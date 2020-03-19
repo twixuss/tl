@@ -45,8 +45,8 @@ constexpr void minmax(T a, U b, V& mn, W& mx) {
 		mx = a;
 	}
 }
-template <class T>
-constexpr auto map(T v, T sn, T sx, T dn, T dx) {
+template <class T, class SN, class SX, class DN, class DX>
+constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) {
 	return (v - sn) / (sx - sn) * (dx - dn) + dn;
 }
 template <class T, class U, class V>
@@ -1427,11 +1427,18 @@ v3 cross(v3 a, v3 b) {
 	// clang-format on
 }
 
+v2 abs(v2 v) { return {fabsf(v.x),fabsf(v.y)};  }
+v3 abs(v3 v) { return {fabsf(v.x),fabsf(v.y),fabsf(v.z)};  }
+v4 abs(v4 v) { return {fabsf(v.x),fabsf(v.y),fabsf(v.z),fabsf(v.w)};  }
 v2i abs(v2i a) { return {labs(a.x), labs(a.y)}; }
 v3i abs(v3i a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
 v4i abs(v4i a) { return V4i(_mm_abs_epi32(a.m)); }
 
 f32 sign(f32 v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
+
+f32 sum(v2 v) {
+	return v.x + v.y;
+}
 
 template <class T>
 auto lengthSqr(T a) {
@@ -1460,7 +1467,10 @@ template <class T>
 auto distance(T a, T b) {
 	return sqrt(distanceSqr(a, b));
 }
-
+template<class T>
+auto manhattan(T a, T b) {
+	return sum(abs(a - b));
+}
 int maxDistance(v3i a, v3i b) {
 	a = abs(a - b);
 	return max(max(a.x, a.y), a.z);
