@@ -1227,8 +1227,10 @@ constexpr f32 aspectRatio(v2u v) { return aspectRatio(V2(v)); }
 
 u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
 u32 countBits(i32 v) { return countBits((u32)v); }
+#if !ARCH_X86
 u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
 u32 countBits(i64 v) { return countBits((u64)v); }
+#endif
 u32 fillBits(u32 v) {
 	u32 r = 0;
 	while (v--) {
@@ -2194,6 +2196,7 @@ inline f32 voronoi(v4i v, u32 cellSize) {
 #endif
 	return sqrt(minDist) * (1 / SQRT3);
 }
+/*
 struct Hit {
 	v3 p, n;
 };
@@ -2261,6 +2264,7 @@ inline bool raycastBlock(v3 a, v3 b, v3 blk, Hit& hit, v3 blockDimensions) {
 	hit = hits[min];
 	return true;
 }
+*/
 template <class T, size_t size>
 constexpr T linearSample(const T (&arr)[size], float t) noexcept {
 	f32 f = frac(t) * size;

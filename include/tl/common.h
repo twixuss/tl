@@ -34,11 +34,23 @@
 #pragma warning(pop)
 #endif
 
+#define ARCH_X86 0
+#define ARCH_X64 0
+
 #if COMPILER_MSVC
 #define DEBUG_BREAK()		 ::__debugbreak()
 #define WRITE_BARRIER()		 ::_WriteBarrier()
 #define READ_BARRIER()		 ::_ReadBarrier()
 #define READ_WRITE_BARRIER() ::_ReadWriteBarrier()
+#if defined _M_IX86
+#undef ARCH_X86 
+#define ARCH_X86 1
+#elif defined _M_X64
+#undef ARCH_X64
+#define ARCH_X64 1
+#else
+#error "Unresolved target architecture"
+#endif
 #elif COMPILER_GCC
 #define DEBUG_BREAK() ::__builtin_trap()
 #endif
