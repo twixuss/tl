@@ -36,6 +36,9 @@
 
 #define ARCH_X86 0
 #define ARCH_X64 0
+#define ARCH_AVX 0
+#define ARCH_AVX2 0
+#define ARCH_AVX512 0
 
 #if COMPILER_MSVC
 #define DEBUG_BREAK()		 ::__debugbreak()
@@ -48,11 +51,25 @@
 #elif defined _M_X64
 #undef ARCH_X64
 #define ARCH_X64 1
-#else
-#error "Unresolved target architecture"
+#endif
+#ifdef __AVX__ 
+#undef ARCH_AVX
+#define ARCH_AVX 1
+#endif
+#ifdef __AVX2__ 
+#undef ARCH_AVX2
+#define ARCH_AVX2 1
+#endif
+#ifdef __AVX512F__ 
+#undef ARCH_AVX512
+#define ARCH_AVX512 1
 #endif
 #elif COMPILER_GCC
 #define DEBUG_BREAK() ::__builtin_trap()
+#endif
+
+#if !(ARCH_X86|ARCH_X64)
+#error "Unresolved target architecture"
 #endif
 
 #define STRINGIZE_(x) #x
@@ -80,20 +97,20 @@
 namespace TL {
 
 typedef wchar_t wchar;
-typedef char i8;
-typedef short i16;
-typedef int i32;
-typedef long long i64;
+typedef char s8;
+typedef short s16;
+typedef int s32;
+typedef long long s64;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 typedef float f32;
 typedef double f64;
-typedef i32 b32;
+typedef s32 b32;
 template <class... Callables>
-struct Visitor : public Callables... {
-	constexpr Visitor(Callables&&... c) : Callables(std::move(c))... {}
+struct Combine : public Callables... {
+	constexpr Combine(Callables&&... c) : Callables(std::move(c))... {}
 	using Callables::operator()...;
 #pragma warning(suppress : 5027) // TODO
 };
@@ -120,6 +137,7 @@ constexpr size_t length(char const* string) {
 }
 
 size_t length(wchar const* string) {
+	alignof(wchar);
 	return wcslen(string);
 }
 
