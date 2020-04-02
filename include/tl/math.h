@@ -22,23 +22,44 @@
 #if COMPILER_MSVC
 #pragma warning(pop)
 #pragma warning(push)
-#pragma warning(disable : 4201 4626)
+#pragma warning(disable : 4201 /* unnamed struct */                              \
+				4626		   /* assignment operator was implicitly deleted  */ \
+				4820		   /* struct padding  */                             \
+				5045 /* spectre */)
 #endif
 
 namespace TL {
 
-#define PI			 3.141592653f
-#define DEG2RAD(deg) ((deg) / 360.0f * PI * 2)
-#define RAD2DEG(rad) ((rad) / PI / 2 * 360.0f)
-#define SQRT2		 1.414213538f
-#define SQRT3		 1.732050776f
-#define SQRT5		 2.23606801f
+FORCEINLINE __m128i _mm_blendv_epi32(__m128i a, __m128i b, __m128i mask) {
+	__m128 r = _mm_blendv_ps(*(__m128*)&a, *(__m128*)&b, *(__m128*)&mask);
+	return *(__m128i*)&r;
+}
+FORCEINLINE __m256 _mm256_cmplt_ps(__m256 a, __m256 b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
+
+// clang-format off
+
+constexpr f32 pi    = f32(3.1415926535897932384626433832795L);
+constexpr f32 invPi = f32(0.31830988618379067153776752674503L);
+constexpr f32 sqrt2 = f32(1.4142135623730950488016887242097L);
+constexpr f32 sqrt3 = f32(1.7320508075688772935274463415059L);
+constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
+
+// clang-format on
+
+template <class T>
+constexpr auto deg2rad(T deg) {
+	return deg * (1.0L / 360.0L * pi * 2);
+}
+template <class T>
+constexpr auto rad2deg(T rad) {
+	return rad * (invPi / 2 * 360.0f);
+}
 
 template <class T, class U>
 constexpr auto min(T a, U b) {
 	return a < b ? a : b;
 }
-template<class T, class U, class... Rest>
+template <class T, class U, class... Rest>
 constexpr auto min(T a, U b, Rest... rest) {
 	return min(min(a, b), rest...);
 }
@@ -46,7 +67,7 @@ template <class T, class U>
 constexpr auto max(T a, U b) {
 	return a > b ? a : b;
 }
-template<class T, class U, class... Rest>
+template <class T, class U, class... Rest>
 constexpr auto max(T a, U b, Rest... rest) {
 	return max(max(a, b), rest...);
 }
@@ -72,13 +93,13 @@ template <class T>
 constexpr auto lerp(T a, T b, f32 t) {
 	return a + (b - a) * t;
 }
+template <class A, class B>
+auto select(bool mask, A a, B b) {
+	return mask ? a : b;
+}
 template <class T>
 constexpr auto moveTowards(T a, T b, f32 t) {
-	if (a < b) {
-		return min(a + t, b);
-	} else {
-		return max(a - t, b);
-	}
+	return select(a < b, min(a + t, b), max(a - t, b));
 }
 template <class T>
 constexpr auto pow2(T v) {
@@ -93,33 +114,65 @@ constexpr auto pow4(T v) {
 	return pow2(v * v);
 }
 
+template <class To, class From>
+To cvt(From v) {
+	return (To)v;
+}
+
+namespace CE {
+
+template <class To, class From>
+constexpr To cvt(From v) {
+	return (To)v;
+}
+
+} // namespace CE
+
 union f32x4;
 union f32x8;
+
 union s32x4;
 union s32x8;
+
 union u32x4;
 union u32x8;
+
 union v2;
-union v3;
-union v4;
 union v2s;
-union v3s;
-union v4s;
 union v2u;
-union v3u;
-union v4u;
-union v4x2;
-union v4sx2;
-union v4ux2;
-union v3x4;
-union v3sx4;
-union v3ux4;
+
+union v2x4;
+union v2sx4;
+union v2ux4;
+
 union v2x8;
 union v2sx8;
 union v2ux8;
+
+union v3;
+union v3s;
+union v3u;
+
+union v3x4;
+union v3sx4;
+union v3ux4;
+
 union v3x8;
 union v3sx8;
 union v3ux8;
+
+union v4;
+union v4s;
+union v4u;
+
+union v4x4;
+union v4sx4;
+union v4ux4;
+
+union v4x8;
+union v4sx8;
+union v4ux8;
+
 union m4;
 
 constexpr f32x4 F32x4(__m128);
@@ -129,6 +182,14 @@ constexpr u32x4 U32x4(__m128i);
 constexpr f32x8 F32x8(__m256);
 constexpr s32x8 S32x8(__m256i);
 constexpr u32x8 U32x8(__m256i);
+
+inline f32x4 F32x4(f32);
+inline s32x4 S32x4(s32);
+inline u32x4 U32x4(u32);
+
+inline f32x8 F32x8(f32);
+inline s32x8 S32x8(s32);
+inline u32x8 U32x8(u32);
 
 inline s32x4 S32x4(s32, s32, s32, s32);
 inline u32x4 U32x4(u32, u32, u32, u32);
@@ -144,9 +205,9 @@ constexpr v3 V3(f32 = 0);
 constexpr v3s V3s(s32 = 0);
 constexpr v3u V3u(u32 = 0);
 
-inline v4 V4(f32 = 0);
-inline v4s V4s(s32 = 0);
-inline v4u V4u(u32 = 0);
+constexpr v4 V4(f32 = 0);
+constexpr v4s V4s(s32 = 0);
+constexpr v4u V4u(u32 = 0);
 
 constexpr v2 V2(f32 x, f32 y);
 constexpr v2s V2s(s32 x, s32 y);
@@ -156,26 +217,21 @@ constexpr v3 V3(f32 x, f32 y, f32 z);
 constexpr v3s V3s(s32 x, s32 y, s32 z);
 constexpr v3u V3u(u32 x, u32 y, u32 z);
 
-inline v4 V4(f32 x, f32 y, f32 z, f32 w);
-inline v4s V4s(s32 x, s32 y, s32 z, s32 w);
-inline v4u V4u(u32 x, u32 y, u32 z, u32 w);
-
 constexpr v4 V4(f32x4);
 constexpr v4s V4s(s32x4);
 constexpr v4u V4u(u32x4);
 
-constexpr v4x2 V4x2(f32x8);
-constexpr v4sx2 V4sx2(s32x8);
-constexpr v4ux2 V4ux2(u32x8);
+inline v2x4 V2x4(f32);
+inline v2sx4 V2sx4(s32);
+inline v2ux4 V2ux4(u32);
 
-constexpr v4x2 V4x2(f32 v);
-constexpr v4x2 V4x2(v4 a, v4 b);
+constexpr v2x4 V2x4(f32x4);
+constexpr v2sx4 V2sx4(s32x4);
+constexpr v2ux4 V2ux4(u32x4);
 
-constexpr v4sx2 V4sx2(s32 v);
-constexpr v4sx2 V4sx2(v4s a, v4s b);
-
-constexpr v4ux2 V4ux2(u32 v);
-constexpr v4ux2 V4ux2(v4u a, v4u b);
+constexpr v3x4 V3x4(f32x4);
+constexpr v3sx4 V3sx4(s32x4);
+constexpr v3ux4 V3ux4(u32x4);
 
 constexpr v3x4 V3x4(__m128 x, __m128 y, __m128 z);
 constexpr v3x4 V3x4(v4 x, v4 y, v4 z);
@@ -189,13 +245,37 @@ constexpr v3ux4 V3ux4(__m128i x, __m128i y, __m128i z);
 constexpr v3ux4 V3ux4(v4u x, v4u y, v4u z);
 inline v3ux4 V3ux4(u32 v);
 
+inline v2x8 V2x8(f32 v);
+inline v2sx8 V2sx8(s32 v);
+inline v2ux8 V2ux8(u32 v);
+
+constexpr v2x8 V2x8(f32x8 v);
+constexpr v2sx8 V2sx8(s32x8 v);
+constexpr v2ux8 V2ux8(u32x8 v);
+
 inline v3x8 V3x8(f32 v);
 inline v3sx8 V3sx8(s32 v);
 inline v3ux8 V3ux8(u32 v);
 
-inline v2x8 V2x8(f32 v);
-inline v2sx8 V2sx8(s32 v);
-inline v2ux8 V2ux8(u32 v);
+constexpr v3x8 V3x8(f32x8 v);
+constexpr v3sx8 V3sx8(s32x8 v);
+constexpr v3ux8 V3ux8(u32x8 v);
+
+v4x4 V4x4(f32);
+v4sx4 V4sx4(s32);
+v4ux4 V4ux4(u32);
+
+constexpr v4x4 V4x4(f32x4);
+constexpr v4sx4 V4sx4(s32x4);
+constexpr v4ux4 V4ux4(u32x4);
+
+v4x8 V4x8(f32);
+v4sx8 V4sx8(s32);
+v4ux8 V4ux8(u32);
+
+constexpr v4x8 V4x8(f32x8);
+constexpr v4sx8 V4sx8(s32x8);
+constexpr v4ux8 V4ux8(u32x8);
 
 constexpr m4 M4();
 constexpr m4 M4(v4 i, v4 j, v4 k, v4 l);
@@ -213,47 +293,42 @@ inline void sincos(v2 v, v2& sinOut, v2& cosOut);
 inline void sincos(v3 v, v3& sinOut, v3& cosOut);
 inline void sincos(v4 v, v4& sinOut, v4& cosOut);
 
-#define MEMBERS2(scl) \
-	struct {          \
-		scl x, y;     \
-	};                \
-	scl v[2]
+#define MEMBERS2(width, scl, v1) \
+	struct {                     \
+		v1 x, y;                 \
+	};                           \
+	scl v[(width)*2]
 
-#define MEMBERS3(scl, v2) \
-	struct {              \
-		scl x, y, z;      \
-	};                    \
-	v2 xy;                \
-	struct {              \
-		scl _pad0;        \
-		v2 yz;            \
-	};                    \
-	scl v[3]
+#define MEMBERS3(width, scl, v1, v2) \
+	struct {                         \
+		v1 x, y, z;                  \
+	};                               \
+	v2 xy;                           \
+	struct {                         \
+		v1 _pad0;                    \
+		v2 yz;                       \
+	};                               \
+	scl v[(width)*3]
 
-#define MEMBERS4(scl, v2, v3) \
-	struct {                  \
-		scl x, y, z, w;       \
-	};                        \
-	v3 xyz;                   \
-	struct {                  \
-		scl _pad0;            \
-		union {               \
-			v2 yz;            \
-			v3 yzw;           \
-		};                    \
-	};                        \
-	struct {                  \
-		v2 xy;                \
-		v2 zw;                \
-	};                        \
-	scl v[4]
+#define MEMBERS4(width, scl, v1, v2, v3) \
+	struct {                             \
+		v1 x, y, z, w;                   \
+	};                                   \
+	v3 xyz;                              \
+	struct {                             \
+		v1 _pad0;                        \
+		union {                          \
+			v2 yz;                       \
+			v3 yzw;                      \
+		};                               \
+	};                                   \
+	struct {                             \
+		v2 xy;                           \
+		v2 zw;                           \
+	};                                   \
+	scl v[(width)*4]
 
-#define MEMFUNS_BASIC(vec, scl, con)                          \
-	vec& operator+=(vec b) { return *this = *this + b; }      \
-	vec& operator-=(vec b) { return *this = *this - b; }      \
-	vec& operator*=(vec b) { return *this = *this * b; }      \
-	vec& operator/=(vec b) { return *this = *this / b; }      \
-	bool operator!=(vec b) const { return !(*this == b); }    \
+#define MEMFUNS_BASIC_SCL(vec, scl, con)                      \
 	friend vec operator+(scl a, vec b) { return con(a) + b; } \
 	friend vec operator-(scl a, vec b) { return con(a) - b; } \
 	friend vec operator*(scl a, vec b) { return con(a) * b; } \
@@ -267,11 +342,19 @@ inline void sincos(v4 v, v4& sinOut, v4& cosOut);
 	vec& operator*=(scl b) { return *this *= con(b); }        \
 	vec& operator/=(scl b) { return *this /= con(b); }
 
-#define MEMFUNS_DATA(scl)     \
-	scl* data() { return v; } \
-	scl const* data() const { return v; } \
-	scl& operator[](size_t i) { return v[i]; } \
-	scl operator[](size_t i) const { return v[i]; }
+#define MEMFUNS_BASIC(vec, scl, con)                       \
+	vec& operator+=(vec b) { return *this = *this + b; }   \
+	vec& operator-=(vec b) { return *this = *this - b; }   \
+	vec& operator*=(vec b) { return *this = *this * b; }   \
+	vec& operator/=(vec b) { return *this = *this / b; }   \
+	bool operator!=(vec b) const { return !(*this == b); } \
+	MEMFUNS_BASIC_SCL(vec, scl, con)
+
+#define MEMFUNS_DATA(scl)                                  \
+	constexpr scl* data() { return v; }                    \
+	constexpr scl const* data() const { return v; }        \
+	constexpr scl& operator[](size_t _i) { return v[_i]; } \
+	constexpr scl operator[](size_t _i) const { return v[_i]; }
 
 #define MEMFUNS_INT(vec, scl, con)                              \
 	vec& operator%=(vec b) { return *this = *this % b; }        \
@@ -301,6 +384,22 @@ inline void sincos(v4 v, v4& sinOut, v4& cosOut);
 	vec operator<<(scl b) const { return *this << con(b); } \
 	vec operator>>(scl b) const { return *this >> con(b); }
 
+#define MEMFUNS_SHIFT_SCL_M(vec, scl, con)              \
+	vec operator<<(scl b) const { return con(m << b); } \
+	vec operator>>(scl b) const { return con(m >> b); }
+
+#define MEMFUNS_SHIFT_SCL_2(vec, scl)                        \
+	vec operator<<(scl b) const { return {x << b, y << b}; } \
+	vec operator>>(scl b) const { return {x >> b, y >> b}; }
+
+#define MEMFUNS_SHIFT_SCL_3(vec, scl)                                \
+	vec operator<<(scl b) const { return {x << b, y << b, z << b}; } \
+	vec operator>>(scl b) const { return {x >> b, y >> b, z >> b}; }
+
+#define MEMFUNS_SHIFT_SCL_4(vec, scl)                                        \
+	vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
+	vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+
 union f32x4 {
 	f32 v[4];
 	struct {
@@ -313,7 +412,12 @@ union f32x4 {
 	f32x4 operator*(f32x4 b) const { return F32x4(_mm_mul_ps(m, b.m)); }
 	f32x4 operator/(f32x4 b) const { return F32x4(_mm_div_ps(m, b.m)); }
 	bool operator==(f32x4 b) const { return i == b.i && j == b.j && k == b.k && l == b.l; }
+	f32x4 operator<(f32x4 b) const { return F32x4(_mm_cmp_ps(m, b.m, _CMP_LT_OQ)); }
+	f32x4 operator>(f32x4 b) const { return F32x4(_mm_cmp_ps(m, b.m, _CMP_GT_OQ)); }
+	f32x4 operator<=(f32x4 b) const { return F32x4(_mm_cmp_ps(m, b.m, _CMP_LE_OQ)); }
+	f32x4 operator>=(f32x4 b) const { return F32x4(_mm_cmp_ps(m, b.m, _CMP_GE_OQ)); }
 	MEMFUNS_DATA(f32);
+	MEMFUNS_BASIC(f32x4, f32, F32x4)
 };
 
 constexpr f32x4 F32x4(__m128 m) {
@@ -336,7 +440,12 @@ union f32x8 {
 		return v[0] == b.v[0] && v[1] == b.v[1] && v[2] == b.v[2] && v[3] == b.v[3] && v[4] == b.v[4] &&
 			   v[5] == b.v[5] && v[6] == b.v[6] && v[7] == b.v[7];
 	}
+	f32x8 operator<(f32x8 b) const { return F32x8(_mm256_cmp_ps(m, b.m, _CMP_LT_OQ)); }
+	f32x8 operator>(f32x8 b) const { return F32x8(_mm256_cmp_ps(m, b.m, _CMP_GT_OQ)); }
+	f32x8 operator<=(f32x8 b) const { return F32x8(_mm256_cmp_ps(m, b.m, _CMP_LE_OQ)); }
+	f32x8 operator>=(f32x8 b) const { return F32x8(_mm256_cmp_ps(m, b.m, _CMP_GE_OQ)); }
 	MEMFUNS_DATA(f32);
+	MEMFUNS_BASIC(f32x8, f32, F32x8)
 };
 constexpr f32x8 F32x8(__m256 m) {
 	f32x8 r{};
@@ -355,7 +464,8 @@ union s32x4 {
 		s32 i, j, k, l;
 	};
 	__m128i m;
-	s32x4 operator-() const { return S32x4(_mm_sub_epi32(_mm_set1_epi32(0), m)); }
+	s32x4 operator-() const { return S32x4(_mm_sub_epi32(_mm_setzero_si128(), m)); }
+	s32x4 operator~() const { return *this ^ (~0); }
 	s32x4 operator+(s32x4 b) const { return S32x4(_mm_add_epi32(m, b.m)); }
 	s32x4 operator-(s32x4 b) const { return S32x4(_mm_sub_epi32(m, b.m)); }
 	s32x4 operator*(s32x4 b) const { return S32x4(_mm_mullo_epi32(m, b.m)); }
@@ -374,6 +484,9 @@ union s32x4 {
 	s32x4 operator<<(s32 b) const { return S32x4(_mm_slli_epi32(m, b)); }
 	s32x4 operator>>(s32 b) const { return S32x4(_mm_srai_epi32(m, b)); }
 	bool operator==(s32x4 b) const { return i == b.i && j == b.j && k == b.k && l == b.l; }
+	MEMFUNS_BASIC(s32x4, s32, S32x4);
+	MEMFUNS_INT(s32x4, s32, S32x4);
+	MEMFUNS_DATA(s32);
 };
 constexpr s32x4 S32x4(__m128i m) {
 	s32x4 r{};
@@ -387,6 +500,7 @@ union s32x8 {
 	s32 v[8];
 	__m256i m;
 	s32x8 operator-() const { return S32x8(_mm256_sub_epi32(_mm256_setzero_si256(), m)); }
+	s32x8 operator~() const { return *this ^ (~0); }
 	s32x8 operator+(s32x8 b) const { return S32x8(_mm256_add_epi32(m, b.m)); }
 	s32x8 operator-(s32x8 b) const { return S32x8(_mm256_sub_epi32(m, b.m)); }
 	s32x8 operator*(s32x8 b) const { return S32x8(_mm256_mullo_epi32(m, b.m)); }
@@ -409,6 +523,9 @@ union s32x8 {
 		return v[0] == b.v[0] && v[1] == b.v[1] && v[2] == b.v[2] && v[3] == b.v[3] && v[4] == b.v[4] &&
 			   v[5] == b.v[5] && v[6] == b.v[6] && v[7] == b.v[7];
 	}
+	MEMFUNS_BASIC(s32x8, s32, S32x8);
+	MEMFUNS_INT(s32x8, s32, S32x8);
+	MEMFUNS_DATA(s32);
 };
 constexpr s32x8 S32x8(__m256i m) {
 	s32x8 r{};
@@ -421,52 +538,13 @@ inline s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) {
 }
 inline s32x8 S32x8(s32 a, s32 b, s32 c, s32 d) { return S32x8(_mm256_setr_epi32(a, b, c, d, a, b, c, d)); }
 
-union u32x8 {
-	u32 v[8];
-	__m256i m;
-	u32x8 operator+(u32x8 b) const { return U32x8(_mm256_add_epi32(m, b.m)); }
-	u32x8 operator-(u32x8 b) const { return U32x8(_mm256_sub_epi32(m, b.m)); }
-	u32x8 operator*(u32x8 b) const {
-		return U32x8(v[0] * b.v[0], v[1] * b.v[1], v[2] * b.v[2], v[3] * b.v[3], v[4] * b.v[4], v[5] * b.v[5],
-					 v[6] * b.v[6], v[7] * b.v[7]);
-	}
-	u32x8 operator/(u32x8 b) const { return U32x8(_mm256_div_epu32(m, b.m)); }
-	u32x8 operator%(u32x8 b) const { return U32x8(_mm256_rem_epu32(m, b.m)); }
-	u32x8 operator^(u32x8 b) const { return U32x8(_mm256_xor_si256(m, b.m)); }
-	u32x8 operator|(u32x8 b) const { return U32x8(_mm256_or_si256(m, b.m)); }
-	u32x8 operator&(u32x8 b) const { return U32x8(_mm256_and_si256(m, b.m)); }
-	u32x8 operator<<(u32 b) const { return U32x8(_mm256_slli_epi32(m, b)); }
-	u32x8 operator>>(u32 b) const { return U32x8(_mm256_srli_epi32(m, b)); }
-	u32x8 operator<<(u32x8 b) const {
-		return U32x8(v[0] << b.v[0], v[1] << b.v[1], v[2] << b.v[2], v[3] << b.v[3], v[4] << b.v[4], v[5] << b.v[5],
-					 v[6] << b.v[6], v[7] << b.v[7]);
-	}
-	u32x8 operator>>(u32x8 b) const {
-		return U32x8(v[0] >> b.v[0], v[1] >> b.v[1], v[2] >> b.v[2], v[3] >> b.v[3], v[4] >> b.v[4], v[5] >> b.v[5],
-					 v[6] >> b.v[6], v[7] >> b.v[7]);
-	}
-	bool operator==(u32x8 b) const {
-		return v[0] == b.v[0] && v[1] == b.v[1] && v[2] == b.v[2] && v[3] == b.v[3] && v[4] == b.v[4] &&
-			   v[5] == b.v[5] && v[6] == b.v[6] && v[7] == b.v[7];
-	}
-};
-constexpr u32x8 U32x8(__m256i m) {
-	u32x8 r{};
-	r.m = m;
-	return r;
-}
-inline u32x8 U32x8(u32 v) { return U32x8(_mm256_set1_epi32(v)); }
-inline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) {
-	return U32x8(_mm256_setr_epi32(a, b, c, d, e, f, g, h));
-}
-inline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d) { return U32x8(_mm256_setr_epi32(a, b, c, d, a, b, c, d)); }
-
 union u32x4 {
 	u32 v[4];
 	struct {
 		u32 i, j, k, l;
 	};
 	__m128i m;
+	u32x4 operator~() const { return *this ^ (~0u); }
 	u32x4 operator+(u32x4 b) const { return U32x4(_mm_add_epi32(m, b.m)); }
 	u32x4 operator-(u32x4 b) const { return U32x4(_mm_sub_epi32(m, b.m)); }
 	u32x4 operator*(u32x4 b) const { return {i * b.i, j * b.j, k * b.k, l * b.l}; }
@@ -485,14 +563,63 @@ union u32x4 {
 	u32x4 operator<<(u32 b) const { return U32x4(_mm_slli_epi32(m, (s32)b)); }
 	u32x4 operator>>(u32 b) const { return U32x4(_mm_srli_epi32(m, (s32)b)); }
 	bool operator==(u32x4 b) const { return i == b.i && j == b.j && k == b.k && l == b.l; }
+	MEMFUNS_BASIC(u32x4, u32, U32x4);
+	MEMFUNS_INT(u32x4, u32, U32x4);
+	MEMFUNS_DATA(u32);
 };
 constexpr u32x4 U32x4(__m128i m) {
 	u32x4 r{};
 	r.m = m;
 	return r;
 }
-inline u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { return U32x4(_mm_setr_epi32((u32)i, (u32)j, (u32)k, (u32)l)); }
-inline u32x4 U32x4(u32 v) { return U32x4(_mm_set1_epi32(v)); }
+inline u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { return U32x4(_mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l)); }
+inline u32x4 U32x4(u32 v) { return U32x4(_mm_set1_epi32((s32)v)); }
+
+union u32x8 {
+	u32 v[8];
+	__m256i m;
+	u32x8 operator~() const { return *this ^ (~0u); }
+	u32x8 operator+(u32x8 b) const { return U32x8(_mm256_add_epi32(m, b.m)); }
+	u32x8 operator-(u32x8 b) const { return U32x8(_mm256_sub_epi32(m, b.m)); }
+	u32x8 operator*(u32x8 b) const {
+		return U32x8(v[0] * b.v[0], v[1] * b.v[1], v[2] * b.v[2], v[3] * b.v[3], v[4] * b.v[4], v[5] * b.v[5],
+					 v[6] * b.v[6], v[7] * b.v[7]);
+	}
+	u32x8 operator/(u32x8 b) const { return U32x8(_mm256_div_epu32(m, b.m)); }
+	u32x8 operator%(u32x8 b) const { return U32x8(_mm256_rem_epu32(m, b.m)); }
+	u32x8 operator^(u32x8 b) const { return U32x8(_mm256_xor_si256(m, b.m)); }
+	u32x8 operator|(u32x8 b) const { return U32x8(_mm256_or_si256(m, b.m)); }
+	u32x8 operator&(u32x8 b) const { return U32x8(_mm256_and_si256(m, b.m)); }
+	u32x8 operator<<(u32 b) const { return U32x8(_mm256_slli_epi32(m, (s32)b)); }
+	u32x8 operator>>(u32 b) const { return U32x8(_mm256_srli_epi32(m, (s32)b)); }
+	u32x8 operator<<(u32x8 b) const {
+		return U32x8(v[0] << b.v[0], v[1] << b.v[1], v[2] << b.v[2], v[3] << b.v[3], v[4] << b.v[4], v[5] << b.v[5],
+					 v[6] << b.v[6], v[7] << b.v[7]);
+	}
+	u32x8 operator>>(u32x8 b) const {
+		return U32x8(v[0] >> b.v[0], v[1] >> b.v[1], v[2] >> b.v[2], v[3] >> b.v[3], v[4] >> b.v[4], v[5] >> b.v[5],
+					 v[6] >> b.v[6], v[7] >> b.v[7]);
+	}
+	bool operator==(u32x8 b) const {
+		return v[0] == b.v[0] && v[1] == b.v[1] && v[2] == b.v[2] && v[3] == b.v[3] && v[4] == b.v[4] &&
+			   v[5] == b.v[5] && v[6] == b.v[6] && v[7] == b.v[7];
+	}
+	MEMFUNS_BASIC(u32x8, u32, U32x8);
+	MEMFUNS_INT(u32x8, u32, U32x8);
+	MEMFUNS_DATA(u32);
+};
+constexpr u32x8 U32x8(__m256i m) {
+	u32x8 r{};
+	r.m = m;
+	return r;
+}
+inline u32x8 U32x8(u32 v) { return U32x8(_mm256_set1_epi32((s32)v)); }
+inline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) {
+	return U32x8(_mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)e, (s32)f, (s32)g, (s32)h));
+}
+inline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d) {
+	return U32x8(_mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)a, (s32)b, (s32)c, (s32)d));
+}
 
 inline f32x4 F32x4(s32x4 v) { return F32x4(_mm_cvtepi32_ps(v.m)); }
 inline f32x4 F32x4(u32x4 v) { return F32x4((f32)v.i, (f32)v.j, (f32)v.k, (f32)v.l); }
@@ -514,295 +641,313 @@ inline u32x8 U32x8(f32x8 v) {
 }
 inline u32x8 U32x8(s32x8 v) { return U32x8(v.m); }
 
+constexpr f32 _maskF32(bool v) {
+	u32 r = v ? ~0u : 0u;
+	return *(f32*)&r;
+}
+
+#define UOP2(op, ty, con) \
+	ty operator op() const { return {op x, op y}; }
+#define UOP3(op, ty, con) \
+	ty operator op() const { return {op x, op y, op z}; }
+#define UOP4(op, ty, con) \
+	ty operator op() const { return {op x, op y, op z, op w}; }
+#define UOP4M(op, ty, con) \
+	ty operator op() const { return con(op m); }
+
+#define UOP2C(op, ty, con) constexpr UOP2(op, ty, con)
+#define UOP3C(op, ty, con) constexpr UOP3(op, ty, con)
+#define UOP4C(op, ty, con) constexpr UOP4(op, ty, con)
+
+#define UOP2P(op, ty, con) UOP2(op, ty, con)
+#define UOP3P(op, ty, con) UOP3(op, ty, con)
+#define UOP4P(op, ty, con) UOP4(op, ty, con)
+
+#define BOP2(op, ty, con) \
+	ty operator op(ty b) const { return {x op b.x, y op b.y}; }
+#define BOP3(op, ty, con) \
+	ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z}; }
+#define BOP4(op, ty, con) \
+	ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z, w op b.w}; }
+
+#define BOP2P(op, ty, con) BOP2(op, ty, con)
+#define BOP3P(op, ty, con) BOP3(op, ty, con)
+#define BOP4P(op, ty, con) BOP4(op, ty, con)
+
+#define BOP4M(op, ty, con) \
+	ty operator op(ty b) const { return con(m op b.m); }
+
+#define BOP2CMP(op, ty, con) \
+	ty operator op(ty b) const { return {_maskF32(x op b.x), _maskF32(y op b.y)}; }
+#define BOP3CMP(op, ty, con) \
+	ty operator op(ty b) const { return {_maskF32(x op b.x), _maskF32(y op b.y), _maskF32(z op b.z)}; }
+#define BOP4CMP(op, ty, con)                                                                     \
+	ty operator op(ty b) const {                                                                 \
+		return {_maskF32(x op b.x), _maskF32(y op b.y), _maskF32(z op b.z), _maskF32(w op b.w)}; \
+	}
+
+#define BOP2PCMP BOP2P
+#define BOP3PCMP BOP2P
+#define BOP4PCMP BOP2P
+
+#define BOP4MCMP(op, ty, con) \
+	ty operator op(ty b) const { return con(m op b.m); }
+
+#define BOP2C(op, ty, con) constexpr BOP2(op, ty, con)
+#define BOP3C(op, ty, con) constexpr BOP3(op, ty, con)
+#define BOP4C(op, ty, con) constexpr BOP4(op, ty, con)
+
+#define BOP2CCMP(op, ty, con) constexpr BOP2CMP(op, ty, con)
+#define BOP3CCMP(op, ty, con) constexpr BOP3CMP(op, ty, con)
+#define BOP4CCMP(op, ty, con) constexpr BOP4CMP(op, ty, con)
+
+#define BOPSF32_(bop, uop, cmp, ty, con)                                                                            \
+	uop(-, ty, con) bop(+, ty, con) bop(-, ty, con) bop(*, ty, con) bop(/, ty, con) cmp(<, ty, con) cmp(>, ty, con) \
+		cmp(<=, ty, con) cmp(>=, ty, con)
+#define BOPSU32_(bop, uop, ty, con)                                                                                 \
+	bop(+, ty, con) bop(-, ty, con) bop(*, ty, con) bop(/, ty, con) bop(%, ty, con) bop(^, ty, con) bop(|, ty, con) \
+		bop(&, ty, con) bop(<<, ty, con) bop(>>, ty, con) uop(~, ty, con)
+#define BOPSS32_(bop, uop, ty, con) BOPSU32_(bop, uop, ty, con) uop(-, ty, con)
+
+#define BOPSF32(op, ty, con) BOPSF32_(CONCAT(B, op), CONCAT(U, op), CONCAT(CONCAT(B, op), CMP), ty, con)
+#define BOPSS32(op, ty, con) BOPSS32_(CONCAT(B, op), CONCAT(U, op), ty, con)
+#define BOPSU32(op, ty, con) BOPSU32_(CONCAT(B, op), CONCAT(U, op), ty, con)
+
+#define CVT(v2s, v2u)              \
+	explicit operator v2s() const; \
+	explicit operator v2u() const
+
 #define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_DATA(scl)
-#define OP(op) \
-	constexpr v2 operator op(v2 b) const { return {x op b.x, y op b.y}; }
 union v2 {
-	MEMBERS2(f32);
-	OP(+) OP(-) OP(*) OP(/);
+	MEMBERS2(1, f32, f32);
+	BOPSF32(OP2C, v2, V2);
 	MEMFUNS(v2, f32, V2);
-	constexpr v2 operator-() const { return {-x, -y}; }
+	CVT(v2s, v2u);
 	constexpr bool operator==(v2 b) const { return x == b.x && y == b.y; }
 };
-#undef OP
-
-#define OP(op) \
-	constexpr v3 operator op(v3 b) const { return {x op b.x, y op b.y, z op b.z}; }
 union v3 {
-	MEMBERS3(f32, v2);
-	OP(+) OP(-) OP(*) OP(/);
+	MEMBERS3(1, f32, f32, v2);
+	BOPSF32(OP3C, v3, V3);
 	MEMFUNS(v3, f32, V3);
-	v3 operator-() const { return {-x, -y, -z}; }
+	CVT(v3s, v3u);
 	bool operator==(v3 b) const { return x == b.x && y == b.y && z == b.z; }
 };
-#undef OP
-
-#define OP(op) \
-	constexpr v4 operator op(v4 b) const { return V4(m op b.m); }
 union v4 {
-	MEMBERS4(f32, v2, v3);
-	OP(+) OP(-) OP(*) OP(/);
+	MEMBERS4(1, f32, f32, v2, v3);
+	BOPSF32(OP4M, v4, V4);
 	MEMFUNS(v4, f32, V4);
+	CVT(v4s, v4u);
 	f32x4 m;
-	v4 operator-() const { return V4(-m); }
 	bool operator==(v4 b) const { return m == b.m; }
 };
 #undef MEMFUNS
-#undef OP
 
 #define MEMFUNS(vec, scl, con) \
 	MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con) MEMFUNS_SHIFT_SCL(vec, scl, con)
-#define OP(op) \
-	constexpr v2s operator op(v2s b) const { return {x op b.x, y op b.y}; }
 union v2s {
-	MEMBERS2(s32);
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
+	MEMBERS2(1, s32, s32);
+	BOPSS32(OP2C, v2s, V2s);
 	MEMFUNS(v2s, s32, V2s);
-	v2s operator-() const { return {-x, -y}; }
+	CVT(v2, v2u);
 	bool operator==(v2s b) const { return x == b.x && y == b.y; }
-	explicit operator v2() const { return {(f32)x, (f32)y}; }
 };
-#undef OP
-
-#define OP(op) \
-	constexpr v3s operator op(v3s b) const { return {x op b.x, y op b.y, z op b.z}; }
 union v3s {
-	MEMBERS3(s32, v2s);
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
+	MEMBERS3(1, s32, s32, v2s);
+	BOPSS32(OP3C, v3s, V3s);
 	MEMFUNS(v3s, s32, V3s);
-	v3s operator-() const { return {-x, -y, -z}; }
+	CVT(v3, v3u);
 	bool operator==(v3s b) const { return x == b.x && y == b.y && z == b.z; }
 };
-#undef OP
+#undef MEMFUNS
 
-#define OP(op) \
-	constexpr v2u operator op(v2u b) const { return {x op b.x, y op b.y}; }
-union v2u {
-	MEMBERS2(u32);
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	MEMFUNS(v2u, u32, V2u);
-	bool operator==(v2u b) const { return x == b.x && y == b.y; }
-	explicit operator v2() const { return {(f32)x, (f32)y}; }
-	explicit operator v2s() const { return {(s32)x, (s32)y}; }
+#define MEMFUNS(vec, scl, con) \
+	MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con) MEMFUNS_SHIFT_SCL_M(vec, scl, con)
+union v4s {
+	MEMBERS4(1, s32, s32, v2s, v3s);
+	BOPSS32(OP4M, v4s, V4s);
+	MEMFUNS(v4s, s32, V4s);
+	CVT(v4, v4u);
+	s32x4 m;
+	bool operator==(v4s b) const { return m == b.m; }
 };
-#undef OP
+#undef MEMFUNS
 
-#define OP(op) \
-	constexpr v3u operator op(v3u b) const { return {x op b.x, y op b.y, z op b.z}; }
+#define MEMFUNS(vec, scl, con) \
+	MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con) MEMFUNS_SHIFT_SCL(vec, scl, con)
+union v2u {
+	MEMBERS2(1, u32, u32);
+	BOPSU32(OP2C, v2u, V2u);
+	MEMFUNS(v2u, u32, V2u);
+	CVT(v2, v2s);
+	bool operator==(v2u b) const { return x == b.x && y == b.y; }
+};
 union v3u {
-	MEMBERS3(u32, v2u);
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
+	MEMBERS3(1, u32, u32, v2u);
+	BOPSU32(OP3C, v3u, V3u);
 	MEMFUNS(v3u, u32, V3u);
+	CVT(v3, v3s);
 	bool operator==(v3u b) const { return x == b.x && y == b.y && z == b.z; }
 };
-#undef OP
+#undef MEMFUNS
+
+#define MEMFUNS(vec, scl, con) \
+	MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con) MEMFUNS_SHIFT_SCL_M(vec, scl, con)
+union v4u {
+	MEMBERS4(1, u32, u32, v2u, v3u);
+	BOPSU32(OP4M, v4u, V4u);
+	MEMFUNS(v4u, u32, V4u);
+	CVT(v4, v4s);
+	u32x4 m;
+	bool operator==(v4u b) const { return m == b.m; }
+};
+#undef MEMFUNS
+
+#define MEMFUNS(vec, scl, con, f32x4) MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_BASIC_SCL(vec, f32x4, con)
+union v2x4 {
+	MEMBERS2(4, f32, f32x4);
+	BOPSF32(OP2P, v2x4, V2x4);
+	MEMFUNS(v2x4, f32, V2x4, f32x4);
+	bool operator==(v2x4 b) const { return x == b.x && y == b.y; }
+};
+union v3x4 {
+	MEMBERS3(4, f32, f32x4, v2x4);
+	BOPSF32(OP3P, v3x4, V3x4);
+	MEMFUNS(v3x4, f32, V3x4, f32x4);
+	bool operator==(v3x4 b) const { return x == b.x && y == b.y && z == b.z; }
+};
+union v4x4 {
+	MEMBERS4(4, f32, f32x4, v2x4, v3x4);
+	BOPSF32(OP4P, v4x4, V4x4);
+	MEMFUNS(v4x4, f32, V4x4, f32x4);
+	bool operator==(v4x4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
+};
 #undef MEMFUNS
 
 #define MEMFUNS(vec, scl, con) MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
-#define OP(op) \
-	v4s operator op(v4s b) const { return V4s(m op b.m); }
-union v4s {
-	MEMBERS4(s32, v2s, v3s);
-	OP(+) OP(-) OP(*) OP(^) OP(|) OP(&) OP(<<) OP(>>) OP(/) OP(%);
-	MEMFUNS(v4s, s32, V4s);
-	s32x4 m;
-	v4s operator-() const { return V4s(-m); }
-	v4s operator<<(s32 b) const { return V4s(m << b); }
-	v4s operator>>(s32 b) const { return V4s(m >> b); }
-	bool operator==(v4s b) const { return m == b.m; }
+union v2sx4 {
+	MEMBERS2(4, s32, s32x4);
+	BOPSS32(OP2P, v2sx4, V2sx4);
+	MEMFUNS(v2sx4, s32, V2sx4);
+	MEMFUNS_SHIFT_SCL_2(v2sx4, s32)
+	bool operator==(v2sx4 b) const { return x == b.x && y == b.y; }
 };
-#undef OP
-
-#define OP(op) \
-	v4u operator op(v4u b) const { return V4u(m op b.m); }
-union v4u {
-	MEMBERS4(u32, v2u, v3u);
-	OP(+) OP(-) OP(*) OP(^) OP(|) OP(&) OP(<<) OP(>>) OP(/) OP(%);
-	MEMFUNS(v4u, u32, V4u);
-	u32x4 m;
-	v4u operator<<(u32 b) const { return V4u(m << b); }
-	v4u operator>>(u32 b) const { return V4u(m >> b); }
-	bool operator==(v4u b) const { return m == b.m; }
-}; // namespace TL
-#undef OP
-#undef MEMFUNS
-
-#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con)
-#define OP(op) \
-	v4x2 operator op(v4x2 b) const { return V4x2(m op b.m); }
-union v4x2 {
-	struct {
-		v4 i, j;
-	};
-	f32x8 m;
-	v4x2 operator-() const { return V4x2(-m); }
-	OP(+) OP(-) OP(*) OP(/);
-	bool operator==(v4x2 b) const { return i == b.i && j == b.j; }
-	MEMFUNS(v4x2, f32, V4x2);
-};
-#undef OP
-#undef MEMFUNS
-
-#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
-#define OP(op) \
-	v4sx2 operator op(v4sx2 b) const { return V4sx2(m op b.m); }
-union v4sx2 {
-	struct {
-		v4s i, j;
-	};
-	s32x8 m;
-	v4sx2 operator-() const { return V4sx2(-m); }
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	v4sx2 operator<<(s32 b) const { return V4sx2(m << b); }
-	v4sx2 operator>>(s32 b) const { return V4sx2(m << b); }
-	bool operator==(v4sx2 b) const { return m == b.m; }
-	MEMFUNS(v4sx2, s32, V4sx2);
-};
-#undef OP
-#undef MEMFUNS
-
-#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
-#define OP(op) \
-	v4ux2 operator op(v4ux2 b) const { return V4ux2(m op b.m); }
-union v4ux2 {
-	struct {
-		v4u i, j;
-	};
-	u32x8 m;
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	v4ux2 operator<<(u32 b) const { return V4ux2(m << b); }
-	v4ux2 operator>>(u32 b) const { return V4ux2(m << b); }
-	bool operator==(v4ux2 b) const { return m == b.m; }
-	MEMFUNS(v4ux2, u32, V4ux2);
-};
-#undef OP
-#undef MEMFUNS
-
-#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con)
-union v3x4 {
-	struct {
-		f32x4 x, y, z;
-	};
-	v3x4 operator-() const { return {-x, -y, -z}; }
-	v3x4 operator+(v3x4 b) const { return {x + b.x, y + b.y, z + b.z}; }
-	v3x4 operator-(v3x4 b) const { return {x - b.x, y - b.y, z - b.z}; }
-	v3x4 operator*(v3x4 b) const { return {x * b.x, y * b.y, z * b.z}; }
-	v3x4 operator/(v3x4 b) const { return {x / b.x, y / b.y, z / b.z}; }
-	bool operator==(v3x4 b) const { return x == b.x && y == b.y && z == b.z; }
-	MEMFUNS(v3x4, f32, V3x4);
-};
-
-union v3x8 {
-	struct {
-		f32x8 x, y, z;
-	};
-	v3x8 operator-() const { return {-x, -y, -z}; }
-	v3x8 operator+(v3x8 b) const { return {x + b.x, y + b.y, z + b.z}; }
-	v3x8 operator-(v3x8 b) const { return {x - b.x, y - b.y, z - b.z}; }
-	v3x8 operator*(v3x8 b) const { return {x * b.x, y * b.y, z * b.z}; }
-	v3x8 operator/(v3x8 b) const { return {x / b.x, y / b.y, z / b.z}; }
-	bool operator==(v3x8 b) const { return x == b.x && y == b.y && z == b.z; }
-	MEMFUNS(v3x8, f32, V3x8);
-};
-
-union v2x8 {
-	struct {
-		f32x8 x, y;
-	};
-	v2x8 operator+(v2x8 b) const { return {x + b.x, y + b.y}; }
-	v2x8 operator-(v2x8 b) const { return {x - b.x, y - b.y}; }
-	v2x8 operator*(v2x8 b) const { return {x * b.x, y * b.y}; }
-	v2x8 operator/(v2x8 b) const { return {x / b.x, y / b.y}; }
-	bool operator==(v2x8 b) const { return x == b.x && y == b.y; }
-	MEMFUNS(v2x8, f32, V2x8);
-};
-#undef MEMFUNS
-
-#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con) MEMFUNS_SHIFT_SCL(vec, scl, con)
-#define OP(op) \
-	v3sx4 operator op(v3sx4 b) const { return {x op b.x, y op b.y, z op b.z}; }
 union v3sx4 {
-	struct {
-		s32x4 x, y, z;
-	};
-	v3sx4 operator-() const { return {-x, -y, -z}; }
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	bool operator==(v3sx4 b) const { return x == b.x && y == b.y && z == b.z; }
+	MEMBERS3(4, s32, s32x4, v2sx4);
+	BOPSS32(OP3P, v3sx4, V3sx4);
 	MEMFUNS(v3sx4, s32, V3sx4);
+	MEMFUNS_SHIFT_SCL_3(v3sx4, s32)
+	bool operator==(v3sx4 b) const { return x == b.x && y == b.y && z == b.z; }
 };
-#undef OP
-
-#define OP(op) \
-	v3sx8 operator op(v3sx8 b) const { return {x op b.x, y op b.y, z op b.z}; }
-union v3sx8 {
-	struct {
-		s32x8 x, y, z;
-	};
-	v3sx8 operator-() const { return {-x, -y, -z}; }
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	bool operator==(v3sx8 b) const { return x == b.x && y == b.y && z == b.z; }
-	MEMFUNS(v3sx8, s32, V3sx8);
+union v4sx4 {
+	MEMBERS4(4, s32, s32x4, v2sx4, v3sx4);
+	BOPSS32(OP4P, v4sx4, V4sx4);
+	MEMFUNS(v4sx4, s32, V4sx4);
+	MEMFUNS_SHIFT_SCL_4(v4sx4, s32)
+	bool operator==(v4sx4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
 };
-#undef OP
+#undef MEMFUNS
 
-#define OP(op) \
-	v3ux4 operator op(v3ux4 b) const { return {x op b.x, y op b.y, z op b.z}; }
+#define MEMFUNS(vec, scl, con) MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
+union v2ux4 {
+	MEMBERS2(4, u32, u32x4);
+	BOPSU32(OP2P, v2ux4, V2ux4);
+	MEMFUNS(v2ux4, u32, V2ux4);
+	MEMFUNS_SHIFT_SCL_2(v2ux4, u32)
+	bool operator==(v2ux4 b) const { return x == b.x && y == b.y; }
+};
 union v3ux4 {
-	struct {
-		u32x4 x, y, z;
-	};
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	bool operator==(v3ux4 b) const { return x == b.x && y == b.y && z == b.z; }
+	MEMBERS3(4, u32, u32x4, v2ux4);
+	BOPSU32(OP3P, v3ux4, V3ux4);
 	MEMFUNS(v3ux4, u32, V3ux4);
+	MEMFUNS_SHIFT_SCL_3(v3ux4, u32)
+	bool operator==(v3ux4 b) const { return x == b.x && y == b.y && z == b.z; }
 };
-#undef OP
-
-#define OP(op) \
-	v3ux8 operator op(v3ux8 b) const { return {x op b.x, y op b.y, z op b.z}; }
-union v3ux8 {
-	struct {
-		u32x8 x, y, z;
-	};
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&) OP(<<) OP(>>);
-	bool operator==(v3ux8 b) const { return x == b.x && y == b.y && z == b.z; }
-	MEMFUNS(v3ux8, u32, V3ux8);
+union v4ux4 {
+	MEMBERS4(4, u32, u32x4, v2ux4, v3ux4);
+	BOPSU32(OP4P, v4ux4, V4ux4);
+	MEMFUNS(v4ux4, u32, V4ux4);
+	MEMFUNS_SHIFT_SCL_4(v4ux4, u32)
+	bool operator==(v4ux4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
 };
-#undef OP
+#undef MEMFUNS
 
+#define MEMFUNS(vec, scl, con) MEMFUNS_BASIC(vec, scl, con)
+union v2x8 {
+	MEMBERS2(8, f32, f32x8);
+	BOPSF32(OP2P, v2x8, V2x8);
+	MEMFUNS(v2x8, f32, V2x8);
+	MEMFUNS_BASIC_SCL(v2x8, f32x8, V2x8)
+	bool operator==(v2x8 b) const { return x == b.x && y == b.y; }
+};
+union v3x8 {
+	MEMBERS3(8, f32, f32x8, v2x8);
+	BOPSF32(OP3P, v3x8, V3x8);
+	MEMFUNS(v3x8, f32, V3x8);
+	MEMFUNS_BASIC_SCL(v3x8, f32x8, V3x8)
+	bool operator==(v3x8 b) const { return x == b.x && y == b.y && z == b.z; }
+};
+union v4x8 {
+	MEMBERS4(8, f32, f32x8, v2x8, v3x8);
+	BOPSF32(OP4P, v4x8, V4x8);
+	MEMFUNS(v4x8, f32, V4x8);
+	MEMFUNS_BASIC_SCL(v4x8, f32x8, V4x8)
+	bool operator==(v4x8 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
+};
+#undef MEMFUNS
+
+#define MEMFUNS(vec, scl, con) MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
 union v2sx8 {
-	struct {
-		s32x8 x, y;
-	};
-	v2sx8 operator+(v2sx8 b) const { return {x + b.x, y + b.y}; }
-	v2sx8 operator-(v2sx8 b) const { return {x - b.x, y - b.y}; }
-	v2sx8 operator*(v2sx8 b) const { return {x * b.x, y * b.y}; }
-	v2sx8 operator/(v2sx8 b) const { return {x / b.x, y / b.y}; }
-	v2sx8 operator%(v2sx8 b) const { return {x % b.x, y % b.y}; }
-	v2sx8 operator^(v2sx8 b) const { return {x ^ b.x, y ^ b.y}; }
-	v2sx8 operator|(v2sx8 b) const { return {x | b.x, y | b.y}; }
-	v2sx8 operator&(v2sx8 b) const { return {x & b.x, y & b.y}; }
-	v2sx8 operator<<(v2sx8 b) const { return {x << b.x, y << b.y}; }
-	v2sx8 operator>>(v2sx8 b) const { return {x >> b.x, y >> b.y}; }
-	bool operator==(v2sx8 b) const { return x == b.x && y == b.y; }
+	MEMBERS2(8, s32, s32x8);
+	BOPSS32(OP2P, v2sx8, V2sx8);
 	MEMFUNS(v2sx8, s32, V2sx8);
+	v2sx8 operator<<(s32 b) const { return {x << b, y << b}; }
+	v2sx8 operator>>(s32 b) const { return {x >> b, y >> b}; }
+	bool operator==(v2sx8 b) const { return x == b.x && y == b.y; }
 };
+union v3sx8 {
+	MEMBERS3(8, s32, s32x8, v2sx8);
+	BOPSS32(OP3P, v3sx8, V3sx8);
+	MEMFUNS(v3sx8, s32, V3sx8);
+	v3sx8 operator<<(s32 b) const { return {x << b, y << b, z << b}; }
+	v3sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b}; }
+	bool operator==(v3sx8 b) const { return x == b.x && y == b.y && z == b.z; }
+};
+union v4sx8 {
+	MEMBERS4(8, s32, s32x8, v2sx8, v3sx8);
+	BOPSS32(OP4P, v4sx8, V4sx8);
+	MEMFUNS(v4sx8, s32, V4sx8);
+	v4sx8 operator<<(s32 b) const { return {x << b, y << b, z << b, w << b}; }
+	v4sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+	bool operator==(v4sx8 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
+};
+#undef MEMFUNS
+
+#define MEMFUNS(vec, scl, con) MEMFUNS_DATA(scl) MEMFUNS_BASIC(vec, scl, con) MEMFUNS_INT(vec, scl, con)
 union v2ux8 {
-	struct {
-		u32x8 x, y;
-	};
-	v2ux8 operator+(v2ux8 b) const { return {x + b.x, y + b.y}; }
-	v2ux8 operator-(v2ux8 b) const { return {x - b.x, y - b.y}; }
-	v2ux8 operator*(v2ux8 b) const { return {x * b.x, y * b.y}; }
-	v2ux8 operator/(v2ux8 b) const { return {x / b.x, y / b.y}; }
-	v2ux8 operator%(v2ux8 b) const { return {x % b.x, y % b.y}; }
-	v2ux8 operator^(v2ux8 b) const { return {x ^ b.x, y ^ b.y}; }
-	v2ux8 operator|(v2ux8 b) const { return {x | b.x, y | b.y}; }
-	v2ux8 operator&(v2ux8 b) const { return {x & b.x, y & b.y}; }
-	v2ux8 operator<<(v2ux8 b) const { return {x << b.x, y << b.y}; }
-	v2ux8 operator>>(v2ux8 b) const { return {x >> b.x, y >> b.y}; }
-	bool operator==(v2ux8 b) const { return x == b.x && y == b.y; }
+	MEMBERS2(8, u32, u32x8);
+	BOPSU32(OP2P, v2ux8, V2ux8);
 	MEMFUNS(v2ux8, u32, V2ux8);
+	v2ux8 operator<<(u32 b) const { return {x << b, y << b}; }
+	v2ux8 operator>>(u32 b) const { return {x >> b, y >> b}; }
+	bool operator==(v2ux8 b) const { return x == b.x && y == b.y; }
 };
+union v3ux8 {
+	MEMBERS3(8, u32, u32x8, v2ux8);
+	BOPSU32(OP3P, v3ux8, V3ux8);
+	MEMFUNS(v3ux8, u32, V3ux8);
+	v3ux8 operator<<(u32 b) const { return {x << b, y << b, z << b}; }
+	v3ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b}; }
+	bool operator==(v3ux8 b) const { return x == b.x && y == b.y && z == b.z; }
+};
+union v4ux8 {
+	MEMBERS4(8, u32, u32x8, v2ux8, v3ux8);
+	BOPSU32(OP4P, v4ux8, V4ux8);
+	MEMFUNS(v4ux8, u32, V4ux8);
+	v4ux8 operator<<(u32 b) const { return {x << b, y << b, z << b, w << b}; }
+	v4ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+	bool operator==(v4ux8 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
+};
+#undef MEMFUNS
 
 union m3;
 m3 transpose(m3 const&);
@@ -881,7 +1026,7 @@ m3 transpose(m3 const& m) {
 	};
 }
 
-union alignas(64) m4 {
+union m4 {
 	struct {
 		v4 i, j, k, l;
 	};
@@ -915,6 +1060,7 @@ union alignas(64) m4 {
 		};
 		// clang-format on
 	}
+	static m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 	static m4 scaling(v3 v) { return scaling(v.x, v.y, v.z); }
 	static m4 scaling(v2 xy, f32 z) { return scaling(xy.x, xy.y, z); }
 	static m4 scaling(f32 v) { return scaling(v, v, v); }
@@ -1019,135 +1165,120 @@ union alignas(64) m4 {
 	}
 };
 
-template <class T>
-struct m128 {};
-template <class T>
-struct m256 {};
-
-template <>
-struct m128<v3> {
-	using Type = v3x4;
-};
-template <>
-struct m256<v3> {
-	using Type = v3x8;
-};
-
+#undef CVT
 #undef MEMFUNS
 
-#define CON(scl, vec2, con)                             \
-	constexpr vec2 con(scl x, scl y) { return {x, y}; } \
-	constexpr vec2 con(scl v) { return {v, v}; }
-CON(f32, v2, V2);
-CON(s32, v2s, V2s);
-CON(u32, v2u, V2u);
+#define CVT(v2, v2s, s32, v2u, u32)                       \
+	v2::operator v2s() const { return {(s32)x, (s32)y}; } \
+	v2::operator v2u() const { return {(u32)x, (u32)y}; }
+CVT(v2, v2s, s32, v2u, u32);
+CVT(v2s, v2, f32, v2u, u32);
+CVT(v2u, v2, f32, v2s, s32);
+#undef CVT
 
-constexpr v2 V2(v2s v) { return {(f32)v.x, (f32)v.y}; }
-constexpr v2 V2(v2u v) { return {(f32)v.x, (f32)v.y}; }
-constexpr v2s V2s(v2 v) { return {(s32)v.x, (s32)v.y}; }
-constexpr v2s V2s(v2u v) { return {(s32)v.x, (s32)v.y}; }
-constexpr v2u V2u(v2 v) { return {(u32)v.x, (u32)v.y}; }
-constexpr v2u V2u(v2s v) { return {(u32)v.x, (u32)v.y}; }
+#define CVT(v3, v3s, s32, v3u, u32)                               \
+	v3::operator v3s() const { return {(s32)x, (s32)y, (s32)z}; } \
+	v3::operator v3u() const { return {(u32)x, (u32)y, (u32)z}; }
+CVT(v3, v3s, s32, v3u, u32);
+CVT(v3s, v3, f32, v3u, u32);
+CVT(v3u, v3, f32, v3s, s32);
+#undef CVT
 
-#undef CON
-#define CON(scl, vec2, vec3, con)                                  \
-	constexpr vec3 con(scl x, scl y, scl z) { return {x, y, z}; }  \
-	constexpr vec3 con(scl v) { return {v, v, v}; }                \
-	constexpr vec3 con(vec2 xy, scl z) { return {xy.x, xy.y, z}; } \
-	constexpr vec3 con(scl x, vec2 yz) { return {x, yz.x, yz.y}; }
+#define CVT(v4, v4s, s32, v4u, u32)                                       \
+	v4::operator v4s() const { return {(s32)x, (s32)y, (s32)z, (s32)w}; } \
+	v4::operator v4u() const { return {(u32)x, (u32)y, (u32)z, (u32)w}; }
+CVT(v4, v4s, s32, v4u, u32);
+CVT(v4s, v4, f32, v4u, u32);
+CVT(v4u, v4, f32, v4s, s32);
+#undef CVT
 
-CON(f32, v2, v3, V3);
-CON(s32, v2s, v3s, V3s);
-CON(u32, v2u, v3u, V3u);
-#undef CON
+#define V2(f32, v2, V2, v2s, v2u)                           \
+	constexpr v2 V2(f32 x, f32 y) { return {x, y}; }        \
+	constexpr v2 V2(f32 v) { return {v, v}; }               \
+	constexpr v2 V2(v2s v) { return {(f32)v.x, (f32)v.y}; } \
+	constexpr v2 V2(v2u v) { return {(f32)v.x, (f32)v.y}; }
+V2(f32, v2, V2, v2s, v2u);
+V2(s32, v2s, V2s, v2, v2u);
+V2(u32, v2u, V2u, v2, v2s);
+#undef V2
 
-constexpr v3 V3(v3s v) { return V3((f32)v.x, (f32)v.y, (f32)v.z); }
-constexpr v3 V3(v3u v) { return V3((f32)v.x, (f32)v.y, (f32)v.z); }
-constexpr v3s V3s(v3 v) { return V3s((s32)v.x, (s32)v.y, (s32)v.z); }
-constexpr v3s V3s(v3u v) { return V3s((s32)v.x, (s32)v.y, (s32)v.z); }
-constexpr v3u V3u(v3 v) { return V3u((u32)v.x, (u32)v.y, (u32)v.z); }
-constexpr v3u V3u(v3s v) { return V3u((u32)v.x, (u32)v.y, (u32)v.z); }
+#define V3(f32, v2, v3, V3, v3s, v3u)                                   \
+	constexpr v3 V3(f32 x, f32 y, f32 z) { return {x, y, z}; }          \
+	constexpr v3 V3(f32 v) { return {v, v, v}; }                        \
+	constexpr v3 V3(v2 xy, f32 z) { return {xy.x, xy.y, z}; }           \
+	constexpr v3 V3(f32 x, v2 yz) { return {x, yz.x, yz.y}; }           \
+	constexpr v3 V3(v3s v) { return V3((f32)v.x, (f32)v.y, (f32)v.z); } \
+	constexpr v3 V3(v3u v) { return V3((f32)v.x, (f32)v.y, (f32)v.z); }
 
-#define CON(scl, vec2, vec3, vec4, con, x4)                                \
-	inline vec4 con(scl x, scl y, scl z, scl w) { return {x, y, z, w}; }   \
-	inline vec4 con(scl v) { return {v, v, v, v}; }                        \
-	inline vec4 con(vec2 xy, vec2 zw) { return {xy.x, xy.y, zw.x, zw.y}; } \
-	inline vec4 con(vec2 xy, scl z, scl w) { return {xy.x, xy.y, z, w}; }  \
-	inline vec4 con(scl x, scl y, vec2 zw) { return {x, y, zw.x, zw.y}; }  \
-	inline vec4 con(vec3 xyz, scl w) { return {xyz.x, xyz.y, xyz.z, w}; }  \
-	inline vec4 con(scl x, vec3 yzw) { return {x, yzw.x, yzw.y, yzw.z}; }  \
-	constexpr vec4 con(x4 v) {                                             \
-		vec4 r{};                                                          \
-		r.m = v;                                                           \
-		return r;                                                          \
-	}
+V3(f32, v2, v3, V3, v3s, v3u);
+V3(s32, v2s, v3s, V3s, v3, v3u);
+V3(u32, v2u, v3u, V3u, v3, v3s);
+#undef V3
 
-CON(f32, v2, v3, v4, V4, f32x4);
-CON(s32, v2s, v3s, v4s, V4s, s32x4);
-CON(u32, v2u, v3u, v4u, V4u, u32x4);
-#undef CON
+#define V4(f32, v2, v3, v4, V4, v4x4, __m128, v4s, v4u, F32x4)           \
+	constexpr v4 V4(f32 x, f32 y, f32 z, f32 w) { return {x, y, z, w}; } \
+	constexpr v4 V4(f32 v) { return {v, v, v, v}; }                      \
+	constexpr v4 V4(v2 xy, v2 zw) { return {xy.x, xy.y, zw.x, zw.y}; }   \
+	constexpr v4 V4(v2 xy, f32 z, f32 w) { return {xy.x, xy.y, z, w}; }  \
+	constexpr v4 V4(f32 x, f32 y, v2 zw) { return {x, y, zw.x, zw.y}; }  \
+	constexpr v4 V4(v3 xyz, f32 w) { return {xyz.x, xyz.y, xyz.z, w}; }  \
+	constexpr v4 V4(f32 x, v3 yzw) { return {x, yzw.x, yzw.y, yzw.z}; }  \
+	constexpr v4 V4(v4x4 v) {                                            \
+		v4 r{};                                                          \
+		r.m = v;                                                         \
+		return r;                                                        \
+	}                                                                    \
+	constexpr v4 V4(__m128 m) {                                          \
+		v4 r{};                                                          \
+		r.m.m = m;                                                       \
+		return r;                                                        \
+	}                                                                    \
+	inline v4 V4(v4s v) { return V4(F32x4(v.m)); }                       \
+	inline v4 V4(v4u v) { return V4(F32x4(v.m)); }
 
-constexpr v4 V4(__m128 m) {
-	v4 r{};
-	r.m.m = m;
-	return r;
-}
-constexpr v4s V4s(__m128i m) {
-	v4s r{};
-	r.m.m = m;
-	return r;
-}
-constexpr v4u V4u(__m128i m) {
-	v4u r{};
-	r.m.m = m;
-	return r;
-}
+V4(f32, v2, v3, v4, V4, f32x4, __m128, v4s, v4u, F32x4);
+V4(s32, v2s, v3s, v4s, V4s, s32x4, __m128i, v4, v4u, S32x4);
+V4(u32, v2u, v3u, v4u, V4u, u32x4, __m128i, v4, v4s, U32x4);
+#undef V4
 
-inline v4 V4(v4s v) { return V4(F32x4(v.m)); }
-inline v4 V4(v4u v) { return V4(F32x4(v.m)); }
-inline v4s V4s(v4 v) { return V4s(S32x4(v.m)); }
-inline v4s V4s(v4u v) { return V4s(S32x4(v.m)); }
-inline v4u V4u(v4 v) { return V4u(U32x4(v.m)); }
-inline v4u V4u(v4s v) { return V4u(U32x4(v.m)); }
+// clang-format off
+#define C(v4, V4) constexpr v4 V4(v4 v) { return v; } template<> constexpr v4 cvt<v4, v4>(v4 v) { return v; }
+C(v2, V2) C(v2s, V2s) C(v2u, V2u)
+C(v3, V3) C(v3s, V3s) C(v3u, V3u)
+C(v4, V4) C(v4s, V4s) C(v4u, V4u)
+C(v2x4, V2x4) C(v2sx4, V2sx4) C(v2ux4, V2ux4)
+C(v3x4, V3x4) C(v3sx4, V3sx4) C(v3ux4, V3ux4)
+C(v4x4, V4x4) C(v4sx4, V4sx4) C(v4ux4, V4ux4)
+C(v2x8, V2x8) C(v2sx8, V2sx8) C(v2ux8, V2ux8)
+C(v3x8, V3x8) C(v3sx8, V3sx8) C(v3ux8, V3ux8)
+C(v4x8, V4x8) C(v4sx8, V4sx8) C(v4ux8, V4ux8)
+#undef C
+// clang-format on
 
-#define V4X2(scl, v4, v4x2, V4, V4x2, sclx8, Sclx8, v4x2o1, v4x2o2)                     \
-	constexpr v4x2 V4x2(scl v) { return V4x2(Sclx8(v)); }                               \
-	constexpr v4x2 V4x2(scl a, scl b, scl c, scl d, scl e, scl f, scl g, scl h) {       \
-		return V4x2(Sclx8(a, b, c, d, e, f, g, h));                                     \
-	}                                                                                   \
-	constexpr v4x2 V4x2(scl a, scl b, scl c, scl d) { return V4x2(Sclx8(a, b, c, d)); } \
-	constexpr v4x2 V4x2(sclx8 v) {                                                      \
-		v4x2 r{};                                                                       \
-		r.m = v;                                                                        \
-		return r;                                                                       \
-	}                                                                                   \
-	constexpr v4x2 V4x2(v4x2o1 v) { return V4x2(V4(v.i), V4(v.j)); }                    \
-	constexpr v4x2 V4x2(v4x2o2 v) { return V4x2(V4(v.i), V4(v.j)); }                    \
-	constexpr v4x2 V4x2(v4 a) { return {a, a}; }                                        \
-	constexpr v4x2 V4x2(v4 a, v4 b) { return {a, b}; }
+#define V2X4(v2x4, V2x4, v2, f32, f32x4, F32x4, v2sx4, v2ux4)                          \
+	inline v2x4 V2x4(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly) { \
+		return {                                                                       \
+			F32x4(ix, jx, kx, lx),                                                     \
+			F32x4(iy, jy, ky, ly),                                                     \
+		};                                                                             \
+	}                                                                                  \
+	inline v2x4 V2x4(v2 i, v2 j, v2 k, v2 l) {                                         \
+		return {                                                                       \
+			F32x4(i.x, j.x, k.x, l.x),                                                 \
+			F32x4(i.y, j.y, k.y, l.y),                                                 \
+		};                                                                             \
+	}                                                                                  \
+	constexpr v2x4 V2x4(f32x4 x, f32x4 y) { return {x, y}; }                           \
+	inline v2x4 V2x4(f32 v) { return {F32x4(v), F32x4(v)}; }                           \
+	constexpr v2x4 V2x4(f32x4 v) { return {v, v}; }                                    \
+	inline v2x4 V2x4(v2 v) { return {F32x4(v.x), F32x4(v.y)}; }                        \
+	inline v2x4 V2x4(v2sx4 v) { return V2x4(F32x4(v.x), F32x4(v.y)); }                 \
+	inline v2x4 V2x4(v2ux4 v) { return V2x4(F32x4(v.x), F32x4(v.y)); }
 
-V4X2(f32, v4, v4x2, V4, V4x2, f32x8, F32x8, v4sx2, v4ux2)
-V4X2(s32, v4s, v4sx2, V4s, V4sx2, s32x8, S32x8, v4x2, v4ux2)
-V4X2(u32, v4u, v4ux2, V4u, V4ux2, u32x8, U32x8, v4x2, v4sx2)
-#undef V4X2
-
-#define V2X8(v2x8, V2x8, v2, V4x2, f32, f32x8, F32x8, v4x2)                                                          \
-	constexpr v2x8 V2x8(f32x8 x, f32x8 y) { return {x, y}; }                                                         \
-	inline v2x8 V2x8(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly, f32 ax, f32 ay, f32 bx, f32 by, \
-					 f32 cx, f32 cy, f32 dx, f32 dy) {                                                               \
-		return V2x8(F32x8(ix, jx, kx, lx, ax, bx, cx, dx), F32x8(iy, jy, ky, ly, ay, by, cy, dy));                   \
-	}                                                                                                                \
-	inline v2x8 V2x8(v2 i, v2 j, v2 k, v2 l, v2 a, v2 b, v2 c, v2 d) {                                               \
-		return V2x8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y));   \
-	}                                                                                                                \
-	inline v2x8 V2x8(f32 v) { return V2x8(F32x8(v), F32x8(v)); }                                                     \
-	constexpr v2x8 V2x8(f32x8 v) { return V2x8(v, v); }                                                              \
-	inline v2x8 V2x8(v2 v) { return V2x8(F32x8(v.x), F32x8(v.y)); }
-
-V2X8(v2x8, V2x8, v2, V4x2, f32, f32x8, F32x8, v4x2);
-V2X8(v2sx8, V2sx8, v2s, V4sx2, s32, s32x8, S32x8, v4sx2);
-V2X8(v2ux8, V2ux8, v2u, V4ux2, u32, u32x8, U32x8, v4ux2);
-#undef V2X8
+				V2X4(v2x4, V2x4, v2, f32, f32x4, F32x4, v2sx4, v2ux4);
+V2X4(v2sx4, V2sx4, v2s, s32, s32x4, S32x4, v2x4, v2ux4);
+V2X4(v2ux4, V2ux4, v2u, u32, u32x4, U32x4, v2x4, v2sx4);
+#undef V2X4
 
 #define V3X4(v3x4, V3x4, v3, f32, f32x4, F32x4, v3sx4, v3ux4)                                                          \
 	inline v3x4 V3x4(f32 ix, f32 iy, f32 iz, f32 jx, f32 jy, f32 jz, f32 kx, f32 ky, f32 kz, f32 lx, f32 ly, f32 lz) { \
@@ -1176,29 +1307,91 @@ V3X4(v3sx4, V3sx4, v3s, s32, s32x4, S32x4, v3x4, v3ux4);
 V3X4(v3ux4, V3ux4, v3u, u32, u32x4, U32x4, v3x4, v3sx4);
 #undef V3X4
 
-inline v3x8 V3x8(f32x8 x, f32x8 y, f32x8 z) { return {x, y, z}; }
-inline v3x8 V3x8(f32 v) { return {F32x8(v), F32x8(v), F32x8(v)}; }
-inline v3x8 V3x8(v3 v) { return {F32x8(v.x), F32x8(v.y), F32x8(v.z)}; }
-inline v3sx8 V3sx8(s32x8 x, s32x8 y, s32x8 z) { return {x, y, z}; }
-inline v3sx8 V3sx8(s32 v) { return {S32x8(v), S32x8(v), S32x8(v)}; }
-inline v3sx8 V3sx8(v3s v) { return {S32x8(v.x), S32x8(v.y), S32x8(v.z)}; }
-inline v3ux8 V3ux8(u32x8 x, u32x8 y, u32x8 z) { return {x, y, z}; }
-inline v3ux8 V3ux8(u32 v) { return {U32x8(v), U32x8(v), U32x8(v)}; }
-inline v3ux8 V3ux8(v3u v) { return {U32x8(v.x), U32x8(v.y), U32x8(v.z)}; }
+#define V4X4(v4x4, V4x4, v4, f32, f32x4, F32x4, v4sx4, v4ux4)                                                        \
+	inline v4x4 V4x4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, \
+					 f32 lx, f32 ly, f32 lz, f32 lw) {                                                               \
+		return {F32x4(ix, jx, kx, lx), F32x4(iy, jy, ky, ly), F32x4(iz, jz, kz, lz), F32x4(iw, jw, kw, lw)};         \
+	}                                                                                                                \
+	inline v4x4 V4x4(v4 i, v4 j, v4 k, v4 l) {                                                                       \
+		return {F32x4(i.x, j.x, k.x, l.x), F32x4(i.y, j.y, k.y, l.y), F32x4(i.z, j.z, k.z, l.z),                     \
+				F32x4(i.w, j.w, k.w, l.w)};                                                                          \
+	}                                                                                                                \
+	constexpr v4x4 V4x4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) { return {x, y, z, w}; }                                 \
+	inline v4x4 V4x4(f32 v) { return {F32x4(v), F32x4(v), F32x4(v), F32x4(v)}; }                                     \
+	constexpr v4x4 V4x4(f32x4 v) { return {v, v, v, v}; }                                                            \
+	inline v4x4 V4x4(v4 v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)}; }                              \
+	inline v4x4 V4x4(v4sx4 v) { return V4x4(F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)); }                       \
+	inline v4x4 V4x4(v4ux4 v) { return V4x4(F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)); }
 
-inline v3x8 V3x8(v3sx8 v) { return {F32x8(v.x), F32x8(v.y), F32x8(v.z)}; }
-inline v3x8 V3x8(v3ux8 v) { return {F32x8(v.x), F32x8(v.y), F32x8(v.z)}; }
-inline v3sx8 V3sx8(v3x8 v) { return {S32x8(v.x), S32x8(v.y), S32x8(v.z)}; }
-inline v3sx8 V3sx8(v3ux8 v) { return {S32x8(v.x), S32x8(v.y), S32x8(v.z)}; }
-inline v3ux8 V3ux8(v3x8 v) { return {U32x8(v.x), U32x8(v.y), U32x8(v.z)}; }
-inline v3ux8 V3ux8(v3sx8 v) { return {U32x8(v.x), U32x8(v.y), U32x8(v.z)}; }
+V4X4(v4x4, V4x4, v4, f32, f32x4, F32x4, v4sx4, v4ux4);
+V4X4(v4sx4, V4sx4, v4s, s32, s32x4, S32x4, v4x4, v4ux4);
+V4X4(v4ux4, V4ux4, v4u, u32, u32x4, U32x4, v4x4, v4sx4);
+#undef V4X4
 
-inline v2x8  V2x8 (v2sx8 v) { return {F32x8(v.x), F32x8(v.y)}; }
-inline v2x8  V2x8 (v2ux8 v) { return {F32x8(v.x), F32x8(v.y)}; }
-inline v2sx8 V2sx8(v2x8  v) { return {S32x8(v.x), S32x8(v.y)}; }
-inline v2sx8 V2sx8(v2ux8 v) { return {S32x8(v.x), S32x8(v.y)}; }
-inline v2ux8 V2ux8(v2x8  v) { return {U32x8(v.x), U32x8(v.y)}; }
-inline v2ux8 V2ux8(v2sx8 v) { return {U32x8(v.x), U32x8(v.y)}; }
+#define V2X8(v2x8, V2x8, v2, V4x2, f32, f32x8, F32x8, v2sx8, v2ux8)                                                  \
+	constexpr v2x8 V2x8(f32x8 x, f32x8 y) { return {x, y}; }                                                         \
+	inline v2x8 V2x8(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly, f32 ax, f32 ay, f32 bx, f32 by, \
+					 f32 cx, f32 cy, f32 dx, f32 dy) {                                                               \
+		return V2x8(F32x8(ix, jx, kx, lx, ax, bx, cx, dx), F32x8(iy, jy, ky, ly, ay, by, cy, dy));                   \
+	}                                                                                                                \
+	inline v2x8 V2x8(v2 i, v2 j, v2 k, v2 l, v2 a, v2 b, v2 c, v2 d) {                                               \
+		return V2x8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y));   \
+	}                                                                                                                \
+	inline v2x8 V2x8(f32 v) { return V2x8(F32x8(v), F32x8(v)); }                                                     \
+	constexpr v2x8 V2x8(f32x8 v) { return V2x8(v, v); }                                                              \
+	inline v2x8 V2x8(v2 v) { return V2x8(F32x8(v.x), F32x8(v.y)); }                                                  \
+	inline v2x8 V2x8(v2sx8 v) { return V2x8(F32x8(v.x), F32x8(v.y)); }                                               \
+	inline v2x8 V2x8(v2ux8 v) { return V2x8(F32x8(v.x), F32x8(v.y)); }
+
+V2X8(v2x8, V2x8, v2, V4x2, f32, f32x8, F32x8, v2sx8, v2ux8);
+V2X8(v2sx8, V2sx8, v2s, V4sx2, s32, s32x8, S32x8, v2x8, v2ux8);
+V2X8(v2ux8, V2ux8, v2u, V4ux2, u32, u32x8, U32x8, v2x8, v2sx8);
+#undef V2X8
+
+#define V3X8(v3x8, V3x8, v3, V3x2, f32, f32x8, F32x8, v3sx8, v3ux8)                                                    \
+	constexpr v3x8 V3x8(f32x8 x, f32x8 y, f32x8 z) { return {x, y, z}; }                                               \
+	inline v3x8 V3x8(f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz, f32 cx, f32 cy, f32 cz, f32 dx, f32 dy, f32 dz,   \
+					 f32 ex, f32 ey, f32 ez, f32 fx, f32 fy, f32 fz, f32 gx, f32 gy, f32 gz, f32 hx, f32 hy, f32 hz) { \
+		return V3x8(F32x8(ax, bx, cx, dx, ex, fx, gx, hx), F32x8(ay, by, cy, dy, ey, fy, gy, hy),                      \
+					F32x8(az, bz, cz, dz, ez, fz, gz, hz));                                                            \
+	}                                                                                                                  \
+	inline v3x8 V3x8(v3 i, v3 j, v3 k, v3 l, v3 a, v3 b, v3 c, v3 d) {                                                 \
+		return V3x8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),      \
+					F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z));                                                    \
+	}                                                                                                                  \
+	inline v3x8 V3x8(f32 v) { return V3x8(F32x8(v), F32x8(v), F32x8(v)); }                                             \
+	constexpr v3x8 V3x8(f32x8 v) { return V3x8(v, v, v); }                                                             \
+	inline v3x8 V3x8(v3 v) { return V3x8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }                                        \
+	inline v3x8 V3x8(v3sx8 v) { return V3x8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }                                     \
+	inline v3x8 V3x8(v3ux8 v) { return V3x8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }
+
+V3X8(v3x8, V3x8, v3, V3x2, f32, f32x8, F32x8, v3sx8, v3ux8);
+V3X8(v3sx8, V3sx8, v3s, V3sx2, s32, s32x8, S32x8, v3x8, v3ux8);
+V3X8(v3ux8, V3ux8, v3u, V3ux2, u32, u32x8, U32x8, v3x8, v3sx8);
+#undef V3X8
+
+#define V4X8(v4x8, V4x8, v4, V4x2, f32, f32x8, F32x8, v4sx8, v4ux8)                                                  \
+	constexpr v4x8 V4x8(f32x8 x, f32x8 y, f32x8 z, f32x8 w) { return {x, y, z, w}; }                                 \
+	inline v4x8 V4x8(f32 ax, f32 ay, f32 az, f32 aw, f32 bx, f32 by, f32 bz, f32 bw, f32 cx, f32 cy, f32 cz, f32 cw, \
+					 f32 dx, f32 dy, f32 dz, f32 dw, f32 ex, f32 ey, f32 ez, f32 ew, f32 fx, f32 fy, f32 fz, f32 fw, \
+					 f32 gx, f32 gy, f32 gz, f32 gw, f32 hx, f32 hy, f32 hz, f32 hw) {                               \
+		return V4x8(F32x8(ax, bx, cx, dx, ex, fx, gx, hx), F32x8(ay, by, cy, dy, ey, fy, gy, hy),                    \
+					F32x8(az, bz, cz, dz, ez, fz, gz, hz), F32x8(aw, bw, cw, dw, ew, fw, gw, hw));                   \
+	}                                                                                                                \
+	inline v4x8 V4x8(v4 i, v4 j, v4 k, v4 l, v4 a, v4 b, v4 c, v4 d) {                                               \
+		return V4x8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),    \
+					F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z), F32x8(i.w, j.w, k.w, l.w, a.w, b.w, c.w, d.w));   \
+	}                                                                                                                \
+	inline v4x8 V4x8(f32 v) { return V4x8(F32x8(v), F32x8(v), F32x8(v), F32x8(v)); }                                 \
+	constexpr v4x8 V4x8(f32x8 v) { return V4x8(v, v, v, v); }                                                        \
+	inline v4x8 V4x8(v4 v) { return V4x8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }                          \
+	inline v4x8 V4x8(v4sx8 v) { return V4x8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }                       \
+	inline v4x8 V4x8(v4ux8 v) { return V4x8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }
+
+V4X8(v4x8, V4x8, v4, V4x2, f32, f32x8, F32x8, v4sx8, v4ux8);
+V4X8(v4sx8, V4sx8, v4s, V4sx2, s32, s32x8, S32x8, v4x8, v4ux8);
+V4X8(v4ux8, V4ux8, v4u, V4ux2, u32, u32x8, U32x8, v4x8, v4sx8);
+#undef V4X8
 
 constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
 constexpr m4 M4(v4 i, v4 j, v4 k, v4 l) { return m4{i, j, k, l}; }
@@ -1225,93 +1418,226 @@ m4 M4(m3 v) {
 }
 
 namespace CE {
-
-constexpr v3x4 V3x4(v3 v) { return {v.x, v.x, v.x, v.x, v.y, v.y, v.y, v.y, v.z, v.z, v.z, v.z}; }
-constexpr v3sx4 V3sx4(v3s v) { return {v.x, v.x, v.x, v.x, v.y, v.y, v.y, v.y, v.z, v.z, v.z, v.z}; }
-
-constexpr v3sx4 V3sx4(s32 ix, s32 iy, s32 iz, s32 jx, s32 jy, s32 jz, s32 kx, s32 ky, s32 kz, s32 lx, s32 ly, s32 lz) {
-	return {ix, jx, kx, lx, iy, jy, ky, ly, iz, jz, kz, lz};
-}
-
-constexpr v3sx4 V3sx4(v3s a, v3s b, v3s c, v3s d) {
-	return {
-		a.x, b.x, c.x, d.x, a.y, b.y, c.y, d.y, a.z, b.z, c.z, d.z,
-	};
-}
-
-constexpr v3x8 V3x8(v3 v) {
-	return {v.x, v.x, v.x, v.x, v.x, v.x, v.x, v.x, v.y, v.y, v.y, v.y,
-			v.y, v.y, v.y, v.y, v.z, v.z, v.z, v.z, v.z, v.z, v.z, v.z};
-}
-constexpr v3sx8 V3sx8(v3s v) {
-	return {v.x, v.x, v.x, v.x, v.x, v.x, v.x, v.x, v.y, v.y, v.y, v.y,
-			v.y, v.y, v.y, v.y, v.z, v.z, v.z, v.z, v.z, v.z, v.z, v.z};
-}
-
-constexpr v3sx8 V3sx8(s32 x0, s32 y0, s32 z0, s32 x1, s32 y1, s32 z1, s32 x2, s32 y2, s32 z2, s32 x3, s32 y3, s32 z3,
-					  s32 x4, s32 y4, s32 z4, s32 x5, s32 y5, s32 z5, s32 x6, s32 y6, s32 z6, s32 x7, s32 y7, s32 z7) {
-	return {x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7, z0, z1, z2, z3, z4, z5, z6, z7};
-}
-
-constexpr v3sx8 V3sx8(v3s a, v3s b, v3s c, v3s d, v3s e, v3s f, v3s g, v3s h) {
-	return {
-		a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x, a.y, b.y, c.y, d.y,
-		e.y, f.y, g.y, h.y, a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z,
-	};
-}
-
-constexpr v2sx8 V2sx8(s32 x0, s32 y0, s32 x1, s32 y1, s32 x2, s32 y2, s32 x3, s32 y3, s32 x4, s32 y4, s32 x5, s32 y5,
-					  s32 x6, s32 y6, s32 x7, s32 y7) {
-	return {x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7};
-}
-
-constexpr v4sx2 V4sx2(v4s a, v4s b) { return {a, b}; }
-
+#define V2x4(v2, v2x4, V2x4)                                                                         \
+	constexpr v2x4 V2x4(v2 a, v2 b, v2 c, v2 d) { return {a.x, b.x, c.x, d.x, a.y, b.y, c.y, d.y}; } \
+	constexpr v2x4 V2x4(v2 v) { return CE::V2x4(v, v, v, v); }
+V2x4(v2, v2x4, V2x4) V2x4(v2s, v2sx4, V2sx4) V2x4(v2u, v2ux4, V2ux4);
+#undef V2x4
+#define V3x4(v3, v3x4, V3x4)                                                 \
+	constexpr v3x4 V3x4(v3 a, v3 b, v3 c, v3 d) {                            \
+		return {a.x, b.x, c.x, d.x, a.y, b.y, c.y, d.y, a.z, b.z, c.z, d.z}; \
+	}                                                                        \
+	constexpr v3x4 V3x4(v3 v) { return CE::V3x4(v, v, v, v); }
+V3x4(v3, v3x4, V3x4) V3x4(v3s, v3sx4, V3sx4) V3x4(v3u, v3ux4, V3ux4);
+#undef V3x4
+#define V4x4(v4, v4x4, V4x4)                                                                     \
+	constexpr v4x4 V4x4(v4 a, v4 b, v4 c, v4 d) {                                                \
+		return {a.x, b.x, c.x, d.x, a.y, b.y, c.y, d.y, a.z, b.z, c.z, d.z, a.w, b.w, c.w, d.w}; \
+	}                                                                                            \
+	constexpr v4x4 V4x4(v4 v) { return CE::V4x4(v, v, v, v); }
+V4x4(v4, v4x4, V4x4) V4x4(v4s, v4sx4, V4sx4) V4x4(v4u, v4ux4, V4ux4);
+#undef V4x4
+#define V2x8(v2, v2x8, V2x8)                                                                     \
+	constexpr v2x8 V2x8(v2 a, v2 b, v2 c, v2 d, v2 e, v2 f, v2 g, v2 h) {                        \
+		return {a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x, a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y}; \
+	}                                                                                            \
+	constexpr v2x8 V2x8(v2 v) { return CE::V2x8(v, v, v, v, v, v, v, v); }
+V2x8(v2, v2x8, V2x8) V2x8(v2s, v2sx8, V2sx8) V2x8(v2u, v2ux8, V2ux8);
+#undef V2x8
+#define V3x8(v3, v3x8, V3x8)                                              \
+	constexpr v3x8 V3x8(v3 a, v3 b, v3 c, v3 d, v3 e, v3 f, v3 g, v3 h) { \
+		return {                                                          \
+			a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x, a.y, b.y, c.y, d.y,   \
+			e.y, f.y, g.y, h.y, a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z,   \
+		};                                                                \
+	}                                                                     \
+	constexpr v3x8 V3x8(v3 v) { return CE::V3x8(v, v, v, v, v, v, v, v); }
+V3x8(v3, v3x8, V3x8) V3x8(v3s, v3sx8, V3sx8) V3x8(v3u, v3ux8, V3ux8);
+#undef V3x8
+#define V4x8(v4, v4x8, V4x8)                                                                     \
+	constexpr v4x8 V4x8(v4 a, v4 b, v4 c, v4 d, v4 e, v4 f, v4 g, v4 h) {                        \
+		return {a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x, a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y,  \
+				a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z, a.w, b.w, c.w, d.w, e.w, f.w, g.w, h.w}; \
+	}                                                                                            \
+	constexpr v4x8 V4x8(v4 v) { return CE::V4x8(v, v, v, v, v, v, v, v); }
+V4x8(v4, v4x8, V4x8) V4x8(v4s, v4sx8, V4sx8) V4x8(v4u, v4ux8, V4ux8);
+#undef V4x8
 } // namespace CE
+  // clang-format off
 
-f32 min(f32x8 v) {
-	return min(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-}
+template<> s32x4 cvt(f32x4 v) {  return S32x4(_mm_cvtps_epi32(v.m));  }
+template<> f32x4 cvt(s32x4 v) {  return F32x4(_mm_cvtepi32_ps(v.m));  }
+
+template<> s32x8 cvt(f32x8 v) {  return S32x8(_mm256_cvtps_epi32(v.m));  }
+template<> f32x8 cvt(s32x8 v) {  return F32x8(_mm256_cvtepi32_ps(v.m));  }
+
+#define CVT(u32x4, f32x4, F32x4, f32) template<> f32x4 cvt(u32x4 v) {  return F32x4((f32)v[0], (f32)v[1], (f32)v[2], (f32)v[3]);  }
+CVT(u32x4, f32x4, F32x4, f32);
+CVT(f32x4, u32x4, U32x4, u32);
+#undef CVT
+
+#define CVT(u32x8, f32x8, F32x8, f32) template<> f32x8 cvt(u32x8 v) {  return F32x8((f32)v[0], (f32)v[1], (f32)v[2], (f32)v[3], (f32)v[4], (f32)v[5], (f32)v[6], (f32)v[7]);  }
+CVT(u32x8, f32x8, F32x8, f32);
+CVT(f32x8, u32x8, U32x8, u32);
+#undef CVT
+
+#define CVT(u32x4, s32x4, S32x4) template<> constexpr s32x4 cvt(u32x4 v) {  return S32x4(v.m);  }
+CVT(u32x4, s32x4, S32x4);
+CVT(s32x4, u32x4, U32x4);
+#undef CVT
+
+#define CVT(u32x8, s32x8, S32x8) template<> constexpr s32x8 cvt(u32x8 v) {  return S32x8(v.m);  }
+CVT(u32x8, s32x8, S32x8);
+CVT(s32x8, u32x8, U32x8);
+#undef CVT
+
+#define CVT(v2, v2s, s32) template<> constexpr v2s cvt(v2 v) { return {(s32)v.x, (s32)v.y}; }
+CVT(v2, v2s, s32) CVT(v2, v2u, u32);
+CVT(v2s, v2, f32) CVT(v2s, v2u, u32);
+CVT(v2u, v2, f32) CVT(v2u, v2s, s32);
+#undef CVT
+
+#define CVT(v3, v3s, s32) template<> constexpr v3s cvt(v3 v) { return {(s32)v.x, (s32)v.y, (s32)v.z}; }
+CVT(v3, v3s, s32) CVT(v3, v3u, u32);
+CVT(v3s, v3, f32) CVT(v3s, v3u, u32);
+CVT(v3u, v3, f32) CVT(v3u, v3s, s32);
+#undef CVT
+
+#define CVT(v4, v4s, s32) template<> constexpr v4s cvt(v4 v) { return {(s32)v.x, (s32)v.y, (s32)v.z, (s32)v.w}; }
+CVT(v4, v4u, u32) CVT(v4s, v4u, u32);
+CVT(v4u, v4, f32) CVT(v4u, v4s, s32);
+#undef CVT
+
+template<> v4s cvt(v4 v) { return V4s(cvt<s32x4>(v.m)); }
+template<> v4 cvt(v4s v) { return V4( cvt<f32x4>(v.m)); }
+
+#define CVT(v2, v2s, V2s, s32) template<> v2s cvt(v2 v) { return V2s(cvt<s32>(v.x), cvt<s32>(v.y)); }
+CVT(v2x4, v2sx4, V2sx4, s32x4) CVT(v2sx4, v2x4, V2x4, f32x4);
+CVT(v2x8, v2sx8, V2sx8, s32x8) CVT(v2sx8, v2x8, V2x8, f32x8);
+#undef CVT
+
+#define CVT(v3, v3s, V3s, s32) template<> v3s cvt(v3 v) { return V3s(cvt<s32>(v.x), cvt<s32>(v.y), cvt<s32>(v.z)); }
+CVT(v3x4, v3sx4, V3sx4, s32x4) CVT(v3sx4, v3x4, V3x4, f32x4);
+CVT(v3x8, v3sx8, V3sx8, s32x8) CVT(v3sx8, v3x8, V3x8, f32x8);
+#undef CVT
+
+#define CVT(v4, v4s, V4s, s32) template<> v4s cvt(v4 v) { return V4s(cvt<s32>(v.x), cvt<s32>(v.y), cvt<s32>(v.z), cvt<s32>(v.w)); }
+CVT(v4x4, v4sx4, V4sx4, s32x4) CVT(v4sx4, v4x4, V4x4, f32x4);
+CVT(v4x8, v4sx8, V4sx8, s32x8) CVT(v4sx8, v4x8, V4x8, f32x8);
+#undef CVT
+
+#define CVT(v2, v2s, V2s, s32) template<> constexpr v2s cvt(v2 v) { return V2s(cvt<s32>(v.x), cvt<s32>(v.y)); }
+CVT(v2x4, v2ux4, V2ux4, u32x4) CVT(v2ux4, v2x4, V2x4, f32x4);
+CVT(v2x8, v2ux8, V2ux8, u32x8) CVT(v2ux8, v2x8, V2x8, f32x8);
+CVT(v2sx4, v2ux4, V2ux4, u32x4) CVT(v2ux4, v2sx4, V2sx4, s32x4);
+CVT(v2sx8, v2ux8, V2ux8, u32x8) CVT(v2ux8, v2sx8, V2sx8, s32x8);
+#undef CVT
+
+#define CVT(v3, v3s, V3s, s32) template<> constexpr v3s cvt(v3 v) { return V3s(cvt<s32>(v.x), cvt<s32>(v.y), cvt<s32>(v.z)); }
+CVT(v3x4, v3ux4, V3ux4, u32x4) CVT(v3ux4, v3x4, V3x4, f32x4);
+CVT(v3x8, v3ux8, V3ux8, u32x8) CVT(v3ux8, v3x8, V3x8, f32x8);
+CVT(v3sx4, v3ux4, V3ux4, u32x4) CVT(v3ux4, v3sx4, V3sx4, s32x4);
+CVT(v3sx8, v3ux8, V3ux8, u32x8) CVT(v3ux8, v3sx8, V3sx8, s32x8);
+#undef CVT
+
+#define CVT(v4, v4s, V4s, s32) template<> constexpr v4s cvt(v4 v) { return V4s(cvt<s32>(v.x), cvt<s32>(v.y), cvt<s32>(v.z), cvt<s32>(v.w)); }
+CVT(v4x4, v4ux4, V4ux4, u32x4) CVT(v4ux4, v4x4, V4x4, f32x4);
+CVT(v4x8, v4ux8, V4ux8, u32x8) CVT(v4ux8, v4x8, V4x8, f32x8);
+CVT(v4sx4, v4ux4, V4ux4, u32x4) CVT(v4ux4, v4sx4, V4sx4, s32x4);
+CVT(v4sx8, v4ux8, V4ux8, u32x8) CVT(v4ux8, v4sx8, V4sx8, s32x8);
+#undef CVT
+
+namespace CE {
+
+#define CVT(u32x4, f32x4, f32) template<> constexpr f32x4 cvt(u32x4 v) {  return {(f32)v[0], (f32)v[1], (f32)v[2], (f32)v[3]};  }
+CVT(f32x4, s32x4, s32) CVT(f32x4, u32x4, u32);
+CVT(s32x4, f32x4, f32) CVT(s32x4, u32x4, u32);
+CVT(u32x4, f32x4, f32) CVT(u32x4, s32x4, s32);
+#undef CVT
+
+#define CVT(u32x8, f32x8, f32) template<> constexpr f32x8 cvt(u32x8 v) {  return {(f32)v[0], (f32)v[1], (f32)v[2], (f32)v[3], (f32)v[4], (f32)v[5], (f32)v[6], (f32)v[7]};  }
+CVT(f32x8, s32x8, s32) CVT(f32x8, u32x8, u32);
+CVT(s32x8, f32x8, f32) CVT(s32x8, u32x8, u32);
+CVT(u32x8, f32x8, f32) CVT(u32x8, s32x8, s32);
+#undef CVT
+
+#define CVT(v2, v2s, s32) template<> constexpr v2s cvt(v2 v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y)}; }
+CVT(v2, v2s, s32) CVT(v2, v2u, u32);
+CVT(v2s, v2, f32) CVT(v2s, v2u, u32);
+CVT(v2u, v2, f32) CVT(v2u, v2s, s32);
+CVT(v2x4, v2sx4, s32x4) CVT(v2x4, v2ux4, u32x4);
+CVT(v2x8, v2sx8, s32x8)	CVT(v2x8, v2ux8, u32x8);
+CVT(v2sx4, v2x4, f32x4) CVT(v2sx4, v2ux4, u32x4);
+CVT(v2sx8, v2x8, f32x8) CVT(v2sx8, v2ux8, u32x8);
+CVT(v2ux4, v2x4, f32x4) CVT(v2ux4, v2sx4, s32x4);
+CVT(v2ux8, v2x8, f32x8) CVT(v2ux8, v2sx8, s32x8);
+#undef CVT
+
+#define CVT(v3, v3s, s32) template<> constexpr v3s cvt(v3 v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y), CE::cvt<s32>(v.z)}; }
+CVT(v3, v3s, s32) CVT(v3, v3u, u32);
+CVT(v3s, v3, f32) CVT(v3s, v3u, u32);
+CVT(v3u, v3, f32) CVT(v3u, v3s, s32);
+CVT(v3x4, v3sx4, s32x4) CVT(v3x8, v3sx8, s32x8);
+CVT(v3x4, v3ux4, u32x4) CVT(v3x8, v3ux8, u32x8);
+CVT(v3sx4, v3x4, f32x4) CVT(v3sx4, v3ux4, u32x4);
+CVT(v3sx8, v3x8, f32x8) CVT(v3sx8, v3ux8, u32x8);
+CVT(v3ux4, v3x4, f32x4) CVT(v3ux4, v3sx4, s32x4);
+CVT(v3ux8, v3x8, f32x8) CVT(v3ux8, v3sx8, s32x8);
+#undef CVT
+
+#define CVT(v4, v4s, s32) template<> constexpr v4s cvt(v4 v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y), CE::cvt<s32>(v.z), CE::cvt<s32>(v.w)}; }
+CVT(v4, v4s, s32) CVT(v4, v4u, u32);
+CVT(v4s, v4, f32) CVT(v4s, v4u, u32);
+CVT(v4u, v4, f32) CVT(v4u, v4s, s32);
+CVT(v4x4, v4sx4, s32x4) CVT(v4x8, v4sx8, s32x8);
+CVT(v4x4, v4ux4, u32x4) CVT(v4x8, v4ux8, u32x8);
+CVT(v4sx4, v4x4, f32x4) CVT(v4sx4, v4ux4, u32x4);
+CVT(v4sx8, v4x8, f32x8) CVT(v4sx8, v4ux8, u32x8);
+CVT(v4ux4, v4x4, f32x4) CVT(v4ux4, v4sx4, s32x4);
+CVT(v4ux8, v4x8, f32x8) CVT(v4ux8, v4sx8, s32x8);
+#undef CVT
+} // namespace CE
+// clang-format on
+
+f32 min(f32x8 v) { return min(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]); }
 
 // clang-format off
-template<> auto min(f32x4 a, f32x4 b) { return F32x4(_mm_min_ps(a.m, b.m)); }
-template<> auto min(s32x4 a, s32x4 b) { return S32x4(_mm_min_epi32(a.m, b.m)); }
-template<> auto min(u32x4 a, u32x4 b) { return U32x4(_mm_min_epu32(a.m, b.m)); }
-template<> auto min(v2 a, v2 b) { return V2(min(a.x, b.x), min(a.y, b.y)); }
-template<> auto min(v3 a, v3 b) { return V3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
-template<> auto min(v4 a, v4 b) { return V4(min(a.m, b.m)); }
-template<> auto min(v2s a, v2s b) { return V2s(min(a.x, b.x), min(a.y, b.y)); }
-template<> auto min(v3s a, v3s b) { return V3s(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
-template<> auto min(v4s a, v4s b) { return V4s(min(a.m, b.m)); }
-template<> auto min(v2u a, v2u b) { return V2u(min(a.x, b.x), min(a.y, b.y)); }
-template<> auto min(v3u a, v3u b) { return V3u(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
-template<> auto min(v4u a, v4u b) { return V4u(min(a.m, b.m)); }
-template<> auto min(f32 a, v2 b) { return min(a, min(b.x, b.y)); }
-template<> auto min(f32 a, v4 b) { return min(a, min(min(b.x, b.y), min(b.z, b.w))); }
-template<> auto min(f32 a, v4x2 b) { return min(a, min(b.i, b.j)); } 
-template<> auto min(f32 a, f32x8 b) { return min(a, min(b)); } 
+auto min(f32x4 a, f32x4 b) { return F32x4(_mm_min_ps(a.m, b.m)); }
+auto min(s32x4 a, s32x4 b) { return S32x4(_mm_min_epi32(a.m, b.m)); }
+auto min(u32x4 a, u32x4 b) { return U32x4(_mm_min_epu32(a.m, b.m)); }
+auto min(v2 a, v2 b) { return V2(min(a.x, b.x), min(a.y, b.y)); }
+auto min(v3 a, v3 b) { return V3(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
+auto min(v4 a, v4 b) { return V4(min(a.m, b.m)); }
+auto min(v2s a, v2s b) { return V2s(min(a.x, b.x), min(a.y, b.y)); }
+auto min(v3s a, v3s b) { return V3s(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
+auto min(v4s a, v4s b) { return V4s(min(a.m, b.m)); }
+auto min(v2u a, v2u b) { return V2u(min(a.x, b.x), min(a.y, b.y)); }
+auto min(v3u a, v3u b) { return V3u(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
+auto min(v4u a, v4u b) { return V4u(min(a.m, b.m)); }
+auto min(f32 a, v2 b) { return min(a, min(b.x, b.y)); }
+auto min(f32 a, v4 b) { return min(a, min(min(b.x, b.y), min(b.z, b.w))); }
+auto min(f32 a, f32x8 b) { return min(a, min(b)); } 
 
-template<> auto max(f32x4 a, f32x4 b) { return F32x4(_mm_max_ps(a.m, b.m)); }
-template<> auto max(s32x4 a, s32x4 b) { return S32x4(_mm_max_epi32(a.m, b.m)); }
-template<> auto max(u32x4 a, u32x4 b) { return U32x4(_mm_max_epu32(a.m, b.m)); }
-template<> auto max(v2 a, v2 b) { return V2(max(a.x, b.x), max(a.y, b.y)); }
-template<> auto max(v3 a, v3 b) { return V3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
-template<> auto max(v4 a, v4 b) { return V4(max(a.m, b.m)); }
-template<> auto max(v2s a, v2s b) { return V2s(max(a.x, b.x), max(a.y, b.y)); }
-template<> auto max(v3s a, v3s b) { return V3s(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
-template<> auto max(v4s a, v4s b) { return V4s(max(a.m, b.m)); }
-template<> auto max(v2u a, v2u b) { return V2u(max(a.x, b.x), max(a.y, b.y)); }
-template<> auto max(v3u a, v3u b) { return V3u(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
-template<> auto max(v4u a, v4u b) { return V4u(max(a.m, b.m)); }
-template<> auto max(f32 a, v2 b) { return max(a, max(b.x, b.y)); }
-template<> auto max(f32 a, v4 b) { return max(a, max(max(b.x, b.y), max(b.z, b.w))); }
-template<> auto max(f32 a, v4x2 b) { return max(a, max(b.i, b.j)); }
+auto max(f32x4 a, f32x4 b) { return F32x4(_mm_max_ps(a.m, b.m)); }
+auto max(s32x4 a, s32x4 b) { return S32x4(_mm_max_epi32(a.m, b.m)); }
+auto max(u32x4 a, u32x4 b) { return U32x4(_mm_max_epu32(a.m, b.m)); }
+auto max(v2 a, v2 b) { return V2(max(a.x, b.x), max(a.y, b.y)); }
+auto max(v3 a, v3 b) { return V3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+auto max(v4 a, v4 b) { return V4(max(a.m, b.m)); }
+auto max(v2s a, v2s b) { return V2s(max(a.x, b.x), max(a.y, b.y)); }
+auto max(v3s a, v3s b) { return V3s(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+auto max(v4s a, v4s b) { return V4s(max(a.m, b.m)); }
+auto max(v2u a, v2u b) { return V2u(max(a.x, b.x), max(a.y, b.y)); }
+auto max(v3u a, v3u b) { return V3u(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+auto max(v4u a, v4u b) { return V4u(max(a.m, b.m)); }
+auto max(f32 a, v2 b) { return max(a, max(b.x, b.y)); }
+auto max(f32 a, v4 b) { return max(a, max(max(b.x, b.y), max(b.z, b.w))); }
 #if ARCH_AVX
-template<> auto min(f32x8 a, f32x8 b) { return F32x8(_mm256_min_ps(a.m, b.m)); }
-template<> auto max(f32x8 a, f32x8 b) { return F32x8(_mm256_max_ps(a.m, b.m)); }
+auto min(f32x8 a, f32x8 b) { return F32x8(_mm256_min_ps(a.m, b.m)); }
+auto max(f32x8 a, f32x8 b) { return F32x8(_mm256_max_ps(a.m, b.m)); }
 #else
-template<> auto min(f32x8 a, f32x8 b) { return F32x8(min(a.im, b.im), min(a.jm, b.jm)); }
-template<> auto max(f32x8 a, f32x8 b) { return F32x8(max(a.im, b.im), max(a.jm, b.jm)); }
+auto min(f32x8 a, f32x8 b) { return F32x8(min(a.im, b.im), min(a.jm, b.jm)); }
+auto max(f32x8 a, f32x8 b) { return F32x8(max(a.im, b.im), max(a.jm, b.jm)); }
 #endif
 
 void minmax(v2 a, v2 b, v2& mn, v2& mx) {
@@ -1328,13 +1654,26 @@ void minmax(v2u a, v2u b, v2u& mn, v2u& mx) {
 }
 // clang-format on
 
-template <>
-constexpr auto moveTowards(v2 a, v2 b, f32 t) {
-	return v2{
+constexpr bool _isTrueMask(f32 v) { return *(u32*)&v == ~0u; }
+
+f32 select(f32 mask, f32 a, f32 b) { return _isTrueMask(mask) ? a : b; }
+
+f32x4 select(f32x4 mask, f32x4 a, f32x4 b) { return F32x4(_mm_blendv_ps(b.m, a.m, mask.m)); }
+v2 select(v2 mask, v2 a, v2 b) { return {select(mask.x, a.x, b.x), select(mask.y, a.y, b.y)}; }
+v3 select(v3 mask, v3 a, v3 b) {
+	return {select(mask.x, a.x, b.x), select(mask.y, a.y, b.y), select(mask.z, a.z, b.z)};
+}
+v4 select(v4 mask, v4 a, v4 b) { return V4(select(mask.m, a.m, b.m)); }
+
+v2 moveTowards(v2 a, v2 b, f32 t) { return select(a < b, min(a + t, b), max(a - t, b)); }
+v3 moveTowards(v3 a, v3 b, f32 t) {
+	return {
 		moveTowards(a.x, b.x, t),
 		moveTowards(a.y, b.y, t),
+		moveTowards(a.z, b.z, t),
 	};
 }
+v4 moveTowards(v4 a, v4 b, f32 t) { return select(a < b, min(a + t, b), max(a - t, b)); }
 
 f32 sqrt(f32 v) { return sqrtf(v); }
 v2 sqrt(v2 v) { return V2(sqrtf(v.x), sqrtf(v.y)); }
@@ -1387,10 +1726,6 @@ inline void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m = _mm_sinco
 inline void sincos(v4 v, v4& sinOut, v4& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
 #endif
 
-constexpr f32 aspectRatio(v2 v) { return v.x / v.y; }
-constexpr f32 aspectRatio(v2s v) { return aspectRatio(V2(v)); }
-constexpr f32 aspectRatio(v2u v) { return aspectRatio(V2(v)); }
-
 u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
 u32 countBits(s32 v) { return countBits((u32)v); }
 #if ARCH_AVX2
@@ -1421,25 +1756,28 @@ constexpr f32 frac(f32 v) {
 		++r;
 	return r;
 }
-v2 frac(v2 v) {
-	return {
-		frac(v.x),
-		frac(v.y),
-	};
-}
-v3 frac(v3 v) {
-	return {
-		frac(v.x),
-		frac(v.y),
-		frac(v.z),
-	};
-}
 f32x4 frac(f32x4 v) {
 	v.m = _mm_sub_ps(v.m, _mm_cvtepi32_ps(_mm_cvtps_epi32(v.m)));
 	v.m = _mm_add_ps(v.m, _mm_and_ps(_mm_cmplt_ps(v.m, _mm_setzero_ps()), _mm_set1_ps(1.0f)));
 	return v;
 }
+f32x8 frac(f32x8 v) {
+	v.m = _mm256_sub_ps(v.m, _mm256_cvtepi32_ps(_mm256_cvtps_epi32(v.m)));
+	v.m = _mm256_add_ps(v.m, _mm256_and_ps(_mm256_cmplt_ps(v.m, _mm256_setzero_ps()), _mm256_set1_ps(1.0f)));
+	return v;
+}
 v4 frac(v4 v) { return V4(frac(v.m)); }
+v4x4 frac(v4x4 v) { return V4x4(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
+v4x8 frac(v4x8 v) { return V4x8(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
+
+v2 frac(v2 v) { return frac(V4(v, 0, 0)).xy; }
+v2x4 frac(v2x4 v) { return V2x4(frac(v.x), frac(v.y)); }
+v2x8 frac(v2x8 v) { return V2x8(frac(v.x), frac(v.y)); }
+
+v3 frac(v3 v) { return frac(V4(v, 0)).xyz; }
+v3x4 frac(v3x4 v) { return V3x4(frac(v.x), frac(v.y), frac(v.z)); }
+v3x8 frac(v3x8 v) { return V3x8(frac(v.x), frac(v.y), frac(v.z)); }
+
 constexpr s32 frac(s32 v, u32 s) {
 	if (v < 0)
 		return (v + 1) % (s32)s + (s32)s - 1;
@@ -1537,7 +1875,7 @@ v3s floor(v3s v, u32 step) {
 	};
 }
 v4s floor(v4s v, u32 step) {
-#if 1
+#if 0
 	return {
 		floor(v.x, step),
 		floor(v.y, step),
@@ -1545,49 +1883,49 @@ v4s floor(v4s v, u32 step) {
 		floor(v.w, step),
 	};
 #else
-	__m128i ms = _mm_set1_epi32((s32)step);
-	__m128i one = _mm_set1_epi32(1);
-	__m128i pos = _mm_div_epi32(v.m, ms);
-	__m128i neg = _mm_sub_epi32(_mm_div_epi32(_mm_add_epi32(v.m, one), ms), one);
-	__m128i mask = _mm_cmplt_epi32(v.m, _mm_setzero_si128());
-	return V4s(_mm_mullo_epi32(_mm_or_si128(_mm_and_si128(mask, neg), _mm_andnot_si128(mask, pos)),
-							   _mm_set1_epi32((s32)step)));
+	s32x4 ms = S32x4((s32)step);
+	s32x4 pos = v.m / ms;
+	s32x4 neg = (v.m + 1) / ms - 1;
+	__m128i mask = _mm_cmplt_epi32(v.m.m, _mm_setzero_si128());
+	return V4s(S32x4(_mm_blendv_epi32(pos.m, neg.m, mask)) * (s32)step);
 #endif
 }
-f32 dot(v2 a, v2 b) { return a.x * b.x + a.y * b.y; }
-f32 dot(v3 a, v3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 f32 dot(f32x4 a, f32x4 b) {
 	f32 result;
 	_mm_store_ss(&result, _mm_dp_ps(a.m, b.m, 0xFF));
 	return result;
 }
+#define DOT(f32, v2)      \
+	f32 dot(v2 a, v2 b) { \
+		a *= b;           \
+		return a.x + a.y; \
+	}
+DOT(f32, v2)
+DOT(f32x4, v2x4)
+DOT(f32x8, v2x8)
+#undef DOT
+
+#define DOT(f32, v3)            \
+	f32 dot(v3 a, v3 b) {       \
+		a *= b;                 \
+		return a.x + a.y + a.z; \
+	}
+DOT(f32, v3)
+DOT(f32x4, v3x4)
+DOT(f32x8, v3x8)
+#undef DOT
+
 f32 dot(v4 a, v4 b) { return dot(a.m, b.m); }
-f32x4 dot(v3x4 a, v3x4 b) {
-	a *= b;
-	return a.x + a.y + a.z;
-}
-f32x8 dot(v3x8 a, v3x8 b) {
-	a *= b;
-	return a.x + a.y + a.z;
-}
-f32x8 dot(v2x8 a, v2x8 b) {
-	a *= b;
-	return a.x + a.y;
-}
-s32 dot(v2s a, v2s b) { return a.x * b.x + a.y * b.y; }
-s32 dot(v3s a, v3s b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-s32 dot(v4s a, v4s b) {
-	a *= b;
-	return a.x + a.y + a.z + a.w;
-}
-#if ARCH_AVX
-v2 dot(v4x2 a, v4x2 b) {
-	auto dp = _mm256_dp_ps(a.m.m, b.m.m, 0xF1);
-	return V2(dp.m256_f32[0], dp.m256_f32[4]);
-}
-#else
-v2 dot(v4x2 a, v4x2 b) { return V2(dot(a.i, b.i), dot(a.j, b.j)); }
-#endif
+
+#define DOT(f32, v4)                  \
+	f32 dot(v4 a, v4 b) {             \
+		a *= b;                       \
+		return a.x + a.y + a.z + a.w; \
+	}
+DOT(f32x4, v4x4)
+DOT(f32x8, v4x8)
+#undef DOT
+
 v2 cross(v2 a) { return {a.y, -a.x}; }
 v3 cross(v3 a, v3 b) {
 	// clang-format off
@@ -1607,7 +1945,7 @@ v3s abs(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
 s32x4 abs(s32x4 a) { return S32x4(_mm_abs_epi32(a.m)); }
 v4s abs(v4s a) { return V4s(abs(a.m)); }
 
-f32 sign(f32 v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
+f32 sign(f32 v) { return v > 0.0f ? 1.0f : v < 0.0f ? -1.0f : 0.0f; }
 
 f32 sum(v2 v) { return v.x + v.y; }
 
@@ -1646,7 +1984,7 @@ int maxDistance(v3s a, v3s b) {
 	a = abs(a - b);
 	return max(max(a.x, a.y), a.z);
 }
-inline f32 cos01(f32 t) { return 0.5f - cosf(t * PI) * 0.5f; }
+inline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
 /*
 f32 noise(s32 x) {
 	x = (x << 13) ^ x;
@@ -1677,9 +2015,9 @@ inline f32 interpolate(v2s p, s32 s, Interp&& interp, Sample&& sample) {
 				  interp(sample(fl + v2s{0, 1}), sample(fl + v2s{1, 1}), fr), frac(p.y, s) / f32(s));
 }
 */
-inline static constexpr v2 _randMul2{PI, SQRT2 * 2};
-inline static constexpr v3 _randMul3{PI, SQRT2 * 2, SQRT3 * 3};
-inline static constexpr v4 _randMul4{PI, SQRT2 * 2, SQRT3 * 3, SQRT5};
+inline static constexpr v2 _randMul2{pi * 10, sqrt2 * 20};
+inline static constexpr v3 _randMul3{pi * 10, sqrt2 * 20, sqrt3 * 15};
+inline static constexpr v4 _randMul4{pi * 10, sqrt2 * 20, sqrt3 * 15, sqrt5 * 10};
 
 u32 rotateLeft(u32 v, int shift) { return _rotl(v, shift); }
 u32 rotateRight(u32 v, int shift) { return _rotr(v, shift); }
@@ -1698,75 +2036,52 @@ u8 rotateRight(u8 v, int shift) { return _rotr8(v, (u8)shift); }
 u16 rotateRight(u16 v, int shift) { return _rotr16(v, (u8)shift); }
 u64 rotateRight(u64 v, int shift) { return _rotr64(v, shift); }
 #endif
-u32 randomize(u32 v) { return rotateLeft(((v + 0x0C252DA0) * 0x034FB5E7) ^ 0xF5605798, 16); }
-s32 randomize(s32 v) { return randomize((u32)v); }
-v2s randomize(v2s v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v.x = v.x * v.y + v.x;
-	v.y = v.x * v.y + v.x;
-	return v;
+u32 randomize(u32 v) { 
+	return v * 0xEB84226F ^ 0x034FB5E7;
+	//return rotateLeft(((v + 0x0C252DA0) * 0x034FB5E7) ^ 0xF5605798, 16); 
 }
-v2sx8 randomize(v2sx8 v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v.x = v.x * v.y + v.x;
-	v.y = v.x * v.y + v.x;
-	return v;
-}
-v3s randomize(v3s v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v *= V3s(v.z, v.x, v.y);
-	v *= V3s(v.z, v.x, v.y);
-	v *= V3s(v.z, v.x, v.y);
-	return v;
-}
-__forceinline v3sx4 randomize(v3sx4 v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v *= V3sx4(v.z, v.x, v.y);
-	v *= V3sx4(v.z, v.x, v.y);
-	v *= V3sx4(v.z, v.x, v.y);
-	return v;
-}
-v3sx8 randomize(v3sx8 v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v *= V3sx8(v.z, v.x, v.y);
-	v *= V3sx8(v.z, v.x, v.y);
-	v *= V3sx8(v.z, v.x, v.y);
-	return v;
-}
-v4s randomize(v4s v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v ^= V4s(V4u(v) >> 31);
-	v *= V4s(_mm_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3)));
-	v *= V4s(_mm_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3)));
-	v *= V4s(_mm_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3)));
-	return v;
-}
-#if ARCH_AVX
-v4sx2 randomize(v4sx2 v) {
-	v += 0x0C252DA0;
-	v *= 0x034FB5E7;
-	v ^= 0xF5605798;
-	v ^= V4sx2(V4ux2(v) >> 31);
-	v *= V4sx2(S32x8(_mm256_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3))));
-	v *= V4sx2(S32x8(_mm256_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3))));
-	v *= V4sx2(S32x8(_mm256_shuffle_epi32(v.m.m, _MM_SHUFFLE(2, 1, 0, 3))));
-	return v;
-}
-#else
-v4sx2 randomize(v4sx2 v) { return V4sx2(randomize(v.i), randomize(v.j)); }
-#endif
+s32 randomize(s32 v) { return (s32)randomize((u32)v); }
+#define RANDOMIZE(v2u)         \
+	v2u randomize(v2u v) {     \
+		v += 0x0C252DA0;       \
+		v *= 0x034FB5E7;       \
+		v ^= 0xF5605798;       \
+		v.x = v.x * v.y + v.x; \
+		v.y = v.x * v.y + v.x; \
+		return v;              \
+	}
+RANDOMIZE(v2u) RANDOMIZE(v2ux4) RANDOMIZE(v2ux8);
+#undef RANDOMIZE
+#define RANDOMIZE(v3u, V3u)      \
+	v3u randomize(v3u v) {       \
+		v += 0x0C252DA0;         \
+		v *= 0x034FB5E7;         \
+		v ^= 0xF5605798;         \
+		v *= V3u(v.z, v.x, v.y); \
+		v *= V3u(v.z, v.x, v.y); \
+		v *= V3u(v.z, v.x, v.y); \
+		return v;                \
+	}
+RANDOMIZE(v3u, V3u) RANDOMIZE(v3ux4, V3ux4) RANDOMIZE(v3ux8, V3ux8);
+#undef RANDOMIZE
+#define RANDOMIZE(v4u, V4u)           \
+	v4u randomize(v4u v) {            \
+		v += 0x0C252DA0;              \
+		v *= 0x034FB5E7;              \
+		v ^= 0xF5605798;              \
+		v *= V4u(v.w, v.x, v.y, v.z); \
+		v *= V4u(v.w, v.x, v.y, v.z); \
+		v *= V4u(v.w, v.x, v.y, v.z); \
+		return v;                     \
+	}
+RANDOMIZE(v4u, V4u) RANDOMIZE(v4ux4, V4ux4) RANDOMIZE(v4ux8, V4ux8);
+#undef RANDOMIZE
+#define RANDOMIZE(v2s, v2u) \
+	v2s randomize(v2s v) { return cvt<v2s>(randomize(cvt<v2u>(v))); }
+RANDOMIZE(v2s, v2u) RANDOMIZE(v2sx4, v2ux4) RANDOMIZE(v2sx8, v2ux8);
+RANDOMIZE(v3s, v3u) RANDOMIZE(v3sx4, v3ux4) RANDOMIZE(v3sx8, v3ux8);
+RANDOMIZE(v4s, v4u) RANDOMIZE(v4sx4, v4ux4) RANDOMIZE(v4sx8, v4ux8);
+#undef RANDOMIZE
 
 u8 randomU8(u8 r) {
 	r += 0x0C;
@@ -1803,606 +2118,672 @@ u32 randomU32(v4s v) {
 	return u32(v.x) + u32(v.y) + u32(v.z) + u32(v.w);
 }
 u64 randomU64(v3s in) {
-	auto x = randomU32(in.x);
-	auto y = randomU32(in.y);
-	auto z = randomU32(in.z);
-	return (u64)x | ((u64)y << 32) + (u64)z | ((u64)x << 32) + (u64)y | ((u64)z << 32);
+	auto x = (u64)randomU32(in.x);
+	auto y = (u64)randomU32(in.y);
+	auto z = (u64)randomU32(in.z);
+	return x | (y << 32) + z | (x << 32) + y | (z << 32);
 }
-v2 random01(v2 p) {
-	v2 a = frac((p + SQRT2) * _randMul2);
-	a += dot(a, a + PI * 4);
-	return frac(V2(a.x * a.y, a.x + a.y));
-}
-/*
-v3 random01(v3 p) {
-	v3 a = frac((p + SQRT2) * _randMul3);
-	a += dot(a, a + PI * 4);
-	return frac(V3(a.x * a.y, a.y * a.z, a.x * a.z));
-}
-*/
-v4 random01(v4 p) {
-	v4 a = frac((p + SQRT2) * _randMul4);
-	a += dot(a, a + PI * 4);
-	return frac(a * V4(_mm_shuffle_ps(a.m.m, a.m.m, _MM_SHUFFLE(1, 2, 3, 0))));
-}
-v3 random01(v3 p) {
-	v4 a = random01(V4(p, 0));
-	memcpy(&p, &a, sizeof(p));
-	return p;
-}
-/*
-v2 random01(v2 p) {
-	v4 a = random01(V4(p, 0, 0));
-	memcpy(&p, &a, sizeof(p));
-	return p;
-}
-v4 random01x2(v4 p) {
-	p	 = frac((p + SQRT2) * V4(_randMul2, _randMul2));
-	v4 a = p + V4(PI * 4);
-	v2 d = V2(dot(p.xy, a.xy), dot(p.zw, a.zw));
-	p += V4(d.x, d.x, d.y, d.y);
-	return V4(frac(V2(p.x * p.y, p.x + p.y)),
-			  frac(V2(p.z * p.w, p.z + p.w)));
-}
-*/
-v2 random01(v2s v) {
-	auto x = randomU32(v);
-	auto y = randomU32(u32(x + 2454940283));
-	return V2(V2u(x, y) / 256) / 16777215.f + 0.5f;
-}
-v3 random01(v3s v) {
-	auto x = randomU32(v);
-	auto y = randomU32(u32(x + 2454940283));
-	auto z = randomU32(x ^ y);
-	return V3(V3u(x, y, z) / 256) / 16777215.f;
-}
-v2 randomN(v2s v) { return V2(randomize(v) / 256) * (1.0f / 8388608.f); }
-v3 randomN(v3s v) { return V3(randomize(v) / 256) * (1.0f / 8388608.f); }
-v4 randomN(v4s v) { return V4(randomize(v) / 256) * (1.0f / 8388608.f); }
-v4x2 randomN(v4sx2 v) { return V4x2(randomize(v) / 256) * (1.0f / 8388608.f); }
-v3x4 randomN(v3sx4 v) { return V3x4(randomize(v) / 256) * (1.0f / 8388608.f); }
-v2x8 randomN(v2sx8 v) { return V2x8(randomize(v) / 256) * (1.0f / 8388608.f); }
-v3x8 randomN(v3sx8 v) { return V3x8(randomize(v) / 256) * (1.0f / 8388608.f); }
+#define RANDOM(v2, V2)               \
+	v2 random(v2 v) {                \
+		v = frac(v * V2(_randMul2)); \
+		v += dot(v, v + pi * 4);     \
+		v.x *= v.x;                  \
+		v.y *= v.y;                  \
+		return frac(v);              \
+	}
+RANDOM(v2, V2)
+RANDOM(v2x4, V2x4)
+RANDOM(v2x8, V2x8)
+#undef RANDOM
+#define RANDOM(v3, V3)                                    \
+	v3 random(v3 v) {                                     \
+		v = frac(v * V3(_randMul3));                      \
+		v += dot(v, v + pi * 4);                          \
+		return frac(V3(v.x * v.y, v.y * v.z, v.x * v.z)); \
+	}
+RANDOM(v3, V3)
+RANDOM(v3x4, V3x4)
+RANDOM(v3x8, V3x8)
+#undef RANDOM
+#define RANDOM(v4, V4)                           \
+	v4 random(v4 v) {                            \
+		v = frac((v + sqrt2) * V4(_randMul4));   \
+		v += dot(v, v + pi * 4);                 \
+		return frac(v * V4(v.y, v.z, v.w, v.x)); \
+	}
+RANDOM(v4, V4)
+RANDOM(v4x4, V4x4)
+RANDOM(v4x8, V4x8)
+#undef RANDOM
 
-#define MSVC_BUG_FIXED 0
-#if MSVC_BUG_FIXED
+// clang-format off
+#define RANDOM(v2, v2s, V2, V2u) v2 random(v2s v) { return V2(randomize(V2u(v)) >> 8) * (1.0f / 16777216.0f); }
+RANDOM(v2, v2s, V2, V2u) RANDOM(v2x4, v2sx4, V2x4, V2ux4) RANDOM(v2x8, v2sx8, V2x8, V2ux8)
+RANDOM(v3, v3s, V3, V3u) RANDOM(v3x4, v3sx4, V3x4, V3ux4) RANDOM(v3x8, v3sx8, V3x8, V3ux8)
+RANDOM(v4, v4s, V4, V4u) RANDOM(v4x4, v4sx4, V4x4, V4ux4) RANDOM(v4x8, v4sx8, V4x8, V4ux8)
+#undef RANDOM
 
-template <size_t i, size_t size, v3s const (&arr)[size], class Cb>
-constexpr void wideForEachIter(Cb cb) {
-	if constexpr (i + 8 <= size) {
-		constexpr auto x	   = arr[0].x;
-		constexpr v3s const* c = arr + i;
-		constexpr v3sx8 v	   = {
-			 c[0].x, c[1].x, c[2].x, c[3].x, c[4].x, c[5].x, c[6].x, c[7].x, c[0].y, c[1].y, c[2].y, c[3].y,
-			 c[4].y, c[5].y, c[6].y, c[7].y, c[0].z, c[1].z, c[2].z, c[3].z, c[4].z, c[5].z, c[6].z, c[7].z,
-		 };
-		cb(v);
-		wideForEachIter<i + 8, size, arr>(cb);
-	} else if constexpr (i + 4 <= size) {
-		constexpr v3s const* c = arr + i;
-		constexpr v3sx4 v	   = {
-			 c[0].x, c[1].x, c[2].x, c[3].x, c[0].y, c[1].y, c[2].y, c[3].y, c[0].z, c[1].z, c[2].z, c[3].z,
-		 };
-		cb(v);
-		wideForEachIter<i - 4, size, arr>(cb);
-	} else if constexpr (i + 1 <= size) {
-		cb(arr[i]);
-		wideForEachIter<i + 1, size, arr>(cb);
-	}
-}
+#define RANDOM(v2, v2s) v2 operator()(v2s v) const { return random(v); }
+struct Random {
+	RANDOM(v2, v2s) RANDOM(v2x4, v2sx4) RANDOM(v2x8, v2sx8)
+	RANDOM(v3, v3s) RANDOM(v3x4, v3sx4) RANDOM(v3x8, v3sx8)
+	RANDOM(v4, v4s) RANDOM(v4x4, v4sx4) RANDOM(v4x8, v4sx8)
+	RANDOM(v2, v2) RANDOM(v2x4, v2x4) RANDOM(v2x8, v2x8)
+	RANDOM(v3, v3) RANDOM(v3x4, v3x4) RANDOM(v3x8, v3x8)
+	RANDOM(v4, v4) RANDOM(v4x4, v4x4) RANDOM(v4x8, v4x8)
+};
+#undef RANDOM
 
-template <size_t size, v3s const (&arr)[size], class Cb>
-constexpr void wideForEach(Cb cb) {
-	wideForEachIter<0, size, arr>(cb);
-	/*
-	size_t i	   = 0;
-	for (; i + 8 < size; i += 8) {
-		constexpr v3s const* c = arr + i;
-		v3sx8 v			   = {
-			  c[0].x, c[1].x, c[2].x, c[3].x, c[4].x, c[5].x, c[6].x, c[7].x, c[0].y, c[1].y, c[2].y, c[3].y,
-			  c[4].y, c[5].y, c[6].y, c[7].y, c[0].z, c[1].z, c[2].z, c[3].z, c[4].z, c[5].z, c[6].z, c[7].z,
-		  };
-		cb(v);
-	}
-	for (; i + 4 < size; i += 4) {
-		v3s const* c = arr + i;
-		v3sx4 v	 = {
-			c[0].x, c[1].x, c[2].x, c[3].x, c[0].y, c[1].y, c[2].y, c[3].y, c[0].z, c[1].z, c[2].z, c[3].z,
-		};
-		cb(v);
-	}
-	for (; i + 1 < size; ++i) {
-		cb(arr[i]);
-	}
-	*/
-}
-#endif
+template<class T> constexpr bool isVector = false;
+template<> constexpr bool isVector<v2   > = true;
+template<> constexpr bool isVector<v3   > = true;
+template<> constexpr bool isVector<v4   > = true;
+template<> constexpr bool isVector<v2s  > = true;
+template<> constexpr bool isVector<v3s  > = true;
+template<> constexpr bool isVector<v4s  > = true;
+template<> constexpr bool isVector<v2u  > = true;
+template<> constexpr bool isVector<v3u  > = true;
+template<> constexpr bool isVector<v4u  > = true;
+template<> constexpr bool isVector<v2x4 > = true;
+template<> constexpr bool isVector<v3x4 > = true;
+template<> constexpr bool isVector<v4x4 > = true;
+template<> constexpr bool isVector<v2sx4> = true;
+template<> constexpr bool isVector<v3sx4> = true;
+template<> constexpr bool isVector<v4sx4> = true;
+template<> constexpr bool isVector<v2ux4> = true;
+template<> constexpr bool isVector<v3ux4> = true;
+template<> constexpr bool isVector<v4ux4> = true;
+template<> constexpr bool isVector<v2x8 > = true;
+template<> constexpr bool isVector<v3x8 > = true;
+template<> constexpr bool isVector<v4x8 > = true;
+template<> constexpr bool isVector<v2sx8> = true;
+template<> constexpr bool isVector<v3sx8> = true;
+template<> constexpr bool isVector<v4sx8> = true;
+template<> constexpr bool isVector<v2ux8> = true;
+template<> constexpr bool isVector<v3ux8> = true;
+template<> constexpr bool isVector<v4ux8> = true;
+// clang-format on
 
 template <class T>
-constexpr size_t noWidth() {
-	static_assert(false, "no width");
-	return -1;
-}
+struct RemoveQualifiers {
+	using Type = T;
+};
+template <class T>
+struct RemoveQualifiers<const T> {
+	using Type = typename RemoveQualifiers<T>::Type;
+};
+template <class T>
+struct RemoveQualifiers<volatile T> {
+	using Type = typename RemoveQualifiers<T>::Type;
+};
+template <class T>
+struct RemoveQualifiers<T*> {
+	using Type = typename RemoveQualifiers<T>::Type;
+};
+template <class T>
+struct RemoveQualifiers<T&> {
+	using Type = typename RemoveQualifiers<T>::Type;
+};
 
 template <class T>
-constexpr size_t widthOf = noWidth<T>();
-template <>
-constexpr size_t widthOf<v3s> = 1;
-template <>
-constexpr size_t widthOf<v3sx4> = 4;
-template <>
-constexpr size_t widthOf<v3sx8> = 8;
+constexpr size_t _widthOf = [] {}(); // invalid width for invalid types
+// clang-format off
+template<> constexpr size_t _widthOf<v2>    = 1;
+template<> constexpr size_t _widthOf<v3>    = 1;
+template<> constexpr size_t _widthOf<v4>    = 1;
+template<> constexpr size_t _widthOf<v2s>   = 1;
+template<> constexpr size_t _widthOf<v3s>   = 1;
+template<> constexpr size_t _widthOf<v4s>   = 1;
+template<> constexpr size_t _widthOf<v2u>   = 1;
+template<> constexpr size_t _widthOf<v3u>   = 1;
+template<> constexpr size_t _widthOf<v4u>   = 1;
+template<> constexpr size_t _widthOf<v2x4>  = 4;
+template<> constexpr size_t _widthOf<v3x4>  = 4;
+template<> constexpr size_t _widthOf<v4x4>  = 4;
+template<> constexpr size_t _widthOf<v2sx4> = 4;
+template<> constexpr size_t _widthOf<v3sx4> = 4;
+template<> constexpr size_t _widthOf<v4sx4> = 4;
+template<> constexpr size_t _widthOf<v2ux4> = 4;
+template<> constexpr size_t _widthOf<v3ux4> = 4;
+template<> constexpr size_t _widthOf<v4ux4> = 4;
+template<> constexpr size_t _widthOf<v2x8>  = 8;
+template<> constexpr size_t _widthOf<v3x8>  = 8;
+template<> constexpr size_t _widthOf<v4x8>  = 8;
+template<> constexpr size_t _widthOf<v2sx8> = 8;
+template<> constexpr size_t _widthOf<v3sx8> = 8;
+template<> constexpr size_t _widthOf<v4sx8> = 8;
+template<> constexpr size_t _widthOf<v2ux8> = 8;
+template<> constexpr size_t _widthOf<v3ux8> = 8;
+template<> constexpr size_t _widthOf<v4ux8> = 8;
+// clang-format on
+
+template <class T>
+constexpr size_t widthOf = _widthOf<RemoveQualifiers<T>::Type>;
 
 template <size_t width, class T>
-inline constexpr auto widen(T v) = delete;
-template <>
-inline constexpr auto widen<1>(v3 v) {
-	return v;
-}
-template <>
-inline constexpr auto widen<1>(v3s v) {
-	return v;
-}
-template <>
-inline constexpr auto widen<4>(v3 v) {
-	return CE::V3x4(v);
-}
-template <>
-inline constexpr auto widen<4>(v3x4 v) {
-	return v;
-}
-template <>
-inline constexpr auto widen<4>(v3s v) {
-	return CE::V3sx4(v);
-}
-template <>
-inline constexpr auto widen<4>(v3sx4 v) {
-	return v;
-}
-template <>
-inline constexpr auto widen<8>(v3 v) {
-	return CE::V3x8(v);
-}
-template <>
-inline constexpr auto widen<8>(v3x8 v) {
-	return v;
-}
-template <>
-inline constexpr auto widen<8>(v3s v) {
-	return CE::V3sx8(v);
-}
-template <>
-inline constexpr auto widen<8>(v3sx8 v) {
-	return v;
-}
+auto widen(T v) = delete;
+
+// clang-format off
+template<> auto widen<1>(v2    v) { return v; }
+template<> auto widen<1>(v3    v) { return v; }
+template<> auto widen<1>(v4    v) { return v; }
+template<> auto widen<1>(v2s   v) { return v; }
+template<> auto widen<1>(v3s   v) { return v; }
+template<> auto widen<1>(v4s   v) { return v; }
+template<> auto widen<1>(v2u   v) { return v; }
+template<> auto widen<1>(v3u   v) { return v; }
+template<> auto widen<1>(v4u   v) { return v; }
+template<> auto widen<4>(v2    v) { return  V2x4(v); }
+template<> auto widen<4>(v3    v) { return  V3x4(v); }
+template<> auto widen<4>(v4    v) { return  V4x4(v); }
+template<> auto widen<4>(v2s   v) { return V2sx4(v); }
+template<> auto widen<4>(v3s   v) { return V3sx4(v); }
+template<> auto widen<4>(v4s   v) { return V4sx4(v); }
+template<> auto widen<4>(v2u   v) { return V2ux4(v); }
+template<> auto widen<4>(v3u   v) { return V3ux4(v); }
+template<> auto widen<4>(v4u   v) { return V4ux4(v); }
+template<> auto widen<8>(v2    v) { return  V2x8(v); }
+template<> auto widen<8>(v3    v) { return  V3x8(v); }
+template<> auto widen<8>(v4    v) { return  V4x8(v); }
+template<> auto widen<8>(v2s   v) { return V2sx8(v); }
+template<> auto widen<8>(v3s   v) { return V3sx8(v); }
+template<> auto widen<8>(v4s   v) { return V4sx8(v); }
+template<> auto widen<8>(v2u   v) { return V2ux8(v); }
+template<> auto widen<8>(v3u   v) { return V3ux8(v); }
+template<> auto widen<8>(v4u   v) { return V4ux8(v); }
+// clang-format on
 
 namespace CE {
-inline constexpr v3sx4 widen(v3s a, v3s b, v3s c, v3s d) { return CE::V3sx4(a, b, c, d); }
-inline constexpr v3sx8 widen(v3s a, v3s b, v3s c, v3s d, v3s e, v3s f, v3s g, v3s h) {
-	return CE::V3sx8(a, b, c, d, e, f, g, h);
-}
-inline constexpr v4sx2 widen(v4s a, v4s b) { return CE::V4sx2(a, b); }
+#define WIDEN(ty, tyx4, conx4) \
+	constexpr tyx4 widen(ty a, ty b, ty c, ty d) { return CE::conx4(a, b, c, d); }
+WIDEN(v2, v2x4, V2x4)
+WIDEN(v2s, v2sx4, V2sx4)
+WIDEN(v2u, v2ux4, V2ux4)
+WIDEN(v3, v3x4, V3x4)
+WIDEN(v3s, v3sx4, V3sx4)
+WIDEN(v3u, v3ux4, V3ux4)
+WIDEN(v4, v4x4, V4x4)
+WIDEN(v4s, v4sx4, V4sx4)
+WIDEN(v4u, v4ux4, V4ux4)
+#undef WIDEN
+#define WIDEN(ty, tyx8, conx8) \
+	constexpr tyx8 widen(ty a, ty b, ty c, ty d, ty e, ty f, ty g, ty h) { return CE::conx8(a, b, c, d, e, f, g, h); }
+WIDEN(v2, v2x8, V2x8)
+WIDEN(v2s, v2sx8, V2sx8)
+WIDEN(v2u, v2ux8, V2ux8)
+WIDEN(v3, v3x8, V3x8)
+WIDEN(v3s, v3sx8, V3sx8)
+WIDEN(v3u, v3ux8, V3ux8)
+WIDEN(v4, v4x8, V4x8)
+WIDEN(v4s, v4sx8, V4sx8)
+WIDEN(v4u, v4ux8, V4ux8)
+#undef WIDEN
 } // namespace CE
 
 template <class To, class T>
 auto wideCast(T v) = delete;
 
-template <>
-inline auto wideCast<float, v3s>(v3s v) {
-	return V3(v);
-}
-template <>
-inline auto wideCast<float, v3sx4>(v3sx4 v) {
-	return V3x4(v);
-}
-template <>
-inline auto wideCast<float, v3sx8>(v3sx8 v) {
-	return V3x8(v);
-}
-template <>
-inline auto wideCast<float>(v4sx2 v) {
-	return V4x2(v);
-}
+// clang-format off
+template<> inline auto wideCast<f32>(v2s v) { return V2(v); }
+template<> inline auto wideCast<f32>(v2sx4 v) { return V2x4(v); }
+template<> inline auto wideCast<f32>(v2sx8 v) { return V2x8(v); }
+template<> inline auto wideCast<f32>(v3s v) { return V3(v); }
+template<> inline auto wideCast<f32>(v3sx4 v) { return V3x4(v); }
+template<> inline auto wideCast<f32>(v3sx8 v) { return V3x8(v); }
+template<> inline auto wideCast<f32>(v4s v) { return V4(v); }
+template<> inline auto wideCast<f32>(v4sx4 v) { return V4x4(v); }
+template<> inline auto wideCast<f32>(v4sx8 v) { return V4x8(v); }
+// clang-format on
+
+template <class T, size_t size>
+struct Array {
+	constexpr T& operator[](size_t i) { return v[i]; }
+	constexpr T const& operator[](size_t i) const { return v[i]; }
+	T v[size];
+};
 
 template <class T, size_t size>
 struct WideType {};
 
-template <>
-struct WideType<v3s, 4> {
-	using Type = v3sx4;
-};
-template <>
-struct WideType<v3s, 8> {
-	using Type = v3sx8;
-};
-template <>
-struct WideType<v4s, 4> {
-	using Type = v4s;
-};
-template <>
-struct WideType<v4s, 8> {
-	using Type = v4sx2;
-};
+// clang-format off
+template<> struct WideType<v2, 4> { using Type = v2x4; };
+template<> struct WideType<v3, 4> { using Type = v3x4; };
+template<> struct WideType<v4, 4> { using Type = v4x4; };
+template<> struct WideType<v2s, 4> { using Type = v2sx4; };
+template<> struct WideType<v3s, 4> { using Type = v3sx4; };
+template<> struct WideType<v4s, 4> { using Type = v4sx4; };
+template<> struct WideType<v2u, 4> { using Type = v2ux4; };
+template<> struct WideType<v3u, 4> { using Type = v3ux4; };
+template<> struct WideType<v4u, 4> { using Type = v4ux4; };
+template<> struct WideType<v2, 8> { using Type = v2x8; };
+template<> struct WideType<v3, 8> { using Type = v3x8; };
+template<> struct WideType<v4, 8> { using Type = v4x8; };
+template<> struct WideType<v2s, 8> { using Type = v2sx8; };
+template<> struct WideType<v3s, 8> { using Type = v3sx8; };
+template<> struct WideType<v4s, 8> { using Type = v4sx8; };
+template<> struct WideType<v2u, 8> { using Type = v2ux8; };
+template<> struct WideType<v3u, 8> { using Type = v3ux8; };
+template<> struct WideType<v4u, 8> { using Type = v4ux8; };
+// clang-format on
+
+template <class From, class ToScalar>
+struct Convert {};
+
+// clang-format off
+template<> struct Convert<v2, s32> { using Type = v2s; };
+template<> struct Convert<v3, s32> { using Type = v3s; };
+template<> struct Convert<v4, s32> { using Type = v4s; };
+template<> struct Convert<v2, u32> { using Type = v2u; };
+template<> struct Convert<v3, u32> { using Type = v3u; };
+template<> struct Convert<v4, u32> { using Type = v4u; };
+template<> struct Convert<v2s, f32> { using Type = v2; };
+template<> struct Convert<v3s, f32> { using Type = v3; };
+template<> struct Convert<v4s, f32> { using Type = v4; };
+template<> struct Convert<v2s, u32> { using Type = v2u; };
+template<> struct Convert<v3s, u32> { using Type = v3u; };
+template<> struct Convert<v4s, u32> { using Type = v4u; };
+template<> struct Convert<v2u, f32> { using Type = v2; };
+template<> struct Convert<v3u, f32> { using Type = v3; };
+template<> struct Convert<v4u, f32> { using Type = v4; };
+template<> struct Convert<v2u, s32> { using Type = v2s; };
+template<> struct Convert<v3u, s32> { using Type = v3s; };
+template<> struct Convert<v4u, s32> { using Type = v4s; };
+// clang-format on
 
 namespace CE {
-namespace Widen {
+template <class ToScalar, class From, size_t size>
+constexpr auto wideCast(Array<From, size> const& arr) {
+	using To = typename Convert<From, ToScalar>::Type;
+	Array<To, size> result{};
+	for (size_t i = 0; i < size; ++i) {
+		result[i] = CE::cvt<To>(arr[i]);
+	}
+	return result;
+}
+
 template <class T, size_t count1, size_t count4, size_t count8>
-struct WideHolder {
-	using T1 = T;
+struct WideArray {
+	using T8 = typename WideType<T, 8>::Type;
 	using T4 = typename WideType<T, 4>::Type;
-	using T8 = typename WideType<T, 8>::Type;
-};
-template <class T, size_t count1, size_t count4>
-struct WideHolder<T, count1, count4, 0> {};
-template <class T, size_t count1, size_t count8>
-struct WideHolder<T, count1, 0, count8> {
 	using T1 = T;
-	using T8 = typename WideType<T, 8>::Type;
-	T8 t8[count8 * sizeof(T) * 8 / sizeof(T8)]{};
+	T8 t8[count8]{};
+	T4 t4[count4]{};
 	T1 t1[count1]{};
-	constexpr WideHolder() = delete;
-	inline constexpr WideHolder(T const (&arr)[count8 * 8 + count1]) {
-		for (size_t i = 0; i < _countof(t8); ++i) {
-			if constexpr (sizeof(T8) == sizeof(T) * 8) {
-				t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
-								  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
-			} else if constexpr (sizeof(T8) == sizeof(T) * 2) {
-				t8[i] = CE::widen(arr[i * 2 + 0], arr[i * 2 + 1]);
-			} else if constexpr (sizeof(T8) == sizeof(T)) {
-				t8[i] = arr[i];
-			} else {
-				static_assert(false);
-			}
+	inline constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4 + count1]) {
+		for (size_t i = 0; i < count8; ++i) {
+			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
+							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
+		}
+		for (size_t i = 0; i < count4; ++i) {
+			t4[i] = CE::widen(arr[count8 * 8 + i * 4 + 0], arr[count8 * 8 + i * 4 + 1], arr[count8 * 8 + i * 4 + 2],
+							  arr[count8 * 8 + i * 4 + 3]);
 		}
 		for (size_t i = 0; i < count1; ++i) {
-			t1[i] = arr[count8 * 8 + i];
+			t1[i] = arr[count8 * 8 + count4 * 4 + i];
 		}
 	}
+	inline constexpr WideArray(Array<T, count8 * 8 + count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
 	inline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
+		for (auto const& t : t4)
+			cb(t);
 		for (auto const& t : t1)
 			cb(t);
 	}
 };
-// template<class T>
-// struct WideHolder<T,0,0,0> {
-//	static_assert(false, "bad wide holder");
-//};
-} // namespace Widen
-template <class T, size_t size>
-inline constexpr auto prepareForSIMD(T const (&arr)[size]) {
-	using namespace Widen;
-	constexpr size_t count8 = size / 8;
-	constexpr size_t count4 = (size - count8 * 8) / 4;
-	constexpr size_t count1 = size - count8 * 8 - count4 * 4;
-	return WideHolder<T, count1, count4, count8>(arr);
-}
-} // namespace CE
-namespace Widen {
-template <class T, size_t count1, size_t count4, size_t count8>
-struct WideHolder {
+template <class T, size_t count1>
+struct WideArray<T, count1, 0, 0> {
 	using T1 = T;
+	T1 t1[count1]{};
+	inline constexpr WideArray(T const (&arr)[count1]) {
+		for (size_t i = 0; i < count1; ++i) {
+			t1[i] = arr[i];
+		}
+	}
+	inline constexpr WideArray(Array<T, count1> const& arr) : WideArray(arr.v) {}
+	template <class Cb>
+	inline constexpr void forEach(Cb cb) const {
+		for (auto const& t : t1)
+			cb(t);
+	}
+};
+template <class T, size_t count4>
+struct WideArray<T, 0, count4, 0> {
 	using T4 = typename WideType<T, 4>::Type;
-	using T8 = typename WideType<T, 8>::Type;
+	T4 t4[count4]{};
+	inline constexpr WideArray(T const (&arr)[count4 * 4]) {
+		for (size_t i = 0; i < count4; ++i) {
+			t4[i] = CE::widen(arr[i * 4 + 0], arr[i * 4 + 1], arr[i * 4 + 2], arr[i * 4 + 3]);
+		}
+	}
+	inline constexpr WideArray(Array<T, count4 * 4> const& arr) : WideArray(arr.v) {}
+	template <class Cb>
+	inline constexpr void forEach(Cb cb) const {
+		for (auto const& t : t4)
+			cb(t);
+	}
 };
 template <class T, size_t count1, size_t count4>
-struct WideHolder<T, count1, count4, 0> {};
-template <class T, size_t count1, size_t count8>
-struct WideHolder<T, count1, 0, count8> {
+struct WideArray<T, count1, count4, 0> {
+	using T4 = typename WideType<T, 4>::Type;
 	using T1 = T;
-	using T8 = typename WideType<T, 8>::Type;
-	T8 t8[count8 * sizeof(T) * 8 / sizeof(T8)]{};
+	T4 t4[count4]{};
 	T1 t1[count1]{};
-	WideHolder() = delete;
-	inline WideHolder(T const (&arr)[count8 * 8 + count1]) {
-		if constexpr (std::is_same_v<T8, v4sx2>) {
-			memcpy(t8, arr, sizeof(t8));
-		} else {
-			for (size_t i = 0; i < _countof(t8); ++i) {
-				if constexpr (sizeof(T8) == sizeof(T) * 8) {
-					t8[i] = widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
-								  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
-				} else if constexpr (sizeof(T8) == sizeof(T) * 2) {
-					t8[i] = widen(arr[i * 2 + 0], arr[i * 2 + 1]);
-				} else {
-					static_assert(false);
-				}
-			}
+	inline constexpr WideArray(T const (&arr)[count4 * 4 + count1]) {
+		for (size_t i = 0; i < count4; ++i) {
+			t4[i] = CE::widen(arr[i * 4 + 0], arr[i * 4 + 1], arr[i * 4 + 2], arr[i * 4 + 3]);
+		}
+		for (size_t i = 0; i < count1; ++i) {
+			t1[i] = arr[count4 * 4 + i];
+		}
+	}
+	inline constexpr WideArray(Array<T, count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
+	template <class Cb>
+	inline constexpr void forEach(Cb cb) const {
+		for (auto const& t : t4)
+			cb(t);
+		for (auto const& t : t1)
+			cb(t);
+	}
+};
+template <class T, size_t count8>
+struct WideArray<T, 0, 0, count8> {
+	using T8 = typename WideType<T, 8>::Type;
+	T8 t8[count8]{};
+	inline constexpr WideArray(T const (&arr)[count8 * 8]) {
+		for (size_t i = 0; i < count8; ++i) {
+			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
+							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
+		}
+	}
+	inline constexpr WideArray(Array<T, count8 * 8> const& arr) : WideArray(arr.v) {}
+	template <class Cb>
+	inline constexpr void forEach(Cb cb) const {
+		for (auto const& t : t8)
+			cb(t);
+	}
+};
+template <class T, size_t count1, size_t count8>
+struct WideArray<T, count1, 0, count8> {
+	using T8 = typename WideType<T, 8>::Type;
+	using T1 = T;
+	T8 t8[count8]{};
+	T1 t1[count1]{};
+	inline constexpr WideArray(T const (&arr)[count8 * 8 + count1]) {
+		for (size_t i = 0; i < count8; ++i) {
+			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
+							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
 		}
 		for (size_t i = 0; i < count1; ++i) {
 			t1[i] = arr[count8 * 8 + i];
 		}
 	}
+	inline constexpr WideArray(Array<T, count8 * 8 + count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	inline void forEach(Cb cb) const {
+	FORCEINLINE constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
 		for (auto const& t : t1)
 			cb(t);
 	}
 };
-// template<class T>
-// struct WideHolder<T,0,0,0> {
-//	static_assert(false, "bad wide holder");
-//};
-} // namespace Widen
+template <class T, size_t count4, size_t count8>
+struct WideArray<T, 0, count4, count8> {
+	using T8 = typename WideType<T, 8>::Type;
+	using T4 = typename WideType<T, 4>::Type;
+	T8 t8[count8]{};
+	T4 t4[count4]{};
+	inline constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4]) {
+		for (size_t i = 0; i < count8; ++i) {
+			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
+							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
+		}
+		for (size_t i = 0; i < count4; ++i) {
+			t4[i] = CE::widen(arr[count8 * 8 + i * 4 + 0], arr[count8 * 8 + i * 4 + 1], arr[count8 * 8 + i * 4 + 2],
+							  arr[count8 * 8 + i * 4 + 3]);
+		}
+	}
+	inline constexpr WideArray(Array<T, count8 * 8 + count4 * 4> const& arr) : WideArray(arr.v) {}
+	template <class Cb>
+	inline constexpr void forEach(Cb cb) const {
+		for (auto const& t : t8)
+			cb(t);
+		for (auto const& t : t4)
+			cb(t);
+	}
+};
 template <class T, size_t size>
-inline constexpr auto prepareForSIMD(T const (&arr)[size]) {
-	using namespace Widen;
+inline constexpr auto makeWide(Array<T, size> const& arr) {
 	constexpr size_t count8 = size / 8;
 	constexpr size_t count4 = (size - count8 * 8) / 4;
 	constexpr size_t count1 = size - count8 * 8 - count4 * 4;
-	return WideHolder<T, count1, count4, count8>(arr);
+	return WideArray<T, count1, count4, count8>(arr);
 }
-inline f32 voronoi(v2 v) {
-	v2 rel		= frac(v) - 0.5f;
-	v2 tile		= floor(v);
-	f32 minDist = 1000;
-	for (f32 x = -1; x <= 1; ++x) {
-		for (f32 y = -1; y <= 1; ++y) {
-			v2 off	= V2(x, y);
-			minDist = min(minDist, lengthSqr(rel - random01(tile + off) + off - 0.5f));
-		}
-	}
-	return sqrt(minDist) * (1 / SQRT2);
-}
-inline f32 voronoi(v3 v) {
-	v3 rel		= frac(v) - 0.5f;
-	v3 tile		= floor(v);
-	f32 minDist = 1000;
-	for (f32 x = -1; x <= 1; ++x) {
-		for (f32 y = -1; y <= 1; ++y) {
-			for (f32 z = -1; z <= 1; ++z) {
-				v3 off	= V3(x, y, z);
-				minDist = min(minDist, lengthSqr(rel - random01(tile + off) + off - 0.5f));
-			}
-		}
-	}
-	return sqrt(minDist) * (1 / SQRT3);
-}
-inline f32 voronoi(v4 v) {
-	v4 rel		= frac(v) - 0.5f;
-	v4 tile		= floor(v);
-	f32 minDist = 1000;
-	for (f32 x = -1; x <= 1; ++x) {
-		for (f32 y = -1; y <= 1; ++y) {
-			for (f32 z = -1; z <= 1; ++z) {
-				for (f32 w = -1; w <= 1; ++w) {
-					v4 off	= V4(x, y, z, w);
-					minDist = min(minDist, lengthSqr(rel - random01(tile + off) + off - 0.5f));
-				}
-			}
-		}
-	}
-	return sqrt(minDist) * (1 / SQRT3);
-}
-/*
-inline v2 voronoi(v2 a, v2 b) {
-	v4 ab	   = V4(a, b);
-	v4 rel	   = frac(ab) - 0.5f;
-	v4 tile	   = floor(ab);
-	v2 minDist = V2(1000.0f);
-	for (f32 x = -1; x <= 1; ++x) {
-		for (f32 y = -1; y <= 1; ++y) {
-			v4 off	= V4(x, y, x, y);
-			minDist = min(minDist, lengthSqrx2(rel - random01x2(tile + off) + off - 0.5f));
-		}
-	}
-	return sqrt(minDist) * (1 / SQRT2);
-}
-*/
-inline f32 voronoi(v2s v, u32 cellSize) {
-	v2s flr		= floor(v, cellSize);
-	v2s tile	= flr / (s32)cellSize;
-	v2 rel		= V2(v - flr) / (f32)cellSize - 0.5f;
-	f32 minDist = 1000;
-	auto tile8	= V2sx8(tile);
-	auto rel8	= V2x8(rel);
+} // namespace CE
 
-	static constexpr v2sx8 offset8 = CE::V2sx8(-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0);
-	auto target					   = randomN(tile8 + offset8) * 0.5f + V2x8(offset8) - rel8;
-	f32x8 dp					   = dot(target, target);
-	minDist						   = min(minDist, dp);
-	minDist						   = min(minDist, lengthSqr(rel - randomN(tile + 1) * 0.5f + 1));
-	return sqrt(minDist) * (1 / SQRT2);
-}
-inline f32 voronoi(v3s v, u32 cellSize) {
-	v3s flr		= floor(v, cellSize);
-	v3s tile	= flr / (s32)cellSize;
-	v3 rel		= V3(v - flr) / (f32)cellSize - 0.5f;
+// for some reason compiler generates bad code for WideArray::forEach, so we don't use it by
+// default. it's ~50-100 cycles faster if iterate raw arrays
+#ifndef TL_USE_CONSTEXPR_WIDE
+#define TL_USE_CONSTEXPR_WIDE 0
+#endif
+template <class T, class Random, size_t count1, size_t count4, size_t count8>
+FORCEINLINE f32 _voronoiF32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T v, Random random) {
+	T tile		= floor(v);
+	T rel		= v - tile;
 	f32 minDist = 1000;
-	v3sx8 tile8 = V3sx8(tile);
-	v3x8 rel8	= V3x8(rel);
-#if 0
-	// clang-format off
-	static constexpr v3s offsets[]{ 
-		{-1,-1,-1}, {-1,-1, 0}, {-1,-1, 1},
-		{-1, 0,-1}, {-1, 0, 0}, {-1, 0, 1},
-		{-1, 1,-1}, {-1, 1, 0}, {-1, 1, 1},
-		{ 0,-1,-1}, { 0,-1, 0}, { 0,-1, 1},
-		{ 0, 0,-1}, { 0, 0, 0}, { 0, 0, 1},
-		{ 0, 1,-1}, { 0, 1, 0}, { 0, 1, 1},
-		{ 1,-1,-1}, { 1,-1, 0}, { 1,-1, 1},
-		{ 1, 0,-1}, { 1, 0, 0}, { 1, 0, 1},
-		{ 1, 1,-1}, { 1, 1, 0}, { 1, 1, 1},
-	};
-	// clang-format on
-	static constexpr auto wideOffsets = CE::prepareForSIMD(offsets);
-#if 1
-	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, lengthSqr(randomN(tile8 + offset) * 0.5f + V3x8(offset) - rel8));
-	}
-	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, lengthSqr(randomN(tile + offset) * 0.5f + V3(offset) - rel));
-	}
-#else
 	wideOffsets.forEach([&](auto const& offset) {
-		static constexpr auto offsetW = widthOf<std::decay_t<decltype(offset)>>;
-		// static_assert(offsetW == 8);
-		// static_assert(std::is_same_v<decltype(makeWideAs<offsetW>(rel)), v3x8>);
-		minDist = min(minDist, lengthSqr(randomN(widen<offsetW>(tile) + offset) * 0.5f + wideCast<float>(offset) -
-									   widen<offsetW>(rel)));
+		static constexpr auto offsetW = widthOf<decltype(offset)>;
+
+		minDist = min(minDist, distanceSqr(widen<offsetW>(rel), random(widen<offsetW>(tile) + offset) + offset));
 	});
-#endif
-#else
-	// clang-format off
-	static constexpr v3sx8 offsets8[] {
-		CE::V3sx8(-1,-1,-1,-1,-1, 0,-1,-1, 1,-1, 0,-1,-1, 0, 0,-1, 0, 1,-1, 1,-1,-1, 1, 0),
-		CE::V3sx8(-1, 1, 1, 0,-1,-1, 0,-1, 0, 0,-1, 1, 0, 0,-1, 0, 0, 0, 0, 0, 1, 0, 1,-1),
-		CE::V3sx8( 0, 1, 0, 0, 1, 1, 1,-1,-1, 1,-1, 0, 1,-1, 1, 1, 0,-1, 1, 0, 0, 1, 0, 1),
-	};
-	static constexpr v3s offsets[]{ 
-		{1, 1,-1}, 
-		{1, 1, 0}, 
-		{1, 1, 1}
-	};
-	// clang-format on
-	for (auto offset : offsets8) {
-		minDist = min(minDist, lengthSqr(randomN(tile8 + offset) * 0.5f + V3x8(offset) - rel8));
-	}
-	for (auto offset : offsets) {
-		minDist = min(minDist, lengthSqr(randomN(tile + offset) * 0.5f + V3(offset) - rel));
-	}
-#endif
-	return sqrt(minDist) * (1 / SQRT3);
-}
-inline f32 voronoi(v4s v, u32 cellSize) {
-	v4s flr		= floor(v, cellSize);
-	v4s tile	= flr / (s32)cellSize;
-	v4 rel		= V4(v - flr) / (f32)cellSize - 0.5f;
+	return minDist;
+};
+template <class T, class U, class Random, size_t count1, size_t count4, size_t count8>
+FORCEINLINE f32 _voronoiS32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T tile, U rel, Random random) {
 	f32 minDist = 1000;
-	v4sx2 tile8 = V4sx2(tile);
-	v4x2 rel8	= V4x2(rel);
-#if 1
-	// clang-format off
-	v4s offsets[] {
-		{-1,-1,-1,-1},{-1,-1,-1, 0},{-1,-1,-1, 1},
-		{-1,-1, 0,-1},{-1,-1, 0, 0},{-1,-1, 0, 1},
-		{-1,-1, 1,-1},{-1,-1, 1, 0},{-1,-1, 1, 1},
-		{-1, 0,-1,-1},{-1, 0,-1, 0},{-1, 0,-1, 1},
-		{-1, 0, 0,-1},{-1, 0, 0, 0},{-1, 0, 0, 1},
-		{-1, 0, 1,-1},{-1, 0, 1, 0},{-1, 0, 1, 1},
-		{-1, 1,-1,-1},{-1, 1,-1, 0},{-1, 1,-1, 1},
-		{-1, 1, 0,-1},{-1, 1, 0, 0},{-1, 1, 0, 1},
-		{-1, 1, 1,-1},{-1, 1, 1, 0},{-1, 1, 1, 1},
-		{ 0,-1,-1,-1},{ 0,-1,-1, 0},{ 0,-1,-1, 1},
-		{ 0,-1, 0,-1},{ 0,-1, 0, 0},{ 0,-1, 0, 1},
-		{ 0,-1, 1,-1},{ 0,-1, 1, 0},{ 0,-1, 1, 1},
-		{ 0, 0,-1,-1},{ 0, 0,-1, 0},{ 0, 0,-1, 1},
-		{ 0, 0, 0,-1},{ 0, 0, 0, 0},{ 0, 0, 0, 1},
-		{ 0, 0, 1,-1},{ 0, 0, 1, 0},{ 0, 0, 1, 1},
-		{ 0, 1,-1,-1},{ 0, 1,-1, 0},{ 0, 1,-1, 1},
-		{ 0, 1, 0,-1},{ 0, 1, 0, 0},{ 0, 1, 0, 1},
-		{ 0, 1, 1,-1},{ 0, 1, 1, 0},{ 0, 1, 1, 1},
-		{ 1,-1,-1,-1},{ 1,-1,-1, 0},{ 1,-1,-1, 1},
-		{ 1,-1, 0,-1},{ 1,-1, 0, 0},{ 1,-1, 0, 1},
-		{ 1,-1, 1,-1},{ 1,-1, 1, 0},{ 1,-1, 1, 1},
-		{ 1, 0,-1,-1},{ 1, 0,-1, 0},{ 1, 0,-1, 1},
-		{ 1, 0, 0,-1},{ 1, 0, 0, 0},{ 1, 0, 0, 1},
-		{ 1, 0, 1,-1},{ 1, 0, 1, 0},{ 1, 0, 1, 1},
-		{ 1, 1,-1,-1},{ 1, 1,-1, 0},{ 1, 1,-1, 1},
-		{ 1, 1, 0,-1},{ 1, 1, 0, 0},{ 1, 1, 0, 1},
-		{ 1, 1, 1,-1},{ 1, 1, 1, 0},{ 1, 1, 1, 1}
-	};
-	// clang-format on
-	auto wideOffsets = prepareForSIMD(offsets);
+	wideOffsets.forEach([&](auto const& offset) {
+		static constexpr auto width = widthOf<decltype(offset)>;
+
+		minDist = min(minDist, distanceSqr(widen<width>(rel),
+										   random(widen<width>(tile) + offset) * 0.5f + wideCast<float>(offset)));
+	});
+	return minDist;
+};
+// clang-format off
+static constexpr Array<v2s, 9> voronoiOffsets2s { 
+	-1,-1,
+	-1, 0,
+	-1, 1,
+	 0,-1,
+	 0, 0,
+	 0, 1,
+	 1,-1,
+	 1, 0,
+	 1, 1,
+};
+static constexpr Array<v3s, 27> voronoiOffsets3s { 
+	-1,-1,-1, -1,-1, 0, -1,-1, 1,
+	-1, 0,-1, -1, 0, 0, -1, 0, 1,
+	-1, 1,-1, -1, 1, 0, -1, 1, 1,
+	 0,-1,-1,  0,-1, 0,  0,-1, 1,
+	 0, 0,-1,  0, 0, 0,  0, 0, 1,
+	 0, 1,-1,  0, 1, 0,  0, 1, 1,
+	 1,-1,-1,  1,-1, 0,  1,-1, 1,
+	 1, 0,-1,  1, 0, 0,  1, 0, 1,
+	 1, 1,-1,  1, 1, 0,  1, 1, 1,
+};
+static constexpr Array<v4s, 81> voronoiOffsets4s {
+	-1,-1,-1,-1, -1,-1,-1, 0, -1,-1,-1, 1,  -1,-1, 0,-1, -1,-1, 0, 0, -1,-1, 0, 1,  -1,-1, 1,-1, -1,-1, 1, 0, -1,-1, 1, 1,
+	-1, 0,-1,-1, -1, 0,-1, 0, -1, 0,-1, 1,  -1, 0, 0,-1, -1, 0, 0, 0, -1, 0, 0, 1,  -1, 0, 1,-1, -1, 0, 1, 0, -1, 0, 1, 1,
+	-1, 1,-1,-1, -1, 1,-1, 0, -1, 1,-1, 1,  -1, 1, 0,-1, -1, 1, 0, 0, -1, 1, 0, 1,  -1, 1, 1,-1, -1, 1, 1, 0, -1, 1, 1, 1,
+	 0,-1,-1,-1,  0,-1,-1, 0,  0,-1,-1, 1,   0,-1, 0,-1,  0,-1, 0, 0,  0,-1, 0, 1,   0,-1, 1,-1,  0,-1, 1, 0,  0,-1, 1, 1,
+	 0, 0,-1,-1,  0, 0,-1, 0,  0, 0,-1, 1,   0, 0, 0,-1,  0, 0, 0, 0,  0, 0, 0, 1,   0, 0, 1,-1,  0, 0, 1, 0,  0, 0, 1, 1,
+	 0, 1,-1,-1,  0, 1,-1, 0,  0, 1,-1, 1,   0, 1, 0,-1,  0, 1, 0, 0,  0, 1, 0, 1,   0, 1, 1,-1,  0, 1, 1, 0,  0, 1, 1, 1,
+	 1,-1,-1,-1,  1,-1,-1, 0,  1,-1,-1, 1,   1,-1, 0,-1,  1,-1, 0, 0,  1,-1, 0, 1,   1,-1, 1,-1,  1,-1, 1, 0,  1,-1, 1, 1,
+	 1, 0,-1,-1,  1, 0,-1, 0,  1, 0,-1, 1,   1, 0, 0,-1,  1, 0, 0, 0,  1, 0, 0, 1,   1, 0, 1,-1,  1, 0, 1, 0,  1, 0, 1, 1,
+	 1, 1,-1,-1,  1, 1,-1, 0,  1, 1,-1, 1,   1, 1, 0,-1,  1, 1, 0, 0,  1, 1, 0, 1,   1, 1, 1,-1,  1, 1, 1, 0,  1, 1, 1, 1,
+};
+static constexpr auto voronoiOffsets2 = CE::wideCast<f32>(voronoiOffsets2s);
+static constexpr auto voronoiOffsets3 = CE::wideCast<f32>(voronoiOffsets3s);
+static constexpr auto voronoiOffsets4 = CE::wideCast<f32>(voronoiOffsets4s);
+// clang-format on
+
+template <class Random = Random>
+inline f32 voronoi(v2 v, Random random = {}) {
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2);
+	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt2);
+}
+template <class Random = Random>
+inline f32 voronoi(v3 v, Random random = {}) {
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3);
+	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt3);
+}
+template <class Random = Random>
+inline f32 voronoi(v4 v, Random random = {}) {
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4);
+	return sqrt(_voronoiF32(wideOffsets, v, random)) * 0.5f;
+}
+template <class Random = Random>
+inline f32 voronoi(v2s v, u32 cellSize, Random random = {}) {
+	v2s flr							  = floor(v, cellSize);
+	v2s tile						  = flr / (s32)cellSize;
+	v2 rel							  = V2(v - flr) / (f32)cellSize - 0.5f;
+	f32 minDist						  = 1000;
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2s);
+#if TL_USE_CONSTEXPR_WIDE
+	minDist = _voronoiS32(wideOffsets, tile, rel, random);
+#else
+	auto tile8 = V2sx8(tile);
+	auto rel8 = V2x8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, lengthSqr(randomN(tile8 + offset) * 0.5f + wideCast<float>(offset) - rel8));
+		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + V2x8(offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, lengthSqr(randomN(tile + offset) * 0.5f + V4(offset) - rel));
+		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + V2(offset)));
 	}
+#endif
+	return sqrt(minDist) * (1 / sqrt2);
+}
+template <class Random = Random>
+inline f32 voronoi(v3s v, u32 cellSize, Random random = {}) {
+	v3s flr							  = floor(v, cellSize);
+	v3s tile						  = flr / (s32)cellSize;
+	v3 rel							  = V3(v - flr) / (f32)cellSize - 0.5f;
+	f32 minDist						  = 1000;
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3s);
+#if TL_USE_CONSTEXPR_WIDE
+	minDist = _voronoiS32(wideOffsets, tile, rel, random);
 #else
+	v3sx8 tile8 = V3sx8(tile);
+	v3x8 rel8 = V3x8(rel);
+	for (auto offset : wideOffsets.t8) {
+		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + V3x8(offset)));
+	}
+	for (auto offset : wideOffsets.t1) {
+		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + V3(offset)));
+	}
+#endif
+	return sqrt(minDist) * (1 / sqrt3);
+}
+template <class Random = Random>
+inline f32 voronoi(v4s v, u32 cellSize, Random random = {}) {
+	v4s flr							  = floor(v, cellSize);
+	v4s tile						  = flr / (s32)cellSize;
+	v4 rel							  = V4(v - flr) / (f32)cellSize - 0.5f;
+	f32 minDist						  = 1000;
+	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4s);
+#if TL_USE_CONSTEXPR_WIDE
+	minDist = _voronoiS32(wideOffsets, tile, rel, random);
+#else
+	v4sx8 tile8 = V4sx8(tile);
+	v4x8 rel8 = V4x8(rel);
+	for (auto offset : wideOffsets.t8) {
+		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + wideCast<float>(offset)));
+	}
+	for (auto offset : wideOffsets.t1) {
+		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + V4(offset)));
+	}
+#endif
+	return sqrt(minDist) * 0.5f;
+}
+
+bool raycastLine(v2 a, v2 b, v2 c, v2 d, v2& point, v2& normal) {
+	v2 ba = b - a;
+	v2 dc = d - c;
+	v2 ac = a - c;
+
+	v2 s = v2{ba.x, dc.x} * ac.y - v2{ba.y, dc.y} * ac.x;
+	s /= ba.x * dc.y - dc.x * ba.y;
+
+	if (s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1) {
+		point  = a + (s.y * ba);
+		normal = c - d;
+		normal = cross(normal);
+		if (dot(b - a, normal) > 0)
+			normal *= -1;
+		return true;
+	}
+	return false;
+}
+bool raycastRect(v2 a, v2 b, v2 tile, v2 size, v2& point, v2& normal) {
+	v2 points[4];
+	v2 normals[4];
+	v2 const w = size;
 	// clang-format off
-	static constexpr v4sx2 offsets256[] {
-		{-1,-1,-1,-1,-1,-1,-1, 0},
-		{-1,-1,-1, 1,-1,-1, 0,-1},
-		{-1,-1, 0, 0,-1,-1, 0, 1},
-		{-1,-1, 1,-1,-1,-1, 1, 0},
-		{-1,-1, 1, 1,-1, 0,-1,-1},
-		{-1, 0,-1, 0,-1, 0,-1, 1},
-		{-1, 0, 0,-1,-1, 0, 0, 0},
-		{-1, 0, 0, 1,-1, 0, 1,-1},
-		{-1, 0, 1, 0,-1, 0, 1, 1},
-		{-1, 1,-1,-1,-1, 1,-1, 0},
-		{-1, 1,-1, 1,-1, 1, 0,-1},
-		{-1, 1, 0, 0,-1, 1, 0, 1},
-		{-1, 1, 1,-1,-1, 1, 1, 0},
-		{-1, 1, 1, 1, 0,-1,-1,-1},
-		{ 0,-1,-1, 0, 0,-1,-1, 1},
-		{ 0,-1, 0,-1, 0,-1, 0, 0},
-		{ 0,-1, 0, 1, 0,-1, 1,-1},
-		{ 0,-1, 1, 0, 0,-1, 1, 1},
-		{ 0, 0,-1,-1, 0, 0,-1, 0},
-		{ 0, 0,-1, 1, 0, 0, 0,-1},
-		{ 0, 0, 0, 0, 0, 0, 0, 1},
-		{ 0, 0, 1,-1, 0, 0, 1, 0},
-		{ 0, 0, 1, 1, 0, 1,-1,-1},
-		{ 0, 1,-1, 0, 0, 1,-1, 1},
-		{ 0, 1, 0,-1, 0, 1, 0, 0},
-		{ 0, 1, 0, 1, 0, 1, 1,-1},
-		{ 0, 1, 1, 0, 0, 1, 1, 1},
-		{ 1,-1,-1,-1, 1,-1,-1, 0},
-		{ 1,-1,-1, 1, 1,-1, 0,-1},
-		{ 1,-1, 0, 0, 1,-1, 0, 1},
-		{ 1,-1, 1,-1, 1,-1, 1, 0},
-		{ 1,-1, 1, 1, 1, 0,-1,-1},
-		{ 1, 0,-1, 0, 1, 0,-1, 1},
-		{ 1, 0, 0,-1, 1, 0, 0, 0},
-		{ 1, 0, 0, 1, 1, 0, 1,-1},
-		{ 1, 0, 1, 0, 1, 0, 1, 1},
-		{ 1, 1,-1,-1, 1, 1,-1, 0},
-		{ 1, 1,-1, 1, 1, 1, 0,-1},
-		{ 1, 1, 0, 0, 1, 1, 0, 1},
-		{ 1, 1, 1,-1, 1, 1, 1, 0},
+	bool hits[]{
+		raycastLine(a, b, tile + v2{-w.x, w.y}, tile + v2{ w.x, w.y}, points[0], normals[0]),
+		raycastLine(a, b, tile + v2{ w.x, w.y}, tile + v2{ w.x,-w.y}, points[1], normals[1]),
+		raycastLine(a, b, tile + v2{ w.x,-w.y}, tile + v2{-w.x,-w.y}, points[2], normals[2]),
+		raycastLine(a, b, tile + v2{-w.x,-w.y}, tile + v2{-w.x, w.y}, points[3], normals[3]),
 	};
 	// clang-format on
-	for (auto offset : offsets256) {
-		v4x2 target = randomN(tile8 + offset) * 0.5f + V4x2(offset) - rel8;
-		v2 dp = dot(target, target);
-		minDist = min(minDist, dp.x);
-		minDist = min(minDist, dp.y);
+	f32 minDist	 = FLT_MAX;
+	int minIndex = -1;
+	for (int i = 0; i < 4; ++i) {
+		if (!hits[i])
+			continue;
+		f32 len = lengthSqr(a - points[i]);
+		if (len < minDist) {
+			minDist	 = len;
+			minIndex = i;
+		}
 	}
-	minDist = min(minDist, lengthSqr(rel - randomN(tile + 1) * 0.5f + 1));
-#endif
-	return sqrt(minDist) * (1 / SQRT3);
+	if (minIndex == -1) {
+		return false;
+	}
+	point  = points[minIndex];
+	normal = normals[minIndex];
+	return true;
+}
+bool raycastPlane(v3 a, v3 b, v3 p1, v3 p2, v3 p3, v3& point, v3& normal) {
+	auto p21 = p2 - p1;
+	auto p31 = p3 - p1;
+	normal	 = normalize(cross(p21, p31));
+
+	auto r = a - b;
+
+	f32 nr = dot(normal, r);
+
+	if (nr <= 1e-5f) {
+		return false;
+	}
+
+	f32 t = dot(-normal, a - p1) / nr;
+	point = a + r * t;
+
+	auto dp1 = point - p1;
+	float u	 = dot(dp1, p21);
+	float v	 = dot(dp1, p31);
+
+	if (lengthSqr(a - point) > lengthSqr(a - b) || dot(a - point, a - b) <= 0) {
+		return false;
+	}
+
+	return u >= 0.0f && u <= dot(p21, p21) && v >= 0.0f && v <= dot(p31, p31);
 }
 /*
-struct Hit {
-	v3 p, n;
-};
-inline bool raycastPlane(v3 a, v3 b, v3 s1, v3 s2, v3 s3, Hit& hit) {
-	// 1.
-	auto dS21 = s2 - s1;
-	auto dS31 = s3 - s1;
-	hit.n	  = normalize(cross(dS21, dS31));
-
-	// 2.
-	auto dR = a - b;
-
-	f32 ndotdR = dot(hit.n, dR);
-
-	if (ndotdR <= 1e-5f) { // Choose your tolerance
-		return false;
-	}
-
-	f32 t = dot(-hit.n, a - s1) / ndotdR;
-	hit.p = a + dR * t;
-
-	// 3.
-	auto dMS1 = hit.p - s1;
-	float u	  = dot(dMS1, dS21);
-	float v	  = dot(dMS1, dS31);
-
-	if (lengthSqr(a - hit.p) > lengthSqr(a - b) || dot(a - hit.p, a - b) <= 0) {
-		return false;
-	}
-
-	// 4.
-	return (u >= 0.0f && u <= dot(dS21, dS21) && v >= 0.0f && v <= dot(dS31, dS31));
-}
 inline bool raycastBlock(v3 a, v3 b, v3 blk, Hit& hit, v3 blockDimensions) {
 	Hit hits[6];
 	bool results[6]{};
