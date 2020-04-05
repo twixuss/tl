@@ -133,15 +133,6 @@ private:
 	Fn fn;
 };
 
-constexpr size_t length(char const* string) {
-	size_t result = 0;
-	while (*string++)
-		++result;
-	return result;
-}
-
-size_t length(wchar const* string) { return wcslen(string); }
-
 template <class T>
 struct Span {
 	Span() = default;
