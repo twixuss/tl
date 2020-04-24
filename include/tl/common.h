@@ -27,7 +27,6 @@
 #pragma warning(push, 0)
 #endif
 
-#include <stdexcept>
 #include <utility>
 
 #if COMPILER_MSVC
@@ -53,6 +52,19 @@
 #undef ARCH_X64
 #define ARCH_X64 1
 #endif
+#elif COMPILER_GCC
+#define FORCEINLINE	  __attribute__((always_inline))
+#define DEBUG_BREAK() ::__builtin_trap()
+#if defined _X86_
+#undef ARCH_X86
+#define ARCH_X86 1
+#elif defined __x86_64__
+#undef ARCH_X64
+#define ARCH_X64 1
+#endif
+#endif
+
+#if COMPILER_MSVC || COMPILER_GCC
 #ifdef __AVX__
 #undef ARCH_AVX
 #define ARCH_AVX 1
@@ -65,8 +77,6 @@
 #undef ARCH_AVX512
 #define ARCH_AVX512 1
 #endif
-#elif COMPILER_GCC
-#define DEBUG_BREAK() ::__builtin_trap()
 #endif
 
 #if !(ARCH_X86 | ARCH_X64)
@@ -80,21 +90,18 @@
 #define CONCAT(x, y)  CONCAT_(x, y)
 
 #ifndef ASSERTION_FAILURE
-#define ASSERTION_FAILURE(causeString, expression, ...)                                                                     \
-	DEBUG_BREAK();                                                                                              \
-	throw std::runtime_error(causeString "\nFile: " __FILE__ "\nLine: " STRINGIZE(__LINE__) "\nExpression: " expression \
-																							"\nMessage: " __VA_ARGS__)
+#define ASSERTION_FAILURE(causeString, expression, ...) DEBUG_BREAK()
 #endif
 
-#define ASSERT(x, ...)                                \
-	do {                                              \
-		if (!(x)) {                                   \
+#define ASSERT(x, ...)                                    \
+	do {                                                  \
+		if (!(x)) {                                       \
 			ASSERTION_FAILURE("ASSERT", #x, __VA_ARGS__); \
-		}                                             \
+		}                                                 \
 	} while (0)
 
-#define INVALID_CODE_PATH(...)                               \
-	do {                                                     \
+#define INVALID_CODE_PATH(...)                                   \
+	do {                                                         \
 		ASSERTION_FAILURE("INVALID_CODE_PATH", "", __VA_ARGS__); \
 	} while (0)
 
@@ -112,6 +119,13 @@ typedef unsigned long long u64;
 typedef float f32;
 typedef double f64;
 typedef s32 b32;
+
+#if ARCH_X64
+typedef u64 umm;
+#else
+typedef u32 umm;
+#endif
+
 template <class... Callables>
 struct Combine : public Callables... {
 	constexpr Combine(Callables&&... c) : Callables(std::move(c))... {}
@@ -137,12 +151,12 @@ template <class T>
 struct Span {
 	Span() = default;
 	Span(T* begin, T* end) : _begin(begin), _end(end) {}
-	Span(T* begin, size_t size) : Span(begin, begin + size) {}
+	Span(T* begin, umm size) : Span(begin, begin + size) {}
 	auto data() const { return _begin; }
 	auto begin() const { return _begin; }
 	auto end() const { return _end; }
-	size_t size() const { return size_t(_end - _begin); }
-	T& operator[](size_t i) const { return _begin[i]; }
+	umm size() const { return umm(_end - _begin); }
+	T& operator[](umm i) const { return _begin[i]; }
 
 private:
 	T* _begin{};
@@ -153,15 +167,15 @@ template <class T>
 struct View {
 	constexpr View() = default;
 	constexpr View(T const* begin, T const* end) : _begin(begin), _end(end) {}
-	constexpr View(T const* begin, size_t size) : View(begin, begin + size) {}
+	constexpr View(T const* begin, umm size) : View(begin, begin + size) {}
 	constexpr View(Span<T> s) : View(s.begin(), s.end()) {}
-	template <size_t size>
+	template <umm size>
 	constexpr View(T const (&arr)[size]) : View(arr, size) {}
 	constexpr auto data() const { return _begin; }
 	constexpr auto begin() const { return _begin; }
 	constexpr auto end() const { return _end; }
-	constexpr size_t size() const { return size_t(_end - _begin); }
-	constexpr T const& operator[](size_t i) const { return _begin[i]; }
+	constexpr umm size() const { return umm(_end - _begin); }
+	constexpr T const& operator[](umm i) const { return _begin[i]; }
 
 private:
 	T const* _begin{};
@@ -171,85 +185,171 @@ private:
 using StringSpan = Span<char>;
 using StringView = View<char>;
 
+#define LIST_BASE(List)                                                        \
+	List() = default;                                                          \
+	List(List&& that) {                                                        \
+		_begin		   = that._begin;                                          \
+		_end		   = that._end;                                            \
+		_allocEnd	   = that._allocEnd;                                       \
+		that._begin	   = 0;                                                    \
+		that._end	   = 0;                                                    \
+		that._allocEnd = 0;                                                    \
+	}                                                                          \
+	List(List const& that) {                                                   \
+		_begin	  = (T*)malloc(that.size() * sizeof(T));                       \
+		_allocEnd = _end = _begin + that.size();                               \
+		for (T* src = that._begin, *dst = _begin; dst != _end; ++src, ++dst) { \
+			new (dst) T(*src);                                                 \
+		}                                                                      \
+	}                                                                          \
+	~List() {                                                                  \
+		clear();                                                               \
+		if (_begin)                                                            \
+			free(_begin);                                                      \
+		_begin	  = 0;                                                         \
+		_end	  = 0;                                                         \
+		_allocEnd = 0;                                                         \
+	}                                                                          \
+	List& operator=(List const& that) {                                        \
+		this->~List();                                                         \
+		return *new (this) List(that);                                         \
+	}                                                                          \
+	List& operator=(List&& that) {                                             \
+		this->~List();                                                         \
+		return *new (this) List(that);                                         \
+	}                                                                          \
+                                                                               \
+	umm remainingCapacity() const { return (umm)(_allocEnd - _end); }          \
+	umm capacity() const { return (umm)(_allocEnd - _begin); }                 \
+	umm size() const { return (umm)(_end - _begin); }                          \
+                                                                               \
+	T* begin() { return _begin; }                                              \
+	T* end() { return _end; }                                                  \
+	T* data() { return _begin; }                                               \
+	T& front() { return *_begin; }                                             \
+	T& back() { return _end[-1]; }                                             \
+	T& operator[](umm i) { return _begin[i]; }                                 \
+                                                                               \
+	T const* begin() const { return _begin; }                                  \
+	T const* end() const { return _end; }                                      \
+	T const* data() const { return _begin; }                                   \
+	T const& front() const { return *_begin; }                                 \
+	T const& back() const { return _end[-1]; }                                 \
+	T const& operator[](umm i) const { return _begin[i]; }                     \
+                                                                               \
+	void push_back(T const& val) { _push_back(val); }                          \
+	void push_back(T&& val) { _push_back(std::move(val)); }                    \
+	void pop_back() { (--_end)->~T(); }                                        \
+	void erase(T& val) { erase(&val); }                                        \
+	void reserve(umm count) {                                                  \
+		if (count > capacity())                                                \
+			reallocate(count);                                                 \
+	}                                                                          \
+	void resize(umm newSize) {                                                 \
+		if (newSize > capacity())                                              \
+			reallocate(newSize);                                               \
+		if (newSize > size()) {                                                \
+			for (T* t = _begin + size(); t < _begin + newSize; ++t)            \
+				new (t) T;                                                     \
+			_end = _begin + newSize;                                           \
+		} else if (newSize < size()) {                                         \
+			for (T* t = _begin + newSize; t < _end; ++t)                       \
+				t->~T();                                                       \
+			_end = _begin + newSize;                                           \
+		}                                                                      \
+	}                                                                          \
+	void clear() {                                                             \
+		for (auto& val : *this) {                                              \
+			val.~T();                                                          \
+		}                                                                      \
+		_end = _begin;                                                         \
+	}                                                                          \
+                                                                               \
+private:                                                                       \
+	T* _begin	 = 0;                                                          \
+	T* _end		 = 0;                                                          \
+	T* _allocEnd = 0;                                                          \
+                                                                               \
+	void reallocate(umm newCapacity) {                                         \
+		ASSERT(capacity() < newCapacity);                                      \
+		umm oldSize = size();                                                  \
+		T* newBegin = (T*)malloc(newCapacity * sizeof(T));                     \
+		for (T* src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {    \
+			new (dst) T(std::move(*src));                                      \
+			src->~T();                                                         \
+		}                                                                      \
+		if (_begin)                                                            \
+			free(_begin);                                                      \
+		_begin	  = newBegin;                                                  \
+		_end	  = _begin + oldSize;                                          \
+		_allocEnd = _begin + newCapacity;                                      \
+	}                                                                          \
+	template <class... Args>                                                   \
+	void _push_back(Args&&... args) {                                          \
+		if (remainingCapacity() == 0) {                                        \
+			umm newCapacity = capacity() * 2;                                  \
+			if (newCapacity == 0)                                              \
+				newCapacity = 1;                                               \
+			reallocate(newCapacity);                                           \
+		}                                                                      \
+		new (_end++) T(std::forward<Args>(args)...);                           \
+	}                                                                          \
+                                                                               \
+public:
+
 template <class T>
-struct UnorderedList {
-	UnorderedList() = default;
-	UnorderedList(UnorderedList&& that) {
-		_begin = that._begin;
-		_end = that._end;
-		_allocEnd = that._allocEnd;
-		that._begin = 0;
-		that._end = 0;
-		that._allocEnd = 0;
-	}
-	UnorderedList(UnorderedList const& that) {
-		_begin = (T*)malloc(that.size() * sizeof(T));
-		_allocEnd = _end = _begin + that.size();
-		for (T *src = that._begin, *dst = _begin; dst != _end; ++src, ++dst) {
-			new (dst) T(*src);
-		}
-	}
-	~UnorderedList() {
-		if (_begin)
-			free(_begin);
-		_begin = 0;
-		_end = 0;
-		_allocEnd = 0;
-	}
-	void reserve(size_t count) {
-		if (count <= capacity())
-			return;
-		reallocate(count);
-	}
+struct List {
+	LIST_BASE(List);
 	template <class... Args>
-	void _push_back(Args&&... args) {
+	void push_front(Args&&... args) {
 		if (remainingCapacity() == 0) {
-			size_t newCapacity = capacity() * 2;
+			umm newCapacity = capacity() * 2;
 			if (newCapacity == 0)
 				newCapacity = 1;
 			reallocate(newCapacity);
 		}
-		new (_end++) T(std::forward<Args>(args)...);
+		new (_end) T(std::move(_end[-1]));
+		for (T* dest = _end - 1; dest > _begin; --dest) {
+			*dest = std::move(dest[-1]);
+		}
+		++_end;
+		new (_begin) T(std::forward<Args>(args)...);
 	}
-	void push_back(T const& val) { _push_back(val); }
-	void push_back(T&& val) { _push_back(std::move(val)); }
-	size_t remainingCapacity() const { return (size_t)(_allocEnd - _end); }
-	size_t capacity() const { return (size_t)(_allocEnd - _begin); }
-	size_t size() const { return (size_t)(_end - _begin); }
-	void erase(T& val) { erase(&val); }
 	void erase(T* val) {
 		ASSERT(_begin <= val && val < _end, "value is not in container");
+		val->~T();
+		--_end;
+		for (T* dest = val; dest != _end; ++dest) {
+			*dest = std::move(dest[1]);
+		}
+		_end->~T();
+	}
+	operator View<T>() const { return {begin(), end()}; }
+	operator Span<T>() { return {begin(), end()}; }
+};
+
+template <class T>
+struct UnorderedList {
+	LIST_BASE(UnorderedList);
+	template <class... Args>
+	void push_front(Args&&... args) {
+		if (remainingCapacity() == 0) {
+			umm newCapacity = capacity() * 2;
+			if (newCapacity == 0)
+				newCapacity = 1;
+			reallocate(newCapacity);
+		}
+		new (_end) T(std::move(*_begin));
+		++_end;
+		new (_begin) T(std::forward<Args>(args)...);
+	}
+	void erase(T* val) {
+		ASSERT(_begin <= val && val < _end, "value is not in container");
+		val->~T();
 		new (val) T(std::move(*(_end-- - 1)));
 	}
-
-	T* data() { return _begin; }
-	T* begin() { return _begin; }
-	T* end() { return _end; }
-	T& operator[](size_t i) { return _begin[i]; }
-
-	T const* data() const { return _begin; }
-	T const* begin() const { return _begin; }
-	T const* end() const { return _end; }
-	T const& operator[](size_t i) const { return _begin[i]; }
-
-private:
-	T* _begin = 0;
-	T* _end = 0;
-	T* _allocEnd = 0;
-
-	void reallocate(size_t newCapacity) {
-		size_t oldSize = size();
-		T* newBegin = (T*)malloc(newCapacity * sizeof(T));
-		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
-			new (dst) T(std::move(*src));
-			src->~T();
-		}
-		if (_begin)
-			free(_begin);
-		_begin = newBegin;
-		_end = _begin + oldSize;
-		_allocEnd = _begin + newCapacity;
-	}
+	operator View<T>() const { return {begin(), end()}; }
+	operator Span<T>() { return {begin(), end()}; }
 };
 template <class T>
 void erase(UnorderedList<T>& list, T& val) {
@@ -260,16 +360,7 @@ void erase(UnorderedList<T>& list, T* val) {
 	list.erase(val);
 }
 
-#if 0
-template <class T>
-void erase(std::vector<T>& vec, T* val) {
-	vec.erase(vec.begin() + (val - vec.data()));
-}
-template <class T>
-void erase(std::vector<T>& vec, T& val) {
-	erase(vec, &val);
-}
-#endif
+#undef LIST_BASE
 
 #define DEFER ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]()
 
