@@ -2320,27 +2320,17 @@ IN_BOUNDS(bool, v2s) IN_BOUNDS(b32x4, v2sx4) IN_BOUNDS(b32x8, v2sx8);
 IN_BOUNDS(bool, v2u) IN_BOUNDS(b32x4, v2ux4) IN_BOUNDS(b32x8, v2ux8);
 #undef IN_BOUNDS
 
-inline constexpr bool _isTrueMask(f32 v) { return *(u32*)&v == ~0u; }
-
 inline constexpr f32 select(bool mask, f32 a, f32 b) { return mask ? a : b; }
 inline f32x4 select(b32x4 mask, f32x4 a, f32x4 b) { return F32x4(select(mask.m, a.m, b.m)); }
 inline s32x4 select(b32x4 mask, s32x4 a, s32x4 b) { return S32x4(select(mask.m, a.m, b.m)); }
 inline v2fx4 select(b32x4 mask, v2fx4 a, v2fx4 b) { return V2fx4(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
-inline v3fx4 select(b32x4 mask, v3fx4 a, v3fx4 b) {
-	return V3fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z));
-}
-inline v4fx4 select(b32x4 mask, v4fx4 a, v4fx4 b) {
-	return V4fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w));
-}
+inline v3fx4 select(b32x4 mask, v3fx4 a, v3fx4 b) { return V3fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
+inline v4fx4 select(b32x4 mask, v4fx4 a, v4fx4 b) { return V4fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
 inline f32x8 select(b32x8 mask, f32x8 a, f32x8 b) { return F32x8(select(mask.m, a.m, b.m)); }
 inline s32x8 select(b32x8 mask, s32x8 a, s32x8 b) { return S32x8(select(mask.m, a.m, b.m)); }
 inline v2fx8 select(b32x8 mask, v2fx8 a, v2fx8 b) { return V2fx8(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
-inline v3fx8 select(b32x8 mask, v3fx8 a, v3fx8 b) {
-	return V3fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z));
-}
-inline v4fx8 select(b32x8 mask, v4fx8 a, v4fx8 b) {
-	return V4fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w));
-}
+inline v3fx8 select(b32x8 mask, v3fx8 a, v3fx8 b) { return V3fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
+inline v4fx8 select(b32x8 mask, v4fx8 a, v4fx8 b) { return V4fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
 
 inline f32 sqrt(f32 v) { return sqrtf(v); }
 inline v2f sqrt(v2f v) { return V2f(sqrtf(v.x), sqrtf(v.y)); }
@@ -3699,8 +3689,11 @@ FORCEINLINE v4fx##p V4fxm(v4f v) { return V4fx##p(v); }
 
 static_assert(TL_MATH_MAX_PACK == 4 || TL_MATH_MAX_PACK == 8 ||TL_MATH_MAX_PACK == 16, "TL_MATH_MAX_PACK must be 4 (SSE), 8 (AVX) or 16 (AVX512)");
 
-MAX_PACK_IMPL(TL_MATH_MAX_PACK)
+#define MAX_PACK_IMPL_(p) MAX_PACK_IMPL(p)
 
+MAX_PACK_IMPL_(TL_MATH_MAX_PACK)
+
+#undef MAX_PACK_IMPL_
 #undef MAX_PACK_IMPL
 
 template <class T>
