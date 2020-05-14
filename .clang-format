@@ -12,7 +12,7 @@ BraceWrapping:
 ColumnLimit: '120'
 TabWidth: '4'
 UseTab: Always
-PointerAlignment: Left 
+PointerAlignment: Right 
 IndentCaseLabels: true
 AlwaysBreakAfterReturnType: None
 PenaltyBreakAssignment: 50

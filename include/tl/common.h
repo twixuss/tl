@@ -13,18 +13,21 @@
 #define COMPILER_MSVC 0
 #define COMPILER_GCC  0
 
+// clang-format off
 #if defined __GNUG__
-#undef COMPILER_GCC
-#define COMPILER_GCC 1
+	#undef  COMPILER_GCC
+	#define COMPILER_GCC 1
 #elif defined _MSC_VER
-#undef COMPILER_MSVC
-#define COMPILER_MSVC 1
+	#undef  COMPILER_MSVC
+	#define COMPILER_MSVC 1
 #else
-#pragma message "TL: Unresolved compiler"
+	#pragma message "TL: Unresolved compiler"
 #endif
+// clang-format on
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
+#include <intrin.h>
 #endif
 
 #include <utility>
@@ -33,18 +36,17 @@
 #pragma warning(pop)
 #endif
 
-#define ARCH_X86	0
-#define ARCH_X64	0
-#define ARCH_AVX	0
-#define ARCH_AVX2	0
-#define ARCH_AVX512 0
-
 #if COMPILER_MSVC
+
 #define FORCEINLINE			 __forceinline
 #define DEBUG_BREAK()		 ::__debugbreak()
 #define WRITE_BARRIER()		 ::_WriteBarrier()
 #define READ_BARRIER()		 ::_ReadBarrier()
 #define READ_WRITE_BARRIER() ::_ReadWriteBarrier()
+
+#define ARCH_X86 0
+#define ARCH_X64 0
+
 #if defined _M_IX86
 #undef ARCH_X86
 #define ARCH_X86 1
@@ -52,7 +54,9 @@
 #undef ARCH_X64
 #define ARCH_X64 1
 #endif
+
 #elif COMPILER_GCC
+
 #define FORCEINLINE	  __attribute__((always_inline))
 #define DEBUG_BREAK() ::__builtin_trap()
 #if defined _X86_
@@ -62,22 +66,41 @@
 #undef ARCH_X64
 #define ARCH_X64 1
 #endif
+
 #endif
 
+// clang-format off
 #if COMPILER_MSVC || COMPILER_GCC
-#ifdef __AVX__
-#undef ARCH_AVX
-#define ARCH_AVX 1
+	#ifndef ARCH_AVX
+		#ifdef __AVX__
+			#define ARCH_AVX 1
+		#else
+			#define ARCH_AVX 0
+		#endif
+	#endif
+	#ifndef ARCH_AVX2 
+		#ifdef __AVX2__
+			#define ARCH_AVX2 1
+		#else
+			#define ARCH_AVX2 0
+		#endif
+	#endif
+	#ifndef ARCH_AVX512F
+		#ifdef __AVX512F__
+			#define ARCH_AVX512F 1
+		#else
+			#define ARCH_AVX512F 0
+		#endif
+	#endif
+	#ifndef ARCH_AVX512DQ
+		#ifdef __AVX512DQ__
+			#define ARCH_AVX512DQ 1
+		#else
+			#define ARCH_AVX512DQ 0
+		#endif
+	#endif
 #endif
-#ifdef __AVX2__
-#undef ARCH_AVX2
-#define ARCH_AVX2 1
-#endif
-#ifdef __AVX512F__
-#undef ARCH_AVX512
-#define ARCH_AVX512 1
-#endif
-#endif
+// clang-format on
 
 #if !(ARCH_X86 | ARCH_X64)
 #error "Unresolved target architecture"
@@ -107,30 +130,32 @@
 
 namespace TL {
 
-typedef wchar_t wchar;
-typedef char s8;
-typedef short s16;
-typedef int s32;
-typedef long long s64;
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef unsigned long long u64;
-typedef float f32;
-typedef double f64;
-typedef s32 b32;
+using wchar = wchar_t;
+using s8	= char;
+using s16	= short;
+using s32	= int;
+using s64	= long long;
+using u8	= unsigned char;
+using u16	= unsigned short;
+using u32	= unsigned int;
+using u64	= unsigned long long;
+using f32	= float;
+using f64	= double;
+using b32	= s32;
+using b64	= s64;
 
 #if ARCH_X64
 typedef u64 umm;
+typedef s64 smm;
 #else
 typedef u32 umm;
+typedef s32 smm;
 #endif
 
 template <class... Callables>
 struct Combine : public Callables... {
 	constexpr Combine(Callables&&... c) : Callables(std::move(c))... {}
 	using Callables::operator()...;
-#pragma warning(suppress : 5027) // TODO
 };
 
 template <class Enum, class = std::enable_if_t<std::is_enum_v<Enum>>>
@@ -363,18 +388,5 @@ void erase(UnorderedList<T>& list, T* val) {
 #undef LIST_BASE
 
 #define DEFER ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]()
-
-template <class Cont>
-auto reverse(Cont& cont) {
-	struct {
-		auto begin() { return _begin; }
-		auto end() { return _end; }
-		decltype(std::rbegin(cont)) _begin;
-		decltype(std::rend(cont)) _end;
-	} result;
-	result._begin = std::rbegin(cont);
-	result._end	  = std::rend(cont);
-	return result;
-}
 
 } // namespace TL
