@@ -7,8 +7,54 @@
 #pragma warning(disable : 4582)
 #pragma warning(disable : 4583)
 #pragma warning(disable : 4625)
-// single producer, single consumer
+#if OS_WINDOWS
+#include <intrin.h>
+#endif
 namespace TL {
+
+#if OS_WINDOWS
+extern "C" __declspec(dllimport) int __stdcall SwitchToThread();
+FORCEINLINE void switchThread() {
+	SwitchToThread();
+}
+
+FORCEINLINE u32 lockIncrement(u32 volatile *v) {
+	return (u32)_InterlockedIncrement((long *)v);
+}
+#endif
+
+template <class Pred>
+inline void waitUntil(Pred pred) {
+	u32 miss = 0;
+	while (!pred()) {
+		++miss;
+		if (miss >= 256) {
+			std::this_thread::sleep_for(std::chrono::nanoseconds(1));
+		} else 
+		if (miss >= 64) {
+			switchThread();
+		} else if (miss >= 16) {
+			_mm_pause();
+		}
+	}
+}
+
+inline void waitUntil(bool const volatile &condition) {
+	waitUntil([&]{ return condition; });
+}
+
+struct SyncPoint {
+	u32 const threadCount;
+	u32 volatile counter;
+	inline SyncPoint(u32 threadCount) : threadCount(threadCount), counter(0) {}
+};
+
+inline void sync(SyncPoint& sp) {
+	lockIncrement(&sp.counter);
+	waitUntil([&]{return sp.counter==sp.threadCount;});
+}
+
+// single producer, single consumer
 namespace SPSC {
 template <class T, size_t capacity>
 struct CircularQueue {

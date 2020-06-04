@@ -41,9 +41,9 @@ void test(T t, U u) {
 void test(f32 a, f32 b) {
 	ASSERT(abs(a-b) < 0.0001f);
 }
-b32x4 approxEqual(f32x4 a, f32x4 b) { return abs(a - b) < FLT_EPSILON; }
+b32x4 approxEqual(f32x4 a, f32x4 b) { return absolute(a - b) < FLT_EPSILON; }
 b32x4 approxEqual(v2fx4 a, v2fx4 b) { 
-	auto v = abs(a - b);
+	auto v = absolute(a - b);
 	return v.x < FLT_EPSILON && v.y < FLT_EPSILON; 
 }
 f32 _a;
@@ -309,4 +309,9 @@ void mathTest() {
 		test((u32)b, 0b10101010);
 	}
 }
-int main() { mathTest(); }
+#include <thread>
+#include <mutex>
+#include "..\include\tl\thread.h"
+int main() { 
+	mathTest(); 
+}

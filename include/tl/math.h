@@ -130,7 +130,8 @@ template <class T, class U, class V, class W> FORCEINLINE constexpr void minmax(
 template <class T, class SN, class SX, class DN, class DX> FORCEINLINE constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class U, class V> FORCEINLINE constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
 template <class T, class U> FORCEINLINE constexpr auto lerp(T a, U b, f32 t) { return a + (b - a) * t; }
-template <class T> FORCEINLINE T select(bool mask, T a, T b) { return mask ? a : b; }
+template <class T, class U> FORCEINLINE constexpr auto lerp(T a, U b, f64 t) { return a + (b - a) * t; }
+template <class T> FORCEINLINE constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T> FORCEINLINE constexpr auto pow2(T v) { return v * v; }
 template <class T> FORCEINLINE constexpr auto pow3(T v) { return v * v * v; }
 template <class T> FORCEINLINE constexpr auto pow4(T v) { return pow2(v * v); }
@@ -146,12 +147,12 @@ FORCEINLINE constexpr To cvt(From v) {
 } // namespace CE
 
 // clang-format off
-template<umm> union b32x; using b32x2 = b32x<2>; using b32x4 = b32x<4>; using b32x8 = b32x<8>; using b32x16 = b32x<16>;
-template<umm> union f32x; using f32x2 = f32x<2>; using f32x4 = f32x<4>; using f32x8 = f32x<8>; using f32x16 = f32x<16>;
-template<umm> union s32x; using s32x2 = s32x<2>; using s32x4 = s32x<4>; using s32x8 = s32x<8>; using s32x16 = s32x<16>;
-template<umm> union u32x; using u32x2 = u32x<2>; using u32x4 = u32x<4>; using u32x8 = u32x<8>; using u32x16 = u32x<16>;
-template<umm> union b64x; using b64x2 = b64x<2>; using b64x4 = b64x<4>; using b64x8 = b64x<8>; using b64x16 = b64x<16>;
-template<umm> union f64x; using f64x2 = f64x<2>; using f64x4 = f64x<4>; using f64x8 = f64x<8>; using f64x16 = f64x<16>;
+template<umm> union b32x; using b32x4 = b32x<4>; using b32x8 = b32x<8>; using b32x16 = b32x<16>;
+template<umm> union f32x; using f32x4 = f32x<4>; using f32x8 = f32x<8>; using f32x16 = f32x<16>;
+template<umm> union s32x; using s32x4 = s32x<4>; using s32x8 = s32x<8>; using s32x16 = s32x<16>;
+template<umm> union u32x; using u32x4 = u32x<4>; using u32x8 = u32x<8>; using u32x16 = u32x<16>;
+template<umm> union b64x; using b64x2 = b64x<2>; using b64x4 = b64x<4>; using b64x8 = b64x<8>;
+template<umm> union f64x; using f64x2 = f64x<2>; using f64x4 = f64x<4>; using f64x8 = f64x<8>;
 
 #if 0
 template<class, umm> union _v2;
@@ -209,15 +210,15 @@ using v4fxm = v4fx<simdWidth / sizeof(f32)>;
 using v4sxm = v4sx<simdWidth / sizeof(s32)>;
 using v4uxm = v4ux<simdWidth / sizeof(u32)>;
 
-union v2f;
-union v2s;
-union v2u;
-union v3f;
-union v3s;
-union v3u;
-union v4f;
-union v4s;
-union v4u;
+using v2f = v2fx<1>;
+using v2s = v2sx<1>;
+using v2u = v2ux<1>;
+using v3f = v3fx<1>;
+using v3s = v3sx<1>;
+using v3u = v3ux<1>;
+using v4f = v4fx<1>;
+using v4s = v4sx<1>;
+using v4u = v4ux<1>;
 #endif
 // clang-format on
 
@@ -291,6 +292,46 @@ FORCEINLINE constexpr v3u V3u(u32 = 0);
 FORCEINLINE constexpr v4f V4f(f32 = 0);
 FORCEINLINE constexpr v4s V4s(s32 = 0);
 FORCEINLINE constexpr v4u V4u(u32 = 0);
+
+template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32 = 0);
+template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32 = 0);
+template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32 = 0);
+template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32 = 0);
+template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32 = 0);
+template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32 = 0);
+template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32 = 0);
+template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32 = 0);
+template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32 = 0);
+
+template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32, f32);
+template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32, s32);
+template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32, u32);
+template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32, f32, f32);
+template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32, s32, s32);
+template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32, u32, u32);
+template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32, f32, f32, f32);
+template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32, s32, s32, s32);
+template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32, u32, u32, u32);
+
+template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>);
+template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32x<ps>);
+template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32x<ps>);
+template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32x<ps>);
+template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32x<ps>);
+template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32x<ps>);
+template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32x<ps>);
+template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32x<ps>);
+template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32x<ps>);
+
+template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>, f32x<ps>);
+template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32x<ps>, s32x<ps>);
+template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32x<ps>, u32x<ps>);
+template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32x<ps>, f32x<ps>, f32x<ps>);
+template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32x<ps>, s32x<ps>, s32x<ps>);
+template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32x<ps>, u32x<ps>, u32x<ps>);
+template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32x<ps>, f32x<ps>, f32x<ps>, f32x<ps>);
+template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32x<ps>, s32x<ps>, s32x<ps>, s32x<ps>);
+template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32x<ps>, u32x<ps>, u32x<ps>, u32x<ps>);
 
 FORCEINLINE constexpr v2f V2f(f32 x, f32 y);
 FORCEINLINE constexpr v2s V2s(s32 x, s32 y);
@@ -619,99 +660,6 @@ union f32x<4> {
 	INDEX_S(f32);
 	MEMFUNS_BASIC(f32x4, f32, F32x4)
 };
-
-#define OP(op) \
-	FORCEINLINE s32x4 operator op(s32 b) const { return s32x4(*this) op##= b; } 
-template<>
-union s32x<4> {
-	s32 s[4];
-	M128 m;
-	FORCEINLINE s32x4 operator-() const { return S32x4(_mm_sub_epi32(_mm_setzero_si128(), m)); }
-	FORCEINLINE s32x4 operator~() const { return *this ^ (~0); }
-	FORCEINLINE s32x4 operator+(s32x4 b) const { return S32x4(  _mm_add_epi32(m, b.m)); }
-	FORCEINLINE s32x4 operator-(s32x4 b) const { return S32x4(  _mm_sub_epi32(m, b.m)); }
-	FORCEINLINE s32x4 operator*(s32x4 b) const { return S32x4(_mm_mullo_epi32(m, b.m)); }
-	FORCEINLINE s32x4 operator^(s32x4 b) const { return S32x4(  _mm_xor_si128(m, b.m)); }
-	FORCEINLINE s32x4 operator|(s32x4 b) const { return S32x4(   _mm_or_si128(m, b.m)); }
-	FORCEINLINE s32x4 operator&(s32x4 b) const { return S32x4(  _mm_and_si128(m, b.m)); }
-	FORCEINLINE s32x4 operator<<(s32x4 b) const { return S32x4(s[0] << b.s[0], s[1] << b.s[1], s[2] << b.s[2], s[3] << b.s[3]); }
-	FORCEINLINE s32x4 operator>>(s32x4 b) const { return S32x4(s[0] >> b.s[0], s[1] >> b.s[1], s[2] >> b.s[2], s[3] >> b.s[3]); }
-	FORCEINLINE s32x4 operator/(s32x4 b) const { return S32x4(s[0] / b.s[0], s[1] / b.s[1], s[2] / b.s[2], s[3] / b.s[3]); }
-	FORCEINLINE s32x4 operator%(s32x4 b) const { return S32x4(s[0] % b.s[0], s[1] % b.s[1], s[2] % b.s[2], s[3] % b.s[3]); }
-	FORCEINLINE s32x4 operator<<(s32 b) const { return S32x4(_mm_slli_epi32(m, b)); }
-	FORCEINLINE s32x4 operator>>(s32 b) const { return S32x4(_mm_srai_epi32(m, b)); }
-#if 0
-	OP(+) OP(-) OP(*) OP(/) OP(%) OP(^) OP(|) OP(&)
-	FORCEINLINE s32x4& operator+=(s32x4 b) { return *this = *this + b; }
-	FORCEINLINE s32x4& operator-=(s32x4 b) { return *this = *this - b; }
-	FORCEINLINE s32x4& operator*=(s32x4 b) { return *this = *this * b; }
-	FORCEINLINE s32x4& operator/=(s32x4 b) { return s[0] /= b.s[0], s[1] /= b.s[1], s[2] /= b.s[2], s[3] /= b.s[3], *this; }
-	FORCEINLINE s32x4& operator%=(s32x4 b) { return s[0] %= b.s[0], s[1] %= b.s[1], s[2] %= b.s[2], s[3] %= b.s[3], *this; }
-	FORCEINLINE s32x4& operator^=(s32x4 b) { return *this = *this ^ b; }
-	FORCEINLINE s32x4& operator|=(s32x4 b) { return *this = *this | b; }
-	FORCEINLINE s32x4& operator&=(s32x4 b) { return *this = *this & b; }
-	FORCEINLINE s32x4& operator+=(s32 b) { return *this += S32x4(b); }
-	FORCEINLINE s32x4& operator-=(s32 b) { return *this -= S32x4(b); }
-	FORCEINLINE s32x4& operator*=(s32 b) { return *this *= S32x4(b); }
-	FORCEINLINE s32x4& operator/=(s32 b) { return s[0] /= b, s[1] /= b, s[2] /= b, s[3] /= b, *this; }
-	FORCEINLINE s32x4& operator%=(s32 b) { return s[0] %= b, s[1] %= b, s[2] %= b, s[3] %= b, *this; }
-	FORCEINLINE s32x4& operator^=(s32 b) { return *this ^= S32x4(b); }
-	FORCEINLINE s32x4& operator|=(s32 b) { return *this |= S32x4(b); }
-	FORCEINLINE s32x4& operator&=(s32 b) { return *this &= S32x4(b); }
-#endif
-	FORCEINLINE b32x4 operator<(s32x4 b) const { return  _mm_cmplt_epi32(m, b.m); }
-	FORCEINLINE b32x4 operator>(s32x4 b) const { return  _mm_cmpgt_epi32(m, b.m); }
-	FORCEINLINE b32x4 operator<=(s32x4 b) const { return _mm_cmpgt_epi32(b.m, m); }
-	FORCEINLINE b32x4 operator>=(s32x4 b) const { return _mm_cmplt_epi32(b.m, m); }
-	FORCEINLINE b32x4 operator==(s32x4 b) const { return _mm_cmpeq_epi32(m, b.m); }
-	FORCEINLINE b32x4 operator!=(s32x4 b) const { return !(*this == b); }
-	CVT(f32x4);
-	CVT(u32x4);
-	SCLX_CMP(b32x4, s32x4, s32, S32x4)
-	MEMFUNS_BASIC(s32x4, s32, S32x4);
-	MEMFUNS_INT(s32x4, s32, S32x4);
-	MEMFUNS_DATA(s32);
-	INDEX_S(s32);
-};
-template<>
-union u32x<4> {
-	u32 s[4];
-	M128 m;
-	FORCEINLINE u32x4 operator~() const { return *this ^ (~0u); }
-	FORCEINLINE u32x4 operator+(u32x4 b) const { return U32x4(_mm_add_epi32(m, b.m)); }
-	FORCEINLINE u32x4 operator-(u32x4 b) const { return U32x4(_mm_sub_epi32(m, b.m)); }
-	FORCEINLINE u32x4 operator*(u32x4 b) const { return {s[0] * b.s[0], s[1] * b.s[1], s[2] * b.s[2], s[3] * b.s[3]}; }
-#if COMPILER_GCC
-	FORCEINLINE u32x4 operator/(u32x4 b) const { return {s[0] / b.s[0], s[1] / b.s[1], s[2] / b.s[2], s[3] / b.s[3]}; }
-	FORCEINLINE u32x4 operator%(u32x4 b) const { return {s[0] % b.s[0], s[1] % b.s[1], s[2] % b.s[2], s[3] % b.s[3]}; }
-#else
-	FORCEINLINE u32x4 operator/(u32x4 b) const { return U32x4(_mm_div_epu32(m, b.m)); }
-	FORCEINLINE u32x4 operator%(u32x4 b) const { return U32x4(_mm_rem_epu32(m, b.m)); }
-#endif
-	FORCEINLINE u32x4 operator^(u32x4 b) const { return U32x4(_mm_xor_si128(m, b.m)); }
-	FORCEINLINE u32x4 operator|(u32x4 b) const { return U32x4(_mm_or_si128 (m, b.m)); }
-	FORCEINLINE u32x4 operator&(u32x4 b) const { return U32x4(_mm_and_si128(m, b.m)); }
-	FORCEINLINE u32x4 operator<<(u32x4 b) const { return U32x4(s[0] << b.s[0], s[1] << b.s[1], s[2] << b.s[2], s[3] << b.s[3]); }
-	FORCEINLINE u32x4 operator>>(u32x4 b) const { return U32x4(s[0] >> b.s[0], s[1] >> b.s[1], s[2] >> b.s[2], s[3] >> b.s[3]); }
-	FORCEINLINE u32x4 operator<<(u32 b) const { return U32x4(_mm_slli_epi32(m, (s32)b)); }
-	FORCEINLINE u32x4 operator>>(u32 b) const { return U32x4(_mm_srli_epi32(m, (s32)b)); }
-	FORCEINLINE b32x4 operator<(u32x4 b) const { return  _mm_cmplt_epu32(m, b.m); }
-	FORCEINLINE b32x4 operator>(u32x4 b) const { return  _mm_cmpgt_epu32(m, b.m); }
-	FORCEINLINE b32x4 operator<=(u32x4 b) const { return _mm_cmple_epu32(m, b.m); }
-	FORCEINLINE b32x4 operator>=(u32x4 b) const { return _mm_cmpge_epu32(m, b.m); }
-	FORCEINLINE b32x4 operator==(u32x4 b) const { return _mm_cmpeq_epu32(m, b.m); }
-	FORCEINLINE b32x4 operator!=(u32x4 b) const { return !(*this == b); }
-	CVT(f32x4);
-	CVT(s32x4);
-	CVT(f64x4);
-
-	SCLX_CMP(b32x4, u32x4, u32, U32x4)
-	MEMFUNS_BASIC(u32x4, u32, U32x4);
-	MEMFUNS_INT(u32x4, u32, U32x4);
-	MEMFUNS_DATA(u32);
-	INDEX_S(u32);
-};
-
 template <>
 union f32x<8> {
 	f32 s[8];
@@ -738,90 +686,6 @@ union f32x<8> {
 	MEMFUNS_DATA(f32);
 	INDEX_S(f32);
 	MEMFUNS_BASIC(f32x8, f32, F32x8)
-};
-
-template<>
-union s32x<8> {
-	s32 s[8];
-	s32x4 _128[2];
-	M256 m;
-#if ARCH_AVX2
-	FORCEINLINE s32x8 operator-() const { return S32x8(_mm256_sub_epi32(_mm256_setzero_si256(), m)); }
-	FORCEINLINE s32x8 operator+(s32x8 b) const { return S32x8(_mm256_add_epi32  (m, b.m)); }
-	FORCEINLINE s32x8 operator-(s32x8 b) const { return S32x8(_mm256_sub_epi32  (m, b.m)); }
-	FORCEINLINE s32x8 operator*(s32x8 b) const { return S32x8(_mm256_mullo_epi32(m, b.m)); }
-#if COMPILER_GCC
-	FALLBACK_BIN_OP(s32x8, /, S32x8, _128)
-	FALLBACK_BIN_OP(s32x8, %, S32x8, _128)
-#else
-	FORCEINLINE s32x8 operator/(s32x8 b) const { return S32x8(_mm256_div_epi32(m, b.m)); }
-	FORCEINLINE s32x8 operator%(s32x8 b) const { return S32x8(_mm256_rem_epi32(m, b.m)); }
-#endif
-	FORCEINLINE s32x8 operator^(s32x8 b) const { return S32x8(_mm256_xor_si256(m, b.m)); }
-	FORCEINLINE s32x8 operator|(s32x8 b) const { return S32x8( _mm256_or_si256(m, b.m)); }
-	FORCEINLINE s32x8 operator&(s32x8 b) const { return S32x8(_mm256_and_si256(m, b.m)); }
-	FORCEINLINE s32x8 operator<<(s32 b) const { return S32x8(_mm256_slli_epi32(m, b)); }
-	FORCEINLINE s32x8 operator>>(s32 b) const { return S32x8(_mm256_srai_epi32(m, b)); }
-	FORCEINLINE b32x8 operator<(s32x8 b) const { return     _mm256_cmplt_epi32(m, b.m); }
-	FORCEINLINE b32x8 operator>(s32x8 b) const { return     _mm256_cmpgt_epi32(m, b.m); }
-	FORCEINLINE b32x8 operator<=(s32x8 b) const { return    _mm256_cmpgt_epi32(b.m, m); }
-	FORCEINLINE b32x8 operator>=(s32x8 b) const { return    _mm256_cmplt_epi32(b.m, m); }
-	FORCEINLINE b32x8 operator==(s32x8 b) const { return    _mm256_cmpeq_epi32(m, b.m); }
-#else
-	FALLBACK_S32X_OPERATORS(s32x8, S32x8, b32x8, _128)
-#endif
-	FORCEINLINE s32x8 operator~() const { return *this ^ (~0); }
-	FALLBACK_BIN_OP(s32x8, <<, S32x8, _128)
-	FALLBACK_BIN_OP(s32x8, >>, S32x8, _128)
-	b32x8 operator!=(s32x8 b) const { return !(*this == b); }
-	CVT(f32x8);
-	CVT(u32x8);
-	SCLX_CMP(b32x8, s32x8, s32, S32x8)
-	MEMFUNS_BASIC(s32x8, s32, S32x8);
-	MEMFUNS_INT(s32x8, s32, S32x8);
-	MEMFUNS_DATA(s32);
-	INDEX_S(s32);
-};
-template<>
-union u32x<8> {
-	u32 s[8];
-	u32x4 _128[2];
-	M256 m;
-#if ARCH_AVX2
-	FORCEINLINE u32x8 operator+(u32x8 b) const { return U32x8(_mm256_add_epi32(m, b.m)); }
-	FORCEINLINE u32x8 operator-(u32x8 b) const { return U32x8(_mm256_sub_epi32(m, b.m)); }
-#if COMPILER_GCC
-	FALLBACK_BIN_OP(u32x8, /, U32x8, _128)
-	FALLBACK_BIN_OP(u32x8, %, U32x8, _128)
-#else
-	FORCEINLINE u32x8 operator/(u32x8 b) const { return U32x8(_mm256_div_epu32(m, b.m)); }
-	FORCEINLINE u32x8 operator%(u32x8 b) const { return U32x8(_mm256_rem_epu32(m, b.m)); }
-#endif
-	FORCEINLINE u32x8 operator^(u32x8 b) const { return U32x8(_mm256_xor_si256(m, b.m)); }
-	FORCEINLINE u32x8 operator|(u32x8 b) const { return U32x8(_mm256_or_si256 (m, b.m)); }
-	FORCEINLINE u32x8 operator&(u32x8 b) const { return U32x8(_mm256_and_si256(m, b.m)); }
-	FORCEINLINE u32x8 operator<<(u32 b) const { return U32x8(_mm256_slli_epi32(m, (s32)b)); }
-	FORCEINLINE u32x8 operator>>(u32 b) const { return U32x8(_mm256_srli_epi32(m, (s32)b)); }
-	FORCEINLINE b32x8 operator<(u32x8 b) const { return _mm256_cmplt_epu32    (m, b.m); }
-	FORCEINLINE b32x8 operator>(u32x8 b) const { return _mm256_cmpgt_epu32    (m, b.m); }
-	FORCEINLINE b32x8 operator<=(u32x8 b) const { return _mm256_cmple_epu32   (m, b.m); }
-	FORCEINLINE b32x8 operator>=(u32x8 b) const { return _mm256_cmpge_epu32   (m, b.m); }
-	FORCEINLINE b32x8 operator==(u32x8 b) const { return _mm256_cmpeq_epu32   (m, b.m); }
-#else
-	FALLBACK_U32X_OPERATORS(u32x8, U32x8, b32x8, _128)
-#endif
-	FORCEINLINE u32x8 operator~() const { return *this ^ (~0u); }
-	FALLBACK_BIN_OP(u32x8, * , U32x8, _128)
-	FALLBACK_BIN_OP(u32x8, <<, U32x8, _128)
-	FALLBACK_BIN_OP(u32x8, >>, U32x8, _128)
-	FORCEINLINE b32x8 operator!=(u32x8 b) const { return !(*this == b); }
-	CVT(f32x8);
-	CVT(s32x8);
-	SCLX_CMP(b32x8, u32x8, u32, U32x8)
-	MEMFUNS_BASIC(u32x8, u32, U32x8);
-	MEMFUNS_INT(u32x8, u32, U32x8);
-	MEMFUNS_DATA(u32);
-	INDEX_S(u32);
 };
 template<>
 union f32x<16> {
@@ -850,89 +714,6 @@ union f32x<16> {
 	MEMFUNS_DATA(f32);
 	INDEX_S(f32);
 	MEMFUNS_BASIC(f32x16, f32, F32x16)
-};
-template<>
-union s32x<16> {
-	s32 s[16];
-	s32x8 _256[2];
-	__m512i m;
-#if ARCH_AVX512F
-	FORCEINLINE s32x16 operator-() const { return S32x16(_mm512_sub_epi32(_mm512_setzero_si512(), m)); }
-	FORCEINLINE s32x16 operator+(s32x16 b) const { return S32x16(_mm512_add_epi32(m, b.m)); }
-	FORCEINLINE s32x16 operator-(s32x16 b) const { return S32x16(_mm512_sub_epi32(m, b.m)); }
-	FORCEINLINE s32x16 operator*(s32x16 b) const { return S32x16(_mm512_mullo_epi32(m, b.m)); }
-#if COMPILER_GCC
-	FALLBACK_BIN_OP(s32x16, /, S32x16, _256)
-	FALLBACK_BIN_OP(s32x16, %, S32x16, _256)
-#else
-	FORCEINLINE s32x16 operator/(s32x16 b) const { return S32x16(_mm512_div_epi32(m, b.m)); }
-	FORCEINLINE s32x16 operator%(s32x16 b) const { return S32x16(_mm512_rem_epi32(m, b.m)); }
-#endif
-	FORCEINLINE s32x16 operator^(s32x16 b) const { return S32x16(_mm512_xor_si512(m, b.m)); }
-	FORCEINLINE s32x16 operator|(s32x16 b) const { return S32x16(_mm512_or_si512(m, b.m)); }
-	FORCEINLINE s32x16 operator&(s32x16 b) const { return S32x16(_mm512_and_si512(m, b.m)); }
-	FORCEINLINE s32x16 operator<<(s32 b) const { return S32x16(_mm512_slli_epi32(m, b)); }
-	FORCEINLINE s32x16 operator>>(s32 b) const { return S32x16(_mm512_srai_epi32(m, b)); }
-	FORCEINLINE b32x16 operator<(s32x16 b) const { return _mm512_cmplt_epi32(m, b.m); }
-	FORCEINLINE b32x16 operator>(s32x16 b) const { return _mm512_cmpgt_epi32(m, b.m); }
-	FORCEINLINE b32x16 operator<=(s32x16 b) const { return _mm512_cmpgt_epi32(b.m, m); }
-	FORCEINLINE b32x16 operator>=(s32x16 b) const { return _mm512_cmplt_epi32(b.m, m); }
-	FORCEINLINE b32x16 operator==(s32x16 b) const { return _mm512_cmpeq_epi32(m, b.m); }
-#else
-	FALLBACK_S32X_OPERATORS(s32x16, S32x16, b32x16, _256)
-#endif
-	s32x16 operator~() const { return *this ^ (~0); }
-	FALLBACK_BIN_OP(s32x16, <<, S32x16, _256)
-	FALLBACK_BIN_OP(s32x16, >>, S32x16, _256)
-	b32x16 operator!=(s32x16 b) const { return !(*this == b); }
-	CVT(f32x16);
-	CVT(u32x16);
-	SCLX_CMP(b32x16, s32x16, s32, S32x16)
-	MEMFUNS_BASIC(s32x16, s32, S32x16);
-	MEMFUNS_INT(s32x16, s32, S32x16);
-	MEMFUNS_DATA(s32);
-	INDEX_S(s32);
-};
-template<>
-union u32x<16> {
-	u32 s[16];
-	u32x8 _256[2];
-	__m512i m;
-#if ARCH_AVX512F
-	FORCEINLINE u32x16 operator+(u32x16 b) const { return U32x16(_mm512_add_epi32(m, b.m)); }
-	FORCEINLINE u32x16 operator-(u32x16 b) const { return U32x16(_mm512_sub_epi32(m, b.m)); }
-#if COMPILER_GCC
-	FALLBACK_BIN_OP(u32x16, /, U32x16, _256)
-	FALLBACK_BIN_OP(u32x16, %, U32x16, _256)
-#else
-	FORCEINLINE u32x16 operator/(u32x16 b) const { return U32x16(_mm512_div_epu32(m, b.m)); }
-	FORCEINLINE u32x16 operator%(u32x16 b) const { return U32x16(_mm512_rem_epu32(m, b.m)); }
-#endif
-	FORCEINLINE u32x16 operator^(u32x16 b) const { return U32x16(_mm512_xor_si512(m, b.m)); }
-	FORCEINLINE u32x16 operator|(u32x16 b) const { return U32x16(_mm512_or_si512(m, b.m)); }
-	FORCEINLINE u32x16 operator&(u32x16 b) const { return U32x16(_mm512_and_si512(m, b.m)); }
-	FORCEINLINE u32x16 operator<<(u32 b) const { return U32x16(_mm512_slli_epi32(m, (s32)b)); }
-	FORCEINLINE u32x16 operator>>(u32 b) const { return U32x16(_mm512_srli_epi32(m, (s32)b)); }
-	FORCEINLINE b32x16 operator<(u32x16 b) const { return _mm512_cmplt_epu32(m, b.m); }
-	FORCEINLINE b32x16 operator>(u32x16 b) const { return _mm512_cmpgt_epu32(m, b.m); }
-	FORCEINLINE b32x16 operator<=(u32x16 b) const { return _mm512_cmple_epu32(m, b.m); }
-	FORCEINLINE b32x16 operator>=(u32x16 b) const { return _mm512_cmpge_epu32(m, b.m); }
-	FORCEINLINE b32x16 operator==(u32x16 b) const { return _mm512_cmpeq_epu32(m, b.m); }
-#else
-	FALLBACK_U32X_OPERATORS(u32x16, U32x16, b32x16, _256)
-#endif
-	FORCEINLINE u32x16 operator~() const { return *this ^ (~0u); }
-	FALLBACK_BIN_OP(u32x16, * , U32x16, _256)
-	FALLBACK_BIN_OP(u32x16, <<, U32x16, _256)
-	FALLBACK_BIN_OP(u32x16, >>, U32x16, _256)
-	FORCEINLINE b32x16 operator!=(u32x16 b) const { return !(*this == b); }
-	CVT(f32x16);
-	CVT(s32x16);
-	SCLX_CMP(b32x16, u32x16, u32, U32x16)
-	MEMFUNS_BASIC(u32x16, u32, U32x16);
-	MEMFUNS_INT(u32x16, u32, U32x16);
-	MEMFUNS_DATA(u32);
-	INDEX_S(u32);
 };
 
 template <>
@@ -986,6 +767,243 @@ union f64x<4> {
 	MEMFUNS_BASIC(f64x4, f64, F64x4)
 };
 
+template<>
+union s32x<4> {
+	s32 s[4];
+	M128 m;
+	FORCEINLINE s32x4 operator-() const { return S32x4(_mm_sub_epi32(_mm_setzero_si128(), m)); }
+	FORCEINLINE s32x4 operator~() const { return *this ^ (~0); }
+	FORCEINLINE s32x4 operator+(s32x4 b) const { return S32x4(  _mm_add_epi32(m, b.m)); }
+	FORCEINLINE s32x4 operator-(s32x4 b) const { return S32x4(  _mm_sub_epi32(m, b.m)); }
+	FORCEINLINE s32x4 operator*(s32x4 b) const { return S32x4(_mm_mullo_epi32(m, b.m)); }
+	FORCEINLINE s32x4 operator^(s32x4 b) const { return S32x4(  _mm_xor_si128(m, b.m)); }
+	FORCEINLINE s32x4 operator|(s32x4 b) const { return S32x4(   _mm_or_si128(m, b.m)); }
+	FORCEINLINE s32x4 operator&(s32x4 b) const { return S32x4(  _mm_and_si128(m, b.m)); }
+	FORCEINLINE s32x4 operator<<(s32x4 b) const { return S32x4(s[0] << b.s[0], s[1] << b.s[1], s[2] << b.s[2], s[3] << b.s[3]); }
+	FORCEINLINE s32x4 operator>>(s32x4 b) const { return S32x4(s[0] >> b.s[0], s[1] >> b.s[1], s[2] >> b.s[2], s[3] >> b.s[3]); }
+	FORCEINLINE s32x4 operator/(s32x4 b) const { return S32x4(s[0] / b.s[0], s[1] / b.s[1], s[2] / b.s[2], s[3] / b.s[3]); }
+	FORCEINLINE s32x4 operator%(s32x4 b) const { return S32x4(s[0] % b.s[0], s[1] % b.s[1], s[2] % b.s[2], s[3] % b.s[3]); }
+	FORCEINLINE s32x4 operator<<(s32 b) const { return S32x4(_mm_slli_epi32(m, b)); }
+	FORCEINLINE s32x4 operator>>(s32 b) const { return S32x4(_mm_srai_epi32(m, b)); }
+	FORCEINLINE b32x4 operator<(s32x4 b) const { return  _mm_cmplt_epi32(m, b.m); }
+	FORCEINLINE b32x4 operator>(s32x4 b) const { return  _mm_cmpgt_epi32(m, b.m); }
+	FORCEINLINE b32x4 operator<=(s32x4 b) const { return _mm_cmpgt_epi32(b.m, m); }
+	FORCEINLINE b32x4 operator>=(s32x4 b) const { return _mm_cmplt_epi32(b.m, m); }
+	FORCEINLINE b32x4 operator==(s32x4 b) const { return _mm_cmpeq_epi32(m, b.m); }
+	FORCEINLINE b32x4 operator!=(s32x4 b) const { return !(*this == b); }
+	CVT(f32x4);
+	CVT(u32x4);
+	SCLX_CMP(b32x4, s32x4, s32, S32x4)
+	MEMFUNS_BASIC(s32x4, s32, S32x4);
+	MEMFUNS_INT(s32x4, s32, S32x4);
+	MEMFUNS_DATA(s32);
+	INDEX_S(s32);
+};
+template<>
+union s32x<8> {
+	s32 s[8];
+	s32x4 _128[2];
+	M256 m;
+#if ARCH_AVX2
+	FORCEINLINE s32x8 operator-() const { return S32x8(_mm256_sub_epi32(_mm256_setzero_si256(), m)); }
+	FORCEINLINE s32x8 operator+(s32x8 b) const { return S32x8(_mm256_add_epi32  (m, b.m)); }
+	FORCEINLINE s32x8 operator-(s32x8 b) const { return S32x8(_mm256_sub_epi32  (m, b.m)); }
+	FORCEINLINE s32x8 operator*(s32x8 b) const { return S32x8(_mm256_mullo_epi32(m, b.m)); }
+#if COMPILER_GCC
+	FALLBACK_BIN_OP(s32x8, /, S32x8, _128)
+	FALLBACK_BIN_OP(s32x8, %, S32x8, _128)
+#else
+	FORCEINLINE s32x8 operator/(s32x8 b) const { return S32x8(_mm256_div_epi32(m, b.m)); }
+	FORCEINLINE s32x8 operator%(s32x8 b) const { return S32x8(_mm256_rem_epi32(m, b.m)); }
+#endif
+	FORCEINLINE s32x8 operator^(s32x8 b) const { return S32x8(_mm256_xor_si256(m, b.m)); }
+	FORCEINLINE s32x8 operator|(s32x8 b) const { return S32x8( _mm256_or_si256(m, b.m)); }
+	FORCEINLINE s32x8 operator&(s32x8 b) const { return S32x8(_mm256_and_si256(m, b.m)); }
+	FORCEINLINE s32x8 operator<<(s32 b) const { return S32x8(_mm256_slli_epi32(m, b)); }
+	FORCEINLINE s32x8 operator>>(s32 b) const { return S32x8(_mm256_srai_epi32(m, b)); }
+	FORCEINLINE b32x8 operator<(s32x8 b) const { return     _mm256_cmplt_epi32(m, b.m); }
+	FORCEINLINE b32x8 operator>(s32x8 b) const { return     _mm256_cmpgt_epi32(m, b.m); }
+	FORCEINLINE b32x8 operator<=(s32x8 b) const { return    _mm256_cmpgt_epi32(b.m, m); }
+	FORCEINLINE b32x8 operator>=(s32x8 b) const { return    _mm256_cmplt_epi32(b.m, m); }
+	FORCEINLINE b32x8 operator==(s32x8 b) const { return    _mm256_cmpeq_epi32(m, b.m); }
+#else
+	FALLBACK_S32X_OPERATORS(s32x8, S32x8, b32x8, _128)
+#endif
+	FORCEINLINE s32x8 operator~() const { return *this ^ (~0); }
+	FALLBACK_BIN_OP(s32x8, <<, S32x8, _128)
+	FALLBACK_BIN_OP(s32x8, >>, S32x8, _128)
+	b32x8 operator!=(s32x8 b) const { return !(*this == b); }
+	CVT(f32x8);
+	CVT(u32x8);
+	SCLX_CMP(b32x8, s32x8, s32, S32x8)
+	MEMFUNS_BASIC(s32x8, s32, S32x8);
+	MEMFUNS_INT(s32x8, s32, S32x8);
+	MEMFUNS_DATA(s32);
+	INDEX_S(s32);
+};
+template<>
+union s32x<16> {
+	s32 s[16];
+	s32x8 _256[2];
+	__m512i m;
+#if ARCH_AVX512F
+	FORCEINLINE s32x16 operator-() const { return S32x16(_mm512_sub_epi32(_mm512_setzero_si512(), m)); }
+	FORCEINLINE s32x16 operator+(s32x16 b) const { return S32x16(_mm512_add_epi32(m, b.m)); }
+	FORCEINLINE s32x16 operator-(s32x16 b) const { return S32x16(_mm512_sub_epi32(m, b.m)); }
+	FORCEINLINE s32x16 operator*(s32x16 b) const { return S32x16(_mm512_mullo_epi32(m, b.m)); }
+#if COMPILER_GCC
+	FALLBACK_BIN_OP(s32x16, /, S32x16, _256)
+	FALLBACK_BIN_OP(s32x16, %, S32x16, _256)
+#else
+	FORCEINLINE s32x16 operator/(s32x16 b) const { return S32x16(_mm512_div_epi32(m, b.m)); }
+	FORCEINLINE s32x16 operator%(s32x16 b) const { return S32x16(_mm512_rem_epi32(m, b.m)); }
+#endif
+	FORCEINLINE s32x16 operator^(s32x16 b) const { return S32x16(_mm512_xor_si512(m, b.m)); }
+	FORCEINLINE s32x16 operator|(s32x16 b) const { return S32x16(_mm512_or_si512(m, b.m)); }
+	FORCEINLINE s32x16 operator&(s32x16 b) const { return S32x16(_mm512_and_si512(m, b.m)); }
+	FORCEINLINE s32x16 operator<<(s32 b) const { return S32x16(_mm512_slli_epi32(m, b)); }
+	FORCEINLINE s32x16 operator>>(s32 b) const { return S32x16(_mm512_srai_epi32(m, b)); }
+	FORCEINLINE b32x16 operator<(s32x16 b) const { return _mm512_cmplt_epi32(m, b.m); }
+	FORCEINLINE b32x16 operator>(s32x16 b) const { return _mm512_cmpgt_epi32(m, b.m); }
+	FORCEINLINE b32x16 operator<=(s32x16 b) const { return _mm512_cmpgt_epi32(b.m, m); }
+	FORCEINLINE b32x16 operator>=(s32x16 b) const { return _mm512_cmplt_epi32(b.m, m); }
+	FORCEINLINE b32x16 operator==(s32x16 b) const { return _mm512_cmpeq_epi32(m, b.m); }
+#else
+	FALLBACK_S32X_OPERATORS(s32x16, S32x16, b32x16, _256)
+#endif
+	s32x16 operator~() const { return *this ^ (~0); }
+	FALLBACK_BIN_OP(s32x16, <<, S32x16, _256)
+	FALLBACK_BIN_OP(s32x16, >>, S32x16, _256)
+	b32x16 operator!=(s32x16 b) const { return !(*this == b); }
+	CVT(f32x16);
+	CVT(u32x16);
+	SCLX_CMP(b32x16, s32x16, s32, S32x16)
+	MEMFUNS_BASIC(s32x16, s32, S32x16);
+	MEMFUNS_INT(s32x16, s32, S32x16);
+	MEMFUNS_DATA(s32);
+	INDEX_S(s32);
+};
+
+template<>
+union u32x<4> {
+	u32 s[4];
+	M128 m;
+	FORCEINLINE u32x4 operator~() const { return *this ^ (~0u); }
+	FORCEINLINE u32x4 operator+(u32x4 b) const { return U32x4(_mm_add_epi32(m, b.m)); }
+	FORCEINLINE u32x4 operator-(u32x4 b) const { return U32x4(_mm_sub_epi32(m, b.m)); }
+	FORCEINLINE u32x4 operator*(u32x4 b) const { return {s[0] * b.s[0], s[1] * b.s[1], s[2] * b.s[2], s[3] * b.s[3]}; }
+#if COMPILER_GCC
+	FORCEINLINE u32x4 operator/(u32x4 b) const { return {s[0] / b.s[0], s[1] / b.s[1], s[2] / b.s[2], s[3] / b.s[3]}; }
+	FORCEINLINE u32x4 operator%(u32x4 b) const { return {s[0] % b.s[0], s[1] % b.s[1], s[2] % b.s[2], s[3] % b.s[3]}; }
+#else
+	FORCEINLINE u32x4 operator/(u32x4 b) const { return U32x4(_mm_div_epu32(m, b.m)); }
+	FORCEINLINE u32x4 operator%(u32x4 b) const { return U32x4(_mm_rem_epu32(m, b.m)); }
+#endif
+	FORCEINLINE u32x4 operator^(u32x4 b) const { return U32x4(_mm_xor_si128(m, b.m)); }
+	FORCEINLINE u32x4 operator|(u32x4 b) const { return U32x4(_mm_or_si128 (m, b.m)); }
+	FORCEINLINE u32x4 operator&(u32x4 b) const { return U32x4(_mm_and_si128(m, b.m)); }
+	FORCEINLINE u32x4 operator<<(u32x4 b) const { return U32x4(s[0] << b.s[0], s[1] << b.s[1], s[2] << b.s[2], s[3] << b.s[3]); }
+	FORCEINLINE u32x4 operator>>(u32x4 b) const { return U32x4(s[0] >> b.s[0], s[1] >> b.s[1], s[2] >> b.s[2], s[3] >> b.s[3]); }
+	FORCEINLINE u32x4 operator<<(u32 b) const { return U32x4(_mm_slli_epi32(m, (s32)b)); }
+	FORCEINLINE u32x4 operator>>(u32 b) const { return U32x4(_mm_srli_epi32(m, (s32)b)); }
+	FORCEINLINE b32x4 operator<(u32x4 b) const { return  _mm_cmplt_epu32(m, b.m); }
+	FORCEINLINE b32x4 operator>(u32x4 b) const { return  _mm_cmpgt_epu32(m, b.m); }
+	FORCEINLINE b32x4 operator<=(u32x4 b) const { return _mm_cmple_epu32(m, b.m); }
+	FORCEINLINE b32x4 operator>=(u32x4 b) const { return _mm_cmpge_epu32(m, b.m); }
+	FORCEINLINE b32x4 operator==(u32x4 b) const { return _mm_cmpeq_epu32(m, b.m); }
+	FORCEINLINE b32x4 operator!=(u32x4 b) const { return !(*this == b); }
+	CVT(f32x4);
+	CVT(s32x4);
+	CVT(f64x4);
+
+	SCLX_CMP(b32x4, u32x4, u32, U32x4)
+	MEMFUNS_BASIC(u32x4, u32, U32x4);
+	MEMFUNS_INT(u32x4, u32, U32x4);
+	MEMFUNS_DATA(u32);
+	INDEX_S(u32);
+};
+template<>
+union u32x<8> {
+	u32 s[8];
+	u32x4 _128[2];
+	M256 m;
+#if ARCH_AVX2
+	FORCEINLINE u32x8 operator+(u32x8 b) const { return U32x8(_mm256_add_epi32(m, b.m)); }
+	FORCEINLINE u32x8 operator-(u32x8 b) const { return U32x8(_mm256_sub_epi32(m, b.m)); }
+#if COMPILER_GCC
+	FALLBACK_BIN_OP(u32x8, /, U32x8, _128)
+	FALLBACK_BIN_OP(u32x8, %, U32x8, _128)
+#else
+	FORCEINLINE u32x8 operator/(u32x8 b) const { return U32x8(_mm256_div_epu32(m, b.m)); }
+	FORCEINLINE u32x8 operator%(u32x8 b) const { return U32x8(_mm256_rem_epu32(m, b.m)); }
+#endif
+	FORCEINLINE u32x8 operator^(u32x8 b) const { return U32x8(_mm256_xor_si256(m, b.m)); }
+	FORCEINLINE u32x8 operator|(u32x8 b) const { return U32x8(_mm256_or_si256 (m, b.m)); }
+	FORCEINLINE u32x8 operator&(u32x8 b) const { return U32x8(_mm256_and_si256(m, b.m)); }
+	FORCEINLINE u32x8 operator<<(u32 b) const { return U32x8(_mm256_slli_epi32(m, (s32)b)); }
+	FORCEINLINE u32x8 operator>>(u32 b) const { return U32x8(_mm256_srli_epi32(m, (s32)b)); }
+	FORCEINLINE b32x8 operator<(u32x8 b) const { return _mm256_cmplt_epu32    (m, b.m); }
+	FORCEINLINE b32x8 operator>(u32x8 b) const { return _mm256_cmpgt_epu32    (m, b.m); }
+	FORCEINLINE b32x8 operator<=(u32x8 b) const { return _mm256_cmple_epu32   (m, b.m); }
+	FORCEINLINE b32x8 operator>=(u32x8 b) const { return _mm256_cmpge_epu32   (m, b.m); }
+	FORCEINLINE b32x8 operator==(u32x8 b) const { return _mm256_cmpeq_epu32   (m, b.m); }
+#else
+	FALLBACK_U32X_OPERATORS(u32x8, U32x8, b32x8, _128)
+#endif
+	FORCEINLINE u32x8 operator~() const { return *this ^ (~0u); }
+	FALLBACK_BIN_OP(u32x8, * , U32x8, _128)
+	FALLBACK_BIN_OP(u32x8, <<, U32x8, _128)
+	FALLBACK_BIN_OP(u32x8, >>, U32x8, _128)
+	FORCEINLINE b32x8 operator!=(u32x8 b) const { return !(*this == b); }
+	CVT(f32x8);
+	CVT(s32x8);
+	SCLX_CMP(b32x8, u32x8, u32, U32x8)
+	MEMFUNS_BASIC(u32x8, u32, U32x8);
+	MEMFUNS_INT(u32x8, u32, U32x8);
+	MEMFUNS_DATA(u32);
+	INDEX_S(u32);
+};
+template<>
+union u32x<16> {
+	u32 s[16];
+	u32x8 _256[2];
+	__m512i m;
+#if ARCH_AVX512F
+	FORCEINLINE u32x16 operator+(u32x16 b) const { return U32x16(_mm512_add_epi32(m, b.m)); }
+	FORCEINLINE u32x16 operator-(u32x16 b) const { return U32x16(_mm512_sub_epi32(m, b.m)); }
+#if COMPILER_GCC
+	FALLBACK_BIN_OP(u32x16, /, U32x16, _256)
+	FALLBACK_BIN_OP(u32x16, %, U32x16, _256)
+#else
+	FORCEINLINE u32x16 operator/(u32x16 b) const { return U32x16(_mm512_div_epu32(m, b.m)); }
+	FORCEINLINE u32x16 operator%(u32x16 b) const { return U32x16(_mm512_rem_epu32(m, b.m)); }
+#endif
+	FORCEINLINE u32x16 operator^(u32x16 b) const { return U32x16(_mm512_xor_si512(m, b.m)); }
+	FORCEINLINE u32x16 operator|(u32x16 b) const { return U32x16(_mm512_or_si512(m, b.m)); }
+	FORCEINLINE u32x16 operator&(u32x16 b) const { return U32x16(_mm512_and_si512(m, b.m)); }
+	FORCEINLINE u32x16 operator<<(u32 b) const { return U32x16(_mm512_slli_epi32(m, (s32)b)); }
+	FORCEINLINE u32x16 operator>>(u32 b) const { return U32x16(_mm512_srli_epi32(m, (s32)b)); }
+	FORCEINLINE b32x16 operator<(u32x16 b) const { return _mm512_cmplt_epu32(m, b.m); }
+	FORCEINLINE b32x16 operator>(u32x16 b) const { return _mm512_cmpgt_epu32(m, b.m); }
+	FORCEINLINE b32x16 operator<=(u32x16 b) const { return _mm512_cmple_epu32(m, b.m); }
+	FORCEINLINE b32x16 operator>=(u32x16 b) const { return _mm512_cmpge_epu32(m, b.m); }
+	FORCEINLINE b32x16 operator==(u32x16 b) const { return _mm512_cmpeq_epu32(m, b.m); }
+#else
+	FALLBACK_U32X_OPERATORS(u32x16, U32x16, b32x16, _256)
+#endif
+	FORCEINLINE u32x16 operator~() const { return *this ^ (~0u); }
+	FALLBACK_BIN_OP(u32x16, * , U32x16, _256)
+	FALLBACK_BIN_OP(u32x16, <<, U32x16, _256)
+	FALLBACK_BIN_OP(u32x16, >>, U32x16, _256)
+	FORCEINLINE b32x16 operator!=(u32x16 b) const { return !(*this == b); }
+	CVT(f32x16);
+	CVT(s32x16);
+	SCLX_CMP(b32x16, u32x16, u32, U32x16)
+	MEMFUNS_BASIC(u32x16, u32, U32x16);
+	MEMFUNS_INT(u32x16, u32, U32x16);
+	MEMFUNS_DATA(u32);
+	INDEX_S(u32);
+};
 
 FORCEINLINE b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) != 0; }
 FORCEINLINE b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
@@ -1286,14 +1304,14 @@ template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32
 #define VECIMPL(dim, SorP, packSize, type) TYPES_##type##x##packSize(MEMBERS##dim##SorP, packSize, dim)
 
 
-union v2f { VECIMPL(2, S, 1, f32); };
-union v3f { VECIMPL(3, S, 1, f32); };
-union v4f { VECIMPL(4, S, 1, f32); };
+template<> union v2fx<1> { VECIMPL(2, S, 1, f32); };
+template<> union v3fx<1> { VECIMPL(3, S, 1, f32); };
+template<> union v4fx<1> { VECIMPL(4, S, 1, f32); };
 
-union v2s { VECIMPL(2, S, 1, s32); };
-union v3s { VECIMPL(3, S, 1, s32); };
+template<> union v2sx<1> { VECIMPL(2, S, 1, s32); };
+template<> union v3sx<1> { VECIMPL(3, S, 1, s32); };
 #if 1
-union v4s { VECIMPL(4, S, 1, s32); };
+template<> union v4sx<1> { VECIMPL(4, S, 1, s32); };
 #else
 #define MEMBERS4(f32, v2, v3) \
 	struct {                  \
@@ -1341,9 +1359,9 @@ bool v4s::operator==(v4s b) const { return allTrue(m == b.m); }
 #undef DATA
 #undef MEMBERS4
 #endif
-union v2u { VECIMPL(2, S, 1, u32); };
-union v3u { VECIMPL(3, S, 1, u32); };
-union v4u { VECIMPL(4, S, 1, u32); };
+template<> union v2ux<1> { VECIMPL(2, S, 1, u32); };
+template<> union v3ux<1> { VECIMPL(3, S, 1, u32); };
+template<> union v4ux<1> { VECIMPL(4, S, 1, u32); };
 
 template<> union v2fx<4> { VECIMPL(2, P, 4, f32); };
 template<> union v3fx<4> { VECIMPL(3, P, 4, f32); };
@@ -1719,7 +1737,8 @@ V2x4(v2ux4, V2ux4, v2u, u32, u32x4, U32x4);
 		};                                                                                                          \
 	}                                                                                                               \
 	FORCEINLINE constexpr v3fx4 V3fx4(f32x4 x, f32x4 y, f32x4 z) { return {x, y, z}; }                              \
-	FORCEINLINE v3fx4 V3fx4(f32 v) { return {F32x4(v), F32x4(v), F32x4(v)}; }                                       \
+	FORCEINLINE v3fx4 V3fx4(f32 x, f32 y, f32 z) { return {F32x4(x), F32x4(y), F32x4(z)}; }                                       \
+	FORCEINLINE v3fx4 V3fx4(f32 v) { return V3fx4(v, v, v); }                                       \
 	FORCEINLINE constexpr v3fx4 V3fx4(f32x4 v) { return {v, v, v}; }                                                \
 	FORCEINLINE v3fx4 V3fx4(v3f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z)}; }
 
@@ -1738,7 +1757,8 @@ V3x4(v3ux4, V3ux4, v3u, u32, u32x4, U32x4);
 				F32x4(i.w, j.w, k.w, l.w)};                                                                         \
 	}                                                                                                               \
 	FORCEINLINE constexpr v4fx4 V4fx4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) { return {x, y, z, w}; }                  \
-	FORCEINLINE v4fx4 V4fx4(f32 v) { return {F32x4(v), F32x4(v), F32x4(v), F32x4(v)}; }                             \
+	FORCEINLINE v4fx4 V4fx4(f32 x, f32 y, f32 z, f32 w) { return {F32x4(x), F32x4(y), F32x4(z), F32x4(w)}; }                                       \
+	FORCEINLINE v4fx4 V4fx4(f32 v) { return V4fx4(v, v, v, v); }                             \
 	FORCEINLINE constexpr v4fx4 V4fx4(f32x4 v) { return {v, v, v, v}; }                                             \
 	FORCEINLINE v4fx4 V4fx4(v4f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)}; }
 
@@ -1778,7 +1798,8 @@ V2x8(v2ux8, V2ux8, v2u, u32, u32x8, U32x8);
 		return V3fx8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),  \
 					 F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z));                                                \
 	}                                                                                                               \
-	FORCEINLINE v3fx8 V3fx8(f32 v) { return V3fx8(F32x8(v), F32x8(v), F32x8(v)); }                                  \
+	FORCEINLINE v3fx8 V3fx8(f32 x, f32 y, f32 z) { return V3fx8(F32x8(x), F32x8(y), F32x8(z)); }                                  \
+	FORCEINLINE v3fx8 V3fx8(f32 v) { return V3fx8(v, v, v); }                                  \
 	FORCEINLINE constexpr v3fx8 V3fx8(f32x8 v) { return V3fx8(v, v, v); }                                           \
 	FORCEINLINE v3fx8 V3fx8(v3f v) { return V3fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }
 V3x8(v3fx8, V3fx8, v3f, f32, f32x8, F32x8, v3fx4);
@@ -1798,7 +1819,8 @@ V3x8(v3ux8, V3ux8, v3u, u32, u32x8, U32x8, v3ux4);
 		return V4fx8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),  \
 					 F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z), F32x8(i.w, j.w, k.w, l.w, a.w, b.w, c.w, d.w)); \
 	}                                                                                                               \
-	FORCEINLINE v4fx8 V4fx8(f32 v) { return V4fx8(F32x8(v), F32x8(v), F32x8(v), F32x8(v)); }                        \
+	FORCEINLINE v4fx8 V4fx8(f32 x, f32 y, f32 z, f32 w) { return V4fx8(F32x8(x), F32x8(y), F32x8(z), F32x8(w)); }                                  \
+	FORCEINLINE v4fx8 V4fx8(f32 v) { return V4fx8(v, v, v, v); }                                  \
 	FORCEINLINE constexpr v4fx8 V4fx8(f32x8 v) { return V4fx8(v, v, v, v); }                                        \
 	FORCEINLINE v4fx8 V4fx8(v4f v) { return V4fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }
 
@@ -1806,6 +1828,82 @@ V4x8(v4fx8, V4fx8, v4f, f32, f32x8, F32x8);
 V4x8(v4sx8, V4sx8, v4s, s32, s32x8, S32x8);
 V4x8(v4ux8, V4ux8, v4u, u32, u32x8, U32x8);
 #undef V4x8
+
+template<> FORCEINLINE v2fx<4> V2fx<4>(f32 v) { return V2fx4(v); }
+template<> FORCEINLINE v2sx<4> V2sx<4>(s32 v) { return V2sx4(v); }
+template<> FORCEINLINE v2ux<4> V2ux<4>(u32 v) { return V2ux4(v); }
+template<> FORCEINLINE v3fx<4> V3fx<4>(f32 v) { return V3fx4(v); }
+template<> FORCEINLINE v3sx<4> V3sx<4>(s32 v) { return V3sx4(v); }
+template<> FORCEINLINE v3ux<4> V3ux<4>(u32 v) { return V3ux4(v); }
+template<> FORCEINLINE v4fx<4> V4fx<4>(f32 v) { return V4fx4(v); }
+template<> FORCEINLINE v4sx<4> V4sx<4>(s32 v) { return V4sx4(v); }
+template<> FORCEINLINE v4ux<4> V4ux<4>(u32 v) { return V4ux4(v); }
+template<> FORCEINLINE v2fx<8> V2fx<8>(f32 v) { return V2fx8(v); }
+template<> FORCEINLINE v2sx<8> V2sx<8>(s32 v) { return V2sx8(v); }
+template<> FORCEINLINE v2ux<8> V2ux<8>(u32 v) { return V2ux8(v); }
+template<> FORCEINLINE v3fx<8> V3fx<8>(f32 v) { return V3fx8(v); }
+template<> FORCEINLINE v3sx<8> V3sx<8>(s32 v) { return V3sx8(v); }
+template<> FORCEINLINE v3ux<8> V3ux<8>(u32 v) { return V3ux8(v); }
+template<> FORCEINLINE v4fx<8> V4fx<8>(f32 v) { return V4fx8(v); }
+template<> FORCEINLINE v4sx<8> V4sx<8>(s32 v) { return V4sx8(v); }
+template<> FORCEINLINE v4ux<8> V4ux<8>(u32 v) { return V4ux8(v); }
+
+template<> FORCEINLINE v2fx<4> V2fx<4>(f32 x, f32 y) { return V2fx4(x, y); }
+template<> FORCEINLINE v2sx<4> V2sx<4>(s32 x, s32 y) { return V2sx4(x, y); }
+template<> FORCEINLINE v2ux<4> V2ux<4>(u32 x, u32 y) { return V2ux4(x, y); }
+template<> FORCEINLINE v2fx<8> V2fx<8>(f32 x, f32 y) { return V2fx8(x, y); }
+template<> FORCEINLINE v2sx<8> V2sx<8>(s32 x, s32 y) { return V2sx8(x, y); }
+template<> FORCEINLINE v2ux<8> V2ux<8>(u32 x, u32 y) { return V2ux8(x, y); }
+template<> FORCEINLINE v3fx<4> V3fx<4>(f32 x, f32 y, f32 z) { return V3fx4(x, y, z); }
+template<> FORCEINLINE v3sx<4> V3sx<4>(s32 x, s32 y, s32 z) { return V3sx4(x, y, z); }
+template<> FORCEINLINE v3ux<4> V3ux<4>(u32 x, u32 y, u32 z) { return V3ux4(x, y, z); }
+template<> FORCEINLINE v3fx<8> V3fx<8>(f32 x, f32 y, f32 z) { return V3fx8(x, y, z); }
+template<> FORCEINLINE v3sx<8> V3sx<8>(s32 x, s32 y, s32 z) { return V3sx8(x, y, z); }
+template<> FORCEINLINE v3ux<8> V3ux<8>(u32 x, u32 y, u32 z) { return V3ux8(x, y, z); }
+template<> FORCEINLINE v4fx<4> V4fx<4>(f32 x, f32 y, f32 z, f32 w) { return V4fx4(x, y, z, w); }
+template<> FORCEINLINE v4sx<4> V4sx<4>(s32 x, s32 y, s32 z, s32 w) { return V4sx4(x, y, z, w); }
+template<> FORCEINLINE v4ux<4> V4ux<4>(u32 x, u32 y, u32 z, u32 w) { return V4ux4(x, y, z, w); }
+template<> FORCEINLINE v4fx<8> V4fx<8>(f32 x, f32 y, f32 z, f32 w) { return V4fx8(x, y, z, w); }
+template<> FORCEINLINE v4sx<8> V4sx<8>(s32 x, s32 y, s32 z, s32 w) { return V4sx8(x, y, z, w); }
+template<> FORCEINLINE v4ux<8> V4ux<8>(u32 x, u32 y, u32 z, u32 w) { return V4ux8(x, y, z, w); }
+
+template<> FORCEINLINE v2fx<4> V2fx<4>(f32x4 v) { return V2fx4(v); }
+template<> FORCEINLINE v2sx<4> V2sx<4>(s32x4 v) { return V2sx4(v); }
+template<> FORCEINLINE v2ux<4> V2ux<4>(u32x4 v) { return V2ux4(v); }
+template<> FORCEINLINE v3fx<4> V3fx<4>(f32x4 v) { return V3fx4(v); }
+template<> FORCEINLINE v3sx<4> V3sx<4>(s32x4 v) { return V3sx4(v); }
+template<> FORCEINLINE v3ux<4> V3ux<4>(u32x4 v) { return V3ux4(v); }
+template<> FORCEINLINE v4fx<4> V4fx<4>(f32x4 v) { return V4fx4(v); }
+template<> FORCEINLINE v4sx<4> V4sx<4>(s32x4 v) { return V4sx4(v); }
+template<> FORCEINLINE v4ux<4> V4ux<4>(u32x4 v) { return V4ux4(v); }
+template<> FORCEINLINE v2fx<8> V2fx<8>(f32x8 v) { return V2fx8(v); }
+template<> FORCEINLINE v2sx<8> V2sx<8>(s32x8 v) { return V2sx8(v); }
+template<> FORCEINLINE v2ux<8> V2ux<8>(u32x8 v) { return V2ux8(v); }
+template<> FORCEINLINE v3fx<8> V3fx<8>(f32x8 v) { return V3fx8(v); }
+template<> FORCEINLINE v3sx<8> V3sx<8>(s32x8 v) { return V3sx8(v); }
+template<> FORCEINLINE v3ux<8> V3ux<8>(u32x8 v) { return V3ux8(v); }
+template<> FORCEINLINE v4fx<8> V4fx<8>(f32x8 v) { return V4fx8(v); }
+template<> FORCEINLINE v4sx<8> V4sx<8>(s32x8 v) { return V4sx8(v); }
+template<> FORCEINLINE v4ux<8> V4ux<8>(u32x8 v) { return V4ux8(v); }
+
+template<> FORCEINLINE v2fx<4> V2fx<4>(f32x4 x, f32x4 y) { return V2fx4(x, y); }
+template<> FORCEINLINE v2sx<4> V2sx<4>(s32x4 x, s32x4 y) { return V2sx4(x, y); }
+template<> FORCEINLINE v2ux<4> V2ux<4>(u32x4 x, u32x4 y) { return V2ux4(x, y); }
+template<> FORCEINLINE v2fx<8> V2fx<8>(f32x8 x, f32x8 y) { return V2fx8(x, y); }
+template<> FORCEINLINE v2sx<8> V2sx<8>(s32x8 x, s32x8 y) { return V2sx8(x, y); }
+template<> FORCEINLINE v2ux<8> V2ux<8>(u32x8 x, u32x8 y) { return V2ux8(x, y); }
+template<> FORCEINLINE v3fx<4> V3fx<4>(f32x4 x, f32x4 y, f32x4 z) { return V3fx4(x, y, z); }
+template<> FORCEINLINE v3sx<4> V3sx<4>(s32x4 x, s32x4 y, s32x4 z) { return V3sx4(x, y, z); }
+template<> FORCEINLINE v3ux<4> V3ux<4>(u32x4 x, u32x4 y, u32x4 z) { return V3ux4(x, y, z); }
+template<> FORCEINLINE v3fx<8> V3fx<8>(f32x8 x, f32x8 y, f32x8 z) { return V3fx8(x, y, z); }
+template<> FORCEINLINE v3sx<8> V3sx<8>(s32x8 x, s32x8 y, s32x8 z) { return V3sx8(x, y, z); }
+template<> FORCEINLINE v3ux<8> V3ux<8>(u32x8 x, u32x8 y, u32x8 z) { return V3ux8(x, y, z); }
+template<> FORCEINLINE v4fx<4> V4fx<4>(f32x4 x, f32x4 y, f32x4 z, f32x4 w) { return V4fx4(x, y, z, w); }
+template<> FORCEINLINE v4sx<4> V4sx<4>(s32x4 x, s32x4 y, s32x4 z, s32x4 w) { return V4sx4(x, y, z, w); }
+template<> FORCEINLINE v4ux<4> V4ux<4>(u32x4 x, u32x4 y, u32x4 z, u32x4 w) { return V4ux4(x, y, z, w); }
+template<> FORCEINLINE v4fx<8> V4fx<8>(f32x8 x, f32x8 y, f32x8 z, f32x8 w) { return V4fx8(x, y, z, w); }
+template<> FORCEINLINE v4sx<8> V4sx<8>(s32x8 x, s32x8 y, s32x8 z, s32x8 w) { return V4sx8(x, y, z, w); }
+template<> FORCEINLINE v4ux<8> V4ux<8>(u32x8 x, u32x8 y, u32x8 z, u32x8 w) { return V4ux8(x, y, z, w); }
 
 // clang-format off
 #define CVT(v2f, v2s, V2s, s32, v2u, V2u, u32)                \
@@ -2320,7 +2418,6 @@ IN_BOUNDS(bool, v2s) IN_BOUNDS(b32x4, v2sx4) IN_BOUNDS(b32x8, v2sx8);
 IN_BOUNDS(bool, v2u) IN_BOUNDS(b32x4, v2ux4) IN_BOUNDS(b32x8, v2ux8);
 #undef IN_BOUNDS
 
-inline constexpr f32 select(bool mask, f32 a, f32 b) { return mask ? a : b; }
 inline f32x4 select(b32x4 mask, f32x4 a, f32x4 b) { return F32x4(select(mask.m, a.m, b.m)); }
 inline s32x4 select(b32x4 mask, s32x4 a, s32x4 b) { return S32x4(select(mask.m, a.m, b.m)); }
 inline v2fx4 select(b32x4 mask, v2fx4 a, v2fx4 b) { return V2fx4(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
@@ -2437,9 +2534,22 @@ inline constexpr f32 frac(f32 v) {	\
 	return select(v < 0, v + 1, v);	\
 }
 FRAC(constexpr, f32, s32)
+FRAC(constexpr, f64, s64)
 FRAC(, f32x4, s32x4)
 FRAC(, f32x8, s32x8)
 #undef FRAC
+
+#if 1
+bool isPowerOf2(u8  v) { return v && ((v & (v - 1)) == 0); }
+bool isPowerOf2(u16 v) { return v && ((v & (v - 1)) == 0); }
+bool isPowerOf2(u32 v) { return v && ((v & (v - 1)) == 0); }
+bool isPowerOf2(u64 v) { return v && ((v & (v - 1)) == 0); }
+#else
+bool isPowerOf2(u8  v) { return countBits(v) == 1; }
+bool isPowerOf2(u16 v) { return countBits(v) == 1; }
+bool isPowerOf2(u32 v) { return countBits(v) == 1; }
+bool isPowerOf2(u64 v) { return countBits(v) == 1; }
+#endif
 
 inline v4f frac(v4f v) { return V4f(frac(v.m)); }
 inline v4fx4 frac(v4fx4 v) { return V4fx4(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
@@ -2473,16 +2583,40 @@ inline v3s frac(v3s v, u32 s) {
 }
 inline v4s frac(v4s v, u32 step) {
 #if 0
+	//    | ---- ctime ---- | ---- rtime ---- |
+	//    | - n2 - | - p2 - | - n2 - | - p2 - |
+	// l1 |  15.9  |  14.0  |  28.2  |  28.2  |
+	//    |  15.8  |  13.8  |  28.1  |  28.1  |
+	//    |  15.9  |  13.8  |  28.1  |  28.3  |
+	//    |        |        |        |        |
+	// l2 |  15.6  |  13.6  |  28.2  |  28.2  |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	// l3 |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
 	return {
-		frac(v.x, s),
-		frac(v.y, s),
-		frac(v.z, s),
-		frac(v.w, s),
+		frac(v.x, step),
+		frac(v.y, step),
+		frac(v.z, step),
+		frac(v.w, step),
 	};
 #else
-	// NOTE: this version is ~2 cycles slower than just 4 fracs (20 -> 22), 
-	// but it is 2x faster if step is a power of 2
-	if (u32 bits = countBits(step); bits == 1) {
+	//    | ---- ctime ---- | ---- rtime ---- |
+	//    | - n2 - | - p2 - | - n2 - | - p2 - |
+	// l1 |  28.3  |   7.5  |  30.3  |  13.6  |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	// l2 |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	// l3 |        |        |        |        |
+	//    |        |        |        |        |
+	//    |        |        |        |        |
+	if (isPowerOf2(step)) {
 		s32x4 mrmask = S32x4((s32)fillBits(findLowestBit(step)));
 		s32x4 one = S32x4(1);
 		return V4s(select(v.m < 0, ((v.m + one) & mrmask) + S32x4((s32)step) - one, v.m & mrmask));
@@ -2517,22 +2651,6 @@ inline f32x8 floor(f32x8 v) { return F32x8(_mm256_round_ps(v.m, _MM_FROUND_TO_NE
 inline f32x8 floor(f32x8 v) { return F32x8(floor(v._128[0]), floor(v._128[1])); }
 #endif
 inline v4f floor(v4f v) { return V4f(floor(v.m)); }
-inline s32 floorToInt(f32 v) { return (s32)floorf(v); }
-inline v2s floorToInt(v2f v) {
-	return {
-		floorToInt(v.x),
-		floorToInt(v.y),
-	};
-}
-inline v3s floorToInt(v3f v) {
-	return {
-		floorToInt(v.x),
-		floorToInt(v.y),
-		floorToInt(v.z),
-	};
-}
-inline s32x4 floorToInt(f32x4 v) { return S32x4(_mm_cvtps_epi32(_mm_floor_ps(v.m))); }
-inline v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
 inline constexpr s32 floor(s32 v, u32 s) {
 	if (v < 0)
 		v = (v + 1) / (s32)s - 1;
@@ -2572,21 +2690,52 @@ inline v4s floor(v4s v, u32 step) {
 #endif
 }
 
+inline s32 floorToInt(f32 v) { return (s32)floorf(v); }
+inline s64 floorToInt(f64 v) { return (s64)floor(v); }
+inline v2s floorToInt(v2f v) {
+	return {
+		floorToInt(v.x),
+		floorToInt(v.y),
+	};
+}
+inline v3s floorToInt(v3f v) {
+	return {
+		floorToInt(v.x),
+		floorToInt(v.y),
+		floorToInt(v.z),
+	};
+}
+inline s32x4 floorToInt(f32x4 v) { return (s32x4)floor(v); }
+inline v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
+
+f32 ceil(f32 v) { return ceilf(v); }
+inline f32x4 ceil(f32x4 v) { return v.m = _mm_round_ps(v.m, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC), v; }
+#if ARCH_AVX
+inline f32x8 ceil(f32x8 v) { return v.m = _mm256_round_ps(v.m, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC), v; }
+#else
+inline f32x8 ceil(f32x8 v) { return F32x8(ceil(v._128[0]), ceil(v._128[1])); }
+#endif
+
 #define CEIL(t) \
 	t ceil(t v, u32 s) { return floor(v + ((s32)s - 1), s); }
 inline constexpr CEIL(s32) CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
-#define ROUND(f32) \
-	inline f32 round(f32 v) { return floor(v + 0.5f); }
+s32 ceilToInt(f32 v) { return (s32)ceilf(v); }
+s64 ceilToInt(f64 v) { return (s64)ceil(v); }
+
+#define ROUND(f32) inline f32 round(f32 v) { return floor(v + 0.5f); }
 ROUND(f32) ROUND(f32x4) ROUND(f32x8) ROUND(v2f) ROUND(v3f) ROUND(v4f);
 #undef ROUND
 inline v2fx8 round(v2fx8 v) { return V2fx8(round(v.x), round(v.y)); }
+
 inline s32 roundToInt(f32 v) { return floorToInt(v + 0.5f); }
 inline v2s roundToInt(v2f v) { return {roundToInt(v.x), roundToInt(v.y)}; }
 inline v3s roundToInt(v3f v) { return {roundToInt(v.x), roundToInt(v.y), roundToInt(v.z)}; }
 inline v4s roundToInt(v4f v) { return (v4s)round(v); }
 inline v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
+
+inline f32 dot(f32 a, f32 b) { return a * b; }
 inline f32 dot(f32x4 a, f32x4 b) {
 	f32 result;
 	_mm_store_ss(&result, _mm_dp_ps(a.m, b.m, 0xFF));
@@ -2600,22 +2749,14 @@ inline u32 dot(u32x4 a, u32x4 b) {
 	a *= b;
 	return a[0] + a[1] + a[2] + a[3];
 }
-inline f32 dot(f32 a, f32 b) { return a * b; }
-#define DOT(f32, v2f)       \
-	inline f32 dot(v2f a, v2f b) { \
-		a *= b;             \
-		return a.x + a.y;   \
-	}
+
+#define DOT(f32, v2f) inline f32 dot(v2f a, v2f b) { return a *= b, a.x + a.y; }
 DOT(f32, v2f) DOT(f32x4, v2fx4) DOT(f32x8, v2fx8);
 DOT(s32, v2s) DOT(s32x4, v2sx4) DOT(s32x8, v2sx8);
 DOT(u32, v2u) DOT(u32x4, v2ux4) DOT(u32x8, v2ux8);
 #undef DOT
 
-#define DOT(f32, v3f)           \
-	inline f32 dot(v3f a, v3f b) {     \
-		a *= b;                 \
-		return a.x + a.y + a.z; \
-	}
+#define DOT(f32, v3f) inline f32 dot(v3f a, v3f b) { return a *= b, a.x + a.y + a.z; }
 DOT(f32, v3f) DOT(f32x4, v3fx4) DOT(f32x8, v3fx8);
 DOT(s32, v3s) DOT(s32x4, v3sx4) DOT(s32x8, v3sx8);
 DOT(u32, v3u) DOT(u32x4, v3ux4) DOT(u32x8, v3ux8);
@@ -2656,25 +2797,28 @@ inline v3f cross(v3f a, v3f b) {
 	// clang-format on
 }
 
-inline f32x4 abs(f32x4 v) { return F32x4(v.m & (M128)_mm_set1_epi32(0x7FFFFFFF)); }
+inline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
+inline f32x4 absolute(f32x4 v) { return v.m &= _mm_set1_epi32(0x7FFFFFFF), v; }
 #if ARCH_AVX
-inline f32x8 abs(f32x8 v) { return F32x8(v.m & (M256)_mm256_set1_epi32(0x7FFFFFFF)); }
+inline f32x8 absolute(f32x8 v) { return F32x8(v.m & (M256)_mm256_set1_epi32(0x7FFFFFFF)); }
 #else
-inline f32x8 abs(f32x8 v) { return F32x8(abs(v._128[0]), abs(v._128[1])); }
+inline f32x8 absolute(f32x8 v) { return F32x8(absolute(v._128[0]), absolute(v._128[1])); }
 #endif
 
-inline v2f abs(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
-inline v3f abs(v3f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z)}; }
-inline v4f abs(v4f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w)}; }
-inline v2fx4 abs(v2fx4 v) { return V2fx4(abs(v.x), abs(v.y)); }
-inline v2fx8 abs(v2fx8 v) { return V2fx8(abs(v.x), abs(v.y)); }
+inline v2f absolute(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
+inline v3f absolute(v3f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z)}; }
+inline v4f absolute(v4f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w)}; }
+inline v2fx4 absolute(v2fx4 v) { return V2fx4(absolute(v.x), absolute(v.y)); }
+inline v2fx8 absolute(v2fx8 v) { return V2fx8(absolute(v.x), absolute(v.y)); }
 
-inline v2s abs(v2s a) { return {labs(a.x), labs(a.y)}; }
-inline v3s abs(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
-inline s32x4 abs(s32x4 a) { return S32x4(_mm_abs_epi32(a.m)); }
-inline v4s abs(v4s a) { return V4s(abs(a.m)); }
+inline v2s absolute(v2s a) { return {labs(a.x), labs(a.y)}; }
+inline v3s absolute(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
+inline s32x4 absolute(s32x4 a) { return S32x4(_mm_abs_epi32(a.m)); }
+inline v4s absolute(v4s a) { return V4s(absolute(a.m)); }
 
 inline f32 sign(f32 v) { return v > 0.0f ? 1.0f : v < 0.0f ? -1.0f : 0.0f; }
+template<umm ps>
+f32x<ps> sign(f32x<ps> v) { return select(v > 0, F32x<ps>(1), select(v < 0, F32x<ps>(-1), F32x<ps>(0))); }
 
 inline f32 sum(v2f v) { return v.x + v.y; }
 
@@ -2688,14 +2832,14 @@ inline auto length(T a) {
 }
 template <class T>
 inline auto normalize(T a) {
-	return a / length(a);
+	return a * (1.0f / length(a));
 }
 template <class T>
 inline auto normalize(T a, T fallback) {
 	auto lsq = lengthSqr(a);
 	if (lsq == decltype(lsq){})
 		return fallback;
-	return a / sqrt(lsq);
+	return a * (1.0f / sqrt(lsq));
 }
 template <class T>
 inline auto distanceSqr(T a, T b) {
@@ -2710,7 +2854,7 @@ inline auto manhattan(T a, T b) {
 	return sum(abs(a - b));
 }
 inline int maxDistance(v3s a, v3s b) {
-	a = abs(a - b);
+	a = absolute(a - b);
 	return max(max(a.x, a.y), a.z);
 }
 
@@ -2928,16 +3072,80 @@ struct Random {
 };
 #undef RANDOM
 
+f32 setSign(f32 dst, f32 src) {
+    *(u32*)&dst &= 0x7FFFFFFF;
+    *(u32*)&dst |= *(u32*)&src & 0x80000000;
+    return dst;
+}
+f64 setSign(f64 dst, f64 src) {
+    *(u64*)&dst &= 0x7FFFFFFFFFFFFFFF;
+    *(u64*)&dst |= *(u64*)&src & 0x8000000000000000;
+    return dst;
+}
+template<umm ps>
+f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
+    *(u32x<ps>*)&dst &= U32x<ps>(0x7FFFFFFF);
+    *(u32x<ps>*)&dst |= *(u32x<ps>*)&src & U32x<ps>(0x80000000);
+    return dst;
+}
+
+#define TRUNC(f32) f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
+TRUNC(f32)
+TRUNC(f64)
+#undef TRUNC
+
+template<umm ps>
+f32x<ps> trunc(f32x<ps> v) { return select(v > 0, floor(v), ceil(v)); }
+
+#define MOD(f32) f32 mod(f32 a, f32 b) { return setSign(a - trunc(a / b) * b, a); }
+MOD(f32)
+MOD(f64)
+#undef MOD
+
+template<umm ps>
+f32x<ps> mod(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a / b) * b, a); }
+
+v3f hsvToRgb(f32 h, f32 s, f32 v) {
+	h = frac(h);
+	f32 c = v * s;
+	f32 x = c * (1 - absolute(mod(h * 6, 2) - 1));
+	v3f m = V3f(v - c);
+	     if (h < ( 60 / 360.0f)) { m += v3f{c, x, 0}; }
+	else if (h < (120 / 360.0f)) { m += v3f{x, c, 0}; }
+	else if (h < (180 / 360.0f)) { m += v3f{0, c, x}; }
+	else if (h < (240 / 360.0f)) { m += v3f{0, x, c}; }
+	else if (h < (300 / 360.0f)) { m += v3f{x, 0, c}; }
+	else                         { m += v3f{c, 0, x}; }
+
+	return m;
+}
+template<umm ps>
+v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
+	h = frac(h);
+	f32x<ps> c = v * s;
+	f32x<ps> x = c * (1 - abs(mod(h * 6, F32x<ps>(2)) - 1));
+	b32x<ps> cmp0 = h < ( 60 / 360.0f);
+	b32x<ps> cmp1 = h < (120 / 360.0f);
+	b32x<ps> cmp2 = h < (180 / 360.0f);
+	b32x<ps> cmp3 = h < (240 / 360.0f);
+	b32x<ps> cmp4 = h < (300 / 360.0f);
+	b32x<ps> m0 =          cmp0;
+	b32x<ps> m1 = !cmp0 && cmp1;
+	b32x<ps> m2 = !cmp1 && cmp2;
+	b32x<ps> m3 = !cmp2 && cmp3;
+	b32x<ps> m4 = !cmp3 && cmp4;
+	b32x<ps> m5 = !cmp4;
+	v3fx<ps> m = V3fx<ps>(v - c);
+	m = select(m0, m + V3fx<ps>(c, x, {}), m);
+	m = select(m1, m + V3fx<ps>(x, c, {}), m);
+	m = select(m2, m + V3fx<ps>({}, c, x), m);
+	m = select(m3, m + V3fx<ps>({}, x, c), m);
+	m = select(m4, m + V3fx<ps>(x, {}, c), m);
+	m = select(m5, m + V3fx<ps>(c, {}, x), m);
+	return m;
+}
+
 template<class T> constexpr bool isVector = false;
-template<> constexpr bool isVector<v2f  > = true;
-template<> constexpr bool isVector<v3f  > = true;
-template<> constexpr bool isVector<v4f  > = true;
-template<> constexpr bool isVector<v2s  > = true;
-template<> constexpr bool isVector<v3s  > = true;
-template<> constexpr bool isVector<v4s  > = true;
-template<> constexpr bool isVector<v2u  > = true;
-template<> constexpr bool isVector<v3u  > = true;
-template<> constexpr bool isVector<v4u  > = true;
 template<umm w> constexpr bool isVector<v2fx<w>> = true;
 template<umm w> constexpr bool isVector<v3fx<w>> = true;
 template<umm w> constexpr bool isVector<v4fx<w>> = true;
@@ -3533,6 +3741,49 @@ inline b32x<ps> raycastRect(v2fx<ps> a, v2fx<ps> b, v2fx<ps> tile, v2fx<ps> size
 			 select(masks[1], normals[0], select(masks[2], normals[1], select(masks[3], normals[2], normals[3]))));
 
 	return !masks[0];
+}
+inline bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v2f& normal) {
+	v2f dir = normalize(b - a);
+	v2f rdir = 1.0f / dir;
+	v2f vMin = (boxMin - a) * rdir;
+	v2f vMax = (boxMax - a) * rdir;
+
+	f32 tMin = max(min(vMin.x, vMax.x), min(vMin.y, vMax.y));
+	f32 tMax = min(max(vMin.x, vMax.x), max(vMin.y, vMax.y));
+
+	if (tMax < 0 || tMin > tMax) {
+		return false;
+	}
+
+	v2f boxDim = (boxMax - boxMin) * 0.5f;
+	v2f localPoint = dir * tMin;
+	point = a + localPoint;
+	if (localPoint.x == boxDim.x) {
+		normal = {sign(localPoint.x), 0};
+	} else {
+		normal = {0, sign(localPoint.y)};
+	}
+	return true;
+}
+template <umm ps>
+inline b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, v2fx<ps> boxMin, v2fx<ps> boxMax, v2fx<ps>& point, v2fx<ps>& normal) {
+	auto dir = normalize(b - a);
+	auto rdir = 1.0f / dir;
+	auto vMin = (boxMin - a) * rdir;
+	auto vMax = (boxMax - a) * rdir;
+
+	auto tMin = max(min(vMin.x, vMax.x), min(vMin.y, vMax.y));
+	auto tMax = min(max(vMin.x, vMax.x), max(vMin.y, vMax.y));
+
+	auto boxDim = (boxMax - boxMin) * 0.5f;
+	auto localPoint = dir * tMin;
+	point = a + localPoint;
+	if (localPoint.x == boxDim.x) {
+		normal = V2fx<ps>(sign(localPoint.x), {});
+	} else {
+		normal = V2fx<ps>({}, sign(localPoint.y));
+	}
+	return tMax >= 0 && tMin <= tMax;
 }
 inline bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, v3f& normal) {
 	auto p21 = p2 - p1;

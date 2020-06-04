@@ -44,8 +44,8 @@ union XMM {
 	FORCEINLINE XMM operator==(XMM b) const { return _mm_cmpeq_epi32(pi, b); }
 	FORCEINLINE XMM operator!=(XMM b) const { return _mm_xor_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(pi, b)), _mm_castsi128_ps(_mm_set1_epi32(~0))); }
 	FORCEINLINE XMM &operator^=(XMM b) { return *this = _mm_xor_ps(ps, b); }
-	FORCEINLINE XMM &operator|=(XMM b) { return *this = _mm_or_ps (ps, b); }
-	FORCEINLINE XMM &operator&=(XMM b) { return *this = _mm_and_ps (ps, b); }
+	FORCEINLINE XMM &operator|=(XMM b) { return *this = _mm_or_ps(ps, b); }
+	FORCEINLINE XMM &operator&=(XMM b) { return *this = _mm_and_ps(ps, b); }
 };
 struct XMMWORD_PTR {
 	void *ptr;
@@ -108,7 +108,6 @@ union YMM {
 	FORCEINLINE YMM &operator&=(YMM b) { return l &= b.l, h &= b.h, *this; }
 #endif
 	FORCEINLINE constexpr YMM() = default;
-	FORCEINLINE constexpr operator YMMWORD_PTR();
 };
 
 struct YMMWORD_PTR {
@@ -173,7 +172,6 @@ union ZMM {
 #endif
 
 	FORCEINLINE constexpr ZMM() = default;
-	FORCEINLINE constexpr operator ZMMWORD_PTR();
 };
 
 struct ZMMWORD_PTR {
@@ -195,14 +193,12 @@ struct ZMMWORD_PTR {
 	FORCEINLINE constexpr ZMM &operator*() { return *(ZMM *)ptr; }
 };
 
-FORCEINLINE constexpr YMM::operator YMMWORD_PTR() { return YMMWORD_PTR(this); }
-
-FORCEINLINE void movaps(XMMWORD_PTR dst, XMMWORD_PTR src) { _mm_store_ps((float *)dst.ptr, *src); }
+FORCEINLINE void movaps(XMM &dst, XMM src) { _mm_store_ps(dst.f32, src); }
 
 #if ARCH_AVX
-FORCEINLINE void vmovaps(XMMWORD_PTR dst, XMMWORD_PTR src) { movaps(dst, src); }
-FORCEINLINE void vmovaps(YMMWORD_PTR dst, YMMWORD_PTR src) { _mm256_store_ps((float *)dst.ptr, *src); }
-FORCEINLINE void vmovdqa(YMMWORD_PTR dst, YMMWORD_PTR src) { vmovaps(dst, src); }
+FORCEINLINE void vmovaps(XMM &dst, XMM src) { movaps(dst, src); }
+FORCEINLINE void vmovaps(YMM &dst, YMM src) { _mm256_store_ps(dst.f32, src); }
+FORCEINLINE void vmovdqa(YMM &dst, YMM src) { vmovaps(dst, src); }
 FORCEINLINE void vunpcklps(YMM &dst, YMM a, YMM b) { dst = _mm256_unpacklo_ps(a, b); }
 FORCEINLINE void vunpckhps(YMM &dst, YMM a, YMM b) { dst = _mm256_unpackhi_ps(a, b); }
 #endif
