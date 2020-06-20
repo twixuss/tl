@@ -8,6 +8,7 @@
 #include <float.h>
 #include <math.h>
 #include <memory.h>
+#include <utility>
 
 #if COMPILER_MSVC
 #pragma warning(disable : 5045) // spectre
@@ -19,63 +20,8 @@ using M128 = ASM::XMM;
 using M256 = ASM::YMM;
 using M512 = ASM::ZMM;
 
-#if ARCH_AVX512F
-#define _simdWidth 64
-#elif ARCH_AVX
-#define _simdWidth 32
-#else
-#define _simdWidth 16
-#endif
-
 // simd register width in bytes
-static constexpr u32 simdWidth = _simdWidth;
-
-#undef _simdWidth
-
-template<class T, u32 w, class UInt>
-void _shuffleFallback(void *dst, void const *idx) {
-	T src[w];
-	memcpy(src, dst, sizeof(src));
-	for(u32 i=0;i<w;++i) {
-		((T *)dst)[i] = src[((UInt *)idx)[i]];
-	}
-}
-
-#if ARCH_AVX
-FORCEINLINE void _shuffle32x4(void *dst, void const *idx) { *(__m128*)dst = _mm_permutevar_ps(*(__m128*)dst, *(__m128i*)idx); }
-#else
-FORCEINLINE void _shuffle32x4(void *dst, void const *idx) { _shuffleFallback<u32, 4, u32>(dst, idx); }
-#endif
-
-#if ARCH_AVX2
-FORCEINLINE void _gather32x4(void *dst, void const *memory, void const *offsets) { *(__m128*)dst = _mm_i32gather_ps((f32*)memory, *(__m128i*)offsets, 1); }
-FORCEINLINE void _gather32x8(void *dst, void const *memory, void const *offsets) { *(__m256*)dst = _mm256_i32gather_ps((f32*)memory, *(__m256i*)offsets, 1); }
-FORCEINLINE void _shuffle32x8(void *dst, void const *idx) { *(__m256*)dst = _mm256_permutevar_ps(*(__m256*)dst, *(__m256i*)idx); }
-#else
-FORCEINLINE void _gather32x4(void *_dst, void const *_memory, void const *_offsets) { 
-	f32 *dst = (f32 *)_dst;
-	u8 *memory = (u8*)_memory;
-	s32 *offsets = (s32*)_offsets;
-	_mm_storeu_ps(dst, _mm_setr_ps(*(f32*)(memory + offsets[0]), 
-								   *(f32*)(memory + offsets[1]), 
-								   *(f32*)(memory + offsets[2]), 
-								   *(f32*)(memory + offsets[3]))); 
-}
-FORCEINLINE void _gather32x8(void *dst, void const *memory, void const *offsets) { 
-	_gather32x4((u8*)dst +  0, memory, (u8*)offsets +  0);
-	_gather32x4((u8*)dst + 16, memory, (u8*)offsets + 16);
-}
-FORCEINLINE void _shuffle32x8(void *dst, void const *idx) { _shuffleFallback<u32, 8, u32>(dst, idx); }
-#endif
-
-#if ARCH_AVX512F
-FORCEINLINE void _gather32x16(void *dst, void const *memory, void const *offsets) { *(__m512*)dst = _mm512_i32gather_ps(*(__m512i*)offsets, (f32*)memory, sizeof(f32)); }
-#else
-FORCEINLINE void _gather32x16(void *dst, void const *memory, void const *offsets) { 
-	_gather32x8((u8*)dst +  0, memory, (u8*)offsets +  0);
-	_gather32x8((u8*)dst + 32, memory, (u8*)offsets + 32);
-}
-#endif
+static constexpr u32 simdWidth = ASM::simdWidth;
 
 #define _mm_not_int(a)		 _mm_xor_si128(a, _mm_set1_epi32(~0))
 #define _mm_cmpge_epu8(a, b) _mm_cmpeq_epi8(_mm_max_epu8(a, b), a)
@@ -116,17 +62,8 @@ constexpr f32 sqrt2 = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3 = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
 
-static const f32 _trueMask = []{ u32 v = ~0; return *(f32*)&v; }();
-static const __m128 _trueMask128 = _mm_set1_ps(_trueMask);
-static const __m256 _trueMask256 = _mm256_set1_ps(_trueMask);
-
 template <class T> FORCEINLINE constexpr auto radians(T deg) { return deg * (T)(pi / 180.0L); }
 template <class T> FORCEINLINE constexpr auto degrees(T rad) { return rad * (T)(180.0L / pi); }
-template <class T, class U> FORCEINLINE constexpr auto min(T a, U b) { return a < b ? a : b; }
-template <class T, class U> FORCEINLINE constexpr auto max(T a, U b) { return a > b ? a : b; }
-template <class T, class U, class... Rest> FORCEINLINE constexpr auto min(T a, U b, Rest... rest) { return min(min(a, b), rest...); }
-template <class T, class U, class... Rest> FORCEINLINE constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
-template <class T, class U, class V, class W> FORCEINLINE constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 template <class T, class SN, class SX, class DN, class DX> FORCEINLINE constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class U, class V> FORCEINLINE constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
 template <class T, class U> FORCEINLINE constexpr auto lerp(T a, U b, f32 t) { return a + (b - a) * t; }
@@ -402,14 +339,10 @@ FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut);
 FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut);
 FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 
-#define MOP(op, vec) \
-	FORCEINLINE vec& operator op##=(vec b) { return *this = *this op b; }
-#define MOPS(op, vec, scl, con) \
-	FORCEINLINE vec& operator op##=(scl b) { return *this op## = con(b); }
-#define OPS(op, vec, scl, con) \
-	FORCEINLINE vec operator op(scl b) const { return *this op con(b); }
-#define SOP(op, vec, scl, con) \
-	FORCEINLINE friend vec operator op(scl a, vec b) { return con(a) op b; }
+#define MOP(op, vec)			FORCEINLINE vec& operator op##=(vec b) { return *this = *this op b; }
+#define MOPS(op, vec, scl, con)	FORCEINLINE vec& operator op##=(scl b) { return *this op## = con(b); }
+#define OPS(op, vec, scl, con)	FORCEINLINE vec operator op(scl b) const { return *this op con(b); }
+#define SOP(op, vec, scl, con)	FORCEINLINE friend vec operator op(scl a, vec b) { return con(a) op b; }
 
 #define AOP(op, vec, scl, con) MOP(op, vec) MOPS(op, vec, scl, con) OPS(op, vec, scl, con) SOP(op, vec, scl, con)
 
@@ -489,10 +422,10 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
 	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 
-#define FALLBACK_UN_OP(ret, op, con, _128)			FORCEINLINE ret operator op(       ) const { return con(op _128[0], op _128[1]); }
-#define FALLBACK_BIN_OP(ret, op, con, _128)			FORCEINLINE ret operator op(ret b  ) const { return con(   _128[0] op b._128[0], _128[1] op b._128[1]); }
-#define FALLBACK_BIN_OP_S(ret, op, scl, con, _128)	FORCEINLINE ret operator op(scl b  ) const { return con(   _128[0] op b        , _128[1] op b); }
-#define FALLBACK_CMP_OP(ret, op, param, _128)		FORCEINLINE ret operator op(param b) const { return    {   _128[0] op b._128[0], _128[1] op b._128[1]}; }
+#define FALLBACK_UN_OP(ret, op, con, _128)			FORCEINLINE ret operator op() const { return con(op _128[0], op _128[1]); }
+#define FALLBACK_BIN_OP(ret, op, con, _128)			FORCEINLINE ret operator op(ret b) const { return con(_128[0] op b._128[0], _128[1] op b._128[1]); }
+#define FALLBACK_BIN_OP_S(ret, op, scl, con, _128)	FORCEINLINE ret operator op(scl b) const { return con(_128[0] op b, _128[1] op b); }
+#define FALLBACK_CMP_OP(ret, op, param, _128)		FORCEINLINE ret operator op(param b) const { return {_128[0] op b._128[0], _128[1] op b._128[1]}; }
 
 #define FALLBACK_F32X_OPERATORS(f32x8, F32x8, b32x8, _128) \
 	FALLBACK_UN_OP(f32x8, -, F32x8, _128)                     \
@@ -665,21 +598,17 @@ union f32x<8> {
 	f32 s[8];
 	f32x4 _128[2];
 	M256 m;
-#if ARCH_AVX
-	FORCEINLINE f32x8 operator-() const { return F32x8(_mm256_xor_ps(m, _mm256_set1_ps(-0.0f))); }
-	FORCEINLINE f32x8 operator+(f32x8 b) const { return F32x8(_mm256_add_ps(m, b.m)); }
-	FORCEINLINE f32x8 operator-(f32x8 b) const { return F32x8(_mm256_sub_ps(m, b.m)); }
-	FORCEINLINE f32x8 operator*(f32x8 b) const { return F32x8(_mm256_mul_ps(m, b.m)); }
-	FORCEINLINE f32x8 operator/(f32x8 b) const { return F32x8(_mm256_div_ps(m, b.m)); }
-	FORCEINLINE b32x8 operator<(f32x8 b) const { return       _mm256_cmp_ps(m, b.m, _CMP_LT_OQ); }
-	FORCEINLINE b32x8 operator>(f32x8 b) const { return       _mm256_cmp_ps(m, b.m, _CMP_GT_OQ); }
-	FORCEINLINE b32x8 operator<=(f32x8 b) const { return      _mm256_cmp_ps(m, b.m, _CMP_LE_OQ); }
-	FORCEINLINE b32x8 operator>=(f32x8 b) const { return      _mm256_cmp_ps(m, b.m, _CMP_GE_OQ); }
-	FORCEINLINE b32x8 operator==(f32x8 b) const { return      _mm256_cmp_ps(m, b.m, _CMP_EQ_OQ); }
-	FORCEINLINE b32x8 operator!=(f32x8 b) const { return      _mm256_cmp_ps(m, b.m, _CMP_NEQ_OQ); }
-#else
-	FALLBACK_F32X_OPERATORS(f32x8, F32x8, b32x8, _128)
-#endif
+	FORCEINLINE f32x8 operator-() const { return F32x8(ASM::negate(m)); }
+	FORCEINLINE f32x8 operator+(f32x8 b) const { return F32x8(ASM::addF32(m, b.m)); }
+	FORCEINLINE f32x8 operator-(f32x8 b) const { return F32x8(ASM::subF32(m, b.m)); }
+	FORCEINLINE f32x8 operator*(f32x8 b) const { return F32x8(ASM::mulF32(m, b.m)); }
+	FORCEINLINE f32x8 operator/(f32x8 b) const { return F32x8(ASM::divF32(m, b.m)); }
+	FORCEINLINE b32x8 operator< (f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpLT); }
+	FORCEINLINE b32x8 operator> (f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpGT); }
+	FORCEINLINE b32x8 operator<=(f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpLE); }
+	FORCEINLINE b32x8 operator>=(f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpGE); }
+	FORCEINLINE b32x8 operator==(f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpEQ); }
+	FORCEINLINE b32x8 operator!=(f32x8 b) const { return ASM::cmpF32(m, b.m, ASM::cmpNE); }
 	CVT(s32x8);
 	CVT(u32x8);
 	SCLX_CMP(b32x8, f32x8, f32, F32x8)
@@ -845,7 +774,7 @@ template<>
 union s32x<16> {
 	s32 s[16];
 	s32x8 _256[2];
-	__m512i m;
+	M512 m;
 #if ARCH_AVX512F
 	FORCEINLINE s32x16 operator-() const { return S32x16(_mm512_sub_epi32(_mm512_setzero_si512(), m)); }
 	FORCEINLINE s32x16 operator+(s32x16 b) const { return S32x16(_mm512_add_epi32(m, b.m)); }
@@ -967,7 +896,7 @@ template<>
 union u32x<16> {
 	u32 s[16];
 	u32x8 _256[2];
-	__m512i m;
+	M512 m;
 #if ARCH_AVX512F
 	FORCEINLINE u32x16 operator+(u32x16 b) const { return U32x16(_mm512_add_epi32(m, b.m)); }
 	FORCEINLINE u32x16 operator-(u32x16 b) const { return U32x16(_mm512_sub_epi32(m, b.m)); }
@@ -1100,32 +1029,24 @@ FORCEINLINE s32x8::operator u32x8() const { return *(u32x8*)this; }
 FORCEINLINE u32x8::operator f32x8() const { return F32x8((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3], (f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7]); }
 FORCEINLINE u32x8::operator s32x8() const { return *(s32x8*)this; }
 
-FORCEINLINE void gather(f32x4& v, s32x4 offsets, void const* memory) { _gather32x4(&v, memory, &offsets); }
-FORCEINLINE void gather(s32x4& v, s32x4 offsets, void const* memory) { _gather32x4(&v, memory, &offsets); }
-FORCEINLINE void gather(u32x4& v, s32x4 offsets, void const* memory) { _gather32x4(&v, memory, &offsets); }
+FORCEINLINE void gather(f32x4  &dst, void const *src, s32x4  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(s32x4  &dst, void const *src, s32x4  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(u32x4  &dst, void const *src, s32x4  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(f32x8  &dst, void const *src, s32x8  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(s32x8  &dst, void const *src, s32x8  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(u32x8  &dst, void const *src, s32x8  offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(f32x16 &dst, void const *src, s32x16 offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(s32x16 &dst, void const *src, s32x16 offsets) { dst.m = ASM::gather32(src, offsets.m); }
+FORCEINLINE void gather(u32x16 &dst, void const *src, s32x16 offsets) { dst.m = ASM::gather32(src, offsets.m); }
 
-FORCEINLINE s32x4 makeGatherOffsets(s32 structSize, s32 memberOffset, s32 elementOffset = 0) {
-	return (S32x4(0, 1, 2, 3) + elementOffset) * structSize + memberOffset;
-}
-
-#define GATHER_STRUCT_OFFSETS(struct, member, ...) makeGatherOffsets(sizeof(struct), offsetof(struct, member), __VA_ARGS__)
-
-FORCEINLINE void gather(f32x8& v, s32x8 offsets, void const* memory) { _gather32x8(&v, memory, &offsets); }
-FORCEINLINE void gather(s32x8& v, s32x8 offsets, void const* memory) { _gather32x8(&v, memory, &offsets); }
-FORCEINLINE void gather(u32x8& v, s32x8 offsets, void const* memory) { _gather32x8(&v, memory, &offsets); }
-
-FORCEINLINE void gather(f32x16& v, s32x16 offsets, void const* memory) { _gather32x16(&v, memory, &offsets); }
-FORCEINLINE void gather(s32x16& v, s32x16 offsets, void const* memory) { _gather32x16(&v, memory, &offsets); }
-FORCEINLINE void gather(u32x16& v, s32x16 offsets, void const* memory) { _gather32x16(&v, memory, &offsets); }
-
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE f32x4 shuffle(f32x4 v) { return v.ps = _mm_shuffle_ps(v.ps, v.ps, _MM_SHUFFLE(s3, s2, s1, s0)), v; }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE s32x4 shuffle(s32x4 v) { return v.ps = _mm_shuffle_ps(v.ps, v.ps, _MM_SHUFFLE(s3, s2, s1, s0)), v; }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { return v.ps = _mm_shuffle_ps(v.ps, v.ps, _MM_SHUFFLE(s3, s2, s1, s0)), v; }
-FORCEINLINE f32x4 shuffle(f32x4 v, s32x4 s) { return _shuffle32x4(&v, &s), v; }
-FORCEINLINE f32x8 shuffle(f32x8 v, s32x8 s) { return _shuffle32x8(&v, &s), v; }
-template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE f32x8 shuffle(f32x8 v) { return v.ps = _mm256_permutevar8x32_ps(v.ps, _mm256_setr_epi32(s0,s1,s2,s3,s4,s5,s6,s7)), v; }
-template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE s32x8 shuffle(s32x8 v) { return v.ps = _mm256_permutevar8x32_ps(v.ps, _mm256_setr_epi32(s0,s1,s2,s3,s4,s5,s6,s7)), v; }
-template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32x8 shuffle(u32x8 v) { return v.ps = _mm256_permutevar8x32_ps(v.ps, _mm256_setr_epi32(s0,s1,s2,s3,s4,s5,s6,s7)), v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE f32x4 shuffle(f32x4 v) { v.m = _mm_shuffle_ps(v.m, v.m, _MM_SHUFFLE(s3, s2, s1, s0)); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE s32x4 shuffle(s32x4 v) { v.m = _mm_shuffle_ps(v.m, v.m, _MM_SHUFFLE(s3, s2, s1, s0)); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { v.m = _mm_shuffle_ps(v.m, v.m, _MM_SHUFFLE(s3, s2, s1, s0)); return v; }
+FORCEINLINE f32x4 shuffle(f32x4 v, s32x4 s) { v.m = ASM::shuffle32(v.m, s.m); return v; }
+FORCEINLINE f32x8 shuffle(f32x8 v, s32x8 s) { v.m = ASM::shuffle32(v.m, s.m); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE f32x8 shuffle(f32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE s32x8 shuffle(s32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32x8 shuffle(u32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
 
 // clang-format on
 
@@ -2214,18 +2135,18 @@ inline v4fx4 pack(v4fx4 v) {
 	// msvc can't do this
 	using namespace ASM;
 	
-	YMM &v0 = YMMWORD_PTR(v);
-	YMM &v1 = YMMWORD_PTR(v) + 32;
-	YMM &r0 = YMMWORD_PTR(r);
-	YMM &r1 = YMMWORD_PTR(r) + 32;
+	YMM &v0 = YMMWORD_PTR(&v);
+	YMM &v1 = YMMWORD_PTR(&v) + 32;
+	YMM &r0 = YMMWORD_PTR(&r);
+	YMM &r1 = YMMWORD_PTR(&r) + 32;
 	YMM idx = _mm256_setr_epi32(0,4,1,5,2,6,3,7);
 
-    vunpcklps	(r1, v0, v1);
-    vunpckhps	(r0, v0, v1);
-    vpermd		(v1, idx, r1);
-    vpermd		(v0, idx, r0);
-    vmovaps		(r0, v1);
-    vmovaps		(r1, v0);
+    unpcklps(r1, v0, v1);
+    unpckhps(r0, v0, v1);
+    permd	(v1, idx, r1);
+    permd	(v0, idx, r0);
+    movaps	(r0, v1);
+    movaps	(r1, v0);
 
 #else
     r.s[0]  = v.s[0]; 
@@ -2249,19 +2170,19 @@ inline v4fx4 pack(v4fx4 v) {
 }
 inline v2fx8 pack(v2fx8 v) {
 	v2fx8 r;
-	gather(*(f32x16*)&r, S32x16(0,2,4,6,8,10,12,14,1,3,5,7,9,11,13,15)*sizeof(f32), &v);
+	gather(*(f32x16*)&r, &v, S32x16(0,2,4,6,8,10,12,14,1,3,5,7,9,11,13,15)*sizeof(f32));
 	return r;
 }
 inline v3fx8 pack(v3fx8 v) { 
 	v3fx8 r;
-	gather(*(f32x16*)&r, S32x16(0,3,6, 9,12,15,18,21,1,4,7,10,13,16,19,22)*sizeof(f32), &v);
-	gather(r.z, S32x8(2,5,8,11,14,17,20,23)*sizeof(f32), &v);
+	gather(*(f32x16*)&r, &v, S32x16(0,3,6, 9,12,15,18,21,1,4,7,10,13,16,19,22)*sizeof(f32));
+	gather(r.z, &v, S32x8(2,5,8,11,14,17,20,23)*sizeof(f32));
 	return r;
 }
 inline v4fx8 pack(v4fx8 v) { 
 	v4fx8 r;
-	gather(*(f32x16*)&r.x, S32x16(0,4, 8,12,16,20,24,28,1,5, 9,13,17,21,25,29)*sizeof(f32), &v);
-	gather(*(f32x16*)&r.z, S32x16(2,6,10,14,18,22,26,30,3,7,11,15,19,23,27,31)*sizeof(f32), &v);
+	gather(*(f32x16*)&r.x, &v, S32x16(0,4, 8,12,16,20,24,28,1,5, 9,13,17,21,25,29)*sizeof(f32));
+	gather(*(f32x16*)&r.z, &v, S32x16(2,6,10,14,18,22,26,30,3,7,11,15,19,23,27,31)*sizeof(f32));
 	return r;
 }
 inline v2fx4 unpack(v2fx4 v) { 
@@ -2411,13 +2332,6 @@ MINMAX(v4fx8, V4fx8) MINMAX(v4sx8, V4sx8) MINMAX(v4ux8, V4ux8);
 #undef MINMAX
 // clang-format on
 
-#define IN_BOUNDS(bool, v2f) \
-	inline bool inBounds(v2f v, v2f min, v2f max) { return (min.x < v.x) && (v.x < max.x) && (min.y < v.y) && (v.y < max.y); }
-IN_BOUNDS(bool, v2f) IN_BOUNDS(b32x4, v2fx4) IN_BOUNDS(b32x8, v2fx8);
-IN_BOUNDS(bool, v2s) IN_BOUNDS(b32x4, v2sx4) IN_BOUNDS(b32x8, v2sx8);
-IN_BOUNDS(bool, v2u) IN_BOUNDS(b32x4, v2ux4) IN_BOUNDS(b32x8, v2ux8);
-#undef IN_BOUNDS
-
 inline f32x4 select(b32x4 mask, f32x4 a, f32x4 b) { return F32x4(select(mask.m, a.m, b.m)); }
 inline s32x4 select(b32x4 mask, s32x4 a, s32x4 b) { return S32x4(select(mask.m, a.m, b.m)); }
 inline v2fx4 select(b32x4 mask, v2fx4 a, v2fx4 b) { return V2fx4(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
@@ -2496,19 +2410,19 @@ inline void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosO
 
 inline f32 atan2(v2f v) { return atan2f(v.y, v.x); }
 
-inline u32 findLowestBit(u32 val) {
+inline u32 findLowestOneBit(u32 val) {
 	unsigned long result;
 	return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0;
 }
-inline u32 findLowestBit(u64 val) {
+inline u32 findLowestOneBit(u64 val) {
 	unsigned long result;
 	return _BitScanForward64(&result, val) ? (u32)result : ~0;
 }
-inline u32 findHighestBit(u32 val) {
+inline u32 findHighestOneBit(u32 val) {
 	unsigned long result;
 	return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0;
 }
-inline u32 findHighestBit(u64 val) {
+inline u32 findHighestOneBit(u64 val) {
 	unsigned long result;
 	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
 }
@@ -2538,18 +2452,6 @@ FRAC(constexpr, f64, s64)
 FRAC(, f32x4, s32x4)
 FRAC(, f32x8, s32x8)
 #undef FRAC
-
-#if 1
-bool isPowerOf2(u8  v) { return v && ((v & (v - 1)) == 0); }
-bool isPowerOf2(u16 v) { return v && ((v & (v - 1)) == 0); }
-bool isPowerOf2(u32 v) { return v && ((v & (v - 1)) == 0); }
-bool isPowerOf2(u64 v) { return v && ((v & (v - 1)) == 0); }
-#else
-bool isPowerOf2(u8  v) { return countBits(v) == 1; }
-bool isPowerOf2(u16 v) { return countBits(v) == 1; }
-bool isPowerOf2(u32 v) { return countBits(v) == 1; }
-bool isPowerOf2(u64 v) { return countBits(v) == 1; }
-#endif
 
 inline v4f frac(v4f v) { return V4f(frac(v.m)); }
 inline v4fx4 frac(v4fx4 v) { return V4fx4(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
@@ -2617,7 +2519,7 @@ inline v4s frac(v4s v, u32 step) {
 	//    |        |        |        |        |
 	//    |        |        |        |        |
 	if (isPowerOf2(step)) {
-		s32x4 mrmask = S32x4((s32)fillBits(findLowestBit(step)));
+		s32x4 mrmask = S32x4((s32)fillBits(findLowestOneBit(step)));
 		s32x4 one = S32x4(1);
 		return V4s(select(v.m < 0, ((v.m + one) & mrmask) + S32x4((s32)step) - one, v.m & mrmask));
 	} else {
@@ -2631,6 +2533,7 @@ inline v4s frac(v4s v, u32 step) {
 #endif
 }
 inline f32 floor(f32 v) { return floorf(v); }
+inline f64 floor(f64 v) { return ::floor(v); }
 inline v2f floor(v2f v) {
 	return {
 		floorf(v.x),
@@ -2690,7 +2593,7 @@ inline v4s floor(v4s v, u32 step) {
 #endif
 }
 
-inline s32 floorToInt(f32 v) { return (s32)floorf(v); }
+inline s32 floorToInt(f32 v) { return (s32)floor(v); }
 inline s64 floorToInt(f64 v) { return (s64)floor(v); }
 inline v2s floorToInt(v2f v) {
 	return {
@@ -2708,7 +2611,7 @@ inline v3s floorToInt(v3f v) {
 inline s32x4 floorToInt(f32x4 v) { return (s32x4)floor(v); }
 inline v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
 
-f32 ceil(f32 v) { return ceilf(v); }
+inline f32 ceil(f32 v) { return ceilf(v); }
 inline f32x4 ceil(f32x4 v) { return v.m = _mm_round_ps(v.m, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC), v; }
 #if ARCH_AVX
 inline f32x8 ceil(f32x8 v) { return v.m = _mm256_round_ps(v.m, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC), v; }
@@ -2717,19 +2620,20 @@ inline f32x8 ceil(f32x8 v) { return F32x8(ceil(v._128[0]), ceil(v._128[1])); }
 #endif
 
 #define CEIL(t) \
-	t ceil(t v, u32 s) { return floor(v + ((s32)s - 1), s); }
-inline constexpr CEIL(s32) CEIL(v2s) CEIL(v3s) CEIL(v4s);
+	inline t ceil(t v, u32 s) { return floor(v + ((s32)s - 1), s); }
+constexpr CEIL(s32) CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
-s32 ceilToInt(f32 v) { return (s32)ceilf(v); }
-s64 ceilToInt(f64 v) { return (s64)ceil(v); }
+inline s32 ceilToInt(f32 v) { return (s32)ceilf(v); }
+inline s64 ceilToInt(f64 v) { return (s64)ceil(v); }
 
 #define ROUND(f32) inline f32 round(f32 v) { return floor(v + 0.5f); }
 ROUND(f32) ROUND(f32x4) ROUND(f32x8) ROUND(v2f) ROUND(v3f) ROUND(v4f);
 #undef ROUND
 inline v2fx8 round(v2fx8 v) { return V2fx8(round(v.x), round(v.y)); }
 
-inline s32 roundToInt(f32 v) { return floorToInt(v + 0.5f); }
+inline s32 roundToInt(f32 v) { return (s32)lroundf(v); }
+inline s64 roundToInt(f64 v) { return llround(v); }
 inline v2s roundToInt(v2f v) { return {roundToInt(v.x), roundToInt(v.y)}; }
 inline v3s roundToInt(v3f v) { return {roundToInt(v.x), roundToInt(v.y), roundToInt(v.z)}; }
 inline v4s roundToInt(v4f v) { return (v4s)round(v); }
@@ -2818,7 +2722,7 @@ inline v4s absolute(v4s a) { return V4s(absolute(a.m)); }
 
 inline f32 sign(f32 v) { return v > 0.0f ? 1.0f : v < 0.0f ? -1.0f : 0.0f; }
 template<umm ps>
-f32x<ps> sign(f32x<ps> v) { return select(v > 0, F32x<ps>(1), select(v < 0, F32x<ps>(-1), F32x<ps>(0))); }
+inline f32x<ps> sign(f32x<ps> v) { return select(v > 0, F32x<ps>(1), select(v < 0, F32x<ps>(-1), F32x<ps>(0))); }
 
 inline f32 sum(v2f v) { return v.x + v.y; }
 
@@ -2908,28 +2812,28 @@ inline static constexpr v2f _randMul2{pi * 10, sqrt2 * 20};
 inline static constexpr v3f _randMul3{pi * 10, sqrt2 * 20, sqrt3 * 15};
 inline static constexpr v4f _randMul4{pi * 10, sqrt2 * 20, sqrt3 * 15, sqrt5 * 10};
 
-inline u32 rotateLeft(u32 v, int shift) { return _rotl(v, shift); }
-inline u32 rotateRight(u32 v, int shift) { return _rotr(v, shift); }
+inline u32 rotateLeft(u32 v, s32 shift) { return _rotl(v, shift); }
+inline u32 rotateRight(u32 v, s32 shift) { return _rotr(v, shift); }
 #if COMPILER_GCC
-inline u8 rotateLeft(u8 v, int shift) { return (v << shift) | (v >> (8 - shift)); }
-inline u16 rotateLeft(u16 v, int shift) { return (v << shift) | (v >> (16 - shift)); }
-inline u64 rotateLeft(u64 v, int shift) { return (v << shift) | (v >> (64 - shift)); }
-inline u8 rotateRight(u8 v, int shift) { return (v >> shift) | (v << (8 - shift)); }
-inline u16 rotateRight(u16 v, int shift) { return (v >> shift) | (v << (16 - shift)); }
-inline u64 rotateRight(u64 v, int shift) { return (v >> shift) | (v << (64 - shift)); }
+inline u8  rotateLeft (u8  v, s32 shift) { return (v << shift) | (v >> ( 8 - shift)); }
+inline u16 rotateLeft (u16 v, s32 shift) { return (v << shift) | (v >> (16 - shift)); }
+inline u64 rotateLeft (u64 v, s32 shift) { return (v << shift) | (v >> (64 - shift)); }
+inline u8  rotateRight(u8  v, s32 shift) { return (v >> shift) | (v << ( 8 - shift)); }
+inline u16 rotateRight(u16 v, s32 shift) { return (v >> shift) | (v << (16 - shift)); }
+inline u64 rotateRight(u64 v, s32 shift) { return (v >> shift) | (v << (64 - shift)); }
 #else
-inline u8 rotateLeft(u8 v, int shift) { return _rotl8(v, (u8)shift); }
-inline u16 rotateLeft(u16 v, int shift) { return _rotl16(v, (u8)shift); }
-inline u64 rotateLeft(u64 v, int shift) { return _rotl64(v, shift); }
-inline u8 rotateRight(u8 v, int shift) { return _rotr8(v, (u8)shift); }
-inline u16 rotateRight(u16 v, int shift) { return _rotr16(v, (u8)shift); }
-inline u64 rotateRight(u64 v, int shift) { return _rotr64(v, shift); }
+inline u8  rotateLeft (u8  v, s32 shift) { return _rotl8(v, (u8)shift); }
+inline u16 rotateLeft (u16 v, s32 shift) { return _rotl16(v, (u8)shift); }
+inline u64 rotateLeft (u64 v, s32 shift) { return _rotl64(v, shift); }
+inline u8  rotateRight(u8  v, s32 shift) { return _rotr8(v, (u8)shift); }
+inline u16 rotateRight(u16 v, s32 shift) { return _rotr16(v, (u8)shift); }
+inline u64 rotateRight(u64 v, s32 shift) { return _rotr64(v, shift); }
 #endif
 
 #define RANDOMIZE(u32) inline u32 randomize(u32 v) { return v * 0xEB84226F ^ 0x034FB5E7; }
 RANDOMIZE(u32) RANDOMIZE(u32x4) RANDOMIZE(u32x8)
 #undef RANDOMIZE
-#define RANDOMIZE(u32, s32) s32 randomize(s32 v) { return (s32)randomize((u32)v); }
+#define RANDOMIZE(u32, s32) inline s32 randomize(s32 v) { return (s32)randomize((u32)v); }
 RANDOMIZE(u32, s32) RANDOMIZE(u32x4, s32x4) RANDOMIZE(u32x8, s32x8)
 #undef RANDOMIZE
 
@@ -3055,7 +2959,7 @@ RANDOM(v4fx8, V4fx8)
 #undef RANDOM
 
 // clang-format off
-#define RANDOM(v2f, v2s, v2u) v2f random(v2s v) { return (v2f)(randomize((v2u)v) >> 8) * (1.0f / 16777216.0f); }
+#define RANDOM(v2f, v2s, v2u) inline v2f random(v2s v) { return (v2f)(randomize((v2u)v) >> 8) * (1.0f / 16777216.0f); }
 RANDOM(v2f, v2s, v2u) RANDOM(v2fx4, v2sx4, v2ux4) RANDOM(v2fx8, v2sx8, v2ux8)
 RANDOM(v3f, v3s, v3u) RANDOM(v3fx4, v3sx4, v3ux4) RANDOM(v3fx8, v3sx8, v3ux8)
 RANDOM(v4f, v4s, v4u) RANDOM(v4fx4, v4sx4, v4ux4) RANDOM(v4fx8, v4sx8, v4ux8)
@@ -3072,40 +2976,40 @@ struct Random {
 };
 #undef RANDOM
 
-f32 setSign(f32 dst, f32 src) {
+inline f32 setSign(f32 dst, f32 src) {
     *(u32*)&dst &= 0x7FFFFFFF;
     *(u32*)&dst |= *(u32*)&src & 0x80000000;
     return dst;
 }
-f64 setSign(f64 dst, f64 src) {
+inline f64 setSign(f64 dst, f64 src) {
     *(u64*)&dst &= 0x7FFFFFFFFFFFFFFF;
     *(u64*)&dst |= *(u64*)&src & 0x8000000000000000;
     return dst;
 }
 template<umm ps>
-f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
+inline f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
     *(u32x<ps>*)&dst &= U32x<ps>(0x7FFFFFFF);
     *(u32x<ps>*)&dst |= *(u32x<ps>*)&src & U32x<ps>(0x80000000);
     return dst;
 }
 
-#define TRUNC(f32) f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
+#define TRUNC(f32) inline f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
 TRUNC(f32)
 TRUNC(f64)
 #undef TRUNC
 
 template<umm ps>
-f32x<ps> trunc(f32x<ps> v) { return select(v > 0, floor(v), ceil(v)); }
+inline f32x<ps> trunc(f32x<ps> v) { return select(v > 0, floor(v), ceil(v)); }
 
-#define MOD(f32) f32 mod(f32 a, f32 b) { return setSign(a - trunc(a / b) * b, a); }
+#define MOD(f32) inline f32 mod(f32 a, f32 b) { return setSign(a - trunc(a / b) * b, a); }
 MOD(f32)
 MOD(f64)
 #undef MOD
 
 template<umm ps>
-f32x<ps> mod(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a / b) * b, a); }
+inline f32x<ps> mod(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a / b) * b, a); }
 
-v3f hsvToRgb(f32 h, f32 s, f32 v) {
+inline v3f hsvToRgb(f32 h, f32 s, f32 v) {
 	h = frac(h);
 	f32 c = v * s;
 	f32 x = c * (1 - absolute(mod(h * 6, 2) - 1));
@@ -3120,7 +3024,7 @@ v3f hsvToRgb(f32 h, f32 s, f32 v) {
 	return m;
 }
 template<umm ps>
-v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
+inline v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	h = frac(h);
 	f32x<ps> c = v * s;
 	f32x<ps> x = c * (1 - abs(mod(h * 6, F32x<ps>(2)) - 1));
@@ -3145,16 +3049,16 @@ v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	return m;
 }
 
-template<class T> constexpr bool isVector = false;
-template<umm w> constexpr bool isVector<v2fx<w>> = true;
-template<umm w> constexpr bool isVector<v3fx<w>> = true;
-template<umm w> constexpr bool isVector<v4fx<w>> = true;
-template<umm w> constexpr bool isVector<v2sx<w>> = true;
-template<umm w> constexpr bool isVector<v3sx<w>> = true;
-template<umm w> constexpr bool isVector<v4sx<w>> = true;
-template<umm w> constexpr bool isVector<v2ux<w>> = true;
-template<umm w> constexpr bool isVector<v3ux<w>> = true;
-template<umm w> constexpr bool isVector<v4ux<w>> = true;
+template<class T> inline static constexpr bool isVector = false;
+template<umm w> inline static constexpr bool isVector<v2fx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v3fx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v4fx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v2sx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v3sx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v4sx<w>> = true;
+template<umm w> inline static constexpr bool isVector<v2ux<w>> = true;
+template<umm w> inline static constexpr bool isVector<v3ux<w>> = true;
+template<umm w> inline static constexpr bool isVector<v4ux<w>> = true;
 // clang-format on
 
 template <class T>
@@ -3179,24 +3083,24 @@ struct RemoveQualifiers<T&> {
 };
 
 template <class T>
-constexpr umm _widthOf = 0;
+inline static constexpr umm _widthOf = 0;
 // clang-format off
-template<umm width> constexpr umm _widthOf<f32x<width>> = width;
-template<umm width> constexpr umm _widthOf<s32x<width>> = width;
-template<umm width> constexpr umm _widthOf<u32x<width>> = width;
-template<umm width> constexpr umm _widthOf<v2fx<width>> = width;
-template<umm width> constexpr umm _widthOf<v2sx<width>> = width;
-template<umm width> constexpr umm _widthOf<v2ux<width>> = width;
-template<umm width> constexpr umm _widthOf<v3fx<width>> = width;
-template<umm width> constexpr umm _widthOf<v3sx<width>> = width;
-template<umm width> constexpr umm _widthOf<v3ux<width>> = width;
-template<umm width> constexpr umm _widthOf<v4fx<width>> = width;
-template<umm width> constexpr umm _widthOf<v4sx<width>> = width;
-template<umm width> constexpr umm _widthOf<v4ux<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<f32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<s32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<u32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v2fx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v2sx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v2ux<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v3fx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v3sx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v3ux<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v4fx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v4sx<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<v4ux<width>> = width;
 // clang-format on
 
 template <class T>
-constexpr umm widthOf = _widthOf<RemoveQualifiers<T>::Type>;
+inline static constexpr umm widthOf = _widthOf<RemoveQualifiers<T>::Type>;
 
 template <umm width, class T>
 inline auto widen(T v) = delete;
@@ -3272,13 +3176,6 @@ template<> inline auto cvtScalar<f32>(v2sx8 v) { return (v2fx8)v; }
 template<> inline auto cvtScalar<f32>(v3sx8 v) { return (v3fx8)v; }
 template<> inline auto cvtScalar<f32>(v4sx8 v) { return (v4fx8)v; }
 // clang-format on
-
-template <class T, umm size>
-struct Array {
-	inline constexpr T& operator[](umm i) { return v[i]; }
-	inline constexpr T const& operator[](umm i) const { return v[i]; }
-	T v[size];
-};
 
 template <class T, umm size>
 struct WideType {};
@@ -3521,7 +3418,7 @@ FORCEINLINE f32 _voronoiS32(CE::WideArray<T, count1, count4, count8> const& wide
 	return minDist;
 };
 // clang-format off
-static constexpr Array<v2s, 9> voronoiOffsets2s { 
+inline static constexpr Array<v2s, 9> voronoiOffsets2s { 
 	-1,-1,
 	-1, 0,
 	-1, 1,
@@ -3532,7 +3429,7 @@ static constexpr Array<v2s, 9> voronoiOffsets2s {
 	 1, 0,
 	 1, 1,
 };
-static constexpr Array<v3s, 27> voronoiOffsets3s { 
+inline static constexpr Array<v3s, 27> voronoiOffsets3s { 
 	-1,-1,-1, -1,-1, 0, -1,-1, 1,
 	-1, 0,-1, -1, 0, 0, -1, 0, 1,
 	-1, 1,-1, -1, 1, 0, -1, 1, 1,
@@ -3543,7 +3440,7 @@ static constexpr Array<v3s, 27> voronoiOffsets3s {
 	 1, 0,-1,  1, 0, 0,  1, 0, 1,
 	 1, 1,-1,  1, 1, 0,  1, 1, 1,
 };
-static constexpr Array<v4s, 81> voronoiOffsets4s {
+inline static constexpr Array<v4s, 81> voronoiOffsets4s {
 	-1,-1,-1,-1, -1,-1,-1, 0, -1,-1,-1, 1,  -1,-1, 0,-1, -1,-1, 0, 0, -1,-1, 0, 1,  -1,-1, 1,-1, -1,-1, 1, 0, -1,-1, 1, 1,
 	-1, 0,-1,-1, -1, 0,-1, 0, -1, 0,-1, 1,  -1, 0, 0,-1, -1, 0, 0, 0, -1, 0, 0, 1,  -1, 0, 1,-1, -1, 0, 1, 0, -1, 0, 1, 1,
 	-1, 1,-1,-1, -1, 1,-1, 0, -1, 1,-1, 1,  -1, 1, 0,-1, -1, 1, 0, 0, -1, 1, 0, 1,  -1, 1, 1,-1, -1, 1, 1, 0, -1, 1, 1, 1,
@@ -3554,9 +3451,9 @@ static constexpr Array<v4s, 81> voronoiOffsets4s {
 	 1, 0,-1,-1,  1, 0,-1, 0,  1, 0,-1, 1,   1, 0, 0,-1,  1, 0, 0, 0,  1, 0, 0, 1,   1, 0, 1,-1,  1, 0, 1, 0,  1, 0, 1, 1,
 	 1, 1,-1,-1,  1, 1,-1, 0,  1, 1,-1, 1,   1, 1, 0,-1,  1, 1, 0, 0,  1, 1, 0, 1,   1, 1, 1,-1,  1, 1, 1, 0,  1, 1, 1, 1,
 };
-static constexpr auto voronoiOffsets2f = CE::cvtScalar<f32>(voronoiOffsets2s);
-static constexpr auto voronoiOffsets3f = CE::cvtScalar<f32>(voronoiOffsets3s);
-static constexpr auto voronoiOffsets4f = CE::cvtScalar<f32>(voronoiOffsets4s);
+inline static constexpr auto voronoiOffsets2f = CE::cvtScalar<f32>(voronoiOffsets2s);
+inline static constexpr auto voronoiOffsets3f = CE::cvtScalar<f32>(voronoiOffsets3s);
+inline static constexpr auto voronoiOffsets4f = CE::cvtScalar<f32>(voronoiOffsets4s);
 // clang-format on
 
 template <class Random = Random>
@@ -3637,6 +3534,83 @@ inline f32 voronoi(v4s v, u32 cellSize, Random random = {}) {
 #endif
 	return sqrt(minDist) * 0.5f;
 }
+
+template<class T>
+struct box {
+	T min, max;
+};
+
+template <class T>
+inline box<T> boxMinMax(T min, T max) {
+	return {min, max};
+}
+template <class T>
+inline box<T> boxMinDim(T min, T dim) {
+	return {min, min + dim};
+}
+template <class T>
+inline box<T> boxCenterDim(T center, T dim) {
+	dim = half(dim);
+	return {center - dim, center + dim};
+}
+template <class T>
+inline box<T> boxCenterRadius(T center, T radius) {
+	return {center - radius, center + radius};
+}
+
+#define IN_BOUNDS2(bool, v2f) 				   \
+	inline bool inBounds(v2f v, box<v2f> b) {  \
+		return 								   \
+			(v.x > b.min.x) && 				   \
+			(v.y > b.min.y) && 				   \
+			(v.x < b.max.x) && 				   \
+			(v.y < b.max.y); 				   \
+	}
+#define IN_BOUNDS3(bool, v3f) 				  \
+	inline bool inBounds(v3f v, box<v3f> b) { \
+		return 								  \
+			(v.x > b.min.x) && 				  \
+			(v.y > b.min.y) &&				  \
+			(v.z > b.min.z) &&				  \
+			(v.x < b.max.x) &&				  \
+			(v.y < b.max.y) &&				  \
+			(v.z < b.max.z);				  \
+	}
+IN_BOUNDS2(bool, v2f) IN_BOUNDS2(b32x4, v2fx4) IN_BOUNDS2(b32x8, v2fx8);
+IN_BOUNDS2(bool, v2s) IN_BOUNDS2(b32x4, v2sx4) IN_BOUNDS2(b32x8, v2sx8);
+IN_BOUNDS2(bool, v2u) IN_BOUNDS2(b32x4, v2ux4) IN_BOUNDS2(b32x8, v2ux8);
+IN_BOUNDS3(bool, v3f) IN_BOUNDS3(b32x4, v3fx4) IN_BOUNDS3(b32x8, v3fx8);
+IN_BOUNDS3(bool, v3s) IN_BOUNDS3(b32x4, v3sx4) IN_BOUNDS3(b32x8, v3sx8);
+IN_BOUNDS3(bool, v3u) IN_BOUNDS3(b32x4, v3ux4) IN_BOUNDS3(b32x8, v3ux8);
+#undef IN_BOUNDS2
+#undef IN_BOUNDS3
+
+#define INTERSECTS2(bool, v2f)						 \
+	inline bool intersects(box<v2f> a, box<v2f> b) { \
+		return 										 \
+			(a.min.x < b.max.x) && 					 \
+			(a.min.y < b.max.y) && 					 \
+			(a.max.x > b.min.x) && 					 \
+			(a.max.y > b.min.y); 					 \
+	}
+#define INTERSECTS3(bool, v3f)						 \
+	inline bool intersects(box<v3f> a, box<v3f> b) { \
+		return 										 \
+			(a.min.x < b.max.x) && 					 \
+			(a.min.y < b.max.y) && 					 \
+			(a.min.z < b.max.z) && 					 \
+			(a.max.x > b.min.x) && 					 \
+			(a.max.y > b.min.y) && 					 \
+			(a.max.z > b.min.z); 					 \
+	}
+INTERSECTS2(bool, v2f) INTERSECTS2(b32x4, v2fx4) INTERSECTS2(b32x8, v2fx8);
+INTERSECTS2(bool, v2s) INTERSECTS2(b32x4, v2sx4) INTERSECTS2(b32x8, v2sx8);
+INTERSECTS2(bool, v2u) INTERSECTS2(b32x4, v2ux4) INTERSECTS2(b32x8, v2ux8);
+INTERSECTS3(bool, v3f) INTERSECTS3(b32x4, v3fx4) INTERSECTS3(b32x8, v3fx8);
+INTERSECTS3(bool, v3s) INTERSECTS3(b32x4, v3sx4) INTERSECTS3(b32x8, v3sx8);
+INTERSECTS3(bool, v3u) INTERSECTS3(b32x4, v3ux4) INTERSECTS3(b32x8, v3ux8);
+#undef INTERSECTS2
+#undef INTERSECTS3
 
 inline bool raycastLine(v2f a, v2f b, v2f c, v2f d, v2f& point, v2f& normal) {
 	v2f ba = b - a;
@@ -3948,7 +3922,7 @@ MAX_PACK_IMPL_(TL_MATH_MAX_PACK)
 #undef MAX_PACK_IMPL
 
 template <class T>
-static constexpr u32 simdElementCount = simdWidth / sizeof(T);
+inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 
 } // namespace TL
 

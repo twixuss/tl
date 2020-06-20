@@ -1,7 +1,7 @@
 #pragma warning(disable: 4711)
 #pragma warning(disable: 4710)
-#pragma warning(suppress: 4464)
-#define ASSERTION_FAILURE(cause, expr, ...) do{puts(cause);puts(expr);print(__VA_ARGS__);DEBUG_BREAK();}while(0)
+#pragma warning(disable: 4464)
+#define ASSERTION_FAILURE(cause, expr, ...) do{puts(cause);puts(expr);print(__VA_ARGS__);DEBUG_BREAK;}while(0)
 #include "../include/tl/math.h"
 #pragma warning(push, 0)
 #pragma warning(disable: 5045)
@@ -39,7 +39,7 @@ void test(T t, U u) {
 	ASSERT(t == u);
 }
 void test(f32 a, f32 b) {
-	ASSERT(abs(a-b) < 0.0001f);
+	ASSERT(absolute(a-b) < 0.0001f);
 }
 b32x4 approxEqual(f32x4 a, f32x4 b) { return absolute(a - b) < FLT_EPSILON; }
 b32x4 approxEqual(v2fx4 a, v2fx4 b) { 
@@ -168,17 +168,33 @@ struct v4 {
 	f32 x,y,z,w;
 };
 v4fx4 fff;
+__m128 ta, tb;
 void mathTest() {
 	fff = pack(fff);
+
+	ta = _mm_cmp_ps(ta, tb, _CMP_LE_OQ);
+
+#if 0
+	u32 seed = 0;
+	u32 test = seed;
+	u32 count = 0;
+	do {
+		test = randomize(test);
+		++count;
+		printf("%x\n", test);
+		if(test == seed){
+			if(count) {
+				printf("Unique values: %u\n", count);
+			}
+			ASSERT(!count);
+		}
+	} while(count);
+#endif
 
 #define PACK_UNPACK(a, b) 											 \
 	do {															 \
 		auto packedA = pack(a);										 \
 		auto unpackedB = unpack(b);									 \
-		/*printf("a: ");         print(a); putc('\n', stdout);		 \
-		printf("b: ");         print(b); putc('\n', stdout);		 \
-		printf("packedA: ");   print(packedA); putc('\n', stdout);	 \
-		printf("unpackedB: "); print(unpackedB); putc('\n', stdout);*/ \
 		ASSERT(allTrue(packedA == b)); 								 \
 		ASSERT(allTrue(unpackedB == a));							 \
 	} while(0)
@@ -190,26 +206,21 @@ void mathTest() {
 	PACK_UNPACK(V3fx8(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23), V3fx8(0,3,6,9,12,15,18,21,1,4,7,10,13,16,19,22,2,5,8,11,14,17,20,23));
 	PACK_UNPACK(V4fx8(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31), V4fx8(0,4,8,12,16,20,24,28,1,5,9,13,17,21,25,29,2,6,10,14,18,22,26,30,3,7,11,15,19,23,27,31));
 
-	//perfTest<v4f>("x4", [](auto& v){ v += 15.5f; });
-	//perfTest<v4 >("x1", [](auto& v){ v.x += 15.5f; v.y += 15.5f; v.z += 15.5f; v.w += 15.5f; });
-	//funTest<v2f>(); funTest<v3f>(); funTest<v4f>();
-	//funTest<v2s>(); funTest<v3s>();	funTest<v4s>();
-	//funTest<v2u>(); funTest<v3u>();	funTest<v4u>();
-	//funTest<v2fx4>(); funTest<v3fx4>(); funTest<v4fx4>();
-	//funTest<v2sx4>(); funTest<v3sx4>();	funTest<v4sx4>();
-	//funTest<v2ux4>(); funTest<v3ux4>();	funTest<v4ux4>();
-	//funTest<v2fx8>(); funTest<v3fx8>(); funTest<v4fx8>();
-	//funTest<v2sx8>(); funTest<v3sx8>();	funTest<v4sx8>();
-	//funTest<v2ux8>(); funTest<v3ux8>();	funTest<v4ux8>();
+	f32 _[8]{99,99,99,99,99,99,99,99};
+	
+	f32 data[]{0,1,2,3,4,5,6,7};
 
-	static constexpr auto magic  = 135521;
-	static constexpr auto magic4 = V4s(135521, 6177, 46178, 51758);
+	f32 __[8]{99,99,99,99,99,99,99,99};
+	
+	f32x4 fx4;
+	gather(fx4, data, s32x4{0,1,2,3} * sizeof(f32)); ASSERT(allTrue(fx4 == F32x4(0,1,2,3)));
+	gather(fx4, data, s32x4{1,2,3,4} * sizeof(f32)); ASSERT(allTrue(fx4 == F32x4(1,2,3,4)));
+	gather(fx4, data, s32x4{2,3,4,5} * sizeof(f32)); ASSERT(allTrue(fx4 == F32x4(2,3,4,5)));
+	gather(fx4, data, s32x4{3,4,5,6} * sizeof(f32)); ASSERT(allTrue(fx4 == F32x4(3,4,5,6)));
+	gather(fx4, data, s32x4{4,5,6,7} * sizeof(f32)); ASSERT(allTrue(fx4 == F32x4(4,5,6,7)));
 
-#define TEST(op) \
-	perfTest<v4s>(#op "=s4", [](auto& v){ v op##= magic; }); perfTest<v4s>(#op "=s1", [](auto& v){ v.x op##= magic; v.y op##= magic; v.z op##= magic; v.w op##= magic; });\
-	perfTest<v4s>(#op " s4", [](auto& v){ v = v op magic; }); perfTest<v4s>(#op " s1", [](auto& v){ v.x = v.x op magic; v.y = v.y op magic; v.z = v.z op magic; v.w = v.w op magic; });\
-	perfTest<v4s>(#op "=p4", [](auto& v){ v op##= magic4; }); perfTest<v4s>(#op "=p1", [](auto& v){ v.x op##= magic4.data()[0]; v.y op##= magic4.data()[1]; v.z op##= magic4.data()[2]; v.w op##= magic4.data()[3]; });\
-	perfTest<v4s>(#op " p4", [](auto& v){ v = v op magic4; }); perfTest<v4s>(#op " p1", [](auto& v){ v.x = v.x op magic4.data()[0]; v.y = v.y op magic4.data()[1]; v.z = v.z op magic4.data()[2]; v.w = v.w op magic4.data()[3]; });
+	f32x8 fx8;
+	gather(fx8, data, s32x8{0,2,4,6,1,3,5,7} * sizeof(f32)); ASSERT(allTrue(fx8 == F32x8(0,2,4,6,1,3,5,7)));
 
 	//TEST(+);
 	//TEST(-);
@@ -236,8 +247,11 @@ void mathTest() {
 	test(linearSample(arr, 0.875f), 1.5f);
 	test(linearSample(arr, 1), 0);
 
+	test(frac(-1.0f), 0.0f);
 	test(frac(-0.1f), 0.9f);
+	test(frac(0.0f), 0.0f);
 	test(frac(0.3f), 0.3f);
+	test(frac(1.0f), 0.0f);
 	test(frac(1.6f), 0.6f);
 	test(frac(2.9f), 0.9f);
 	test(frac(3.2f), 0.2f);
@@ -272,15 +286,15 @@ void mathTest() {
 	test(floor(7, 3), 6);
 	test(floor(8, 3), 6);
 
-	test(roundToInt(-1), -1);
+	test(roundToInt(-1.0), -1);
 	test(roundToInt(-0.6), -1);
-	test(roundToInt(-0.5), 0);
+	test(roundToInt(-0.5), -1);
 	test(roundToInt(-0.4), 0);
-	test(roundToInt(0), 0);
+	test(roundToInt(0.0), 0);
 	test(roundToInt(0.4), 0);
 	test(roundToInt(0.5), 1);
 	test(roundToInt(0.6), 1);
-	test(roundToInt(1), 1);
+	test(roundToInt(1.0), 1);
 
 	test(roundToInt(A2 + 0.5f), A2i + 1);
 	test(roundToInt(A3 + 0.5f), A3i + 1);
