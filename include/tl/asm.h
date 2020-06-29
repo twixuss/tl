@@ -251,27 +251,32 @@ FORCEINLINE void movdqa(YMM &dst, YMM src) { movaps(dst, src); }
 FORCEINLINE void permd(YMM &dst, YMM indices, YMM src) { dst = _mm256_permutevar8x32_epi32(src, indices); }
 #endif
 
-FORCEINLINE XMM negate(XMM a) { return _mm_xor_ps(a, _mm_set1_ps(-0.0f)); }
+FORCEINLINE XMM negateF32(XMM a) { return _mm_xor_ps(a, _mm_set1_ps(-0.0f)); }
 
 FORCEINLINE XMM andNot(XMM a, XMM b) { return _mm_andnot_ps(b, a); }
-FORCEINLINE XMM select(XMM mask, XMM a, XMM b) { return _mm_blendv_ps(b, a, mask); }
+FORCEINLINE XMM select32(XMM mask, XMM a, XMM b) { return _mm_blendv_ps(b, a, mask); }
 FORCEINLINE u8 compressMask32(XMM mask) { return (u8)_mm_movemask_ps(mask); }
 FORCEINLINE u8 compressMask64(XMM mask) { return (u8)_mm_movemask_pd(mask); }
 
 #if ARCH_AVX
-FORCEINLINE YMM select(YMM mask, YMM a, YMM b) { return _mm256_blendv_ps(b, a, mask); }
+FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) { return _mm256_blendv_ps(b, a, mask); }
 FORCEINLINE u8 compressMask32(YMM mask) { return (u8)_mm256_movemask_ps(mask); }
 FORCEINLINE u8 compressMask64(YMM mask) { return (u8)_mm256_movemask_pd(mask); }
 FORCEINLINE XMM shuffle32(XMM src, XMM idx) { return _mm_permutevar_ps(src.ps, idx.pi); }
-FORCEINLINE YMM negate(YMM a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0.0f)); }
+FORCEINLINE YMM negateF32(YMM a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0.0f)); }
 #else
-FORCEINLINE YMM select(YMM mask, YMM a, YMM b) { return {select(mask.l, a.l, b.l), select(mask.h, a.h, b.h)}; }
+FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) { 
+	YMM result;
+	result.l = select32(mask.l, a.l, b.l);
+	result.h = select32(mask.h, a.h, b.h);
+	return result;
+}
 FORCEINLINE u8 compressMask32(YMM mask) { return (u8)((compressMask32(mask.h) << 4) | compressMask32(mask.l)); }
 FORCEINLINE u8 compressMask64(YMM mask) { return (u8)((compressMask64(mask.h) << 2) | compressMask64(mask.l)); }
 FORCEINLINE XMM shuffle32(XMM src, XMM idx) { shuffleFallback<4>(src.f32, idx.u32); return src; }
-FORCEINLINE YMM negate(YMM a) { 
-	a.l = negate(a.l); 
-	a.h = negate(a.h); 
+FORCEINLINE YMM negateF32(YMM a) { 
+	a.l = negateF32(a.l); 
+	a.h = negateF32(a.h); 
 	return a;
 }
 #endif
@@ -279,19 +284,34 @@ FORCEINLINE YMM negate(YMM a) {
 #if ARCH_AVX2
 FORCEINLINE XMM gather32(void const *src, XMM offsets) { return _mm_i32gather_ps((f32*)src, offsets.pi, 1); }
 FORCEINLINE YMM gather32(void const *src, YMM offsets) { return _mm256_i32gather_ps((f32*)src, offsets.pi, 1); }
+FORCEINLINE XMM gatherMask32(void const *src, XMM offsets, XMM mask, XMM default) { return _mm_mask_i32gather_ps(default, (f32*)src, offsets.pi, mask, 1); }
+FORCEINLINE YMM gatherMask32(void const *src, YMM offsets, YMM mask, YMM default) { return _mm256_mask_i32gather_ps(default, (f32*)src, offsets.pi, mask, 1); }
 FORCEINLINE YMM shuffle32(YMM src, YMM idx) { return _mm256_permutevar8x32_ps(src.ps, idx.pi); }
 #else
 FORCEINLINE XMM gather32(void const *src, XMM offsets) { 
 	u8 *memory = (u8* )src;
-	return _mm_setr_ps(*(f32*)(memory + offsets.u32[0]), 
-					   *(f32*)(memory + offsets.u32[1]), 
-					   *(f32*)(memory + offsets.u32[2]), 
-					   *(f32*)(memory + offsets.u32[3])); 
+	return _mm_setr_ps(*(f32*)(memory + offsets.s32[0]), 
+					   *(f32*)(memory + offsets.s32[1]), 
+					   *(f32*)(memory + offsets.s32[2]), 
+					   *(f32*)(memory + offsets.s32[3])); 
 }
 FORCEINLINE YMM gather32(void const *src, YMM offsets) { 
 	YMM result;
 	result.l = gather32(src, offsets.l);
 	result.h = gather32(src, offsets.h);
+	return result;
+}
+FORCEINLINE XMM gatherMask32(void const *src, XMM offsets, XMM mask, XMM default) { 
+	u8 *memory = (u8* )src;
+	return _mm_setr_ps(mask.u32[0] ? *(f32*)(memory + offsets.s32[0]) : default.f32[0], 
+					   mask.u32[1] ? *(f32*)(memory + offsets.s32[1]) : default.f32[1], 
+					   mask.u32[2] ? *(f32*)(memory + offsets.s32[2]) : default.f32[2], 
+					   mask.u32[3] ? *(f32*)(memory + offsets.s32[3]) : default.f32[3]); 
+}
+FORCEINLINE YMM gatherMask32(void const *src, YMM offsets, YMM mask, YMM default) { 
+	YMM result;
+	result.l = gatherMask32(src, offsets.l, mask.l, default.l);
+	result.h = gatherMask32(src, offsets.h, mask.h, default.h);
 	return result;
 }
 FORCEINLINE YMM shuffle32(YMM src, YMM idx) { 
