@@ -152,6 +152,11 @@ typedef u32 umm;
 typedef s32 smm;
 #endif
 
+#if COMPILER_MSVC
+template <class T> T *addressOf(T &val) { return __builtin_addressof(val); }
+template <class T> T const *addressOf(T const &val) { return __builtin_addressof(val); }
+#endif
+
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
 
@@ -192,6 +197,10 @@ template <class T> struct RemoveReferenceT       { using Type = T; };
 template <class T> struct RemoveReferenceT<T &>  { using Type = T; };
 template <class T> struct RemoveReferenceT<T &&> { using Type = T; };
 template <class T> using RemoveReference = typename RemoveReferenceT<T>::Type;
+
+template <class T> struct RemoveConstT		    { using Type = T; };
+template <class T> struct RemoveConstT<T const> { using Type = T; };
+template <class T> using RemoveConst = typename RemoveConstT<T>::Type;
 
 template <bool v, class T, class F> struct ConditionalT { using Type = T; };
 template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
@@ -371,6 +380,31 @@ struct OsAllocator {
 	static void deallocate(void *data) { _aligned_free(data); }
 };
 
+bool equals(StringView a, StringView b) {
+	if (a.size() != b.size())
+		return false;
+	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp) {
+		if (*ap != *bp)
+			return false;
+	}
+	return true;
+}
+bool equals(char const *a, StringView b) {
+	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp) {
+		if (*a != *bp)
+			return false;
+	}
+	return true;
+}
+bool equals(StringView a, char const *b) {
+	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b) {
+		if (*ap != *b)
+			return false;
+	}
+	return true;
+}
+
+
 inline constexpr bool startsWith(char const *str, char const *subStr) {
 	while (*subStr) {
 		if (*str++ != *subStr++) {
@@ -439,7 +473,7 @@ void toString(Int v, u32 radix, CopyFn &&copyFn) {
 	u32 charsWritten = 0;
 
 	bool negative = false;
-	if constexpr (std::is_signed_v<Int>) {
+	if constexpr (isSigned<Int>) {
 		if (v < 0) {
 			negative = true;
 			if (v == min<Int>()) {
@@ -458,7 +492,7 @@ void toString(Int v, u32 radix, CopyFn &&copyFn) {
 		if (v == 0)
 			break;
 	}
-	if constexpr (std::is_signed_v<Int>) {
+	if constexpr (isSigned<Int>) {
 		if (negative) {
 			++charsWritten;
 			*lsc-- = '-';

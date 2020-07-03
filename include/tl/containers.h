@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include <string.h>
 
 #pragma warning(push)
 #pragma warning(disable : 4582)
@@ -635,10 +636,7 @@ struct StringBuilder {
 		}
 	}
 
-	void append(Span<char const> span) {
-		if (!span.data())
-			span = {"(null)", 6};
-
+	umm append(Span<char const> span) {
 		umm charsToWrite = span.size();
 		while (last->remaining() < charsToWrite) {
 			memcpy(last->end, span.data(), last->remaining());
@@ -652,9 +650,117 @@ struct StringBuilder {
 		}
 		memcpy(last->end, span.data(), charsToWrite);
 		last->end += charsToWrite;
+		return span.size();
 	}
-	void append(char const *str) { append(Span{str, str ? strlen(str) : 0}); }
-	void append(char c) { append(Span{&c, 1}); }
+	umm append(char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
+	umm append(char c) { return append(Span{&c, 1}); }
+	
+	umm appendFormat(char const *fmt) {
+		return append(Span{fmt, strlen(fmt)});
+	}
+	template <class Arg, class ...Args>
+	umm appendFormat(char const *fmt, Arg const &arg, Args const &...args) {
+		if (!*fmt)
+			return 0;
+		char const *c = fmt;
+		char const *fmtBegin = 0;
+		char const *fmtEnd = 0;
+		bool argAsFormat = false;
+		u32 align = 0;
+		bool alignRight;
+		while (*c) {
+			if (*c == '{') {
+				fmtBegin = c;
+				++c;
+				if (*c == '}') {
+					fmtEnd = c + 1;
+					break;
+				}
+				if (startsWith(c, "fmt}")) {
+					argAsFormat = true;
+					fmtEnd = c + 4;
+					break;
+				}
+				if (*c == 'a') {
+					++c;
+					if (*c == 'r') {
+						alignRight = true;
+					} else if (*c == 'l') {
+						alignRight = false;
+					} else {
+						INVALID_CODE_PATH("invalid format: bad align");
+					}
+					ASSERT(*++c == ':', "invalid format: missing ':' after align");
+					++c;
+					char buf[64];
+					char *d = buf;
+					while (*c != '}') {
+						*d++ = *c++;
+					}
+					ASSERT(d != buf, "invalid format: missing number after ':'");
+					*d = '\0';
+					align = atoi(buf);
+					ASSERT(align > 0, "invalid format: bad align");
+					fmtEnd = c + 1;
+					break;
+				}
+				INVALID_CODE_PATH("invalid format");
+			}
+			++c;
+		}
+		//ASSERT(fmtBegin && fmtEnd, "invalid format");
+		if (!(fmtBegin && fmtEnd)) {
+			return appendFormat(fmt);
+		}
+
+		umm charsAppended = append(Span{fmt, fmtBegin});
+
+		auto appendArg = [&] (auto &builder) {
+			umm result;
+			if (argAsFormat) {
+				if constexpr (isSame<RemoveConst<Arg>, char const *> || isSame<RemoveConst<Arg>, char *>)
+					result = builder.appendFormat(*(char **)addressOf(arg), args...);
+				else 
+					INVALID_CODE_PATH("'{fmt}' arg is not a string");
+			} else {
+				toString(arg, [&] (char const *src, umm length) {
+					result = length;
+					builder.append(Span{src, length});
+					return 0;
+				});
+			}
+			charsAppended += result;
+			return result;
+		};
+		
+		if (align) {
+			if (alignRight) {
+				StringBuilder temp;
+				umm argLen = appendArg(temp);
+				if (align > argLen) {
+					umm spaceCount = align - argLen;
+					for (umm i = 0; i < spaceCount; ++i) {
+						append(' ');
+					}
+					charsAppended += spaceCount;
+				}
+				append(temp.get());
+			} else {
+				umm argLen = appendArg(*this);
+				if (align > argLen) {
+					umm spaceCount = align - argLen;
+					for (umm i = 0; i < spaceCount; ++i) {
+						append(' ');
+					}
+					charsAppended += spaceCount;
+				}
+			}
+		} else {
+			appendArg(*this);
+		}
+		charsAppended += appendFormat(fmtEnd, args...);
+		return charsAppended;
+	}
 	String get(bool terminate = false) {
 		umm totalSize = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
@@ -674,6 +780,26 @@ struct StringBuilder {
 	}
 	String getTerminated() { return get(true); }
 };
+
+// --- Format options: ---						--- Example ---							--- Result ---
+// {} - append an argument using 'toString'		format("{}", 5)							"5"
+// {ar:N} - align right, N is width				format("{ar:3}", 5)						"  5"
+// {al:N} - align left, N is width				format("{al:3}", 5)						"5  "
+// {fmt} - append an argument as a format		format("{} {fmt}", 1, "{} {}", 2, 3)	"1 2 3"		NOTE: this option should be last in the format string
+template <class Allocator = OsAllocator, class ...Args>
+String<Allocator> format(char const *fmt, Args const &...args) {
+	StringBuilder<Allocator> builder;
+	builder.appendFormat(fmt, args...);
+	return builder.get();
+}
+
+template <class Allocator = OsAllocator, class ...Args>
+String<Allocator> formatAndTerminate(char const *fmt, Args const &...args) {
+	StringBuilder<Allocator> builder;
+	builder.appendFormat(fmt, args...);
+	builder.append('\0');
+	return builder.get();
+}
 
 template <class T>
 struct Optional {
@@ -703,6 +829,12 @@ struct Optional {
 	T const *operator->() const { return std::addressof(_value); }
 
 	operator bool() const { return _hasValue; }
+	bool has_value() const { return _hasValue; }
+
+	T &operator*() & { ASSERT(_hasValue); return _value; }
+	T &&operator*() && { ASSERT(_hasValue); return _value; }
+	T const &operator*() const & { ASSERT(_hasValue); return move(_value); }
+	T const &&operator*() const && { ASSERT(_hasValue); return move(_value); }
 
 	union {
 		T _value;
