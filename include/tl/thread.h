@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "optional.h"
 #pragma warning(push)
 #pragma warning(disable : 4582)
 #pragma warning(disable : 4583)

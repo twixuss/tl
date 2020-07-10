@@ -31,6 +31,8 @@
 #include <vcruntime_new.h>
 #endif
 
+#include <utility>
+
 #if COMPILER_MSVC
 #pragma warning(pop)
 #endif
@@ -152,11 +154,6 @@ typedef u32 umm;
 typedef s32 smm;
 #endif
 
-#if COMPILER_MSVC
-template <class T> T *addressOf(T &val) { return __builtin_addressof(val); }
-template <class T> T const *addressOf(T const &val) { return __builtin_addressof(val); }
-#endif
-
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
 
@@ -202,6 +199,12 @@ template <class T> struct RemoveConstT		    { using Type = T; };
 template <class T> struct RemoveConstT<T const> { using Type = T; };
 template <class T> using RemoveConst = typename RemoveConstT<T>::Type;
 
+template <class T> struct RemoveVolatileT		      { using Type = T; };
+template <class T> struct RemoveVolatileT<T volatile> { using Type = T; };
+template <class T> using RemoveVolatile = typename RemoveVolatileT<T>::Type;
+
+template <class T> using RemoveCVRef = RemoveConst<RemoveVolatile<RemoveReference<T>>>;
+
 template <bool v, class T, class F> struct ConditionalT { using Type = T; };
 template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
 template <bool v, class T, class F> using Conditional = typename ConditionalT<v, T, F>::Type;
@@ -209,22 +212,6 @@ template <bool v, class T, class F> using Conditional = typename ConditionalT<v,
 template <bool v, class T = void> struct EnableIfT {};
 template <class T> struct EnableIfT<true, T> { using Type = T; };
 template <bool v, class T = void> using EnableIf = typename EnableIfT<v, T>::Type;
-
-template <class T> 
-[[nodiscard]] inline constexpr RemoveReference<T>&& move(T&& val) noexcept {
-    return static_cast<RemoveReference<T>&&>(val);
-}
-
-template <class T>
-[[nodiscard]] inline constexpr T&& forward(RemoveReference<T>& val) noexcept {
-    return static_cast<T&&>(val);
-}
-
-template <class T>
-[[nodiscard]] inline constexpr T&& forward(RemoveReference<T>&& val) noexcept {
-    static_assert(!isLValueReference<T>, "bad forward call");
-    return static_cast<T&&>(val);
-}
 
 template <class T, class ...Args>
 T *construct(T *val, Args &&...args) {
@@ -265,6 +252,11 @@ template<> inline constexpr s8  max() { return 0x7F; }
 template<> inline constexpr s16 max() { return 0x7FFF; }
 template<> inline constexpr s32 max() { return 0x7FFFFFFF; }
 template<> inline constexpr s64 max() { return 0x7FFFFFFFFFFFFFFF; }
+
+template<> inline constexpr unsigned long min() { return (unsigned long)min<u32>(); }
+template<> inline constexpr unsigned long max() { return (unsigned long)max<u32>(); }
+template<> inline constexpr long min() { return (long)min<s32>(); }
+template<> inline constexpr long max() { return (long)max<s32>(); }
 // clang-format on
 #pragma warning(pop)
 
@@ -372,8 +364,8 @@ using StringView = Span<char const>;
 using StringSpan = Span<char>;
 
 template <class T, class Allocator>
-static T *allocate(umm count = 1) {
-	return (T *)Allocator::allocate(count * sizeof(T), alignof(T));
+static T *allocate(umm count = 1, umm align = 0) {
+	return (T *)Allocator::allocate(count * sizeof(T), max(alignof(T), align));
 }
 struct OsAllocator {
 	static void *allocate(umm size, umm align = 0) { return _aligned_malloc(size, max(align, (umm)8)); }
@@ -440,37 +432,67 @@ inline constexpr bool startsWith(char const *str, umm strLength, char const *sub
 	return true;
 }
 
+namespace Fmt {
+
+constexpr u32 precisionMask = 0x3F;
+constexpr u32 precisionBit = 0;
+
+constexpr u32 radixMask = 0xF;
+constexpr u32 radixBit = 6;
+
+struct Flags;
+
+Flags precision(u32 value);
+Flags radix(u32 value);
+
+struct Flags {
+	u32 value;
+	Flags(u32 value) : value(value) {}
+	Flags() : Flags(precision(5) | radix(10)) {}
+	Flags operator|(Flags b) { return value | b.value; }
+
+	u32 getPrecision() { return (value >> precisionBit) & precisionMask; }
+	u32 getRadix() { return ((value >> radixBit) & radixMask) + 1; }
+};
+
+Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
+Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
+
+}
+
 template <class CopyFn> 
-void toString(char *v, CopyFn &&copyFn) { 
+void toString(char *v, CopyFn &&copyFn, Fmt::Flags flags = {}) { 
 	copyFn(v, strlen(v));
 }
 template <class CopyFn> 
-void toString(char const *v, CopyFn &&copyFn) { 
+void toString(char const *v, CopyFn &&copyFn, Fmt::Flags flags = {}) { 
 	copyFn(v, strlen(v));
 }
 
 template <class CopyFn> 
-void toString(Span<char> v, CopyFn &&copyFn) {
+void toString(StringSpan v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	copyFn(v.data(), v.size());
 }
 template <class CopyFn> 
-void toString(Span<char const> v, CopyFn &&copyFn) {
+void toString(Span<char const> v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	copyFn(v.data(), v.size());
 }
 template <class CopyFn>
-void toString(bool v, CopyFn &&copyFn) {
+void toString(bool v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
 }
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
 template <class Int, class CopyFn, class = EnableIf<isInteger<Int>>>
-void toString(Int v, u32 radix, CopyFn &&copyFn) {
+StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
 	char charMap[] = "0123456789ABCDEF";
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
+
+	u32 radix = flags.getRadix();
 
 	bool negative = false;
 	if constexpr (isSigned<Int>) {
@@ -500,39 +522,44 @@ void toString(Int v, u32 radix, CopyFn &&copyFn) {
 	} else {
 		(void)negative;
 	}
-	copyFn(lsc + 1, charsWritten);
+	return copyFn(lsc + 1, charsWritten);
 }
-template <class Int, class CopyFn, class = EnableIf<isInteger<Int>>>
-void toString(Int v, CopyFn &&copyFn) {
-	toString(v, 10, copyFn);
-}
+
 template <class Int, class = EnableIf<isInteger<Int>>>
-Span<char> toString(Int v, char *outBuf, u32 radix = 10) {
-	Span<char> result;
-	toString(v, radix, [&](char const *src, umm length) { 
+StringSpan toString(Int v, char *outBuf, Fmt::Flags flags = {}) {
+	StringSpan result;
+	toString(v, [&](char const *src, umm length) { 
 		result = {outBuf, length};
 		memcpy(outBuf, src, length); 
-	});
+		return Span(outBuf, length);
+	}, flags);
 	return result;
 }
 template <class Int, class = EnableIf<isInteger<Int>>>
-Span<char> toStringNT(Int v, char *outBuf, u32 radix = 10) {
-	Span<char> result;
-	toString(v, radix, [&](char const *src, umm length) { 
+StringSpan toStringNT(Int v, char *outBuf, Fmt::Flags flags = {}) {
+	StringSpan result;
+	toString(v, [&](char const *src, umm length) { 
 		result = {outBuf, length};
 		memcpy(outBuf, src, length); 
 		outBuf[length] = '\0';
-	});
+		return Span(outBuf, length);
+	}, flags);
 	return result;
 }
+
 template <class CopyFn>
-void toString(f64 v, CopyFn &&copyFn) {
+StringSpan toString(void const *p, CopyFn &&copyFn, Fmt::Flags flags = Fmt::radix(16)) {
+	return toString((umm)p, std::forward<CopyFn>(copyFn), flags);
+}
+
+template <class CopyFn>
+StringSpan toString(f64 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	char buf[64];
-	copyFn(buf, (umm)sprintf(buf, "%.2f", v));
+	return copyFn(buf, (umm)sprintf(buf, "%.*f", flags.getPrecision(), v));
 }
 template <class CopyFn>
-void toString(f32 v, CopyFn &&copyFn) {
-	toString((f64)v, copyFn);
+StringSpan toString(f32 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
+	return toString((f64)v, copyFn, flags);
 }
 
 } // namespace TL

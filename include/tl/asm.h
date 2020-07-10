@@ -5,6 +5,29 @@
 namespace TL {
 namespace ASM {
 
+#define _mm_cmpgt_epu32(a, b) _mm_cmpgt_epi32(_mm_xor_si128(a, _mm_set1_epi32(0x80000000)), _mm_xor_si128(b, _mm_set1_epi32(0x80000000)))
+#define _mm256_cmpgt_epu32(a, b) _mm256_cmpgt_epi32(_mm256_xor_si256(a, _mm256_set1_epi32(0x80000000)), _mm256_xor_si256(b, _mm256_set1_epi32(0x80000000)))
+
+FORCEINLINE __m128 operator!(__m128 a) { return _mm_xor_ps(a, _mm_castsi128_ps(_mm_set1_epi32(~0))); }
+FORCEINLINE __m128 operator|(__m128 a, __m128 b) { return _mm_or_ps(a, b); }
+FORCEINLINE __m128 operator&(__m128 a, __m128 b) { return _mm_and_ps(a, b); }
+FORCEINLINE __m128 operator^(__m128 a, __m128 b) { return _mm_xor_ps(a, b); }
+
+FORCEINLINE __m256 operator!(__m256 a) { return _mm256_xor_ps(a, _mm256_castsi256_ps(_mm256_set1_epi32(~0))); }
+FORCEINLINE __m256 operator|(__m256 a, __m256 b) { return _mm256_or_ps(a, b); }
+FORCEINLINE __m256 operator&(__m256 a, __m256 b) { return _mm256_and_ps(a, b); }
+FORCEINLINE __m256 operator^(__m256 a, __m256 b) { return _mm256_xor_ps(a, b); }
+
+FORCEINLINE __m128i operator!(__m128i a) { return _mm_castps_si128(!_mm_castsi128_ps(a)); }
+FORCEINLINE __m128i operator|(__m128i a, __m128i b) { return _mm_castps_si128(_mm_castsi128_ps(a) | _mm_castsi128_ps(b)); }
+FORCEINLINE __m128i operator&(__m128i a, __m128i b) { return _mm_castps_si128(_mm_castsi128_ps(a) & _mm_castsi128_ps(b)); }
+FORCEINLINE __m128i operator^(__m128i a, __m128i b) { return _mm_castps_si128(_mm_castsi128_ps(a) ^ _mm_castsi128_ps(b)); }
+
+FORCEINLINE __m256i operator!(__m256i a) { return _mm256_castps_si256(!_mm256_castsi256_ps(a)); }
+FORCEINLINE __m256i operator|(__m256i a, __m256i b) { return _mm256_castps_si256(_mm256_castsi256_ps(a) | _mm256_castsi256_ps(b)); }
+FORCEINLINE __m256i operator&(__m256i a, __m256i b) { return _mm256_castps_si256(_mm256_castsi256_ps(a) & _mm256_castsi256_ps(b)); }
+FORCEINLINE __m256i operator^(__m256i a, __m256i b) { return _mm256_castps_si256(_mm256_castsi256_ps(a) ^ _mm256_castsi256_ps(b)); }
+
 #if ARCH_AVX512F
 #define _simdWidth 64
 #elif ARCH_AVX
@@ -54,11 +77,11 @@ union XMM {
 	FORCEINLINE XMM operator& (XMM b) const { return _mm_and_ps(ps, b); }
 	FORCEINLINE XMM operator||(XMM b) const { return _mm_or_ps(ps, b); }
 	FORCEINLINE XMM operator&&(XMM b) const { return _mm_and_ps(ps, b); }
+	FORCEINLINE XMM &operator^=(XMM b) { return *this = *this ^ b; }
+	FORCEINLINE XMM &operator|=(XMM b) { return *this = *this | b; }
+	FORCEINLINE XMM &operator&=(XMM b) { return *this = *this & b; }
 	FORCEINLINE XMM operator==(XMM b) const { return _mm_cmpeq_epi32(pi, b); }
 	FORCEINLINE XMM operator!=(XMM b) const { return _mm_xor_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(pi, b)), _mm_castsi128_ps(_mm_set1_epi32(~0))); }
-	FORCEINLINE XMM &operator^=(XMM b) { return *this = _mm_xor_ps(ps, b); }
-	FORCEINLINE XMM &operator|=(XMM b) { return *this = _mm_or_ps(ps, b); }
-	FORCEINLINE XMM &operator&=(XMM b) { return *this = _mm_and_ps(ps, b); }
 };
 struct XMMWORD_PTR {
 	void *ptr;
@@ -93,11 +116,11 @@ union YMM {
 	FORCEINLINE YMM operator& (YMM b) const { return _mm256_and_ps(ps, b); }
 	FORCEINLINE YMM operator||(YMM b) const { return _mm256_or_ps(ps, b); }
 	FORCEINLINE YMM operator&&(YMM b) const { return _mm256_and_ps(ps, b); }
+	FORCEINLINE YMM &operator^=(YMM b) { return *this = *this ^ b; }
+	FORCEINLINE YMM &operator|=(YMM b) { return *this = *this | b; }
+	FORCEINLINE YMM &operator&=(YMM b) { return *this = *this & b; }
 	FORCEINLINE YMM operator==(YMM b) const { return _mm256_cmpeq_epi32(pi, b); }
 	FORCEINLINE YMM operator!=(YMM b) const { return _mm256_xor_ps(_mm256_castsi256_ps(_mm256_cmpeq_epi32(pi, b)), _mm256_castsi256_ps(_mm256_set1_epi32(~0))); }
-	FORCEINLINE YMM &operator^=(YMM b) { return *this = _mm256_xor_ps(ps, b); }
-	FORCEINLINE YMM &operator|=(YMM b) { return *this = _mm256_or_ps (ps, b); }
-	FORCEINLINE YMM &operator&=(YMM b) { return *this = _mm256_and_ps (ps, b); }
 #else
 	FORCEINLINE YMM operator!() const { return {!l, !h}; }
 	FORCEINLINE YMM operator~() const { return {~l, ~h}; }
@@ -182,26 +205,16 @@ struct ZMMWORD_PTR {
 	FORCEINLINE constexpr ZMMWORD_PTR operator-(smm val) { return ZMMWORD_PTR((u8 *)ptr - val); }
 };
 
-template<u32 w, class T, class UInt>
-void shuffleFallback(T *dst, UInt const *idx) {
-	static_assert(isPowerOf2(w));
-	T src[w];
-	memcpy(src, dst, sizeof(src));
-	for(u32 i=0;i<w;++i) {
-		((T *)dst)[i] = src[idx[i] & (w - 1)];
-	}
-}
-
 template <u32 _cmp>
 struct Cmp {
 	inline static constexpr u32 cmp = _cmp;
 };
-Cmp<_CMP_LT_OQ>  cmpLT;
-Cmp<_CMP_GT_OQ>  cmpGT;
-Cmp<_CMP_LE_OQ>  cmpLE;
-Cmp<_CMP_GE_OQ>  cmpGE;
-Cmp<_CMP_EQ_OQ>  cmpEQ;
-Cmp<_CMP_NEQ_OQ> cmpNE;
+Cmp<0> cmpLT;
+Cmp<1> cmpGT;
+Cmp<2> cmpLE;
+Cmp<3> cmpGE;
+Cmp<4> cmpEQ;
+Cmp<5> cmpNE;
 
 FORCEINLINE void movaps(XMM &dst, XMM src) { _mm_store_ps(dst.f32, src); }
 FORCEINLINE void movups(XMM &dst, XMM src) { _mm_storeu_ps(dst.f32, src); }
@@ -212,6 +225,26 @@ FORCEINLINE void subps(XMM &dst, XMM src) { dst = _mm_sub_ps(dst, src); }
 FORCEINLINE void mulps(XMM &dst, XMM src) { dst = _mm_mul_ps(dst, src); }
 FORCEINLINE void divps(XMM &dst, XMM src) { dst = _mm_div_ps(dst, src); }
 
+template <u32 cmp>
+FORCEINLINE void pcmpd(XMM &dst, XMM src, Cmp<cmp>) {
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm_cmpgt_epi32(src, dst);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm_cmpgt_epi32(dst, src);
+	else if constexpr(cmp == cmpLE.cmp) dst = !_mm_cmpgt_epi32(dst, src);
+	else if constexpr(cmp == cmpGE.cmp) dst = !_mm_cmpgt_epi32(src, dst);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpNE.cmp) dst = !_mm_cmpeq_epi32(dst, src);
+	else static_assert(false, "bad comparison");
+}
+template <u32 cmp>
+FORCEINLINE void pcmpud(XMM &dst, XMM src, Cmp<cmp>) {
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm_cmpgt_epu32(src, dst);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm_cmpgt_epu32(dst, src);
+	else if constexpr(cmp == cmpLE.cmp) dst = !_mm_cmpgt_epu32(dst, src);
+	else if constexpr(cmp == cmpGE.cmp) dst = !_mm_cmpgt_epu32(src, dst);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpNE.cmp) dst = !_mm_cmpeq_epi32(dst, src);
+	else static_assert(false, "bad comparison");
+}
 #if ARCH_AVX
 FORCEINLINE void movaps(YMM &dst, YMM src) { _mm256_store_ps(dst.f32, src); }
 FORCEINLINE void unpcklps(YMM &dst, YMM a, YMM b) { dst = _mm256_unpacklo_ps(a, b); }
@@ -221,9 +254,44 @@ FORCEINLINE void subps(YMM &dst, YMM src) { dst = _mm256_sub_ps(dst, src); }
 FORCEINLINE void mulps(YMM &dst, YMM src) { dst = _mm256_mul_ps(dst, src); }
 FORCEINLINE void divps(YMM &dst, YMM src) { dst = _mm256_div_ps(dst, src); }
 template <u32 cmp>
-FORCEINLINE void cmpps(XMM &dst, XMM src, Cmp<cmp>) { dst = _mm_cmp_ps(dst, src, cmp); }
+FORCEINLINE void cmpps(XMM &dst, XMM src, Cmp<cmp>) { 
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm_cmp_ps(dst, src, _CMP_LT_OQ);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm_cmp_ps(dst, src, _CMP_GT_OQ);
+	else if constexpr(cmp == cmpLE.cmp) dst = _mm_cmp_ps(dst, src, _CMP_LE_OQ);
+	else if constexpr(cmp == cmpGE.cmp) dst = _mm_cmp_ps(dst, src, _CMP_GE_OQ);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm_cmp_ps(dst, src, _CMP_EQ_OQ);
+	else if constexpr(cmp == cmpNE.cmp) dst = _mm_cmp_ps(dst, src, _CMP_NEQ_OQ);
+	else static_assert(false, "bad comparison");
+}
 template <u32 cmp>
-FORCEINLINE void cmpps(YMM &dst, YMM src, Cmp<cmp>) { dst = _mm256_cmp_ps(dst, src, cmp); }
+FORCEINLINE void cmpps(YMM &dst, YMM src, Cmp<cmp>) { 
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_LT_OQ);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_GT_OQ);
+	else if constexpr(cmp == cmpLE.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_LE_OQ);
+	else if constexpr(cmp == cmpGE.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_GE_OQ);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_EQ_OQ);
+	else if constexpr(cmp == cmpNE.cmp) dst = _mm256_cmp_ps(dst, src, _CMP_NEQ_OQ);
+}
+template <u32 cmp>
+FORCEINLINE void pcmpd(YMM &dst, YMM src, Cmp<cmp>) {
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm256_cmpgt_epi32(src, dst);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm256_cmpgt_epi32(dst, src);
+	else if constexpr(cmp == cmpLE.cmp) dst = _mm256_cmpgt_epi32(src, dst) | _mm256_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpGE.cmp) dst = _mm256_cmpgt_epi32(dst, src) | _mm256_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm256_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpNE.cmp) dst = !_mm256_cmpeq_epi32(dst, src);
+	else static_assert(false, "bad comparison");
+}
+template <u32 cmp>
+FORCEINLINE void pcmpud(YMM &dst, YMM src, Cmp<cmp>) {
+		 if constexpr(cmp == cmpLT.cmp) dst = _mm256_cmpgt_epu32(src, dst);
+	else if constexpr(cmp == cmpGT.cmp) dst = _mm256_cmpgt_epu32(dst, src);
+	else if constexpr(cmp == cmpLE.cmp) dst = !_mm256_cmpgt_epu32(dst, src);
+	else if constexpr(cmp == cmpGE.cmp) dst = !_mm256_cmpgt_epu32(src, dst);
+	else if constexpr(cmp == cmpEQ.cmp) dst = _mm256_cmpeq_epi32(dst, src);
+	else if constexpr(cmp == cmpNE.cmp) dst = !_mm256_cmpeq_epi32(dst, src);
+	else static_assert(false, "bad comparison");
+}
 #else
 FORCEINLINE void movaps(YMM &dst, YMM src) { _mm_store_ps(dst.l.f32, src.l); _mm_store_ps(dst.h.f32, src.h); }
 FORCEINLINE void unpcklps(YMM &dst, YMM a, YMM b) { unpcklps(dst.l, a.l, b.l); unpcklps(dst.l, a.h, b.h); }
@@ -233,7 +301,7 @@ FORCEINLINE void subps(YMM &dst, YMM src) { subps(dst.l, src.l); subps(dst.h, sr
 FORCEINLINE void mulps(YMM &dst, YMM src) { mulps(dst.l, src.l); mulps(dst.h, src.h); }
 FORCEINLINE void divps(YMM &dst, YMM src) { divps(dst.l, src.l); divps(dst.h, src.h); }
 template <u32 cmp>
-FORCEINLINE void cmpps(XMM &dst, XMM src, Cmp<cmp>) { 
+FORCEINLINE void cmpps(XMM &dst, XMM src, Cmp<cmp>) {
 		 if constexpr(cmp == cmpLT.cmp) dst = _mm_cmplt_ps(dst, src);
 	else if constexpr(cmp == cmpGT.cmp) dst = _mm_cmpgt_ps(dst, src);
 	else if constexpr(cmp == cmpLE.cmp) dst = _mm_cmple_ps(dst, src);
@@ -242,8 +310,9 @@ FORCEINLINE void cmpps(XMM &dst, XMM src, Cmp<cmp>) {
 	else if constexpr(cmp == cmpNE.cmp) dst = _mm_cmpneq_ps(dst, src);
 	else static_assert(false, "bad comparison");
 }
-template <u32 cmp>
-FORCEINLINE void cmpps(YMM &dst, YMM src, Cmp<cmp> c) { cmpps(dst.l, src.l, c); cmpps(dst.h, src.h, c); }
+template <u32 cmp> FORCEINLINE void cmpps(YMM &dst, YMM src, Cmp<cmp> c) { cmpps(dst.l, src.l, c); cmpps(dst.h, src.h, c); }
+template <u32 cmp> FORCEINLINE void pcmpd(YMM &dst, YMM src, Cmp<cmp> c) { pcmpd(dst.l, src.l, c); pcmpd(dst.h, src.h, c); }
+template <u32 cmp> FORCEINLINE void pcmpud(YMM &dst, YMM src, Cmp<cmp> c) { pcmpud(dst.l, src.l, c); pcmpud(dst.h, src.h, c); }
 #endif
 FORCEINLINE void movdqa(YMM &dst, YMM src) { movaps(dst, src); }
 
@@ -258,13 +327,39 @@ FORCEINLINE XMM select32(XMM mask, XMM a, XMM b) { return _mm_blendv_ps(b, a, ma
 FORCEINLINE u8 compressMask32(XMM mask) { return (u8)_mm_movemask_ps(mask); }
 FORCEINLINE u8 compressMask64(XMM mask) { return (u8)_mm_movemask_pd(mask); }
 
+template<u32 w, class T, class UInt>
+void shuffleFallback(T *dst, UInt const *idx) {
+	static_assert(isPowerOf2(w));
+	T src[w];
+	memcpy(src, dst, sizeof(src));
+	for(u32 i=0;i<w;++i) {
+		((T *)dst)[i] = src[idx[i] & (w - 1)];
+	}
+}
+
 #if ARCH_AVX
+FORCEINLINE void storeMask32(void *dst, XMM src, XMM mask) { _mm_maskstore_ps((f32 *)dst, mask, src); }
+FORCEINLINE void storeMask32(void *dst, YMM src, YMM mask) { _mm256_maskstore_ps((f32 *)dst, mask, src); }
 FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) { return _mm256_blendv_ps(b, a, mask); }
 FORCEINLINE u8 compressMask32(YMM mask) { return (u8)_mm256_movemask_ps(mask); }
 FORCEINLINE u8 compressMask64(YMM mask) { return (u8)_mm256_movemask_pd(mask); }
 FORCEINLINE XMM shuffle32(XMM src, XMM idx) { return _mm_permutevar_ps(src.ps, idx.pi); }
 FORCEINLINE YMM negateF32(YMM a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0.0f)); }
 #else
+FORCEINLINE void storeMask32(void *dst, XMM src, XMM mask) { 
+	for (u32 i = 0; i < 4; ++i) {
+		if (mask.u32[i]) {
+			((f32 *)dst)[i] = src.f32[i];
+		}
+	}
+}
+FORCEINLINE void storeMask32(void *dst, YMM src, YMM mask) { 
+	for (u32 i = 0; i < 8; ++i) {
+		if (mask.u32[i]) {
+			((f32 *)dst)[i] = src.f32[i];
+		}
+	}
+}
 FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) { 
 	YMM result;
 	result.l = select32(mask.l, a.l, b.l);
@@ -273,7 +368,23 @@ FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) {
 }
 FORCEINLINE u8 compressMask32(YMM mask) { return (u8)((compressMask32(mask.h) << 4) | compressMask32(mask.l)); }
 FORCEINLINE u8 compressMask64(YMM mask) { return (u8)((compressMask64(mask.h) << 2) | compressMask64(mask.l)); }
-FORCEINLINE XMM shuffle32(XMM src, XMM idx) { shuffleFallback<4>(src.f32, idx.u32); return src; }
+FORCEINLINE XMM shuffle32(XMM src, XMM idx) {
+	// making indices for pshufb
+	//|   32   |   32   |   32   |   32   |
+	// 00000000 00000001 00000002 00000003
+	// 00000000 00010001 00020002 00030003
+	// 00000000 00040004 00080008 000C000C
+	// 00000000 04040404 08080808 0C0C0C0C
+	// 00010203 04050607 08090A0B 0C0D0E0F
+
+	idx &= _mm_set1_epi32(3);
+	idx |= _mm_slli_si128(idx, 2);
+	idx = _mm_mullo_epi16(idx, _mm_set1_epi16(4));
+	idx |= _mm_slli_si128(idx, 1);
+	idx = _mm_add_epi8(idx, _mm_setr_epi8(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3));
+	src = _mm_shuffle_epi8(src, idx);
+	return src;
+}
 FORCEINLINE YMM negateF32(YMM a) { 
 	a.l = negateF32(a.l); 
 	a.h = negateF32(a.h); 
@@ -282,14 +393,14 @@ FORCEINLINE YMM negateF32(YMM a) {
 #endif
 
 #if ARCH_AVX2
-FORCEINLINE XMM gather32(void const *src, XMM offsets) { return _mm_i32gather_ps((f32*)src, offsets.pi, 1); }
-FORCEINLINE YMM gather32(void const *src, YMM offsets) { return _mm256_i32gather_ps((f32*)src, offsets.pi, 1); }
+FORCEINLINE XMM gather32(void const *src, XMM offsets) { return _mm_i32gather_ps((f32 const *)src, offsets.pi, 1); }
+FORCEINLINE YMM gather32(void const *src, YMM offsets) { return _mm256_i32gather_ps((f32 const *)src, offsets.pi, 1); }
 FORCEINLINE XMM gatherMask32(void const *src, XMM offsets, XMM mask, XMM default) { return _mm_mask_i32gather_ps(default, (f32*)src, offsets.pi, mask, 1); }
 FORCEINLINE YMM gatherMask32(void const *src, YMM offsets, YMM mask, YMM default) { return _mm256_mask_i32gather_ps(default, (f32*)src, offsets.pi, mask, 1); }
 FORCEINLINE YMM shuffle32(YMM src, YMM idx) { return _mm256_permutevar8x32_ps(src.ps, idx.pi); }
 #else
 FORCEINLINE XMM gather32(void const *src, XMM offsets) { 
-	u8 *memory = (u8* )src;
+	auto memory = (u8 const *)src;
 	return _mm_setr_ps(*(f32*)(memory + offsets.s32[0]), 
 					   *(f32*)(memory + offsets.s32[1]), 
 					   *(f32*)(memory + offsets.s32[2]), 
@@ -302,11 +413,11 @@ FORCEINLINE YMM gather32(void const *src, YMM offsets) {
 	return result;
 }
 FORCEINLINE XMM gatherMask32(void const *src, XMM offsets, XMM mask, XMM default) { 
-	u8 *memory = (u8* )src;
-	return _mm_setr_ps(mask.u32[0] ? *(f32*)(memory + offsets.s32[0]) : default.f32[0], 
-					   mask.u32[1] ? *(f32*)(memory + offsets.s32[1]) : default.f32[1], 
-					   mask.u32[2] ? *(f32*)(memory + offsets.s32[2]) : default.f32[2], 
-					   mask.u32[3] ? *(f32*)(memory + offsets.s32[3]) : default.f32[3]); 
+	auto memory = (u8 const *)src;
+	return _mm_setr_ps(mask.u32[0] ? *(f32 const*)(memory + offsets.s32[0]) : default.f32[0], 
+					   mask.u32[1] ? *(f32 const*)(memory + offsets.s32[1]) : default.f32[1], 
+					   mask.u32[2] ? *(f32 const*)(memory + offsets.s32[2]) : default.f32[2], 
+					   mask.u32[3] ? *(f32 const*)(memory + offsets.s32[3]) : default.f32[3]); 
 }
 FORCEINLINE YMM gatherMask32(void const *src, YMM offsets, YMM mask, YMM default) { 
 	YMM result;
@@ -352,6 +463,12 @@ FORCEINLINE YMM divF32(YMM a, YMM b) { divps(a, b); return a; }
 
 template <u32 cmp> FORCEINLINE XMM cmpF32(XMM a, XMM b, Cmp<cmp> c) { cmpps(a, b, c); return a; }
 template <u32 cmp> FORCEINLINE YMM cmpF32(YMM a, YMM b, Cmp<cmp> c) { cmpps(a, b, c); return a; }
+
+template <u32 cmp> FORCEINLINE XMM cmpS32(XMM a, XMM b, Cmp<cmp> c) { pcmpd(a, b, c); return a; }
+template <u32 cmp> FORCEINLINE YMM cmpS32(YMM a, YMM b, Cmp<cmp> c) { pcmpd(a, b, c); return a; }
+
+template <u32 cmp> FORCEINLINE XMM cmpU32(XMM a, XMM b, Cmp<cmp> c) { pcmpud(a, b, c); return a; }
+template <u32 cmp> FORCEINLINE YMM cmpU32(YMM a, YMM b, Cmp<cmp> c) { pcmpud(a, b, c); return a; }
 
 } // namespace ASM
 } // namespace TL

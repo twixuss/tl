@@ -8,7 +8,45 @@
 #include <time.h>
 #include <stdio.h>
 #include <vector>
+#define NOMINMAX
+#include <Windows.h>
 using namespace TL;
+
+struct PerfTimer {
+	inline PerfTimer() { reset(); }
+	inline s64 getElapsedCounter() { return getCounter() - begin; }
+	inline void reset() { begin = getCounter(); }
+
+	inline static s64 const frequency = []() {
+		LARGE_INTEGER freq;
+		QueryPerformanceFrequency(&freq);
+		return freq.QuadPart;
+	}();
+	inline static s64 getCounter() {
+		LARGE_INTEGER counter;
+		QueryPerformanceCounter(&counter);
+		return counter.QuadPart;
+	}
+	template <class Ret = f32> inline static Ret getSeconds(s64 elapsed) { return (Ret)elapsed / (Ret)frequency; }
+	template <class Ret = f32> inline static Ret getMilliseconds(s64 elapsed) { return getSeconds<Ret>(elapsed * 1000); }
+	template <class Ret = f32> inline static Ret getMicroseconds(s64 elapsed) { return getSeconds<Ret>(elapsed * 1000000); }
+	template <class Ret = f32> inline static Ret getNanoseconds (s64 elapsed) { return getSeconds<Ret>(elapsed * 1000000000); }
+	template <class Ret = f32> inline static Ret getSeconds(s64 begin, s64 end) { return getSeconds<Ret>(end - begin); }
+	template <class Ret = f32> inline static Ret getMilliseconds(s64 begin, s64 end) { return getMilliseconds<Ret>(end - begin); }
+	template <class Ret = f32> inline static Ret getMicroseconds(s64 begin, s64 end) { return getMicroseconds<Ret>(end - begin); }
+	template <class Ret = f32> inline static Ret getNanoseconds (s64 begin, s64 end) { return getNanoseconds <Ret>(end - begin); }
+	template <class Ret = f32> inline Ret getSeconds() { return getSeconds<Ret>(getElapsedCounter()); }
+	template <class Ret = f32> inline Ret getMilliseconds() { return getMilliseconds<Ret>(getElapsedCounter()); }
+	template <class Ret = f32> inline Ret getMicroseconds() { return getMicroseconds<Ret>(getElapsedCounter()); }
+	template <class Ret = f32> inline Ret getNanoseconds() { return getNanoseconds<Ret>(getElapsedCounter()); }
+
+private:
+	s64 begin;
+};
+
+void (*_dummy)(void const *) = [](void const *) {};
+template <class T>
+void dummy(T const &v) { _dummy(&v); }
 
 template<class ...T>
 void print(T const &...vals) {
@@ -36,7 +74,7 @@ void print(){}
 #define B4i V4s(5, 6, 7, 8)
 template <class T, class U>
 void test(T t, U u) {
-	ASSERT(t == u);
+	ASSERT(allTrue(t == u));
 }
 void test(f32 a, f32 b) {
 	ASSERT(absolute(a-b) < 0.0001f);
@@ -322,10 +360,46 @@ void mathTest() {
 		test((u32)a, 0b00100010);
 		test((u32)b, 0b10101010);
 	}
+	
+	static constexpr umm sinTableSize = 1024*1024;
+	static auto sinTableData = [] {
+		f32 *arr = allocate<f32, OsAllocator>(sinTableSize, 64);
+		for (u32 i = 0; i < sinTableSize; ++i) {
+			arr[i] = TL::sin((f32)i / sinTableSize * pi * 2);
+		}
+		return arr;
+	}();
+	auto sinTable = [](f32 angle) {
+		static_assert(isPowerOf2(sinTableSize));
+		static constexpr u32 mask = sinTableSize - 1;
+
+		return sinTableData[(s32)(angle * (1 / (pi * 2)) * sinTableSize) & mask];
+	};
+
+	auto perfTest = [](auto &&fn) {
+		f32 const maxx = 0xFFFFFF;
+
+		u64 tmin = ~0;
+		u64 tmax = 0;
+		u64 ttotal = 0;
+
+		for (f32 a = 0; a < maxx; ++a) {
+			auto begin = __rdtsc();
+			dummy(fn(a));
+			auto time = __rdtsc() - begin;
+			ttotal += time;
+			tmin = min(tmin, time);
+			tmax = max(tmax, time);
+		}
+		printf("Min: %llu, Max: %llu, Avg: %f\n", tmin, tmax, ttotal / maxx);
+	};
+
+	perfTest([](auto x) { return sinBhaskara(F32x8(x)); });
 }
 #include <thread>
 #include <mutex>
 #include "..\include\tl\thread.h"
 int main() { 
 	mathTest(); 
+	system("pause");
 }
