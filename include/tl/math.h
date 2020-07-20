@@ -2440,22 +2440,30 @@ inline v2fx8 unpack(v2fx8 v) {
 	v.x.m.h = m13.l;
 	return v;
 }
-inline v3fx8 unpack(v3fx8 v) { 
-#if 0
-	v3fx8 result;
-	gather(result.x, &v, S32x8( 0,  8, 16,  1,  9, 17,  2, 10) * sizeof(f32));
-	gather(result.y, &v, S32x8(18,  3, 11, 19,  4, 12, 20,  5) * sizeof(f32));
-	gather(result.z, &v, S32x8(13, 21,  6, 14, 22,  7, 15, 23) * sizeof(f32));
-	return result;
-#else
-	v3fx4 &a = ((v3fx4*)&v)[0];
-	v3fx4 &b = ((v3fx4*)&v)[1];
-	std::swap(a.y, a.z);
-	std::swap(a.z, b.y);
-	std::swap(b.x, b.y);
-	a = unpack(a);
-	b = unpack(b);
+inline v3fx8 unpack(v3fx8 v) {
+#if ARCH_AVX
+#define MM256_PERM128(a, b) ((a) | ((b) << 4))
+#define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
+	auto xy = _mm256_shuffle_ps(v.x.m.ps, v.y.m.ps, MM_SHUFFLE(0, 2, 0, 2));
+	auto yz = _mm256_shuffle_ps(v.y.m.ps, v.z.m.ps, MM_SHUFFLE(1, 3, 1, 3));
+	auto xz = _mm256_shuffle_ps(v.x.m.ps, v.z.m.ps, MM_SHUFFLE(1, 3, 0, 2));
+	auto rx = _mm256_shuffle_ps(xy, xz, MM_SHUFFLE(0, 2, 2, 0));
+	auto ry = _mm256_shuffle_ps(yz, xy, MM_SHUFFLE(0, 2, 1, 3));
+	auto rz = _mm256_shuffle_ps(xz, yz, MM_SHUFFLE(3, 1, 1, 3));
+	v.x.m.ps = _mm256_permute2f128_ps(rx, ry, MM256_PERM128(0, 2));
+	v.y.m.ps = _mm256_permute2f128_ps(rz, rx, MM256_PERM128(0, 3));
+	v.z.m.ps = _mm256_permute2f128_ps(ry, rz, MM256_PERM128(1, 3));
 	return v;
+#undef MM_SHUFFLE
+#undef MM256_PERM128
+#else
+	v3fx8 r;
+	for (u32 i = 0; i < 8; ++i) {
+		r.s[i * 3 + 0] = v.s[i + 0];
+		r.s[i * 3 + 1] = v.s[i + 8];
+		r.s[i * 3 + 2] = v.s[i + 16];
+	}
+	return r;
 #endif
 }
 inline v4fx8 unpack(v4fx8 v) {
@@ -2809,7 +2817,12 @@ inline v4fx8 ceil(v4fx8 v) { return V4fx8(ceil(v.x), ceil(v.y), ceil(v.z), ceil(
 #define ROUND(f32) inline f32 round(f32 v) { return floor(v + 0.5f); }
 ROUND(f32) ROUND(f32x4) ROUND(f32x8) ROUND(v2f) ROUND(v3f) ROUND(v4f);
 #undef ROUND
-inline v2fx8 round(v2fx8 v) { return V2fx8(round(v.x), round(v.y)); }
+inline v2fx4 round(v2fx4 v) { v.x = round(v.x); v.y = round(v.y); return v; }
+inline v2fx8 round(v2fx8 v) { v.x = round(v.x); v.y = round(v.y); return v; }
+inline v3fx4 round(v3fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
+inline v3fx8 round(v3fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
+inline v4fx4 round(v4fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
+inline v4fx8 round(v4fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
 
 inline s32 roundToInt(f32 v) { return (s32)lroundf(v); }
 inline s64 roundToInt(f64 v) { return llround(v); }
@@ -2857,8 +2870,9 @@ inline f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
 }
 
 inline f32 sign(f32 v) { return setSign(1.0f, v); }
-template<umm ps>
-inline f32x<ps> sign(f32x<ps> v) { return setSign(F32x<ps>(1.0f), v); }
+inline v2f sign(v2f v) { v.x = setSign(1.0f, v.x); v.y = setSign(1.0f, v.y); return v; }
+template<umm ps> inline f32x<ps> sign(f32x<ps> v) { return setSign(F32x<ps>(1.0f), v); }
+template<umm ps> inline v2fx<ps> sign(v2fx<ps> v) { v.x = setSign(F32x<ps>(1.0f), v.x); v.y = setSign(F32x<ps>(1.0f), v.y); return v; }
 
 #define TRUNC(f32) inline f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
 TRUNC(f32)
