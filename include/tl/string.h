@@ -68,17 +68,13 @@ String<Allocator> nullTerminate(Span<char const> span) {
 	return result;
 }
 
-template <class T>
-Optional<T> parse(StringView s) = delete;
-
-template <>
-Optional<u32> parse(StringView s) {
-	u32 result = 0;
-	u32 oldResult = 0;
+Optional<u64> parseDecimal(StringView s) {
+	u64 result	  = 0;
+	u64 oldResult = 0;
 	for (auto c : s) {
 		result *= 10;
-		u32 digit = (u32)c - '0';
-		if (digit > 9) 
+		u64 digit = (u64)c - '0';
+		if (digit > 9)
 			return {};
 		result += digit;
 		if (result < oldResult)
@@ -175,7 +171,7 @@ struct StringBuilder {
 						++c;
 					}
 					ASSERT(numStart != c, "invalid format: missing number after ':'");
-					auto parsed = parse<u32>(StringView(numStart, c));
+					auto parsed = parseDecimal(StringView(numStart, c));
 					ASSERT(parsed.has_value(), "invalid format: expected a number after ':'");
 					return parsed.value();
 				};
@@ -280,19 +276,25 @@ struct StringBuilder {
 		charsAppended += appendFormat(fmtEnd, args...);
 		return charsAppended;
 	}
-	String get(bool terminate = false) {
+	umm size() {
 		umm totalSize = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
 			totalSize += block->size();
 		}
-		if (terminate)
-			++totalSize;
-		String result(totalSize);
-		char *dst = result.data();
+		return totalSize;
+	}
+	StringSpan fill(StringSpan dst_) {
+		ASSERT(dst_.size() >= this->size());
+		char *dst = dst_.data();
 		for (Block *block = &first; block != 0; block = block->next) {
 			memcpy(dst, block->buffer, block->size());
 			dst += block->size();
 		}
+		return StringSpan(dst_.begin(), dst);
+	}
+	String get(bool terminate = false) {
+		String result(size() + terminate);
+		fill(result);
 		if (terminate)
 			result.back() = '\0';
 		return result;

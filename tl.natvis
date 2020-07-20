@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="TL::Span&lt;char&gt;">
+    <Intrinsic Name="size" Expression="_end-_begin" />
+    <Intrinsic Name="data" Expression="_begin" />
+    <DisplayString>{data(),[size()]s}</DisplayString>
+    <StringView>data(),[size()]s</StringView>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>data()</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::Span&lt;char const&gt;">
+    <Intrinsic Name="size" Expression="_end-_begin" />
+    <Intrinsic Name="data" Expression="_begin" />
+    <DisplayString>{data(),[size()]s}</DisplayString>
+    <StringView>data(),[size()]s</StringView>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>data()</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::Span&lt;*&gt;">
+    <Intrinsic Name="size" Expression="_end-_begin" />
+    <Intrinsic Name="data" Expression="_begin" />
+    <DisplayString>{data(),[size()]}</DisplayString>
+    <StringView>data(),[size()]</StringView>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>data()</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::String&lt;*&gt;">
+    <Intrinsic Name="size" Expression="_end-_begin" />
+    <Intrinsic Name="data" Expression="_begin" />
+    <DisplayString>{data(),[size()]s}</DisplayString>
+    <StringView>data(),[size()]s</StringView>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>data()</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::AllocListBase&lt;*&gt;" Inheritable="true">
+    <Intrinsic Name="size" Expression="_end - _begin" />
+    <Intrinsic Name="capacity" Expression="_allocEnd - _begin" />
+    <DisplayString>{{ size={size()}, capacity={capacity()} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>_begin</ValuePointer>
+        </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

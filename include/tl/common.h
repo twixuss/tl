@@ -169,6 +169,10 @@ template <> inline constexpr bool isInteger<s64> = true;
 template <> inline constexpr bool isInteger<long> = true;
 template <> inline constexpr bool isInteger<unsigned long> = true;
 
+template <class T> inline constexpr bool isChar = false;
+template <> inline constexpr bool isChar<u8> = true;
+template <> inline constexpr bool isChar<s8> = true;
+
 template <class T> inline constexpr bool isSigned = false;
 template <> inline constexpr bool isSigned<s8 > = true;
 template <> inline constexpr bool isSigned<s16> = true;
@@ -186,6 +190,9 @@ template <> inline constexpr bool isUnsigned<unsigned long> = true;
 template <class T> inline constexpr bool isFloat = false;
 template <> inline constexpr bool isFloat<f32> = true;
 template <> inline constexpr bool isFloat<f64> = true;
+
+template <class T> inline constexpr bool isPointer = false;
+template <class T> inline constexpr bool isPointer<T *> = true;
 
 template <class T> inline constexpr bool isLValueReference = false;
 template <class T> inline constexpr bool isLValueReference<T&> = true;
@@ -275,8 +282,18 @@ template <class T, class U, class... Rest> FORCEINLINE constexpr auto min(T a, U
 template <class T, class U, class... Rest> FORCEINLINE constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
 template <class T, class U, class V, class W> FORCEINLINE constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 
-inline constexpr void *floor(void *v, u32 s) { return (void *)((umm)v / s * s); }
-inline void *ceil(void *v, u32 s) { return floor((u8 *)v + ((s32)s - 1), s); }
+inline constexpr u8  floor(u8  v, u8  s) { return v / s * s; }
+inline constexpr u16 floor(u16 v, u16 s) { return v / s * s; }
+inline constexpr u32 floor(u32 v, u32 s) { return v / s * s; }
+inline constexpr u64 floor(u64 v, u64 s) { return v / s * s; }
+
+inline constexpr u8  ceil(u8  v, u8  s) { return v / s * s; }
+inline constexpr u16 ceil(u16 v, u16 s) { return v / s * s; }
+inline constexpr u32 ceil(u32 v, u32 s) { return v / s * s; }
+inline constexpr u64 ceil(u64 v, u64 s) { return v / s * s; }
+
+inline constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
+inline void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
 inline constexpr u8  negate(u8  v) { return (u8 )((u8 )~v + 1); }
 inline constexpr u16 negate(u16 v) { return (u16)((u16)~v + 1); }
@@ -340,6 +357,30 @@ template <class T> Range<T> exclusiveRange(T begin, T end) { return Range<T>(beg
 template <class T> Range<T> inclusiveRange(T begin, T end) { return Range<T>(begin, end + 1); }
 
 template <class T>
+auto reverse(T &x) {
+	using Ptr = decltype(x.begin());
+	struct Iter {
+		Iter &operator++() { --ptr; return *this; }
+		Iter &operator--() { ++ptr; return *this; }
+		Iter operator++(int) { Iter prev = *this; --ptr; return prev; }
+		Iter operator--(int) { Iter prev = *this; ++ptr; return prev; }
+		bool operator==(Iter const &that) { return ptr == that.ptr; }
+		bool operator!=(Iter const &that) { return ptr != that.ptr; }
+		auto &operator*() { return *ptr; }
+		Ptr ptr;
+	};
+	struct Range {
+		Iter begin() { return {_begin}; }
+		Iter end() { return {_end}; }
+		Ptr _begin, _end;
+	};
+	Range r;
+	r._begin = x.end() - 1;
+	r._end = x.begin() - 1;
+	return r;
+}
+
+template <class T>
 struct Span {
 	constexpr Span() = default;
 	constexpr Span(T &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
@@ -350,6 +391,8 @@ struct Span {
 	constexpr T *data() const { return _begin; }
 	constexpr T *begin() const { return _begin; }
 	constexpr T *end() const { return _end; }
+	constexpr T &front() const { return *_begin; }
+	constexpr T &back() const { return _end[-1]; }
 	constexpr umm size() const { return umm(_end - _begin); }
 	constexpr T &operator[](umm i) { return _begin[i]; }
 	constexpr T const &operator[](umm i) const { return _begin[i]; }
@@ -484,7 +527,12 @@ void toString(bool v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
-template <class Int, class CopyFn, class = EnableIf<isInteger<Int>>>
+template <class Char, class CopyFn, char X = '?', class = EnableIf<isChar<Char>>>
+StringSpan toString(Char v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
+	return copyFn(&v, 1);
+}
+
+template <class Int, class CopyFn, class = EnableIf<isInteger<Int> && !isChar<Int>>>
 StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
@@ -525,7 +573,7 @@ StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	return copyFn(lsc + 1, charsWritten);
 }
 
-template <class Int, class = EnableIf<isInteger<Int>>>
+template <class Int, class = EnableIf<isInteger<Int> && !isChar<Int>>>
 StringSpan toString(Int v, char *outBuf, Fmt::Flags flags = {}) {
 	StringSpan result;
 	toString(v, [&](char const *src, umm length) { 
