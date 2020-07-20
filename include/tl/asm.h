@@ -218,6 +218,8 @@ Cmp<5> cmpNE;
 
 FORCEINLINE void movaps(XMM &dst, XMM src) { _mm_store_ps(dst.f32, src); }
 FORCEINLINE void movups(XMM &dst, XMM src) { _mm_storeu_ps(dst.f32, src); }
+FORCEINLINE void movups(XMM &dst, void const *src) { _mm_storeu_ps(dst.f32, _mm_loadu_ps((f32 *)src)); }
+FORCEINLINE void movups(void *dst, XMM src) { _mm_storeu_ps((f32 *)dst, src); }
 FORCEINLINE void unpcklps(XMM &dst, XMM a, XMM b) { dst = _mm_unpacklo_ps(a, b); }
 FORCEINLINE void unpckhps(XMM &dst, XMM a, XMM b) { dst = _mm_unpackhi_ps(a, b); }
 FORCEINLINE void addps(XMM &dst, XMM src) { dst = _mm_add_ps(dst, src); }
@@ -247,6 +249,11 @@ FORCEINLINE void pcmpud(XMM &dst, XMM src, Cmp<cmp>) {
 }
 #if ARCH_AVX
 FORCEINLINE void movaps(YMM &dst, YMM src) { _mm256_store_ps(dst.f32, src); }
+
+FORCEINLINE void movups(YMM &dst, YMM src) { _mm256_storeu_ps(dst.f32, src); }
+FORCEINLINE void movups(YMM &dst, void const *src) { _mm256_storeu_ps(dst.f32, _mm256_loadu_ps((f32 *)src)); }
+FORCEINLINE void movups(void *dst, YMM src) { _mm256_storeu_ps((f32 *)dst, src); }
+
 FORCEINLINE void unpcklps(YMM &dst, YMM a, YMM b) { dst = _mm256_unpacklo_ps(a, b); }
 FORCEINLINE void unpckhps(YMM &dst, YMM a, YMM b) { dst = _mm256_unpackhi_ps(a, b); }
 FORCEINLINE void addps(YMM &dst, YMM src) { dst = _mm256_add_ps(dst, src); }
@@ -293,7 +300,12 @@ FORCEINLINE void pcmpud(YMM &dst, YMM src, Cmp<cmp>) {
 	else static_assert(false, "bad comparison");
 }
 #else
-FORCEINLINE void movaps(YMM &dst, YMM src) { _mm_store_ps(dst.l.f32, src.l); _mm_store_ps(dst.h.f32, src.h); }
+FORCEINLINE void movaps(YMM &dst, YMM src) { movaps(dst.l, src.l); movaps(dst.h, src.h); }
+
+FORCEINLINE void movups(YMM &dst, YMM src) { movups(dst.l, src.l); movups(dst.h, src.h); }
+FORCEINLINE void movups(void *dst, YMM src) { movups(dst, src.l); movups((XMM *)dst + 1, src.h); }
+FORCEINLINE void movups(YMM &dst, void const *src) { movups(dst.l, src); movups(dst.h, (XMM *)src + 1); }
+
 FORCEINLINE void unpcklps(YMM &dst, YMM a, YMM b) { unpcklps(dst.l, a.l, b.l); unpcklps(dst.l, a.h, b.h); }
 FORCEINLINE void unpckhps(YMM &dst, YMM a, YMM b) { unpckhps(dst.l, a.l, b.l); unpckhps(dst.l, a.h, b.h); }
 FORCEINLINE void addps(YMM &dst, YMM src) { addps(dst.l, src.l); addps(dst.h, src.h); }
@@ -338,6 +350,8 @@ void shuffleFallback(T *dst, UInt const *idx) {
 }
 
 #if ARCH_AVX
+FORCEINLINE XMM loadMask32(void const *src, XMM mask) { return _mm_maskload_ps((f32 *)src, mask); }
+FORCEINLINE YMM loadMask32(void const *src, YMM mask) { return _mm256_maskload_ps((f32 *)src, mask); }
 FORCEINLINE void storeMask32(void *dst, XMM src, XMM mask) { _mm_maskstore_ps((f32 *)dst, mask, src); }
 FORCEINLINE void storeMask32(void *dst, YMM src, YMM mask) { _mm256_maskstore_ps((f32 *)dst, mask, src); }
 FORCEINLINE YMM select32(YMM mask, YMM a, YMM b) { return _mm256_blendv_ps(b, a, mask); }
@@ -346,6 +360,20 @@ FORCEINLINE u8 compressMask64(YMM mask) { return (u8)_mm256_movemask_pd(mask); }
 FORCEINLINE XMM shuffle32(XMM src, XMM idx) { return _mm_permutevar_ps(src.ps, idx.pi); }
 FORCEINLINE YMM negateF32(YMM a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0.0f)); }
 #else
+FORCEINLINE XMM loadMask32(void const *src, XMM mask) { 
+	XMM result;
+	for (u32 i = 0; i < 4; ++i) {
+		result.f32[i] = mask.u32[i] ? ((f32 *)src)[i] : 0.0f;
+	}
+	return result;
+}
+FORCEINLINE YMM loadMask32(void const *src, YMM mask) { 
+	YMM result;
+	for (u32 i = 0; i < 8; ++i) {
+		result.f32[i] = mask.u32[i] ? ((f32 *)src)[i] : 0.0f;
+	}
+	return result;
+}
 FORCEINLINE void storeMask32(void *dst, XMM src, XMM mask) { 
 	for (u32 i = 0; i < 4; ++i) {
 		if (mask.u32[i]) {
