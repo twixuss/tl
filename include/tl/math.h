@@ -346,6 +346,7 @@ FORCEINLINE constexpr m4 M4(v4f i, v4f j, v4f k, v4f l);
 FORCEINLINE constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
 				f32 ly, f32 lz, f32 lw);
 
+FORCEINLINE void sincos(f32 v, f32& sinOut, f32& cosOut);
 FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut);
 FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut);
 FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
@@ -1527,6 +1528,46 @@ union v4ux<8> {
 union m3;
 FORCEINLINE m3 transpose(m3 const&);
 
+union m2 {
+	struct {
+		v2f i, j;
+	};
+	f32 s[4];
+	FORCEINLINE v2f operator*(v2f b) const {
+		v2f x = V2f(b.x) * i;
+		v2f y = V2f(b.y) * j;
+		return x + y;
+	}
+	FORCEINLINE m2 operator*(m2 b) const { return {*this * b.i, *this * b.j}; }
+	FORCEINLINE m2& operator*=(m2 b) { return *this = *this * b; }
+	static FORCEINLINE m2 identity() { 
+		return {
+			1, 0,
+			0, 1,
+		};
+	}
+	static FORCEINLINE m2 scaling(f32 x, f32 y) {
+		// clang-format off
+		return {
+			x, 0,
+			0, y,
+		};
+		// clang-format on
+	}
+	static FORCEINLINE m2 scaling(v2f v) { return scaling(v.x, v.y); }
+	static FORCEINLINE m2 scaling(f32 v) { return scaling(v, v); }
+	static FORCEINLINE m2 rotation(f32 a) {
+		f32 s, c;
+		sincos(a, s, c);
+		// clang-format off
+		return {
+			c, s,
+		   -s, c,
+		};
+		// clang-format on
+	}
+};
+
 union m3 {
 	struct {
 		v3f i, j, k;
@@ -1540,6 +1581,13 @@ union m3 {
 	}
 	inline m3 operator*(m3 b) const { return {*this * b.i, *this * b.j, *this * b.k}; }
 	inline m3& operator*=(m3 b) { return *this = *this * b; }
+	static inline m3 identity() { 
+		return {
+			1, 0, 0,
+			0, 1, 0,
+			0, 0, 1,
+		};
+	}
 	static inline m3 scaling(f32 x, f32 y, f32 z) {
 		// clang-format off
 		return {
@@ -3439,6 +3487,7 @@ inline v3f hsvToRgb(f32 h, f32 s, f32 v) {
 
 	return m;
 }
+FORCEINLINE v3f hsvToRgb(v3f hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
 template<umm ps>
 inline v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	h = frac(h);
@@ -3464,6 +3513,35 @@ inline v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	m = select(m5, m + V3fx<ps>(c, {}, x), m);
 	return m;
 }
+template<umm ps>
+FORCEINLINE v3fx<ps> hsvToRgb(v3fx<ps> hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
+
+inline v3f rgbToHsv(f32 r, f32 g, f32 b) {
+	f32 cMax = max(max(r, g), b);
+	f32 cMin = min(min(r, g), b);
+	f32 delta = cMax - cMin;
+	v3f result;
+
+    result.z = cMax;
+    if (delta == 0) {
+        result.x = result.y = 0;
+        return result;
+    }
+    if (cMax == 0) {
+        result.x = result.y = 0;
+        return result;
+    } else {
+        result.y = (delta / cMax);
+    }
+         if (r >= cMax) result.x =       (g - b) / delta;
+    else if (g >= cMax) result.x = 2.0 + (b - r) / delta;
+    else                result.x = 4.0 + (r - g) / delta;
+
+    result.x = frac(result.x * 1.0f / 6.0f);
+
+    return result;
+}
+FORCEINLINE v3f rgbToHsv(v3f rgb) { return rgbToHsv(rgb.x, rgb.y, rgb.z); }
 
 template<class T> inline static constexpr bool isVector = false;
 template<umm w> inline static constexpr bool isVector<v2fx<w>> = true;
