@@ -483,6 +483,9 @@ constexpr u32 precisionBit = 0;
 constexpr u32 radixMask = 0xF;
 constexpr u32 radixBit = 6;
 
+constexpr u32 asCharMask = 0x1;
+constexpr u32 asCharBit = 10;
+
 struct Flags;
 
 Flags precision(u32 value);
@@ -491,15 +494,17 @@ Flags radix(u32 value);
 struct Flags {
 	u32 value;
 	Flags(u32 value) : value(value) {}
-	Flags() : Flags(precision(5) | radix(10)) {}
+	Flags() : Flags(Fmt::precision(5) | Fmt::radix(10)) {}
 	Flags operator|(Flags b) { return value | b.value; }
 
-	u32 getPrecision() { return (value >> precisionBit) & precisionMask; }
-	u32 getRadix() { return ((value >> radixBit) & radixMask) + 1; }
+	u32 precision() { return (value >> precisionBit) & precisionMask; }
+	u32 radix() { return ((value >> radixBit) & radixMask) + 1; }
+	u32 asChar() { return (value >> asCharBit) & asCharMask; }
 };
 
 Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
 Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
+Flags asChar(bool value) { return value << asCharBit; }
 
 }
 
@@ -527,20 +532,19 @@ void toString(bool v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
-template <class Char, class CopyFn, char X = '?', class = EnableIf<isChar<Char>>>
-StringSpan toString(Char v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
-	return copyFn(&v, 1);
-}
-
-template <class Int, class CopyFn, class = EnableIf<isInteger<Int> && !isChar<Int>>>
+template <class Int, class CopyFn, class = EnableIf<isInteger<Int>>>
 StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
+	if (flags.asChar()) {
+		char c = (char)v;
+		return copyFn(&c, 1);
+	}
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
 	char charMap[] = "0123456789ABCDEF";
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
 
-	u32 radix = flags.getRadix();
+	u32 radix = flags.radix();
 
 	bool negative = false;
 	if constexpr (isSigned<Int>) {
@@ -603,7 +607,7 @@ StringSpan toString(void const *p, CopyFn &&copyFn, Fmt::Flags flags = Fmt::radi
 template <class CopyFn>
 StringSpan toString(f64 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 	char buf[64];
-	return copyFn(buf, (umm)sprintf(buf, "%.*f", flags.getPrecision(), v));
+	return copyFn(buf, (umm)sprintf(buf, "%.*f", flags.precision(), v));
 }
 template <class CopyFn>
 StringSpan toString(f32 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {

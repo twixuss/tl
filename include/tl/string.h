@@ -173,7 +173,8 @@ struct StringBuilder {
 					ASSERT(numStart != c, "invalid format: missing number after ':'");
 					auto parsed = parseDecimal(StringView(numStart, c));
 					ASSERT(parsed.has_value(), "invalid format: expected a number after ':'");
-					return parsed.value();
+					ASSERT(parsed.value() <= 0xFFFF, "number too big");
+					return (u32)parsed.value();
 				};
 				for (;;) { 
 					if (startsWith(c, "fmt")) {
