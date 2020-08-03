@@ -13,11 +13,21 @@ struct String : List<char, Allocator> {
 	String(Span<char const> span) : Base(span) {}
 	String(String const &that) = default;
 	String(String &&that) = default;
+	String(char const *str) : Base(str, strlen(str)) {}
 	String &operator=(String const &that) = default;
 	String &operator=(String &&that) = default;
 	String &set(Span<char const> span) { return Base::set(span), *this; }
-	String(char const *str) : Base(str, strlen(str)) {}
-
+	void append(StringView str) {
+		auto requiredSize = size() + str.size();
+		if (requiredSize > capacity()) {
+			_grow(requiredSize);
+		}
+		memcpy(_end, str.data(), str.size());
+		_end += str.size();
+	}
+	void append(char const *str) {
+		append(StringView(str, strlen(str)));
+	}
 	s32 compare(String const &b) const {
 		s32 result = 0;
         for (umm i = 0; i < min(size(), b.size()); ++i) {
@@ -36,26 +46,26 @@ struct String : List<char, Allocator> {
 	}
 };
 
-template <class Allocator, class ...Args>
-String<Allocator> toString(Args const &...args) {
+template <class Allocator, class T>
+String<Allocator> toString(T const &val, Fmt::Flags fmt = {}) {
 	String<Allocator> result;
-	toString(args..., [&](char const *src, umm length) {
+	toString([&](char const *src, umm length) {
 		result.resize(length);
 		memcpy(result.data(), src, length);
 		return StringSpan();
-	}); 
+	}, val, fmt); 
 	return result;
 }
 
-template <class Allocator, class ...Args>
-String<Allocator> toStringNT(Args const &...args) {
+template <class Allocator, class T>
+String<Allocator> toStringNT(T const &val, Fmt::Flags fmt = {}) {
 	String<Allocator> result;
-	toString(args..., [&](char const *src, umm length) {
+	toString([&](char const *src, umm length) {
 		result.resize(length + 1);
 		memcpy(result.data(), src, length);
 		result[length] = '\0';
 		return StringSpan();
-	}); 
+	}, val, fmt); 
 	return result;
 }
 

@@ -145,13 +145,19 @@ struct AllocListBase {
 		_end	  = _begin + oldSize;
 		_allocEnd = _begin + newCapacity;
 	}
+	void _grow(umm requiredSize) {
+		umm newCapacity = capacity();
+		if (newCapacity == 0)
+			newCapacity = 1;
+		while (newCapacity < requiredSize) {
+			newCapacity *= 2;
+		}
+		_reallocate(newCapacity);
+	}
 	template <class... Args>
 	void emplace_back(Args &&... args) {
 		if (remainingCapacity() == 0) {
-			umm newCapacity = capacity() * 2;
-			if (newCapacity == 0)
-				newCapacity = 1;
-			_reallocate(newCapacity);
+			_grow(size() + 1);
 		}
 		new ((void *)_end++) T(std::forward<Args>(args)...);
 	}

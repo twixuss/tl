@@ -508,32 +508,35 @@ Flags asChar(bool value) { return value << asCharBit; }
 
 }
 
-template <class CopyFn> 
-void toString(char *v, CopyFn &&copyFn, Fmt::Flags flags = {}) { 
-	copyFn(v, strlen(v));
+template <class CopyFn>
+inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, char *, umm>;
+
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
+StringSpan toString(CopyFn &&copyFn, char *v, Fmt::Flags flags = {}) { 
+	return copyFn(v, strlen(v));
 }
-template <class CopyFn> 
-void toString(char const *v, CopyFn &&copyFn, Fmt::Flags flags = {}) { 
-	copyFn(v, strlen(v));
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
+StringSpan toString(CopyFn &&copyFn, char const *v, Fmt::Flags flags = {}) { 
+	return copyFn(v, strlen(v));
 }
 
-template <class CopyFn> 
-void toString(StringSpan v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
-	copyFn(v.data(), v.size());
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
+StringSpan toString(CopyFn &&copyFn, StringSpan v, Fmt::Flags flags = {}) {
+	return copyFn(v.data(), v.size());
 }
-template <class CopyFn> 
-void toString(Span<char const> v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
-	copyFn(v.data(), v.size());
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
+StringSpan toString(CopyFn &&copyFn, Span<char const> v, Fmt::Flags flags = {}) {
+	return copyFn(v.data(), v.size());
 }
-template <class CopyFn>
-void toString(bool v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
-	copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
+StringSpan toString(CopyFn &&copyFn, bool v, Fmt::Flags flags = {}) {
+	return copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
 }
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
-template <class Int, class CopyFn, class = EnableIf<isInteger<Int>>>
-StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
+template <class CopyFn, class Int, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn>>>
+StringSpan toString(CopyFn &&copyFn, Int v, Fmt::Flags flags = {}) {
 	if (flags.asChar()) {
 		char c = (char)v;
 		return copyFn(&c, 1);
@@ -579,39 +582,33 @@ StringSpan toString(Int v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
 
 template <class Int, class = EnableIf<isInteger<Int> && !isChar<Int>>>
 StringSpan toString(Int v, char *outBuf, Fmt::Flags flags = {}) {
-	StringSpan result;
-	toString(v, [&](char const *src, umm length) { 
-		result = {outBuf, length};
+	return toString([&](char const *src, umm length) { 
 		memcpy(outBuf, src, length); 
-		return Span(outBuf, length);
-	}, flags);
-	return result;
+		return StringSpan(outBuf, length);
+	}, v, flags);
 }
 template <class Int, class = EnableIf<isInteger<Int>>>
 StringSpan toStringNT(Int v, char *outBuf, Fmt::Flags flags = {}) {
-	StringSpan result;
-	toString(v, [&](char const *src, umm length) { 
-		result = {outBuf, length};
+	return toString([&](char const *src, umm length) { 
 		memcpy(outBuf, src, length); 
 		outBuf[length] = '\0';
-		return Span(outBuf, length);
-	}, flags);
-	return result;
+		return StringSpan(outBuf, length);
+	}, v, flags);
 }
 
-template <class CopyFn>
-StringSpan toString(void const *p, CopyFn &&copyFn, Fmt::Flags flags = Fmt::radix(16)) {
-	return toString((umm)p, std::forward<CopyFn>(copyFn), flags);
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
+StringSpan toString(CopyFn &&copyFn, void const *p, Fmt::Flags flags = Fmt::radix(16)) {
+	return toString(std::forward<CopyFn>(copyFn), (umm)p, flags);
 }
 
-template <class CopyFn>
-StringSpan toString(f64 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
+StringSpan toString(CopyFn &&copyFn, f64 v, Fmt::Flags flags = {}) {
 	char buf[64];
 	return copyFn(buf, (umm)sprintf(buf, "%.*f", flags.precision(), v));
 }
-template <class CopyFn>
-StringSpan toString(f32 v, CopyFn &&copyFn, Fmt::Flags flags = {}) {
-	return toString((f64)v, copyFn, flags);
+template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
+StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
+	return toString(copyFn, (f64)v, flags);
 }
 
 } // namespace TL
