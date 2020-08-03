@@ -260,21 +260,21 @@ template<> inline constexpr s16 max() { return 0x7FFF; }
 template<> inline constexpr s32 max() { return 0x7FFFFFFF; }
 template<> inline constexpr s64 max() { return 0x7FFFFFFFFFFFFFFF; }
 
-template<> inline constexpr unsigned long min() { return (unsigned long)min<u32>(); }
-template<> inline constexpr unsigned long max() { return (unsigned long)max<u32>(); }
-template<> inline constexpr long min() { return (long)min<s32>(); }
-template<> inline constexpr long max() { return (long)max<s32>(); }
+template<> inline constexpr long unsigned min() { return (long unsigned)min<u32>(); }
+template<> inline constexpr long unsigned max() { return (long unsigned)max<u32>(); }
+template<> inline constexpr long   signed min() { return (long   signed)min<s32>(); }
+template<> inline constexpr long   signed max() { return (long   signed)max<s32>(); }
 // clang-format on
 #pragma warning(pop)
 
-inline constexpr bool isPowerOf2(u8  v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(u16 v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(u32 v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(u64 v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(s8  v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(s16 v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(s32 v) { return v && ((v & (v - 1)) == 0); }
-inline constexpr bool isPowerOf2(s64 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(u8  v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(u16 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(u32 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(u64 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(s8  v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(s16 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(s32 v) { return v && ((v & (v - 1)) == 0); }
+FORCEINLINE constexpr bool isPowerOf2(s64 v) { return v && ((v & (v - 1)) == 0); }
 
 template <class T, class U> FORCEINLINE constexpr auto min(T a, U b) { return a < b ? a : b; }
 template <class T, class U> FORCEINLINE constexpr auto max(T a, U b) { return a > b ? a : b; }
@@ -282,27 +282,27 @@ template <class T, class U, class... Rest> FORCEINLINE constexpr auto min(T a, U
 template <class T, class U, class... Rest> FORCEINLINE constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
 template <class T, class U, class V, class W> FORCEINLINE constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 
-inline constexpr u8  floor(u8  v, u8  s) { return v / s * s; }
-inline constexpr u16 floor(u16 v, u16 s) { return v / s * s; }
-inline constexpr u32 floor(u32 v, u32 s) { return v / s * s; }
-inline constexpr u64 floor(u64 v, u64 s) { return v / s * s; }
+FORCEINLINE constexpr u8  floor(u8  v, u8  s) { return (u8 )(v / s * s); }
+FORCEINLINE constexpr u16 floor(u16 v, u16 s) { return (u16)(v / s * s); }
+FORCEINLINE constexpr u32 floor(u32 v, u32 s) { return (u32)(v / s * s); }
+FORCEINLINE constexpr u64 floor(u64 v, u64 s) { return (u64)(v / s * s); }
 
-inline constexpr u8  ceil(u8  v, u8  s) { return v / s * s; }
-inline constexpr u16 ceil(u16 v, u16 s) { return v / s * s; }
-inline constexpr u32 ceil(u32 v, u32 s) { return v / s * s; }
-inline constexpr u64 ceil(u64 v, u64 s) { return v / s * s; }
+FORCEINLINE constexpr u8  ceil(u8  v, u8  s) { return floor((u8 )(v + s - 1), s); }
+FORCEINLINE constexpr u16 ceil(u16 v, u16 s) { return floor((u16)(v + s - 1), s); }
+FORCEINLINE constexpr u32 ceil(u32 v, u32 s) { return floor((u32)(v + s - 1), s); }
+FORCEINLINE constexpr u64 ceil(u64 v, u64 s) { return floor((u64)(v + s - 1), s); }
 
-inline constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
-inline void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
+FORCEINLINE constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
+FORCEINLINE constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
-inline constexpr u8  negate(u8  v) { return (u8 )((u8 )~v + 1); }
-inline constexpr u16 negate(u16 v) { return (u16)((u16)~v + 1); }
-inline constexpr u32 negate(u32 v) { return (u32)((u32)~v + 1); }
-inline constexpr u64 negate(u64 v) { return (u64)((u64)~v + 1); }
-inline constexpr s8  negate(s8  v) { return (s8 )((s8 )~v + 1); }
-inline constexpr s16 negate(s16 v) { return (s16)((s16)~v + 1); }
-inline constexpr s32 negate(s32 v) { return (s32)((s32)~v + 1); }
-inline constexpr s64 negate(s64 v) { return (s64)((s64)~v + 1); }
+FORCEINLINE constexpr u8  negate(u8  v) { return (u8 )(~v + 1); }
+FORCEINLINE constexpr u16 negate(u16 v) { return (u16)(~v + 1); }
+FORCEINLINE constexpr u32 negate(u32 v) { return (u32)(~v + 1); }
+FORCEINLINE constexpr u64 negate(u64 v) { return (u64)(~v + 1); }
+FORCEINLINE constexpr s8  negate(s8  v) { return -v; }
+FORCEINLINE constexpr s16 negate(s16 v) { return -v; }
+FORCEINLINE constexpr s32 negate(s32 v) { return -v; }
+FORCEINLINE constexpr s64 negate(s64 v) { return -v; }
 
 template <class... Callables>
 struct Combine : public Callables... {

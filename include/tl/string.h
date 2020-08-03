@@ -242,17 +242,17 @@ struct StringBuilder {
 					INVALID_CODE_PATH("'{fmt}' arg is not a string");
 			} else {
 				if (usePrecision) {
-					toString(arg, [&] (char const *src, umm length) {
+					toString([&] (char const *src, umm length) {
 						result = length;
 						builder.append(Span{src, length});
 						return StringSpan();
-					}, Fmt::precision(precision));
+					}, arg, Fmt::precision(precision));
 				} else {
-					toString(arg, [&] (char const *src, umm length) {
+					toString([&] (char const *src, umm length) {
 						result = length;
 						builder.append(Span{src, length});
 						return StringSpan();
-					});
+					}, arg);
 				}
 			}
 			charsAppended += result;
