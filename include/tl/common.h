@@ -406,6 +406,21 @@ struct Span {
 using StringView = Span<char const>;
 using StringSpan = Span<char>;
 
+struct Allocator {
+	void *(*allocate  )(void *state, umm size, umm align) = 0;
+	void *(*reallocate)(void *state, void *data, umm size, umm align) = 0;
+	void  (*deallocate)(void *state, void *data) = 0;
+	void *state = 0;
+};
+
+extern Allocator osAllocator;
+
+static void *  allocate(Allocator al, umm size, umm align = 0) { return al.allocate(al.state, size, align); }
+static void *reallocate(Allocator al, void *data, umm size, umm align = 0) { return al.reallocate(al.state, data, size, align); }
+static void  deallocate(Allocator al, void *data) { al.deallocate(al.state, data); }
+
+template <class T> static T *allocate(Allocator al, umm count = 1, umm align = 0) { return (T *)allocate(al, count * sizeof(T), max(alignof(T), align)); }
+
 template <class T, class Allocator>
 static T *allocate(umm count = 1, umm align = 0) {
 	return (T *)Allocator::allocate(count * sizeof(T), max(alignof(T), align));
@@ -610,5 +625,13 @@ template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
 StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
 	return toString(copyFn, (f64)v, flags);
 }
+
+#ifdef TL_IMPL
+Allocator osAllocator = {
+	.allocate   = [](void *, umm size, umm align)             -> void * { return _aligned_malloc(size, max(align, (umm)8)); },
+	.reallocate = [](void *, void *data, umm size, umm align) -> void * { return _aligned_realloc(data, size, align); },
+	.deallocate = [](void *, void *data)                                { _aligned_free(data); }
+};
+#endif
 
 } // namespace TL

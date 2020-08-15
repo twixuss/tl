@@ -27,13 +27,12 @@ struct StructuredBuffer {
 	ID3D11Buffer *buffer;
 	ID3D11ShaderResourceView *srv;
 	D3D11_USAGE usage;
-	void release();
+	u32 size;
 };
 
 struct RenderTarget {
 	ID3D11RenderTargetView *rtv;
 	ID3D11Texture2D *tex;
-	void release();
 };
 
 struct Texture {
@@ -41,14 +40,12 @@ struct Texture {
 	ID3D11Texture2D *tex;
 	u32 width;
 	u32 height;
-	void release();
 };
 
 struct RenderTexture {
 	ID3D11RenderTargetView *rtv;
 	ID3D11ShaderResourceView *srv;
 	ID3D11Texture2D *tex;
-	void release();
 };
 
 void defaultShaderHandler(HRESULT result, char const *messages) {
@@ -57,12 +54,15 @@ void defaultShaderHandler(HRESULT result, char const *messages) {
 
 struct State {
 	IDXGISwapChain *swapChain;
-	ID3D11Device *device;
+	ID3D11Device  *device;
+	ID3D11Device2 *device2;
+	ID3D11Device3 *device3;
 	ID3D11DeviceContext *immediateContext;
 	RenderTarget backBuffer;
 
+	void createBackBuffer();
 	StructuredBuffer createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage);
-	RenderTexture createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format);
+	RenderTexture createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, UINT cpuFlags = 0);
 	Texture createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data);
 	template <class Handler = decltype(defaultShaderHandler)>
 	ID3D11VertexShader *createVertexShader(char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
@@ -91,10 +91,11 @@ struct State {
 		return pixelShader;
 	}
 
-	void updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stride, void const *data);
+	void updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stride, void const *data, u32 firstElement = 0);
 
 	void clearRenderTarget(ID3D11RenderTargetView *renderTarget, f32 const rgba[4]);
-	void clearRenderTarget(RenderTarget &renderTarget, f32 const rgba[4]) { clearRenderTarget(renderTarget.rtv, rgba); }
+	void clearRenderTarget(RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
+	void clearRenderTarget(RenderTexture &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
 
 	void draw(u32 vertexCount, u32 offset = 0) { immediateContext->Draw(vertexCount, offset); }
 
@@ -113,7 +114,6 @@ struct State {
 	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv); }
 
 	u32 getMaxMsaaSampleCount(DXGI_FORMAT format);
-	RenderTarget getBackBuffer();
 };
 
 u32 getBitsPerPixel(DXGI_FORMAT format) {
@@ -260,28 +260,30 @@ u32 getBitsPerPixel(DXGI_FORMAT format) {
     }
 }
 
-void StructuredBuffer::release() {
-	TL_COM_RELEASE(buffer);
-	TL_COM_RELEASE(srv);
+void release(StructuredBuffer v) {
+	TL_COM_RELEASE(v.buffer);
+	TL_COM_RELEASE(v.srv);
 }
-void RenderTarget::release() {
-	TL_COM_RELEASE(rtv);
-	TL_COM_RELEASE(tex);
+void release(RenderTarget v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.tex);
 }
-void Texture::release() {
-	TL_COM_RELEASE(srv);
-	TL_COM_RELEASE(tex);
+void release(Texture v) {
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
 }
-void RenderTexture::release() {
-	TL_COM_RELEASE(rtv);
-	TL_COM_RELEASE(srv);
-	TL_COM_RELEASE(tex);
+void release(RenderTexture v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
 }
 
-State createState(ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
+State createState(IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
     State state = {};
+	state.swapChain = swapChain;
 	state.device = device;
 	state.immediateContext = immediateContext;
+	state.backBuffer.rtv = backBuffer;
 	return state;
 }
 State createState(HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0) {
@@ -296,10 +298,19 @@ State createState(HWND window, u32 width, u32 height, DXGI_FORMAT backBufferForm
 	d.SampleDesc.Count = sampleCount;
 	d.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	d.OutputWindow = window;
+	D3D_FEATURE_LEVEL maxFeature = D3D_FEATURE_LEVEL_11_1;
+	if (FAILED(D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, &maxFeature, 1, D3D11_SDK_VERSION, &d, &state.swapChain, &state.device, 0, &state.immediateContext))) {
+		TL_HRESULT_HANDLER(D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &d, &state.swapChain, &state.device, 0, &state.immediateContext));
+	}
 
-	TL_HRESULT_HANDLER(D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &d, &state.swapChain, &state.device, 0, &state.immediateContext));
+	if (FAILED(state.device->QueryInterface(&state.device2))) { 
+		state.device2 = 0;
+	}
+	if (FAILED(state.device->QueryInterface(&state.device3))) { 
+		state.device3 = 0;
+	}
 
-	state.backBuffer = state.getBackBuffer();
+	state.createBackBuffer();
 
 	return state;
 }
@@ -307,9 +318,10 @@ State createState(HWND window, u32 width, u32 height, DXGI_FORMAT backBufferForm
 StructuredBuffer State::createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage) {
 	StructuredBuffer result;
 	result.usage = usage;
+	result.size = count * stride;
 	{
 		D3D11_BUFFER_DESC d = {};
-		d.ByteWidth = count * stride;
+		d.ByteWidth = result.size;
 		d.Usage = usage;
 		d.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 		if (usage == D3D11_USAGE_DYNAMIC)
@@ -334,7 +346,7 @@ StructuredBuffer State::createStructuredBuffer(u32 count, u32 stride, void const
 	}
 	return result;
 }
-RenderTexture State::createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format) {
+RenderTexture State::createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, UINT cpuFlags) {
 	RenderTexture result;
 	{
 		D3D11_TEXTURE2D_DESC d = {};
@@ -345,6 +357,7 @@ RenderTexture State::createRenderTexture(u32 width, u32 height, u32 sampleCount,
 		d.Height = height;
 		d.MipLevels = 1;
 		d.SampleDesc = {sampleCount, 0};
+		d.CPUAccessFlags = cpuFlags;
 		TL_HRESULT_HANDLER(device->CreateTexture2D(&d, 0, &result.tex));
 	}
 	{
@@ -394,14 +407,22 @@ Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void con
 	return result;
 }
 
-void State::updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stride, void const *data) {
+void State::updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stride, void const *data, u32 firstElement) {
+	u32 size = count * stride;
+	u32 offset = firstElement * stride;
+	ASSERT(size + offset <= buffer.size);
 	if (buffer.usage == D3D11_USAGE_DYNAMIC) {
 		D3D11_MAPPED_SUBRESOURCE mapped;
 		TL_HRESULT_HANDLER(immediateContext->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
-		memcpy(mapped.pData, data, count * stride);
+		memcpy(mapped.pData, data, size);
 		immediateContext->Unmap(buffer.buffer, 0);
 	} else if (buffer.usage == D3D11_USAGE_DEFAULT) {
-		immediateContext->UpdateSubresource(buffer.buffer, 0, 0, data, 0, 0);
+		D3D11_BOX box = {};
+		box.left = offset;
+		box.right = box.left + size;
+		box.back = 1;
+		box.bottom = 1;
+		immediateContext->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0);
 	}
 }
 
@@ -433,10 +454,8 @@ u32 State::getMaxMsaaSampleCount(DXGI_FORMAT format) {
 	}
 	return sampleCount;
 }
-RenderTarget State::getBackBuffer() {
-	RenderTarget result = {};
-    TL_HRESULT_HANDLER(swapChain->GetBuffer(0, IID_PPV_ARGS(&result.tex)));
-    TL_HRESULT_HANDLER(device->CreateRenderTargetView(result.tex, 0, &result.rtv));
-	return result;
+void State::createBackBuffer() {
+    TL_HRESULT_HANDLER(swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer.tex)));
+    TL_HRESULT_HANDLER(device->CreateRenderTargetView(backBuffer.tex, 0, &backBuffer.rtv));
 }
 }}
