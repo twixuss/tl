@@ -310,21 +310,21 @@ struct List : ForwardListBase<T, Allocator> {
 				newCapacity = 1;
 			reallocate(newCapacity);
 		}
-		new (_end) T(std::move(_end[-1]));
-		for (T *dest = _end - 1; dest > _begin; --dest) {
+		new (this->_end) T(std::move(this->_end[-1]));
+		for (T *dest = this->_end - 1; dest > this->_begin; --dest) {
 			*dest = std::move(dest[-1]);
 		}
-		++_end;
-		new (_begin) T(std::forward<Args>(args)...);
+		++this->_end;
+		new (this->_begin) T(std::forward<Args>(args)...);
 	}
 	void erase(T *val) {
-		ASSERT(_begin <= val && val < _end, "value is not in container");
+		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
 		val->~T();
-		--_end;
-		for (T *dest = val; dest != _end; ++dest) {
+		--this->_end;
+		for (T *dest = val; dest != this->_end; ++dest) {
 			*dest = std::move(dest[1]);
 		}
-		_end->~T();
+		this->_end->~T();
 	}
 	void erase(T &val) { erase(std::addressof(val)); }
 };
@@ -347,14 +347,14 @@ struct UnorderedList : ForwardListBase<T, Allocator> {
 				newCapacity = 1;
 			reallocate(newCapacity);
 		}
-		new (_end) T(std::move(*_begin));
-		++_end;
-		new (_begin) T(std::forward<Args>(args)...);
+		new (this->_end) T(std::move(*this->_begin));
+		++this->_end;
+		new (this->_begin) T(std::forward<Args>(args)...);
 	}
 	void erase(T *val) {
-		ASSERT(_begin <= val && val < _end, "value is not in container");
+		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
 		val->~T();
-		new (val) T(std::move(*(_end-- - 1)));
+		new (val) T(std::move(*(this->_end-- - 1)));
 	}
 	void erase(T &val) { erase(&val); }
 };

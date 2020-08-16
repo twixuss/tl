@@ -59,8 +59,8 @@
 
 #elif COMPILER_GCC
 
-#define FORCEINLINE	  __attribute__((always_inline))
-#define DEBUG_BREAK() ::__builtin_trap()
+#define FORCEINLINE	__attribute__((always_inline))
+#define DEBUG_BREAK ::__builtin_trap()
 #if defined _X86_
 #undef ARCH_X86
 #define ARCH_X86 1
@@ -222,12 +222,12 @@ template <bool v, class T = void> using EnableIf = typename EnableIfT<v, T>::Typ
 
 template <class T, class ...Args>
 T *construct(T *val, Args &&...args) {
-	return new(val) T(forward<Args>(args)...);
+	return new(val) T(std::forward<Args>(args)...);
 }
 
 template <class T, class ...Args>
 T &construct(T &val, Args &&...args) {
-	return *new(std::addressof(val)) T(forward<Args>(args)...);
+	return *new(std::addressof(val)) T(std::forward<Args>(args)...);
 }
 
 //template <class T>
@@ -315,11 +315,22 @@ inline constexpr auto toInt(Enum e) {
 	return static_cast<std::underlying_type_t<Enum>>(e);
 }
 
+template <class T, umm size>
+constexpr umm countof(T const (&arr)[size]) { return size; }
+
+void copyMemory(void *_dst, void const *_src, umm size) {
+	u8 *dst = (u8 *)_dst;
+	u8 const *src = (u8 const *)_src;
+	while (size--) {
+		*dst++ = *src++;
+	}
+}
+
 template <class T>
 inline void populate(void *_dst, T const &src, umm count) {
 	T *dst = (T *)_dst;
 	while (count--) {
-		memcpy(dst++, std::addressof(src), sizeof(T));
+		copyMemory(dst++, std::addressof(src), sizeof(T));
 	}
 }
 
@@ -408,15 +419,21 @@ using StringSpan = Span<char>;
 
 struct Allocator {
 	void *(*allocate  )(void *state, umm size, umm align) = 0;
-	void *(*reallocate)(void *state, void *data, umm size, umm align) = 0;
 	void  (*deallocate)(void *state, void *data) = 0;
 	void *state = 0;
 };
 
+Allocator makeAllocator(void *state, void *(*allocate)(void *state, umm size, umm align), void  (*deallocate)(void *state, void *data)) {
+	Allocator result;
+	result.allocate = allocate;
+	result.deallocate = deallocate;
+	result.state = state;
+	return result;
+}
+
 extern Allocator osAllocator;
 
 static void *  allocate(Allocator al, umm size, umm align = 0) { return al.allocate(al.state, size, align); }
-static void *reallocate(Allocator al, void *data, umm size, umm align = 0) { return al.reallocate(al.state, data, size, align); }
 static void  deallocate(Allocator al, void *data) { al.deallocate(al.state, data); }
 
 template <class T> static T *allocate(Allocator al, umm count = 1, umm align = 0) { return (T *)allocate(al, count * sizeof(T), max(alignof(T), align)); }
@@ -425,9 +442,19 @@ template <class T, class Allocator>
 static T *allocate(umm count = 1, umm align = 0) {
 	return (T *)Allocator::allocate(count * sizeof(T), max(alignof(T), align));
 }
+
 struct OsAllocator {
+#if OS_WINDOWS
 	static void *allocate(umm size, umm align = 0) { return _aligned_malloc(size, max(align, (umm)8)); }
 	static void deallocate(void *data) { _aligned_free(data); }
+#else
+	static void *allocate(umm size, umm align = 0) {
+		void *result = 0;
+		posix_memalign(&result, max(align, (umm)8), size);
+		return result;
+	}
+	static void deallocate(void *data) { free(data); }
+#endif
 };
 
 bool equals(StringView a, StringView b) {
@@ -463,26 +490,26 @@ inline constexpr bool startsWith(char const *str, char const *subStr) {
 	}
 	return true;
 }
-inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr) {
-	while (*subStr && strLength--) {
+inline constexpr bool startsWith(char const *str, umm lengthgth, char const *subStr) {
+	while (*subStr && lengthgth--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
 	}
 	return !*subStr;
 }
-inline constexpr bool startsWith(char const *str, char const *subStr, umm subStrLength) {
-	while (subStrLength--) {
+inline constexpr bool startsWith(char const *str, char const *subStr, umm sublengthgth) {
+	while (sublengthgth--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
 	}
 	return true;
 }
-inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr, umm subStrLength) {
-	if (strLength < subStrLength)
+inline constexpr bool startsWith(char const *str, umm lengthgth, char const *subStr, umm sublengthgth) {
+	if (lengthgth < sublengthgth)
 		return false;
-	while (strLength-- && subStrLength--) {
+	while (lengthgth-- && sublengthgth--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
@@ -526,13 +553,21 @@ Flags asChar(bool value) { return (u32)value << asCharBit; }
 template <class CopyFn>
 inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, char *, umm>;
 
+umm length(char const *str) {
+	umm result = 0;
+	while (*str++) {
+		++result;
+	}
+	return result;	
+}
+
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
 StringSpan toString(CopyFn &&copyFn, char *v, Fmt::Flags flags = {}) { 
-	return copyFn(v, strlen(v));
+	return copyFn(v, length(v));
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
 StringSpan toString(CopyFn &&copyFn, char const *v, Fmt::Flags flags = {}) { 
-	return copyFn(v, strlen(v));
+	return copyFn(v, length(v));
 }
 
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
@@ -598,14 +633,14 @@ StringSpan toString(CopyFn &&copyFn, Int v, Fmt::Flags flags = {}) {
 template <class Int, class = EnableIf<isInteger<Int> && !isChar<Int>>>
 StringSpan toString(Int v, char *outBuf, Fmt::Flags flags = {}) {
 	return toString([&](char const *src, umm length) { 
-		memcpy(outBuf, src, length); 
+		copyMemory(outBuf, src, length); 
 		return StringSpan(outBuf, length);
 	}, v, flags);
 }
 template <class Int, class = EnableIf<isInteger<Int>>>
 StringSpan toStringNT(Int v, char *outBuf, Fmt::Flags flags = {}) {
 	return toString([&](char const *src, umm length) { 
-		memcpy(outBuf, src, length); 
+		copyMemory(outBuf, src, length); 
 		outBuf[length] = '\0';
 		return StringSpan(outBuf, length);
 	}, v, flags);
@@ -627,11 +662,10 @@ StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
 }
 
 #ifdef TL_IMPL
-Allocator osAllocator = {
-	.allocate   = [](void *, umm size, umm align)             -> void * { return _aligned_malloc(size, max(align, (umm)8)); },
-	.reallocate = [](void *, void *data, umm size, umm align) -> void * { return _aligned_realloc(data, size, align); },
-	.deallocate = [](void *, void *data)                                { _aligned_free(data); }
-};
+Allocator osAllocator = makeAllocator(0,
+	[](void *, umm size, umm align)             -> void * { return OsAllocator::allocate(size, align); },
+	[](void *, void *data)                                { return OsAllocator::deallocate(data); }
+);
 #endif
 
 } // namespace TL

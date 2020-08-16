@@ -4,6 +4,9 @@
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
+#include <intrin.h>
+#else
+#include <immintrin.h>
 #endif
 #include <float.h>
 #include <math.h>
@@ -98,6 +101,39 @@ namespace TL {
 #define _mm256_srav_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) >> _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) >> _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) >> _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) >> _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) >> _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) >> _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) >> _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) >> _mm256_extract_epi32(b, 7))
 #define _mm256_srlv_epi32(a, b)  _mm256_setr_epi32((u32)_mm256_extract_epi32(a, 0) >> (u32)_mm256_extract_epi32(b, 0), (u32)_mm256_extract_epi32(a, 1) >> (u32)_mm256_extract_epi32(b, 1), (u32)_mm256_extract_epi32(a, 2) >> (u32)_mm256_extract_epi32(b, 2), (u32)_mm256_extract_epi32(a, 3) >> (u32)_mm256_extract_epi32(b, 3), (u32)_mm256_extract_epi32(a, 4) >> (u32)_mm256_extract_epi32(b, 4), (u32)_mm256_extract_epi32(a, 5) >> (u32)_mm256_extract_epi32(b, 5), (u32)_mm256_extract_epi32(a, 6) >> (u32)_mm256_extract_epi32(b, 6), (u32)_mm256_extract_epi32(a, 7) >> (u32)_mm256_extract_epi32(b, 7))
 #endif
+
+
+#if COMPILER_GCC
+#define _mm_div_epi32(a,b)                             \
+_mm_setr_epi32(                                        \
+	_mm_extract_epi32(a, 0) / _mm_extract_epi32(b, 0), \
+	_mm_extract_epi32(a, 1) / _mm_extract_epi32(b, 1), \
+	_mm_extract_epi32(a, 2) / _mm_extract_epi32(b, 2), \
+	_mm_extract_epi32(a, 3) / _mm_extract_epi32(b, 3)  \
+)
+#define _mm_rem_epi32(a,b)                             \
+_mm_setr_epi32(                                        \
+	_mm_extract_epi32(a, 0) % _mm_extract_epi32(b, 0), \
+	_mm_extract_epi32(a, 1) % _mm_extract_epi32(b, 1), \
+	_mm_extract_epi32(a, 2) % _mm_extract_epi32(b, 2), \
+	_mm_extract_epi32(a, 3) % _mm_extract_epi32(b, 3)  \
+)
+#define _mm_div_epu32(a,b)                                       \
+_mm_setr_epi32(                                                  \
+	(u32)_mm_extract_epi32(a, 0) / (u32)_mm_extract_epi32(b, 0), \
+	(u32)_mm_extract_epi32(a, 1) / (u32)_mm_extract_epi32(b, 1), \
+	(u32)_mm_extract_epi32(a, 2) / (u32)_mm_extract_epi32(b, 2), \
+	(u32)_mm_extract_epi32(a, 3) / (u32)_mm_extract_epi32(b, 3)  \
+)
+#define _mm_rem_epu32(a,b)                                       \
+_mm_setr_epi32(                                                  \
+	(u32)_mm_extract_epi32(a, 0) % (u32)_mm_extract_epi32(b, 0), \
+	(u32)_mm_extract_epi32(a, 1) % (u32)_mm_extract_epi32(b, 1), \
+	(u32)_mm_extract_epi32(a, 2) % (u32)_mm_extract_epi32(b, 2), \
+	(u32)_mm_extract_epi32(a, 3) % (u32)_mm_extract_epi32(b, 3)  \
+)
+#endif
+
 
 #define MM256_PERM128(a, b) ((a) | ((b) << 4))
 #define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
@@ -1087,8 +1123,8 @@ union f64x<4> {
 	FORCEINLINE Vector operator>>(Vector b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
 	FORCEINLINE Vector operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
 	FORCEINLINE Vector operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
-	FORCEINLINE friend Vector operator<<(Scalar a, Vector b) { RETURN_2(a << b.lo, a << b.hi); } \
-	FORCEINLINE friend Vector operator>>(Scalar a, Vector b) { RETURN_2(a >> b.lo, a >> b.hi); } \
+	FORCEINLINE friend Vector operator<<(Scalar a, Vector b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
+	FORCEINLINE friend Vector operator>>(Scalar a, Vector b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
 	FORCEINLINE Mask operator> (Vector b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
 	FORCEINLINE Mask operator< (Vector b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
 	FORCEINLINE Mask operator>=(Vector b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
@@ -1211,8 +1247,8 @@ union s32x<4> {
 	FORCEINLINE	       b32x4  operator!=(s32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
 	FORCEINLINE	       s32x4  operator<<(s32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
 	FORCEINLINE	       s32x4  operator>>(s32   b)  const { RETURN_M(_mm_srai_epi32(m.pi, b)); }
-	FORCEINLINE	friend s32x4  operator<<(s32 a, s32x4 b) { RETURN_M(_mm_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend s32x4  operator>>(s32 a, s32x4 b) { RETURN_M(_mm_sraiv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend s32x4  operator<<(s32 a, s32x4 b) { RETURN_MT(s32x4, _mm_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend s32x4  operator>>(s32 a, s32x4 b) { RETURN_MT(s32x4, _mm_sraiv_epi32(a, b.m.pi)); }
 	
 	OPERATORS_INT(S32x4);
 
@@ -1307,8 +1343,8 @@ union u32x<4> {
 	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
 	FORCEINLINE	       u32x4  operator<<(u32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
 	FORCEINLINE	       u32x4  operator>>(u32   b)  const { RETURN_M(_mm_srli_epi32(m.pi, b)); }
-	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_M(_mm_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_M(_mm_srliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_MT(u32x4, _mm_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_MT(u32x4, _mm_srliv_epi32(a, b.m.pi)); }
 
 	OPERATORS_INT(U32x4);
 
@@ -3432,13 +3468,55 @@ FORCEINLINE f32 reciprocal(f32 v) { return 1.0f / v; }
 
 FORCEINLINE f32 sin(f32 v) { return ::sinf(v); }
 FORCEINLINE f32 cos(f32 v) { return ::cosf(v); }
+
 #if COMPILER_GCC
-FORCEINLINE v2f sin(v2f v) { return V2f(sinf(v.x), sinf(v.y)); }
-FORCEINLINE v3f sin(v3f v) { return V3f(sinf(v.x), sinf(v.y), sinf(v.z)); }
-FORCEINLINE v4f sin(v4f v) { return V4f(sinf(v.x), sinf(v.y), sinf(v.z), sinf(v.w)); }
-FORCEINLINE v2f cos(v2f v) { return V2f(cosf(v.x), cosf(v.y)); }
-FORCEINLINE v3f cos(v3f v) { return V3f(cosf(v.x), cosf(v.y), cosf(v.z)); }
-FORCEINLINE v4f cos(v4f v) { return V4f(cosf(v.x), cosf(v.y), cosf(v.z), cosf(v.w)); }
+FORCEINLINE f32x4 sin(f32x4 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3])}; }
+FORCEINLINE f32x4 cos(f32x4 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3])}; }
+FORCEINLINE f32x8 sin(f32x8 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3]),sin(v.s[4]),sin(v.s[5]),sin(v.s[6]),sin(v.s[7])}; }
+FORCEINLINE f32x8 cos(f32x8 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3]),cos(v.s[4]),cos(v.s[5]),cos(v.s[6]),cos(v.s[7])}; }
+#else
+FORCEINLINE f32x4 sin(f32x4 v) { RETURN_MT(f32x4, _mm_sin_ps(v.m.ps)); }
+FORCEINLINE f32x4 cos(f32x4 v) { RETURN_MT(f32x4, _mm_cos_ps(v.m.ps)); }
+#if ARCH_AVX
+FORCEINLINE f32x8 sin(f32x8 v) { RETURN_MT(f32x8, _mm256_sin_ps(v.m.ps)); }
+FORCEINLINE f32x8 cos(f32x8 v) { RETURN_MT(f32x8, _mm256_cos_ps(v.m.ps)); }
+#else
+FORCEINLINE f32x8 sin(f32x8 v) { RETURN_T2(f32x8, sin(v.lo), sin(v.hi)); }
+FORCEINLINE f32x8 cos(f32x8 v) { RETURN_T2(f32x8, cos(v.lo), cos(v.hi)); }
+#endif
+#endif
+
+FORCEINLINE v4f sin(v4f v) { return V4f(sin(v.m)); }
+FORCEINLINE v2f sin(v2f v) { return sin(V4f(v, 0, 0)).xy; }
+FORCEINLINE v3f sin(v3f v) { return sin(V4f(v, 0)).xyz; }
+
+FORCEINLINE v4f cos(v4f v) { return V4f(cos(v.m)); }
+FORCEINLINE v2f cos(v2f v) { return cos(V4f(v, 0, 0)).xy; }
+FORCEINLINE v3f cos(v3f v) { return cos(V4f(v, 0)).xyz; }
+
+FORCEINLINE void sincos(f32 v, f32& sinOut, f32& cosOut) {
+	sinOut = sin(v);
+	cosOut = cos(v);
+}
+
+#if COMPILER_GCC
+FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) {
+	sincos(v.s[0], sinOut.s[0], cosOut.s[0]);
+	sincos(v.s[1], sinOut.s[1], cosOut.s[1]);
+	sincos(v.s[2], sinOut.s[2], cosOut.s[2]);
+	sincos(v.s[3], sinOut.s[3], cosOut.s[3]);
+}
+#else
+FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m.ps = _mm_sincos_ps(&cosOut.m.ps, v.m.ps); }
+#endif
+
+#if ARCH_AVX && !COMPILER_GCC
+FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sinOut.m.ps = _mm256_sincos_ps(&cosOut.m.ps, v.m.ps); }
+#else
+FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sincos(v.lo, sinOut.lo, cosOut.lo); sincos(v.hi, sinOut.hi, cosOut.hi); }
+#endif
+
+#if COMPILER_GCC
 FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
 	sinOut = sin(v);
 	cosOut = cos(v);
@@ -3452,18 +3530,39 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) {
 	cosOut = cos(v);
 }
 #else
-FORCEINLINE f32x4 sin(f32x4 v) { RETURN_MT(f32x4, _mm_sin_ps(v.m.ps)); }
-FORCEINLINE f32x4 cos(f32x4 v) { RETURN_MT(f32x4, _mm_cos_ps(v.m.ps)); }
-#if ARCH_AVX
-FORCEINLINE f32x8 sin(f32x8 v) { RETURN_MT(f32x8, _mm256_sin_ps(v.m.ps)); }
-FORCEINLINE f32x8 cos(f32x8 v) { RETURN_MT(f32x8, _mm256_cos_ps(v.m.ps)); }
-#else
-FORCEINLINE f32x8 sin(f32x8 v) { RETURN_T2(f32x8, sin(v.lo), sin(v.hi)); }
-FORCEINLINE f32x8 cos(f32x8 v) { RETURN_T2(f32x8, cos(v.lo), cos(v.hi)); }
+
+FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
+	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, 0, 0));
+	memcpy(&sinOut, &s, sizeof(sinOut));
+	memcpy(&cosOut, &c, sizeof(cosOut));
+}
+FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
+	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, v.z, 0));
+	memcpy(&sinOut, &s, sizeof(sinOut));
+	memcpy(&cosOut, &c, sizeof(cosOut));
+}
+FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
 #endif
-FORCEINLINE v4f sin(v4f v) { return V4f(sin(v.m)); }
-FORCEINLINE v2f sin(v2f v) { return sin(V4f(v, 0, 0)).xy; }
-FORCEINLINE v3f sin(v3f v) { return sin(V4f(v, 0)).xyz; }
+
+FORCEINLINE v2f sincos(f32 v) { return {cos(v), sin(v)}; }
+FORCEINLINE v2fx4 sincos(f32x4 v) { v2fx4 result; sincos(v, result.y, result.x); return result; }
+FORCEINLINE v2fx8 sincos(f32x8 v) { v2fx8 result; sincos(v, result.y, result.x); return result; }
+
+#define SINCOS(v2f, F32x4)				 \
+FORCEINLINE void sincos(f32 v, v2f& result) { \
+	result.y = F32x4(sin(v));			 \
+	result.x = F32x4(cos(v));			 \
+}										   
+SINCOS(v2fx4, F32x4) SINCOS(v2fx8, F32x8)
+#undef SINCOS
+
+#define SINCOS(v2fx4, f32x4)				 \
+FORCEINLINE void sincos(f32x4 v, v2fx4& result) { \
+	result.y = sin(v);					     \
+	result.x = cos(v);					     \
+}
+SINCOS(v2f, f32) SINCOS(v2fx4, f32x4) SINCOS(v2fx8, f32x8)
+#undef SINCOS
 
 #define SIN_BHASKARA(f32x4) 															\
 FORCEINLINE f32x4 sinBhaskara(f32x4 v) {												\
@@ -3489,64 +3588,29 @@ SINCOS_BHASKARA(v2fx4, V2fx4, f32x4)
 SINCOS_BHASKARA(v2fx8, V2fx8, f32x8)
 #undef SINCOS_BHASKARA
 
-FORCEINLINE v4f cos(v4f v) { return V4f(cos(v.m)); }
-FORCEINLINE v2f cos(v2f v) { return cos(V4f(v, 0, 0)).xy; }
-FORCEINLINE v3f cos(v3f v) { return cos(V4f(v, 0)).xyz; }
-
-FORCEINLINE void sincos(f32 v, f32& sinOut, f32& cosOut) {
-	sinOut = sin(v);
-	cosOut = cos(v);
-}
-#define SINCOS(v2f, F32x4)				 \
-FORCEINLINE void sincos(f32 v, v2f& result) { \
-	result.y = F32x4(sin(v));			 \
-	result.x = F32x4(cos(v));			 \
-}										   
-SINCOS(v2fx4, F32x4) SINCOS(v2fx8, F32x8)
-#undef SINCOS
-
-#define SINCOS(v2fx4, f32x4)				 \
-FORCEINLINE void sincos(f32x4 v, v2fx4& result) { \
-	result.y = sin(v);					     \
-	result.x = cos(v);					     \
-}
-SINCOS(v2f, f32) SINCOS(v2fx4, f32x4) SINCOS(v2fx8, f32x8)
-#undef SINCOS
-
-FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
-	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, 0, 0));
-	memcpy(&sinOut, &s, sizeof(sinOut));
-	memcpy(&cosOut, &c, sizeof(cosOut));
-}
-FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
-	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, v.z, 0));
-	memcpy(&sinOut, &s, sizeof(sinOut));
-	memcpy(&cosOut, &c, sizeof(cosOut));
-}
-FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m.ps = _mm_sincos_ps(&cosOut.m.ps, v.m.ps); }
-#if ARCH_AVX
-FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sinOut.m.ps = _mm256_sincos_ps(&cosOut.m.ps, v.m.ps); }
-#else
-FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sincos(v.lo, sinOut.lo, cosOut.lo); sincos(v.hi, sinOut.hi, cosOut.hi); }
-#endif
-FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
-#endif
-
-FORCEINLINE v2f sincos(f32 v) { return {cos(v), sin(v)}; }
-FORCEINLINE v2fx4 sincos(f32x4 v) { v2fx4 result; sincos(v, result.y, result.x); return result; }
-FORCEINLINE v2fx8 sincos(f32x8 v) { v2fx8 result; sincos(v, result.y, result.x); return result; }
-
 FORCEINLINE f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
 FORCEINLINE f32 atan2(v2f v) { return atan2(v.y, v.x); }
 
+#if COMPILER_GCC
+FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) {
+	return {
+		atan2(y.s[0], x.s[0]),
+		atan2(y.s[1], x.s[1]),
+		atan2(y.s[2], x.s[2]),
+		atan2(y.s[3], x.s[3])
+	};
+}
+#else
 FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) { RETURN_MT(f32x4, _mm_atan2_ps(y.m.ps, x.m.ps)); }
-FORCEINLINE f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
+#endif
 
-#if ARCH_AVX
+#if ARCH_AVX && !COMPILER_GCC
 FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_MT(f32x8, _mm256_atan2_ps(y.m.ps, x.m.ps)); }
 #else
 FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_T2(f32x8, atan2(y.lo, x.lo), atan2(y.hi, x.hi)); }
 #endif
+
+FORCEINLINE f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
 FORCEINLINE f32x8 atan2(v2fx8 v) { return atan2(v.y, v.x); }
 
 #define ATAN2_APPROX(f32, v2f)										 \
@@ -3564,6 +3628,12 @@ ATAN2_APPROX(f32x4, v2fx4)
 ATAN2_APPROX(f32x8, v2fx8)
 #undef ATAN2_APPROX
 
+#if COMPILER_GCC
+FORCEINLINE u32 findLowestOneBit(u32 val) { val ? __builtin_ffs(val) : ~0; }
+FORCEINLINE u32 findLowestOneBit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
+FORCEINLINE u32 findHighestOneBit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
+FORCEINLINE u32 findHighestOneBit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
+#else
 FORCEINLINE u32 findLowestOneBit(u32 val) {
 	unsigned long result;
 	return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0;
@@ -3580,15 +3650,13 @@ FORCEINLINE u32 findHighestOneBit(u64 val) {
 	unsigned long result;
 	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
 }
-FORCEINLINE u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
-FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
-#if ARCH_AVX2
-FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
-FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
-#else
-FORCEINLINE u32 countBits(u64 v) { return countBits((u32)v) + countBits((u32)(v >> 32)); }
-FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
 #endif
+
+FORCEINLINE u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
+FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
+FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
+FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
+
 FORCEINLINE u32 fillBits(u32 v) {
 	u32 r = 0;
 	while (v--) {
@@ -3742,21 +3810,23 @@ inline static constexpr v2f _randMul2{pi * 10, sqrt2 * 20};
 inline static constexpr v3f _randMul3{pi * 10, sqrt2 * 20, sqrt3 * 15};
 inline static constexpr v4f _randMul4{pi * 10, sqrt2 * 20, sqrt3 * 15, sqrt5 * 10};
 
-FORCEINLINE u32 rotateLeft(u32 v, s32 shift = 1) { return _rotl(v, shift); }
-FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return _rotr(v, shift); }
 #if COMPILER_GCC
 FORCEINLINE u8  rotateLeft (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
 FORCEINLINE u16 rotateLeft (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
+FORCEINLINE u32 rotateLeft (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
 FORCEINLINE u64 rotateLeft (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
 FORCEINLINE u8  rotateRight(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
 FORCEINLINE u16 rotateRight(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
+FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
 FORCEINLINE u64 rotateRight(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
 #else
 FORCEINLINE u8  rotateLeft (u8  v, s32 shift = 1) { return _rotl8(v, (u8)shift); }
 FORCEINLINE u16 rotateLeft (u16 v, s32 shift = 1) { return _rotl16(v, (u8)shift); }
+FORCEINLINE u32 rotateLeft (u32 v, s32 shift = 1) { return _rotl(v, shift); }
 FORCEINLINE u64 rotateLeft (u64 v, s32 shift = 1) { return _rotl64(v, shift); }
 FORCEINLINE u8  rotateRight(u8  v, s32 shift = 1) { return _rotr8(v, (u8)shift); }
 FORCEINLINE u16 rotateRight(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift); }
+FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return _rotr(v, shift); }
 FORCEINLINE u64 rotateRight(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
 #endif
 
