@@ -33,6 +33,7 @@ namespace TL {
 #define _mm_blendv_epi32(a, b, m) _mm_castps_pi(_mm_blendv_ps(_mm_castpi_ps(a), _mm_castpi_ps(b), _mm_castpi_ps(m)))
 #define _mm_slli_pi(a, b) _mm_slli_si128(a, b)
 #define _mm_setone_ps() _mm_castpi_ps(_mm_set1_epi8(0xFF))
+#define _mm_setone_pd() _mm_castpi_pd(_mm_set1_epi8(0xFF))
 #define _mm_not_ps(x) _mm_xor_ps(x, _mm_setone_ps())
 #define _mm_not_epi32_ps(x) _mm_not_ps(_mm_castpi_ps(x))
 #define _mm_not_epi32(x) _mm_castps_pi(_mm_not_epi32_ps(x))
@@ -41,11 +42,8 @@ namespace TL {
 #define _mm_cmpge_epi32(a, b) _mm_not_epi32(_mm_cmpgt_epi32(b, a))
 #define _mm_cmpne_epi32(a, b) _mm_not_epi32(_mm_cmpeq_epi32(b, a))
 #define _mm_cmpgt_epu32(a, b) _mm_cmpgt_epi32(_mm_xor_pi(a, _mm_set1_epi32(0x80000000)), _mm_xor_pi(b, _mm_set1_epi32(0x80000000)))
-#define _mm_sllv_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) << _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) << _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) << _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) << _mm_extract_epi32(b, 3))
-#define _mm_srlv_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) >> _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) >> _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) >> _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) >> _mm_extract_epi32(b, 3))
-#define _mm_srlv_epi32(a, b)  _mm_setr_epi32((u32)_mm_extract_epi32(a, 0) >> (u32)_mm_extract_epi32(b, 0), (u32)_mm_extract_epi32(a, 1) >> (u32)_mm_extract_epi32(b, 1), (u32)_mm_extract_epi32(a, 2) >> (u32)_mm_extract_epi32(b, 2), (u32)_mm_extract_epi32(a, 3) >> (u32)_mm_extract_epi32(b, 3))
 #define _mm_slliv_epi32(a, b) _mm_setr_epi32(a << _mm_extract_epi32(b, 0), a << _mm_extract_epi32(b, 1), a << _mm_extract_epi32(b, 2), a << _mm_extract_epi32(b, 3))
-#define _mm_srliv_epi32(a, b) _mm_setr_epi32(a >> _mm_extract_epi32(b, 0), a >> _mm_extract_epi32(b, 1), a >> _mm_extract_epi32(b, 2), a >> _mm_extract_epi32(b, 3))
+#define _mm_sraiv_epi32(a, b) _mm_setr_epi32(a >> _mm_extract_epi32(b, 0), a >> _mm_extract_epi32(b, 1), a >> _mm_extract_epi32(b, 2), a >> _mm_extract_epi32(b, 3))
 #define _mm_srliv_epi32(a, b) _mm_setr_epi32((u32)a >> (u32)_mm_extract_epi32(b, 0), (u32)a >> (u32)_mm_extract_epi32(b, 1), (u32)a >> (u32)_mm_extract_epi32(b, 2), (u32)a >> (u32)_mm_extract_epi32(b, 3))
 
 #define _mm256_castpi_ps(x) _mm256_castsi256_ps(x)
@@ -55,6 +53,7 @@ namespace TL {
 #define _mm256_setzero_pi() _mm256_setzero_si256()
 #define _mm256_xor_pi(a, b) _mm256_castps_pi(_mm256_xor_ps(_mm256_castpi_ps(a), _mm256_castpi_ps(b)))
 #define _mm256_setone_ps() _mm256_castpi_ps(_mm256_set1_epi8(0xFF))
+#define _mm256_setone_pd() _mm256_castpi_pd(_mm256_set1_epi8(0xFF))
 #define _mm256_not_ps(x) _mm256_xor_ps(x, _mm256_setone_ps())
 #define _mm256_not_epi32_ps(x) _mm256_not_ps(_mm256_castpi_ps(x))
 #define _mm256_not_epi32(x) _mm256_castps_pi(_mm256_not_epi32_ps(x))
@@ -63,9 +62,6 @@ namespace TL {
 #define _mm256_cmpge_epi32(a, b) _mm256_not_epi32(_mm256_cmpgt_epi32(b, a))
 #define _mm256_cmpne_epi32(a, b) _mm256_not_epi32(_mm256_cmpeq_epi32(b, a))
 #define _mm256_cmpgt_epu32(a, b) _mm256_cmpgt_epi32(_mm256_xor_pi(a, _mm256_set1_epi32(0x80000000)), _mm256_xor_pi(b, _mm256_set1_epi32(0x80000000)))
-#define _mm256_sllv_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) << _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) << _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) << _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) << _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) << _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) << _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) << _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) << _mm256_extract_epi32(b, 7))
-#define _mm256_srav_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) >> _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) >> _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) >> _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) >> _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) >> _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) >> _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) >> _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) >> _mm256_extract_epi32(b, 7))
-#define _mm256_srlv_epi32(a, b)  _mm256_setr_epi32((u32)_mm256_extract_epi32(a, 0) >> (u32)_mm256_extract_epi32(b, 0), (u32)_mm256_extract_epi32(a, 1) >> (u32)_mm256_extract_epi32(b, 1), (u32)_mm256_extract_epi32(a, 2) >> (u32)_mm256_extract_epi32(b, 2), (u32)_mm256_extract_epi32(a, 3) >> (u32)_mm256_extract_epi32(b, 3), (u32)_mm256_extract_epi32(a, 4) >> (u32)_mm256_extract_epi32(b, 4), (u32)_mm256_extract_epi32(a, 5) >> (u32)_mm256_extract_epi32(b, 5), (u32)_mm256_extract_epi32(a, 6) >> (u32)_mm256_extract_epi32(b, 6), (u32)_mm256_extract_epi32(a, 7) >> (u32)_mm256_extract_epi32(b, 7))
 #define _mm256_slliv_epi32(a, b) _mm256_setr_epi32(a << _mm256_extract_epi32(b, 0), a << _mm256_extract_epi32(b, 1), a << _mm256_extract_epi32(b, 2), a << _mm256_extract_epi32(b, 3), a << _mm256_extract_epi32(b, 4), a << _mm256_extract_epi32(b, 5), a << _mm256_extract_epi32(b, 6), a << _mm256_extract_epi32(b, 7))
 #define _mm256_sraiv_epi32(a, b) _mm256_setr_epi32(a >> _mm256_extract_epi32(b, 0), a >> _mm256_extract_epi32(b, 1), a >> _mm256_extract_epi32(b, 2), a >> _mm256_extract_epi32(b, 3), a >> _mm256_extract_epi32(b, 4), a >> _mm256_extract_epi32(b, 5), a >> _mm256_extract_epi32(b, 6), a >> _mm256_extract_epi32(b, 7))
 #define _mm256_srliv_epi32(a, b) _mm256_setr_epi32((u32)a >> (u32)_mm256_extract_epi32(b, 0), (u32)a >> (u32)_mm256_extract_epi32(b, 1), (u32)a >> (u32)_mm256_extract_epi32(b, 2), (u32)a >> (u32)_mm256_extract_epi32(b, 3), (u32)a >> (u32)_mm256_extract_epi32(b, 4), (u32)a >> (u32)_mm256_extract_epi32(b, 5), (u32)a >> (u32)_mm256_extract_epi32(b, 6), (u32)a >> (u32)_mm256_extract_epi32(b, 7))
@@ -73,6 +69,35 @@ namespace TL {
 #define _mm_cvtipd_epi32(x) _mm_cvtpd_epi32(_mm_round_pd(x, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC))
 #define _mm256_cvtipd_epi32(x) _mm256_cvtpd_epi32(_mm256_round_pd(x, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC))
 
+#if !ARCH_AVX2
+#ifdef _mm_sllv_epi32
+#undef _mm_sllv_epi32
+#endif
+#ifdef _mm_srav_epi32
+#undef _mm_srav_epi32
+#endif
+#ifdef _mm_srlv_epi32
+#undef _mm_srlv_epi32
+#endif
+#ifdef _mm256_sllv_epi32
+#undef _mm256_sllv_epi32
+#endif
+#ifdef _mm256_srav_epi32
+#undef _mm256_srav_epi32
+#endif
+#ifdef _mm256_srlv_epi32
+#undef _mm256_srlv_epi32
+#endif
+
+
+#define _mm_sllv_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) << _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) << _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) << _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) << _mm_extract_epi32(b, 3))
+#define _mm_srav_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) >> _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) >> _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) >> _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) >> _mm_extract_epi32(b, 3))
+#define _mm_srlv_epi32(a, b)  _mm_setr_epi32((u32)_mm_extract_epi32(a, 0) >> (u32)_mm_extract_epi32(b, 0), (u32)_mm_extract_epi32(a, 1) >> (u32)_mm_extract_epi32(b, 1), (u32)_mm_extract_epi32(a, 2) >> (u32)_mm_extract_epi32(b, 2), (u32)_mm_extract_epi32(a, 3) >> (u32)_mm_extract_epi32(b, 3))
+
+#define _mm256_sllv_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) << _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) << _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) << _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) << _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) << _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) << _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) << _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) << _mm256_extract_epi32(b, 7))
+#define _mm256_srav_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) >> _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) >> _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) >> _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) >> _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) >> _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) >> _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) >> _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) >> _mm256_extract_epi32(b, 7))
+#define _mm256_srlv_epi32(a, b)  _mm256_setr_epi32((u32)_mm256_extract_epi32(a, 0) >> (u32)_mm256_extract_epi32(b, 0), (u32)_mm256_extract_epi32(a, 1) >> (u32)_mm256_extract_epi32(b, 1), (u32)_mm256_extract_epi32(a, 2) >> (u32)_mm256_extract_epi32(b, 2), (u32)_mm256_extract_epi32(a, 3) >> (u32)_mm256_extract_epi32(b, 3), (u32)_mm256_extract_epi32(a, 4) >> (u32)_mm256_extract_epi32(b, 4), (u32)_mm256_extract_epi32(a, 5) >> (u32)_mm256_extract_epi32(b, 5), (u32)_mm256_extract_epi32(a, 6) >> (u32)_mm256_extract_epi32(b, 6), (u32)_mm256_extract_epi32(a, 7) >> (u32)_mm256_extract_epi32(b, 7))
+#endif
 
 #define MM256_PERM128(a, b) ((a) | ((b) << 4))
 #define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
@@ -81,6 +106,9 @@ union M16 {
 	__m128  ps;
 	__m128i pi;
 	__m128d pd;
+	M16 &operator=(__m128  ps) { this->ps = ps; return *this; }
+	M16 &operator=(__m128i pi) { this->pi = pi; return *this; }
+	M16 &operator=(__m128d pd) { this->pd = pd; return *this; }
 };
 
 #if ARCH_AVX
@@ -88,6 +116,9 @@ union M32 {
 	__m256  ps;
 	__m256i pi;
 	__m256d pd;
+	M32 &operator=(__m256  ps) { this->ps = ps; return *this; }
+	M32 &operator=(__m256i pi) { this->pi = pi; return *this; }
+	M32 &operator=(__m256d pd) { this->pd = pd; return *this; }
 };
 #else
 union M32 {
@@ -100,6 +131,9 @@ union M64 {
 	__m512  ps;
 	__m512i pi;
 	__m512d pd;
+	M64 &operator=(__m512  ps) { this->ps = ps; return *this; }
+	M64 &operator=(__m512i pi) { this->pi = pi; return *this; }
+	M64 &operator=(__m512d pd) { this->pd = pd; return *this; }
 };
 #else
 union M64 {
@@ -243,6 +277,7 @@ inline static constexpr umm widthOf = _widthOf<RemoveCVRef<T>>;
 template<umm width> inline static constexpr umm _widthOf<f32x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<s32x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<u32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<f64x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v2fx<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v2sx<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v2ux<width>> = width;
@@ -254,6 +289,24 @@ template<umm width> inline static constexpr umm _widthOf<v4sx<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v4ux<width>> = width;
 // clang-format on
 
+template <class T> struct HalfT {};
+template <umm width> struct HalfT<f32x<width>> { using Type = f32x<width/2>; };
+template <umm width> struct HalfT<s32x<width>> { using Type = s32x<width/2>; };
+template <umm width> struct HalfT<u32x<width>> { using Type = u32x<width/2>; };
+template <umm width> struct HalfT<f64x<width>> { using Type = f64x<width/2>; };
+template <umm width> struct HalfT<v2fx<width>> { using Type = v2fx<width/2>; };
+template <umm width> struct HalfT<v2sx<width>> { using Type = v2sx<width/2>; };
+template <umm width> struct HalfT<v2ux<width>> { using Type = v2ux<width/2>; };
+template <umm width> struct HalfT<v3fx<width>> { using Type = v3fx<width/2>; };
+template <umm width> struct HalfT<v3sx<width>> { using Type = v3sx<width/2>; };
+template <umm width> struct HalfT<v3ux<width>> { using Type = v3ux<width/2>; };
+template <umm width> struct HalfT<v4fx<width>> { using Type = v4fx<width/2>; };
+template <umm width> struct HalfT<v4sx<width>> { using Type = v4sx<width/2>; };
+template <umm width> struct HalfT<v4ux<width>> { using Type = v4ux<width/2>; };
+
+template <class T> 
+using Half = typename HalfT<T>::Type;
+
 FORCEINLINE f32x8 F32x8(f32x4, f32x4);
 FORCEINLINE s32x8 S32x8(s32x4, s32x4);
 FORCEINLINE u32x8 U32x8(u32x4, u32x4);
@@ -263,6 +316,18 @@ template<umm width> FORCEINLINE b32x<width> B32x(b32 = false);
 template<umm width> FORCEINLINE f32x<width> F32x(f32 = 0);
 template<umm width> FORCEINLINE s32x<width> S32x(s32 = 0);
 template<umm width> FORCEINLINE u32x<width> U32x(u32 = 0);
+
+FORCEINLINE constexpr b32x4 B32x4(__m128);
+
+#if ARCH_AVX
+FORCEINLINE constexpr b32x8 B32x8(__m256);
+#else
+FORCEINLINE constexpr b32x8 B32x8(__m128, __m128);
+#endif
+
+FORCEINLINE constexpr f32x4 F32x4(__m128);
+FORCEINLINE constexpr s32x4 S32x4(__m128);
+FORCEINLINE constexpr u32x4 U32x4(__m128);
 
 FORCEINLINE constexpr f32x4 F32x4(M16);
 FORCEINLINE constexpr s32x4 S32x4(M16);
@@ -284,8 +349,8 @@ FORCEINLINE f32x4 F32x4(f32 = 0);
 FORCEINLINE s32x4 S32x4(s32 = 0);
 FORCEINLINE u32x4 U32x4(u32 = 0);
 
-FORCEINLINE f64x2 F64x2(f32 = 0);
-FORCEINLINE f64x4 F64x4(f32 = 0);
+FORCEINLINE f64x2 F64x2(f64 = 0);
+FORCEINLINE f64x4 F64x4(f64 = 0);
 
 FORCEINLINE f32x8 F32x8(f32 = 0);
 FORCEINLINE s32x8 S32x8(s32 = 0);
@@ -436,8 +501,6 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 #define OPS(op, vec, scl, con)	FORCEINLINE vec operator op(scl b) const { return *this op con(b); }
 #define SOP(op, vec, scl, con)	FORCEINLINE friend vec operator op(scl a, vec b) { return con(a) op b; }
 
-#define AOP(op, vec, scl, con) MOP(op, vec) MOPS(op, vec, scl, con) OPS(op, vec, scl, con) SOP(op, vec, scl, con)
-
 #define MEMFUNS_BASIC_SCL(vec, scl, con) \
 	SOP(+, vec, scl, con)                \
 	SOP(-, vec, scl, con)                \
@@ -514,79 +577,6 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
 	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 
-#define FALLBACK_UN_OP(ret, op, con, _128)			FORCEINLINE ret operator op() const { return con(op _128[0], op _128[1]); }
-#define FALLBACK_BIN_OP(ret, op, con, _128)			FORCEINLINE ret operator op(ret b) const { return con(_128[0] op b._128[0], _128[1] op b._128[1]); }
-#define FALLBACK_BIN_OP_S(ret, op, scl, con, _128)	FORCEINLINE ret operator op(scl b) const { return con(_128[0] op b, _128[1] op b); }
-#define FALLBACK_CMP_OP(ret, op, param, _128)		FORCEINLINE ret operator op(param b) const { return {_128[0] op b._128[0], _128[1] op b._128[1]}; }
-
-#define FALLBACK_F32X_OPERATORS(f32x8, F32x8, b32x8, _128) \
-	FALLBACK_UN_OP(f32x8, -, F32x8, _128)                     \
-	FALLBACK_BIN_OP(f32x8, +, F32x8, _128)                    \
-	FALLBACK_BIN_OP(f32x8, -, F32x8, _128)                    \
-	FALLBACK_BIN_OP(f32x8, *, F32x8, _128)                    \
-	FALLBACK_BIN_OP(f32x8, /, F32x8, _128)                    \
-	FALLBACK_CMP_OP(b32x8, <, f32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, >, f32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, <=, f32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, >=, f32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, ==, f32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, !=, f32x8, _128)
-
-#define FALLBACK_S32X_OPERATORS(s32x8, S32x8, b32x8, _128) \
-	FALLBACK_UN_OP(s32x8, -, S32x8, _128)                     \
-	FALLBACK_BIN_OP(s32x8, +, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, -, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, *, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, /, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, %, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, ^, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, |, S32x8, _128)                    \
-	FALLBACK_BIN_OP(s32x8, &, S32x8, _128)                    \
-	FALLBACK_BIN_OP_S(s32x8, <<, s32, S32x8, _128)            \
-	FALLBACK_BIN_OP_S(s32x8, >>, s32, S32x8, _128)            \
-	FALLBACK_CMP_OP(b32x8, <, s32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, >, s32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, <=, s32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, >=, s32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, ==, s32x8, _128)
-
-#define FALLBACK_U32X_OPERATORS(u32x8, U32x8, b32x8, _128) \
-	FALLBACK_BIN_OP(u32x8, +, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, -, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, /, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, %, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, ^, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, |, U32x8, _128)                 \
-	FALLBACK_BIN_OP(u32x8, &, U32x8, _128)                 \
-	FALLBACK_BIN_OP_S(u32x8, <<, u32, U32x8, _128)         \
-	FALLBACK_BIN_OP_S(u32x8, >>, u32, U32x8, _128)         \
-	FALLBACK_CMP_OP(b32x8, <, u32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, >, u32x8, _128)                 \
-	FALLBACK_CMP_OP(b32x8, <=, u32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, >=, u32x8, _128)                \
-	FALLBACK_CMP_OP(b32x8, ==, u32x8, _128)				   \
-	FALLBACK_CMP_OP(b32x8, !=, u32x8, _128)
-
-#define MASK_IMPL(b32, b32x4, M16, width)								\
-	b32 s[width];														\
-	M16 m;																\
-	FORCEINLINE b32x4() = default;										\
-	FORCEINLINE b32x4(M16 m) : m(m) {}									\
-	FORCEINLINE b32x4  operator!() const { return !m; }					\
-	FORCEINLINE b32x4  operator~() const { return ~m; }					\
-	FORCEINLINE b32x4  operator==(b32x4 b) const { return m == b.m; }	\
-	FORCEINLINE b32x4  operator!=(b32x4 b) const { return m != b.m; }	\
-	FORCEINLINE b32x4  operator^ (b32x4 b) const { return m ^  b.m; }	\
-	FORCEINLINE b32x4  operator& (b32x4 b) const { return m &  b.m; }	\
-	FORCEINLINE b32x4  operator| (b32x4 b) const { return m |  b.m; }	\
-	FORCEINLINE b32x4  operator&&(b32x4 b) const { return m &  b.m; }	\
-	FORCEINLINE b32x4  operator||(b32x4 b) const { return m |  b.m; }	\
-	FORCEINLINE b32x4& operator^=(b32x4 b) { return m ^= b.m, *this; }	\
-	FORCEINLINE b32x4& operator&=(b32x4 b) { return m &= b.m, *this; }	\
-	FORCEINLINE b32x4& operator|=(b32x4 b) { return m |= b.m, *this; }	\
-	FORCEINLINE b32 operator[](umm index) const { return s[index]; }	\
-	FORCEINLINE b32& operator[](umm index) { return s[index]; }
-
 struct TrueMask {
 	FORCEINLINE constexpr operator bool() const { return true; }
 	FORCEINLINE constexpr operator u8 () const { return ~0; }
@@ -599,6 +589,8 @@ struct TrueMask {
 	FORCEINLINE constexpr operator s64() const { return ~0; }
 	FORCEINLINE operator b32x4() const;
 	FORCEINLINE operator b32x8() const;
+	FORCEINLINE operator b64x2() const;
+	FORCEINLINE operator b64x4() const;
 };
 struct FalseMask {
 	FORCEINLINE constexpr operator bool() const { return false; }
@@ -612,213 +604,194 @@ struct FalseMask {
 	FORCEINLINE constexpr operator s64() const { return 0; }
 	FORCEINLINE operator b32x4() const;
 	FORCEINLINE operator b32x8() const;
+	FORCEINLINE operator b64x2() const;
+	FORCEINLINE operator b64x4() const;
 };
 
 inline static constexpr TrueMask trueMask;
 inline static constexpr FalseMask falseMask;
 
+#define OPERATORS_BOOL                                     \
+	FORCEINLINE Vector operator!() const { return ~*this; }            \
+	FORCEINLINE Vector operator&&(Vector b) const { return *this & b; }  \
+	FORCEINLINE Vector operator||(Vector b) const { return *this | b; }  \
+	FORCEINLINE Vector &operator^=(Vector b) { return *this = *this ^ b; } \
+	FORCEINLINE Vector &operator&=(Vector b) { return *this = *this & b; } \
+	FORCEINLINE Vector &operator|=(Vector b) { return *this = *this | b; } \
+	FORCEINLINE Scalar operator[](umm index) const { return s[index]; } \
+	FORCEINLINE Scalar &operator[](umm index) { return s[index]; }
+
+#define RETURN_T(t,x)    t result; result = x; return result
+#define RETURN_T2(t,x,y) t result; result.lo = x; result.hi = y; return result
+#define RETURN(x)        RETURN_T(Vector,x)
+#define RETURN_2(x,y)    RETURN_T2(Vector,x,y)
+
+#define RETURN_MT(t,x)    t result; result.m = x; return result
+#define RETURN_MT2(t,x,y) t result; result.lo.m = x; result.hi.m = y; return result
+#define RETURN_M(x)       RETURN_MT(Vector,x)
+#define RETURN_M2(x,y)    RETURN_MT2(Vector,x,y)
+
+#define RETURN_MASK(x)       RETURN_MT(Mask,x)
+
+#define FALLBACK_BOOL                                                                  \
+	FORCEINLINE Vector operator~() const { RETURN_2(~lo, ~hi); }                        \
+	FORCEINLINE Vector operator==(Vector b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
+	FORCEINLINE Vector operator!=(Vector b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
+	FORCEINLINE Vector operator^ (Vector b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
+	FORCEINLINE Vector operator& (Vector b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
+	FORCEINLINE Vector operator| (Vector b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
+
 template <>
 union b32x<1> {
-	b32 m;
-	b32 s[1];
-	FORCEINLINE b32x operator!() const { return {~m}; }
+	using Scalar = b32;
+	using Vector = b32x;
+
+	Scalar s[1];
+	Scalar m;
+
 	FORCEINLINE b32x operator~() const { return {~m}; }
 	FORCEINLINE b32x operator==(b32x b) const { return {-(m == b.m)}; }
 	FORCEINLINE b32x operator!=(b32x b) const { return {-(m != b.m)}; }
 	FORCEINLINE b32x operator^ (b32x b) const { return {m ^ b.m}; }
 	FORCEINLINE b32x operator& (b32x b) const { return {m & b.m}; }
 	FORCEINLINE b32x operator| (b32x b) const { return {m | b.m}; }
-	FORCEINLINE b32x operator&&(b32x b) const { return {m & b.m}; }
-	FORCEINLINE b32x operator||(b32x b) const { return {m | b.m}; }
-	FORCEINLINE b32x &operator^=(b32x b) { return m ^= b.m, *this; }
-	FORCEINLINE b32x &operator&=(b32x b) { return m &= b.m, *this; }
-	FORCEINLINE b32x &operator|=(b32x b) { return m |= b.m, *this; }
-	FORCEINLINE b32 operator[](umm index) const { return s[index]; }
-	FORCEINLINE b32 &operator[](umm index) { return s[index]; }
+	OPERATORS_BOOL;
 };
 
 template <>
 union b32x<4> {
-	M16 m;
+	using Scalar = b32;
+	using Vector = b32x;
+
 	b32 s[4];
-	FORCEINLINE b32x operator!() const { return {_mm_xor_ps(m.ps, _mm_setone_ps())}; }
-	FORCEINLINE b32x operator~() const { return {_mm_xor_ps(m.ps, _mm_setone_ps())}; }
-	FORCEINLINE b32x operator==(b32x b) const { return {_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE b32x operator!=(b32x b) const { return {_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi)), _mm_setone_ps())}; }
-	FORCEINLINE b32x operator^ (b32x b) const { return {_mm_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator& (b32x b) const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator| (b32x b) const { return {_mm_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator&&(b32x b) const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator||(b32x b) const { return {_mm_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b32x &operator^=(b32x b) { return m.ps = _mm_xor_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b32x &operator&=(b32x b) { return m.ps = _mm_and_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b32x &operator|=(b32x b) { return m.ps = _mm_or_ps (m.ps, b.m.ps), *this; }
-	FORCEINLINE b32 operator[](umm index) const { return s[index]; }
-	FORCEINLINE b32 &operator[](umm index) { return s[index]; }
+	M16 m;
+	
+	FORCEINLINE b32x operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }
+	FORCEINLINE b32x operator==(b32x b) const { RETURN_M(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE b32x operator!=(b32x b) const { RETURN_M(_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi)), _mm_setone_ps())); }
+	FORCEINLINE b32x operator^ (b32x b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b32x operator& (b32x b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b32x operator| (b32x b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
+	OPERATORS_BOOL;
 };
 
 template<>
 union b32x<8> {
+	using Scalar = b32;
+	using Vector = b32x;
+
+	b32 s[8];
+	struct {
+		b32x4 lo, hi;
+	};
+
 #if ARCH_AVX
 	M32 m;
-	FORCEINLINE b32x operator!() const { return {_mm256_xor_ps(m.ps, _mm256_setone_ps())}; }
-	FORCEINLINE b32x operator~() const { return {_mm256_xor_ps(m.ps, _mm256_setone_ps())}; }
-	FORCEINLINE b32x operator==(b32x b) const { return {_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))}; }
-	FORCEINLINE b32x operator!=(b32x b) const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator^ (b32x b) const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator& (b32x b) const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator| (b32x b) const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator&&(b32x b) const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b32x operator||(b32x b) const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b32x &operator^=(b32x b) { return m.ps = _mm256_xor_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b32x &operator&=(b32x b) { return m.ps = _mm256_and_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b32x &operator|=(b32x b) { return m.ps = _mm256_or_ps (m.ps, b.m.ps), *this; }
+	FORCEINLINE b32x operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }
+	FORCEINLINE b32x operator==(b32x b) const { RETURN_M(_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))); }
+	FORCEINLINE b32x operator!=(b32x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b32x operator^ (b32x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b32x operator& (b32x b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b32x operator| (b32x b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 #else
-	struct {
-		M16 lo, hi;
-	}; 
-	FORCEINLINE b32x operator!() const { return {_mm_xor_ps(lo.ps, _mm_setone_ps()), _mm_xor_ps(hi.ps, _mm_setone_ps())}; }
-	FORCEINLINE b32x operator~() const { return {_mm_xor_ps(lo.ps, _mm_setone_ps()), _mm_xor_ps(hi.ps, _mm_setone_ps())}; }
-	FORCEINLINE b32x operator==(b32x b) const { return {_mm_castpi_ps(_mm_cmpeq_epi8(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpeq_epi8(hi.pi, b.hi.pi))}; }
-	FORCEINLINE b32x operator!=(b32x b) const { return {_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(lo.pi, b.lo.pi)), _mm_setone_ps()), _mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(hi.pi, b.hi.pi)), _mm_setone_ps())}; }
-	FORCEINLINE b32x operator^ (b32x b) const { return {_mm_xor_ps(lo.ps, b.lo.ps), _mm_xor_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b32x operator& (b32x b) const { return {_mm_and_ps(lo.ps, b.lo.ps), _mm_and_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b32x operator| (b32x b) const { return {_mm_or_ps (lo.ps, b.lo.ps), _mm_or_ps (hi.ps, b.hi.ps)}; }
-	FORCEINLINE b32x operator&&(b32x b) const { return {_mm_and_ps(lo.ps, b.lo.ps), _mm_and_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b32x operator||(b32x b) const { return {_mm_or_ps (lo.ps, b.lo.ps), _mm_or_ps (hi.ps, b.hi.ps)}; }
-	FORCEINLINE b32x &operator^=(b32x b) { lo.ps = _mm_xor_ps(lo.ps, b.lo.ps); hi.ps = _mm_xor_ps(hi.ps, b.hi.ps); return *this; }
-	FORCEINLINE b32x &operator&=(b32x b) { lo.ps = _mm_and_ps(lo.ps, b.lo.ps); hi.ps = _mm_and_ps(hi.ps, b.hi.ps); return *this; }
-	FORCEINLINE b32x &operator|=(b32x b) { lo.ps = _mm_or_ps (lo.ps, b.lo.ps); hi.ps = _mm_or_ps (hi.ps, b.hi.ps); return *this; }
+	FALLBACK_BOOL;
 #endif
-	b32 s[8];
-	FORCEINLINE b32 operator[](umm index) const { return s[index]; }
-	FORCEINLINE b32 &operator[](umm index) { return s[index]; }
+	OPERATORS_BOOL;
 };
 
 template<>
 union b64x<2> {
-	M16 m;
+	using Scalar = b64;
+	using Vector = b64x;
+
 	b64 s[2];
-	FORCEINLINE b64x operator!() const { return {_mm_xor_ps(m.ps, _mm_setone_ps())}; }
-	FORCEINLINE b64x operator~() const { return {_mm_xor_ps(m.ps, _mm_setone_ps())}; }
-	FORCEINLINE b64x operator==(b64x b) const { return {_mm_castpi_ps(_mm_cmpeq_epi8(m.pi, b.m.pi))}; }
-	FORCEINLINE b64x operator!=(b64x b) const { return {_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(m.pi, b.m.pi)), _mm_setone_ps())}; }
-	FORCEINLINE b64x operator^ (b64x b) const { return {_mm_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator& (b64x b) const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator| (b64x b) const { return {_mm_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator&&(b64x b) const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator||(b64x b) const { return {_mm_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b64x &operator^=(b64x b) { return m.ps = _mm_xor_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b64x &operator&=(b64x b) { return m.ps = _mm_and_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b64x &operator|=(b64x b) { return m.ps = _mm_or_ps (m.ps, b.m.ps), *this; }
-	FORCEINLINE b64 operator[](umm index) const { return s[index]; }
-	FORCEINLINE b64 &operator[](umm index) { return s[index]; }
+	M16 m;
+
+	FORCEINLINE b64x operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }
+	FORCEINLINE b64x operator==(b64x b) const { RETURN_M(_mm_cmpeq_epi8(m.pi, b.m.pi)); }
+	FORCEINLINE b64x operator!=(b64x b) const { RETURN_M(_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(m.pi, b.m.pi)), _mm_setone_ps())); }
+	FORCEINLINE b64x operator^ (b64x b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b64x operator& (b64x b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b64x operator| (b64x b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
+	OPERATORS_BOOL;
 };
 
 template<>
 union b64x<4> {
+	using Scalar = b64;
+	using Vector = b64x;
+
+	b64 s[4];
+	struct {
+		b64x2 lo, hi;
+	};
+
 #if ARCH_AVX
 	M32 m;
-	FORCEINLINE b64x operator!() const { return {_mm256_xor_ps(m.ps, _mm256_setone_ps())}; }
-	FORCEINLINE b64x operator~() const { return {_mm256_xor_ps(m.ps, _mm256_setone_ps())}; }
-	FORCEINLINE b64x operator==(b64x b) const { return {_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))}; }
-	FORCEINLINE b64x operator!=(b64x b) const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator^ (b64x b) const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator& (b64x b) const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator| (b64x b) const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator&&(b64x b) const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE b64x operator||(b64x b) const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE b64x &operator^=(b64x b) { return m.ps = _mm256_xor_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b64x &operator&=(b64x b) { return m.ps = _mm256_and_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE b64x &operator|=(b64x b) { return m.ps = _mm256_or_ps (m.ps, b.m.ps), *this; }
+	FORCEINLINE b64x operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }
+	FORCEINLINE b64x operator==(b64x b) const { RETURN_M(_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))); }
+	FORCEINLINE b64x operator!=(b64x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b64x operator^ (b64x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b64x operator& (b64x b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE b64x operator| (b64x b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 #else
-	struct {
-		M16 lo, hi;
-	}; 
-	FORCEINLINE b64x operator!() const { return {_mm_xor_ps(lo.ps, _mm_setone_ps()), _mm_xor_ps(hi.ps, _mm_setone_ps())}; }
-	FORCEINLINE b64x operator~() const { return {_mm_xor_ps(lo.ps, _mm_setone_ps()), _mm_xor_ps(hi.ps, _mm_setone_ps())}; }
-	FORCEINLINE b64x operator==(b64x b) const { return {_mm_castpi_ps(_mm_cmpeq_epi8(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpeq_epi8(hi.pi, b.hi.pi))}; }
-	FORCEINLINE b64x operator!=(b64x b) const { return {_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(lo.pi, b.lo.pi)), _mm_setone_ps()), _mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(hi.pi, b.hi.pi)), _mm_setone_ps())}; }
-	FORCEINLINE b64x operator^ (b64x b) const { return {_mm_xor_ps(lo.ps, b.lo.ps), _mm_xor_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b64x operator& (b64x b) const { return {_mm_and_ps(lo.ps, b.lo.ps), _mm_and_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b64x operator| (b64x b) const { return {_mm_or_ps (lo.ps, b.lo.ps), _mm_or_ps (hi.ps, b.hi.ps)}; }
-	FORCEINLINE b64x operator&&(b64x b) const { return {_mm_and_ps(lo.ps, b.lo.ps), _mm_and_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE b64x operator||(b64x b) const { return {_mm_or_ps (lo.ps, b.lo.ps), _mm_or_ps (hi.ps, b.hi.ps)}; }
-	FORCEINLINE b64x &operator^=(b64x b) { lo.ps = _mm_xor_ps(lo.ps, b.lo.ps); hi.ps = _mm_xor_ps(hi.ps, b.hi.ps); return *this; }
-	FORCEINLINE b64x &operator&=(b64x b) { lo.ps = _mm_and_ps(lo.ps, b.lo.ps); hi.ps = _mm_and_ps(hi.ps, b.hi.ps); return *this; }
-	FORCEINLINE b64x &operator|=(b64x b) { lo.ps = _mm_or_ps (lo.ps, b.lo.ps); hi.ps = _mm_or_ps (hi.ps, b.hi.ps); return *this; }
+	FALLBACK_BOOL;
 #endif
-	b64 s[4];
-	FORCEINLINE b64 operator[](umm index) const { return s[index]; }
-	FORCEINLINE b64 &operator[](umm index) { return s[index]; }
+	OPERATORS_BOOL;
 };
 #undef MASK_IMPL
 
-FORCEINLINE bool anyTrue (b32x1 v) { return v.m != 0;   }
-FORCEINLINE bool allTrue (b32x1 v) { return v.m == 1; }
-FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0;   }
-FORCEINLINE bool anyFalse(b32x1 v) { return v.m != 1; }
+FORCEINLINE b32x4 B32x4(bool v) { RETURN_MT(b32x4, v ? _mm_setone_ps() : _mm_setzero_ps()); }
+FORCEINLINE b64x2 B64x2(bool v) { RETURN_MT(b64x2, v ? _mm_setone_pd() : _mm_setzero_pd()); }
 
-FORCEINLINE TrueMask::operator b32x4() const { return {_mm_setone_ps()}; }
-FORCEINLINE FalseMask::operator b32x4() const { return {_mm_setzero_ps()}; }
+FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.ps, a.m.ps)); }
+
 FORCEINLINE u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
 FORCEINLINE u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
-FORCEINLINE b32x4 B32x4(bool v) { return {v ? _mm_setone_ps() : _mm_setzero_ps()}; }
-FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { return {_mm_andnot_ps(b.m.ps, a.m.ps)}; }
-FORCEINLINE bool anyTrue (b32x4 v) { return _mm_movemask_ps(v.m.ps) != 0;   }
-FORCEINLINE bool allTrue (b32x4 v) { return _mm_movemask_ps(v.m.ps) == 0xF; }
-FORCEINLINE bool allFalse(b32x4 v) { return _mm_movemask_ps(v.m.ps) == 0;   }
-FORCEINLINE bool anyFalse(b32x4 v) { return _mm_movemask_ps(v.m.ps) != 0xF; }
-FORCEINLINE bool anyTrue (b64x2 v) { return _mm_movemask_pd(v.m.pd) != 0;   }
-FORCEINLINE bool allTrue (b64x2 v) { return _mm_movemask_pd(v.m.pd) == 0x3; }
-FORCEINLINE bool allFalse(b64x2 v) { return _mm_movemask_pd(v.m.pd) == 0;   }
-FORCEINLINE bool anyFalse(b64x2 v) { return _mm_movemask_pd(v.m.pd) != 0x3; }
+
+FORCEINLINE bool allTrue (b32x1 v) { return v.m == 1; }
+FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0;   }
+FORCEINLINE bool allTrue (b32x4 v) { return compressMask(v) == 0xF; }
+FORCEINLINE bool allFalse(b32x4 v) { return compressMask(v) == 0;   }
+FORCEINLINE bool allTrue (b64x2 v) { return compressMask(v) == 0x3; }
+FORCEINLINE bool allFalse(b64x2 v) { return compressMask(v) == 0;   }
 
 #if ARCH_AVX
-FORCEINLINE TrueMask::operator b32x8() const { return {_mm256_setone_ps()}; }
-FORCEINLINE FalseMask::operator b32x8() const { return {_mm256_setzero_ps()}; }
+FORCEINLINE b32x8 B32x8(bool v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
+FORCEINLINE b64x4 B64x4(bool v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
+
+FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_MT(b32x8, _mm256_andnot_ps(b.m.ps, a.m.ps)); }
+
 FORCEINLINE u64 compressMask(b32x8 a) { return _mm256_movemask_ps(a.m.ps); }
 FORCEINLINE u64 compressMask(b64x4 a) { return _mm256_movemask_pd(a.m.pd); }
-FORCEINLINE b32x8 B32x8(bool v) { return {v ? _mm256_setone_ps() : _mm256_setzero_ps()}; }
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { return {_mm256_andnot_ps(b.m.ps, a.m.ps)}; }
-FORCEINLINE bool anyTrue (b32x8 v) { return _mm256_movemask_ps(v.m.ps) != 0;    }
-FORCEINLINE bool allTrue (b32x8 v) { return _mm256_movemask_ps(v.m.ps) == 0xFF; }
-FORCEINLINE bool allFalse(b32x8 v) { return _mm256_movemask_ps(v.m.ps) == 0;    }
-FORCEINLINE bool anyFalse(b32x8 v) { return _mm256_movemask_ps(v.m.ps) != 0xFF; }
-FORCEINLINE bool anyTrue (b64x4 v) { return _mm256_movemask_pd(v.m.pd) != 0;   }
-FORCEINLINE bool allTrue (b64x4 v) { return _mm256_movemask_pd(v.m.pd) == 0xF; }
-FORCEINLINE bool allFalse(b64x4 v) { return _mm256_movemask_pd(v.m.pd) == 0;   }
-FORCEINLINE bool anyFalse(b64x4 v) { return _mm256_movemask_pd(v.m.pd) != 0xF; }
 #else
-FORCEINLINE TrueMask::operator b32x8() const { return {_mm_setone_ps(), _mm_setone_ps()}; }
-FORCEINLINE FalseMask::operator b32x8() const { return {_mm_setzero_ps(), _mm_setzero_ps()}; }
-FORCEINLINE u64 compressMask(b32x8 a) { return (_mm_movemask_ps(a.lo.ps) << 8) | _mm_movemask_ps(a.hi.ps); }
-FORCEINLINE u64 compressMask(b64x4 a) { return (_mm_movemask_pd(a.lo.pd) << 4) | _mm_movemask_pd(a.hi.pd); }
-FORCEINLINE b32x8 B32x8(bool v) { return v ? b32x8{_mm_setone_ps(), _mm_setone_ps()} : b32x8{_mm_setzero_ps(), _mm_setzero_ps()}; }
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { return {_mm_andnot_ps(b.lo.ps, a.lo.ps), _mm_andnot_ps(b.hi.ps, a.hi.ps)}; }
-FORCEINLINE bool anyTrue (b32x8 a) { return ((_mm_movemask_ps(a.lo.ps) << 8) | _mm_movemask_ps(a.hi.ps)) != 0;    }
-FORCEINLINE bool allTrue (b32x8 a) { return ((_mm_movemask_ps(a.lo.ps) << 8) | _mm_movemask_ps(a.hi.ps)) == 0xFF; }
-FORCEINLINE bool allFalse(b32x8 a) { return ((_mm_movemask_ps(a.lo.ps) << 8) | _mm_movemask_ps(a.hi.ps)) == 0;    }
-FORCEINLINE bool anyFalse(b32x8 a) { return ((_mm_movemask_ps(a.lo.ps) << 8) | _mm_movemask_ps(a.hi.ps)) != 0xFF; }
-FORCEINLINE bool anyTrue (b64x4 a) { return ((_mm_movemask_pd(a.lo.pd) << 4) | _mm_movemask_pd(a.hi.pd)) != 0;   }
-FORCEINLINE bool allTrue (b64x4 a) { return ((_mm_movemask_pd(a.lo.pd) << 4) | _mm_movemask_pd(a.hi.pd)) == 0xF; }
-FORCEINLINE bool allFalse(b64x4 a) { return ((_mm_movemask_pd(a.lo.pd) << 4) | _mm_movemask_pd(a.hi.pd)) == 0;   }
-FORCEINLINE bool anyFalse(b64x4 a) { return ((_mm_movemask_pd(a.lo.pd) << 4) | _mm_movemask_pd(a.hi.pd)) != 0xF; }
+FORCEINLINE b32x8 B32x8(bool v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
+FORCEINLINE b64x4 B64x4(bool v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
+
+FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_T2(b32x8, andNot(b.lo, a.lo), andNot(b.hi, a.hi)); }
+
+FORCEINLINE u64 compressMask(b32x8 a) { return (compressMask(a.lo) << 4) | compressMask(a.hi); }
+FORCEINLINE u64 compressMask(b64x4 a) { return (compressMask(a.lo) << 2) | compressMask(a.hi); }
 #endif
 
-#define SCLX_CMP(b32x8, f32x8, f32, F32x8)                                        \
-	FORCEINLINE b32x8 operator<(f32 b) const { return *this < F32x8(b); }         \
-	FORCEINLINE b32x8 operator>(f32 b) const { return *this > F32x8(b); }         \
-	FORCEINLINE b32x8 operator<=(f32 b) const { return *this <= F32x8(b); }       \
-	FORCEINLINE b32x8 operator>=(f32 b) const { return *this >= F32x8(b); }       \
-	FORCEINLINE b32x8 operator==(f32 b) const { return *this == F32x8(b); }       \
-	FORCEINLINE b32x8 operator!=(f32 b) const { return *this != F32x8(b); }       \
-	FORCEINLINE friend b32x8 operator<(f32 a, f32x8 b) { return F32x8(a) < b; }   \
-	FORCEINLINE friend b32x8 operator>(f32 a, f32x8 b) { return F32x8(a) > b; }   \
-	FORCEINLINE friend b32x8 operator<=(f32 a, f32x8 b) { return F32x8(a) <= b; } \
-	FORCEINLINE friend b32x8 operator>=(f32 a, f32x8 b) { return F32x8(a) >= b; } \
-	FORCEINLINE friend b32x8 operator==(f32 a, f32x8 b) { return F32x8(a) == b; } \
-	FORCEINLINE friend b32x8 operator!=(f32 a, f32x8 b) { return F32x8(a) != b; }
+FORCEINLINE bool allTrue (b32x8 a) { return compressMask(a) == 0xFF; }
+FORCEINLINE bool allFalse(b32x8 a) { return compressMask(a) == 0;    }
+FORCEINLINE bool allTrue (b64x4 a) { return compressMask(a) == 0xF; }
+FORCEINLINE bool allFalse(b64x4 a) { return compressMask(a) == 0;   }
+
+#define MASK_IMPL(FalseMask, false)									   \
+FORCEINLINE FalseMask::operator b32x4() const { return B32x4(false); } \
+FORCEINLINE FalseMask::operator b32x8() const { return B32x8(false); } \
+FORCEINLINE FalseMask::operator b64x2() const { return B64x2(false); } \
+FORCEINLINE FalseMask::operator b64x4() const { return B64x4(false); } \
+
+MASK_IMPL(FalseMask, false)
+MASK_IMPL(TrueMask, true)
+
+#undef MASK_IMPL
+
+template <class T> FORCEINLINE bool anyTrue (T v) { return !allFalse(v); }
+template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
 
 #define CVT(other) explicit FORCEINLINE operator other() const
 
@@ -907,54 +880,77 @@ union f32x<1> {
 #define CMPNEF64x2(a, b) _mm_cmpneq_pd(a, b)
 #endif
 
+#define OPERATOR_SCALAR(op, extend) \
+	FORCEINLINE Vector operator op(Scalar b) { return *this op extend(b); } \
+	FORCEINLINE friend Vector operator op(Scalar a, Vector b) { return extend(a) op b; }
+
+// is first is member s32x4's operator!= refuses to compile
+#define OPERATOR_COMPARE(op, extend) \
+	FORCEINLINE friend Mask operator op(Vector a, Scalar b) { return a op extend(b); } \
+	FORCEINLINE friend Mask operator op(Scalar a, Vector b) { return extend(a) op b; }
+
+#define OPERATOR_MODIFY(op, extend) \
+	FORCEINLINE Vector &operator op##=(Vector b) { return *this = *this op b; } \
+	FORCEINLINE Vector &operator op##=(Scalar b) { return *this = *this op extend(b); }
+
+
+#define OPERATOR_ALL_VER(op, extend) \
+	OPERATOR_MODIFY(op, extend) \
+	OPERATOR_SCALAR(op, extend)
+
+#define OPERATOR_XCREMENT(extend) \
+	FORCEINLINE Vector &operator++()   { return *this = *this + extend(1); } \
+	FORCEINLINE Vector &operator--()   { return *this = *this - extend(1); } \
+	FORCEINLINE Vector  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
+	FORCEINLINE Vector  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
+
+#define OPERATORS_FLOAT(extend) \
+	OPERATOR_COMPARE(>, extend) \
+	OPERATOR_COMPARE(<, extend) \
+	OPERATOR_COMPARE(>=, extend) \
+	OPERATOR_COMPARE(<=, extend) \
+	OPERATOR_COMPARE(==, extend) \
+	OPERATOR_COMPARE(!=, extend) \
+	OPERATOR_ALL_VER(+, extend) \
+	OPERATOR_ALL_VER(-, extend) \
+	OPERATOR_ALL_VER(*, extend) \
+	OPERATOR_ALL_VER(/, extend) \
+	OPERATOR_XCREMENT(extend)
+
+#define FALLBACK_FLOAT                                                                  \
+	FORCEINLINE Vector operator-() const { RETURN_2(-lo, -hi); }                        \
+	FORCEINLINE Vector operator+ (Vector b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
+	FORCEINLINE Vector operator- (Vector b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
+	FORCEINLINE Vector operator* (Vector b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
+	FORCEINLINE Vector operator/ (Vector b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
+	FORCEINLINE Mask operator> (Vector b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
+	FORCEINLINE Mask operator< (Vector b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
+	FORCEINLINE Mask operator>=(Vector b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
+	FORCEINLINE Mask operator<=(Vector b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
+	FORCEINLINE Mask operator==(Vector b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
+	FORCEINLINE Mask operator!=(Vector b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+
 template<>
 union f32x<4> {
-	M16 m;
+	using Scalar = f32;
+	using Vector = f32x;
+	using Mask   = b32x4;
+
 	f32 s[4];
+	M16 m;
 	
-	FORCEINLINE        f32x4  operator-()          const { return {_mm_xor_ps(m.ps, _mm_set1_ps(-0.0f))}; }
-	FORCEINLINE	       f32x4  operator+ (f32x4 b)  const { return {_mm_add_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x4  operator- (f32x4 b)  const { return {_mm_sub_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x4  operator* (f32x4 b)  const { return {_mm_mul_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x4  operator/ (f32x4 b)  const { return {_mm_div_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator< (f32x4 b)  const { return {CMPLTF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator> (f32x4 b)  const { return {CMPGTF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator<=(f32x4 b)  const { return {CMPLEF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator>=(f32x4 b)  const { return {CMPGEF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator==(f32x4 b)  const { return {CMPEQF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x4  operator!=(f32x4 b)  const { return {CMPNEF32x4(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x4  operator+ (f32   b)  const { return {_mm_add_ps(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x4  operator- (f32   b)  const { return {_mm_sub_ps(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x4  operator* (f32   b)  const { return {_mm_mul_ps(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x4  operator/ (f32   b)  const { return {_mm_div_ps(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator< (f32   b)  const { return {CMPLTF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator> (f32   b)  const { return {CMPGTF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator<=(f32   b)  const { return {CMPLEF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator>=(f32   b)  const { return {CMPGEF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator==(f32   b)  const { return {CMPEQF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x4  operator!=(f32   b)  const { return {CMPNEF32x4(m.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE friend f32x4  operator+ (f32 a, f32x4 b) { return {_mm_add_ps(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x4  operator- (f32 a, f32x4 b) { return {_mm_sub_ps(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x4  operator* (f32 a, f32x4 b) { return {_mm_mul_ps(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x4  operator/ (f32 a, f32x4 b) { return {_mm_div_ps(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator< (f32 a, f32x4 b) { return {CMPLTF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator> (f32 a, f32x4 b) { return {CMPGTF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator<=(f32 a, f32x4 b) { return {CMPLEF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator>=(f32 a, f32x4 b) { return {CMPGEF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator==(f32 a, f32x4 b) { return {CMPEQF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x4  operator!=(f32 a, f32x4 b) { return {CMPNEF32x4(_mm_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE        f32x4 &operator+=(f32x4 b)        { return m.ps = _mm_add_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x4 &operator-=(f32x4 b)        { return m.ps = _mm_sub_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x4 &operator*=(f32x4 b)        { return m.ps = _mm_mul_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x4 &operator/=(f32x4 b)        { return m.ps = _mm_div_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x4 &operator+=(f32   b)        { return m.ps = _mm_add_ps(m.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x4 &operator-=(f32   b)        { return m.ps = _mm_sub_ps(m.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x4 &operator*=(f32   b)        { return m.ps = _mm_mul_ps(m.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x4 &operator/=(f32   b)        { return m.ps = _mm_div_ps(m.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x4 &operator++ ()              { return m.ps = _mm_add_ps(m.ps, _mm_set1_ps(1)), *this; }
-	FORCEINLINE        f32x4 &operator-- ()              { return m.ps = _mm_sub_ps(m.ps, _mm_set1_ps(1)), *this; }
-	FORCEINLINE        f32x4  operator++ (int)           { auto result = *this; m.ps = _mm_add_ps(m.ps, _mm_set1_ps(1)); return result; }
-	FORCEINLINE        f32x4  operator-- (int)           { auto result = *this; m.ps = _mm_sub_ps(m.ps, _mm_set1_ps(1)); return result; }
+	FORCEINLINE f32x4 operator-()         const { RETURN_M(_mm_xor_ps(m.ps, _mm_set1_ps(-0.0f))); }
+	FORCEINLINE	f32x4 operator+ (f32x4 b) const { RETURN_M(_mm_add_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x4 operator- (f32x4 b) const { RETURN_M(_mm_sub_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x4 operator* (f32x4 b) const { RETURN_M(_mm_mul_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x4 operator/ (f32x4 b) const { RETURN_M(_mm_div_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator< (f32x4 b) const { RETURN_MASK(CMPLTF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator> (f32x4 b) const { RETURN_MASK(CMPGTF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator<=(f32x4 b) const { RETURN_MASK(CMPLEF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator>=(f32x4 b) const { RETURN_MASK(CMPGEF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator==(f32x4 b) const { RETURN_MASK(CMPEQF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator!=(f32x4 b) const { RETURN_MASK(CMPNEF32x4(m.ps, b.m.ps)); }
+	OPERATORS_FLOAT(F32x4)
 
 	CVT(s32x4);
 	CVT(u32x4);
@@ -964,100 +960,32 @@ union f32x<4> {
 
 template <>
 union f32x<8> {
+	using Scalar = f32;
+	using Vector = f32x;
+	using Mask   = b32x8;
+
+	f32 s[8];
+	
+	struct {
+		f32x4 lo, hi;
+	};
 #if ARCH_AVX
 	M32 m;
-	FORCEINLINE        f32x8  operator-()          const { return {_mm256_xor_ps(m.ps, _mm256_set1_ps(-0.0f))}; }
-	FORCEINLINE	       f32x8  operator+ (f32x8 b)  const { return {_mm256_add_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x8  operator- (f32x8 b)  const { return {_mm256_sub_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x8  operator* (f32x8 b)  const { return {_mm256_mul_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       f32x8  operator/ (f32x8 b)  const { return {_mm256_div_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       b32x8  operator< (f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LT_OQ )}; }
-	FORCEINLINE	       b32x8  operator> (f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GT_OQ )}; }
-	FORCEINLINE	       b32x8  operator<=(f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LE_OQ )}; }
-	FORCEINLINE	       b32x8  operator>=(f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GE_OQ )}; }
-	FORCEINLINE	       b32x8  operator==(f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_EQ_OQ )}; }
-	FORCEINLINE	       b32x8  operator!=(f32x8 b)  const { return {_mm256_cmp_ps(m.ps, b.m.ps, _CMP_NEQ_OQ)}; }
-	FORCEINLINE	       f32x8  operator+ (f32   b)  const { return {_mm256_add_ps(m.ps, _mm256_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator- (f32   b)  const { return {_mm256_sub_ps(m.ps, _mm256_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator* (f32   b)  const { return {_mm256_mul_ps(m.ps, _mm256_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator/ (f32   b)  const { return {_mm256_div_ps(m.ps, _mm256_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator< (f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_LT_OQ )}; }
-	FORCEINLINE	       b32x8  operator> (f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_GT_OQ )}; }
-	FORCEINLINE	       b32x8  operator<=(f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_LE_OQ )}; }
-	FORCEINLINE	       b32x8  operator>=(f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_GE_OQ )}; }
-	FORCEINLINE	       b32x8  operator==(f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_EQ_OQ )}; }
-	FORCEINLINE	       b32x8  operator!=(f32   b)  const { return {_mm256_cmp_ps(m.ps, _mm256_set1_ps(b), _CMP_NEQ_OQ)}; }
-	FORCEINLINE friend f32x8  operator+ (f32 a, f32x8 b) { return {_mm256_add_ps(_mm256_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x8  operator- (f32 a, f32x8 b) { return {_mm256_sub_ps(_mm256_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x8  operator* (f32 a, f32x8 b) { return {_mm256_mul_ps(_mm256_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend f32x8  operator/ (f32 a, f32x8 b) { return {_mm256_div_ps(_mm256_set1_ps(a), b.m.ps)}; }
-	FORCEINLINE friend b32x8  operator< (f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_LT_OQ )}; }
-	FORCEINLINE friend b32x8  operator> (f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_GT_OQ )}; }
-	FORCEINLINE friend b32x8  operator<=(f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_LE_OQ )}; }
-	FORCEINLINE friend b32x8  operator>=(f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_GE_OQ )}; }
-	FORCEINLINE friend b32x8  operator==(f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_EQ_OQ )}; }
-	FORCEINLINE friend b32x8  operator!=(f32 a, f32x8 b) { return {_mm256_cmp_ps(_mm256_set1_ps(a), b.m.ps, _CMP_NEQ_OQ)}; }
-	FORCEINLINE        f32x8 &operator+=(f32x8 b)        { return m.ps = _mm256_add_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x8 &operator-=(f32x8 b)        { return m.ps = _mm256_sub_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x8 &operator*=(f32x8 b)        { return m.ps = _mm256_mul_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x8 &operator/=(f32x8 b)        { return m.ps = _mm256_div_ps(m.ps, b.m.ps), *this; }
-	FORCEINLINE        f32x8 &operator+=(f32   b)        { return m.ps = _mm256_add_ps(m.ps, _mm256_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator-=(f32   b)        { return m.ps = _mm256_sub_ps(m.ps, _mm256_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator*=(f32   b)        { return m.ps = _mm256_mul_ps(m.ps, _mm256_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator/=(f32   b)        { return m.ps = _mm256_div_ps(m.ps, _mm256_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator++ ()              { return m.ps = _mm256_add_ps(m.ps, _mm256_set1_ps(1)), *this; }
-	FORCEINLINE        f32x8 &operator-- ()              { return m.ps = _mm256_sub_ps(m.ps, _mm256_set1_ps(1)), *this; }
-	FORCEINLINE        f32x8  operator++ (int)           { auto result = *this; m.ps = _mm256_add_ps(m.ps, _mm256_set1_ps(1)); return result; }
-	FORCEINLINE        f32x8  operator-- (int)           { auto result = *this; m.ps = _mm256_sub_ps(m.ps, _mm256_set1_ps(1)); return result; }
+	FORCEINLINE f32x8 operator-()         const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_set1_ps(-0.0f))); }
+	FORCEINLINE	f32x8 operator+ (f32x8 b) const { RETURN_M(_mm256_add_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x8 operator- (f32x8 b) const { RETURN_M(_mm256_sub_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x8 operator* (f32x8 b) const { RETURN_M(_mm256_mul_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	f32x8 operator/ (f32x8 b) const { RETURN_M(_mm256_div_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x8 operator< (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LT_OQ )); }
+	FORCEINLINE	b32x8 operator> (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GT_OQ )); }
+	FORCEINLINE	b32x8 operator<=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LE_OQ )); }
+	FORCEINLINE	b32x8 operator>=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GE_OQ )); }
+	FORCEINLINE	b32x8 operator==(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_EQ_OQ )); }
+	FORCEINLINE	b32x8 operator!=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_NEQ_OQ)); }
 #else
-	struct {
-		M16 lo, hi;
-	};
-	FORCEINLINE        f32x8  operator-()          const { return {_mm_xor_ps(lo.ps, _mm_set1_ps(-0.0f)), _mm_xor_ps(hi.ps, _mm_set1_ps(-0.0f))}; }
-	FORCEINLINE	       f32x8  operator+ (f32x8 b)  const { return {_mm_add_ps(lo.ps, b.lo.ps), _mm_add_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       f32x8  operator- (f32x8 b)  const { return {_mm_sub_ps(lo.ps, b.lo.ps), _mm_sub_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       f32x8  operator* (f32x8 b)  const { return {_mm_mul_ps(lo.ps, b.lo.ps), _mm_mul_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       f32x8  operator/ (f32x8 b)  const { return {_mm_div_ps(lo.ps, b.lo.ps), _mm_div_ps(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator< (f32x8 b)  const { return {CMPLTF32x4(lo.ps, b.lo.ps), CMPLTF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator> (f32x8 b)  const { return {CMPGTF32x4(lo.ps, b.lo.ps), CMPGTF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator<=(f32x8 b)  const { return {CMPLEF32x4(lo.ps, b.lo.ps), CMPLEF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator>=(f32x8 b)  const { return {CMPGEF32x4(lo.ps, b.lo.ps), CMPGEF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator==(f32x8 b)  const { return {CMPEQF32x4(lo.ps, b.lo.ps), CMPEQF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       b32x8  operator!=(f32x8 b)  const { return {CMPNEF32x4(lo.ps, b.lo.ps), CMPNEF32x4(hi.ps, b.hi.ps)}; }
-	FORCEINLINE	       f32x8  operator+ (f32   b)  const { return {_mm_add_ps(lo.ps, _mm_set1_ps(b)), _mm_add_ps(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator- (f32   b)  const { return {_mm_sub_ps(lo.ps, _mm_set1_ps(b)), _mm_sub_ps(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator* (f32   b)  const { return {_mm_mul_ps(lo.ps, _mm_set1_ps(b)), _mm_mul_ps(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       f32x8  operator/ (f32   b)  const { return {_mm_div_ps(lo.ps, _mm_set1_ps(b)), _mm_div_ps(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator< (f32   b)  const { return {CMPLTF32x4(lo.ps, _mm_set1_ps(b)), CMPLTF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator> (f32   b)  const { return {CMPGTF32x4(lo.ps, _mm_set1_ps(b)), CMPGTF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator<=(f32   b)  const { return {CMPLEF32x4(lo.ps, _mm_set1_ps(b)), CMPLEF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator>=(f32   b)  const { return {CMPGEF32x4(lo.ps, _mm_set1_ps(b)), CMPGEF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator==(f32   b)  const { return {CMPEQF32x4(lo.ps, _mm_set1_ps(b)), CMPEQF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE	       b32x8  operator!=(f32   b)  const { return {CMPNEF32x4(lo.ps, _mm_set1_ps(b)), CMPNEF32x4(hi.ps, _mm_set1_ps(b))}; }
-	FORCEINLINE friend f32x8  operator+ (f32 a, f32x8 b) { return {_mm_add_ps(_mm_set1_ps(a), b.lo.ps), _mm_add_ps(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend f32x8  operator- (f32 a, f32x8 b) { return {_mm_sub_ps(_mm_set1_ps(a), b.lo.ps), _mm_sub_ps(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend f32x8  operator* (f32 a, f32x8 b) { return {_mm_mul_ps(_mm_set1_ps(a), b.lo.ps), _mm_mul_ps(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend f32x8  operator/ (f32 a, f32x8 b) { return {_mm_div_ps(_mm_set1_ps(a), b.lo.ps), _mm_div_ps(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator< (f32 a, f32x8 b) { return {CMPLTF32x4(_mm_set1_ps(a), b.lo.ps), CMPLTF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator> (f32 a, f32x8 b) { return {CMPGTF32x4(_mm_set1_ps(a), b.lo.ps), CMPGTF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator<=(f32 a, f32x8 b) { return {CMPLEF32x4(_mm_set1_ps(a), b.lo.ps), CMPLEF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator>=(f32 a, f32x8 b) { return {CMPGEF32x4(_mm_set1_ps(a), b.lo.ps), CMPGEF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator==(f32 a, f32x8 b) { return {CMPEQF32x4(_mm_set1_ps(a), b.lo.ps), CMPEQF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE friend b32x8  operator!=(f32 a, f32x8 b) { return {CMPNEF32x4(_mm_set1_ps(a), b.lo.ps), CMPNEF32x4(_mm_set1_ps(a), b.hi.ps)}; }
-	FORCEINLINE        f32x8 &operator+=(f32x8 b)        { return lo.ps = _mm_add_ps(lo.ps, b.lo.ps), hi.ps = _mm_add_ps(hi.ps, b.hi.ps), *this; }
-	FORCEINLINE        f32x8 &operator-=(f32x8 b)        { return lo.ps = _mm_sub_ps(lo.ps, b.lo.ps), hi.ps = _mm_sub_ps(hi.ps, b.hi.ps), *this; }
-	FORCEINLINE        f32x8 &operator*=(f32x8 b)        { return lo.ps = _mm_mul_ps(lo.ps, b.lo.ps), hi.ps = _mm_mul_ps(hi.ps, b.hi.ps), *this; }
-	FORCEINLINE        f32x8 &operator/=(f32x8 b)        { return lo.ps = _mm_div_ps(lo.ps, b.lo.ps), hi.ps = _mm_div_ps(hi.ps, b.hi.ps), *this; }
-	FORCEINLINE        f32x8 &operator+=(f32   b)        { return lo.ps = _mm_add_ps(lo.ps, _mm_set1_ps(b)), hi.ps = _mm_add_ps(hi.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator-=(f32   b)        { return lo.ps = _mm_sub_ps(lo.ps, _mm_set1_ps(b)), hi.ps = _mm_sub_ps(hi.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator*=(f32   b)        { return lo.ps = _mm_mul_ps(lo.ps, _mm_set1_ps(b)), hi.ps = _mm_mul_ps(hi.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator/=(f32   b)        { return lo.ps = _mm_div_ps(lo.ps, _mm_set1_ps(b)), hi.ps = _mm_div_ps(hi.ps, _mm_set1_ps(b)), *this; }
-	FORCEINLINE        f32x8 &operator++ ()              { return lo.ps = _mm_add_ps(lo.ps, _mm_set1_ps(1)), hi.ps = _mm_add_ps(hi.ps, _mm_set1_ps(1)), *this; }
-	FORCEINLINE        f32x8 &operator-- ()              { return lo.ps = _mm_sub_ps(lo.ps, _mm_set1_ps(1)), hi.ps = _mm_sub_ps(hi.ps, _mm_set1_ps(1)), *this; }
-	FORCEINLINE        f32x8  operator++ (int)           { auto result = *this; lo.ps = _mm_add_ps(lo.ps, _mm_set1_ps(1)); hi.ps = _mm_add_ps(hi.ps, _mm_set1_ps(1)); return result; }
-	FORCEINLINE        f32x8  operator-- (int)           { auto result = *this; lo.ps = _mm_sub_ps(lo.ps, _mm_set1_ps(1)); hi.ps = _mm_sub_ps(hi.ps, _mm_set1_ps(1)); return result; }
+	FALLBACK_FLOAT;
 #endif
-	f32 s[8];
+	OPERATORS_FLOAT(F32x8)
 
 	CVT(s32x8);
 	CVT(u32x8);
@@ -1067,52 +995,25 @@ union f32x<8> {
 
 template <>
 union f64x<2> {
-	M16 m;
-	f64 s[2];
+	using Scalar = f64;
+	using Vector = f64x;
+	using Mask   = b64x2;
 
-	FORCEINLINE        f64x2  operator-()          const { return {_mm_castpd_ps(_mm_xor_pd(m.pd, _mm_set1_pd(-0.0f)))}; }
-	FORCEINLINE	       f64x2  operator+ (f64x2 b)  const { return {_mm_castpd_ps(_mm_add_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x2  operator- (f64x2 b)  const { return {_mm_castpd_ps(_mm_sub_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x2  operator* (f64x2 b)  const { return {_mm_castpd_ps(_mm_mul_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x2  operator/ (f64x2 b)  const { return {_mm_castpd_ps(_mm_div_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator< (f64x2 b)  const { return {_mm_castpd_ps(CMPLTF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator> (f64x2 b)  const { return {_mm_castpd_ps(CMPGTF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator<=(f64x2 b)  const { return {_mm_castpd_ps(CMPLEF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator>=(f64x2 b)  const { return {_mm_castpd_ps(CMPGEF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator==(f64x2 b)  const { return {_mm_castpd_ps(CMPEQF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x2  operator!=(f64x2 b)  const { return {_mm_castpd_ps(CMPNEF64x2(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x2  operator+ (f64   b)  const { return {_mm_castpd_ps(_mm_add_pd(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x2  operator- (f64   b)  const { return {_mm_castpd_ps(_mm_sub_pd(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x2  operator* (f64   b)  const { return {_mm_castpd_ps(_mm_mul_pd(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x2  operator/ (f64   b)  const { return {_mm_castpd_ps(_mm_div_pd(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator< (f64   b)  const { return {_mm_castpd_ps(CMPLTF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator> (f64   b)  const { return {_mm_castpd_ps(CMPGTF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator<=(f64   b)  const { return {_mm_castpd_ps(CMPLEF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator>=(f64   b)  const { return {_mm_castpd_ps(CMPGEF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator==(f64   b)  const { return {_mm_castpd_ps(CMPEQF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x2  operator!=(f64   b)  const { return {_mm_castpd_ps(CMPNEF64x2(m.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE friend f64x2  operator+ (f64 a, f64x2 b) { return {_mm_castpd_ps(_mm_add_pd(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x2  operator- (f64 a, f64x2 b) { return {_mm_castpd_ps(_mm_sub_pd(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x2  operator* (f64 a, f64x2 b) { return {_mm_castpd_ps(_mm_mul_pd(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x2  operator/ (f64 a, f64x2 b) { return {_mm_castpd_ps(_mm_div_pd(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator< (f64 a, f64x2 b) { return {_mm_castpd_ps(CMPLTF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator> (f64 a, f64x2 b) { return {_mm_castpd_ps(CMPGTF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator<=(f64 a, f64x2 b) { return {_mm_castpd_ps(CMPLEF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator>=(f64 a, f64x2 b) { return {_mm_castpd_ps(CMPGEF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator==(f64 a, f64x2 b) { return {_mm_castpd_ps(CMPEQF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x2  operator!=(f64 a, f64x2 b) { return {_mm_castpd_ps(CMPNEF64x2(_mm_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE        f64x2 &operator+=(f64x2 b)        { return m.pd = _mm_add_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x2 &operator-=(f64x2 b)        { return m.pd = _mm_sub_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x2 &operator*=(f64x2 b)        { return m.pd = _mm_mul_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x2 &operator/=(f64x2 b)        { return m.pd = _mm_div_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x2 &operator+=(f64   b)        { return m.pd = _mm_add_pd(m.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x2 &operator-=(f64   b)        { return m.pd = _mm_sub_pd(m.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x2 &operator*=(f64   b)        { return m.pd = _mm_mul_pd(m.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x2 &operator/=(f64   b)        { return m.pd = _mm_div_pd(m.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x2 &operator++ ()              { return m.pd = _mm_add_pd(m.pd, _mm_set1_pd(1)), *this; }
-	FORCEINLINE        f64x2 &operator-- ()              { return m.pd = _mm_sub_pd(m.pd, _mm_set1_pd(1)), *this; }
-	FORCEINLINE        f64x2  operator++ (int)           { auto result = *this; m.pd = _mm_add_pd(m.pd, _mm_set1_pd(1)); return result; }
-	FORCEINLINE        f64x2  operator-- (int)           { auto result = *this; m.pd = _mm_sub_pd(m.pd, _mm_set1_pd(1)); return result; }
+	f64 s[2];
+	M16 m;
+
+	FORCEINLINE f64x2 operator-()         const { RETURN_M(_mm_xor_pd(m.pd, _mm_set1_pd(-0.0f))); }
+	FORCEINLINE	f64x2 operator+ (f64x2 b) const { RETURN_M(_mm_add_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x2 operator- (f64x2 b) const { RETURN_M(_mm_sub_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x2 operator* (f64x2 b) const { RETURN_M(_mm_mul_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x2 operator/ (f64x2 b) const { RETURN_M(_mm_div_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator< (f64x2 b) const { RETURN_MASK(CMPLTF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator> (f64x2 b) const { RETURN_MASK(CMPGTF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator<=(f64x2 b) const { RETURN_MASK(CMPLEF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator>=(f64x2 b) const { RETURN_MASK(CMPGEF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator==(f64x2 b) const { RETURN_MASK(CMPEQF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator!=(f64x2 b) const { RETURN_MASK(CMPNEF64x2(m.pd, b.m.pd)); }
+	OPERATORS_FLOAT(F64x2)
 
 	//CVT(s64x2);
 	//CVT(u64x2);
@@ -1121,103 +1022,32 @@ union f64x<2> {
 };
 template <>
 union f64x<4> {
-#if ARCH_AVX
-	M32 m;
-#endif
-	struct {
-		M16 lo, hi;
-	};
+	using Scalar = f64;
+	using Vector = f64x;
+	using Mask   = b64x4;
+
 	f64 s[4];
+	struct {
+		f64x2 lo, hi;
+	};
 
 #if ARCH_AVX
-	FORCEINLINE        f64x4  operator-()          const { return {_mm256_castpd_ps(_mm256_xor_pd(m.pd, _mm256_set1_pd(-0.0f)))}; }
-	FORCEINLINE	       f64x4  operator+ (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_add_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x4  operator- (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_sub_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x4  operator* (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_mul_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       f64x4  operator/ (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_div_pd(m.pd, b.m.pd))}; }
-	FORCEINLINE	       b64x4  operator< (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LT_OQ ))}; }
-	FORCEINLINE	       b64x4  operator> (f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GT_OQ ))}; }
-	FORCEINLINE	       b64x4  operator<=(f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LE_OQ ))}; }
-	FORCEINLINE	       b64x4  operator>=(f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GE_OQ ))}; }
-	FORCEINLINE	       b64x4  operator==(f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_EQ_OQ ))}; }
-	FORCEINLINE	       b64x4  operator!=(f64x4 b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_NEQ_OQ))}; }
-	FORCEINLINE	       f64x4  operator+ (f64   b)  const { return {_mm256_castpd_ps(_mm256_add_pd(m.pd, _mm256_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator- (f64   b)  const { return {_mm256_castpd_ps(_mm256_sub_pd(m.pd, _mm256_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator* (f64   b)  const { return {_mm256_castpd_ps(_mm256_mul_pd(m.pd, _mm256_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator/ (f64   b)  const { return {_mm256_castpd_ps(_mm256_div_pd(m.pd, _mm256_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator< (f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_LT_OQ ))}; }
-	FORCEINLINE	       b64x4  operator> (f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_GT_OQ ))}; }
-	FORCEINLINE	       b64x4  operator<=(f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_LE_OQ ))}; }
-	FORCEINLINE	       b64x4  operator>=(f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_GE_OQ ))}; }
-	FORCEINLINE	       b64x4  operator==(f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_EQ_OQ ))}; }
-	FORCEINLINE	       b64x4  operator!=(f64   b)  const { return {_mm256_castpd_ps(_mm256_cmp_pd(m.pd, _mm256_set1_pd(b), _CMP_NEQ_OQ))}; }
-	FORCEINLINE friend f64x4  operator+ (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_add_pd(_mm256_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x4  operator- (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_sub_pd(_mm256_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x4  operator* (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_mul_pd(_mm256_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend f64x4  operator/ (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_div_pd(_mm256_set1_pd(a), b.m.pd))}; }
-	FORCEINLINE friend b64x4  operator< (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_LT_OQ ))}; }
-	FORCEINLINE friend b64x4  operator> (f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_GT_OQ ))}; }
-	FORCEINLINE friend b64x4  operator<=(f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_LE_OQ ))}; }
-	FORCEINLINE friend b64x4  operator>=(f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_GE_OQ ))}; }
-	FORCEINLINE friend b64x4  operator==(f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_EQ_OQ ))}; }
-	FORCEINLINE friend b64x4  operator!=(f64 a, f64x4 b) { return {_mm256_castpd_ps(_mm256_cmp_pd(_mm256_set1_pd(a), b.m.pd, _CMP_NEQ_OQ))}; }
-	FORCEINLINE        f64x4 &operator+=(f64x4 b)        { return m.pd = _mm256_add_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x4 &operator-=(f64x4 b)        { return m.pd = _mm256_sub_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x4 &operator*=(f64x4 b)        { return m.pd = _mm256_mul_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x4 &operator/=(f64x4 b)        { return m.pd = _mm256_div_pd(m.pd, b.m.pd), *this; }
-	FORCEINLINE        f64x4 &operator+=(f64   b)        { return m.pd = _mm256_add_pd(m.pd, _mm256_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator-=(f64   b)        { return m.pd = _mm256_sub_pd(m.pd, _mm256_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator*=(f64   b)        { return m.pd = _mm256_mul_pd(m.pd, _mm256_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator/=(f64   b)        { return m.pd = _mm256_div_pd(m.pd, _mm256_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator++ ()              { return m.pd = _mm256_add_pd(m.pd, _mm256_set1_pd(1)), *this; }
-	FORCEINLINE        f64x4 &operator-- ()              { return m.pd = _mm256_sub_pd(m.pd, _mm256_set1_pd(1)), *this; }
-	FORCEINLINE        f64x4  operator++ (int)           { auto result = *this; m.pd = _mm256_add_pd(m.pd, _mm256_set1_pd(1)); return result; }
-	FORCEINLINE        f64x4  operator-- (int)           { auto result = *this; m.pd = _mm256_sub_pd(m.pd, _mm256_set1_pd(1)); return result; }
-#else
-	FORCEINLINE        f64x4  operator-()          const { return {_mm_castpd_ps(_mm_xor_pd(lo.pd, _mm_set1_pd(-0.0f))), _mm_castpd_ps(_mm_xor_pd(hi.pd, _mm_set1_pd(-0.0f)))}; }
-	FORCEINLINE	       f64x4  operator+ (f64x4 b)  const { return {_mm_castpd_ps(_mm_add_pd(lo.pd, b.lo.pd)), _mm_castpd_ps(_mm_add_pd(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       f64x4  operator- (f64x4 b)  const { return {_mm_castpd_ps(_mm_sub_pd(lo.pd, b.lo.pd)), _mm_castpd_ps(_mm_sub_pd(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       f64x4  operator* (f64x4 b)  const { return {_mm_castpd_ps(_mm_mul_pd(lo.pd, b.lo.pd)), _mm_castpd_ps(_mm_mul_pd(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       f64x4  operator/ (f64x4 b)  const { return {_mm_castpd_ps(_mm_div_pd(lo.pd, b.lo.pd)), _mm_castpd_ps(_mm_div_pd(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator< (f64x4 b)  const { return {_mm_castpd_ps(CMPLTF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPLTF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator> (f64x4 b)  const { return {_mm_castpd_ps(CMPGTF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPGTF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator<=(f64x4 b)  const { return {_mm_castpd_ps(CMPLEF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPLEF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator>=(f64x4 b)  const { return {_mm_castpd_ps(CMPGEF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPGEF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator==(f64x4 b)  const { return {_mm_castpd_ps(CMPEQF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPEQF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       b64x4  operator!=(f64x4 b)  const { return {_mm_castpd_ps(CMPNEF64x2(lo.pd, b.lo.pd)), _mm_castpd_ps(CMPNEF64x2(hi.pd, b.hi.pd))}; }
-	FORCEINLINE	       f64x4  operator+ (f64   b)  const { return {_mm_castpd_ps(_mm_add_pd(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(_mm_add_pd(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator- (f64   b)  const { return {_mm_castpd_ps(_mm_sub_pd(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(_mm_sub_pd(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator* (f64   b)  const { return {_mm_castpd_ps(_mm_mul_pd(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(_mm_mul_pd(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       f64x4  operator/ (f64   b)  const { return {_mm_castpd_ps(_mm_div_pd(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(_mm_div_pd(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator< (f64   b)  const { return {_mm_castpd_ps(CMPLTF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPLTF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator> (f64   b)  const { return {_mm_castpd_ps(CMPGTF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPGTF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator<=(f64   b)  const { return {_mm_castpd_ps(CMPLEF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPLEF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator>=(f64   b)  const { return {_mm_castpd_ps(CMPGEF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPGEF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator==(f64   b)  const { return {_mm_castpd_ps(CMPEQF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPEQF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE	       b64x4  operator!=(f64   b)  const { return {_mm_castpd_ps(CMPNEF64x2(lo.pd, _mm_set1_pd(b))), _mm_castpd_ps(CMPNEF64x2(hi.pd, _mm_set1_pd(b)))}; }
-	FORCEINLINE friend f64x4  operator+ (f64 a, f64x4 b) { return {_mm_castpd_ps(_mm_add_pd(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(_mm_add_pd(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend f64x4  operator- (f64 a, f64x4 b) { return {_mm_castpd_ps(_mm_sub_pd(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(_mm_sub_pd(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend f64x4  operator* (f64 a, f64x4 b) { return {_mm_castpd_ps(_mm_mul_pd(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(_mm_mul_pd(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend f64x4  operator/ (f64 a, f64x4 b) { return {_mm_castpd_ps(_mm_div_pd(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(_mm_div_pd(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator< (f64 a, f64x4 b) { return {_mm_castpd_ps(CMPLTF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPLTF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator> (f64 a, f64x4 b) { return {_mm_castpd_ps(CMPGTF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPGTF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator<=(f64 a, f64x4 b) { return {_mm_castpd_ps(CMPLEF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPLEF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator>=(f64 a, f64x4 b) { return {_mm_castpd_ps(CMPGEF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPGEF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator==(f64 a, f64x4 b) { return {_mm_castpd_ps(CMPEQF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPEQF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE friend b64x4  operator!=(f64 a, f64x4 b) { return {_mm_castpd_ps(CMPNEF64x2(_mm_set1_pd(a), b.lo.pd)), _mm_castpd_ps(CMPNEF64x2(_mm_set1_pd(a), b.hi.pd))}; }
-	FORCEINLINE        f64x4 &operator+=(f64x4 b)        { return lo.pd = _mm_add_pd(lo.pd, b.lo.pd), hi.pd = _mm_add_pd(hi.pd, b.hi.pd), *this; }
-	FORCEINLINE        f64x4 &operator-=(f64x4 b)        { return lo.pd = _mm_sub_pd(lo.pd, b.lo.pd), hi.pd = _mm_sub_pd(hi.pd, b.hi.pd), *this; }
-	FORCEINLINE        f64x4 &operator*=(f64x4 b)        { return lo.pd = _mm_mul_pd(lo.pd, b.lo.pd), hi.pd = _mm_mul_pd(hi.pd, b.hi.pd), *this; }
-	FORCEINLINE        f64x4 &operator/=(f64x4 b)        { return lo.pd = _mm_div_pd(lo.pd, b.lo.pd), hi.pd = _mm_div_pd(hi.pd, b.hi.pd), *this; }
-	FORCEINLINE        f64x4 &operator+=(f64   b)        { return lo.pd = _mm_add_pd(lo.pd, _mm_set1_pd(b)), hi.pd = _mm_add_pd(hi.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator-=(f64   b)        { return lo.pd = _mm_sub_pd(lo.pd, _mm_set1_pd(b)), hi.pd = _mm_sub_pd(hi.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator*=(f64   b)        { return lo.pd = _mm_mul_pd(lo.pd, _mm_set1_pd(b)), hi.pd = _mm_mul_pd(hi.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator/=(f64   b)        { return lo.pd = _mm_div_pd(lo.pd, _mm_set1_pd(b)), hi.pd = _mm_div_pd(hi.pd, _mm_set1_pd(b)), *this; }
-	FORCEINLINE        f64x4 &operator++ ()              { return lo.pd = _mm_add_pd(lo.pd, _mm_set1_pd(1)), hi.pd = _mm_add_pd(hi.pd, _mm_set1_pd(1)), *this; }
-	FORCEINLINE        f64x4 &operator-- ()              { return lo.pd = _mm_sub_pd(lo.pd, _mm_set1_pd(1)), hi.pd = _mm_sub_pd(hi.pd, _mm_set1_pd(1)), *this; }
-	FORCEINLINE        f64x4  operator++ (int)           { auto result = *this; lo.pd = _mm_add_pd(lo.pd, _mm_set1_pd(1)); hi.pd = _mm_add_pd(hi.pd, _mm_set1_pd(1)); return result; }
-	FORCEINLINE        f64x4  operator-- (int)           { auto result = *this; lo.pd = _mm_sub_pd(lo.pd, _mm_set1_pd(1)); hi.pd = _mm_sub_pd(hi.pd, _mm_set1_pd(1)); return result; }
+	M32 m;
+	FORCEINLINE f64x4 operator-()         const { RETURN_M(_mm256_xor_pd(m.pd, _mm256_set1_pd(-0.0f))); }
+	FORCEINLINE	f64x4 operator+ (f64x4 b) const { RETURN_M(_mm256_add_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x4 operator- (f64x4 b) const { RETURN_M(_mm256_sub_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x4 operator* (f64x4 b) const { RETURN_M(_mm256_mul_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	f64x4 operator/ (f64x4 b) const { RETURN_M(_mm256_div_pd(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x4 operator< (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LT_OQ )); }
+	FORCEINLINE	b64x4 operator> (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GT_OQ )); }
+	FORCEINLINE	b64x4 operator<=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LE_OQ )); }
+	FORCEINLINE	b64x4 operator>=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GE_OQ )); }
+	FORCEINLINE	b64x4 operator==(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_EQ_OQ )); }
+	FORCEINLINE	b64x4 operator!=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_NEQ_OQ)); }
+#else                                                                                        
+	FALLBACK_FLOAT;
 #endif
+	OPERATORS_FLOAT(F64x4)
 
 	CVT(u32x4);
 	//CVT(s64x4);
@@ -1226,10 +1056,58 @@ union f64x<4> {
 	INDEX_S(f64);
 };
 
+#define OPERATORS_INT(extend) \
+	OPERATOR_COMPARE(>, extend) \
+	OPERATOR_COMPARE(<, extend) \
+	OPERATOR_COMPARE(>=, extend) \
+	OPERATOR_COMPARE(<=, extend) \
+	OPERATOR_COMPARE(==, extend) \
+	OPERATOR_COMPARE(!=, extend) \
+	OPERATOR_ALL_VER(+, extend) \
+	OPERATOR_ALL_VER(-, extend) \
+	OPERATOR_ALL_VER(*, extend) \
+	OPERATOR_ALL_VER(/, extend) \
+	OPERATOR_ALL_VER(%, extend) \
+	OPERATOR_ALL_VER(^, extend) \
+	OPERATOR_ALL_VER(&, extend) \
+	OPERATOR_ALL_VER(|, extend) \
+	OPERATOR_MODIFY(>>, extend) \
+	OPERATOR_MODIFY(<<, extend) \
+	FORCEINLINE Mask operator!() const { return *this == 0; } \
+	OPERATOR_XCREMENT(extend)
+
+#define FALLBACK_INT_NO_BITWISE                                                                  \
+	FORCEINLINE Vector operator-() const { RETURN_2(-lo, -hi); }                                 \
+	FORCEINLINE Vector operator+(Vector b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
+	FORCEINLINE Vector operator-(Vector b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
+	FORCEINLINE Vector operator*(Vector b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
+	FORCEINLINE Vector operator/(Vector b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
+	FORCEINLINE Vector operator%(Vector b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
+	FORCEINLINE Vector operator<<(Vector b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
+	FORCEINLINE Vector operator>>(Vector b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
+	FORCEINLINE Vector operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
+	FORCEINLINE Vector operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
+	FORCEINLINE friend Vector operator<<(Scalar a, Vector b) { RETURN_2(a << b.lo, a << b.hi); } \
+	FORCEINLINE friend Vector operator>>(Scalar a, Vector b) { RETURN_2(a >> b.lo, a >> b.hi); } \
+	FORCEINLINE Mask operator> (Vector b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
+	FORCEINLINE Mask operator< (Vector b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
+	FORCEINLINE Mask operator>=(Vector b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
+	FORCEINLINE Mask operator<=(Vector b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
+	FORCEINLINE Mask operator==(Vector b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
+	FORCEINLINE Mask operator!=(Vector b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+
+#define FALLBACK_INT                                                                 \
+	FALLBACK_INT_NO_BITWISE                                                          \
+	FORCEINLINE Vector operator~() const { RETURN_2(~lo, ~hi); }                     \
+	FORCEINLINE Vector operator^(Vector b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
+	FORCEINLINE Vector operator&(Vector b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
+	FORCEINLINE Vector operator|(Vector b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
+
+#if 0
 template<>
 union s32x<1> {
-	s32 m;
 	s32 s[1];
+	s32 m;
 	
 	FORCEINLINE        s32x1  operator-()          const { return {-m}; }
 	FORCEINLINE	       s32x1  operator+ (s32x1 b)  const { return {m +  b.m}; }
@@ -1295,91 +1173,48 @@ union s32x<1> {
 	FORCEINLINE        s32x1  operator++ (int)           { return {m++}; }
 	FORCEINLINE        s32x1  operator-- (int)           { return {m--}; }
 
+	OPERATORS_INT;
+
 	CVT(f32x1);
 	CVT(u32x1);
 	MEMFUNS_DATA(s32);
 	INDEX_S(s32);
 };
+#endif
 
 template<>
 union s32x<4> {
+	using Scalar = s32;
+	using Vector = s32x;
+	using Mask = b32x4;
+
 	M16 m;
 	s32 s[4];
 
-	FORCEINLINE        s32x4  operator-()          const { return {_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), m.pi))}; }
-	FORCEINLINE        s32x4  operator~()          const { return {_mm_not_ps(m.ps)}; }
-	FORCEINLINE	       s32x4  operator+ (s32x4 b)  const { return {_mm_castpi_ps(_mm_add_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator- (s32x4 b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator* (s32x4 b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator/ (s32x4 b)  const { return {_mm_castpi_ps(_mm_div_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator% (s32x4 b)  const { return {_mm_castpi_ps(_mm_rem_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator^ (s32x4 b)  const { return {_mm_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x4  operator& (s32x4 b)  const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x4  operator| (s32x4 b)  const { return { _mm_or_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x4  operator<<(s32x4 b)  const { return {_mm_castpi_ps(_mm_sllv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator>>(s32x4 b)  const { return {_mm_castpi_ps(_mm_srlv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator< (s32x4 b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator> (s32x4 b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator<=(s32x4 b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator>=(s32x4 b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator==(s32x4 b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator!=(s32x4 b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x4  operator+ (s32   b)  const { return {_mm_castpi_ps(_mm_add_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator- (s32   b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator* (s32   b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator/ (s32   b)  const { return {_mm_castpi_ps(_mm_div_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator% (s32   b)  const { return {_mm_castpi_ps(_mm_rem_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator^ (s32   b)  const { return {_mm_xor_ps(m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator& (s32   b)  const { return {_mm_and_ps(m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator| (s32   b)  const { return { _mm_or_ps(m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x4  operator<<(s32   b)  const { return {_mm_castpi_ps(_mm_slli_epi32(m.pi, b))}; }
-	FORCEINLINE	       s32x4  operator>>(s32   b)  const { return {_mm_castpi_ps(_mm_srli_epi32(m.pi, b))}; }
-	FORCEINLINE	       b32x4  operator< (s32   b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator> (s32   b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator<=(s32   b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator>=(s32   b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator==(s32   b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator!=(s32   b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE friend s32x4  operator+ (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x4  operator- (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x4  operator* (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x4  operator/ (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_div_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend s32x4  operator% (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_rem_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend s32x4  operator^ (s32 a, s32x4 b) { return {_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x4  operator& (s32 a, s32x4 b) { return {_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x4  operator| (s32 a, s32x4 b) { return { _mm_or_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x4  operator<<(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_slliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE	friend s32x4  operator>>(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_srliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator< (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator> (s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator<=(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator>=(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator==(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator!=(s32 a, s32x4 b) { return {_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE        s32x4 &operator+= (s32x4 b)       { return m.pi = _mm_add_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x4 &operator-= (s32x4 b)       { return m.pi = _mm_sub_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x4 &operator*= (s32x4 b)       { return m.pi = _mm_mullo_epi32(m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x4 &operator/= (s32x4 b)       { return m.pi = _mm_div_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x4 &operator%= (s32x4 b)       { return m.pi = _mm_rem_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x4 &operator^= (s32x4 b)       { return m.ps = _mm_xor_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x4 &operator&= (s32x4 b)       { return m.ps = _mm_and_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x4 &operator|= (s32x4 b)       { return m.ps = _mm_or_ps      (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x4 &operator<<=(s32x4 b)       { return m.pi = _mm_sllv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x4 &operator>>=(s32x4 b)       { return m.pi = _mm_srlv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x4 &operator+= (s32   b)       { return m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x4 &operator-= (s32   b)       { return m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x4 &operator*= (s32   b)       { return m.pi = _mm_mullo_epi32(m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x4 &operator/= (s32   b)       { return m.pi = _mm_div_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE	       s32x4 &operator%= (s32   b)       { return m.pi = _mm_rem_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE	       s32x4 &operator^= (s32   b)       { return m.ps = _mm_xor_ps     (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x4 &operator&= (s32   b)       { return m.ps = _mm_and_ps     (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x4 &operator|= (s32   b)       { return m.ps = _mm_or_ps      (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x4 &operator<<=(s32   b)       { return m.pi = _mm_slli_epi32(m.pi, b), *this; }
-	FORCEINLINE	       s32x4 &operator>>=(s32   b)       { return m.pi = _mm_srli_epi32(m.pi, b), *this; }
-	FORCEINLINE        s32x4 &operator++ ()              { return m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(1)), *this; }
-	FORCEINLINE        s32x4 &operator-- ()              { return m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(1)), *this; }
-	FORCEINLINE        s32x4  operator++ (int)           { auto result = *this; m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        s32x4  operator-- (int)           { auto result = *this; m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(1)); return result; }
+	FORCEINLINE        s32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
+	FORCEINLINE        s32x4  operator~()          const { RETURN_M(_mm_not_ps(m.ps)); }
+	FORCEINLINE	       s32x4  operator+ (s32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator- (s32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator* (s32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator/ (s32x4 b)  const { RETURN_M(_mm_div_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator% (s32x4 b)  const { RETURN_M(_mm_rem_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator^ (s32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x4  operator& (s32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x4  operator| (s32x4 b)  const { RETURN_M( _mm_or_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x4  operator<<(s32x4 b)  const { RETURN_M(_mm_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator>>(s32x4 b)  const { RETURN_M(_mm_srlv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator< (s32x4 b)  const { RETURN_MASK(_mm_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator> (s32x4 b)  const { RETURN_MASK(_mm_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator<=(s32x4 b)  const { RETURN_MASK(_mm_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator>=(s32x4 b)  const { RETURN_MASK(_mm_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator==(s32x4 b)  const { RETURN_MASK(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator!=(s32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x4  operator<<(s32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
+	FORCEINLINE	       s32x4  operator>>(s32   b)  const { RETURN_M(_mm_srai_epi32(m.pi, b)); }
+	FORCEINLINE	friend s32x4  operator<<(s32 a, s32x4 b) { RETURN_M(_mm_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend s32x4  operator>>(s32 a, s32x4 b) { RETURN_M(_mm_sraiv_epi32(a, b.m.pi)); }
+	
+	OPERATORS_INT(S32x4);
 
 	CVT(f32x4);
 	CVT(u32x4);
@@ -1389,239 +1224,53 @@ union s32x<4> {
 
 template<>
 union s32x<8> {
+	using Scalar = s32;
+	using Vector = s32x;
+	using Mask = b32x8;
+
+	s32 s[8];
+
 #if ARCH_AVX
 	M32 m;
 #endif
+
 	struct {
-		M16 lo, hi;
+		s32x4 lo, hi;
 	};
 #if ARCH_AVX2
-	FORCEINLINE        s32x8  operator-()          const { return {_mm256_castpi_ps(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi))}; }
-	FORCEINLINE        s32x8  operator~()          const { return {_mm256_not_ps(m.ps)}; }
-	FORCEINLINE	       s32x8  operator+ (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_add_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator- (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_sub_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator* (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_mullo_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator/ (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_div_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator% (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_rem_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator^ (s32x8 b)  const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x8  operator& (s32x8 b)  const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x8  operator| (s32x8 b)  const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE	       s32x8  operator<<(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_sllv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator>>(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_srav_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator< (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmplt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator> (s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator<=(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmple_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator>=(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpge_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator==(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator!=(s32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpne_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       s32x8  operator+ (s32   b)  const { return {_mm256_castpi_ps(_mm256_add_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator- (s32   b)  const { return {_mm256_castpi_ps(_mm256_sub_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator* (s32   b)  const { return {_mm256_castpi_ps(_mm256_mullo_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator/ (s32   b)  const { return {_mm256_castpi_ps(_mm256_div_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator% (s32   b)  const { return {_mm256_castpi_ps(_mm256_rem_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator^ (s32   b)  const { return {_mm256_xor_ps(m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator& (s32   b)  const { return {_mm256_and_ps(m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator| (s32   b)  const { return {_mm256_or_ps (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       s32x8  operator<<(s32   b)  const { return {_mm256_castpi_ps(_mm256_slli_epi32(m.pi, b))}; }
-	FORCEINLINE	       s32x8  operator>>(s32   b)  const { return {_mm256_castpi_ps(_mm256_srai_epi32(m.pi, b))}; }
-	FORCEINLINE	       b32x8  operator< (s32   b)  const { return {_mm256_castpi_ps(_mm256_cmplt_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator> (s32   b)  const { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator<=(s32   b)  const { return {_mm256_castpi_ps(_mm256_cmple_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator>=(s32   b)  const { return {_mm256_castpi_ps(_mm256_cmpge_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator==(s32   b)  const { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator!=(s32   b)  const { return {_mm256_castpi_ps(_mm256_cmpne_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE friend s32x8  operator+ (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_add_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x8  operator- (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_sub_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x8  operator* (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_mullo_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend s32x8  operator/ (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_div_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend s32x8  operator% (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_rem_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend s32x8  operator^ (s32 a, s32x8 b) { return {_mm256_xor_ps(_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x8  operator& (s32 a, s32x8 b) { return {_mm256_and_ps(_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x8  operator| (s32 a, s32x8 b) { return {_mm256_or_ps (_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend s32x8  operator<<(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_slliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE	friend s32x8  operator>>(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_sraiv_epi32(a, b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator< (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmplt_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator> (s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator<=(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmple_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator>=(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmpge_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator==(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator!=(s32 a, s32x8 b) { return {_mm256_castpi_ps(_mm256_cmpne_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE        s32x8 &operator+= (s32x8 b)       { return m.pi = _mm256_add_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x8 &operator-= (s32x8 b)       { return m.pi = _mm256_sub_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x8 &operator*= (s32x8 b)       { return m.pi = _mm256_mullo_epi32(m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x8 &operator/= (s32x8 b)       { return m.pi = _mm256_div_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32x8 b)       { return m.pi = _mm256_rem_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32x8 b)       { return m.ps = _mm256_xor_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32x8 b)       { return m.ps = _mm256_and_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32x8 b)       { return m.ps = _mm256_or_ps      (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32x8 b)       { return m.pi = _mm256_sllv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32x8 b)       { return m.pi = _mm256_srav_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE        s32x8 &operator+= (s32   b)       { return m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x8 &operator-= (s32   b)       { return m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x8 &operator*= (s32   b)       { return m.pi = _mm256_mullo_epi32(m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        s32x8 &operator/= (s32   b)       { return m.pi = _mm256_div_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32   b)       { return m.pi = _mm256_rem_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32   b)       { return m.ps = _mm256_xor_ps     (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32   b)       { return m.ps = _mm256_and_ps     (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32   b)       { return m.ps = _mm256_or_ps      (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32   b)       { return m.pi = _mm256_slli_epi32(m.pi, b), *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32   b)       { return m.pi = _mm256_srai_epi32(m.pi, b), *this; }
-	FORCEINLINE        s32x8 &operator++ ()              { return m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(1)), *this; }
-	FORCEINLINE        s32x8 &operator-- ()              { return m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(1)), *this; }
-	FORCEINLINE        s32x8  operator++ (int)           { auto result = *this; m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(1)); return result; }
-	FORCEINLINE        s32x8  operator-- (int)           { auto result = *this; m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(1)); return result; }
+	FORCEINLINE        s32x8  operator-()          const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	FORCEINLINE        s32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	       s32x8  operator+ (s32x8 b)  const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator- (s32x8 b)  const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator* (s32x8 b)  const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator/ (s32x8 b)  const { RETURN_M(_mm256_div_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator% (s32x8 b)  const { RETURN_M(_mm256_rem_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator^ (s32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x8  operator& (s32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x8  operator| (s32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE	       s32x8  operator<<(s32x8 b)  const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator>>(s32x8 b)  const { RETURN_M(_mm256_srav_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator< (s32x8 b)  const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator> (s32x8 b)  const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator<=(s32x8 b)  const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator>=(s32x8 b)  const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator==(s32x8 b)  const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator!=(s32x8 b)  const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       s32x8  operator<<(s32   b)  const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
+	FORCEINLINE	       s32x8  operator>>(s32   b)  const { RETURN_M(_mm256_srai_epi32(m.pi, b)); }
+	FORCEINLINE	friend s32x8  operator<<(s32 a, s32x8 b) { RETURN_M(_mm256_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend s32x8  operator>>(s32 a, s32x8 b) { RETURN_M(_mm256_sraiv_epi32(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE        s32x8  operator-()          const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), lo.pi))        , _mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), hi.pi)))        }; }
-	FORCEINLINE        s32x8  operator~()          const { return {_mm256_setr_m128(_mm_not_ps(lo.ps), _mm_not_ps(hi.ps))}; }
-	FORCEINLINE	       s32x8  operator+ (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_add_epi32  (hi.pi, b.hi.pi)))               }; }
-	FORCEINLINE	       s32x8  operator- (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, b.hi.pi)))               }; }
-	FORCEINLINE	       s32x8  operator* (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, b.hi.pi)))               }; }
-	FORCEINLINE	       s32x8  operator/ (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_div_epi32  (hi.pi, b.hi.pi)))               }; }
-	FORCEINLINE	       s32x8  operator% (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_rem_epi32  (hi.pi, b.hi.pi)))               }; }
-	FORCEINLINE	       s32x8  operator^ (s32x8 b)  const { return {_mm256_setr_m128(_mm_xor_ps(lo.ps, b.lo.ps)                                   , _mm_xor_ps(hi.ps, b.hi.ps))                                   }; }
-	FORCEINLINE	       s32x8  operator& (s32x8 b)  const { return {_mm256_setr_m128(_mm_and_ps(lo.ps, b.lo.ps)                                   , _mm_and_ps(hi.ps, b.hi.ps))                                   }; }
-	FORCEINLINE	       s32x8  operator| (s32x8 b)  const { return {_mm256_setr_m128(_mm_or_ps (lo.ps, b.lo.ps)                                   , _mm_or_ps (hi.ps, b.hi.ps))                                   }; }
-	FORCEINLINE	       s32x8  operator<<(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sllv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_sllv_epi32(hi.pi, b.hi.pi)))                }; }
-	FORCEINLINE	       s32x8  operator>>(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srlv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_srlv_epi32(hi.pi, b.hi.pi)))                }; }
-	FORCEINLINE	       b32x8  operator< (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       b32x8  operator> (s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       b32x8  operator<=(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmple_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       b32x8  operator>=(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       b32x8  operator==(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       b32x8  operator!=(s32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, b.hi.pi)))            }; }
-	FORCEINLINE	       s32x8  operator+ (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_add_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       s32x8  operator- (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       s32x8  operator* (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       s32x8  operator/ (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_div_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       s32x8  operator% (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_rem_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       s32x8  operator^ (s32   b)  const { return {_mm256_setr_m128(_mm_xor_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_xor_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       s32x8  operator& (s32   b)  const { return {_mm256_setr_m128(_mm_and_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_and_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       s32x8  operator| (s32   b)  const { return {_mm256_setr_m128(_mm_or_ps (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_or_ps (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       s32x8  operator<<(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_slli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_slli_epi32(hi.pi, b))                      )}; }
-	FORCEINLINE	       s32x8  operator>>(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_srli_epi32(hi.pi, b))                      )}; }
-	FORCEINLINE	       b32x8  operator< (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE	       b32x8  operator> (s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE	       b32x8  operator<=(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmple_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE	       b32x8  operator>=(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE	       b32x8  operator==(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE	       b32x8  operator!=(s32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, _mm_set1_epi32(b))))}; }
-	FORCEINLINE friend s32x8  operator+ (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.hi.pi))  )}; }
-	FORCEINLINE friend s32x8  operator- (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.hi.pi))  )}; }
-	FORCEINLINE friend s32x8  operator* (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.hi.pi))  )}; }
-	FORCEINLINE friend s32x8  operator/ (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_div_epi32  (_mm_set1_epi32(a), b.hi.pi))  )}; }
-	FORCEINLINE	friend s32x8  operator% (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_rem_epi32  (_mm_set1_epi32(a), b.hi.pi))  )}; }
-	FORCEINLINE	friend s32x8  operator^ (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)       )}; }
-	FORCEINLINE	friend s32x8  operator& (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)       )}; }
-	FORCEINLINE	friend s32x8  operator| (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)       )}; }
-	FORCEINLINE	friend s32x8  operator<<(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_slliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_slliv_epi32(a, b.hi.pi))                  )}; }
-	FORCEINLINE	friend s32x8  operator>>(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_srliv_epi32(a, b.hi.pi))                  )}; }
-	FORCEINLINE friend b32x8  operator< (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE friend b32x8  operator> (s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE friend b32x8  operator<=(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE friend b32x8  operator>=(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE friend b32x8  operator==(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE friend b32x8  operator!=(s32 a, s32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.hi.pi)))}; }
-	FORCEINLINE        s32x8 &operator+= (s32x8 b)       { return lo.pi = _mm_add_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_add_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator-= (s32x8 b)       { return lo.pi = _mm_sub_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_sub_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator*= (s32x8 b)       { return lo.pi = _mm_mullo_epi32(lo.pi, b.lo.pi)                         , hi.pi = _mm_mullo_epi32(hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator/= (s32x8 b)       { return lo.pi = _mm_div_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_div_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32x8 b)       { return lo.pi = _mm_rem_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_rem_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32x8 b)       { return lo.ps = _mm_xor_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_xor_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32x8 b)       { return lo.ps = _mm_and_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_and_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32x8 b)       { return lo.ps = _mm_or_ps      (lo.ps, b.lo.ps)                         , hi.ps = _mm_or_ps      (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32x8 b)       { return lo.pi = _mm_sllv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_sllv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32x8 b)       { return lo.pi = _mm_srlv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_srlv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator+= (s32   b)       { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator-= (s32   b)       { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator*= (s32   b)       { return lo.pi = _mm_mullo_epi32(lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_mullo_epi32(hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator/= (s32   b)       { return lo.pi = _mm_div_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_div_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32   b)       { return lo.pi = _mm_rem_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_rem_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32   b)       { return lo.ps = _mm_xor_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_xor_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32   b)       { return lo.ps = _mm_and_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_and_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32   b)       { return lo.ps = _mm_or_ps      (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_or_ps      (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32   b)       { return lo.pi = _mm_slli_epi32 (lo.pi, b)                               , hi.pi = _mm_slli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32   b)       { return lo.pi = _mm_srli_epi32 (lo.pi, b)                               , hi.pi = _mm_srli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE        s32x8 &operator++ ()              { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        s32x8 &operator-- ()              { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        s32x8  operator++ (int)           { auto result = *this; lo.pi = _mm_add_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_add_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        s32x8  operator-- (int)           { auto result = *this; lo.pi = _mm_sub_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_sub_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
+	FORCEINLINE s32x8 operator~()         const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	s32x8 operator^ (s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator& (s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator| (s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FALLBACK_INT_NO_BITWISE;
 #else
-	FORCEINLINE        s32x8  operator-()          const { return {_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), lo.pi))        , _mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), hi.pi))        }; }
-	FORCEINLINE        s32x8  operator~()          const { return {_mm_not_ps(lo.ps), _mm_not_ps(hi.ps)}; }
-	FORCEINLINE	       s32x8  operator+ (s32x8 b)  const { return {_mm_castpi_ps(_mm_add_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_add_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       s32x8  operator- (s32x8 b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       s32x8  operator* (s32x8 b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       s32x8  operator/ (s32x8 b)  const { return {_mm_castpi_ps(_mm_div_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_div_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       s32x8  operator% (s32x8 b)  const { return {_mm_castpi_ps(_mm_rem_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_rem_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       s32x8  operator^ (s32x8 b)  const { return {_mm_xor_ps(lo.ps, b.lo.ps)                                   , _mm_xor_ps(hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       s32x8  operator& (s32x8 b)  const { return {_mm_and_ps(lo.ps, b.lo.ps)                                   , _mm_and_ps(hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       s32x8  operator| (s32x8 b)  const { return {_mm_or_ps (lo.ps, b.lo.ps)                                   , _mm_or_ps (hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       s32x8  operator<<(s32x8 b)  const { return {_mm_castpi_ps(_mm_sllv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_sllv_epi32(hi.pi, b.hi.pi))                }; }
-	FORCEINLINE	       s32x8  operator>>(s32x8 b)  const { return {_mm_castpi_ps(_mm_srlv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_srlv_epi32(hi.pi, b.hi.pi))                }; }
-	FORCEINLINE	       b32x8  operator< (s32x8 b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator> (s32x8 b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator<=(s32x8 b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmple_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator>=(s32x8 b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator==(s32x8 b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator!=(s32x8 b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       s32x8  operator+ (s32   b)  const { return {_mm_castpi_ps(_mm_add_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_add_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       s32x8  operator- (s32   b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       s32x8  operator* (s32   b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       s32x8  operator/ (s32   b)  const { return {_mm_castpi_ps(_mm_div_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_div_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       s32x8  operator% (s32   b)  const { return {_mm_castpi_ps(_mm_rem_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_rem_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       s32x8  operator^ (s32   b)  const { return {_mm_xor_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_xor_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       s32x8  operator& (s32   b)  const { return {_mm_and_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_and_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       s32x8  operator| (s32   b)  const { return {_mm_or_ps (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_or_ps (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       s32x8  operator<<(s32   b)  const { return {_mm_castpi_ps(_mm_slli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_slli_epi32(hi.pi, b))                      }; }
-	FORCEINLINE	       s32x8  operator>>(s32   b)  const { return {_mm_castpi_ps(_mm_srli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_srli_epi32(hi.pi, b))                      }; }
-	FORCEINLINE	       b32x8  operator< (s32   b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator> (s32   b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator<=(s32   b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmple_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator>=(s32   b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator==(s32   b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator!=(s32   b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, _mm_set1_epi32(b))), _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE friend s32x8  operator+ (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend s32x8  operator- (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend s32x8  operator* (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend s32x8  operator/ (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_div_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_div_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE	friend s32x8  operator% (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_rem_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_rem_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE	friend s32x8  operator^ (s32 a, s32x8 b) { return {_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend s32x8  operator& (s32 a, s32x8 b) { return {_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend s32x8  operator| (s32 a, s32x8 b) { return {_mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend s32x8  operator<<(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_slliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_slliv_epi32(a, b.hi.pi))                   }; }
-	FORCEINLINE	friend s32x8  operator>>(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_srliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_srliv_epi32(a, b.hi.pi))                   }; }
-	FORCEINLINE friend b32x8  operator< (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator> (s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator<=(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator>=(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator==(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator!=(s32 a, s32x8 b) { return {_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE        s32x8 &operator+= (s32x8 b)       { return lo.pi = _mm_add_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_add_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator-= (s32x8 b)       { return lo.pi = _mm_sub_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_sub_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator*= (s32x8 b)       { return lo.pi = _mm_mullo_epi32(lo.pi, b.lo.pi)                         , hi.pi = _mm_mullo_epi32(hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator/= (s32x8 b)       { return lo.pi = _mm_div_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_div_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32x8 b)       { return lo.pi = _mm_rem_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_rem_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32x8 b)       { return lo.ps = _mm_xor_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_xor_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32x8 b)       { return lo.ps = _mm_and_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_and_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32x8 b)       { return lo.ps = _mm_or_ps      (lo.ps, b.lo.ps)                         , hi.ps = _mm_or_ps      (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32x8 b)       { return lo.pi = _mm_sllv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_sllv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32x8 b)       { return lo.pi = _mm_srlv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_srlv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        s32x8 &operator+= (s32   b)       { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator-= (s32   b)       { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator*= (s32   b)       { return lo.pi = _mm_mullo_epi32(lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_mullo_epi32(hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        s32x8 &operator/= (s32   b)       { return lo.pi = _mm_div_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_div_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       s32x8 &operator%= (s32   b)       { return lo.pi = _mm_rem_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_rem_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       s32x8 &operator^= (s32   b)       { return lo.ps = _mm_xor_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_xor_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator&= (s32   b)       { return lo.ps = _mm_and_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_and_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator|= (s32   b)       { return lo.ps = _mm_or_ps      (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_or_ps      (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       s32x8 &operator<<=(s32   b)       { return lo.pi = _mm_slli_epi32 (lo.pi, b)                               , hi.pi = _mm_slli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE	       s32x8 &operator>>=(s32   b)       { return lo.pi = _mm_srli_epi32 (lo.pi, b)                               , hi.pi = _mm_srli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE        s32x8 &operator++ ()              { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        s32x8 &operator-- ()              { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        s32x8  operator++ (int)           { auto result = *this; lo.pi = _mm_add_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_add_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        s32x8  operator-- (int)           { auto result = *this; lo.pi = _mm_sub_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_sub_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
+	FALLBACK_INT;
 #endif
-	s32 s[8];
+
+	OPERATORS_INT(S32x8);
 
 	CVT(f32x8);
 	CVT(u32x8);
@@ -1631,83 +1280,37 @@ union s32x<8> {
 
 template<>
 union u32x<4> {
-	M16 m;
+	using Scalar = u32;
+	using Vector = u32x;
+	using Mask = b32x4;
+
 	u32 s[4];
+	M16 m;
 	
-	FORCEINLINE        u32x4  operator-()          const { return {_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), m.pi))}; }
-	FORCEINLINE        u32x4  operator~()          const { return {_mm_not_ps(m.ps)}; }
-	FORCEINLINE	       u32x4  operator+ (u32x4 b)  const { return {_mm_castpi_ps(_mm_add_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator- (u32x4 b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator* (u32x4 b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator/ (u32x4 b)  const { return {_mm_castpi_ps(_mm_div_epu32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator% (u32x4 b)  const { return {_mm_castpi_ps(_mm_rem_epu32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator^ (u32x4 b)  const { return {_mm_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x4  operator& (u32x4 b)  const { return {_mm_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x4  operator| (u32x4 b)  const { return {_mm_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x4  operator<<(u32x4 b)  const { return {_mm_castpi_ps(_mm_sllv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator>>(u32x4 b)  const { return {_mm_castpi_ps(_mm_srlv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator< (u32x4 b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator> (u32x4 b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator<=(u32x4 b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator>=(u32x4 b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator==(u32x4 b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x4  operator+ (u32   b)  const { return {_mm_castpi_ps(_mm_add_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator- (u32   b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator* (u32   b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator/ (u32   b)  const { return {_mm_castpi_ps(_mm_div_epu32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator% (u32   b)  const { return {_mm_castpi_ps(_mm_rem_epu32  (m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator^ (u32   b)  const { return {_mm_xor_ps(m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator& (u32   b)  const { return {_mm_and_ps(m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator| (u32   b)  const { return {_mm_or_ps (m.ps, _mm_castpi_ps(_mm_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x4  operator<<(u32   b)  const { return {_mm_castpi_ps(_mm_slli_epi32(m.pi, b))}; }
-	FORCEINLINE	       u32x4  operator>>(u32   b)  const { return {_mm_castpi_ps(_mm_srli_epi32(m.pi, b))}; }
-	FORCEINLINE	       b32x4  operator< (u32   b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator> (u32   b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator<=(u32   b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator>=(u32   b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator==(u32   b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x4  operator!=(u32   b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(m.pi, _mm_set1_epi32(b)))}; }
-	FORCEINLINE friend u32x4  operator+ (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x4  operator- (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x4  operator* (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x4  operator/ (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_div_epu32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend u32x4  operator% (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_rem_epu32  (_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend u32x4  operator^ (u32 a, u32x4 b) { return {_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x4  operator& (u32 a, u32x4 b) { return {_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x4  operator| (u32 a, u32x4 b) { return {_mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_slliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_srliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator< (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator> (u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator<=(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator>=(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator==(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x4  operator!=(u32 a, u32x4 b) { return {_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE        u32x4 &operator+= (u32x4 b)       { return m.pi = _mm_add_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x4 &operator-= (u32x4 b)       { return m.pi = _mm_sub_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x4 &operator*= (u32x4 b)       { return m.pi = _mm_mullo_epi32(m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x4 &operator/= (u32x4 b)       { return m.pi = _mm_div_epu32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x4 &operator%= (u32x4 b)       { return m.pi = _mm_rem_epu32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x4 &operator^= (u32x4 b)       { return m.ps = _mm_xor_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x4 &operator&= (u32x4 b)       { return m.ps = _mm_and_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x4 &operator|= (u32x4 b)       { return m.ps = _mm_or_ps      (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x4 &operator<<=(u32x4 b)       { return m.pi = _mm_sllv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x4 &operator>>=(u32x4 b)       { return m.pi = _mm_srlv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x4 &operator+= (u32   b)       { return m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x4 &operator-= (u32   b)       { return m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x4 &operator*= (u32   b)       { return m.pi = _mm_mullo_epi32(m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x4 &operator/= (u32   b)       { return m.pi = _mm_div_epu32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE	       u32x4 &operator%= (u32   b)       { return m.pi = _mm_rem_epu32  (m.pi, _mm_set1_epi32(b)), *this; }
-	FORCEINLINE	       u32x4 &operator^= (u32   b)       { return m.ps = _mm_xor_ps     (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x4 &operator&= (u32   b)       { return m.ps = _mm_and_ps     (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x4 &operator|= (u32   b)       { return m.ps = _mm_or_ps      (m.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x4 &operator<<=(u32   b)       { return m.pi = _mm_slli_epi32(m.pi, b), *this; }
-	FORCEINLINE	       u32x4 &operator>>=(u32   b)       { return m.pi = _mm_srli_epi32(m.pi, b), *this; }
-	FORCEINLINE        u32x4 &operator++ ()              { return m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(1)), *this; }
-	FORCEINLINE        u32x4 &operator-- ()              { return m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(1)), *this; }
-	FORCEINLINE        u32x4  operator++ (int)           { auto result = *this; m.pi = _mm_add_epi32  (m.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        u32x4  operator-- (int)           { auto result = *this; m.pi = _mm_sub_epi32  (m.pi, _mm_set1_epi32(1)); return result; }
+	FORCEINLINE        u32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
+	FORCEINLINE        u32x4  operator~()          const { RETURN_M(_mm_not_ps(m.ps)); }
+	FORCEINLINE	       u32x4  operator+ (u32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator- (u32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator* (u32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator/ (u32x4 b)  const { RETURN_M(_mm_div_epu32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator% (u32x4 b)  const { RETURN_M(_mm_rem_epu32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator^ (u32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x4  operator& (u32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x4  operator| (u32x4 b)  const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x4  operator<<(u32x4 b)  const { RETURN_M(_mm_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator>>(u32x4 b)  const { RETURN_M(_mm_srlv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator< (u32x4 b)  const { RETURN_MASK(_mm_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator> (u32x4 b)  const { RETURN_MASK(_mm_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator<=(u32x4 b)  const { RETURN_MASK(_mm_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator>=(u32x4 b)  const { RETURN_MASK(_mm_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator==(u32x4 b)  const { RETURN_MASK(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator<<(u32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
+	FORCEINLINE	       u32x4  operator>>(u32   b)  const { RETURN_M(_mm_srli_epi32(m.pi, b)); }
+	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_M(_mm_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_M(_mm_srliv_epi32(a, b.m.pi)); }
+
+	OPERATORS_INT(U32x4);
 
 	CVT(f32x4);
 	CVT(s32x4);
@@ -1716,287 +1319,54 @@ union u32x<4> {
 	INDEX_S(u32);
 };
 
-#define BROADCAST(a) _mm256_set1_epi32((int)a)
-#define NEGATE(a) _mm256_sub_epi32(_mm256_setzero_pi(), a)
-#define FLIP(a) _mm256_castps_pi(_mm256_xor_ps(_mm256_castpi_ps(a), _mm256_setone_ps()))
-#define ADD(a, b) _mm256_add_epi32(a, b)
-#define SUB(a, b) _mm256_sub_epi32(a, b)
-#define MUL(a, b) _mm256_mullo_epi32(a, b)
-#define DIV(a, b) _mm256_div_epu32(a, b)
-#define MOD(a, b) _mm256_rem_epu32(a, b)
-#define XOR(a, b) _mm256_castps_pi(_mm256_xor_ps(_mm256_castpi_ps(a), _mm256_castpi_ps(b)))
-#define AND(a, b) _mm256_castps_pi(_mm256_and_ps(_mm256_castpi_ps(a), _mm256_castpi_ps(b)))
-#define  OR(a, b) _mm256_castps_pi(_mm256_or_ps (_mm256_castpi_ps(a), _mm256_castpi_ps(b)))
-#define SHL_MM(a, b) _mm256_setr_epi32(									\
-	(u32)_mm256_extract_epi32(a, 0) << (u32)_mm256_extract_epi32(b, 0),	\
-	(u32)_mm256_extract_epi32(a, 1) << (u32)_mm256_extract_epi32(b, 1),	\
-	(u32)_mm256_extract_epi32(a, 2) << (u32)_mm256_extract_epi32(b, 2),	\
-	(u32)_mm256_extract_epi32(a, 3) << (u32)_mm256_extract_epi32(b, 3),	\
-	(u32)_mm256_extract_epi32(a, 4) << (u32)_mm256_extract_epi32(b, 4),	\
-	(u32)_mm256_extract_epi32(a, 5) << (u32)_mm256_extract_epi32(b, 5),	\
-	(u32)_mm256_extract_epi32(a, 6) << (u32)_mm256_extract_epi32(b, 6),	\
-	(u32)_mm256_extract_epi32(a, 7) << (u32)_mm256_extract_epi32(b, 7))
-#define SHR_MM(a, b) _mm256_setr_epi32(									\
-	(u32)_mm256_extract_epi32(a, 0) >> (u32)_mm256_extract_epi32(b, 0),	\
-	(u32)_mm256_extract_epi32(a, 1) >> (u32)_mm256_extract_epi32(b, 1),	\
-	(u32)_mm256_extract_epi32(a, 2) >> (u32)_mm256_extract_epi32(b, 2),	\
-	(u32)_mm256_extract_epi32(a, 3) >> (u32)_mm256_extract_epi32(b, 3),	\
-	(u32)_mm256_extract_epi32(a, 4) >> (u32)_mm256_extract_epi32(b, 4),	\
-	(u32)_mm256_extract_epi32(a, 5) >> (u32)_mm256_extract_epi32(b, 5),	\
-	(u32)_mm256_extract_epi32(a, 6) >> (u32)_mm256_extract_epi32(b, 6),	\
-	(u32)_mm256_extract_epi32(a, 7) >> (u32)_mm256_extract_epi32(b, 7))
-#define SHL_MS(a, b) _mm256_slli_epi32(a, _mm256_extract_epi32(b, 0))
-#define SHR_MS(a, b) _mm256_srli_epi32(a, _mm256_extract_epi32(b, 0))
-#define SHL_SM(a, b) SHL_MM(a, b)
-#define SHR_SM(a, b) SHR_MM(a, b)
-#define SHL(a, b, mode) SHL_##mode(a, b)
-#define SHR(a, b, mode) SHR_##mode(a, b)
-#define CMPLT(a, b) _mm256_cmpgt_epu32(b, a)
-#define CMPGT(a, b) _mm256_cmpgt_epu32(a, b)
-#define CMPLE(a, b) _mm256_not_epi32(_mm256_cmpgt_epu32(a, b))
-#define CMPGE(a, b) _mm256_not_epi32(_mm256_cmpgt_epu32(b, a))
-#define CMPEQ(a, b) _mm256_cmpeq_epi32(a, b)
-#define CMPNE(a, b) _mm256_not_epi32(_mm256_cmpeq_epi32(a, b))
-
 template<>
 union u32x<8> {
+	using Scalar = u32;
+	using Vector = u32x;
+	using Mask = b32x8;
+
+	u32 s[8];
+	struct {
+		u32x4 lo, hi;
+	};
 #if ARCH_AVX
 	M32 m;
 #endif
-	struct {
-		M16 lo, hi;
-	};
-	u32 s[8];
 
 #if ARCH_AVX2
-	FORCEINLINE        u32x8  operator-()          const { return {_mm256_castpi_ps(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi))}; }
-	FORCEINLINE        u32x8  operator~()          const { return {_mm256_not_ps(m.ps)}; }
-	FORCEINLINE	       u32x8  operator+ (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_add_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator- (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_sub_epi32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator* (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_mullo_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator/ (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_div_epu32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator% (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_rem_epu32  (m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { return {_mm256_xor_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { return {_mm256_and_ps(m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { return {_mm256_or_ps (m.ps, b.m.ps)}; }
-	FORCEINLINE	       u32x8  operator<<(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_sllv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator>>(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_srlv_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator< (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmplt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator> (u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator<=(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmple_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator>=(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpge_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator==(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       b32x8  operator!=(u32x8 b)  const { return {_mm256_castpi_ps(_mm256_cmpne_epi32(m.pi, b.m.pi))}; }
-	FORCEINLINE	       u32x8  operator+ (u32   b)  const { return {_mm256_castpi_ps(_mm256_add_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator- (u32   b)  const { return {_mm256_castpi_ps(_mm256_sub_epi32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator* (u32   b)  const { return {_mm256_castpi_ps(_mm256_mullo_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator/ (u32   b)  const { return {_mm256_castpi_ps(_mm256_div_epu32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator% (u32   b)  const { return {_mm256_castpi_ps(_mm256_rem_epu32  (m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator^ (u32   b)  const { return {_mm256_xor_ps(m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator& (u32   b)  const { return {_mm256_and_ps(m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator| (u32   b)  const { return {_mm256_or_ps (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       u32x8  operator<<(u32   b)  const { return {_mm256_castpi_ps(_mm256_slli_epi32(m.pi, b))}; }
-	FORCEINLINE	       u32x8  operator>>(u32   b)  const { return {_mm256_castpi_ps(_mm256_srli_epi32(m.pi, b))}; }
-	FORCEINLINE	       b32x8  operator< (u32   b)  const { return {_mm256_castpi_ps(_mm256_cmplt_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator> (u32   b)  const { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator<=(u32   b)  const { return {_mm256_castpi_ps(_mm256_cmple_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator>=(u32   b)  const { return {_mm256_castpi_ps(_mm256_cmpge_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator==(u32   b)  const { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE	       b32x8  operator!=(u32   b)  const { return {_mm256_castpi_ps(_mm256_cmpne_epi32(m.pi, _mm256_set1_epi32(b)))}; }
-	FORCEINLINE friend u32x8  operator+ (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_add_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x8  operator- (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_sub_epi32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x8  operator* (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_mullo_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend u32x8  operator/ (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_div_epu32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend u32x8  operator% (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_rem_epu32  (_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE	friend u32x8  operator^ (u32 a, u32x8 b) { return {_mm256_xor_ps(_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x8  operator& (u32 a, u32x8 b) { return {_mm256_and_ps(_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x8  operator| (u32 a, u32x8 b) { return {_mm256_or_ps (_mm256_castpi_ps(_mm256_set1_epi32(a)), b.m.ps)}; }
-	FORCEINLINE	friend u32x8  operator<<(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_slliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE	friend u32x8  operator>>(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_srliv_epi32(a, b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator< (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmplt_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator> (u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmpgt_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator<=(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmple_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator>=(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmpge_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator==(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmpeq_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE friend b32x8  operator!=(u32 a, u32x8 b) { return {_mm256_castpi_ps(_mm256_cmpne_epi32(_mm256_set1_epi32(a), b.m.pi))}; }
-	FORCEINLINE        u32x8 &operator+=(u32x8 b)        { return m.pi = _mm256_add_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x8 &operator-=(u32x8 b)        { return m.pi = _mm256_sub_epi32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x8 &operator*=(u32x8 b)        { return m.pi = _mm256_mullo_epi32(m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x8 &operator/=(u32x8 b)        { return m.pi = _mm256_div_epu32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x8 &operator%=(u32x8 b)        { return m.pi = _mm256_rem_epu32  (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x8 &operator^=(u32x8 b)        { return m.ps = _mm256_xor_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x8 &operator&=(u32x8 b)        { return m.ps = _mm256_and_ps     (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x8 &operator|=(u32x8 b)        { return m.ps = _mm256_or_ps      (m.ps, b.m.ps), *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32x8 b)       { return m.pi = _mm256_sllv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32x8 b)       { return m.pi = _mm256_srlv_epi32 (m.pi, b.m.pi), *this; }
-	FORCEINLINE        u32x8 &operator+=(u32   b)        { return m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x8 &operator-=(u32   b)        { return m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x8 &operator*=(u32   b)        { return m.pi = _mm256_mullo_epi32(m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE        u32x8 &operator/=(u32   b)        { return m.pi = _mm256_div_epu32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE	       u32x8 &operator%=(u32   b)        { return m.pi = _mm256_rem_epu32  (m.pi, _mm256_set1_epi32(b)), *this; }
-	FORCEINLINE	       u32x8 &operator^=(u32   b)        { return m.ps = _mm256_xor_ps     (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator&=(u32   b)        { return m.ps = _mm256_and_ps     (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator|=(u32   b)        { return m.ps = _mm256_or_ps      (m.ps, _mm256_castpi_ps(_mm256_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32   b)       { return m.pi = _mm256_slli_epi32(m.pi, b), *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32   b)       { return m.pi = _mm256_srli_epi32(m.pi, b), *this; }
-	FORCEINLINE        u32x8 &operator++ ()              { return m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(1)), *this; }
-	FORCEINLINE        u32x8 &operator-- ()              { return m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(1)), *this; }
-	FORCEINLINE        u32x8  operator++ (int)           { auto result = *this; m.pi = _mm256_add_epi32  (m.pi, _mm256_set1_epi32(1)); return result; }
-	FORCEINLINE        u32x8  operator-- (int)           { auto result = *this; m.pi = _mm256_sub_epi32  (m.pi, _mm256_set1_epi32(1)); return result; }
+	FORCEINLINE        u32x8  operator-()          const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	FORCEINLINE        u32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	       u32x8  operator+ (u32x8 b)  const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator- (u32x8 b)  const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator* (u32x8 b)  const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator/ (u32x8 b)  const { RETURN_M(_mm256_div_epu32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator% (u32x8 b)  const { RETURN_M(_mm256_rem_epu32  (m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x8  operator<<(u32x8 b)  const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator>>(u32x8 b)  const { RETURN_M(_mm256_srlv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator< (u32x8 b)  const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator> (u32x8 b)  const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator<=(u32x8 b)  const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator>=(u32x8 b)  const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator==(u32x8 b)  const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x8  operator!=(u32x8 b)  const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x8  operator<<(u32   b)  const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
+	FORCEINLINE	       u32x8  operator>>(u32   b)  const { RETURN_M(_mm256_srli_epi32(m.pi, b)); }
+	FORCEINLINE	friend u32x8  operator<<(u32 a, u32x8 b) { RETURN_M(_mm256_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend u32x8  operator>>(u32 a, u32x8 b) { RETURN_M(_mm256_srliv_epi32(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE        u32x8  operator-()          const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), lo.pi))        , _mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), hi.pi))        )}; }
-	FORCEINLINE        u32x8  operator~()          const { return {_mm256_setr_m128(_mm_not_ps(lo.ps), _mm_not_ps(hi.ps))}; }
-	FORCEINLINE	       u32x8  operator+ (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_add_epi32  (hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       u32x8  operator- (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       u32x8  operator* (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       u32x8  operator/ (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epu32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_div_epu32  (hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       u32x8  operator% (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epu32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_rem_epu32  (hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { return {_mm256_setr_m128(_mm_xor_ps(lo.ps, b.lo.ps)                                   , _mm_xor_ps(hi.ps, b.hi.ps)                                   )}; }
-	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { return {_mm256_setr_m128(_mm_and_ps(lo.ps, b.lo.ps)                                   , _mm_and_ps(hi.ps, b.hi.ps)                                   )}; }
-	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { return {_mm256_setr_m128(_mm_or_ps (lo.ps, b.lo.ps)                                   , _mm_or_ps (hi.ps, b.hi.ps)                                   )}; }
-	FORCEINLINE	       u32x8  operator<<(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sllv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_sllv_epi32(hi.pi, b.hi.pi))                )}; }
-	FORCEINLINE	       u32x8  operator>>(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srlv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_srlv_epi32(hi.pi, b.hi.pi))                )}; }
-	FORCEINLINE	       b32x8  operator< (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       b32x8  operator> (u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       b32x8  operator<=(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmple_epi32(hi.pi, b.hi.pi))				)}; }
-	FORCEINLINE	       b32x8  operator>=(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, b.hi.pi))				)}; }
-	FORCEINLINE	       b32x8  operator==(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, b.hi.pi))               )}; }
-	FORCEINLINE	       b32x8  operator!=(u32x8 b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, b.hi.pi))				)}; }
-	FORCEINLINE	       u32x8  operator+ (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_add_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       u32x8  operator- (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       u32x8  operator* (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       u32x8  operator/ (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epu32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_div_epu32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       u32x8  operator% (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epu32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_rem_epu32  (hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       u32x8  operator^ (u32   b)  const { return {_mm256_setr_m128(_mm_xor_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_xor_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       u32x8  operator& (u32   b)  const { return {_mm256_setr_m128(_mm_and_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_and_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       u32x8  operator| (u32   b)  const { return {_mm256_setr_m128(_mm_or_ps (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_or_ps (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          )}; }
-	FORCEINLINE	       u32x8  operator<<(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_slli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_slli_epi32(hi.pi, b))                      )}; }
-	FORCEINLINE	       u32x8  operator>>(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_srli_epi32(hi.pi, b))                      )}; }
-	FORCEINLINE	       b32x8  operator< (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       b32x8  operator> (u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       b32x8  operator<=(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmple_epi32(hi.pi, _mm_set1_epi32(b)))		)}; }
-	FORCEINLINE	       b32x8  operator>=(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, _mm_set1_epi32(b)))		)}; }
-	FORCEINLINE	       b32x8  operator==(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, _mm_set1_epi32(b)))     )}; }
-	FORCEINLINE	       b32x8  operator!=(u32   b)  const { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, _mm_set1_epi32(b)))		)}; }
-	FORCEINLINE friend u32x8  operator+ (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend u32x8  operator- (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend u32x8  operator* (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend u32x8  operator/ (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_div_epu32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_div_epu32  (_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE	friend u32x8  operator% (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_rem_epu32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_rem_epu32  (_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE	friend u32x8  operator^ (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        )}; }
-	FORCEINLINE	friend u32x8  operator& (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        )}; }
-	FORCEINLINE	friend u32x8  operator| (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        )}; }
-	FORCEINLINE	friend u32x8  operator<<(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_slliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_slliv_epi32(a, b.hi.pi))                   )}; }
-	FORCEINLINE	friend u32x8  operator>>(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_srliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_srliv_epi32(a, b.hi.pi))                   )}; }
-	FORCEINLINE friend b32x8  operator< (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend b32x8  operator> (u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend b32x8  operator<=(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.hi.pi))	)}; }
-	FORCEINLINE friend b32x8  operator>=(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.hi.pi))	)}; }
-	FORCEINLINE friend b32x8  operator==(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.hi.pi))   )}; }
-	FORCEINLINE friend b32x8  operator!=(u32 a, u32x8 b) { return {_mm256_setr_m128(_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.hi.pi))	)}; }
-	FORCEINLINE        u32x8 &operator+= (u32x8 b)       { return lo.pi = _mm_add_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_add_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator-= (u32x8 b)       { return lo.pi = _mm_sub_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_sub_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator*= (u32x8 b)       { return lo.pi = _mm_mullo_epi32(lo.pi, b.lo.pi)                         , hi.pi = _mm_mullo_epi32(hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator/= (u32x8 b)       { return lo.pi = _mm_div_epu32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_div_epu32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator%= (u32x8 b)       { return lo.pi = _mm_rem_epu32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_rem_epu32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator^= (u32x8 b)       { return lo.ps = _mm_xor_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_xor_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator&= (u32x8 b)       { return lo.ps = _mm_and_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_and_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator|= (u32x8 b)       { return lo.ps = _mm_or_ps      (lo.ps, b.lo.ps)                         , hi.ps = _mm_or_ps      (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32x8 b)       { return lo.pi = _mm_sllv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_sllv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32x8 b)       { return lo.pi = _mm_srlv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_srlv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator+= (u32   b)       { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator-= (u32   b)       { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator*= (u32   b)       { return lo.pi = _mm_mullo_epi32(lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_mullo_epi32(hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator/= (u32   b)       { return lo.pi = _mm_div_epu32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_div_epu32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       u32x8 &operator%= (u32   b)       { return lo.pi = _mm_rem_epu32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_rem_epu32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       u32x8 &operator^= (u32   b)       { return lo.ps = _mm_xor_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_xor_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator&= (u32   b)       { return lo.ps = _mm_and_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_and_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator|= (u32   b)       { return lo.ps = _mm_or_ps      (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_or_ps      (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32   b)       { return lo.pi = _mm_slli_epi32 (lo.pi, b)                               , hi.pi = _mm_slli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32   b)       { return lo.pi = _mm_srli_epi32 (lo.pi, b)                               , hi.pi = _mm_srli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE        u32x8 &operator++ ()              { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        u32x8 &operator-- ()              { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        u32x8  operator++ (int)           { auto result = *this; lo.pi = _mm_add_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_add_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        u32x8  operator-- (int)           { auto result = *this; lo.pi = _mm_sub_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_sub_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
+	FORCEINLINE        u32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FALLBACK_INT_NO_BITWISE;
 #else
-	struct {
-		M16 lo, hi;
-	};
-	FORCEINLINE        u32x8  operator-()          const { return {_mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), lo.pi))        , _mm_castpi_ps(_mm_sub_epi32(_mm_setzero_pi(), hi.pi))        }; }
-	FORCEINLINE        u32x8  operator~()          const { return {_mm_not_ps(lo.ps), _mm_not_ps(hi.ps)}; }
-	FORCEINLINE	       u32x8  operator+ (u32x8 b)  const { return {_mm_castpi_ps(_mm_add_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_add_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       u32x8  operator- (u32x8 b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       u32x8  operator* (u32x8 b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       u32x8  operator/ (u32x8 b)  const { return {_mm_castpi_ps(_mm_div_epu32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_div_epu32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       u32x8  operator% (u32x8 b)  const { return {_mm_castpi_ps(_mm_rem_epu32  (lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_rem_epu32  (hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { return {_mm_xor_ps(lo.ps, b.lo.ps)                                   , _mm_xor_ps(hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { return {_mm_and_ps(lo.ps, b.lo.ps)                                   , _mm_and_ps(hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { return {_mm_or_ps (lo.ps, b.lo.ps)                                   , _mm_or_ps (hi.ps, b.hi.ps)                                   }; }
-	FORCEINLINE	       u32x8  operator<<(u32x8 b)  const { return {_mm_castpi_ps(_mm_sllv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_sllv_epi32(hi.pi, b.hi.pi))                }; }
-	FORCEINLINE	       u32x8  operator>>(u32x8 b)  const { return {_mm_castpi_ps(_mm_srlv_epi32(lo.pi, b.lo.pi))                , _mm_castpi_ps(_mm_srlv_epi32(hi.pi, b.hi.pi))                }; }
-	FORCEINLINE	       b32x8  operator< (u32x8 b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       b32x8  operator> (u32x8 b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       b32x8  operator<=(u32x8 b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmple_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator>=(u32x8 b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       b32x8  operator==(u32x8 b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, b.hi.pi))               }; }
-	FORCEINLINE	       b32x8  operator!=(u32x8 b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, b.lo.pi))               , _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, b.hi.pi))            }; }
-	FORCEINLINE	       u32x8  operator+ (u32   b)  const { return {_mm_castpi_ps(_mm_add_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_add_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       u32x8  operator- (u32   b)  const { return {_mm_castpi_ps(_mm_sub_epi32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_sub_epi32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       u32x8  operator* (u32   b)  const { return {_mm_castpi_ps(_mm_mullo_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_mullo_epi32(hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       u32x8  operator/ (u32   b)  const { return {_mm_castpi_ps(_mm_div_epu32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_div_epu32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       u32x8  operator% (u32   b)  const { return {_mm_castpi_ps(_mm_rem_epu32  (lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_rem_epu32  (hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       u32x8  operator^ (u32   b)  const { return {_mm_xor_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_xor_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       u32x8  operator& (u32   b)  const { return {_mm_and_ps(lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_and_ps(hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       u32x8  operator| (u32   b)  const { return {_mm_or_ps (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          , _mm_or_ps (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b)))          }; }
-	FORCEINLINE	       u32x8  operator<<(u32   b)  const { return {_mm_castpi_ps(_mm_slli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_slli_epi32(hi.pi, b))                      }; }
-	FORCEINLINE	       u32x8  operator>>(u32   b)  const { return {_mm_castpi_ps(_mm_srli_epi32(lo.pi, b))                      , _mm_castpi_ps(_mm_srli_epi32(hi.pi, b))                      }; }
-	FORCEINLINE	       b32x8  operator< (u32   b)  const { return {_mm_castpi_ps(_mm_cmplt_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmplt_epi32(hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       b32x8  operator> (u32   b)  const { return {_mm_castpi_ps(_mm_cmpgt_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpgt_epi32(hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       b32x8  operator<=(u32   b)  const { return {_mm_castpi_ps(_mm_cmple_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmple_epi32(hi.pi, _mm_set1_epi32(b)))  }; }
-	FORCEINLINE	       b32x8  operator>=(u32   b)  const { return {_mm_castpi_ps(_mm_cmpge_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpge_epi32(hi.pi, _mm_set1_epi32(b)))  }; }
-	FORCEINLINE	       b32x8  operator==(u32   b)  const { return {_mm_castpi_ps(_mm_cmpeq_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpeq_epi32(hi.pi, _mm_set1_epi32(b)))     }; }
-	FORCEINLINE	       b32x8  operator!=(u32   b)  const { return {_mm_castpi_ps(_mm_cmpne_epi32(lo.pi, _mm_set1_epi32(b)))     , _mm_castpi_ps(_mm_cmpne_epi32(hi.pi, _mm_set1_epi32(b)))  }; }
-	FORCEINLINE friend u32x8  operator+ (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_add_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend u32x8  operator- (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_sub_epi32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend u32x8  operator* (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_mullo_epi32(_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend u32x8  operator/ (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_div_epu32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_div_epu32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE	friend u32x8  operator% (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_rem_epu32  (_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_rem_epu32  (_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE	friend u32x8  operator^ (u32 a, u32x8 b) { return {_mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_xor_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend u32x8  operator& (u32 a, u32x8 b) { return {_mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_and_ps(_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend u32x8  operator| (u32 a, u32x8 b) { return {_mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.lo.ps)        , _mm_or_ps (_mm_castpi_ps(_mm_set1_epi32(a)), b.hi.ps)        }; }
-	FORCEINLINE	friend u32x8  operator<<(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_slliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_slliv_epi32(a, b.hi.pi))                   }; }
-	FORCEINLINE	friend u32x8  operator>>(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_srliv_epi32(a, b.lo.pi))                   , _mm_castpi_ps(_mm_srliv_epi32(a, b.hi.pi))                   }; }
-	FORCEINLINE friend b32x8  operator< (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmplt_epi32(_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend b32x8  operator> (u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpgt_epi32(_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend b32x8  operator<=(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmple_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator>=(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpge_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE friend b32x8  operator==(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpeq_epi32(_mm_set1_epi32(a), b.hi.pi))   }; }
-	FORCEINLINE friend b32x8  operator!=(u32 a, u32x8 b) { return {_mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.lo.pi))   , _mm_castpi_ps(_mm_cmpne_epi32(_mm_set1_epi32(a), b.hi.pi))}; }
-	FORCEINLINE        u32x8 &operator+= (u32x8 b)       { return lo.pi = _mm_add_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_add_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator-= (u32x8 b)       { return lo.pi = _mm_sub_epi32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_sub_epi32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator*= (u32x8 b)       { return lo.pi = _mm_mullo_epi32(lo.pi, b.lo.pi)                         , hi.pi = _mm_mullo_epi32(hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator/= (u32x8 b)       { return lo.pi = _mm_div_epu32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_div_epu32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator%= (u32x8 b)       { return lo.pi = _mm_rem_epu32  (lo.pi, b.lo.pi)                         , hi.pi = _mm_rem_epu32  (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator^= (u32x8 b)       { return lo.ps = _mm_xor_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_xor_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator&= (u32x8 b)       { return lo.ps = _mm_and_ps     (lo.ps, b.lo.ps)                         , hi.ps = _mm_and_ps     (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator|= (u32x8 b)       { return lo.ps = _mm_or_ps      (lo.ps, b.lo.ps)                         , hi.ps = _mm_or_ps      (hi.ps, b.hi.ps)                         , *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32x8 b)       { return lo.pi = _mm_sllv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_sllv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32x8 b)       { return lo.pi = _mm_srlv_epi32 (lo.pi, b.lo.pi)                         , hi.pi = _mm_srlv_epi32 (hi.pi, b.hi.pi)                         , *this; }
-	FORCEINLINE        u32x8 &operator+= (u32   b)       { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator-= (u32   b)       { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator*= (u32   b)       { return lo.pi = _mm_mullo_epi32(lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_mullo_epi32(hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE        u32x8 &operator/= (u32   b)       { return lo.pi = _mm_div_epu32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_div_epu32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       u32x8 &operator%= (u32   b)       { return lo.pi = _mm_rem_epu32  (lo.pi, _mm_set1_epi32(b))               , hi.pi = _mm_rem_epu32  (hi.pi, _mm_set1_epi32(b))               , *this; }
-	FORCEINLINE	       u32x8 &operator^= (u32   b)       { return lo.ps = _mm_xor_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_xor_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator&= (u32   b)       { return lo.ps = _mm_and_ps     (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_and_ps     (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator|= (u32   b)       { return lo.ps = _mm_or_ps      (lo.ps, _mm_castpi_ps(_mm_set1_epi32(b))), hi.ps = _mm_or_ps      (hi.ps, _mm_castpi_ps(_mm_set1_epi32(b))), *this; }
-	FORCEINLINE	       u32x8 &operator<<=(u32   b)       { return lo.pi = _mm_slli_epi32 (lo.pi, b)                               , hi.pi = _mm_slli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE	       u32x8 &operator>>=(u32   b)       { return lo.pi = _mm_srli_epi32 (lo.pi, b)                               , hi.pi = _mm_srli_epi32 (hi.pi, b)                               , *this; }
-	FORCEINLINE        u32x8 &operator++ ()              { return lo.pi = _mm_add_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_add_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        u32x8 &operator-- ()              { return lo.pi = _mm_sub_epi32  (lo.pi, _mm_set1_epi32(1))               , hi.pi = _mm_sub_epi32  (hi.pi, _mm_set1_epi32(1))               , *this; }
-	FORCEINLINE        u32x8  operator++ (int)           { auto result = *this; lo.pi = _mm_add_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_add_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
-	FORCEINLINE        u32x8  operator-- (int)           { auto result = *this; lo.pi = _mm_sub_epi32(lo.pi, _mm_set1_epi32(1)); hi.pi = _mm_sub_epi32(hi.pi, _mm_set1_epi32(1)); return result; }
+	FALLBACK_INT;
 #endif
+	
+	OPERATORS_INT(U32x8);
 
 	CVT(f32x8);
 	CVT(s32x8);
@@ -2008,44 +1378,49 @@ FORCEINLINE b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) !
 FORCEINLINE b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
 
 // clang-format off
-FORCEINLINE f32x4 F32x4(f32 v) { return {_mm_set1_ps(v)}; }
-FORCEINLINE s32x4 S32x4(s32 v) { return {_mm_castpi_ps(_mm_set1_epi32(v))}; }
-FORCEINLINE u32x4 U32x4(u32 v) { return {_mm_castpi_ps(_mm_set1_epi32((s32)v))}; }
+FORCEINLINE constexpr f32x4 F32x4(M16 m) { return F32x4(m.ps); }
+FORCEINLINE constexpr s32x4 S32x4(M16 m) { return S32x4(m.ps); }
+FORCEINLINE constexpr u32x4 U32x4(M16 m) { return U32x4(m.ps); }
 
-FORCEINLINE f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { return {_mm_setr_ps(i, j, k, l)}; }
-FORCEINLINE s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { return {_mm_castpi_ps(_mm_setr_epi32(i, j, k, l))}; }
-FORCEINLINE u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { return {_mm_castpi_ps(_mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l))}; }
+FORCEINLINE f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { RETURN_MT(f32x4, _mm_setr_ps(i, j, k, l)); }
+FORCEINLINE s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { RETURN_MT(s32x4, _mm_setr_epi32(i, j, k, l)); }
+FORCEINLINE u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { RETURN_MT(u32x4, _mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l)); }
+FORCEINLINE f64x2 F64x2(f64 i, f64 j) { RETURN_MT(f64x2, _mm_setr_pd(i, j)); }
 
-FORCEINLINE f64x2 F64x2(f64 i, f64 j) { return {_mm_castpd_ps(_mm_setr_pd(i, j))}; }
 #if ARCH_AVX
-FORCEINLINE f32x8 F32x8(f32 v) { return {_mm256_set1_ps(v)}; }
-FORCEINLINE s32x8 S32x8(s32 v) { return {_mm256_castpi_ps(_mm256_set1_epi32(v))}; }
-FORCEINLINE u32x8 U32x8(u32 v) { return {_mm256_castpi_ps(_mm256_set1_epi32((s32)v))}; }
 
-FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { return {_mm256_setr_ps(a, b, c, d, e, f, g, h)}; }
-FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { return {_mm256_castpi_ps(_mm256_setr_epi32(a, b, c, d, e, f, g, h))}; }
-FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { return {_mm256_castpi_ps(_mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)e, (s32)f, (s32)g, (s32)h))}; }
+FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_MT(f32x8, _mm256_setr_ps(a, b, c, d, e, f, g, h)); }
+FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_MT(s32x8, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
+FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_MT(u32x8, _mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)e, (s32)f, (s32)g, (s32)h)); }
 
-FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { return {_mm256_setr_m128(m0.m.ps, m1.m.ps)}; }
-FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { return {_mm256_setr_m128(m0.m.ps, m1.m.ps)}; }
-FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { return {_mm256_setr_m128(m0.m.ps, m1.m.ps)}; }
+FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT(f32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
+FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT(s32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
+FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT(u32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
 
-FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { return {_mm256_castpd_ps(_mm256_setr_pd(i, j, k, l))}; }
+FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_MT(f64x4, _mm256_setr_pd(i, j, k, l)); }
 #else
-FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { return {_mm_setr_ps(a, b, c, d), _mm_setr_ps(e, f, g, h)}; }
-FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { return {_mm_castpi_ps(_mm_setr_epi32(a, b, c, d)), _mm_castpi_ps(_mm_setr_epi32(e, f, g, h))}; }
-FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { return {_mm_castpi_ps(_mm_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d)), _mm_castpi_ps(_mm_setr_epi32((s32)e, (s32)f, (s32)g, (s32)h))}; }
+FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_T2(f32x8, F32x4(a, b, c, d), F32x4(e, f, g, h)); }
+FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_T2(s32x8, S32x4(a, b, c, d), S32x4(e, f, g, h)); }
+FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_T2(u32x8, U32x4(a, b, c, d), U32x4(e, f, g, h)); }
 
-FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { return {m0.m.ps, m1.m.ps}; }
-FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { return {m0.m.ps, m1.m.ps}; }
-FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { return {m0.m.ps, m1.m.ps}; }
+FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT2(f32x8, m0.m, m1.m); }
+FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT2(s32x8, m0.m, m1.m); }
+FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT2(u32x8, m0.m, m1.m); }
 
-FORCEINLINE f32x8 F32x8(f32 v) { return {_mm_set1_ps(v), _mm_set1_ps(v)}; }
-FORCEINLINE s32x8 S32x8(s32 v) { return {_mm_castpi_ps(_mm_set1_epi32(v)), _mm_castpi_ps(_mm_set1_epi32(v))}; }
-FORCEINLINE u32x8 U32x8(u32 v) { return {_mm_castpi_ps(_mm_set1_epi32((s32)v)), _mm_castpi_ps(_mm_set1_epi32((s32)v))}; }
-
-FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { return {_mm_castpd_ps(_mm_setr_pd(i, j)), _mm_castpd_ps(_mm_setr_pd(k, l))}; }
+FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_T2(f64x4, F64x2(i, j), F64x2(k, l)); }
 #endif
+
+FORCEINLINE f32x4 F32x4(f32 v) { return F32x4(v,v,v,v); }
+FORCEINLINE s32x4 S32x4(s32 v) { return S32x4(v,v,v,v); }
+FORCEINLINE u32x4 U32x4(u32 v) { return U32x4(v,v,v,v); }
+
+FORCEINLINE f32x8 F32x8(f32 v) { return F32x8(v,v,v,v,v,v,v,v); }
+FORCEINLINE s32x8 S32x8(s32 v) { return S32x8(v,v,v,v,v,v,v,v); }
+FORCEINLINE u32x8 U32x8(u32 v) { return U32x8(v,v,v,v,v,v,v,v); }
+
+FORCEINLINE f64x2 F64x2(f64 v) { return F64x2(v,v); }
+
+FORCEINLINE f64x4 F64x4(f64 v) { return F64x4(v,v,v,v); }
 
 #define X(f32, F32, p) \
 template<> FORCEINLINE f32##x<p> F32##x<p> (f32 val){ return F32##x##p(val); } \
@@ -2062,30 +1437,30 @@ P(u32, U32)
 #undef P
 #undef X
 
-FORCEINLINE f32x4::operator s32x4() const { return {_mm_castpi_ps(_mm_cvtps_epi32(m.ps))}; }
-FORCEINLINE f32x4::operator u32x4() const { return {_mm_castpi_ps(_mm_cvtps_epi32(m.ps))}; }
-FORCEINLINE s32x4::operator f32x4() const { return {_mm_cvtepi32_ps(m.pi)}; }
-FORCEINLINE s32x4::operator u32x4() const { return {m.ps}; }
-FORCEINLINE u32x4::operator f32x4() const { return {_mm_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3])}; }
-FORCEINLINE u32x4::operator s32x4() const { return {m.ps}; }
-FORCEINLINE f64x4::operator u32x4() const { return {_mm_castpi_ps(_mm_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3]))}; }
+FORCEINLINE f32x4::operator s32x4() const { RETURN_MT(s32x4, _mm_cvtps_epi32(m.ps)); }
+FORCEINLINE f32x4::operator u32x4() const { RETURN_MT(u32x4, _mm_cvtps_epi32(m.ps)); }
+FORCEINLINE s32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_cvtepi32_ps(m.pi)); }
+FORCEINLINE s32x4::operator u32x4() const { RETURN_MT(u32x4, m.ps); }
+FORCEINLINE u32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3])); }
+FORCEINLINE u32x4::operator s32x4() const { RETURN_MT(s32x4, m.ps); }
+FORCEINLINE f64x4::operator u32x4() const { RETURN_MT(u32x4, _mm_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3])); }
 
 #if ARCH_AVX
-FORCEINLINE f32x8::operator s32x8() const { return {_mm256_castpi_ps(_mm256_cvtps_epi32(m.ps))}; }
-FORCEINLINE s32x8::operator f32x8() const { return {_mm256_cvtepi32_ps(m.pi)}; }
-FORCEINLINE u32x4::operator f64x4() const { return {_mm256_castpd_ps(_mm256_setr_pd((f64)s[0], (f64)s[1], (f64)s[2], (f64)s[3]))}; }
-FORCEINLINE f32x8::operator u32x8() const { return {_mm256_castpi_ps(_mm256_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3], (u32)s[4], (u32)s[5], (u32)s[6], (u32)s[7]))}; }
-FORCEINLINE s32x8::operator u32x8() const { return {m.ps}; }
-FORCEINLINE u32x8::operator f32x8() const { return {_mm256_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3], (f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7])}; }
-FORCEINLINE u32x8::operator s32x8() const { return {m.ps}; }
+FORCEINLINE f32x8::operator s32x8() const { RETURN_MT(s32x8, _mm256_castpi_ps(_mm256_cvtps_epi32(m.ps))); }
+FORCEINLINE s32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_cvtepi32_ps(m.pi)); }
+FORCEINLINE u32x4::operator f64x4() const { RETURN_MT(f64x4, _mm256_castpd_ps(_mm256_setr_pd((f64)s[0], (f64)s[1], (f64)s[2], (f64)s[3]))); }
+FORCEINLINE f32x8::operator u32x8() const { RETURN_MT(u32x8, _mm256_castpi_ps(_mm256_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3], (u32)s[4], (u32)s[5], (u32)s[6], (u32)s[7]))); }
+FORCEINLINE s32x8::operator u32x8() const { RETURN_MT(u32x8, m.ps); }
+FORCEINLINE u32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3], (f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7])); }
+FORCEINLINE u32x8::operator s32x8() const { RETURN_MT(s32x8, m.ps); }
 #else
-FORCEINLINE f32x8::operator s32x8() const { return {_mm_castpi_ps(_mm_cvtps_epi32(lo.ps)), _mm_castpi_ps(_mm_cvtps_epi32(hi.ps))}; }
-FORCEINLINE s32x8::operator f32x8() const { return {_mm_cvtepi32_ps(lo.pi), _mm_cvtepi32_ps(hi.pi)}; }
-FORCEINLINE u32x4::operator f64x4() const { return {_mm_castpd_ps(_mm_setr_pd((f64)s[0], (f64)s[1])), _mm_castpd_ps(_mm_setr_pd((f64)s[2], (f64)s[3]))}; }
-FORCEINLINE f32x8::operator u32x8() const { return {_mm_castpi_ps(_mm_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3])), _mm_castpi_ps(_mm_setr_epi32((u32)s[4], (u32)s[5], (u32)s[6], (u32)s[7]))}; }
-FORCEINLINE s32x8::operator u32x8() const { return {lo.ps, hi.ps}; }
-FORCEINLINE u32x8::operator f32x8() const { return {_mm_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3]), _mm_setr_ps((f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7])}; }
-FORCEINLINE u32x8::operator s32x8() const { return {lo.ps, hi.ps}; }
+FORCEINLINE f32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
+FORCEINLINE s32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
+FORCEINLINE f32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
+FORCEINLINE s32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
+FORCEINLINE u32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
+FORCEINLINE u32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
+//FORCEINLINE u32x4::operator f64x4() const { RETURN_T2(f64x4, (f64x2)lo, (f64x2)hi); }
 #endif
 
 #if ARCH_AVX2
@@ -2138,31 +1513,31 @@ FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mas
 		_mm256_extract_epi32(mask.m.pi, 7) ? *(f32*)((u8 *)(src) + _mm256_extract_epi32(offsets.m.pi, 7)) : buf[7]);\
 }
 #else
-#define GATHER32x8(type)											\
-FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {\
-	dst.lo.ps = _mm_setr_ps(										\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 0)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 1)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 2)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 3)));\
-	dst.hi.ps = _mm_setr_ps(										\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 0)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 1)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 2)),	\
-		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 3)));\
+#define GATHER32x8(type)											   \
+FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {   \
+	dst.lo.m.ps = _mm_setr_ps(										   \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 0)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 1)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 2)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 3))); \
+	dst.hi.m.ps = _mm_setr_ps(										   \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 0)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 1)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 2)),  \
+		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 3))); \
 }
-#define GATHERMASK32x8(type)																												\
-FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {												\
-	dst.lo.ps = _mm_setr_ps(																												\
-		_mm_extract_epi32(mask.lo.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 0)) : _mm_extract_epi32(def.lo.pi, 0),	\
-		_mm_extract_epi32(mask.lo.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 1)) : _mm_extract_epi32(def.lo.pi, 1),	\
-		_mm_extract_epi32(mask.lo.pi, 2) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 2)) : _mm_extract_epi32(def.lo.pi, 2),	\
-		_mm_extract_epi32(mask.lo.pi, 3) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.pi, 3)) : _mm_extract_epi32(def.lo.pi, 3));	\
-	dst.hi.ps = _mm_setr_ps(																												\
-		_mm_extract_epi32(mask.hi.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 0)) : _mm_extract_epi32(def.hi.pi, 0),	\
-		_mm_extract_epi32(mask.hi.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 1)) : _mm_extract_epi32(def.hi.pi, 1),	\
-		_mm_extract_epi32(mask.hi.pi, 2) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 2)) : _mm_extract_epi32(def.hi.pi, 2),	\
-		_mm_extract_epi32(mask.hi.pi, 3) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.pi, 3)) : _mm_extract_epi32(def.hi.pi, 3));	\
+#define GATHERMASK32x8(type)																												    \
+FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {												    \
+	dst.lo.m.ps = _mm_setr_ps(																												    \
+		_mm_extract_epi32(mask.lo.m.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 0)) : _mm_extract_epi32(def.lo.m.pi, 0),	\
+		_mm_extract_epi32(mask.lo.m.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 1)) : _mm_extract_epi32(def.lo.m.pi, 1),	\
+		_mm_extract_epi32(mask.lo.m.pi, 2) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 2)) : _mm_extract_epi32(def.lo.m.pi, 2),	\
+		_mm_extract_epi32(mask.lo.m.pi, 3) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 3)) : _mm_extract_epi32(def.lo.m.pi, 3));	\
+	dst.hi.m.ps = _mm_setr_ps(																												    \
+		_mm_extract_epi32(mask.hi.m.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 0)) : _mm_extract_epi32(def.hi.m.pi, 0),	\
+		_mm_extract_epi32(mask.hi.m.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 1)) : _mm_extract_epi32(def.hi.m.pi, 1),	\
+		_mm_extract_epi32(mask.hi.m.pi, 2) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 2)) : _mm_extract_epi32(def.hi.m.pi, 2),	\
+		_mm_extract_epi32(mask.hi.m.pi, 3) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 3)) : _mm_extract_epi32(def.hi.m.pi, 3));	\
 }
 #endif
 #endif
@@ -2188,43 +1563,53 @@ GATHERMASK32x8(u32x8)
 template <class T>
 T load(void const *src) = delete;
 
-template<> FORCEINLINE f32x4 load(void const *src) { return {_mm_loadu_ps((f32 const *)src)}; }
-template<> FORCEINLINE s32x4 load(void const *src) { return {_mm_loadu_ps((f32 const *)src)}; }
-template<> FORCEINLINE u32x4 load(void const *src) { return {_mm_loadu_ps((f32 const *)src)}; }
+#define LOAD32x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_ps((f32 const *)src)); }
+LOAD32x4(f32x4)
+LOAD32x4(s32x4)
+LOAD32x4(u32x4)
+
+#define LOAD64x2(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_pd((f64 const *)src)); }
+LOAD64x2(f64x2)
+//LOAD64x2(s64x2)
+//LOAD64x2(u64x2)
+
 #if ARCH_AVX
-template<> FORCEINLINE f32x8 load(void const *src) { return {_mm256_loadu_ps((f32 const *)src)}; }
-template<> FORCEINLINE s32x8 load(void const *src) { return {_mm256_loadu_ps((f32 const *)src)}; }
-template<> FORCEINLINE u32x8 load(void const *src) { return {_mm256_loadu_ps((f32 const *)src)}; }
+#define LOAD32x8(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm256_loadu_ps((f32 const *)src)); }
+#define LOAD64x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm256_loadu_pd((f64 const *)src)); }
 #else
-template<> FORCEINLINE f32x8 load(void const *src) { return {_mm_loadu_ps((f32 const *)src), _mm_loadu_ps((f32 *)src + 4)}; }
-template<> FORCEINLINE s32x8 load(void const *src) { return {_mm_loadu_ps((f32 const *)src), _mm_loadu_ps((f32 *)src + 4)}; }
-template<> FORCEINLINE u32x8 load(void const *src) { return {_mm_loadu_ps((f32 const *)src), _mm_loadu_ps((f32 *)src + 4)}; }
+#define LOAD32x8(type) template<> FORCEINLINE type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f32 *)src + 4)); }
+#define LOAD64x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f64 *)src + 2)); }
 #endif
+
+LOAD32x8(f32x8)
+LOAD32x8(s32x8)
+LOAD32x8(u32x8)
+LOAD64x4(f64x4)
+//LOAD64x4(s64x4)
+//LOAD64x4(u64x4)
+
+#undef LOAD32x4
+#undef LOAD32x8
+#undef LOAD64x2
+#undef LOAD64x4
 
 template <class T>
 T loadMask(void const *src, b32x<widthOf<T>> mask) = delete;
 
 #if ARCH_AVX
-#define LOADMASK32x4(type) template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) { return {_mm_maskload_ps((f32 *)src, mask.m.pi)}; }
-#define LOADMASK32x8(type) template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) { return {_mm256_maskload_ps((f32 *)src, mask.m.pi)}; }
+#define LOADMASK32x4(type) template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) { RETURN_MT(type, _mm_maskload_ps((f32 *)src, mask.m.pi)); }
+#define LOADMASK32x8(type) template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) { RETURN_MT(type, _mm256_maskload_ps((f32 *)src, mask.m.pi)); }
 #else
-#define LOADMASK32x4(type)															\
-template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) {				\
-	return {_mm_setr_ps(_mm_extract_epi32(mask.m.pi, 0) ? ((f32 *)src)[0] : 0.0f,	\
-						_mm_extract_epi32(mask.m.pi, 1) ? ((f32 *)src)[1] : 0.0f,	\
-						_mm_extract_epi32(mask.m.pi, 2) ? ((f32 *)src)[2] : 0.0f,	\
-						_mm_extract_epi32(mask.m.pi, 3) ? ((f32 *)src)[3] : 0.0f)};	\
+#define LOADMASK32x4(type)															        \
+template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) {				        \
+	RETURN_MT(type, _mm_setr_ps(_mm_extract_epi32(mask.m.pi, 0) ? ((f32 *)src)[0] : 0.0f,   \
+						        _mm_extract_epi32(mask.m.pi, 1) ? ((f32 *)src)[1] : 0.0f,   \
+						        _mm_extract_epi32(mask.m.pi, 2) ? ((f32 *)src)[2] : 0.0f,   \
+						        _mm_extract_epi32(mask.m.pi, 3) ? ((f32 *)src)[3] : 0.0f)); \
 }
-#define LOADMASK32x8(type)															\
-template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) {				\
-	return {_mm_setr_ps(_mm_extract_epi32(mask.lo.pi, 0) ? ((f32 *)src)[0] : 0.0f,	\
-						_mm_extract_epi32(mask.lo.pi, 1) ? ((f32 *)src)[1] : 0.0f,	\
-						_mm_extract_epi32(mask.lo.pi, 2) ? ((f32 *)src)[2] : 0.0f,	\
-						_mm_extract_epi32(mask.lo.pi, 3) ? ((f32 *)src)[3] : 0.0f),	\
-			_mm_setr_ps(_mm_extract_epi32(mask.hi.pi, 0) ? ((f32 *)src)[4] : 0.0f,	\
-						_mm_extract_epi32(mask.hi.pi, 1) ? ((f32 *)src)[5] : 0.0f,	\
-						_mm_extract_epi32(mask.hi.pi, 2) ? ((f32 *)src)[6] : 0.0f,	\
-						_mm_extract_epi32(mask.hi.pi, 3) ? ((f32 *)src)[7] : 0.0f)};\
+#define LOADMASK32x8(type)														                        \
+template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) {			                        \
+	RETURN_T2(type, loadMask<Half<type>>(src, mask.lo), loadMask<Half<type>>((f32 *)src + 4, mask.hi)); \
 }
 #endif
 
@@ -2249,16 +1634,10 @@ FORCEINLINE void storeMask(void *dst, type src, b32x<4> mask) {							\
 	if (_mm_extract_epi32(mask.m.pi, 2)) ((f32 *)dst)[2] = _mm_extract_ps(src.m.ps, 2);	\
 	if (_mm_extract_epi32(mask.m.pi, 3)) ((f32 *)dst)[3] = _mm_extract_ps(src.m.ps, 3);	\
 }
-#define STOREMASK32x8(type)																	\
-FORCEINLINE void storeMask(void *dst, type src, b32x<8> mask) {								\
-	if (_mm_extract_epi32(mask.lo.pi, 0)) ((f32 *)dst)[0] = _mm_extract_ps(src.lo.ps, 0);	\
-	if (_mm_extract_epi32(mask.lo.pi, 1)) ((f32 *)dst)[1] = _mm_extract_ps(src.lo.ps, 1);	\
-	if (_mm_extract_epi32(mask.lo.pi, 2)) ((f32 *)dst)[2] = _mm_extract_ps(src.lo.ps, 2);	\
-	if (_mm_extract_epi32(mask.lo.pi, 3)) ((f32 *)dst)[3] = _mm_extract_ps(src.lo.ps, 3);	\
-	if (_mm_extract_epi32(mask.hi.pi, 0)) ((f32 *)dst)[4] = _mm_extract_ps(src.hi.ps, 0);	\
-	if (_mm_extract_epi32(mask.hi.pi, 1)) ((f32 *)dst)[5] = _mm_extract_ps(src.hi.ps, 1);	\
-	if (_mm_extract_epi32(mask.hi.pi, 2)) ((f32 *)dst)[6] = _mm_extract_ps(src.hi.ps, 2);	\
-	if (_mm_extract_epi32(mask.hi.pi, 3)) ((f32 *)dst)[7] = _mm_extract_ps(src.hi.ps, 3);	\
+#define STOREMASK32x8(type)										\
+FORCEINLINE void storeMask(void *dst, type src, b32x<8> mask) {	\
+	storeMask((f32 *)dst + 0, src.lo, mask.lo);                 \
+	storeMask((f32 *)dst + 4, src.hi, mask.hi);                 \
 }
 #endif
 
@@ -2280,18 +1659,18 @@ template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { return
 //template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32x8 shuffle(u32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
 
 #if ARCH_AVX
-#define SHUFFLE32x4(type) FORCEINLINE type shuffle(type v, s32x4 s) { return {_mm_permutevar_ps(v.m.ps, s.m.pi)}; }
+#define SHUFFLE32x4(type) FORCEINLINE type shuffle(type v, s32x4 s) { RETURN_MT(type, _mm_permutevar_ps(v.m.ps, s.m.pi)); }
 #else
 #define SHUFFLE32x4(type) \
 FORCEINLINE type shuffle(type v, s32x4 s) {\
 	__m128 idx = _mm_and_ps(s.m.ps, _mm_castpi_ps(_mm_set1_epi32(3)));\
 	idx = _mm_castpi_ps(_mm_mullo_epi16(_mm_castps_pi(_mm_or_ps(idx, _mm_castpi_ps(_mm_slli_pi(_mm_castps_pi(idx), 2)))), _mm_set1_epi16(4)));\
-	return {_mm_castpi_ps(_mm_shuffle_epi8(v.m.pi, _mm_add_epi8(_mm_castps_pi(_mm_or_ps(idx, _mm_castpi_ps(_mm_slli_pi(_mm_castps_pi(idx), 1)))), _mm_setr_epi8(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3))))};\
+	RETURN_MT(type, _mm_castpi_ps(_mm_shuffle_epi8(v.m.pi, _mm_add_epi8(_mm_castps_pi(_mm_or_ps(idx, _mm_castpi_ps(_mm_slli_pi(_mm_castps_pi(idx), 1)))), _mm_setr_epi8(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)))));\
 }
 #endif
 
 #if ARCH_AVX2
-#define SHUFFLE32x8(type) FORCEINLINE type shuffle(type v, s32x8 s) { return {_mm256_permutevar8x32_ps(v.m.ps, s.m.pi)}; }
+#define SHUFFLE32x8(type) FORCEINLINE type shuffle(type v, s32x8 s) { RETURN_MT(type, _mm256_permutevar8x32_ps(v.m.ps, s.m.pi)); }
 #else
 #define SHUFFLE32x8(type)
 #endif
@@ -3571,52 +2950,33 @@ FORCEINLINE v4fx8 unpack(v4fx8 v) {
 }
 // clang-format on
 
-#define MINF32x4(a, b) {_mm_min_ps(a.m.ps, b.m.ps)}
-#define MINS32x4(a, b) {_mm_castpi_ps(_mm_min_epi32(a.m.pi, b.m.pi))}
-#define MINU32x4(a, b) {_mm_castpi_ps(_mm_min_epu32(a.m.pi, b.m.pi))}
-#define MAXF32x4(a, b) {_mm_max_ps(a.m.ps, b.m.ps)}
-#define MAXS32x4(a, b) {_mm_castpi_ps(_mm_max_epi32(a.m.pi, b.m.pi))}
-#define MAXU32x4(a, b) {_mm_castpi_ps(_mm_max_epu32(a.m.pi, b.m.pi))}
+// clang-format off
+FORCEINLINE f32x4 min(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_min_ps(a.m.ps, b.m.ps)); }
+FORCEINLINE f32x4 max(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_max_ps(a.m.ps, b.m.ps)); }
+FORCEINLINE s32x4 min(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_min_epi32(a.m.pi, b.m.pi)); }
+FORCEINLINE s32x4 max(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_max_epi32(a.m.pi, b.m.pi)); }
+FORCEINLINE u32x4 min(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_min_epu32(a.m.pi, b.m.pi)); }
+FORCEINLINE u32x4 max(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_max_epu32(a.m.pi, b.m.pi)); }
 
 #if ARCH_AVX
-#define MINF32x8(a, b) {_mm256_min_ps(a.m.ps, b.m.ps)}
-#define MAXF32x8(a, b) {_mm256_max_ps(a.m.ps, b.m.ps)}
+FORCEINLINE f32x8 min(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_min_ps(a.m.ps, b.m.ps)); }
+FORCEINLINE f32x8 max(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_max_ps(a.m.ps, b.m.ps)); }
 #else
-#define MINF32x8(a, b) {_mm_min_ps(a.lo.ps, b.lo.ps), _mm_min_ps(a.hi.ps, b.hi.ps)}
-#define MAXF32x8(a, b) {_mm_max_ps(a.lo.ps, b.lo.ps), _mm_max_ps(a.hi.ps, b.hi.ps)}
+FORCEINLINE f32x8 min(f32x8 a, f32x8 b) { RETURN_T2(f32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+FORCEINLINE f32x8 max(f32x8 a, f32x8 b) { RETURN_T2(f32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
 #endif
 
 #if ARCH_AVX2
-#define MINS32x8(a, b) {_mm256_castpi_ps(_mm256_min_epi32(a.m.pi, b.m.pi))}
-#define MINU32x8(a, b) {_mm256_castpi_ps(_mm256_min_epu32(a.m.pi, b.m.pi))}
-#define MAXS32x8(a, b) {_mm256_castpi_ps(_mm256_max_epi32(a.m.pi, b.m.pi))}
-#define MAXU32x8(a, b) {_mm256_castpi_ps(_mm256_max_epu32(a.m.pi, b.m.pi))}
-#elif ARCH_AVX
-#define MAXS32x8(a, b) {_mm256_setr_m128(_mm_castpi_ps(_mm_max_epi32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_max_epi32(a.hi.pi, b.hi.pi)))}
-#define MAXU32x8(a, b) {_mm256_setr_m128(_mm_castpi_ps(_mm_max_epu32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_max_epu32(a.hi.pi, b.hi.pi)))}
-#define MINS32x8(a, b) {_mm256_setr_m128(_mm_castpi_ps(_mm_min_epi32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_min_epi32(a.hi.pi, b.hi.pi)))}
-#define MINU32x8(a, b) {_mm256_setr_m128(_mm_castpi_ps(_mm_min_epu32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_min_epu32(a.hi.pi, b.hi.pi)))}
+FORCEINLINE s32x8 min(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_min_epi32(a.m.pi, b.m.pi)); }
+FORCEINLINE s32x8 max(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_max_epi32(a.m.pi, b.m.pi)); }
+FORCEINLINE u32x8 min(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_min_epu32(a.m.pi, b.m.pi)); }
+FORCEINLINE u32x8 max(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_max_epu32(a.m.pi, b.m.pi)); }
 #else
-#define MAXS32x8(a, b) {_mm_castpi_ps(_mm_max_epi32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_max_epi32(a.hi.pi, b.hi.pi))}
-#define MAXU32x8(a, b) {_mm_castpi_ps(_mm_max_epu32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_max_epu32(a.hi.pi, b.hi.pi))}
-#define MINS32x8(a, b) {_mm_castpi_ps(_mm_min_epi32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_min_epi32(a.hi.pi, b.hi.pi))}
-#define MINU32x8(a, b) {_mm_castpi_ps(_mm_min_epu32(a.lo.pi, b.lo.pi)), _mm_castpi_ps(_mm_min_epu32(a.hi.pi, b.hi.pi))}
+FORCEINLINE s32x8 min(s32x8 a, s32x8 b) { RETURN_T2(s32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+FORCEINLINE s32x8 max(s32x8 a, s32x8 b) { RETURN_T2(s32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
+FORCEINLINE u32x8 min(u32x8 a, u32x8 b) { RETURN_T2(u32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+FORCEINLINE u32x8 max(u32x8 a, u32x8 b) { RETURN_T2(u32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
 #endif
-
-// clang-format off
-FORCEINLINE f32x4 min(f32x4 a, f32x4 b) { return MINF32x4(a, b); }
-FORCEINLINE s32x4 min(s32x4 a, s32x4 b) { return MINS32x4(a, b); }
-FORCEINLINE u32x4 min(u32x4 a, u32x4 b) { return MINU32x4(a, b); }
-FORCEINLINE f32x8 min(f32x8 a, f32x8 b) { return MINF32x8(a, b); }
-FORCEINLINE s32x8 min(s32x8 a, s32x8 b) { return MINS32x8(a, b); }
-FORCEINLINE u32x8 min(u32x8 a, u32x8 b) { return MINU32x8(a, b); }
-
-FORCEINLINE f32x4 max(f32x4 a, f32x4 b) { return MAXF32x4(a, b); }
-FORCEINLINE s32x4 max(s32x4 a, s32x4 b) { return MAXS32x4(a, b); }
-FORCEINLINE u32x4 max(u32x4 a, u32x4 b) { return MAXU32x4(a, b); }
-FORCEINLINE f32x8 max(f32x8 a, f32x8 b) { return MAXF32x8(a, b); }
-FORCEINLINE s32x8 max(s32x8 a, s32x8 b) { return MAXS32x8(a, b); }
-FORCEINLINE u32x8 max(u32x8 a, u32x8 b) { return MAXU32x8(a, b); }
 
 FORCEINLINE f32 min(f32x4 a) { 
 	auto x2 = _mm_min_ps(a.m.ps, _mm_shuffle_ps(a.m.ps, a.m.ps, MM_SHUFFLE(2,3,0,0)));
@@ -3627,42 +2987,8 @@ FORCEINLINE f32 max(f32x4 a) {
 	return _mm_cvtss_f32(_mm_max_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
 }
 
-#if ARCH_AVX
-FORCEINLINE f32 min(f32x8 a) { 
-	auto x4 = _mm_min_ps(_mm256_extractf128_ps(a.m.ps, 0), _mm256_extractf128_ps(a.m.ps, 1));
-	auto x2 = _mm_min_ps(x4, _mm_shuffle_ps(x4, x4, MM_SHUFFLE(2,3,0,0)));
-	return _mm_cvtss_f32(_mm_min_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
-}
-FORCEINLINE f32 max(f32x8 a) { 
-	auto x4 = _mm_max_ps(_mm256_extractf128_ps(a.m.ps, 0), _mm256_extractf128_ps(a.m.ps, 1));
-	auto x2 = _mm_max_ps(x4, _mm_shuffle_ps(x4, x4, MM_SHUFFLE(2,3,0,0)));
-	return _mm_cvtss_f32(_mm_max_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
-}
-#else
-FORCEINLINE f32 min(f32x8 a) { 
-	auto x4 = _mm_min_ps(a.lo.ps, a.hi.ps);
-	auto x2 = _mm_min_ps(x4, _mm_shuffle_ps(x4, x4, MM_SHUFFLE(2,3,0,0)));
-	return _mm_cvtss_f32(_mm_min_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
-}
-FORCEINLINE f32 max(f32x8 a) { 
-	auto x4 = _mm_max_ps(a.lo.ps, a.hi.ps);
-	auto x2 = _mm_max_ps(x4, _mm_shuffle_ps(x4, x4, MM_SHUFFLE(2,3,0,0)));
-	return _mm_cvtss_f32(_mm_max_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
-}
-#endif
-
-#undef MINF32x4
-#undef MINS32x4
-#undef MINU32x4
-#undef MINF32x8
-#undef MINS32x8
-#undef MINU32x8
-#undef MAXF32x4
-#undef MAXS32x4
-#undef MAXU32x4
-#undef MAXF32x8
-#undef MAXS32x8
-#undef MAXU32x8
+FORCEINLINE f32 min(f32x8 a) { return min(min(a.lo, a.hi)); }
+FORCEINLINE f32 max(f32x8 a) { return max(max(a.lo, a.hi)); }
 
 #define MINMAX(v2f, V2f)						  \
 	FORCEINLINE auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }\
@@ -3725,11 +3051,11 @@ HALF(v3u) HALF(v3ux4) HALF(v3ux8);
 HALF(v4u) HALF(v4ux4) HALF(v4ux8);
 #undef HALF
 
-#define SELECT32x4(type) FORCEINLINE type select(b32x4 mask, type a, type b) { return {_mm_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)}; }
+#define SELECT32x4(type) FORCEINLINE type select(b32x4 mask, type a, type b) { RETURN_MT(type, _mm_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
 #if ARCH_AVX
-#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { return {_mm256_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)}; }
+#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { RETURN_MT(type, _mm256_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
 #else
-#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { return {_mm_blendv_ps(b.lo.ps, a.lo.ps, mask.lo.ps), _mm_blendv_ps(b.hi.ps, a.hi.ps, mask.hi.ps)}; }
+#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { RETURN_T2(type, select(mask.lo, a.lo, b.lo), select(mask.hi, a.hi, b.hi)); }
 #endif
 
 SELECT32x4(f32x4)
@@ -3862,14 +3188,17 @@ FORCEINLINE v3f floor(v3f v) {
 	};
 }
 
-FORCEINLINE f32x4 floor(f32x4 v) { return {_mm_round_ps(v.m.ps, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC)}; }
-FORCEINLINE f32x4  ceil(f32x4 v) { return {_mm_round_ps(v.m.ps, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC)}; }
+#define TL_MM_FLOOR _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC
+#define TL_MM_CEIL  _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC
+
+FORCEINLINE f32x4 floor(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_FLOOR)); }
+FORCEINLINE f32x4  ceil(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_CEIL )); }
 #if ARCH_AVX
-FORCEINLINE f32x8 floor(f32x8 v) { return {_mm256_round_ps(v.m.ps, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC)}; }
-FORCEINLINE f32x8  ceil(f32x8 v) { return {_mm256_round_ps(v.m.ps, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC)}; }
+FORCEINLINE f32x8 floor(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_FLOOR)); }
+FORCEINLINE f32x8  ceil(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_CEIL )); }
 #else
-FORCEINLINE f32x8 floor(f32x8 v) { return {_mm_round_ps(v.lo.ps, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC), _mm_round_ps(v.hi.ps, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC)}; }
-FORCEINLINE f32x8  ceil(f32x8 v) { return {_mm_round_ps(v.lo.ps, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC), _mm_round_ps(v.hi.ps, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC)}; }
+FORCEINLINE f32x8 floor(f32x8 v) { RETURN_T2(f32x8, floor(v.lo), floor(v.hi)); }
+FORCEINLINE f32x8  ceil(f32x8 v) { RETURN_T2(f32x8,  ceil(v.lo),  ceil(v.hi)); }
 #endif
 
 FORCEINLINE v4f floor(v4f v) { return V4f(floor(v.m)); }
@@ -4020,11 +3349,11 @@ FORCEINLINE v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
 FORCEINLINE f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
 FORCEINLINE u32 absolute(u32 v) { return v; }
 FORCEINLINE s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
-FORCEINLINE f32x4 absolute(f32x4 v) { return {_mm_and_ps(v.m.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))}; }
+FORCEINLINE f32x4 absolute(f32x4 v) { RETURN_MT(f32x4, _mm_and_ps(v.m.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
 #if ARCH_AVX
-FORCEINLINE f32x8 absolute(f32x8 v) { return {_mm256_and_ps(v.m.ps, _mm256_castpi_ps(_mm256_set1_epi32(0x7FFFFFFF)))}; }
+FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_MT(f32x8, _mm256_and_ps(v.m.ps, _mm256_castpi_ps(_mm256_set1_epi32(0x7FFFFFFF)))); }
 #else
-FORCEINLINE f32x8 absolute(f32x8 v) { return {_mm_and_ps(v.lo.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF))), _mm_and_ps(v.hi.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))}; }
+FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_T2(f32x8, absolute(v.lo), absolute(v.hi)); }
 #endif
 
 FORCEINLINE v2f absolute(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
@@ -4088,14 +3417,14 @@ template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32 b) { return
 FORCEINLINE f32 sqrt(f32 v) { return sqrtf(v); }
 FORCEINLINE v2f sqrt(v2f v) { return V2f(sqrtf(v.x), sqrtf(v.y)); }
 FORCEINLINE v3f sqrt(v3f v) { return V3f(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z)); }
-FORCEINLINE f32x4 reciprocal(f32x4 v) { return {_mm_rcp_ps(v.m.ps)}; }
-FORCEINLINE f32x4 sqrt(f32x4 v) { return {_mm_sqrt_ps(v.m.ps)}; }
+FORCEINLINE f32x4 reciprocal(f32x4 v) { RETURN_MT(f32x4, _mm_rcp_ps(v.m.ps)); }
+FORCEINLINE f32x4 sqrt(f32x4 v) { RETURN_MT(f32x4, _mm_sqrt_ps(v.m.ps)); }
 #if ARCH_AVX
-FORCEINLINE f32x8 sqrt(f32x8 v) { return {_mm256_sqrt_ps(v.m.ps)}; }
-FORCEINLINE f32x8 reciprocal(f32x8 v) { return {_mm256_rcp_ps(v.m.ps)}; }
+FORCEINLINE f32x8 sqrt(f32x8 v) { RETURN_MT(f32x8, _mm256_sqrt_ps(v.m.ps)); }
+FORCEINLINE f32x8 reciprocal(f32x8 v) { RETURN_MT(f32x8, _mm256_rcp_ps(v.m.ps)); }
 #else
-FORCEINLINE f32x8 sqrt(f32x8 v) { return {_mm_sqrt_ps(v.lo.ps), _mm_sqrt_ps(v.hi.ps)}; }
-FORCEINLINE f32x8 reciprocal(f32x8 v) { return {_mm_rcp_ps(v.lo.ps), _mm_rcp_ps(v.hi.ps)}; }
+FORCEINLINE f32x8 sqrt(f32x8 v) { RETURN_T2(f32x8, sqrt(v.lo), sqrt(v.hi)); }
+FORCEINLINE f32x8 reciprocal(f32x8 v) { RETURN_T2(f32x8, reciprocal(v.lo), reciprocal(v.hi)); }
 #endif
 FORCEINLINE v4f sqrt(v4f v) { return V4f(sqrt(v.m)); }
 
@@ -4123,21 +3452,21 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) {
 	cosOut = cos(v);
 }
 #else
-FORCEINLINE f32x4 sin(f32x4 v) { return {_mm_sin_ps(v.m.ps)}; }
-FORCEINLINE f32x4 cos(f32x4 v) { return {_mm_cos_ps(v.m.ps)}; }
+FORCEINLINE f32x4 sin(f32x4 v) { RETURN_MT(f32x4, _mm_sin_ps(v.m.ps)); }
+FORCEINLINE f32x4 cos(f32x4 v) { RETURN_MT(f32x4, _mm_cos_ps(v.m.ps)); }
 #if ARCH_AVX
-FORCEINLINE f32x8 sin(f32x8 v) { return {_mm256_sin_ps(v.m.ps)}; }
-FORCEINLINE f32x8 cos(f32x8 v) { return {_mm256_cos_ps(v.m.ps)}; }
+FORCEINLINE f32x8 sin(f32x8 v) { RETURN_MT(f32x8, _mm256_sin_ps(v.m.ps)); }
+FORCEINLINE f32x8 cos(f32x8 v) { RETURN_MT(f32x8, _mm256_cos_ps(v.m.ps)); }
 #else
-FORCEINLINE f32x8 sin(f32x8 v) { return {_mm_sin_ps(v.lo.ps), _mm_sin_ps(v.hi.ps)}; }
-FORCEINLINE f32x8 cos(f32x8 v) { return {_mm_cos_ps(v.lo.ps), _mm_cos_ps(v.hi.ps)}; }
+FORCEINLINE f32x8 sin(f32x8 v) { RETURN_T2(f32x8, sin(v.lo), sin(v.hi)); }
+FORCEINLINE f32x8 cos(f32x8 v) { RETURN_T2(f32x8, cos(v.lo), cos(v.hi)); }
 #endif
 FORCEINLINE v4f sin(v4f v) { return V4f(sin(v.m)); }
 FORCEINLINE v2f sin(v2f v) { return sin(V4f(v, 0, 0)).xy; }
 FORCEINLINE v3f sin(v3f v) { return sin(V4f(v, 0)).xyz; }
 
 #define SIN_BHASKARA(f32x4) 															\
-FORCEINLINE f32x4 sinBhaskara(f32x4 v) {														\
+FORCEINLINE f32x4 sinBhaskara(f32x4 v) {												\
 	v = positiveModulo(v, pi * 2);														\
 	auto mask = v >= pi;																\
 	v = select(mask, v - pi, v);														\
@@ -4198,10 +3527,7 @@ FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m.ps = _
 #if ARCH_AVX
 FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sinOut.m.ps = _mm256_sincos_ps(&cosOut.m.ps, v.m.ps); }
 #else
-FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { 
-	sinOut.lo.ps = _mm_sincos_ps(&cosOut.lo.ps, v.lo.ps);
-	sinOut.hi.ps = _mm_sincos_ps(&cosOut.hi.ps, v.hi.ps);
-}
+FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sincos(v.lo, sinOut.lo, cosOut.lo); sincos(v.hi, sinOut.hi, cosOut.hi); }
 #endif
 FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
 #endif
@@ -4213,13 +3539,13 @@ FORCEINLINE v2fx8 sincos(f32x8 v) { v2fx8 result; sincos(v, result.y, result.x);
 FORCEINLINE f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
 FORCEINLINE f32 atan2(v2f v) { return atan2(v.y, v.x); }
 
-FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) { return {_mm_atan2_ps(y.m.ps, x.m.ps)}; }
+FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) { RETURN_MT(f32x4, _mm_atan2_ps(y.m.ps, x.m.ps)); }
 FORCEINLINE f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
 
 #if ARCH_AVX
-FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { return {_mm256_atan2_ps(y.m.ps, x.m.ps)}; }
+FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_MT(f32x8, _mm256_atan2_ps(y.m.ps, x.m.ps)); }
 #else
-FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { return {_mm_atan2_ps(y.lo.ps, x.lo.ps), _mm_atan2_ps(y.hi.ps, x.hi.ps)}; }
+FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_T2(f32x8, atan2(y.lo, x.lo), atan2(y.hi, x.hi)); }
 #endif
 FORCEINLINE f32x8 atan2(v2fx8 v) { return atan2(v.y, v.x); }
 
@@ -5582,14 +4908,10 @@ inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 
 } // namespace TL
 
-#undef MEMBERS2
-#undef MEMBERS3
-#undef MEMBERS4
-#undef MEMFUNS_BASIC
-#undef MEMFUNS_DATA
-#undef MEMFUNS_INT
-#undef MEMFUNS_SHIFT_SCL
-#undef SHUFFLE
+#undef MOP
+#undef MOPS
+#undef OPS
+#undef SOP
 
 #undef MM_SHUFFLE
 #undef MM256_PERM128

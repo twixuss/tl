@@ -519,7 +519,7 @@ struct Flags {
 
 Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
 Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
-Flags asChar(bool value) { return value << asCharBit; }
+Flags asChar(bool value) { return (u32)value << asCharBit; }
 
 }
 
