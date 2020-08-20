@@ -142,9 +142,9 @@ union M16 {
 	__m128  ps;
 	__m128i pi;
 	__m128d pd;
-	M16 &operator=(__m128  ps) { this->ps = ps; return *this; }
-	M16 &operator=(__m128i pi) { this->pi = pi; return *this; }
-	M16 &operator=(__m128d pd) { this->pd = pd; return *this; }
+	FORCEINLINE constexpr M16 &operator=(__m128  ps) { this->ps = ps; return *this; }
+	FORCEINLINE constexpr M16 &operator=(__m128i pi) { this->pi = pi; return *this; }
+	FORCEINLINE constexpr M16 &operator=(__m128d pd) { this->pd = pd; return *this; }
 };
 
 #if ARCH_AVX
@@ -152,9 +152,9 @@ union M32 {
 	__m256  ps;
 	__m256i pi;
 	__m256d pd;
-	M32 &operator=(__m256  ps) { this->ps = ps; return *this; }
-	M32 &operator=(__m256i pi) { this->pi = pi; return *this; }
-	M32 &operator=(__m256d pd) { this->pd = pd; return *this; }
+	FORCEINLINE constexpr M32 &operator=(__m256  ps) { this->ps = ps; return *this; }
+	FORCEINLINE constexpr M32 &operator=(__m256i pi) { this->pi = pi; return *this; }
+	FORCEINLINE constexpr M32 &operator=(__m256d pd) { this->pd = pd; return *this; }
 };
 #else
 union M32 {
@@ -167,9 +167,9 @@ union M64 {
 	__m512  ps;
 	__m512i pi;
 	__m512d pd;
-	M64 &operator=(__m512  ps) { this->ps = ps; return *this; }
-	M64 &operator=(__m512i pi) { this->pi = pi; return *this; }
-	M64 &operator=(__m512d pd) { this->pd = pd; return *this; }
+	FORCEINLINE constexpr M64 &operator=(__m512  ps) { this->ps = ps; return *this; }
+	FORCEINLINE constexpr M64 &operator=(__m512i pi) { this->pi = pi; return *this; }
+	FORCEINLINE constexpr M64 &operator=(__m512d pd) { this->pd = pd; return *this; }
 };
 #else
 union M64 {
@@ -199,7 +199,6 @@ template <class T> FORCEINLINE constexpr auto degrees(T rad) { return rad * (T)(
 template <class T, class SN, class SX, class DN, class DX> FORCEINLINE constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class U, class V> FORCEINLINE constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
 template <class A, class B, class T> FORCEINLINE constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
-template <class T> FORCEINLINE constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class M, class T> FORCEINLINE T &maskAssign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> FORCEINLINE constexpr auto pow2(T v) { return v * v; }
 template <class T> FORCEINLINE constexpr auto pow3(T v) { return v * v * v; }
@@ -339,9 +338,7 @@ template <umm width> struct HalfT<v3ux<width>> { using Type = v3ux<width/2>; };
 template <umm width> struct HalfT<v4fx<width>> { using Type = v4fx<width/2>; };
 template <umm width> struct HalfT<v4sx<width>> { using Type = v4sx<width/2>; };
 template <umm width> struct HalfT<v4ux<width>> { using Type = v4ux<width/2>; };
-
-template <class T> 
-using Half = typename HalfT<T>::Type;
+template <class T> using Half = typename HalfT<T>::Type;
 
 FORCEINLINE f32x8 F32x8(f32x4, f32x4);
 FORCEINLINE s32x8 S32x8(s32x4, s32x4);
@@ -380,6 +377,10 @@ FORCEINLINE constexpr f64x2 F64x2(M16);
 FORCEINLINE constexpr f64x4 F64x4(M32);
 //FORCEINLINE constexpr s64x4 S64x4(M32);
 //FORCEINLINE constexpr u64x4 U64x4(M32);
+
+FORCEINLINE constexpr f32x1 F32x1(f32 = 0);
+FORCEINLINE constexpr s32x1 S32x1(s32 = 0);
+FORCEINLINE constexpr u32x1 U32x1(u32 = 0);
 
 FORCEINLINE f32x4 F32x4(f32 = 0);
 FORCEINLINE s32x4 S32x4(s32 = 0);
@@ -648,39 +649,39 @@ inline static constexpr TrueMask trueMask;
 inline static constexpr FalseMask falseMask;
 
 #define OPERATORS_BOOL                                     \
-	FORCEINLINE Vector operator!() const { return ~*this; }            \
-	FORCEINLINE Vector operator&&(Vector b) const { return *this & b; }  \
-	FORCEINLINE Vector operator||(Vector b) const { return *this | b; }  \
-	FORCEINLINE Vector &operator^=(Vector b) { return *this = *this ^ b; } \
-	FORCEINLINE Vector &operator&=(Vector b) { return *this = *this & b; } \
-	FORCEINLINE Vector &operator|=(Vector b) { return *this = *this | b; } \
+	FORCEINLINE Pack operator!() const { return ~*this; }            \
+	FORCEINLINE Pack operator&&(Pack b) const { return *this & b; }  \
+	FORCEINLINE Pack operator||(Pack b) const { return *this | b; }  \
+	FORCEINLINE Pack &operator^=(Pack b) { return *this = *this ^ b; } \
+	FORCEINLINE Pack &operator&=(Pack b) { return *this = *this & b; } \
+	FORCEINLINE Pack &operator|=(Pack b) { return *this = *this | b; } \
 	FORCEINLINE Scalar operator[](umm index) const { return s[index]; } \
 	FORCEINLINE Scalar &operator[](umm index) { return s[index]; }
 
-#define RETURN_T(t,x)    t result; result = x; return result
-#define RETURN_T2(t,x,y) t result; result.lo = x; result.hi = y; return result
-#define RETURN(x)        RETURN_T(Vector,x)
-#define RETURN_2(x,y)    RETURN_T2(Vector,x,y)
+#define RETURN_T(t,x)    t result{}; result = x; return result
+#define RETURN_T2(t,x,y) t result{}; result.lo = x; result.hi = y; return result
+#define RETURN(x)        RETURN_T(Pack,x)
+#define RETURN_2(x,y)    RETURN_T2(Pack,x,y)
 
-#define RETURN_MT(t,x)    t result; result.m = x; return result
-#define RETURN_MT2(t,x,y) t result; result.lo.m = x; result.hi.m = y; return result
-#define RETURN_M(x)       RETURN_MT(Vector,x)
-#define RETURN_M2(x,y)    RETURN_MT2(Vector,x,y)
+#define RETURN_MT(t,x)    t result{}; result.m = x; return result
+#define RETURN_MT2(t,x,y) t result{}; result.lo.m = x; result.hi.m = y; return result
+#define RETURN_M(x)       RETURN_MT(Pack,x)
+#define RETURN_M2(x,y)    RETURN_MT2(Pack,x,y)
 
 #define RETURN_MASK(x)       RETURN_MT(Mask,x)
 
 #define FALLBACK_BOOL                                                                  \
-	FORCEINLINE Vector operator~() const { RETURN_2(~lo, ~hi); }                        \
-	FORCEINLINE Vector operator==(Vector b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
-	FORCEINLINE Vector operator!=(Vector b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
-	FORCEINLINE Vector operator^ (Vector b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
-	FORCEINLINE Vector operator& (Vector b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
-	FORCEINLINE Vector operator| (Vector b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
+	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
+	FORCEINLINE Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
+	FORCEINLINE Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
+	FORCEINLINE Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
+	FORCEINLINE Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
+	FORCEINLINE Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
 
 template <>
 union b32x<1> {
 	using Scalar = b32;
-	using Vector = b32x;
+	using Pack = b32x;
 
 	Scalar s[1];
 	Scalar m;
@@ -697,7 +698,7 @@ union b32x<1> {
 template <>
 union b32x<4> {
 	using Scalar = b32;
-	using Vector = b32x;
+	using Pack = b32x;
 
 	b32 s[4];
 	M16 m;
@@ -714,7 +715,7 @@ union b32x<4> {
 template<>
 union b32x<8> {
 	using Scalar = b32;
-	using Vector = b32x;
+	using Pack = b32x;
 
 	b32 s[8];
 	struct {
@@ -738,7 +739,7 @@ union b32x<8> {
 template<>
 union b64x<2> {
 	using Scalar = b64;
-	using Vector = b64x;
+	using Pack = b64x;
 
 	b64 s[2];
 	M16 m;
@@ -755,7 +756,7 @@ union b64x<2> {
 template<>
 union b64x<4> {
 	using Scalar = b64;
-	using Vector = b64x;
+	using Pack = b64x;
 
 	b64 s[4];
 	struct {
@@ -785,8 +786,10 @@ FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.
 FORCEINLINE u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
 FORCEINLINE u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
 
+FORCEINLINE bool allTrue (bool v) { return v; }
+FORCEINLINE bool allFalse(bool v) { return !v; }
 FORCEINLINE bool allTrue (b32x1 v) { return v.m == 1; }
-FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0;   }
+FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0; }
 FORCEINLINE bool allTrue (b32x4 v) { return compressMask(v) == 0xF; }
 FORCEINLINE bool allFalse(b32x4 v) { return compressMask(v) == 0;   }
 FORCEINLINE bool allTrue (b64x2 v) { return compressMask(v) == 0x3; }
@@ -831,61 +834,6 @@ template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
 
 #define CVT(other) explicit FORCEINLINE operator other() const
 
-template<>
-union f32x<1> {
-	f32 m;
-	f32 s[1];
-
-	FORCEINLINE        f32x1  operator-()          const { return {-m}; }
-	FORCEINLINE	       f32x1  operator+ (f32x1 b)  const { return {m +  b.m}; }
-	FORCEINLINE	       f32x1  operator- (f32x1 b)  const { return {m -  b.m}; }
-	FORCEINLINE	       f32x1  operator* (f32x1 b)  const { return {m *  b.m}; }
-	FORCEINLINE	       f32x1  operator/ (f32x1 b)  const { return {m /  b.m}; }
-	FORCEINLINE	       b32x1  operator< (f32x1 b)  const { return {m <  b.m}; }
-	FORCEINLINE	       b32x1  operator> (f32x1 b)  const { return {m >  b.m}; }
-	FORCEINLINE	       b32x1  operator<=(f32x1 b)  const { return {m <= b.m}; }
-	FORCEINLINE	       b32x1  operator>=(f32x1 b)  const { return {m >= b.m}; }
-	FORCEINLINE	       b32x1  operator==(f32x1 b)  const { return {m == b.m}; }
-	FORCEINLINE	       b32x1  operator!=(f32x1 b)  const { return {m != b.m}; }
-	FORCEINLINE	       f32x1  operator+ (f32   b)  const { return {m +  b  }; }
-	FORCEINLINE	       f32x1  operator- (f32   b)  const { return {m -  b  }; }
-	FORCEINLINE	       f32x1  operator* (f32   b)  const { return {m *  b  }; }
-	FORCEINLINE	       f32x1  operator/ (f32   b)  const { return {m /  b  }; }
-	FORCEINLINE	       b32x1  operator< (f32   b)  const { return {m <  b  }; }
-	FORCEINLINE	       b32x1  operator> (f32   b)  const { return {m >  b  }; }
-	FORCEINLINE	       b32x1  operator<=(f32   b)  const { return {m <= b  }; }
-	FORCEINLINE	       b32x1  operator>=(f32   b)  const { return {m >= b  }; }
-	FORCEINLINE	       b32x1  operator==(f32   b)  const { return {m == b  }; }
-	FORCEINLINE	       b32x1  operator!=(f32   b)  const { return {m != b  }; }
-	FORCEINLINE friend f32x1  operator+ (f32 a, f32x1 b) { return {a +  b.m}; }
-	FORCEINLINE friend f32x1  operator- (f32 a, f32x1 b) { return {a -  b.m}; }
-	FORCEINLINE friend f32x1  operator* (f32 a, f32x1 b) { return {a *  b.m}; }
-	FORCEINLINE friend f32x1  operator/ (f32 a, f32x1 b) { return {a /  b.m}; }
-	FORCEINLINE friend b32x1  operator< (f32 a, f32x1 b) { return {a <  b.m}; }
-	FORCEINLINE friend b32x1  operator> (f32 a, f32x1 b) { return {a >  b.m}; }
-	FORCEINLINE friend b32x1  operator<=(f32 a, f32x1 b) { return {a <= b.m}; }
-	FORCEINLINE friend b32x1  operator>=(f32 a, f32x1 b) { return {a >= b.m}; }
-	FORCEINLINE friend b32x1  operator==(f32 a, f32x1 b) { return {a == b.m}; }
-	FORCEINLINE friend b32x1  operator!=(f32 a, f32x1 b) { return {a != b.m}; }
-	FORCEINLINE        f32x1 &operator+=(f32x1 b)        { return m += b.m, *this; }
-	FORCEINLINE        f32x1 &operator-=(f32x1 b)        { return m -= b.m, *this; }
-	FORCEINLINE        f32x1 &operator*=(f32x1 b)        { return m *= b.m, *this; }
-	FORCEINLINE        f32x1 &operator/=(f32x1 b)        { return m /= b.m, *this; }
-	FORCEINLINE        f32x1 &operator+=(f32   b)        { return m += b  , *this; }
-	FORCEINLINE        f32x1 &operator-=(f32   b)        { return m -= b  , *this; }
-	FORCEINLINE        f32x1 &operator*=(f32   b)        { return m *= b  , *this; }
-	FORCEINLINE        f32x1 &operator/=(f32   b)        { return m /= b  , *this; }
-	FORCEINLINE        f32x1 &operator++ ()              { return ++m, *this; }
-	FORCEINLINE        f32x1 &operator-- ()              { return --m, *this; }
-	FORCEINLINE        f32x1  operator++ (int)           { return {m++}; }
-	FORCEINLINE        f32x1  operator-- (int)           { return {m--}; }
-
-	CVT(s32x1);
-	CVT(u32x1);
-	MEMFUNS_DATA(f32);
-	INDEX_S(f32);
-};
-
 #if ARCH_AVX
 #define CMPLTF32x4(a, b) _mm_cmp_ps(a, b, _CMP_LT_OQ)
 #define CMPGTF32x4(a, b) _mm_cmp_ps(a, b, _CMP_GT_OQ)
@@ -917,17 +865,17 @@ union f32x<1> {
 #endif
 
 #define OPERATOR_SCALAR(op, extend) \
-	FORCEINLINE Vector operator op(Scalar b) { return *this op extend(b); } \
-	FORCEINLINE friend Vector operator op(Scalar a, Vector b) { return extend(a) op b; }
+	FORCEINLINE Pack operator op(Scalar b) { return *this op extend(b); } \
+	FORCEINLINE friend Pack operator op(Scalar a, Pack b) { return extend(a) op b; }
 
-// is first is member s32x4's operator!= refuses to compile
+// is first is not friend, s32x4's operator!= refuses to compile
 #define OPERATOR_COMPARE(op, extend) \
-	FORCEINLINE friend Mask operator op(Vector a, Scalar b) { return a op extend(b); } \
-	FORCEINLINE friend Mask operator op(Scalar a, Vector b) { return extend(a) op b; }
+	FORCEINLINE friend Mask operator op(Pack a, Scalar b) { return a op extend(b); } \
+	FORCEINLINE friend Mask operator op(Scalar a, Pack b) { return extend(a) op b; }
 
 #define OPERATOR_MODIFY(op, extend) \
-	FORCEINLINE Vector &operator op##=(Vector b) { return *this = *this op b; } \
-	FORCEINLINE Vector &operator op##=(Scalar b) { return *this = *this op extend(b); }
+	FORCEINLINE Pack &operator op##=(Pack b) { return *this = *this op b; } \
+	FORCEINLINE Pack &operator op##=(Scalar b) { return *this = *this op extend(b); }
 
 
 #define OPERATOR_ALL_VER(op, extend) \
@@ -935,10 +883,11 @@ union f32x<1> {
 	OPERATOR_SCALAR(op, extend)
 
 #define OPERATOR_XCREMENT(extend) \
-	FORCEINLINE Vector &operator++()   { return *this = *this + extend(1); } \
-	FORCEINLINE Vector &operator--()   { return *this = *this - extend(1); } \
-	FORCEINLINE Vector  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
-	FORCEINLINE Vector  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
+	FORCEINLINE Pack &operator++()   { return *this = *this + extend(1); } \
+	FORCEINLINE Pack &operator--()   { return *this = *this - extend(1); } \
+	FORCEINLINE Pack  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
+	FORCEINLINE Pack  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
+
 
 #define OPERATORS_FLOAT(extend) \
 	OPERATOR_COMPARE(>, extend) \
@@ -953,23 +902,99 @@ union f32x<1> {
 	OPERATOR_ALL_VER(/, extend) \
 	OPERATOR_XCREMENT(extend)
 
+#define OPERATORS_INT(extend) \
+	OPERATOR_COMPARE(>, extend) \
+	OPERATOR_COMPARE(<, extend) \
+	OPERATOR_COMPARE(>=, extend) \
+	OPERATOR_COMPARE(<=, extend) \
+	OPERATOR_COMPARE(==, extend) \
+	OPERATOR_COMPARE(!=, extend) \
+	OPERATOR_ALL_VER(+, extend) \
+	OPERATOR_ALL_VER(-, extend) \
+	OPERATOR_ALL_VER(*, extend) \
+	OPERATOR_ALL_VER(/, extend) \
+	OPERATOR_ALL_VER(%, extend) \
+	OPERATOR_ALL_VER(^, extend) \
+	OPERATOR_ALL_VER(&, extend) \
+	OPERATOR_ALL_VER(|, extend) \
+	OPERATOR_MODIFY(>>, extend) \
+	OPERATOR_MODIFY(<<, extend) \
+	FORCEINLINE Mask operator!() const { return *this == 0; } \
+	OPERATOR_XCREMENT(extend)
+
+
 #define FALLBACK_FLOAT                                                                  \
-	FORCEINLINE Vector operator-() const { RETURN_2(-lo, -hi); }                        \
-	FORCEINLINE Vector operator+ (Vector b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
-	FORCEINLINE Vector operator- (Vector b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
-	FORCEINLINE Vector operator* (Vector b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
-	FORCEINLINE Vector operator/ (Vector b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
-	FORCEINLINE Mask operator> (Vector b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
-	FORCEINLINE Mask operator< (Vector b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
-	FORCEINLINE Mask operator>=(Vector b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
-	FORCEINLINE Mask operator<=(Vector b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
-	FORCEINLINE Mask operator==(Vector b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
-	FORCEINLINE Mask operator!=(Vector b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+	FORCEINLINE Pack operator-() const { RETURN_2(-lo, -hi); }                        \
+	FORCEINLINE Pack operator+ (Pack b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
+	FORCEINLINE Pack operator- (Pack b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
+	FORCEINLINE Pack operator* (Pack b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
+	FORCEINLINE Pack operator/ (Pack b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
+	FORCEINLINE Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
+	FORCEINLINE Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
+	FORCEINLINE Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
+	FORCEINLINE Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
+	FORCEINLINE Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
+	FORCEINLINE Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+
+#define FALLBACK_INT_NO_BITWISE                                                                  \
+	FORCEINLINE Pack operator-() const { RETURN_2(-lo, -hi); }                                 \
+	FORCEINLINE Pack operator+(Pack b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
+	FORCEINLINE Pack operator-(Pack b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
+	FORCEINLINE Pack operator*(Pack b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
+	FORCEINLINE Pack operator/(Pack b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
+	FORCEINLINE Pack operator%(Pack b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
+	FORCEINLINE Pack operator<<(Pack b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
+	FORCEINLINE Pack operator>>(Pack b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
+	FORCEINLINE Pack operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
+	FORCEINLINE Pack operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
+	FORCEINLINE friend Pack operator<<(Scalar a, Pack b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
+	FORCEINLINE friend Pack operator>>(Scalar a, Pack b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
+	FORCEINLINE Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
+	FORCEINLINE Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
+	FORCEINLINE Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
+	FORCEINLINE Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
+	FORCEINLINE Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
+	FORCEINLINE Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+
+#define FALLBACK_INT                                                                 \
+	FALLBACK_INT_NO_BITWISE                                                          \
+	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                     \
+	FORCEINLINE Pack operator^(Pack b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
+	FORCEINLINE Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
+	FORCEINLINE Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
+
+template<>
+union f32x<1> {
+	using Scalar = f32;
+	using Pack   = f32x;
+	using Mask   = b32x1;
+
+	f32 m;
+	f32 s[1];
+
+	FORCEINLINE f32x1 operator-()         const { RETURN_M(-m); }
+	FORCEINLINE	f32x1 operator+ (f32x1 b) const { RETURN_M(m +  b.m); }
+	FORCEINLINE	f32x1 operator- (f32x1 b) const { RETURN_M(m -  b.m); }
+	FORCEINLINE	f32x1 operator* (f32x1 b) const { RETURN_M(m *  b.m); }
+	FORCEINLINE	f32x1 operator/ (f32x1 b) const { RETURN_M(m /  b.m); }
+	FORCEINLINE	b32x1 operator< (f32x1 b) const { RETURN_MT(b32x1, m <  b.m); }
+	FORCEINLINE	b32x1 operator> (f32x1 b) const { RETURN_MT(b32x1, m >  b.m); }
+	FORCEINLINE	b32x1 operator<=(f32x1 b) const { RETURN_MT(b32x1, m <= b.m); }
+	FORCEINLINE	b32x1 operator>=(f32x1 b) const { RETURN_MT(b32x1, m >= b.m); }
+	FORCEINLINE	b32x1 operator==(f32x1 b) const { RETURN_MT(b32x1, m == b.m); }
+	FORCEINLINE	b32x1 operator!=(f32x1 b) const { RETURN_MT(b32x1, m != b.m); }
+	OPERATORS_FLOAT(F32x1)
+
+	CVT(s32x1);
+	CVT(u32x1);
+	MEMFUNS_DATA(f32);
+	INDEX_S(f32);
+};
 
 template<>
 union f32x<4> {
 	using Scalar = f32;
-	using Vector = f32x;
+	using Pack = f32x;
 	using Mask   = b32x4;
 
 	f32 s[4];
@@ -997,7 +1022,7 @@ union f32x<4> {
 template <>
 union f32x<8> {
 	using Scalar = f32;
-	using Vector = f32x;
+	using Pack = f32x;
 	using Mask   = b32x8;
 
 	f32 s[8];
@@ -1032,7 +1057,7 @@ union f32x<8> {
 template <>
 union f64x<2> {
 	using Scalar = f64;
-	using Vector = f64x;
+	using Pack = f64x;
 	using Mask   = b64x2;
 
 	f64 s[2];
@@ -1059,7 +1084,7 @@ union f64x<2> {
 template <>
 union f64x<4> {
 	using Scalar = f64;
-	using Vector = f64x;
+	using Pack = f64x;
 	using Mask   = b64x4;
 
 	f64 s[4];
@@ -1091,53 +1116,6 @@ union f64x<4> {
 	MEMFUNS_DATA(f64);
 	INDEX_S(f64);
 };
-
-#define OPERATORS_INT(extend) \
-	OPERATOR_COMPARE(>, extend) \
-	OPERATOR_COMPARE(<, extend) \
-	OPERATOR_COMPARE(>=, extend) \
-	OPERATOR_COMPARE(<=, extend) \
-	OPERATOR_COMPARE(==, extend) \
-	OPERATOR_COMPARE(!=, extend) \
-	OPERATOR_ALL_VER(+, extend) \
-	OPERATOR_ALL_VER(-, extend) \
-	OPERATOR_ALL_VER(*, extend) \
-	OPERATOR_ALL_VER(/, extend) \
-	OPERATOR_ALL_VER(%, extend) \
-	OPERATOR_ALL_VER(^, extend) \
-	OPERATOR_ALL_VER(&, extend) \
-	OPERATOR_ALL_VER(|, extend) \
-	OPERATOR_MODIFY(>>, extend) \
-	OPERATOR_MODIFY(<<, extend) \
-	FORCEINLINE Mask operator!() const { return *this == 0; } \
-	OPERATOR_XCREMENT(extend)
-
-#define FALLBACK_INT_NO_BITWISE                                                                  \
-	FORCEINLINE Vector operator-() const { RETURN_2(-lo, -hi); }                                 \
-	FORCEINLINE Vector operator+(Vector b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
-	FORCEINLINE Vector operator-(Vector b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
-	FORCEINLINE Vector operator*(Vector b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
-	FORCEINLINE Vector operator/(Vector b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
-	FORCEINLINE Vector operator%(Vector b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
-	FORCEINLINE Vector operator<<(Vector b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
-	FORCEINLINE Vector operator>>(Vector b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
-	FORCEINLINE Vector operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
-	FORCEINLINE Vector operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
-	FORCEINLINE friend Vector operator<<(Scalar a, Vector b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
-	FORCEINLINE friend Vector operator>>(Scalar a, Vector b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
-	FORCEINLINE Mask operator> (Vector b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
-	FORCEINLINE Mask operator< (Vector b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
-	FORCEINLINE Mask operator>=(Vector b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
-	FORCEINLINE Mask operator<=(Vector b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
-	FORCEINLINE Mask operator==(Vector b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
-	FORCEINLINE Mask operator!=(Vector b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
-
-#define FALLBACK_INT                                                                 \
-	FALLBACK_INT_NO_BITWISE                                                          \
-	FORCEINLINE Vector operator~() const { RETURN_2(~lo, ~hi); }                     \
-	FORCEINLINE Vector operator^(Vector b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
-	FORCEINLINE Vector operator&(Vector b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
-	FORCEINLINE Vector operator|(Vector b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
 
 #if 0
 template<>
@@ -1221,7 +1199,7 @@ union s32x<1> {
 template<>
 union s32x<4> {
 	using Scalar = s32;
-	using Vector = s32x;
+	using Pack = s32x;
 	using Mask = b32x4;
 
 	M16 m;
@@ -1261,7 +1239,7 @@ union s32x<4> {
 template<>
 union s32x<8> {
 	using Scalar = s32;
-	using Vector = s32x;
+	using Pack = s32x;
 	using Mask = b32x8;
 
 	s32 s[8];
@@ -1274,33 +1252,60 @@ union s32x<8> {
 		s32x4 lo, hi;
 	};
 #if ARCH_AVX2
-	FORCEINLINE        s32x8  operator-()          const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE        s32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
-	FORCEINLINE	       s32x8  operator+ (s32x8 b)  const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator- (s32x8 b)  const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator* (s32x8 b)  const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator/ (s32x8 b)  const { RETURN_M(_mm256_div_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator% (s32x8 b)  const { RETURN_M(_mm256_rem_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator^ (s32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x8  operator& (s32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x8  operator| (s32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x8  operator<<(s32x8 b)  const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator>>(s32x8 b)  const { RETURN_M(_mm256_srav_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator< (s32x8 b)  const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator> (s32x8 b)  const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator<=(s32x8 b)  const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator>=(s32x8 b)  const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator==(s32x8 b)  const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator!=(s32x8 b)  const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x8  operator<<(s32   b)  const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
-	FORCEINLINE	       s32x8  operator>>(s32   b)  const { RETURN_M(_mm256_srai_epi32(m.pi, b)); }
-	FORCEINLINE	friend s32x8  operator<<(s32 a, s32x8 b) { RETURN_M(_mm256_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend s32x8  operator>>(s32 a, s32x8 b) { RETURN_M(_mm256_sraiv_epi32(a, b.m.pi)); }
+	FORCEINLINE s32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	FORCEINLINE s32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	s32x8 operator+(s32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator-(s32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator*(s32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+#if COMPILER_GCC
+	FORCEINLINE s32x8 operator/(s32x8 b) const {
+		return {
+			s[0] / b.s[0],
+			s[1] / b.s[1],
+			s[2] / b.s[2],
+			s[3] / b.s[3],
+			s[4] / b.s[4],
+			s[5] / b.s[5],
+			s[6] / b.s[6],
+			s[7] / b.s[7],
+		};
+	}
+	FORCEINLINE s32x8 operator%(s32x8 b) const {
+		return {
+			s[0] % b.s[0],
+			s[1] % b.s[1],
+			s[2] % b.s[2],
+			s[3] % b.s[3],
+			s[4] % b.s[4],
+			s[5] % b.s[5],
+			s[6] % b.s[6],
+			s[7] % b.s[7],
+		};
+	}
+#else
+	FORCEINLINE	s32x8 operator/(s32x8 b) const { RETURN_M(_mm256_div_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator%(s32x8 b) const { RETURN_M(_mm256_rem_epi32(m.pi, b.m.pi)); }
+#endif
+	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE	b32x8 operator< (s32x8 b) const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator> (s32x8 b) const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator<=(s32x8 b) const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator>=(s32x8 b) const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator==(s32x8 b) const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator!=(s32x8 b) const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator<<(s32x8 b) const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator>>(s32x8 b) const { RETURN_M(_mm256_srav_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator<<(s32   b) const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
+	FORCEINLINE	s32x8 operator>>(s32   b) const { RETURN_M(_mm256_srai_epi32(m.pi, b)); }
+	FORCEINLINE	friend s32x8 operator<<(s32 a, s32x8 b) { RETURN_MT(s32x8, _mm256_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend s32x8 operator>>(s32 a, s32x8 b) { RETURN_MT(s32x8, _mm256_sraiv_epi32(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE s32x8 operator~()         const { RETURN_M(_mm256_not_ps(m.ps)); }
-	FORCEINLINE	s32x8 operator^ (s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator& (s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator| (s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE s32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 	FALLBACK_INT_NO_BITWISE;
 #else
 	FALLBACK_INT;
@@ -1317,7 +1322,7 @@ union s32x<8> {
 template<>
 union u32x<4> {
 	using Scalar = u32;
-	using Vector = u32x;
+	using Pack = u32x;
 	using Mask = b32x4;
 
 	u32 s[4];
@@ -1358,7 +1363,7 @@ union u32x<4> {
 template<>
 union u32x<8> {
 	using Scalar = u32;
-	using Vector = u32x;
+	using Pack = u32x;
 	using Mask = b32x8;
 
 	u32 s[8];
@@ -1370,33 +1375,60 @@ union u32x<8> {
 #endif
 
 #if ARCH_AVX2
-	FORCEINLINE        u32x8  operator-()          const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE        u32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
-	FORCEINLINE	       u32x8  operator+ (u32x8 b)  const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator- (u32x8 b)  const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator* (u32x8 b)  const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator/ (u32x8 b)  const { RETURN_M(_mm256_div_epu32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator% (u32x8 b)  const { RETURN_M(_mm256_rem_epu32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x8  operator<<(u32x8 b)  const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator>>(u32x8 b)  const { RETURN_M(_mm256_srlv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator< (u32x8 b)  const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator> (u32x8 b)  const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator<=(u32x8 b)  const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator>=(u32x8 b)  const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator==(u32x8 b)  const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x8  operator!=(u32x8 b)  const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x8  operator<<(u32   b)  const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
-	FORCEINLINE	       u32x8  operator>>(u32   b)  const { RETURN_M(_mm256_srli_epi32(m.pi, b)); }
-	FORCEINLINE	friend u32x8  operator<<(u32 a, u32x8 b) { RETURN_M(_mm256_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend u32x8  operator>>(u32 a, u32x8 b) { RETURN_M(_mm256_srliv_epi32(a, b.m.pi)); }
+	FORCEINLINE u32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	FORCEINLINE u32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	u32x8 operator+(u32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator-(u32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator*(u32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+#if COMPILER_GCC
+	FORCEINLINE u32x8 operator/(u32x8 b) const {
+		return {
+			s[0] / b.s[0],
+			s[1] / b.s[1],
+			s[2] / b.s[2],
+			s[3] / b.s[3],
+			s[4] / b.s[4],
+			s[5] / b.s[5],
+			s[6] / b.s[6],
+			s[7] / b.s[7],
+		};
+	}
+	FORCEINLINE u32x8 operator%(u32x8 b) const {
+		return {
+			s[0] % b.s[0],
+			s[1] % b.s[1],
+			s[2] % b.s[2],
+			s[3] % b.s[3],
+			s[4] % b.s[4],
+			s[5] % b.s[5],
+			s[6] % b.s[6],
+			s[7] % b.s[7],
+		};
+	}
+#else
+	FORCEINLINE	u32x8 operator/(u32x8 b) const { RETURN_M(_mm256_div_epu32  (m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator%(u32x8 b) const { RETURN_M(_mm256_rem_epu32  (m.pi, b.m.pi)); }
+#endif
+	FORCEINLINE	u32x8 operator^(u32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	u32x8 operator&(u32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	u32x8 operator|(u32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE	b32x8 operator< (u32x8 b) const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator> (u32x8 b) const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator<=(u32x8 b) const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator>=(u32x8 b) const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator==(u32x8 b) const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator!=(u32x8 b) const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator<<(u32x8 b) const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator>>(u32x8 b) const { RETURN_M(_mm256_srlv_epi32(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator<<(u32   b) const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
+	FORCEINLINE	u32x8 operator>>(u32   b) const { RETURN_M(_mm256_srli_epi32(m.pi, b)); }
+	FORCEINLINE	friend u32x8 operator<<(u32 a, u32x8 b) { RETURN_MT(u32x8, _mm256_slliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	friend u32x8 operator>>(u32 a, u32x8 b) { RETURN_MT(u32x8, _mm256_srliv_epi32(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE        u32x8  operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
-	FORCEINLINE	       u32x8  operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x8  operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x8  operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	FORCEINLINE u32x8 operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE	u32x8 operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	u32x8 operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	FORCEINLINE	u32x8 operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 	FALLBACK_INT_NO_BITWISE;
 #else
 	FALLBACK_INT;
@@ -1414,9 +1446,17 @@ FORCEINLINE b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) !
 FORCEINLINE b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
 
 // clang-format off
-FORCEINLINE constexpr f32x4 F32x4(M16 m) { return F32x4(m.ps); }
-FORCEINLINE constexpr s32x4 S32x4(M16 m) { return S32x4(m.ps); }
-FORCEINLINE constexpr u32x4 U32x4(M16 m) { return U32x4(m.ps); }
+FORCEINLINE constexpr f32x1 F32x1(f32 m) { return {m}; }
+//FORCEINLINE constexpr s32x1 S32x1(s32 m) { return {m}; }
+//FORCEINLINE constexpr u32x1 U32x1(u32 m) { return {m}; }
+
+FORCEINLINE constexpr f32x4 F32x4(__m128 m) { RETURN_MT(f32x4, m); }
+FORCEINLINE constexpr s32x4 S32x4(__m128 m) { RETURN_MT(s32x4, m); }
+FORCEINLINE constexpr u32x4 U32x4(__m128 m) { RETURN_MT(u32x4, m); }
+
+FORCEINLINE constexpr f32x4 F32x4(M16 m) { RETURN_MT(f32x4, m.ps); }
+FORCEINLINE constexpr s32x4 S32x4(M16 m) { RETURN_MT(s32x4, m.ps); }
+FORCEINLINE constexpr u32x4 U32x4(M16 m) { RETURN_MT(u32x4, m.ps); }
 
 FORCEINLINE f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { RETURN_MT(f32x4, _mm_setr_ps(i, j, k, l)); }
 FORCEINLINE s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { RETURN_MT(s32x4, _mm_setr_epi32(i, j, k, l)); }
@@ -1687,9 +1727,9 @@ STOREMASK32x8(u32x8)
 #undef STOREMASK32x4
 #undef STOREMASK32x8
 
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE f32x4 shuffle(f32x4 v) { return {_mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))}; }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE s32x4 shuffle(s32x4 v) { return {_mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))}; }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { return {_mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))}; }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE f32x4 shuffle(f32x4 v) { RETURN_MT(f32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE s32x4 shuffle(s32x4 v) { RETURN_MT(s32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
+template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { RETURN_MT(u32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
 //template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE f32x8 shuffle(f32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
 //template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE s32x8 shuffle(s32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
 //template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32x8 shuffle(u32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
@@ -1732,9 +1772,9 @@ SHUFFLE32x8(u32x8)
 #define UOP4M(op, ty, con) \
 	FORCEINLINE ty operator op() const { return con(op m); }
 
-#define UOP2C(op, ty, con) FORCEINLINE constexpr UOP2(op, ty, con)
-#define UOP3C(op, ty, con) FORCEINLINE constexpr UOP3(op, ty, con)
-#define UOP4C(op, ty, con) FORCEINLINE constexpr UOP4(op, ty, con)
+#define UOP2C(op, ty, con) constexpr UOP2(op, ty, con)
+#define UOP3C(op, ty, con) constexpr UOP3(op, ty, con)
+#define UOP4C(op, ty, con) constexpr UOP4(op, ty, con)
 
 #define UOP2P(op, ty, con) UOP2(op, ty, con)
 #define UOP3P(op, ty, con) UOP3(op, ty, con)
@@ -3385,11 +3425,15 @@ FORCEINLINE v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
 FORCEINLINE f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
 FORCEINLINE u32 absolute(u32 v) { return v; }
 FORCEINLINE s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
+
 FORCEINLINE f32x4 absolute(f32x4 v) { RETURN_MT(f32x4, _mm_and_ps(v.m.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
+FORCEINLINE f64x2 absolute(f64x2 v) { RETURN_MT(f64x2, _mm_and_pd(v.m.pd, _mm_castpi_pd(_mm_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
 #if ARCH_AVX
 FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_MT(f32x8, _mm256_and_ps(v.m.ps, _mm256_castpi_ps(_mm256_set1_epi32(0x7FFFFFFF)))); }
+FORCEINLINE f64x4 absolute(f64x4 v) { RETURN_MT(f64x4, _mm256_and_pd(v.m.pd, _mm256_castpi_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
 #else
 FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_T2(f32x8, absolute(v.lo), absolute(v.hi)); }
+FORCEINLINE f64x4 absolute(f64x4 v) { RETURN_T2(f64x4, absolute(v.lo), absolute(v.hi)); }
 #endif
 
 FORCEINLINE v2f absolute(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
@@ -3439,16 +3483,6 @@ FORCEINLINE f32 positiveModulo(f32 a, f32 b) { return frac(a / b) * b; }
 MOD(f32)
 MOD(f64)
 #undef MOD
-
-template<umm ps> FORCEINLINE f32x<ps> modulo(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a * reciprocal(b)) * b, a); }
-template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
 
 FORCEINLINE f32 sqrt(f32 v) { return sqrtf(v); }
 FORCEINLINE v2f sqrt(v2f v) { return V2f(sqrtf(v.x), sqrtf(v.y)); }
@@ -3563,6 +3597,16 @@ FORCEINLINE void sincos(f32x4 v, v2fx4& result) { \
 }
 SINCOS(v2f, f32) SINCOS(v2fx4, f32x4) SINCOS(v2fx8, f32x8)
 #undef SINCOS
+
+template<umm ps> FORCEINLINE f32x<ps> modulo(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a * reciprocal(b)) * b, a); }
+template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
 
 #define SIN_BHASKARA(f32x4) 															\
 FORCEINLINE f32x4 sinBhaskara(f32x4 v) {												\
@@ -4938,9 +4982,6 @@ FORCEINLINE constexpr v4s frac(v4s v, u32 step) {
 FORCEINLINE f32x<p/4> F32xm(f32 v = 0) { return F32_##p(v); } \
 FORCEINLINE s32x<p/4> S32xm(s32 v = 0) { return S32_##p(v); } \
 FORCEINLINE u32x<p/4> U32xm(u32 v = 0) { return U32_##p(v); } \
-FORCEINLINE f32x<p/4> F32xm(M##p m) { return F32_##p(m); } \
-FORCEINLINE s32x<p/4> S32xm(M##p m) { return S32_##p(m); } \
-FORCEINLINE u32x<p/4> U32xm(M##p m) { return U32_##p(m); } \
 FORCEINLINE v2fx<p/4> V2fxm(f32 v = 0) { return V2f_##p(v); } \
 FORCEINLINE v3fx<p/4> V3fxm(f32 v = 0) { return V3f_##p(v); } \
 FORCEINLINE v4fx<p/4> V4fxm(f32 v = 0) { return V4f_##p(v); } \
@@ -4985,6 +5026,19 @@ inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 
 #undef MM_SHUFFLE
 #undef MM256_PERM128
+
+#undef CMPLTF32x4
+#undef CMPGTF32x4
+#undef CMPLEF32x4
+#undef CMPGEF32x4
+#undef CMPEQF32x4
+#undef CMPNEF32x4
+#undef CMPLTF64x2
+#undef CMPGTF64x2
+#undef CMPLEF64x2
+#undef CMPGEF64x2
+#undef CMPEQF64x2
+#undef CMPNEF64x2
 
 #if COMPILER_MSVC
 #pragma warning(pop)

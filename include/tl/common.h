@@ -1,34 +1,22 @@
 #pragma once
-#define OS_WINDOWS 0
-#define OS_LINUX   0
-
-#if defined _WIN32 || defined _WIN64
-#undef OS_WINDOWS
-#define OS_WINDOWS 1
-#else
-#undef OS_LINUX
-#define OS_LINUX 1
-#endif
-
-#define COMPILER_MSVC 0
-#define COMPILER_GCC  0
-
-// clang-format off
-#if defined __GNUG__
-	#undef  COMPILER_GCC
-	#define COMPILER_GCC 1
-#elif defined _MSC_VER
-	#undef  COMPILER_MSVC
-	#define COMPILER_MSVC 1
-#else
-	#pragma message "TL: Unresolved compiler"
-#endif
-// clang-format on
+#include "system.h"
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
+
+#if OS_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#else
+#endif
+
+#if COMPILER_MSVC
 #include <intrin.h>
 #include <vcruntime_new.h>
+#elif COMPILER_GCC
+#include <malloc.h>
 #endif
 
 #include <utility>
@@ -59,7 +47,7 @@
 
 #elif COMPILER_GCC
 
-#define FORCEINLINE	__attribute__((always_inline))
+#define FORCEINLINE	//__attribute__((always_inline))
 #define DEBUG_BREAK ::__builtin_trap()
 #if defined _X86_
 #undef ARCH_X86
@@ -145,6 +133,8 @@ using f32	= float;
 using f64	= double;
 using b32	= s32;
 using b64	= s64;
+using slong = signed long;
+using ulong = unsigned long;
 
 #if ARCH_X64
 typedef u64 umm;
@@ -153,6 +143,8 @@ typedef s64 smm;
 typedef u32 umm;
 typedef s32 smm;
 #endif
+
+#define TL_DECLARE_HANDLE(name) typedef struct name##__ *name;
 
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
@@ -166,8 +158,8 @@ template <> inline constexpr bool isInteger<s8 > = true;
 template <> inline constexpr bool isInteger<s16> = true;
 template <> inline constexpr bool isInteger<s32> = true;
 template <> inline constexpr bool isInteger<s64> = true;
-template <> inline constexpr bool isInteger<long> = true;
-template <> inline constexpr bool isInteger<unsigned long> = true;
+template <> inline constexpr bool isInteger<slong> = true;
+template <> inline constexpr bool isInteger<ulong> = true;
 
 template <class T> inline constexpr bool isChar = false;
 template <> inline constexpr bool isChar<u8> = true;
@@ -178,14 +170,14 @@ template <> inline constexpr bool isSigned<s8 > = true;
 template <> inline constexpr bool isSigned<s16> = true;
 template <> inline constexpr bool isSigned<s32> = true;
 template <> inline constexpr bool isSigned<s64> = true;
-template <> inline constexpr bool isSigned<long> = true;
+template <> inline constexpr bool isSigned<slong> = true;
 
 template <class T> inline constexpr bool isUnsigned = false;
 template <> inline constexpr bool isUnsigned<u8 > = true;
 template <> inline constexpr bool isUnsigned<u16> = true;
 template <> inline constexpr bool isUnsigned<u32> = true;
 template <> inline constexpr bool isUnsigned<u64> = true;
-template <> inline constexpr bool isUnsigned<unsigned long> = true;
+template <> inline constexpr bool isUnsigned<ulong> = true;
 
 template <class T> inline constexpr bool isFloat = false;
 template <> inline constexpr bool isFloat<f32> = true;
@@ -295,14 +287,10 @@ FORCEINLINE constexpr u64 ceil(u64 v, u64 s) { return floor((u64)(v + s - 1), s)
 FORCEINLINE constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
 FORCEINLINE constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
-FORCEINLINE constexpr u8  negate(u8  v) { return (u8 )(~v + 1); }
-FORCEINLINE constexpr u16 negate(u16 v) { return (u16)(~v + 1); }
-FORCEINLINE constexpr u32 negate(u32 v) { return (u32)(~v + 1); }
-FORCEINLINE constexpr u64 negate(u64 v) { return (u64)(~v + 1); }
-FORCEINLINE constexpr s8  negate(s8  v) { return -v; }
-FORCEINLINE constexpr s16 negate(s16 v) { return -v; }
-FORCEINLINE constexpr s32 negate(s32 v) { return -v; }
-FORCEINLINE constexpr s64 negate(s64 v) { return -v; }
+FORCEINLINE constexpr bool isNegative(f32 v) { return *(u32 *)&v & 0x80000000; }
+FORCEINLINE constexpr bool isNegative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
+
+template <class T> FORCEINLINE constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 
 template <class... Callables>
 struct Combine : public Callables... {
@@ -341,7 +329,13 @@ struct Deferrer {
 
 private:
 	Fn fn;
+#if COMPILER_MSVC
+#pragma warning(suppress: 4626)
 };
+#else
+};
+#endif
+
 #define DEFER ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]()
 
 template <class T>
@@ -417,24 +411,27 @@ struct Span {
 using StringView = Span<char const>;
 using StringSpan = Span<char>;
 
+using FnAllocate   = void *(*)(void *state, umm size, umm align);
+using FnDeallocate = void  (*)(void *state, void *data);
+
 struct Allocator {
-	void *(*allocate  )(void *state, umm size, umm align) = 0;
-	void  (*deallocate)(void *state, void *data) = 0;
-	void *state = 0;
+	FnAllocate   _allocate   = 0;
+	FnDeallocate _deallocate = 0;
+	void *_state = 0;
+	
+	void *allocate(umm size, umm align = 0) { return _allocate(_state, size, align); }
+	void deallocate(void *data) { _deallocate(_state, data); }
 };
 
-Allocator makeAllocator(void *state, void *(*allocate)(void *state, umm size, umm align), void  (*deallocate)(void *state, void *data)) {
+Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate deallocate) {
 	Allocator result;
-	result.allocate = allocate;
-	result.deallocate = deallocate;
-	result.state = state;
+	result._allocate = allocate;
+	result._deallocate = deallocate;
+	result._state = state;
 	return result;
 }
 
 extern Allocator osAllocator;
-
-static void *  allocate(Allocator al, umm size, umm align = 0) { return al.allocate(al.state, size, align); }
-static void  deallocate(Allocator al, void *data) { al.deallocate(al.state, data); }
 
 template <class T> static T *allocate(Allocator al, umm count = 1, umm align = 0) { return (T *)allocate(al, count * sizeof(T), max(alignof(T), align)); }
 
@@ -445,8 +442,13 @@ static T *allocate(umm count = 1, umm align = 0) {
 
 struct OsAllocator {
 #if OS_WINDOWS
+#if COMPILER_MSVC
 	static void *allocate(umm size, umm align = 0) { return _aligned_malloc(size, max(align, (umm)8)); }
 	static void deallocate(void *data) { _aligned_free(data); }
+#elif COMPILER_GCC
+	static void *allocate(umm size, umm align = 0) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
+	static void deallocate(void *data) { __mingw_aligned_free(data); }
+#endif
 #else
 	static void *allocate(umm size, umm align = 0) {
 		void *result = 0;
@@ -654,7 +656,20 @@ StringSpan toString(CopyFn &&copyFn, void const *p, Fmt::Flags flags = Fmt::radi
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
 StringSpan toString(CopyFn &&copyFn, f64 v, Fmt::Flags flags = {}) {
 	char buf[64];
-	return copyFn(buf, (umm)sprintf(buf, "%.*f", flags.precision(), v));
+	char *c = buf;
+	if (isNegative(v)) {
+		*c++ = '-';
+		v = -v;
+	}
+	c += toString((u64)v, c).size();
+	*c++ = '.';
+	auto precision = flags.precision();
+	for (u32 i = 0; i < precision; ++i) {
+		v = v - (f64)(s64)v;
+		v = select(v < 0, v + 1, v) * 10;
+		*c++ = (u32)v + '0';
+	}
+	return copyFn(buf, (umm)(c - buf));
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
 StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
@@ -663,8 +678,8 @@ StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
 
 #ifdef TL_IMPL
 Allocator osAllocator = makeAllocator(0,
-	[](void *, umm size, umm align)             -> void * { return OsAllocator::allocate(size, align); },
-	[](void *, void *data)                                { return OsAllocator::deallocate(data); }
+	[](void *, umm size, umm align) -> void * { return OsAllocator::allocate(size, align); },
+	[](void *, void *data)                    { return OsAllocator::deallocate(data); }
 );
 #endif
 
