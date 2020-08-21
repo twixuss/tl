@@ -78,7 +78,7 @@ String<Allocator> nullTerminate(Span<char const> span) {
 	return result;
 }
 
-Optional<u64> parseDecimal(StringView s) {
+inline Optional<u64> parseDecimal(StringView s) {
 	u64 result	  = 0;
 	u64 oldResult = 0;
 	for (auto c : s) {
@@ -94,20 +94,22 @@ Optional<u64> parseDecimal(StringView s) {
 	return result;
 }
 
-template <class Allocator = OsAllocator, umm bufferSize = 4096>
+template <class Allocator = OsAllocator, umm blockSize_ = 4096>
 struct StringBuilder {
 	using String = String<Allocator>;
+	static constexpr umm blockSize = blockSize_;
 	struct Block {
-		char buffer[bufferSize];
+		char buffer[blockSize];
 		char *end = buffer;
 		Block *next = 0;
 
 		Block() {}
 		umm size() { return (umm)(end - buffer); }
-		umm remaining() { return bufferSize - size(); }
+		umm availableSpace() { return blockSize - size(); }
 	};
 	Block first;
 	Block *last = &first;
+	Block *allocLast = &first;
 
 	StringBuilder() = default;
 	StringBuilder(StringBuilder const &) = delete;
@@ -119,19 +121,48 @@ struct StringBuilder {
 			Allocator::deallocate(block);
 		}
 	}
-
+	umm availableSpace() {
+		umm space = 0;
+		Block *block = last;
+		while (block) {
+			space += block->availableSpace();
+			block = block->next;
+		}
+		return space;
+	}
+	void ensureSpace(umm amount) {
+		umm space = availableSpace();
+		while (space < amount) {
+			Block *newBlock = allocateBlock();
+			allocLast->next = newBlock;
+			allocLast = newBlock;
+			space += blockSize;
+		}
+	}
+	void ensureConsecutiveSpace(umm amount) {
+		ASSERT(amount <= blockSize);
+		if (last->availableSpace() < amount) {
+			if (last->next) {
+				last = last->next;
+				ASSERT(last->availableSpace() == blockSize); // @DEBUG
+			} else {
+				last->next = allocateBlock();
+				last = allocLast = last->next;
+			}
+		}
+	}
 	umm append(Span<char const> span) {
 		umm charsToWrite = span.size();
-		while (last->remaining() < charsToWrite) {
-			umm remCharCount = last->remaining();
-			memcpy(last->end, span.data(), remCharCount);
-			charsToWrite -= remCharCount;
-			last->end += remCharCount;
-			span = {span.begin() + remCharCount, span.end()};
-
-			Block *newBlock = construct(allocate<Block, Allocator>());
-			last->next = newBlock;
-			last = newBlock;
+		while (last->availableSpace() < charsToWrite) {
+			umm spaceInBlock = last->availableSpace();
+			memcpy(last->end, span.data(), spaceInBlock);
+			charsToWrite -= spaceInBlock;
+			last->end += spaceInBlock;
+			span = {span.begin() + spaceInBlock, span.end()};
+			last = last->next;
+			if (!last) {
+				last = allocLast = allocateBlock();
+			}
 		}
 		memcpy(last->end, span.data(), charsToWrite);
 		last->end += charsToWrite;
@@ -294,14 +325,14 @@ struct StringBuilder {
 		}
 		return totalSize;
 	}
-	StringSpan fill(StringSpan dst_) {
-		ASSERT(dst_.size() >= this->size());
-		char *dst = dst_.data();
+	StringSpan fill(StringSpan dstString) {
+		ASSERT(dstString.size() >= this->size());
+		char *dstChar = dstString.data();
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dst, block->buffer, block->size());
-			dst += block->size();
+			memcpy(dstChar, block->buffer, block->size());
+			dstChar += block->size();
 		}
-		return StringSpan(dst_.begin(), dst);
+		return StringSpan(dstString.begin(), dstChar);
 	}
 	String get(bool terminate = false) {
 		String result(size() + terminate);
@@ -311,6 +342,9 @@ struct StringBuilder {
 		return result;
 	}
 	String getTerminated() { return get(true); }
+
+private:
+	Block *allocateBlock() { return construct(allocate<Block, Allocator>()); }
 };
 
 // --- Format options: ---						--- Example ---							--- Result ---

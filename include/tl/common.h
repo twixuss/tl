@@ -5,12 +5,16 @@
 #pragma warning(push, 0)
 #endif
 
+#ifdef TL_IMPL
+
 #if OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #else
 #endif
+
+#endif // TL_IMPL
 
 #if COMPILER_MSVC
 #include <intrin.h>
@@ -306,7 +310,7 @@ inline constexpr auto toInt(Enum e) {
 template <class T, umm size>
 constexpr umm countof(T const (&arr)[size]) { return size; }
 
-void copyMemory(void *_dst, void const *_src, umm size) {
+inline void copyMemory(void *_dst, void const *_src, umm size) {
 	u8 *dst = (u8 *)_dst;
 	u8 const *src = (u8 const *)_src;
 	while (size--) {
@@ -423,7 +427,7 @@ struct Allocator {
 	void deallocate(void *data) { _deallocate(_state, data); }
 };
 
-Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate deallocate) {
+inline Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate deallocate) {
 	Allocator result;
 	result._allocate = allocate;
 	result._deallocate = deallocate;
@@ -459,7 +463,7 @@ struct OsAllocator {
 #endif
 };
 
-bool equals(StringView a, StringView b) {
+inline bool equals(StringView a, StringView b) {
 	if (a.size() != b.size())
 		return false;
 	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp) {
@@ -468,14 +472,14 @@ bool equals(StringView a, StringView b) {
 	}
 	return true;
 }
-bool equals(char const *a, StringView b) {
+inline bool equals(char const *a, StringView b) {
 	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp) {
 		if (*a != *bp)
 			return false;
 	}
 	return true;
 }
-bool equals(StringView a, char const *b) {
+inline bool equals(StringView a, char const *b) {
 	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b) {
 		if (*ap != *b)
 			return false;
@@ -532,30 +536,30 @@ constexpr u32 asCharBit = 10;
 
 struct Flags;
 
-Flags precision(u32 value);
-Flags radix(u32 value);
+inline Flags precision(u32 value);
+inline Flags radix(u32 value);
 
 struct Flags {
 	u32 value;
-	Flags(u32 value) : value(value) {}
-	Flags() : Flags(Fmt::precision(5) | Fmt::radix(10)) {}
-	Flags operator|(Flags b) { return value | b.value; }
+	inline Flags(u32 value) : value(value) {}
+	inline Flags() : Flags(Fmt::precision(5) | Fmt::radix(10)) {}
+	inline Flags operator|(Flags b) { return value | b.value; }
 
-	u32 precision() { return (value >> precisionBit) & precisionMask; }
-	u32 radix() { return ((value >> radixBit) & radixMask) + 1; }
-	u32 asChar() { return (value >> asCharBit) & asCharMask; }
+	inline u32 precision() { return (value >> precisionBit) & precisionMask; }
+	inline u32 radix() { return ((value >> radixBit) & radixMask) + 1; }
+	inline u32 asChar() { return (value >> asCharBit) & asCharMask; }
 };
 
-Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
-Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
-Flags asChar(bool value) { return (u32)value << asCharBit; }
+inline Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
+inline Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
+inline Flags asChar(bool value) { return (u32)value << asCharBit; }
 
 }
 
 template <class CopyFn>
 inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, char *, umm>;
 
-umm length(char const *str) {
+inline umm length(char const *str) {
 	umm result = 0;
 	while (*str++) {
 		++result;
