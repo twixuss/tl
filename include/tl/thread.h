@@ -2,25 +2,6 @@
 #include "common.h"
 #include "optional.h"
 
-#ifdef TL_NO_SYSTEM_HEADER
-namespace TL {
-#if OS_WINDOWS
-extern "C" __declspec(dllimport) void __stdcall *CreateThread(void *security, umm stackSize, u32 (*func)(void *), void *param, u32 flags, u32 *id);
-extern "C" __declspec(dllimport) int __stdcall CloseHandle(void *);
-extern "C" __declspec(dllimport) int __stdcall SwitchToThread();
-extern "C" __declspec(dllimport) void __stdcall Sleep(u32);
-#elif OS_LINUX
-extern "C" int pthread_create(void *newthread, void const  *attr, void *(*func) (void *), void *arg);
-#endif
-}
-#else
-#if OS_WINDOWS
-#include <Windows.h>
-#elif OS_LINUX
-#include <pthread.h>
-#endif
-#endif
-
 #pragma warning(push)
 #pragma warning(disable : 4582)
 #pragma warning(disable : 4583)
@@ -34,81 +15,43 @@ FORCEINLINE void spinIteration() { _mm_pause(); }
 FORCEINLINE void sleepMilliseconds(u32 milliseconds) { Sleep(milliseconds); }
 FORCEINLINE void sleepSeconds(u32 seconds) { Sleep(seconds * 1000); }
 
-FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8(a, b); }
+FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 FORCEINLINE s16 lockAdd(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
 FORCEINLINE s32 lockAdd(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
 FORCEINLINE s64 lockAdd(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
 
-FORCEINLINE s8  lockIncrement(s8  volatile *v) { return lockAdd(v, 1); }
-FORCEINLINE s16 lockIncrement(s16 volatile *v) { return _InterlockedIncrement16(v); }
-FORCEINLINE s32 lockIncrement(s32 volatile *v) { return (s32)_InterlockedIncrement((long *)v); }
-FORCEINLINE s64 lockIncrement(s64 volatile *v) { return _InterlockedIncrement64(v); }
-
-FORCEINLINE s8  lockDecrement(s8  volatile *v) { return lockAdd(v, -1); }
-FORCEINLINE s16 lockDecrement(s16 volatile *v) { return _InterlockedDecrement16(v); }
-FORCEINLINE s32 lockDecrement(s32 volatile *v) { return (s32)_InterlockedDecrement((long *)v); }
-FORCEINLINE s64 lockDecrement(s64 volatile *v) { return _InterlockedDecrement64(v); }
-
 template <class T>
 FORCEINLINE T lockSet(T volatile *dst, T src) {
-	       if constexpr (sizeof(T) == 8) { s64 result = _InterlockedExchange64((s64 *)dst, *(s64 *)&src); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 4) { s32 result = _InterlockedExchange  ((s32 *)dst, *(s32 *)&src); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 2) { s16 result = _InterlockedExchange16((s16 *)dst, *(s16 *)&src); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 1) { s8  result = _InterlockedExchange8 ((s8  *)dst, *(s8  *)&src); return *(T *)&result;
-	} else {
-		static_assert(false);
-	}
+	s64 result;
+	     if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src); 
+	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
+	else if constexpr (sizeof(T) == 2) result = _InterlockedExchange16((short    *)dst, *(short    *)&src);
+	else if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
+	else static_assert(false, "lockSet is not available for this size");
+	return *(T *)&result;
 }
 
 template <class T>
 FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
-	       if constexpr (sizeof(T) == 8) { s64 result = _InterlockedCompareExchange64((s64 *)dst, *(s64 *)&newValue, *(s64 *)&comparand); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 4) { s32 result = _InterlockedCompareExchange  ((s32 *)dst, *(s32 *)&newValue, *(s32 *)&comparand); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 2) { s16 result = _InterlockedCompareExchange16((s16 *)dst, *(s16 *)&newValue, *(s16 *)&comparand); return *(T *)&result;
-	} else if constexpr (sizeof(T) == 1) { s8  result = _InterlockedCompareExchange8 ((s8  *)dst, *(s8  *)&newValue, *(s8  *)&comparand); return *(T *)&result;
-	} else {
-		static_assert(false);
-	}
+	s64 result;
+	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&newValue, *(long long*)&comparand);
+	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)dst, *(long     *)&newValue, *(long     *)&comparand);
+	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)dst, *(short    *)&newValue, *(short    *)&comparand);
+	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)dst, *(char     *)&newValue, *(char     *)&comparand);
+	else static_assert(false, "lockSetIfEquals is not available for this size");
+	return *(T *)&result;
 }
 
-struct ThreadHandle;
-FORCEINLINE ThreadHandle *createThread(void (*fn)(void *), void *param) {
-	bool volatile gotData = false;
-	struct Data {
-		void (*fn)(void *);
-		void *param;
-		bool volatile *gotData;
-	};
-	Data data;
-	data.fn = fn;
-	data.param = param;
-	data.gotData = &gotData;
-	void *result = CreateThread(0, 0, [](void *_data) -> u32 {
-		Data data = *(Data *)_data;
-		*data.gotData = true;
-		data.fn(data.param);
-	}, &data, 0, 0);
-	while (!gotData);
-	return (ThreadHandle *)result;
-}
-FORCEINLINE void destroyThread(ThreadHandle *handle) {
-	CloseHandle((void *)handle);
-}
+TL_DECLARE_HANDLE(ThreadHandle);
+extern ThreadHandle createThread(void (*fn)(void *), void *param);
+extern void destroyThread(ThreadHandle handle);
+extern u32 getCurrentThreadId();
+
 #else
 FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
 FORCEINLINE s16 lockAdd(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
 FORCEINLINE s32 lockAdd(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
 FORCEINLINE s64 lockAdd(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
-
-FORCEINLINE s8  lockIncrement(s8  volatile *v) { return lockAdd(v, 1); }
-FORCEINLINE s16 lockIncrement(s16 volatile *v) { return lockAdd(v, 1); }
-FORCEINLINE s32 lockIncrement(s32 volatile *v) { return lockAdd(v, 1); }
-FORCEINLINE s64 lockIncrement(s64 volatile *v) { return lockAdd(v, 1); }
-
-FORCEINLINE s8  lockDecrement(s8  volatile *v) { return lockAdd(v, -1); }
-FORCEINLINE s16 lockDecrement(s16 volatile *v) { return lockAdd(v, -1); }
-FORCEINLINE s32 lockDecrement(s32 volatile *v) { return lockAdd(v, -1); }
-FORCEINLINE s64 lockDecrement(s64 volatile *v) { return lockAdd(v, -1); }
 
 template <class T>
 FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
@@ -116,39 +59,10 @@ FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
 }
 #endif
 
-FORCEINLINE u16 lockIncrement(u16 volatile *v) { return (u16)lockIncrement((s16 *)v); }
-FORCEINLINE u32 lockIncrement(u32 volatile *v) { return (u32)lockIncrement((s32 *)v); }
-FORCEINLINE u64 lockIncrement(u64 volatile *v) { return (u64)lockIncrement((s64 *)v); }
-
-FORCEINLINE u16 lockDecrement(u16 volatile *v) { return (u16)lockDecrement((s16 *)v); }
-FORCEINLINE u32 lockDecrement(u32 volatile *v) { return (u32)lockDecrement((s32 *)v); }
-FORCEINLINE u64 lockDecrement(u64 volatile *v) { return (u64)lockDecrement((s64 *)v); }
-
 FORCEINLINE u8  lockAdd(u8  volatile *a, u8  b) { return (u8 )lockAdd((s8  *)a, (s8 )b); }
 FORCEINLINE u16 lockAdd(u16 volatile *a, u16 b) { return (u16)lockAdd((s16 *)a, (s16)b); }
 FORCEINLINE u32 lockAdd(u32 volatile *a, u32 b) { return (u32)lockAdd((s32 *)a, (s32)b); }
 FORCEINLINE u64 lockAdd(u64 volatile *a, u64 b) { return (u64)lockAdd((s64 *)a, (s64)b); }
-
-FORCEINLINE s16 lockSubtract(s16 volatile *a, s16 b) { return lockAdd(a, -b); }
-FORCEINLINE s32 lockSubtract(s32 volatile *a, s32 b) { return lockAdd(a, -b); }
-FORCEINLINE s64 lockSubtract(s64 volatile *a, s64 b) { return lockAdd(a, -b); }
-FORCEINLINE u16 lockSubtract(u16 volatile *a, u16 b) { return lockAdd(a, -b); }
-FORCEINLINE u32 lockSubtract(u32 volatile *a, u32 b) { return lockAdd(a, -b); }
-FORCEINLINE u64 lockSubtract(u64 volatile *a, u64 b) { return lockAdd(a, -b); }
-
-FORCEINLINE s16 lockIncrement(s16 volatile &v) { return lockIncrement(&v); }
-FORCEINLINE s32 lockIncrement(s32 volatile &v) { return lockIncrement(&v); }
-FORCEINLINE s64 lockIncrement(s64 volatile &v) { return lockIncrement(&v); }
-FORCEINLINE u16 lockIncrement(u16 volatile &v) { return lockIncrement(&v); }
-FORCEINLINE u32 lockIncrement(u32 volatile &v) { return lockIncrement(&v); }
-FORCEINLINE u64 lockIncrement(u64 volatile &v) { return lockIncrement(&v); }
-
-FORCEINLINE s16 lockDecrement(s16 volatile &v) { return lockDecrement(&v); }
-FORCEINLINE s32 lockDecrement(s32 volatile &v) { return lockDecrement(&v); }
-FORCEINLINE s64 lockDecrement(s64 volatile &v) { return lockDecrement(&v); }
-FORCEINLINE u16 lockDecrement(u16 volatile &v) { return lockDecrement(&v); }
-FORCEINLINE u32 lockDecrement(u32 volatile &v) { return lockDecrement(&v); }
-FORCEINLINE u64 lockDecrement(u64 volatile &v) { return lockDecrement(&v); }
 
 FORCEINLINE s16 lockAdd(s16 volatile &a, s16 b) { return lockAdd(&a, b); }
 FORCEINLINE s32 lockAdd(s32 volatile &a, s32 b) { return lockAdd(&a, b); }
@@ -156,13 +70,6 @@ FORCEINLINE s64 lockAdd(s64 volatile &a, s64 b) { return lockAdd(&a, b); }
 FORCEINLINE u16 lockAdd(u16 volatile &a, u16 b) { return lockAdd(&a, b); }
 FORCEINLINE u32 lockAdd(u32 volatile &a, u32 b) { return lockAdd(&a, b); }
 FORCEINLINE u64 lockAdd(u64 volatile &a, u64 b) { return lockAdd(&a, b); }
-
-FORCEINLINE s16 lockSubtract(s16 volatile &a, s16 b) { return lockSubtract(&a, b); }
-FORCEINLINE s32 lockSubtract(s32 volatile &a, s32 b) { return lockSubtract(&a, b); }
-FORCEINLINE s64 lockSubtract(s64 volatile &a, s64 b) { return lockSubtract(&a, b); }
-FORCEINLINE u16 lockSubtract(u16 volatile &a, u16 b) { return lockSubtract(&a, b); }
-FORCEINLINE u32 lockSubtract(u32 volatile &a, u32 b) { return lockSubtract(&a, b); }
-FORCEINLINE u64 lockSubtract(u64 volatile &a, u64 b) { return lockSubtract(&a, b); }
 
 #if 0
 template <class T>
@@ -268,5 +175,90 @@ private:
 };
 } // namespace SPSC
 #endif
+
+#ifdef TL_IMPL
+#if OS_WINDOWS
+ThreadHandle createThread(void (*fn)(void *), void *param) {
+	struct Data {
+		void (*fn)(void *);
+		void *param;
+		bool volatile acquired;
+	};
+	Data data = {};
+	data.fn = fn;
+	data.param = param;
+	data.acquired = false;
+	HANDLE result = CreateThread(0, 0, [](void *param) -> DWORD {
+		Data *pData = (Data *)param;
+		Data data = *pData;
+		pData->acquired = true;
+		data.fn(data.param);
+		return 0;
+	}, &data, 0, 0);
+	while (!data.acquired);
+	return (ThreadHandle)result;
+}
+void destroyThread(ThreadHandle handle) {
+	CloseHandle((HANDLE)handle);
+}
+u32 getCurrentThreadId() {
+	return GetCurrentThreadId();
+}
+#else // ^^^ OS_WINDOWS ^^^ vvvvvv
+#endif
+#endif // TL_IMPL
+
+template <class Predicate>
+void loopUntil(Predicate &&predicate) {
+	u32 tryCount = 0;
+	while (!predicate()) {
+		spinIteration();
+		if (tryCount >= 64)
+			switchThread();
+		if (tryCount >= 4096)
+			sleepMilliseconds(1);
+		++tryCount;
+	}
+}
+
+struct Mutex {
+	bool volatile inUse = false;
+};
+
+inline void lock(Mutex &m) {
+	loopUntil([&] {
+		return !lockSetIfEquals(&m.inUse, true, false);
+	});
+}
+inline void unlock(Mutex &m) {
+	m.inUse = false;
+}
+
+struct RecursiveMutex {
+	u32 volatile threadId = 0;
+	u32 counter = 0;
+};
+
+inline void lock(RecursiveMutex &m) {
+	u32 threadId = getCurrentThreadId();
+	if (threadId == m.threadId) {
+		++m.counter;
+	} else {
+		loopUntil([&] {
+			return !lockSetIfEquals(&m.threadId, threadId, (u32)0);
+		});
+	}
+}
+inline void unlock(RecursiveMutex &m) {
+	if (m.counter == 0) {
+		m.threadId = 0;
+	} else {
+		--m.counter;
+	}
+}
+
+#define SCOPED_LOCK(mutex) lock(mutex); DEFER { unlock(mutex); }
+#define SCOPED_UNLOCK(mutex) unlock(mutex); DEFER { lock(mutex); }
+
 } // namespace TL
 #pragma warning(pop)

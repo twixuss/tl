@@ -6,12 +6,12 @@
 #endif
 
 #ifdef TL_IMPL
-
 #if OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #else
+#include <pthread.h>
 #endif
 
 #endif // TL_IMPL
@@ -29,106 +29,35 @@
 #pragma warning(pop)
 #endif
 
-#if COMPILER_MSVC
-
-#define FORCEINLINE			__forceinline
-#define NOINLINE			__declspec(noinline)
-#define DEBUG_BREAK			::__debugbreak()
-#define WRITE_BARRIER		::_WriteBarrier()
-#define READ_BARRIER		::_ReadBarrier()
-#define READ_WRITE_BARRIER	::_ReadWriteBarrier()
-
-#define ARCH_X86 0
-#define ARCH_X64 0
-
-#if defined _M_IX86
-#undef ARCH_X86
-#define ARCH_X86 1
-#elif defined _M_X64
-#undef ARCH_X64
-#define ARCH_X64 1
-#endif
-
-#elif COMPILER_GCC
-
-#define FORCEINLINE	//__attribute__((always_inline))
-#define DEBUG_BREAK ::__builtin_trap()
-#if defined _X86_
-#undef ARCH_X86
-#define ARCH_X86 1
-#elif defined __x86_64__
-#undef ARCH_X64
-#define ARCH_X64 1
-#endif
-
-#endif
-
-// clang-format off
-#if COMPILER_MSVC || COMPILER_GCC
-	#ifndef ARCH_AVX
-		#ifdef __AVX__
-			#define ARCH_AVX 1
-		#else
-			#define ARCH_AVX 0
-		#endif
-	#endif
-	#ifndef ARCH_AVX2 
-		#ifdef __AVX2__
-			#define ARCH_AVX2 1
-		#else
-			#define ARCH_AVX2 0
-		#endif
-	#endif
-	#ifndef ARCH_AVX512F
-		#ifdef __AVX512F__
-			#define ARCH_AVX512F 1
-		#else
-			#define ARCH_AVX512F 0
-		#endif
-	#endif
-	#ifndef ARCH_AVX512DQ
-		#ifdef __AVX512DQ__
-			#define ARCH_AVX512DQ 1
-		#else
-			#define ARCH_AVX512DQ 0
-		#endif
-	#endif
-#endif
-// clang-format on
-
-#if !(ARCH_X86 | ARCH_X64)
-#error "Unresolved target architecture"
-#endif
-
-#define STRINGIZE_(x) #x
-#define STRINGIZE(x)  STRINGIZE_(x)
-
-#define CONCAT_(x, y) x##y
-#define CONCAT(x, y)  CONCAT_(x, y)
-
 #ifndef ASSERTION_FAILURE
-#define ASSERTION_FAILURE(causeString, expression, ...) DEBUG_BREAK
+#define ASSERTION_FAILURE(file, line, function, causeString, expression, ...) DEBUG_BREAK
 #endif
 
 #define ASSERT(x, ...)                                    \
 	do {                                                  \
 		if (!(x)) {                                       \
-			ASSERTION_FAILURE("ASSERT", #x, __VA_ARGS__); \
+			ASSERTION_FAILURE(__FILE__, __LINE__, __FUNCTION__, "ASSERT", #x, __VA_ARGS__); \
 		}                                                 \
 	} while (0)
 
 #define INVALID_CODE_PATH(...)                                   \
 	do {                                                         \
-		ASSERTION_FAILURE("INVALID_CODE_PATH", "", __VA_ARGS__); \
+		ASSERTION_FAILURE(__FILE__, __LINE__, __FUNCTION__, "INVALID_CODE_PATH", "", __VA_ARGS__); \
 	} while (0)
+
+#ifdef TL_NO_BOUNDS_CHECK
+#define TL_BOUNDS_CHECK(x)
+#else
+#define TL_BOUNDS_CHECK(x) ASSERT(x, "Bounds check failed")
+#endif
 
 namespace TL {
 
 using wchar = wchar_t;
-using s8	= char;
-using s16	= short;
-using s32	= int;
-using s64	= long long;
+using s8	= signed char;
+using s16	= signed short;
+using s32	= signed int;
+using s64	= signed long long;
 using u8	= unsigned char;
 using u16	= unsigned short;
 using u32	= unsigned int;
@@ -141,14 +70,14 @@ using slong = signed long;
 using ulong = unsigned long;
 
 #if ARCH_X64
-typedef u64 umm;
-typedef s64 smm;
+using umm = u64;
+using smm = s64;
 #else
-typedef u32 umm;
-typedef s32 smm;
+using umm = u32;
+using smm = s32;
 #endif
 
-#define TL_DECLARE_HANDLE(name) typedef struct name##__ *name;
+#define TL_DECLARE_HANDLE(name) typedef struct {} *name;
 
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
@@ -412,6 +341,9 @@ struct Span {
 	T *_end{};
 };
 
+template <class T>
+constexpr umm countof(Span<T const> span) { return span.size(); }
+
 using StringView = Span<char const>;
 using StringSpan = Span<char>;
 
@@ -437,7 +369,10 @@ inline Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate de
 
 extern Allocator osAllocator;
 
-template <class T> static T *allocate(Allocator al, umm count = 1, umm align = 0) { return (T *)allocate(al, count * sizeof(T), max(alignof(T), align)); }
+template <class T>
+static T *allocate(Allocator al, umm count = 1, umm align = 0) {
+	return (T *)al.allocate(count * sizeof(T), max(alignof(T), align));
+}
 
 template <class T, class Allocator>
 static T *allocate(umm count = 1, umm align = 0) {
@@ -463,7 +398,39 @@ struct OsAllocator {
 #endif
 };
 
-inline bool equals(StringView a, StringView b) {
+#ifndef TL_DEFAULT_ALLOCATOR
+#define TL_DEFAULT_ALLOCATOR ::TL::OsAllocator
+#endif
+
+constexpr char toLower(char c) {
+	if (c >= 'A' && c <= 'Z')
+		return c + ('a' - 'A');
+	return c;
+}
+
+inline constexpr umm length(char const *str) {
+	umm result = 0;
+	while (*str++) {
+		++result;
+	}
+	return result;	
+}
+inline constexpr umm length(char *str) {
+	return length((char const *)str);
+}
+
+inline constexpr umm length(wchar const *str) {
+	umm result = 0;
+	while (*str++) {
+		++result;
+	}
+	return result;	
+}
+inline constexpr umm length(wchar *str) {
+	return length((wchar const *)str);
+}
+
+inline constexpr bool equals(StringView a, StringView b) {
 	if (a.size() != b.size())
 		return false;
 	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp) {
@@ -472,14 +439,14 @@ inline bool equals(StringView a, StringView b) {
 	}
 	return true;
 }
-inline bool equals(char const *a, StringView b) {
+inline constexpr bool equals(char const *a, StringView b) {
 	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp) {
 		if (*a != *bp)
 			return false;
 	}
 	return true;
 }
-inline bool equals(StringView a, char const *b) {
+inline constexpr bool equals(StringView a, char const *b) {
 	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b) {
 		if (*ap != *b)
 			return false;
@@ -496,26 +463,26 @@ inline constexpr bool startsWith(char const *str, char const *subStr) {
 	}
 	return true;
 }
-inline constexpr bool startsWith(char const *str, umm lengthgth, char const *subStr) {
-	while (*subStr && lengthgth--) {
+inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr) {
+	while (*subStr && strLength--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
 	}
 	return !*subStr;
 }
-inline constexpr bool startsWith(char const *str, char const *subStr, umm sublengthgth) {
-	while (sublengthgth--) {
+inline constexpr bool startsWith(char const *str, char const *subStr, umm substrLength) {
+	while (substrLength--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
 	}
 	return true;
 }
-inline constexpr bool startsWith(char const *str, umm lengthgth, char const *subStr, umm sublengthgth) {
-	if (lengthgth < sublengthgth)
+inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr, umm substrLength) {
+	if (strLength < substrLength)
 		return false;
-	while (lengthgth-- && sublengthgth--) {
+	while (strLength-- && substrLength--) {
 		if (*str++ != *subStr++) {
 			return false;
 		}
@@ -523,87 +490,100 @@ inline constexpr bool startsWith(char const *str, umm lengthgth, char const *sub
 	return true;
 }
 
-namespace Fmt {
+inline constexpr bool endsWith(char const *str, char const *subStr) {
+	auto strLen = length(str);
+	auto subStrLen = length(subStr);
+	if (subStrLen > strLen) {
+		return false;
+	}
+	str += strLen - subStrLen;
+	while (*subStr) {
+		if (*str++ != *subStr++) {
+			return false;
+		}
+	}
+	return true;
+}
 
-constexpr u32 precisionMask = 0x3F;
-constexpr u32 precisionBit = 0;
+inline constexpr bool endsWithCI(char const *str, char const *subStr) {
+	auto strLen = length(str);
+	auto subStrLen = length(subStr);
+	if (subStrLen > strLen) {
+		return false;
+	}
+	str += strLen - subStrLen;
+	while (*subStr) {
+		if (toLower(*str++) != toLower(*subStr++)) {
+			return false;
+		}
+	}
+	return true;
+}
 
-constexpr u32 radixMask = 0xF;
-constexpr u32 radixBit = 6;
+inline constexpr bool endsWith(wchar const *str, wchar const *subStr) {
+	auto strLen = length(str);
+	auto subStrLen = length(subStr);
+	if (subStrLen > strLen) {
+		return false;
+	}
+	str += strLen - subStrLen;
+	while (*subStr) {
+		if (*str++ != *subStr++) {
+			return false;
+		}
+	}
+	return true;
+}
 
-constexpr u32 asCharMask = 0x1;
-constexpr u32 asCharBit = 10;
-
-struct Flags;
-
-inline Flags precision(u32 value);
-inline Flags radix(u32 value);
-
-struct Flags {
-	u32 value;
-	inline Flags(u32 value) : value(value) {}
-	inline Flags() : Flags(Fmt::precision(5) | Fmt::radix(10)) {}
-	inline Flags operator|(Flags b) { return value | b.value; }
-
-	inline u32 precision() { return (value >> precisionBit) & precisionMask; }
-	inline u32 radix() { return ((value >> radixBit) & radixMask) + 1; }
-	inline u32 asChar() { return (value >> asCharBit) & asCharMask; }
-};
-
-inline Flags precision(u32 value) { return (value & precisionMask) << precisionBit; }
-inline Flags radix(u32 value) { return ((value - 1) & radixMask) << radixBit; }
-inline Flags asChar(bool value) { return (u32)value << asCharBit; }
-
+inline constexpr bool endsWithCI(wchar const *str, wchar const *subStr) {
+	auto strLen = length(str);
+	auto subStrLen = length(subStr);
+	if (subStrLen > strLen) {
+		return false;
+	}
+	str += strLen - subStrLen;
+	while (*subStr) {
+		if (toLower(*str++) != toLower(*subStr++)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 template <class CopyFn>
 inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, char *, umm>;
 
-inline umm length(char const *str) {
-	umm result = 0;
-	while (*str++) {
-		++result;
-	}
-	return result;	
-}
-
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, char *v, Fmt::Flags flags = {}) { 
+StringSpan toString(CopyFn &&copyFn, char *v) { 
 	return copyFn(v, length(v));
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, char const *v, Fmt::Flags flags = {}) { 
+StringSpan toString(CopyFn &&copyFn, char const *v) { 
 	return copyFn(v, length(v));
 }
 
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, StringSpan v, Fmt::Flags flags = {}) {
+StringSpan toString(CopyFn &&copyFn, StringSpan v) {
 	return copyFn(v.data(), v.size());
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, Span<char const> v, Fmt::Flags flags = {}) {
+StringSpan toString(CopyFn &&copyFn, Span<char const> v) {
 	return copyFn(v.data(), v.size());
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, bool v, Fmt::Flags flags = {}) {
+StringSpan toString(CopyFn &&copyFn, bool v) {
 	return copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
 }
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
 template <class CopyFn, class Int, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, Int v, Fmt::Flags flags = {}) {
-	if (flags.asChar()) {
-		char c = (char)v;
-		return copyFn(&c, 1);
-	}
+StringSpan toString(CopyFn &&copyFn, Int v, u32 radix = 10) {
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
 	char charMap[] = "0123456789ABCDEF";
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
-
-	u32 radix = flags.radix();
 
 	bool negative = false;
 	if constexpr (isSigned<Int>) {
@@ -637,28 +617,28 @@ StringSpan toString(CopyFn &&copyFn, Int v, Fmt::Flags flags = {}) {
 }
 
 template <class Int, class = EnableIf<isInteger<Int> && !isChar<Int>>>
-StringSpan toString(Int v, char *outBuf, Fmt::Flags flags = {}) {
+StringSpan toString(Int v, char *outBuf) {
 	return toString([&](char const *src, umm length) { 
 		copyMemory(outBuf, src, length); 
 		return StringSpan(outBuf, length);
-	}, v, flags);
+	}, v);
 }
 template <class Int, class = EnableIf<isInteger<Int>>>
-StringSpan toStringNT(Int v, char *outBuf, Fmt::Flags flags = {}) {
+StringSpan toStringNT(Int v, char *outBuf) {
 	return toString([&](char const *src, umm length) { 
 		copyMemory(outBuf, src, length); 
 		outBuf[length] = '\0';
 		return StringSpan(outBuf, length);
-	}, v, flags);
+	}, v);
 }
 
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, void const *p, Fmt::Flags flags = Fmt::radix(16)) {
-	return toString(std::forward<CopyFn>(copyFn), (umm)p, flags);
+StringSpan toString(CopyFn &&copyFn, void const *p) {
+	return toString(std::forward<CopyFn>(copyFn), (umm)p, 16);
 }
 
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, f64 v, Fmt::Flags flags = {}) {
+StringSpan toString(CopyFn &&copyFn, f64 v, u32 precision = 3) {
 	char buf[64];
 	char *c = buf;
 	if (isNegative(v)) {
@@ -667,7 +647,6 @@ StringSpan toString(CopyFn &&copyFn, f64 v, Fmt::Flags flags = {}) {
 	}
 	c += toString((u64)v, c).size();
 	*c++ = '.';
-	auto precision = flags.precision();
 	for (u32 i = 0; i < precision; ++i) {
 		v = v - (f64)(s64)v;
 		v = select(v < 0, v + 1, v) * 10;
@@ -676,15 +655,471 @@ StringSpan toString(CopyFn &&copyFn, f64 v, Fmt::Flags flags = {}) {
 	return copyFn(buf, (umm)(c - buf));
 }
 template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, f32 v, Fmt::Flags flags = {}) {
-	return toString(copyFn, (f64)v, flags);
+StringSpan toString(CopyFn &&copyFn, f32 v, u32 precision = 3) {
+	return toString(copyFn, (f64)v, precision);
 }
+
+template <class T, umm _capacity>
+struct StaticList {
+	StaticList() = default;
+	template <umm thatCapacity>
+	StaticList(StaticList<T, thatCapacity> const &that) {
+		for (auto &src : that) {
+			push_back(src);
+		}
+	}
+	template <umm thatCapacity>
+	StaticList(StaticList<T, thatCapacity> &&that) {
+		for (auto &src : that) {
+			push_back(std::move(src));
+		}
+		that.clear();
+	}
+	StaticList(StaticList const &that) {
+		for (auto &src : that) {
+			push_back(src);
+		}
+	}
+	StaticList(StaticList &&that) {
+		for (auto &src : that) {
+			push_back(std::move(src));
+		}
+	}
+	template <umm thatCapacity>
+	StaticList &operator=(StaticList<T, thatCapacity> const &that) {
+		clear();
+		return *new (this) StaticList(that);
+	}
+	template <umm thatCapacity>
+	StaticList &operator=(StaticList<T, thatCapacity> &&that) {
+		clear();
+		return *new (this) StaticList(std::move(that));
+	}
+	~StaticList() { clear(); }
+
+	T *begin() { return &_begin->v; }
+	T *end() { return &_end->v; }
+	T const *begin() const { return &_begin->v; }
+	T const *end() const { return &_end->v; }
+
+	umm capacity() { return _capacity; }
+	
+	umm size() const { return (umm)(_end - _begin); }
+	bool empty() const { return size() == 0; }
+
+	T *data() { return std::addressof(_begin->v); }
+	T &front() { TL_BOUNDS_CHECK(size()); return _begin->v; }
+	T &back() { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
+	T &operator[](umm i) { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
+
+	T const *data() const { return std::addressof(_begin->v); }
+	T const &front() const { TL_BOUNDS_CHECK(size()); return _begin->v; }
+	T const &back() const { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
+	T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
+
+	operator Span<T>() { return {begin(), end()}; }
+	operator Span<T const>() const { return {begin(), end()}; }
+
+	bool full() const { return size() == _capacity; }
+
+	template <class... Args>
+	bool try_emplace_back(Args &&... args) {
+		if (full())
+			return false;
+		new (_end++) T(std::forward<Args>(args)...);
+		return true;
+	}
+	bool try_push_back(T const &val) { return try_emplace_back(val); }
+	bool try_push_back(T &&val) { return try_emplace_back(std::move(val)); }
+
+	template <class... Args>
+	void emplace_back(Args &&... args) {
+		ASSERT(try_emplace_back(std::forward<Args>(args)...));
+	}
+	void push_back(T const &val) { emplace_back(val); }
+	void push_back(T &&val) { emplace_back(std::move(val)); }
+
+	void pop_back() {
+		TL_BOUNDS_CHECK(size());
+		_end-- [-1].v.~T();
+	}
+	void pop_front() {
+		TL_BOUNDS_CHECK(size());
+		--_end;
+		for (auto dst = _begin; dst != _end; ++dst) {
+			dst[0] = std::move(dst[1]);
+		}
+		_end->v.~T();
+	}
+
+	void clear() {
+		for (auto &v : *this) {
+			v.~T();
+		}
+		_end = _begin;
+	}
+
+	template <class Pred>
+	T *find_if(Pred pred) {
+		Storage *it = _begin;
+		for (; it < _end; ++it) {
+			if (pred(it->v)) {
+				break;
+			}
+		}
+		return &it->v;
+	}
+
+private:
+	union Storage {
+		T v;
+		Storage() {}
+		~Storage() {}
+	};
+	Storage _begin[_capacity];
+	Storage *_end = _begin;
+};
+
+#if COMPILER_GCC
+FORCEINLINE u32 findLowestOneBit(u32 val) { val ? __builtin_ffs(val) : ~0; }
+FORCEINLINE u32 findLowestOneBit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
+FORCEINLINE u32 findHighestOneBit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
+FORCEINLINE u32 findHighestOneBit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
+#else
+FORCEINLINE u32 findLowestOneBit(u32 val) {
+	unsigned long result;
+	return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0;
+}
+FORCEINLINE u32 findLowestOneBit(u64 val) {
+	unsigned long result;
+	return _BitScanForward64(&result, val) ? (u32)result : ~0;
+}
+FORCEINLINE u32 findHighestOneBit(u32 val) {
+	unsigned long result;
+	return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0;
+}
+FORCEINLINE u32 findHighestOneBit(u64 val) {
+	unsigned long result;
+	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
+}
+#endif
+
+FORCEINLINE u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
+FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
+FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
+FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
+
+enum class CpuFeature : u8 {
+	_3dnow,
+	_3dnowext,
+	abm,
+	adx,
+	aes,
+	avx,
+	avx2,
+	avx512cd,
+	avx512er,
+	avx512f,
+	avx512pf,
+	bmi1,
+	bmi2,
+	clfsh,
+	cmov,
+	cmpxchg16b,
+	cx8,
+	erms,
+	f16c,
+	fma,
+	fsgsbase,
+	fxsr,
+	hle,
+	invpcid,
+	lahf,
+	lzcnt,
+	mmx,
+	mmxext,
+	monitor,
+	movbe,
+	msr,
+	osxsave,
+	pclmulqdq,
+	popcnt,
+	prefetchwt1,
+	rdrand,
+	rdseed,
+	rdtscp,
+	rtm,
+	sep,
+	sha,
+	sse,
+	sse2,
+	sse3,
+	sse41,
+	sse42,
+	sse4a,
+	ssse3,
+	syscall,
+	tbm,
+	xop,
+	xsave,
+
+	count,
+};
+
+struct CpuFeatureIndex {
+	u8 slot;
+	u8 bit;
+};
+
+inline CpuFeatureIndex getCpuFeatureIndex(CpuFeature f) {
+	CpuFeatureIndex result;
+	result.slot = (u32)f >> 5;
+	result.bit = (u32)f & 0x1F;
+	return result;
+}
+
+enum class CpuVendor : u8 {
+	unknown,
+	intel,
+	amd,
+
+	count,
+};
+
+enum class CpuCacheType : u8 {
+	unified, 
+	instruction, 
+	data, 
+	trace, 
+
+	count,
+};
+
+enum class CpuCacheLevel : u8 {
+	l1,
+	l2,
+	l3,
+
+	count,
+};
+
+struct CpuCache {
+	u16 count;
+	u32 size;
+};
+
+struct CpuInfo {
+
+	u32 logicalProcessorCount;
+	CpuCache cache[(u32)CpuCacheLevel::count][(u32)CpuCacheType::count];
+	u32 cacheLineSize;
+	u32 features[ceil((u32)CpuFeature::count, 32u) / 32];
+	CpuVendor vendor;
+	char brand[49];
+
+	inline bool hasFeature(CpuFeature feature) const {
+		CpuFeatureIndex index = getCpuFeatureIndex(feature);
+		if (index.slot >= countof(features))
+			return 0;
+		return features[index.slot] & (1 << index.bit);
+	}
+	u32 totalCacheSize(CpuCacheLevel level) const {
+		u32 index = (u32)level;
+		ASSERT(index < countof(cache));
+		u32 result = 0;
+		for (auto &c : cache[index]) {
+			result += c.size;
+		}
+		return result;
+	}
+};
+
+TL_API char const *toString(CpuFeature);
+TL_API char const *toString(CpuVendor);
+TL_API CpuInfo getCpuInfo();
 
 #ifdef TL_IMPL
 Allocator osAllocator = makeAllocator(0,
 	[](void *, umm size, umm align) -> void * { return OsAllocator::allocate(size, align); },
 	[](void *, void *data)                    { return OsAllocator::deallocate(data); }
 );
-#endif
+
+#if OS_WINDOWS
+
+CpuInfo getCpuInfo() {
+	CpuInfo result = {};
+
+	DWORD processorInfoLength = 0;
+	if (!GetLogicalProcessorInformation(0, &processorInfoLength)) {
+		DWORD err = GetLastError();
+		ASSERT(err == ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
+	}
+
+	auto buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION *)malloc(processorInfoLength);
+	DEFER { free(buffer); };
+
+	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
+		INVALID_CODE_PATH("GetLogicalProcessorInformation: %u", GetLastError());
+
+	ASSERT(processorInfoLength % sizeof(buffer[0]) == 0);
+
+	
+	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {
+		switch (v) {
+			case CacheUnified: return CpuCacheType::unified;
+			case CacheInstruction: return CpuCacheType::instruction;
+			case CacheData: return CpuCacheType::data;
+			case CacheTrace: return CpuCacheType::trace;
+		}
+		INVALID_CODE_PATH();
+		return {};
+	};
+
+
+	for (auto &info : Span{buffer, processorInfoLength / sizeof(buffer[0])}) {
+		switch (info.Relationship) {
+			case RelationNumaNode:
+			case RelationProcessorPackage: break;
+			case RelationProcessorCore: result.logicalProcessorCount += countBits(info.ProcessorMask); break;
+			case RelationCache: {
+				auto &cache = result.cache[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
+				cache.size += info.Cache.Size;
+				++cache.count;
+				result.cacheLineSize = info.Cache.LineSize;
+				break;
+			}
+			default: INVALID_CODE_PATH("Error: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.");
+		}
+	}
+
+	s32 ecx1 = 0;
+	s32 edx1 = 0;
+	s32 ebx7 = 0;
+	s32 ecx7 = 0;
+	s32 ecx1ex = 0;
+	s32 edx1ex = 0;
+
+	struct CPUID {
+		s32 eax;
+		s32 ebx;
+		s32 ecx;
+		s32 edx;
+
+		CPUID(s32 func) { __cpuid(data(), func); }
+		CPUID(s32 func, s32 subfunc) { __cpuidex(data(), func, subfunc); }
+
+		s32 *data() { return &eax; }
+	};
+
+	StaticList<CPUID, 64> data;
+	StaticList<CPUID, 64> dataEx;
+
+	s32 highestId = CPUID(0).eax;
+	for (s32 i = 0; i <= highestId; ++i) {
+		data.push_back(CPUID(i, 0));
+	}
+	if (data.size() > 0) {
+		char vendorName[24];
+		((s32 *)vendorName)[0] = data[0].ebx;
+		((s32 *)vendorName)[1] = data[0].edx;
+		((s32 *)vendorName)[2] = data[0].ecx;
+		if (startsWith(vendorName, 24, "GenuineIntel")) {
+			result.vendor = CpuVendor::intel;
+		} else if (startsWith(vendorName, 24, "AuthenticAMD")) {
+			result.vendor = CpuVendor::amd;
+		}
+	}
+	if (data.size() > 1) {
+		ecx1 = data[1].ecx;
+		edx1 = data[1].edx;
+	}
+	if (data.size() > 7) {
+		ebx7 = data[7].ebx;
+		ecx7 = data[7].ecx;
+	}
+
+	s32 highestExId = CPUID(0x80000000).eax;
+	for (s32 i = 0x80000000; i <= highestExId; ++i) {
+		dataEx.push_back(CPUID(i, 0));
+	}
+	if (dataEx.size() > 1) {
+		ecx1ex = dataEx[1].ecx;
+		edx1ex = dataEx[1].edx;
+	}
+	if (dataEx.size() > 4) {
+		result.brand[48] = 0;
+		memcpy(result.brand + sizeof(CPUID) * 0, dataEx[2].data(), sizeof(CPUID));
+		memcpy(result.brand + sizeof(CPUID) * 1, dataEx[3].data(), sizeof(CPUID));
+		memcpy(result.brand + sizeof(CPUID) * 2, dataEx[4].data(), sizeof(CPUID));
+	} else {
+		result.brand[0] = 0;
+	}
+
+	auto set = [&](CpuFeature feature, bool value) {
+		CpuFeatureIndex index = getCpuFeatureIndex(feature);
+		result.features[index.slot] |= (u32)value << index.bit;
+	};
+
+	// clang-format off
+	set(CpuFeature::sse3,		(ecx1	& (1 <<  0)));
+    set(CpuFeature::pclmulqdq,	(ecx1	& (1 <<  1)));
+    set(CpuFeature::monitor,	(ecx1	& (1 <<  3)));
+    set(CpuFeature::ssse3,		(ecx1	& (1 <<  9)));
+    set(CpuFeature::fma,		(ecx1	& (1 << 12)));
+    set(CpuFeature::cmpxchg16b,	(ecx1	& (1 << 13)));
+    set(CpuFeature::sse41,		(ecx1	& (1 << 19)));
+    set(CpuFeature::sse42,		(ecx1	& (1 << 20)));
+    set(CpuFeature::movbe,		(ecx1	& (1 << 22)));
+    set(CpuFeature::popcnt,		(ecx1	& (1 << 23)));
+    set(CpuFeature::aes,		(ecx1	& (1 << 25)));
+    set(CpuFeature::xsave,		(ecx1	& (1 << 26)));
+    set(CpuFeature::osxsave,	(ecx1	& (1 << 27)));
+    set(CpuFeature::avx,		(ecx1	& (1 << 28)));
+    set(CpuFeature::f16c,		(ecx1	& (1 << 29)));
+    set(CpuFeature::rdrand,		(ecx1	& (1 << 30)));
+    set(CpuFeature::msr,		(edx1	& (1 <<  5)));
+    set(CpuFeature::cx8,		(edx1	& (1 <<  8)));
+    set(CpuFeature::sep,		(edx1	& (1 << 11)));
+    set(CpuFeature::cmov,		(edx1	& (1 << 15)));
+    set(CpuFeature::clfsh,		(edx1	& (1 << 19)));
+    set(CpuFeature::mmx,		(edx1	& (1 << 23)));
+    set(CpuFeature::fxsr,		(edx1	& (1 << 24)));
+    set(CpuFeature::sse,		(edx1	& (1 << 25)));
+    set(CpuFeature::sse2,		(edx1	& (1 << 26)));
+    set(CpuFeature::fsgsbase,	(ebx7	& (1 <<  0)));
+    set(CpuFeature::bmi1,		(ebx7	& (1 <<  3)));
+    set(CpuFeature::hle,		(ebx7	& (1 <<  4)) && result.vendor == CpuVendor::intel);
+    set(CpuFeature::avx2,		(ebx7	& (1 <<  5)));
+    set(CpuFeature::bmi2,		(ebx7	& (1 <<  8)));
+    set(CpuFeature::erms,		(ebx7	& (1 <<  9)));
+    set(CpuFeature::invpcid,	(ebx7	& (1 << 10)));
+    set(CpuFeature::rtm,		(ebx7	& (1 << 11)) && result.vendor == CpuVendor::intel);
+    set(CpuFeature::avx512f,	(ebx7	& (1 << 16)));
+    set(CpuFeature::rdseed,		(ebx7	& (1 << 18)));
+    set(CpuFeature::adx,		(ebx7	& (1 << 19)));
+    set(CpuFeature::avx512pf,	(ebx7	& (1 << 26)));
+    set(CpuFeature::avx512er,	(ebx7	& (1 << 27)));
+    set(CpuFeature::avx512cd,	(ebx7	& (1 << 28)));
+    set(CpuFeature::sha,		(ebx7	& (1 << 29)));
+    set(CpuFeature::prefetchwt1,(ecx7	& (1 <<  0)));
+    set(CpuFeature::lahf,		(ecx1ex	& (1 <<  0)));
+    set(CpuFeature::lzcnt,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::intel);
+    set(CpuFeature::abm,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::sse4a,		(ecx1ex	& (1 <<  6)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::xop,		(ecx1ex	& (1 << 11)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::tbm,		(ecx1ex	& (1 << 21)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::syscall,	(edx1ex	& (1 << 11)) && result.vendor == CpuVendor::intel);
+    set(CpuFeature::mmxext,		(edx1ex	& (1 << 22)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor::intel);
+    set(CpuFeature::_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor::amd);
+    set(CpuFeature::_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor::amd);
+	// clang-format on
+	
+	return result;
+}
+
+#endif // OS_WINDOWS
+
+#endif // TL_IMPL
 
 } // namespace TL

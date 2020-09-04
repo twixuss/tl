@@ -3464,6 +3464,11 @@ FORCEINLINE f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
     return dst;
 }
 
+FORCEINLINE s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+FORCEINLINE s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+FORCEINLINE s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+FORCEINLINE s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+
 FORCEINLINE f32 sign(f32 v) { return setSign(1.0f, v); }
 FORCEINLINE v2f sign(v2f v) { v.x = setSign(1.0f, v.x); v.y = setSign(1.0f, v.y); return v; }
 template<umm ps> FORCEINLINE f32x<ps> sign(f32x<ps> v) { return setSign(F32x<ps>(1.0f), v); }
@@ -3658,7 +3663,7 @@ FORCEINLINE f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
 FORCEINLINE f32x8 atan2(v2fx8 v) { return atan2(v.y, v.x); }
 
 #define ATAN2_APPROX(f32, v2f)										 \
-f32 atan2Approx(f32 y, f32 x) {										 \
+FORCEINLINE f32 atan2Approx(f32 y, f32 x) {							 \
 	auto ay = absolute(y) + 1e-10f;									 \
 	auto mask = x < 0;												 \
 	auto r = select(mask, (x + ay) / (ay - x), (x - ay) / (ay + x)); \
@@ -3672,42 +3677,6 @@ ATAN2_APPROX(f32x4, v2fx4)
 ATAN2_APPROX(f32x8, v2fx8)
 #undef ATAN2_APPROX
 
-#if COMPILER_GCC
-FORCEINLINE u32 findLowestOneBit(u32 val) { val ? __builtin_ffs(val) : ~0; }
-FORCEINLINE u32 findLowestOneBit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
-FORCEINLINE u32 findHighestOneBit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
-FORCEINLINE u32 findHighestOneBit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
-#else
-FORCEINLINE u32 findLowestOneBit(u32 val) {
-	unsigned long result;
-	return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0;
-}
-FORCEINLINE u32 findLowestOneBit(u64 val) {
-	unsigned long result;
-	return _BitScanForward64(&result, val) ? (u32)result : ~0;
-}
-FORCEINLINE u32 findHighestOneBit(u32 val) {
-	unsigned long result;
-	return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0;
-}
-FORCEINLINE u32 findHighestOneBit(u64 val) {
-	unsigned long result;
-	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
-}
-#endif
-
-FORCEINLINE u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
-FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
-FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
-FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
-
-FORCEINLINE u32 fillBits(u32 v) {
-	u32 r = 0;
-	while (v--) {
-		r = (r << 1) | 1;
-	}
-	return r;
-}
 FORCEINLINE f32 dot(f32 a, f32 b) { return a * b; }
 FORCEINLINE f32 dot(f32x4 a, f32x4 b) { return {_mm_cvtss_f32(_mm_dp_ps(a.m.ps, b.m.ps, 0xFF))}; }
 FORCEINLINE s32 dot(s32x4 a, s32x4 b) {

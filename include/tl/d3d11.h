@@ -1,5 +1,5 @@
 #pragma once
-#include "common.h"
+#include "thread.h"
 
 #if OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -61,11 +61,12 @@ struct State {
 	ID3D11Device3 *device3;
 	ID3D11DeviceContext *immediateContext;
 	RenderTarget backBuffer;
+	RecursiveMutex immediateContextMutex;
 
 	void createBackBuffer();
 	StructuredBuffer createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage);
 	RenderTexture createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, UINT cpuFlags = 0);
-	Texture createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data);
+	Texture createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generateMips = false);
 	template <class Handler = decltype(defaultShaderHandler)>
 	ID3D11VertexShader *createVertexShader(char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
 		ID3DBlob* byteCode = 0;
@@ -99,20 +100,30 @@ struct State {
 	void clearRenderTarget(RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
 	void clearRenderTarget(RenderTexture &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
 
-	void draw(u32 vertexCount, u32 offset = 0) { immediateContext->Draw(vertexCount, offset); }
+	template <class Fn>
+	void useContext(Fn &&fn) {
+		SCOPED_LOCK(immediateContextMutex);
+		fn();
+	}
 
-	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { immediateContext->IASetPrimitiveTopology(topology); }
-	void setVertexShader(ID3D11VertexShader *shader) { immediateContext->VSSetShader(shader, 0, 0); }
-	void setPixelShader(ID3D11PixelShader  *shader) { immediateContext->PSSetShader(shader, 0, 0); }
+	void draw(u32 vertexCount, u32 offset = 0) { 
+		useContext([&] { immediateContext->Draw(vertexCount, offset); });
+	}
+
+	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
+	void setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
+	void setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
 	void setShaderResource(StructuredBuffer &buffer, u32 slot, char stage) { 
-		switch (stage) {
-			case 'V': immediateContext->VSSetShaderResources(slot, 1, &buffer.srv); break;
-			case 'P': immediateContext->PSSetShaderResources(slot, 1, &buffer.srv); break;
-			default: INVALID_CODE_PATH("bad stage"); break;
-		}
+		useContext([&] { 
+			switch (stage) {
+				case 'V': immediateContext->VSSetShaderResources(slot, 1, &buffer.srv); break;
+				case 'P': immediateContext->PSSetShaderResources(slot, 1, &buffer.srv); break;
+				default: INVALID_CODE_PATH("bad stage"); break;
+			}
+		});
 	}
     void setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin = 0, f32 depthMax = 1);
-	void setRenderTarget(ID3D11RenderTargetView *renderTarget) { immediateContext->OMSetRenderTargets(1, &renderTarget, 0); }
+	void setRenderTarget(ID3D11RenderTargetView *renderTarget) { useContext([&] { immediateContext->OMSetRenderTargets(1, &renderTarget, 0); }); }
 	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv); }
 
 	u32 getMaxMsaaSampleCount(DXGI_FORMAT format);
@@ -280,17 +291,13 @@ void release(RenderTexture v) {
 	TL_COM_RELEASE(v.tex);
 }
 
-State createState(IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
-    State state = {};
+void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
 	state.swapChain = swapChain;
 	state.device = device;
 	state.immediateContext = immediateContext;
 	state.backBuffer.rtv = backBuffer;
-	return state;
 }
-State createState(HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0) {
-    State state = {};
-    
+void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0) {
 	DXGI_SWAP_CHAIN_DESC d = {};
 	d.BufferDesc.Width = width;
 	d.BufferDesc.Height = height;
@@ -313,8 +320,6 @@ State createState(HWND window, u32 width, u32 height, DXGI_FORMAT backBufferForm
 	}
 
 	state.createBackBuffer();
-
-	return state;
 }
 
 StructuredBuffer State::createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage) {
@@ -375,37 +380,46 @@ RenderTexture State::createRenderTexture(u32 width, u32 height, u32 sampleCount,
 	}
 	return result;
 }
-Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data) {
+Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generateMips) {
 	Texture result;
-	ID3D11Texture2D *tex;
+
+    u32 bpp = getBitsPerPixel(format);
+    ASSERT(bpp % 8 == 0);
+	u32 pitch = width * bpp / 8;
+
 	{
 		D3D11_TEXTURE2D_DESC d = {};
 		d.Format = format;
 		d.ArraySize = 1;
-		d.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		d.BindFlags = D3D11_BIND_SHADER_RESOURCE | (generateMips ? D3D11_BIND_RENDER_TARGET : 0);
 		d.Width = width;
 		d.Height = height;
-		d.MipLevels = 1;
+		d.MipLevels = generateMips ? 0 : 1;
 		d.SampleDesc = {1, 0};
+		d.MiscFlags = generateMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
 
 		if (data) {
 			D3D11_SUBRESOURCE_DATA initialData{};
 			initialData.pSysMem = data;
-            u32 bpp = getBitsPerPixel(format);
-            ASSERT(bpp % 8 == 0);
-			initialData.SysMemPitch = width * bpp / 8;
-			TL_HRESULT_HANDLER(device->CreateTexture2D(&d, &initialData, &tex));
+			initialData.SysMemPitch = pitch;
+			TL_HRESULT_HANDLER(device->CreateTexture2D(&d, generateMips ? nullptr : &initialData, &result.tex));
 		} else {
-			TL_HRESULT_HANDLER(device->CreateTexture2D(&d, 0, &tex));
+			TL_HRESULT_HANDLER(device->CreateTexture2D(&d, 0, &result.tex));
 		}
 	}
 	D3D11_SHADER_RESOURCE_VIEW_DESC d = {};
 	d.Format = format;
-	d.Texture2D.MipLevels = 1;
+	d.Texture2D.MipLevels = generateMips ? -1 : 1;
 	d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 
-	TL_HRESULT_HANDLER(device->CreateShaderResourceView(tex, &d, &result.srv));
-	tex->Release();
+	TL_HRESULT_HANDLER(device->CreateShaderResourceView(result.tex, &d, &result.srv));
+
+	if (generateMips) {
+		useContext([&] { 
+			immediateContext->UpdateSubresource(result.tex, 0, 0, data, pitch, 0);
+			immediateContext->GenerateMips(result.srv);
+		});
+	}
 	return result;
 }
 
@@ -415,21 +429,21 @@ void State::updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stri
 	ASSERT(size + offset <= buffer.size);
 	if (buffer.usage == D3D11_USAGE_DYNAMIC) {
 		D3D11_MAPPED_SUBRESOURCE mapped;
-		TL_HRESULT_HANDLER(immediateContext->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
+		useContext([&] { TL_HRESULT_HANDLER(immediateContext->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)); });
 		memcpy(mapped.pData, data, size);
-		immediateContext->Unmap(buffer.buffer, 0);
+		useContext([&] { immediateContext->Unmap(buffer.buffer, 0); });
 	} else if (buffer.usage == D3D11_USAGE_DEFAULT) {
 		D3D11_BOX box = {};
 		box.left = offset;
 		box.right = box.left + size;
 		box.back = 1;
 		box.bottom = 1;
-		immediateContext->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0);
+		useContext([&] { immediateContext->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0); });
 	}
 }
 
 void State::clearRenderTarget(ID3D11RenderTargetView *renderTarget, f32 const rgba[4]) {
-	immediateContext->ClearRenderTargetView(renderTarget, rgba);
+	useContext([&] { immediateContext->ClearRenderTargetView(renderTarget, rgba); });
 }
 
 void State::setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax) {
@@ -440,7 +454,7 @@ void State::setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax) 
     v.Height = h;
     v.MinDepth = depthMin;
     v.MaxDepth = depthMax;
-    immediateContext->RSSetViewports(1, &v);
+	useContext([&] { immediateContext->RSSetViewports(1, &v); });
 }
 
 u32 State::getMaxMsaaSampleCount(DXGI_FORMAT format) {

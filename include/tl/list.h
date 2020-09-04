@@ -5,12 +5,6 @@
 #pragma warning(push)
 #pragma warning(disable : 4582)
 
-#ifdef TL_NO_BOUNDS_CHECK
-#define TL_BOUNDS_CHECK(x)
-#else
-#define TL_BOUNDS_CHECK(x) ASSERT(x, "Bounds check failed")
-#endif
-
 namespace TL {
 
 template <class T, class Allocator>
@@ -169,128 +163,7 @@ struct ForwardListBase {
 	}
 };
 
-template <class T, umm _capacity>
-struct StaticList {
-	StaticList() = default;
-	template <umm thatCapacity>
-	StaticList(StaticList<T, thatCapacity> const &that) {
-		for (auto &src : that) {
-			push_back(src);
-		}
-	}
-	template <umm thatCapacity>
-	StaticList(StaticList<T, thatCapacity> &&that) {
-		for (auto &src : that) {
-			push_back(std::move(src));
-		}
-		that.clear();
-	}
-	StaticList(StaticList const &that) {
-		for (auto &src : that) {
-			push_back(src);
-		}
-	}
-	StaticList(StaticList &&that) {
-		for (auto &src : that) {
-			push_back(std::move(src));
-		}
-	}
-	template <umm thatCapacity>
-	StaticList &operator=(StaticList<T, thatCapacity> const &that) {
-		clear();
-		return *new (this) StaticList(that);
-	}
-	template <umm thatCapacity>
-	StaticList &operator=(StaticList<T, thatCapacity> &&that) {
-		clear();
-		return *new (this) StaticList(std::move(that));
-	}
-	~StaticList() { clear(); }
-
-	T *begin() { return &_begin->v; }
-	T *end() { return &_end->v; }
-	T const *begin() const { return &_begin->v; }
-	T const *end() const { return &_end->v; }
-
-	umm capacity() { return _capacity; }
-	
-	umm size() const { return (umm)(_end - _begin); }
-	bool empty() const { return size() == 0; }
-
-	T *data() { return std::addressof(_begin->v); }
-	T &front() { TL_BOUNDS_CHECK(size()); return _begin->v; }
-	T &back() { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
-	T &operator[](umm i) { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
-
-	T const *data() const { return std::addressof(_begin->v); }
-	T const &front() const { TL_BOUNDS_CHECK(size()); return _begin->v; }
-	T const &back() const { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
-	T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
-
-	operator Span<T>() { return {begin(), end()}; }
-	operator Span<T const>() const { return {begin(), end()}; }
-
-	bool full() const { return size() == _capacity; }
-
-	template <class... Args>
-	bool try_emplace_back(Args &&... args) {
-		if (full())
-			return false;
-		new (_end++) T(std::forward<Args>(args)...);
-		return true;
-	}
-	bool try_push_back(T const &val) { return try_emplace_back(val); }
-	bool try_push_back(T &&val) { return try_emplace_back(std::move(val)); }
-
-	template <class... Args>
-	void emplace_back(Args &&... args) {
-		ASSERT(try_emplace_back(std::forward<Args>(args)...));
-	}
-	void push_back(T const &val) { emplace_back(val); }
-	void push_back(T &&val) { emplace_back(std::move(val)); }
-
-	void pop_back() {
-		TL_BOUNDS_CHECK(size());
-		_end-- [-1].v.~T();
-	}
-	void pop_front() {
-		TL_BOUNDS_CHECK(size());
-		--_end;
-		for (auto dst = _begin; dst != _end; ++dst) {
-			dst[0] = std::move(dst[1]);
-		}
-		_end->v.~T();
-	}
-
-	void clear() {
-		for (auto &v : *this) {
-			v.~T();
-		}
-		_end = _begin;
-	}
-
-	template <class Pred>
-	T *find_if(Pred pred) {
-		Storage *it = _begin;
-		for (; it < _end; ++it) {
-			if (pred(it->v)) {
-				break;
-			}
-		}
-		return &it->v;
-	}
-
-private:
-	union Storage {
-		T v;
-		Storage() {}
-		~Storage() {}
-	};
-	Storage _begin[_capacity];
-	Storage *_end = _begin;
-};
-
-template <class T, class Allocator = OsAllocator>
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct List : ForwardListBase<T, Allocator> {
 	using Base = ForwardListBase<T, Allocator>;
 	List() = default;
@@ -329,7 +202,7 @@ struct List : ForwardListBase<T, Allocator> {
 	void erase(T &val) { erase(std::addressof(val)); }
 };
 
-template <class T, class Allocator = OsAllocator>
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct UnorderedList : ForwardListBase<T, Allocator> {
 	using Base = ForwardListBase<T, Allocator>;
 	UnorderedList() = default;
@@ -359,25 +232,28 @@ struct UnorderedList : ForwardListBase<T, Allocator> {
 	void erase(T &val) { erase(&val); }
 };
 
-template <class T, class Allocator = OsAllocator>
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct Queue {
 	Queue() = default;
 	explicit Queue(umm size) {
 		resize(size);
 	}
 	Queue(Span<T const> span) {
-		reserve(span.size());
+		_reallocate(span.size());
 		for (auto &src : span) {
 			push(src);
 		}
 	}
 	Queue(Queue const &that) : Queue((Span<T const>)that) {}
 	Queue(Queue &&that) {
-		reserve(that.size());
+		_reallocate(that.size());
 		for (auto &src : that) {
 			push(std::move(src));
 		}
-		that = {};
+		that._allocBegin = 0;
+		that._allocEnd = 0;
+		that._begin = 0;
+		that._end = 0;
 	}
 	Queue &operator=(Queue const &that) { clear(); return *new (this) Queue(that); }
 	Queue &operator=(Queue &&that) { clear(); return *new (this) Queue(std::move(that)); }
@@ -422,10 +298,6 @@ struct Queue {
 	void push(T const &val) { emplace(val); }
 	void push(T &&val) { emplace(std::move(val)); }
 	void pop() { TL_BOUNDS_CHECK(size()); (_begin++)->~T(); }
-	void reserve(umm count) {
-		if (count > capacity())
-			_reallocate(count);
-	}
 	void resize(umm newSize) {
 		if (newSize > capacity())
 			_reallocate(newSize);
@@ -478,7 +350,197 @@ struct Queue {
 	}
 };
 
-template <class T, class Allocator = OsAllocator>
+template <class T, umm blockSize_ = 4096 / sizeof(T), class Allocator = TL_DEFAULT_ALLOCATOR>
+struct BlockList {
+	static constexpr umm blockSize = blockSize_;
+	union Storage {
+		T value;
+	};
+	struct Block {
+		Storage buffer[blockSize];
+		Storage *end = buffer;
+		Block *next = 0;
+		Block *previous = 0;
+
+		Block() {}
+		umm size() const { return (umm)(end - buffer); }
+		umm availableSpace() const { return blockSize - size(); }
+	};
+	Block first;
+	Block *last = &first;
+	Block *allocLast = &first;
+
+	BlockList() = default;
+	BlockList(BlockList const &that) {
+		first.end = first.buffer + that.first.size();
+		for (u32 i = 0; i < that.first.size(); ++i) {
+			new (&first.buffer[i].value) T(that.first.buffer[i].value);
+		}
+		
+		auto previous = &first;
+		for (auto srcBlock = that.first.next; srcBlock != 0;) {
+			if (srcBlock->size()) {
+				last = allocLast = allocateBlock(previous);
+				for (u32 i = 0; i < srcBlock->size(); ++i) {
+					new (&last->buffer[i].value) T(srcBlock->buffer[i].value);
+				}
+				previous = last;
+			}
+		}
+	}
+	BlockList(BlockList &&that) {
+		first.end = first.buffer + that.first.size();
+		for (u32 i = 0; i < that.first.size(); ++i) {
+			new (&first.buffer[i].value) T(std::move(that.first.buffer[i].value));
+		}
+
+		first.next = that.first.next;
+		last = that.last;
+		allocLast = that.allocLast;
+
+		that.first.end = that.first.buffer;
+		that.last = that.allocLast = &that.first;
+	}
+	BlockList &operator=(BlockList const &that) {
+		clear();
+		
+		first.end = first.buffer + that.first.size();
+		for (u32 i = 0; i < that.first.size(); ++i) {
+			new (&first.buffer[i].value) T(that.first.buffer[i].value);
+		}
+		
+		last = &first;
+		for (auto srcBlock = that.first.next; srcBlock != 0;) {
+			if (srcBlock->size()) {
+				if (!last->next)
+					last->next = allocLast = allocateBlock(last);
+				last = last->next;
+				for (u32 i = 0; i < srcBlock->size(); ++i) {
+					new (&last->buffer[i].value) T(srcBlock->buffer[i].value);
+				}
+			}
+		}
+
+		return *this
+	}
+	BlockList &operator=(BlockList &&that) {
+		clear();
+		return *new (this) BlockList(std::move(that));
+	}
+	~BlockList() {
+		for (u32 i = 0; i < first.size(); ++i) {
+			first.buffer[i].value.~T();
+		}
+		first.end = first.buffer;
+
+		for (auto block = first.next; block != 0;) {
+			for (u32 i = 0; i < block->size(); ++i) {
+				block->buffer[i].value.~T();
+			}
+			auto next = block->next;
+			Allocator::deallocate(block);
+			block = next;
+		}
+
+		last = &first;
+		allocLast = &first;
+	}
+
+	void clear() {
+		for (u32 i = 0; i < first.size(); ++i) {
+			first.buffer[i].value.~T();
+		}
+		first.end = first.buffer;
+
+		for (auto block = first.next; block != 0; block = block->next) {
+			for (u32 i = 0; i < block->size(); ++i) {
+				block->buffer[i].value.~T();
+			}
+			block->end = block->buffer;
+		}
+		last = &first;
+	}
+	umm availableSpace() {
+		umm space = 0;
+		auto block = last;
+		while (block) {
+			space += block->availableSpace();
+			block = block->next;
+		}
+		return space;
+	}
+	void ensureSpace(umm amount) {
+		umm space = availableSpace();
+		while (space < amount) {
+			allocLast = allocLast->next = allocateBlock(allocLast);
+			space += blockSize;
+		}
+	}
+	void ensureConsecutiveSpace(umm amount) {
+		ASSERT(amount <= blockSize, "reserving this amount of consecutive space is impossible");
+		if (last->availableSpace() < amount) {
+			if (last->next) {
+				last = last->next;
+			} else {
+				last->next = allocateBlock(last);
+				last = allocLast = last->next;
+			}
+		}
+	}
+	void push_back(T const &value) {
+		auto dstBlock = last;
+		while (dstBlock && (dstBlock->availableSpace() == 0)) {
+			dstBlock = dstBlock->next;
+		}
+
+		if (!dstBlock) {
+			dstBlock = last = allocLast = allocateBlock(allocLast);
+		}
+		new (dstBlock->end++) T(value);
+	}
+	umm size() const {
+		umm totalSize = 0;
+		for (auto block = &first; block != 0; block = block->next) {
+			totalSize += block->size();
+		}
+		return totalSize;
+	}
+	bool empty() const { return (last == &first) && (first.size() == 0); }
+
+	T &back() { return last->end[-1].value; }
+	T const &back() const { return last->end[-1].value; }
+
+	void pop_back() {
+		if (last == &first)
+			TL_BOUNDS_CHECK(first.size());
+
+		(last->end--)[-1].value.~T();
+		if (last->end == last->buffer && last != &first) {
+			last = last->previous;
+		}
+	}
+
+	template <class Fn>
+	void stream(Fn &&fn) const {
+		auto block = &first;
+		do {
+			auto blockSize = block->size();
+			if (blockSize) {
+				fn(block->buffer, blockSize);
+			}
+			block = block->next;
+		} while (block);
+	}
+
+private:
+	Block *allocateBlock(Block *previous) {
+		Block *result = construct(allocate<Block, Allocator>());
+		result->previous = previous;
+		return result;
+	}
+};
+
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct LinkedList {
 	struct Node {
 		T value;
@@ -551,6 +613,22 @@ template <class T>
 void erase(UnorderedList<T> &list, T *val) {
 	list.erase(val);
 }
+
+template <class T>
+umm indexOf(List<T> const &list, T const *value) {
+	return value - list._begin;
+}
+
+template <class T>
+umm indexOf(UnorderedList<T> const &list, T const *value) {
+	return value - list._begin;
+}
+
+template <class T, umm capacity>
+umm indexOf(StaticList<T, capacity> const &list, T const *value) {
+	return value - list._begin;
+}
+
 #pragma warning(pop)
 
 }

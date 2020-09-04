@@ -5,7 +5,14 @@
 
 namespace TL {
 
-template <class Allocator = OsAllocator>
+inline wchar *copyString(wchar const *str, Allocator allocator = osAllocator) {
+	umm size = (length(str) + 1) * sizeof(wchar);
+	wchar *result = (wchar *)allocator.allocate(size);
+	memcpy(result, str, size);
+	return result;
+}
+
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
 struct String : List<char, Allocator> {
 	using Base = List;
 	String() = default;
@@ -16,6 +23,9 @@ struct String : List<char, Allocator> {
 	String(char const *str) : Base(str, strlen(str)) {}
 	String &operator=(String const &that) = default;
 	String &operator=(String &&that) = default;
+	String &operator=(char const *str) {
+		set(StringView(str, strlen(str)));
+	}
 	String &set(Span<char const> span) { return Base::set(span), *this; }
 	void append(StringView str) {
 		auto requiredSize = size() + str.size();
@@ -47,25 +57,25 @@ struct String : List<char, Allocator> {
 };
 
 template <class Allocator, class T>
-String<Allocator> toString(T const &val, Fmt::Flags fmt = {}) {
+String<Allocator> toString(T const &val) {
 	String<Allocator> result;
 	toString([&](char const *src, umm length) {
 		result.resize(length);
 		memcpy(result.data(), src, length);
 		return StringSpan();
-	}, val, fmt); 
+	}, val); 
 	return result;
 }
 
 template <class Allocator, class T>
-String<Allocator> toStringNT(T const &val, Fmt::Flags fmt = {}) {
+String<Allocator> toStringNT(T const &val) {
 	String<Allocator> result;
 	toString([&](char const *src, umm length) {
 		result.resize(length + 1);
 		memcpy(result.data(), src, length);
 		result[length] = '\0';
 		return StringSpan();
-	}, val, fmt); 
+	}, val); 
 	return result;
 }
 
@@ -94,7 +104,7 @@ inline Optional<u64> parseDecimal(StringView s) {
 	return result;
 }
 
-template <class Allocator = OsAllocator, umm blockSize_ = 4096>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096>
 struct StringBuilder {
 	using String = String<Allocator>;
 	static constexpr umm blockSize = blockSize_;
@@ -169,8 +179,30 @@ struct StringBuilder {
 		return span.size();
 	}
 	umm append(char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
-	umm append(char c) { return append(Span{&c, 1}); }
-	
+	umm append(char ch, umm count = 1) {
+		umm charsToWrite = count;
+		while (last->availableSpace() < charsToWrite) {
+			umm spaceInBlock = last->availableSpace();
+			memset(last->end, ch, spaceInBlock);
+			charsToWrite -= spaceInBlock;
+			last->end += spaceInBlock;
+			last = last->next;
+			if (!last) {
+				last = allocLast = allocateBlock();
+			}
+		}
+		memset(last->end, ch, charsToWrite);
+		last->end += charsToWrite;
+		return count;
+	}
+	umm appendBytes(void const *address, umm size) {
+		append(Span((char *)address, (char *)address + size));
+		return size;
+	}
+	template <class T>
+	umm appendBytes(T const &value) {
+		return appendBytes(std::addressof(value), sizeof(value));
+	}
 	umm appendFormat(char const *fmt) {
 		return append(Span{fmt, strlen(fmt)});
 	}
@@ -184,13 +216,6 @@ struct StringBuilder {
 
 		bool argAsFormat = false;
 		
-		bool usePrecision = false;
-		u32 precision = 5;
-		
-		bool useAlign = false;
-		u32 align = 0;
-		bool alignRight = false;
-
 		while (*c) {
 			if (*c == '{') {
 				fmtBegin = c;
@@ -203,56 +228,14 @@ struct StringBuilder {
 					continue;
 				}
 				if (*c == '}') {
-					fmtEnd = c + 1;
-					break;
+					c += 1;
+				} else if (startsWith(c, "fmt}")) {
+					argAsFormat = true;
+					c += 4;
+				} else {
+					INVALID_CODE_PATH("bad format");
 				}
-				auto parseU32 = [&] {
-					char const *numStart = c;
-					while (*c != '}' && *c != ',') {
-						++c;
-					}
-					ASSERT(numStart != c, "invalid format: missing number after ':'");
-					auto parsed = parseDecimal(StringView(numStart, c));
-					ASSERT(parsed.has_value(), "invalid format: expected a number after ':'");
-					ASSERT(parsed.value() <= 0xFFFF, "number too big");
-					return (u32)parsed.value();
-				};
-				for (;;) { 
-					if (startsWith(c, "fmt")) {
-						ASSERT(!usePrecision, "'p' and 'fmt' cannot be used together");
-						argAsFormat = true;
-						c += 3;
-					} else if (*c == 'p') {
-						ASSERT(!argAsFormat, "'p' and 'fmt' cannot be used together");
-						usePrecision = true;
-						++c;
-						ASSERT(*c == ':', "invalid format: missing ':' after align");
-						++c;
-						precision = parseU32();
-					} else if (*c == 'a') {
-						useAlign = true;
-						++c;
-						if (*c == 'r') {
-							alignRight = true;
-						} else if (*c == 'l') {
-							alignRight = false;
-						} else {
-							INVALID_CODE_PATH("invalid format: bad align");
-						}
-						++c;
-						ASSERT(*c == ':', "invalid format: missing ':' after align");
-						++c;
-						align = parseU32();
-					} else {
-						INVALID_CODE_PATH("invalid format");
-					}
-					if (*c == '}') {
-						fmtEnd = c + 1;
-						break;
-					}
-					ASSERT(*c == ',', "expected ',' after format option");
-					++c;
-				}
+				fmtEnd = c;
 				break;
 			}
 			++c;
@@ -264,57 +247,19 @@ struct StringBuilder {
 
 		umm charsAppended = append(Span{fmt, fmtBegin});
 
-		auto appendArg = [&] (auto &builder) {
-			umm result;
-			if (argAsFormat) {
-				if constexpr (isSame<RemoveReference<Arg>, char const *> || isSame<RemoveReference<Arg>, char *>)
-					result = builder.appendFormat(arg, args...);
-				else 
-					INVALID_CODE_PATH("'{fmt}' arg is not a string");
-			} else {
-				if (usePrecision) {
-					toString([&] (char const *src, umm length) {
-						result = length;
-						builder.append(Span{src, length});
-						return StringSpan();
-					}, arg, Fmt::precision(precision));
-				} else {
-					toString([&] (char const *src, umm length) {
-						result = length;
-						builder.append(Span{src, length});
-						return StringSpan();
-					}, arg);
-				}
-			}
-			charsAppended += result;
-			return result;
-		};
-		
-		if (align) {
-			if (alignRight) {
-				StringBuilder temp;
-				umm argLen = appendArg(temp);
-				if (align > argLen) {
-					umm spaceCount = align - argLen;
-					for (umm i = 0; i < spaceCount; ++i) {
-						append(' ');
-					}
-					charsAppended += spaceCount;
-				}
-				append(temp.get());
-			} else {
-				umm argLen = appendArg(*this);
-				if (align > argLen) {
-					umm spaceCount = align - argLen;
-					for (umm i = 0; i < spaceCount; ++i) {
-						append(' ');
-					}
-					charsAppended += spaceCount;
-				}
-			}
+		if (argAsFormat) {
+			if constexpr (isSame<RemoveReference<Arg>, char const *> || isSame<RemoveReference<Arg>, char *>)
+				charsAppended += appendFormat(arg, args...);
+			else 
+				INVALID_CODE_PATH("'{fmt}' arg is not a string");
 		} else {
-			appendArg(*this);
+			toString([&] (char const *src, umm length) {
+				charsAppended += length;
+				append(Span{src, length});
+				return StringSpan();
+			}, arg);
 		}
+
 		charsAppended += appendFormat(fmtEnd, args...);
 		return charsAppended;
 	}
@@ -343,6 +288,18 @@ struct StringBuilder {
 	}
 	String getTerminated() { return get(true); }
 
+	template <class Fn>
+	void stream(Fn &&fn) {
+		Block *block = &first;
+		do {
+			auto blockSize = block->size();
+			if (blockSize) {
+				fn(block->buffer, blockSize);
+			}
+			block = block->next;
+		} while (block);
+	}
+
 private:
 	Block *allocateBlock() { return construct(allocate<Block, Allocator>()); }
 };
@@ -352,14 +309,14 @@ private:
 // {ar:N} - align right, N is width				format("{ar:3}", 5)						"  5"
 // {al:N} - align left, N is width				format("{al:3}", 5)						"5  "
 // {fmt} - append an argument as a format		format("{} {fmt}", 1, "{} {}", 2, 3)	"1 2 3"		NOTE: this option should be last in the format string
-template <class Allocator = OsAllocator, class ...Args>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
 String<Allocator> format(char const *fmt, Args const &...args) {
 	StringBuilder<Allocator> builder;
 	builder.appendFormat(fmt, args...);
 	return builder.get();
 }
 
-template <class Allocator = OsAllocator, class ...Args>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
 String<Allocator> formatAndTerminate(char const *fmt, Args const &...args) {
 	StringBuilder<Allocator> builder;
 	builder.appendFormat(fmt, args...);
