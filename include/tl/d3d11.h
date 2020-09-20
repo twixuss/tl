@@ -2,11 +2,15 @@
 #include "thread.h"
 
 #if OS_WINDOWS
+#pragma warning(push, 0)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d3d11.h>
 #include <d3d11_3.h>
 #include <d3dcompiler.h>
+#pragma warning(pop)
+#pragma warning(push)
+#pragma warning(disable: 4820)
 
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "d3dcompiler")
@@ -50,8 +54,27 @@ struct RenderTexture {
 	ID3D11Texture2D *tex;
 };
 
+void release(StructuredBuffer v) {
+	TL_COM_RELEASE(v.buffer);
+	TL_COM_RELEASE(v.srv);
+}
+void release(RenderTarget v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(Texture v) {
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(RenderTexture v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
+}
+
 void defaultShaderHandler(HRESULT result, char const *messages) {
 	ASSERT(SUCCEEDED(result));
+	(void)messages;
 }
 
 struct State {
@@ -283,25 +306,8 @@ u32 getBitsPerPixel(DXGI_FORMAT format) {
 
         default:
             return 0;
+#pragma warning(suppress: 4061)
     }
-}
-
-void release(StructuredBuffer v) {
-	TL_COM_RELEASE(v.buffer);
-	TL_COM_RELEASE(v.srv);
-}
-void release(RenderTarget v) {
-	TL_COM_RELEASE(v.rtv);
-	TL_COM_RELEASE(v.tex);
-}
-void release(Texture v) {
-	TL_COM_RELEASE(v.srv);
-	TL_COM_RELEASE(v.tex);
-}
-void release(RenderTexture v) {
-	TL_COM_RELEASE(v.rtv);
-	TL_COM_RELEASE(v.srv);
-	TL_COM_RELEASE(v.tex);
 }
 
 void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
@@ -404,12 +410,12 @@ Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void con
 		D3D11_TEXTURE2D_DESC d = {};
 		d.Format = format;
 		d.ArraySize = 1;
-		d.BindFlags = D3D11_BIND_SHADER_RESOURCE | (generateMips ? D3D11_BIND_RENDER_TARGET : 0);
+		d.BindFlags = D3D11_BIND_SHADER_RESOURCE | (generateMips ? D3D11_BIND_RENDER_TARGET : 0u);
 		d.Width = width;
 		d.Height = height;
-		d.MipLevels = generateMips ? 0 : 1;
+		d.MipLevels = generateMips ? 0u : 1u;
 		d.SampleDesc = {1, 0};
-		d.MiscFlags = generateMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+		d.MiscFlags = generateMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0u;
 
 		if (data) {
 			D3D11_SUBRESOURCE_DATA initialData{};
@@ -422,7 +428,7 @@ Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void con
 	}
 	D3D11_SHADER_RESOURCE_VIEW_DESC d = {};
 	d.Format = format;
-	d.Texture2D.MipLevels = generateMips ? -1 : 1;
+	d.Texture2D.MipLevels = generateMips ? ~0u : 1u;
 	d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 
 	TL_HRESULT_HANDLER(device->CreateShaderResourceView(result.tex, &d, &result.srv));
@@ -488,4 +494,5 @@ void State::createBackBuffer() {
     TL_HRESULT_HANDLER(device->CreateRenderTargetView(backBuffer.tex, 0, &backBuffer.rtv));
 }
 }}
+#pragma warning(pop)
 #endif

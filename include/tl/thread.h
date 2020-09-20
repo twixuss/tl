@@ -11,10 +11,10 @@
 
 namespace TL {
 
-FORCEINLINE void sleepMilliseconds(u32 milliseconds);
-FORCEINLINE void sleepSeconds(u32 seconds);
+TL_API void sleepMilliseconds(u32 milliseconds);
+TL_API void sleepSeconds(u32 seconds);
 #if OS_WINDOWS
-FORCEINLINE void switchThread();
+TL_API void switchThread();
 FORCEINLINE void spinIteration() { _mm_pause(); }
 
 FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
@@ -182,9 +182,9 @@ private:
 
 #if OS_WINDOWS
 
-FORCEINLINE void sleepMilliseconds(u32 milliseconds) { Sleep(milliseconds); }
-FORCEINLINE void sleepSeconds(u32 seconds) { Sleep(seconds * 1000); }
-FORCEINLINE void switchThread() { SwitchToThread(); }
+void sleepMilliseconds(u32 milliseconds) { Sleep(milliseconds); }
+void sleepSeconds(u32 seconds) { Sleep(seconds * 1000); }
+void switchThread() { SwitchToThread(); }
 
 ThreadHandle createThread(void (*fn)(void *), void *param) {
 	struct Data {

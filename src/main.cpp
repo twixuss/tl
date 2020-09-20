@@ -1,4 +1,5 @@
 #include "../include/tl/tl.h"
+#include "../include/tl/d3d11.h"
 using namespace TL;
 
 #pragma warning(push, 0)
@@ -614,7 +615,7 @@ struct Timer {
 void sort_test() {
 	List<u32> origList;
 	origList.resize(0x1000);
-	u32 const scale = 0x100000000 / origList.size();
+	u32 const scale = (u32)(0x100000000 / origList.size());
 	for (u32 i = 0; i < origList.size(); ++i)
 		origList[i] = i * scale;
 	std::shuffle(origList.begin(), origList.end(), std::mt19937{std::random_device{}()});
