@@ -127,7 +127,9 @@ struct State {
 			}
 		});
 	}
-    void setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin = 0, f32 depthMax = 1);
+    void setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax);
+	void setViewport(f32 x, f32 y, f32 w, f32 h) { setViewport(x, y, w, h, 0, 1); }
+	void setViewport(f32 w, f32 h) { setViewport(0, 0, w, h); }
 	void setRenderTarget(ID3D11RenderTargetView *renderTarget) { useContext([&] { immediateContext->OMSetRenderTargets(1, &renderTarget, 0); }); }
 	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv); }
 
