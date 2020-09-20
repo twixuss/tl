@@ -62,6 +62,7 @@ struct State {
 	ID3D11DeviceContext *immediateContext;
 	RenderTarget backBuffer;
 	RecursiveMutex immediateContextMutex;
+	u32 syncInterval = 1;
 
 	void createBackBuffer();
 	StructuredBuffer createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage);
@@ -108,6 +109,10 @@ struct State {
 
 	void draw(u32 vertexCount, u32 offset = 0) { 
 		useContext([&] { immediateContext->Draw(vertexCount, offset); });
+	}
+
+	void present() {
+		swapChain->Present(syncInterval, 0);
 	}
 
 	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
