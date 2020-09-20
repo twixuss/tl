@@ -27,44 +27,90 @@ namespace TL {
 #include "undef_unsupported_intrinsics.inl"
 #endif
 
-#define _mm_castpi_ps(x) _mm_castsi128_ps(x)
-#define _mm_castps_pi(x) _mm_castps_si128(x)
-#define _mm_castpi_pd(x) _mm_castsi128_pd(x)
-#define _mm_castpd_pi(x) _mm_castpd_si128(x)
+#define s32x4_set _mm_setr_epi32
+#define s64x2_set _mm_setr_epi64x
+#define u64x2_set _mm_setr_epi64x
+
+#define f32x4_broadcast _mm_set1_ps
+#define s32x4_broadcast _mm_set1_epi32
+#define f64x2_broadcast _mm_set1_pd
+#define s64x2_broadcast _mm_set1_epi64x
+#define u32x4_broadcast(v) _mm_set1_epi32((s32)v)
+
+#define s32x4_get _mm_extract_epi32
+#define u32x4_get(v, i) ((u32)_mm_extract_epi32(v, i))
+#define s64x2_get _mm_extract_epi64
+#define u64x2_get(v, i) ((u64)_mm_extract_epi64(v, i))
+
+#define s32x4_add _mm_add_epi32
+#define s32x4_sub _mm_sub_epi32
+#define s32x4_mul _mm_mullo_epi32
+#define s64x2_add _mm_add_epi64
+#define s64x2_sub _mm_sub_epi64
+
+#define _mm_castpi_ps _mm_castsi128_ps
+#define _mm_castps_pi _mm_castps_si128
+#define _mm_castpi_pd _mm_castsi128_pd
+#define _mm_castpd_pi _mm_castpd_si128
 #define _mm_setzero_pi() _mm_setzero_si128()
 #define _mm_xor_pi(a, b) _mm_castps_pi(_mm_xor_ps(_mm_castpi_ps(a), _mm_castpi_ps(b)))
 #define _mm_blendv_epi32(a, b, m) _mm_castps_pi(_mm_blendv_ps(_mm_castpi_ps(a), _mm_castpi_ps(b), _mm_castpi_ps(m)))
-#define _mm_slli_pi(a, b) _mm_slli_si128(a, b)
+#define _mm_slli_pi _mm_slli_si128
 #define _mm_setone_ps() _mm_castpi_ps(_mm_set1_epi8(0xFF))
 #define _mm_setone_pd() _mm_castpi_pd(_mm_set1_epi8(0xFF))
-#define _mm_not_ps(x) _mm_xor_ps(x, _mm_setone_ps())
-#define _mm_not_epi32_ps(x) _mm_not_ps(_mm_castpi_ps(x))
-#define _mm_not_epi32(x) _mm_castps_pi(_mm_not_epi32_ps(x))
-#define _mm_cmplt_epi32(a, b) _mm_cmpgt_epi32(b, a)
-#define _mm_cmple_epi32(a, b) _mm_not_epi32(_mm_cmpgt_epi32(a, b))
-#define _mm_cmpge_epi32(a, b) _mm_not_epi32(_mm_cmpgt_epi32(b, a))
-#define _mm_cmpne_epi32(a, b) _mm_not_epi32(_mm_cmpeq_epi32(b, a))
-#define _mm_cmpgt_epu32(a, b) _mm_cmpgt_epi32(_mm_xor_pi(a, _mm_set1_epi32(0x80000000)), _mm_xor_pi(b, _mm_set1_epi32(0x80000000)))
-#define _mm_slliv_epi32(a, b) _mm_setr_epi32(a << _mm_extract_epi32(b, 0), a << _mm_extract_epi32(b, 1), a << _mm_extract_epi32(b, 2), a << _mm_extract_epi32(b, 3))
-#define _mm_sraiv_epi32(a, b) _mm_setr_epi32(a >> _mm_extract_epi32(b, 0), a >> _mm_extract_epi32(b, 1), a >> _mm_extract_epi32(b, 2), a >> _mm_extract_epi32(b, 3))
-#define _mm_srliv_epi32(a, b) _mm_setr_epi32((u32)a >> (u32)_mm_extract_epi32(b, 0), (u32)a >> (u32)_mm_extract_epi32(b, 1), (u32)a >> (u32)_mm_extract_epi32(b, 2), (u32)a >> (u32)_mm_extract_epi32(b, 3))
 
-#define _mm256_castpi_ps(x) _mm256_castsi256_ps(x)
-#define _mm256_castps_pi(x) _mm256_castps_si256(x)
-#define _mm256_castpi_pd(x) _mm256_castsi256_pd(x)
-#define _mm256_castpd_pi(x) _mm256_castpd_si256(x)
+#define m16_xor _mm_xor_ps
+#define m16_and _mm_and_ps
+#define m16_or  _mm_or_ps
+#define m16_not(x) m16_xor(x, _mm_setone_ps())
+#define m16_not_pi(x) _mm_castps_pi(m16_not(_mm_castpi_ps(x)))
+
+#define s32x4_eq _mm_cmpeq_epi32
+#define s32x4_ne(a, b) m16_not_pi(s32x4_eq(b, a))
+#define s32x4_gt _mm_cmpgt_epi32
+#define s32x4_lt(a, b) s32x4_gt(b, a)
+#define s32x4_le(a, b) m16_not_pi(s32x4_gt(a, b))
+#define s32x4_ge(a, b) m16_not_pi(s32x4_lt(a, b))
+
+#define s64x2_eq _mm_cmpeq_epi64
+#define s64x2_ne(a, b) m16_not_pi(s64x2_eq(b, a))
+#define s64x2_gt _mm_cmpgt_epi64
+#define s64x2_lt(a, b) s64x2_gt(b, a)
+#define s64x2_le(a, b) m16_not_pi(s64x2_gt(a, b))
+#define s64x2_ge(a, b) m16_not_pi(s64x2_lt(a, b))
+
+#define u32x4_eq s32x4_eq
+#define u32x4_ne s32x4_ne
+#define u32x4_gt(a, b) s32x4_gt(_mm_xor_pi(a, _mm_set1_epi32(0x80000000)), _mm_xor_pi(b, _mm_set1_epi32(0x80000000)))
+#define u32x4_lt(a, b) u32x4_gt(b, a)
+#define u32x4_le(a, b) m16_not_pi(u32x4_gt(a, b))
+#define u32x4_ge(a, b) m16_not_pi(u32x4_lt(a, b))
+
+#define _mm256_castpi_ps _mm256_castsi256_ps
+#define _mm256_castps_pi _mm256_castps_si256
+#define _mm256_castpi_pd _mm256_castsi256_pd
+#define _mm256_castpd_pi _mm256_castpd_si256
 #define _mm256_setzero_pi() _mm256_setzero_si256()
 #define _mm256_xor_pi(a, b) _mm256_castps_pi(_mm256_xor_ps(_mm256_castpi_ps(a), _mm256_castpi_ps(b)))
 #define _mm256_setone_ps() _mm256_castpi_ps(_mm256_set1_epi8(0xFF))
 #define _mm256_setone_pd() _mm256_castpi_pd(_mm256_set1_epi8(0xFF))
-#define _mm256_not_ps(x) _mm256_xor_ps(x, _mm256_setone_ps())
-#define _mm256_not_epi32_ps(x) _mm256_not_ps(_mm256_castpi_ps(x))
-#define _mm256_not_epi32(x) _mm256_castps_pi(_mm256_not_epi32_ps(x))
-#define _mm256_cmplt_epi32(a, b) _mm256_cmpgt_epi32(b, a)
-#define _mm256_cmple_epi32(a, b) _mm256_not_epi32(_mm256_cmpgt_epi32(a, b))
-#define _mm256_cmpge_epi32(a, b) _mm256_not_epi32(_mm256_cmpgt_epi32(b, a))
-#define _mm256_cmpne_epi32(a, b) _mm256_not_epi32(_mm256_cmpeq_epi32(b, a))
-#define _mm256_cmpgt_epu32(a, b) _mm256_cmpgt_epi32(_mm256_xor_pi(a, _mm256_set1_epi32(0x80000000)), _mm256_xor_pi(b, _mm256_set1_epi32(0x80000000)))
+#define m32_not_ps(x) _mm256_xor_ps(x, _mm256_setone_ps())
+#define m32_not_pi(x) _mm256_castps_pi(m32_not_ps(_mm256_castpi_ps(x)))
+
+#define s32x8_eq _mm256_cmpeq_epi32
+#define s32x8_gt _mm256_cmpgt_epi32
+#define s32x8_lt(a, b) s32x8_gt(b, a)
+#define s32x8_le(a, b) m32_not_pi(s32x8_gt(a, b))
+#define s32x8_ge(a, b) m32_not_pi(s32x8_lt(a, b))
+#define s32x8_ne(a, b) m32_not_pi(_mm256_cmpeq_epi32(b, a))
+
+#define u32x8_eq s32x8_eq
+#define u32x8_ne s32x8_ne
+#define u32x8_gt(a, b) s32x8_gt(_mm256_xor_pi(a, _mm256_set1_epi32(0x80000000)), _mm256_xor_pi(b, _mm256_set1_epi32(0x80000000)))
+#define u32x8_lt(a, b) u32x8_gt(b, a)
+#define u32x8_le(a, b) m32_not_pi(u32x8_gt(a, b))
+#define u32x8_ge(a, b) m32_not_pi(u32x8_lt(a, b))
+
 #define _mm256_slliv_epi32(a, b) _mm256_setr_epi32(a << _mm256_extract_epi32(b, 0), a << _mm256_extract_epi32(b, 1), a << _mm256_extract_epi32(b, 2), a << _mm256_extract_epi32(b, 3), a << _mm256_extract_epi32(b, 4), a << _mm256_extract_epi32(b, 5), a << _mm256_extract_epi32(b, 6), a << _mm256_extract_epi32(b, 7))
 #define _mm256_sraiv_epi32(a, b) _mm256_setr_epi32(a >> _mm256_extract_epi32(b, 0), a >> _mm256_extract_epi32(b, 1), a >> _mm256_extract_epi32(b, 2), a >> _mm256_extract_epi32(b, 3), a >> _mm256_extract_epi32(b, 4), a >> _mm256_extract_epi32(b, 5), a >> _mm256_extract_epi32(b, 6), a >> _mm256_extract_epi32(b, 7))
 #define _mm256_srliv_epi32(a, b) _mm256_setr_epi32((u32)a >> (u32)_mm256_extract_epi32(b, 0), (u32)a >> (u32)_mm256_extract_epi32(b, 1), (u32)a >> (u32)_mm256_extract_epi32(b, 2), (u32)a >> (u32)_mm256_extract_epi32(b, 3), (u32)a >> (u32)_mm256_extract_epi32(b, 4), (u32)a >> (u32)_mm256_extract_epi32(b, 5), (u32)a >> (u32)_mm256_extract_epi32(b, 6), (u32)a >> (u32)_mm256_extract_epi32(b, 7))
@@ -72,71 +118,159 @@ namespace TL {
 #define _mm_cvtipd_epi32(x) _mm_cvtpd_epi32(_mm_round_pd(x, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC))
 #define _mm256_cvtipd_epi32(x) _mm256_cvtpd_epi32(_mm256_round_pd(x, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC))
 
-#if !ARCH_AVX2
-#ifdef _mm_sllv_epi32
-#undef _mm_sllv_epi32
-#endif
-#ifdef _mm_srav_epi32
-#undef _mm_srav_epi32
-#endif
-#ifdef _mm_srlv_epi32
-#undef _mm_srlv_epi32
-#endif
-#ifdef _mm256_sllv_epi32
-#undef _mm256_sllv_epi32
-#endif
-#ifdef _mm256_srav_epi32
-#undef _mm256_srav_epi32
-#endif
-#ifdef _mm256_srlv_epi32
-#undef _mm256_srlv_epi32
+#if ARCH_AVX
+#define f32x8_set _mm256_setr_ps
+#define s32x8_set _mm256_setr_epi32
+#define u32x8_set _mm256_setr_epi32
+
+#define f32x8_broadcast _mm256_set1_ps
+#define s32x8_broadcast _mm256_set1_epi32
+#define u32x8_broadcast(v) _mm256_set1_epi32((s32)v)
+
+#define f64x4_broadcast _mm256_set1_pd
+#define s64x4_broadcast _mm256_set1_epi64x
+#define u64x4_broadcast(v) _mm256_set1_epi64x((s32)v)
+
+#define s32x8_get _mm256_extract_epi32
+#define u32x8_get(v, i) ((u32)_mm256_extract_epi32(v, i))
+
+#define f32x4_lt(a, b) _mm_cmp_ps(a, b, _CMP_LT_OQ)
+#define f32x4_gt(a, b) _mm_cmp_ps(a, b, _CMP_GT_OQ)
+#define f32x4_le(a, b) _mm_cmp_ps(a, b, _CMP_LE_OQ)
+#define f32x4_ge(a, b) _mm_cmp_ps(a, b, _CMP_GE_OQ)
+#define f32x4_eq(a, b) _mm_cmp_ps(a, b, _CMP_EQ_OQ)
+#define f32x4_ne(a, b) _mm_cmp_ps(a, b, _CMP_NEQ_OQ)
+#define f64x2_lt(a, b) _mm_cmp_pd(a, b, _CMP_LT_OQ)
+#define f64x2_gt(a, b) _mm_cmp_pd(a, b, _CMP_GT_OQ)
+#define f64x2_le(a, b) _mm_cmp_pd(a, b, _CMP_LE_OQ)
+#define f64x2_ge(a, b) _mm_cmp_pd(a, b, _CMP_GE_OQ)
+#define f64x2_eq(a, b) _mm_cmp_pd(a, b, _CMP_EQ_OQ)
+#define f64x2_ne(a, b) _mm_cmp_pd(a, b, _CMP_NEQ_OQ)
+#else
+#define f32x4_lt _mm_cmplt_ps 
+#define f32x4_gt _mm_cmpgt_ps 
+#define f32x4_le _mm_cmple_ps 
+#define f32x4_ge _mm_cmpge_ps 
+#define f32x4_eq _mm_cmpeq_ps 
+#define f32x4_ne _mm_cmpneq_ps
+#define f64x2_lt _mm_cmplt_pd 
+#define f64x2_gt _mm_cmpgt_pd 
+#define f64x2_le _mm_cmple_pd 
+#define f64x2_ge _mm_cmpge_pd 
+#define f64x2_eq _mm_cmpeq_pd 
+#define f64x2_ne _mm_cmpneq_pd
 #endif
 
+#define i32x4_sli _mm_slli_epi32
+#define s32x4_sri _mm_srai_epi32
+#define u32x4_sri _mm_srli_epi32
+#define i32x4_sil(a, b) i32x4_sl(s32x4_broadcast(a), b)
+#define s32x4_sir(a, b) s32x4_sr(s32x4_broadcast(a), b)
+#define u32x4_sir(a, b) u32x4_sr(u32x4_broadcast(a), b)
 
-#define _mm_sllv_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) << _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) << _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) << _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) << _mm_extract_epi32(b, 3))
-#define _mm_srav_epi32(a, b)  _mm_setr_epi32(_mm_extract_epi32(a, 0) >> _mm_extract_epi32(b, 0), _mm_extract_epi32(a, 1) >> _mm_extract_epi32(b, 1), _mm_extract_epi32(a, 2) >> _mm_extract_epi32(b, 2), _mm_extract_epi32(a, 3) >> _mm_extract_epi32(b, 3))
-#define _mm_srlv_epi32(a, b)  _mm_setr_epi32((u32)_mm_extract_epi32(a, 0) >> (u32)_mm_extract_epi32(b, 0), (u32)_mm_extract_epi32(a, 1) >> (u32)_mm_extract_epi32(b, 1), (u32)_mm_extract_epi32(a, 2) >> (u32)_mm_extract_epi32(b, 2), (u32)_mm_extract_epi32(a, 3) >> (u32)_mm_extract_epi32(b, 3))
+#if ARCH_AVX2
+#define i32x8_sli _mm256_slli_epi32
+#define s32x8_sri _mm256_srai_epi32
+#define u32x8_sri _mm256_srli_epi32
 
-#define _mm256_sllv_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) << _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) << _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) << _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) << _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) << _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) << _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) << _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) << _mm256_extract_epi32(b, 7))
-#define _mm256_srav_epi32(a, b)  _mm256_setr_epi32(_mm256_extract_epi32(a, 0) >> _mm256_extract_epi32(b, 0), _mm256_extract_epi32(a, 1) >> _mm256_extract_epi32(b, 1), _mm256_extract_epi32(a, 2) >> _mm256_extract_epi32(b, 2), _mm256_extract_epi32(a, 3) >> _mm256_extract_epi32(b, 3), _mm256_extract_epi32(a, 4) >> _mm256_extract_epi32(b, 4), _mm256_extract_epi32(a, 5) >> _mm256_extract_epi32(b, 5), _mm256_extract_epi32(a, 6) >> _mm256_extract_epi32(b, 6), _mm256_extract_epi32(a, 7) >> _mm256_extract_epi32(b, 7))
-#define _mm256_srlv_epi32(a, b)  _mm256_setr_epi32((u32)_mm256_extract_epi32(a, 0) >> (u32)_mm256_extract_epi32(b, 0), (u32)_mm256_extract_epi32(a, 1) >> (u32)_mm256_extract_epi32(b, 1), (u32)_mm256_extract_epi32(a, 2) >> (u32)_mm256_extract_epi32(b, 2), (u32)_mm256_extract_epi32(a, 3) >> (u32)_mm256_extract_epi32(b, 3), (u32)_mm256_extract_epi32(a, 4) >> (u32)_mm256_extract_epi32(b, 4), (u32)_mm256_extract_epi32(a, 5) >> (u32)_mm256_extract_epi32(b, 5), (u32)_mm256_extract_epi32(a, 6) >> (u32)_mm256_extract_epi32(b, 6), (u32)_mm256_extract_epi32(a, 7) >> (u32)_mm256_extract_epi32(b, 7))
+#define b256_cmpeq(a, b) (_mm256_cmpeq_epi8(_mm256_castps_pi(a), _mm256_castps_pi(b)))
+#define i32x4_sl _mm_sllv_epi32
+#define s32x4_sr _mm_srav_epi32
+#define u32x4_sr _mm_srlv_epi32
+#define i64x2_sl _mm_sllv_epi64
+#define u64x2_sr _mm_srlv_epi64
+#define i32x8_sl _mm256_sllv_epi32
+#define s32x8_sr _mm256_srav_epi32
+#define u32x8_sr _mm256_srlv_epi32
+#define i32x8_sli _mm256_slli_epi32
+#define s32x8_sri _mm256_srai_epi32
+#define u32x8_sri _mm256_srli_epi32
+#define i32x8_sil(a, b) i32x8_sl(s32x8_broadcast(a), b)
+#define s32x8_sir(a, b) s32x8_sr(s32x8_broadcast(a), b)
+#define u32x8_sir(a, b) u32x8_sr(u32x8_broadcast(a), b)
+#else
+#define b256_cmpeq(a, b) (m32_not_ps(_mm256_xor_ps(a, b)))
+#define i32x4_sl(a, b) s32x4_set(s32x4_get(a, 0) << s32x4_get(b, 0), s32x4_get(a, 1) << s32x4_get(b, 1), s32x4_get(a, 2) << s32x4_get(b, 2), s32x4_get(a, 3) << s32x4_get(b, 3))
+#define s32x4_sr(a, b) s32x4_set(s32x4_get(a, 0) >> s32x4_get(b, 0), s32x4_get(a, 1) >> s32x4_get(b, 1), s32x4_get(a, 2) >> s32x4_get(b, 2), s32x4_get(a, 3) >> s32x4_get(b, 3))
+#define u32x4_sr(a, b) s32x4_set(u32x4_get(a, 0) >> u32x4_get(b, 0), u32x4_get(a, 1) >> u32x4_get(b, 1), u32x4_get(a, 2) >> u32x4_get(b, 2), u32x4_get(a, 3) >> u32x4_get(b, 3))
+#define i64x2_sl(a, b) s64x2_set(s64x2_get(a, 0) << s64x2_get(b, 0), s64x2_get(a, 1) << s64x2_get(b, 1))
+#define u64x2_sr(a, b) s64x2_set(u64x2_get(a, 0) >> u64x2_get(b, 0), u64x2_get(a, 1) >> u64x2_get(b, 1))
+#define i32x8_sl(a, b) _mm256_setr_epi32(s32x8_get(a, 0) << s32x8_get(b, 0), s32x8_get(a, 1) << s32x8_get(b, 1), s32x8_get(a, 2) << s32x8_get(b, 2), s32x8_get(a, 3) << s32x8_get(b, 3), s32x8_get(a, 4) << s32x8_get(b, 4), s32x8_get(a, 5) << s32x8_get(b, 5), s32x8_get(a, 6) << s32x8_get(b, 6), s32x8_get(a, 7) << s32x8_get(b, 7))
+#define s32x8_sr(a, b) _mm256_setr_epi32(s32x8_get(a, 0) >> s32x8_get(b, 0), s32x8_get(a, 1) >> s32x8_get(b, 1), s32x8_get(a, 2) >> s32x8_get(b, 2), s32x8_get(a, 3) >> s32x8_get(b, 3), s32x8_get(a, 4) >> s32x8_get(b, 4), s32x8_get(a, 5) >> s32x8_get(b, 5), s32x8_get(a, 6) >> s32x8_get(b, 6), s32x8_get(a, 7) >> s32x8_get(b, 7))
+#define u32x8_sr(a, b) _mm256_setr_epi32(u32x8_get(a, 0) >> u32x8_get(b, 0), u32x8_get(a, 1) >> u32x8_get(b, 1), u32x8_get(a, 2) >> u32x8_get(b, 2), u32x8_get(a, 3) >> u32x8_get(b, 3), u32x8_get(a, 4) >> u32x8_get(b, 4), u32x8_get(a, 5) >> u32x8_get(b, 5), u32x8_get(a, 6) >> u32x8_get(b, 6), u32x8_get(a, 7) >> u32x8_get(b, 7))
 #endif
 
+#if ARCH_AVX512DQ && ARCH_AVX512VL
+#define s64x2_mul _mm_mullo_epi64
+#else
+#define s64x2_mul(a, b) s64x2_set(s64x2_get(a, 0) * s64x2_get(b, 0), s64x2_get(a, 1) * s64x2_get(b, 1))
+#endif
+
+#if ARCH_AVX512F && ARCH_AVX512VL
+#define s64x2_sr _mm_srav_epi64
+#define i64x2_sli _mm_slli_epi64
+#define s64x2_sri _mm_srai_epi64
+#define u64x2_sri _mm_srli_epi64
+#define i64x2_sil(a, b) i64x2_sl(s64x2_broadcast(a), b)
+#define s64x2_sir(a, b) s64x2_sr(s64x2_broadcast(a), b)
+#define u64x2_sir(a, b) u64x2_sr(u64x2_broadcast(a), b)
+#else
+#define s64x2_sr(a, b) s64x2_set(s64x2_get(a, 0) >> s64x2_get(b, 0), s64x2_get(a, 1) >> s64x2_get(b, 1))
+#define i64x2_sli(a, b) u64x2_set(u64x2_get(a, 0) << ((u64)b), u64x2_get(a, 1) << ((u64)b))
+#define s64x2_sri(a, b) s64x2_set(s64x2_get(a, 0) >> ((s64)b), s64x2_get(a, 1) >> ((s64)b))
+#define u64x2_sri(a, b) u64x2_set(u64x2_get(a, 0) >> ((u64)b), u64x2_get(a, 1) >> ((u64)b))
+#define i64x2_sil(a, b) u64x2_set(((u64)a) << u64x2_get(b, 0), ((u64)a) << u64x2_get(b, 1))
+#define s64x2_sir(a, b) s64x2_set(((s64)a) >> s64x2_get(b, 0), ((s64)a) >> s64x2_get(b, 1))
+#define u64x2_sir(a, b) u64x2_set(((u64)a) >> u64x2_get(b, 0), ((u64)a) >> u64x2_get(b, 1))
+#endif
 
 #if COMPILER_GCC
-#define _mm_div_epi32(a,b)                             \
+#define s32x4_div(a,b)                             \
 _mm_setr_epi32(                                        \
 	_mm_extract_epi32(a, 0) / _mm_extract_epi32(b, 0), \
 	_mm_extract_epi32(a, 1) / _mm_extract_epi32(b, 1), \
 	_mm_extract_epi32(a, 2) / _mm_extract_epi32(b, 2), \
 	_mm_extract_epi32(a, 3) / _mm_extract_epi32(b, 3)  \
 )
-#define _mm_rem_epi32(a,b)                             \
+#define s32x4_rem(a,b)                             \
 _mm_setr_epi32(                                        \
 	_mm_extract_epi32(a, 0) % _mm_extract_epi32(b, 0), \
 	_mm_extract_epi32(a, 1) % _mm_extract_epi32(b, 1), \
 	_mm_extract_epi32(a, 2) % _mm_extract_epi32(b, 2), \
 	_mm_extract_epi32(a, 3) % _mm_extract_epi32(b, 3)  \
 )
-#define _mm_div_epu32(a,b)                                       \
+#define u32x4_div(a,b)                                       \
 _mm_setr_epi32(                                                  \
 	(u32)_mm_extract_epi32(a, 0) / (u32)_mm_extract_epi32(b, 0), \
 	(u32)_mm_extract_epi32(a, 1) / (u32)_mm_extract_epi32(b, 1), \
 	(u32)_mm_extract_epi32(a, 2) / (u32)_mm_extract_epi32(b, 2), \
 	(u32)_mm_extract_epi32(a, 3) / (u32)_mm_extract_epi32(b, 3)  \
 )
-#define _mm_rem_epu32(a,b)                                       \
+#define u32x4_rem(a,b)                                       \
 _mm_setr_epi32(                                                  \
 	(u32)_mm_extract_epi32(a, 0) % (u32)_mm_extract_epi32(b, 0), \
 	(u32)_mm_extract_epi32(a, 1) % (u32)_mm_extract_epi32(b, 1), \
 	(u32)_mm_extract_epi32(a, 2) % (u32)_mm_extract_epi32(b, 2), \
 	(u32)_mm_extract_epi32(a, 3) % (u32)_mm_extract_epi32(b, 3)  \
 )
+#else
+#define s32x4_div _mm_div_epi32
+#define s32x4_rem _mm_rem_epi32
+#define u32x4_div _mm_div_epu32
+#define u32x4_rem _mm_rem_epu32
+#define s64x2_div _mm_div_epi64
+#define s64x2_rem _mm_rem_epi64
+#define u64x2_div _mm_div_epu64
+#define u64x2_rem _mm_rem_epu64
 #endif
 
 
 #define MM256_PERM128(a, b) ((a) | ((b) << 4))
 #define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
+
+#if ARCH_AVX2
+#else
+#endif
 
 union M16 {
 	__m128  ps;
@@ -224,12 +358,23 @@ FORCEINLINE constexpr To cvt(From v) {
 } // namespace CE
 
 // clang-format off
-template<umm> union b32x; using b32x1 = b32x<1>; using b32x4 = b32x<4>; using b32x8 = b32x<8>;
-template<umm> union f32x; using f32x1 = f32x<1>; using f32x4 = f32x<4>; using f32x8 = f32x<8>;
-template<umm> union s32x; using s32x1 = s32x<1>; using s32x4 = s32x<4>; using s32x8 = s32x<8>;
-template<umm> union u32x; using u32x1 = u32x<1>; using u32x4 = u32x<4>; using u32x8 = u32x<8>;
-template<umm> union b64x; using b64x2 = b64x<2>; using b64x4 = b64x<4>;
-template<umm> union f64x; using f64x2 = f64x<2>; using f64x4 = f64x<4>;
+template<umm> union b32x;
+template<umm> union f32x;
+template<umm> union s32x;
+template<umm> union u32x;
+template<umm> union b64x;
+template<umm> union f64x;
+template<umm> union s64x;
+template<umm> union u64x;
+
+ using b32x1 = b32x<1>; using b32x2 = b32x<2>; using b32x4 = b32x<4>; using b32x8 = b32x<8>;
+ using f32x1 = f32x<1>; using f32x2 = f32x<2>; using f32x4 = f32x<4>; using f32x8 = f32x<8>;
+ using s32x1 = s32x<1>; using s32x2 = s32x<2>; using s32x4 = s32x<4>; using s32x8 = s32x<8>;
+ using u32x1 = u32x<1>; using u32x2 = u32x<2>; using u32x4 = u32x<4>; using u32x8 = u32x<8>;
+ using b64x1 = b64x<1>; using b64x2 = b64x<2>; using b64x4 = b64x<4>; using b64x8 = b64x<8>;
+ using f64x1 = f64x<1>; using f64x2 = f64x<2>; using f64x4 = f64x<4>; using f64x8 = f64x<8>;
+ using s64x1 = s64x<1>; using s64x2 = s64x<2>; using s64x4 = s64x<4>; using s64x8 = s64x<8>;
+ using u64x1 = u64x<1>; using u64x2 = u64x<2>; using u64x4 = u64x<4>; using u64x8 = u64x<8>;
 
 #if 0
 template<class, umm> union _v2;
@@ -309,10 +454,18 @@ template <class T>
 inline static constexpr umm widthOf = _widthOf<RemoveCVRef<T>>;
 
 // clang-format off
+template<umm width> inline static constexpr umm _widthOf<b32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<b64x<width>> = width;
+
 template<umm width> inline static constexpr umm _widthOf<f32x<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<s32x<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<u32x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<f64x<width>> = width;
+
+template<umm width> inline static constexpr umm _widthOf<s32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<s64x<width>> = width;
+
+template<umm width> inline static constexpr umm _widthOf<u32x<width>> = width;
+template<umm width> inline static constexpr umm _widthOf<u64x<width>> = width;
+
 template<umm width> inline static constexpr umm _widthOf<v2fx<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v2sx<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<v2ux<width>> = width;
@@ -340,66 +493,50 @@ template <umm width> struct HalfT<v4sx<width>> { using Type = v4sx<width/2>; };
 template <umm width> struct HalfT<v4ux<width>> { using Type = v4ux<width/2>; };
 template <class T> using Half = typename HalfT<T>::Type;
 
-FORCEINLINE f32x8 F32x8(f32x4, f32x4);
-FORCEINLINE s32x8 S32x8(s32x4, s32x4);
-FORCEINLINE u32x8 U32x8(u32x4, u32x4);
-FORCEINLINE f64x4 F64x4(f64x2, f64x2);
+FORCEINLINE constexpr b32x1 B32x1(b32 = 0);
+FORCEINLINE constexpr b64x1 B64x1(b64 = 0);
 
-template<umm width> FORCEINLINE b32x<width> B32x(b32 = false);
+template<umm width> FORCEINLINE b32x<width> B32x(b32 = 0);
 template<umm width> FORCEINLINE f32x<width> F32x(f32 = 0);
 template<umm width> FORCEINLINE s32x<width> S32x(s32 = 0);
 template<umm width> FORCEINLINE u32x<width> U32x(u32 = 0);
 
-FORCEINLINE constexpr b32x4 B32x4(__m128);
+FORCEINLINE b64x2 B64x2(b32 = 0);
 
-#if ARCH_AVX
-FORCEINLINE constexpr b32x8 B32x8(__m256);
-#else
-FORCEINLINE constexpr b32x8 B32x8(__m128, __m128);
-#endif
+FORCEINLINE b32x4 B32x4(b32 = 0);
+FORCEINLINE b64x4 B64x4(b32 = 0);
 
-FORCEINLINE constexpr f32x4 F32x4(__m128);
-FORCEINLINE constexpr s32x4 S32x4(__m128);
-FORCEINLINE constexpr u32x4 U32x4(__m128);
+FORCEINLINE b32x8 B32x8(b32 = 0);
 
-FORCEINLINE constexpr f32x4 F32x4(M16);
-FORCEINLINE constexpr s32x4 S32x4(M16);
-FORCEINLINE constexpr u32x4 U32x4(M16);
+#define Cx1(scl, con) FORCEINLINE constexpr scl##x1 con##x1(scl = 0)
+#define Cx2(scl, con) FORCEINLINE scl##x2 con##x2(scl = 0); FORCEINLINE scl##x2 con##x2(scl, scl)
+#define Cx4(scl, con) FORCEINLINE scl##x4 con##x4(scl = 0); FORCEINLINE scl##x4 con##x4(scl, scl, scl, scl); FORCEINLINE scl##x4 con##x4(scl##x2, scl##x2)
+#define Cx8(scl, con) FORCEINLINE scl##x8 con##x8(scl = 0); FORCEINLINE scl##x8 con##x8(scl, scl, scl, scl, scl, scl, scl, scl); FORCEINLINE scl##x8 con##x8(scl##x4, scl##x4)
+#define Cons(scl, con) Cx1(scl, con); Cx2(scl, con); Cx4(scl, con); Cx8(scl, con)
 
-FORCEINLINE constexpr f32x8 F32x8(M32);
-FORCEINLINE constexpr s32x8 S32x8(M32);
-FORCEINLINE constexpr u32x8 U32x8(M32);
+Cons(f32, F32);
+Cons(s32, S32);
+Cons(u32, U32);
+Cons(f64, F64);
+Cons(s64, S64);
+Cons(u64, U64);
 
-FORCEINLINE constexpr f64x2 F64x2(M16);
-//FORCEINLINE constexpr s64x2 S64x2(M16);
-//FORCEINLINE constexpr u64x2 U64x2(M16);
+#undef Cx1
+#undef Cx2
+#undef Cx4
+#undef Cx8
+#undef Cons
 
-FORCEINLINE constexpr f64x4 F64x4(M32);
-//FORCEINLINE constexpr s64x4 S64x4(M32);
-//FORCEINLINE constexpr u64x4 U64x4(M32);
-
-FORCEINLINE constexpr f32x1 F32x1(f32 = 0);
-FORCEINLINE constexpr s32x1 S32x1(s32 = 0);
-FORCEINLINE constexpr u32x1 U32x1(u32 = 0);
-
-FORCEINLINE f32x4 F32x4(f32 = 0);
-FORCEINLINE s32x4 S32x4(s32 = 0);
-FORCEINLINE u32x4 U32x4(u32 = 0);
-
-FORCEINLINE f64x2 F64x2(f64 = 0);
-FORCEINLINE f64x4 F64x4(f64 = 0);
-
-FORCEINLINE f32x8 F32x8(f32 = 0);
-FORCEINLINE s32x8 S32x8(s32 = 0);
-FORCEINLINE u32x8 U32x8(u32 = 0);
-
-FORCEINLINE f32x4 F32x4(f32, f32, f32, f32);
-FORCEINLINE s32x4 S32x4(s32, s32, s32, s32);
-FORCEINLINE u32x4 U32x4(u32, u32, u32, u32);
-
-FORCEINLINE f32x8 F32x8(f32, f32, f32, f32, f32, f32, f32, f32);
-FORCEINLINE s32x8 S32x8(s32, s32, s32, s32, s32, s32, s32, s32);
-FORCEINLINE u32x8 U32x8(u32, u32, u32, u32, u32, u32, u32, u32);
+#define ConV2\
+	FORCEINLINE constexpr v2f V2f(f32 = 0);\
+	FORCEINLINE constexpr v2f V2f(f32 x, f32 y);\
+	FORCEINLINE v2fx4 V2fx4(f32 = 0); FORCEINLINE constexpr v2fx4 V2fx4(f32x4);\
+	FORCEINLINE v2fx8 V2fx8(f32 = 0); FORCEINLINE constexpr v2fx8 V2fx8(f32x8 v);\
+	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32 = 0);\
+	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32, f32);\
+	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>);\
+	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>, f32x<ps>);\
+	template<umm ps> FORCEINLINE v2fx<ps> V2fx(v2f);
 
 FORCEINLINE constexpr v2f V2f(f32 = 0);
 FORCEINLINE constexpr v2s V2s(s32 = 0);
@@ -614,255 +751,19 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
 	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 
-struct TrueMask {
-	FORCEINLINE constexpr operator bool() const { return true; }
-	FORCEINLINE constexpr operator u8 () const { return ~0; }
-	FORCEINLINE constexpr operator u16() const { return ~0; }
-	FORCEINLINE constexpr operator u32() const { return ~0; }
-	FORCEINLINE constexpr operator u64() const { return ~0; }
-	FORCEINLINE constexpr operator s8 () const { return ~0; }
-	FORCEINLINE constexpr operator s16() const { return ~0; }
-	FORCEINLINE constexpr operator s32() const { return ~0; }
-	FORCEINLINE constexpr operator s64() const { return ~0; }
-	FORCEINLINE operator b32x4() const;
-	FORCEINLINE operator b32x8() const;
-	FORCEINLINE operator b64x2() const;
-	FORCEINLINE operator b64x4() const;
-};
-struct FalseMask {
-	FORCEINLINE constexpr operator bool() const { return false; }
-	FORCEINLINE constexpr operator u8 () const { return 0; }
-	FORCEINLINE constexpr operator u16() const { return 0; }
-	FORCEINLINE constexpr operator u32() const { return 0; }
-	FORCEINLINE constexpr operator u64() const { return 0; }
-	FORCEINLINE constexpr operator s8 () const { return 0; }
-	FORCEINLINE constexpr operator s16() const { return 0; }
-	FORCEINLINE constexpr operator s32() const { return 0; }
-	FORCEINLINE constexpr operator s64() const { return 0; }
-	FORCEINLINE operator b32x4() const;
-	FORCEINLINE operator b32x8() const;
-	FORCEINLINE operator b64x2() const;
-	FORCEINLINE operator b64x4() const;
-};
 
-inline static constexpr TrueMask trueMask;
-inline static constexpr FalseMask falseMask;
-
-#define OPERATORS_BOOL                                     \
-	FORCEINLINE Pack operator!() const { return ~*this; }            \
-	FORCEINLINE Pack operator&&(Pack b) const { return *this & b; }  \
-	FORCEINLINE Pack operator||(Pack b) const { return *this | b; }  \
-	FORCEINLINE Pack &operator^=(Pack b) { return *this = *this ^ b; } \
-	FORCEINLINE Pack &operator&=(Pack b) { return *this = *this & b; } \
-	FORCEINLINE Pack &operator|=(Pack b) { return *this = *this | b; } \
-	FORCEINLINE Scalar operator[](umm index) const { return s[index]; } \
-	FORCEINLINE Scalar &operator[](umm index) { return s[index]; }
-
-#define RETURN_T(t,x)    t result{}; result = x; return result
-#define RETURN_T2(t,x,y) t result{}; result.lo = x; result.hi = y; return result
+#define RETURN_T(t,x)    t _result{}; _result = x; return _result
+#define RETURN_T2(t,x,y) t _result{}; _result.lo = x; _result.hi = y; return _result
 #define RETURN(x)        RETURN_T(Pack,x)
 #define RETURN_2(x,y)    RETURN_T2(Pack,x,y)
 
-#define RETURN_MT(t,x)    t result{}; result.m = x; return result
-#define RETURN_MT2(t,x,y) t result{}; result.lo.m = x; result.hi.m = y; return result
+#define RETURN_MT(t,x)    t _result{}; _result.m = x; return _result
+#define RETURN_MT2(t,x,y) t _result{}; _result.lo.m = x; _result.hi.m = y; return _result
 #define RETURN_M(x)       RETURN_MT(Pack,x)
 #define RETURN_M2(x,y)    RETURN_MT2(Pack,x,y)
 
 #define RETURN_MASK(x)       RETURN_MT(Mask,x)
 
-#define FALLBACK_BOOL                                                                  \
-	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
-	FORCEINLINE Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
-	FORCEINLINE Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
-	FORCEINLINE Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
-	FORCEINLINE Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
-	FORCEINLINE Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
-
-template <>
-union b32x<1> {
-	using Scalar = b32;
-	using Pack = b32x;
-
-	Scalar s[1];
-	Scalar m;
-
-	FORCEINLINE b32x operator~() const { return {~m}; }
-	FORCEINLINE b32x operator==(b32x b) const { return {-(m == b.m)}; }
-	FORCEINLINE b32x operator!=(b32x b) const { return {-(m != b.m)}; }
-	FORCEINLINE b32x operator^ (b32x b) const { return {m ^ b.m}; }
-	FORCEINLINE b32x operator& (b32x b) const { return {m & b.m}; }
-	FORCEINLINE b32x operator| (b32x b) const { return {m | b.m}; }
-	OPERATORS_BOOL;
-};
-
-template <>
-union b32x<4> {
-	using Scalar = b32;
-	using Pack = b32x;
-
-	b32 s[4];
-	M16 m;
-	
-	FORCEINLINE b32x operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }
-	FORCEINLINE b32x operator==(b32x b) const { RETURN_M(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE b32x operator!=(b32x b) const { RETURN_M(_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi32(m.pi, b.m.pi)), _mm_setone_ps())); }
-	FORCEINLINE b32x operator^ (b32x b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b32x operator& (b32x b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b32x operator| (b32x b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
-	OPERATORS_BOOL;
-};
-
-template<>
-union b32x<8> {
-	using Scalar = b32;
-	using Pack = b32x;
-
-	b32 s[8];
-	struct {
-		b32x4 lo, hi;
-	};
-
-#if ARCH_AVX
-	M32 m;
-	FORCEINLINE b32x operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }
-	FORCEINLINE b32x operator==(b32x b) const { RETURN_M(_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))); }
-	FORCEINLINE b32x operator!=(b32x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b32x operator^ (b32x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b32x operator& (b32x b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b32x operator| (b32x b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-#else
-	FALLBACK_BOOL;
-#endif
-	OPERATORS_BOOL;
-};
-
-template<>
-union b64x<2> {
-	using Scalar = b64;
-	using Pack = b64x;
-
-	b64 s[2];
-	M16 m;
-
-	FORCEINLINE b64x operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }
-	FORCEINLINE b64x operator==(b64x b) const { RETURN_M(_mm_cmpeq_epi8(m.pi, b.m.pi)); }
-	FORCEINLINE b64x operator!=(b64x b) const { RETURN_M(_mm_xor_ps(_mm_castpi_ps(_mm_cmpeq_epi8(m.pi, b.m.pi)), _mm_setone_ps())); }
-	FORCEINLINE b64x operator^ (b64x b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b64x operator& (b64x b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b64x operator| (b64x b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
-	OPERATORS_BOOL;
-};
-
-template<>
-union b64x<4> {
-	using Scalar = b64;
-	using Pack = b64x;
-
-	b64 s[4];
-	struct {
-		b64x2 lo, hi;
-	};
-
-#if ARCH_AVX
-	M32 m;
-	FORCEINLINE b64x operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }
-	FORCEINLINE b64x operator==(b64x b) const { RETURN_M(_mm256_not_ps(_mm256_xor_ps(m.ps, b.m.ps))); }
-	FORCEINLINE b64x operator!=(b64x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b64x operator^ (b64x b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b64x operator& (b64x b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE b64x operator| (b64x b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-#else
-	FALLBACK_BOOL;
-#endif
-	OPERATORS_BOOL;
-};
-#undef MASK_IMPL
-
-FORCEINLINE b32x4 B32x4(bool v) { RETURN_MT(b32x4, v ? _mm_setone_ps() : _mm_setzero_ps()); }
-FORCEINLINE b64x2 B64x2(bool v) { RETURN_MT(b64x2, v ? _mm_setone_pd() : _mm_setzero_pd()); }
-
-FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.ps, a.m.ps)); }
-
-FORCEINLINE u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
-FORCEINLINE u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
-
-FORCEINLINE bool allTrue (bool v) { return v; }
-FORCEINLINE bool allFalse(bool v) { return !v; }
-FORCEINLINE bool allTrue (b32x1 v) { return v.m == 1; }
-FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0; }
-FORCEINLINE bool allTrue (b32x4 v) { return compressMask(v) == 0xF; }
-FORCEINLINE bool allFalse(b32x4 v) { return compressMask(v) == 0;   }
-FORCEINLINE bool allTrue (b64x2 v) { return compressMask(v) == 0x3; }
-FORCEINLINE bool allFalse(b64x2 v) { return compressMask(v) == 0;   }
-
-#if ARCH_AVX
-FORCEINLINE b32x8 B32x8(bool v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
-FORCEINLINE b64x4 B64x4(bool v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
-
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_MT(b32x8, _mm256_andnot_ps(b.m.ps, a.m.ps)); }
-
-FORCEINLINE u64 compressMask(b32x8 a) { return _mm256_movemask_ps(a.m.ps); }
-FORCEINLINE u64 compressMask(b64x4 a) { return _mm256_movemask_pd(a.m.pd); }
-#else
-FORCEINLINE b32x8 B32x8(bool v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
-FORCEINLINE b64x4 B64x4(bool v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
-
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_T2(b32x8, andNot(b.lo, a.lo), andNot(b.hi, a.hi)); }
-
-FORCEINLINE u64 compressMask(b32x8 a) { return (compressMask(a.lo) << 4) | compressMask(a.hi); }
-FORCEINLINE u64 compressMask(b64x4 a) { return (compressMask(a.lo) << 2) | compressMask(a.hi); }
-#endif
-
-FORCEINLINE bool allTrue (b32x8 a) { return compressMask(a) == 0xFF; }
-FORCEINLINE bool allFalse(b32x8 a) { return compressMask(a) == 0;    }
-FORCEINLINE bool allTrue (b64x4 a) { return compressMask(a) == 0xF; }
-FORCEINLINE bool allFalse(b64x4 a) { return compressMask(a) == 0;   }
-
-#define MASK_IMPL(FalseMask, false)									   \
-FORCEINLINE FalseMask::operator b32x4() const { return B32x4(false); } \
-FORCEINLINE FalseMask::operator b32x8() const { return B32x8(false); } \
-FORCEINLINE FalseMask::operator b64x2() const { return B64x2(false); } \
-FORCEINLINE FalseMask::operator b64x4() const { return B64x4(false); } \
-
-MASK_IMPL(FalseMask, false)
-MASK_IMPL(TrueMask, true)
-
-#undef MASK_IMPL
-
-template <class T> FORCEINLINE bool anyTrue (T v) { return !allFalse(v); }
-template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
-
-#define CVT(other) explicit FORCEINLINE operator other() const
-
-#if ARCH_AVX
-#define CMPLTF32x4(a, b) _mm_cmp_ps(a, b, _CMP_LT_OQ)
-#define CMPGTF32x4(a, b) _mm_cmp_ps(a, b, _CMP_GT_OQ)
-#define CMPLEF32x4(a, b) _mm_cmp_ps(a, b, _CMP_LE_OQ)
-#define CMPGEF32x4(a, b) _mm_cmp_ps(a, b, _CMP_GE_OQ)
-#define CMPEQF32x4(a, b) _mm_cmp_ps(a, b, _CMP_EQ_OQ)
-#define CMPNEF32x4(a, b) _mm_cmp_ps(a, b, _CMP_NEQ_OQ)
-
-#define CMPLTF64x2(a, b) _mm_cmp_pd(a, b, _CMP_LT_OQ)
-#define CMPGTF64x2(a, b) _mm_cmp_pd(a, b, _CMP_GT_OQ)
-#define CMPLEF64x2(a, b) _mm_cmp_pd(a, b, _CMP_LE_OQ)
-#define CMPGEF64x2(a, b) _mm_cmp_pd(a, b, _CMP_GE_OQ)
-#define CMPEQF64x2(a, b) _mm_cmp_pd(a, b, _CMP_EQ_OQ)
-#define CMPNEF64x2(a, b) _mm_cmp_pd(a, b, _CMP_NEQ_OQ)
-#else
-#define CMPLTF32x4(a, b) _mm_cmplt_ps (a, b)
-#define CMPGTF32x4(a, b) _mm_cmpgt_ps (a, b)
-#define CMPLEF32x4(a, b) _mm_cmple_ps (a, b)
-#define CMPGEF32x4(a, b) _mm_cmpge_ps (a, b)
-#define CMPEQF32x4(a, b) _mm_cmpeq_ps (a, b)
-#define CMPNEF32x4(a, b) _mm_cmpneq_ps(a, b)
-
-#define CMPLTF64x2(a, b) _mm_cmplt_pd (a, b)
-#define CMPGTF64x2(a, b) _mm_cmpgt_pd (a, b)
-#define CMPLEF64x2(a, b) _mm_cmple_pd (a, b)
-#define CMPGEF64x2(a, b) _mm_cmpge_pd (a, b)
-#define CMPEQF64x2(a, b) _mm_cmpeq_pd (a, b)
-#define CMPNEF64x2(a, b) _mm_cmpneq_pd(a, b)
-#endif
 
 #define OPERATOR_SCALAR(op, extend) \
 	FORCEINLINE Pack operator op(Scalar b) { return *this op extend(b); } \
@@ -888,6 +789,64 @@ template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
 	FORCEINLINE Pack  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
 	FORCEINLINE Pack  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
 
+#define OPERATORS_BOOL(extend)                                           \
+	FORCEINLINE Pack operator!() const { return ~*this; }               \
+	FORCEINLINE Pack operator&&(Pack b) const { return *this & b; }     \
+	FORCEINLINE Pack operator||(Pack b) const { return *this | b; }     \
+	FORCEINLINE Scalar operator[](umm index) const { return s[index]; } \
+	FORCEINLINE Scalar &operator[](umm index) { return s[index]; } \
+	OPERATOR_COMPARE(==, extend) \
+	OPERATOR_COMPARE(!=, extend) \
+	OPERATOR_ALL_VER(^, extend) \
+	OPERATOR_ALL_VER(&, extend) \
+	OPERATOR_ALL_VER(|, extend)\
+	OPERATOR_SCALAR(&&, extend) \
+	OPERATOR_SCALAR(||, extend)
+
+#define FALLBACK_BOOL                                                                  \
+	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
+	FORCEINLINE Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
+	FORCEINLINE Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
+	FORCEINLINE Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
+	FORCEINLINE Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
+	FORCEINLINE Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
+
+#define B1_IMPL(extend) \
+	Scalar s[1];\
+	Scalar m;\
+	FORCEINLINE Pack operator~() const { return {~m}; }\
+	FORCEINLINE Pack operator==(Pack b) const { return {~(m ^ b.m)}; }\
+	FORCEINLINE Pack operator!=(Pack b) const { return {m ^ b.m}; }\
+	FORCEINLINE Pack operator^ (Pack b) const { return {m ^ b.m}; }\
+	FORCEINLINE Pack operator& (Pack b) const { return {m & b.m}; }\
+	FORCEINLINE Pack operator| (Pack b) const { return {m | b.m}; }\
+	OPERATORS_BOOL(extend)
+
+#define B128_IMPL(extend) \
+	M16 m;\
+	FORCEINLINE Pack operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }\
+	FORCEINLINE Pack operator==(Pack b) const { RETURN_M(s32x4_eq(m.pi, b.m.pi)); }\
+	FORCEINLINE Pack operator!=(Pack b) const { RETURN_M(s32x4_ne(m.pi, b.m.pi)); }\
+	FORCEINLINE Pack operator^ (Pack b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator& (Pack b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator| (Pack b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }\
+	OPERATORS_BOOL(extend)
+
+#if ARCH_AVX
+#define B256_IMPL(extend) \
+	M32 m;\
+	FORCEINLINE Pack operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }\
+	FORCEINLINE Pack operator==(Pack b) const { RETURN_M(b256_cmpeq(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator!=(Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator^ (Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator& (Pack b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }\
+	FORCEINLINE Pack operator| (Pack b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }\
+	OPERATORS_BOOL(extend)
+#else
+#define B256_IMPL(extend) \
+	FALLBACK_BOOL; \
+	OPERATORS_BOOL(extend)
+#endif
 
 #define OPERATORS_FLOAT(extend) \
 	OPERATOR_COMPARE(>, extend) \
@@ -963,26 +922,180 @@ template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
 	FORCEINLINE Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
 	FORCEINLINE Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
 
+#define TOMASK(expr) {(expr) ? -1 : 0}
+
+template <>
+union b32x<1> {
+	using Scalar = b32;
+	using Pack = b32x;
+	using Mask = Pack;
+	B1_IMPL(B32x1);
+};
+
+template <>
+union b32x<4> {
+	using Scalar = b32;
+	using Pack = b32x;
+	using Mask = Pack;
+	Scalar s[4];
+	B128_IMPL(B32x4)
+};
+
+template<>
+union b32x<8> {
+	using Scalar = b32;
+	using Pack = b32x;
+	using Mask = Pack;
+	Scalar s[8];
+	struct {
+		b32x4 lo, hi;
+	};
+	B256_IMPL(B32x8);
+};
+
+template<>
+union b64x<1> {
+	using Scalar = b64;
+	using Pack = b64x;
+	using Mask = Pack;
+	B1_IMPL(B64x1);
+};
+
+template<>
+union b64x<2> {
+	using Scalar = b64;
+	using Pack = b64x;
+	using Mask = Pack;
+	Scalar s[2];
+	B128_IMPL(B64x2);
+};
+
+template<>
+union b64x<4> {
+	using Scalar = b64;
+	using Pack = b64x;
+	using Mask = Pack;
+
+	Scalar s[4];
+	struct {
+		b64x2 lo, hi;
+	};
+	B256_IMPL(B64x4);
+};
+
+#undef B1_IMPL
+#undef B128_IMPL
+#undef B256_IMPL
+
+FORCEINLINE constexpr b32x1 B32x1(b32 v) { return TOMASK(v); }
+FORCEINLINE constexpr b64x1 B64x1(b64 v) { return TOMASK(v); }
+
+FORCEINLINE b32x4 B32x4(b32 v) { RETURN_MT(b32x4, v ? _mm_setone_ps() : _mm_setzero_ps()); }
+FORCEINLINE b64x2 B64x2(b32 v) { RETURN_MT(b64x2, v ? _mm_setone_pd() : _mm_setzero_pd()); }
+
+#if ARCH_AVX
+FORCEINLINE b32x8 B32x8(b32 v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
+FORCEINLINE b64x4 B64x4(b32 v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
+FORCEINLINE b32x8 B32x8(bool v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
+FORCEINLINE b64x4 B64x4(bool v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
+#else
+FORCEINLINE b32x8 B32x8(b32 v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
+FORCEINLINE b64x4 B64x4(b32 v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
+FORCEINLINE b32x8 B32x8(bool v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
+FORCEINLINE b64x4 B64x4(bool v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
+#endif
+
+FORCEINLINE b32x1 andNot(b32x1 a, b32x1 b) { return {a.m & ~b.m}; }
+FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.ps, a.m.ps)); }
+
+FORCEINLINE b64x1 andNot(b64x1 a, b64x1 b) { return {a.m & ~b.m}; }
+FORCEINLINE b64x2 andNot(b64x2 a, b64x2 b) { RETURN_MT(b64x2, _mm_andnot_pd(b.m.pd, a.m.pd)); }
+#if ARCH_AVX
+FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_MT(b32x8, _mm256_andnot_ps(b.m.ps, a.m.ps)); }
+FORCEINLINE b64x4 andNot(b64x4 a, b64x4 b) { RETURN_MT(b64x4, _mm256_andnot_pd(b.m.pd, a.m.pd)); }
+#else
+FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_T2(b32x8, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
+FORCEINLINE b64x4 andNot(b64x4 a, b64x4 b) { RETURN_T2(b64x4, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
+#endif
+
+FORCEINLINE u64 compressMask(b32x1 a) { return a.m != 0; }
+FORCEINLINE u64 compressMask(b64x1 a) { return a.m != 0; }
+FORCEINLINE u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
+FORCEINLINE u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
+#if ARCH_AVX
+FORCEINLINE u64 compressMask(b32x8 a) { return _mm256_movemask_ps(a.m.ps); }
+FORCEINLINE u64 compressMask(b64x4 a) { return _mm256_movemask_pd(a.m.pd); }
+#else
+FORCEINLINE u64 compressMask(b32x8 a) { return (compressMask(a.lo) << 4) | compressMask(a.hi); }
+FORCEINLINE u64 compressMask(b64x4 a) { return (compressMask(a.lo) << 2) | compressMask(a.hi); }
+#endif
+
+FORCEINLINE bool allTrue(bool v) { return v; }
+FORCEINLINE bool allTrue(b32x1 v) { return v.m != 0; }
+FORCEINLINE bool allTrue(b64x1 v) { return v.m != 0; }
+FORCEINLINE bool allTrue(b64x2 v) { return compressMask(v) == 0x3; }
+FORCEINLINE bool allTrue(b32x4 v) { return compressMask(v) == 0xF; }
+FORCEINLINE bool allTrue(b64x4 a) { return compressMask(a) == 0xF; }
+FORCEINLINE bool allTrue(b32x8 a) { return compressMask(a) == 0xFF; }
+
+FORCEINLINE bool allFalse(bool v) { return !v; }
+FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0; }
+FORCEINLINE bool allFalse(b64x1 v) { return v.m == 0; }
+FORCEINLINE bool allFalse(b64x2 v) { return compressMask(v) == 0; }
+FORCEINLINE bool allFalse(b32x4 v) { return compressMask(v) == 0; }
+FORCEINLINE bool allFalse(b64x4 a) { return compressMask(a) == 0; }
+FORCEINLINE bool allFalse(b32x8 a) { return compressMask(a) == 0; }
+
+template <class T> FORCEINLINE bool anyTrue (T v) { return !allFalse(v); }
+template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
+
+#define MASK_IMPL(TrueMask, trueMask, true)							 \
+	struct TrueMask {												 \
+		FORCEINLINE constexpr operator bool() const { return true; } \
+		FORCEINLINE constexpr operator u8 () const { return true; }	 \
+		FORCEINLINE constexpr operator u16() const { return true; }	 \
+		FORCEINLINE constexpr operator u32() const { return true; }	 \
+		FORCEINLINE constexpr operator u64() const { return true; }	 \
+		FORCEINLINE constexpr operator s8 () const { return true; }	 \
+		FORCEINLINE constexpr operator s16() const { return true; }	 \
+		FORCEINLINE constexpr operator s32() const { return true; }	 \
+		FORCEINLINE constexpr operator s64() const { return true; }	 \
+		FORCEINLINE operator b32x1() const { return B32x1(true); }	 \
+		FORCEINLINE operator b32x4() const { return B32x4(true); }	 \
+		FORCEINLINE operator b32x8() const { return B32x8(true); }	 \
+		FORCEINLINE operator b64x1() const { return B64x1(true); }	 \
+		FORCEINLINE operator b64x2() const { return B64x2(true); }	 \
+		FORCEINLINE operator b64x4() const { return B64x4(true); }	 \
+	};																 \
+	inline static constexpr TrueMask trueMask
+
+MASK_IMPL(FalseMask, falseMask, 0);
+MASK_IMPL(TrueMask, trueMask, ~0);
+
+#undef MASK_IMPL
+
+#define CVT(other) explicit FORCEINLINE operator other() const
+
 template<>
 union f32x<1> {
 	using Scalar = f32;
 	using Pack   = f32x;
 	using Mask   = b32x1;
 
+	Scalar s[1];
 	f32 m;
-	f32 s[1];
 
-	FORCEINLINE f32x1 operator-()         const { RETURN_M(-m); }
-	FORCEINLINE	f32x1 operator+ (f32x1 b) const { RETURN_M(m +  b.m); }
-	FORCEINLINE	f32x1 operator- (f32x1 b) const { RETURN_M(m -  b.m); }
-	FORCEINLINE	f32x1 operator* (f32x1 b) const { RETURN_M(m *  b.m); }
-	FORCEINLINE	f32x1 operator/ (f32x1 b) const { RETURN_M(m /  b.m); }
-	FORCEINLINE	b32x1 operator< (f32x1 b) const { RETURN_MT(b32x1, m <  b.m); }
-	FORCEINLINE	b32x1 operator> (f32x1 b) const { RETURN_MT(b32x1, m >  b.m); }
-	FORCEINLINE	b32x1 operator<=(f32x1 b) const { RETURN_MT(b32x1, m <= b.m); }
-	FORCEINLINE	b32x1 operator>=(f32x1 b) const { RETURN_MT(b32x1, m >= b.m); }
-	FORCEINLINE	b32x1 operator==(f32x1 b) const { RETURN_MT(b32x1, m == b.m); }
-	FORCEINLINE	b32x1 operator!=(f32x1 b) const { RETURN_MT(b32x1, m != b.m); }
+	FORCEINLINE f32x1 operator-()         const { return {-m}; }
+	FORCEINLINE	f32x1 operator+ (f32x1 b) const { return {m + b.m}; }
+	FORCEINLINE	f32x1 operator- (f32x1 b) const { return {m - b.m}; }
+	FORCEINLINE	f32x1 operator* (f32x1 b) const { return {m * b.m}; }
+	FORCEINLINE	f32x1 operator/ (f32x1 b) const { return {m / b.m}; }
+	FORCEINLINE	b32x1 operator< (f32x1 b) const { return TOMASK(m <  b.m); }
+	FORCEINLINE	b32x1 operator> (f32x1 b) const { return TOMASK(m >  b.m); }
+	FORCEINLINE	b32x1 operator<=(f32x1 b) const { return TOMASK(m <= b.m); }
+	FORCEINLINE	b32x1 operator>=(f32x1 b) const { return TOMASK(m >= b.m); }
+	FORCEINLINE	b32x1 operator==(f32x1 b) const { return TOMASK(m == b.m); }
+	FORCEINLINE	b32x1 operator!=(f32x1 b) const { return TOMASK(m != b.m); }
 	OPERATORS_FLOAT(F32x1)
 
 	CVT(s32x1);
@@ -997,7 +1110,7 @@ union f32x<4> {
 	using Pack = f32x;
 	using Mask   = b32x4;
 
-	f32 s[4];
+	Scalar s[4];
 	M16 m;
 	
 	FORCEINLINE f32x4 operator-()         const { RETURN_M(_mm_xor_ps(m.ps, _mm_set1_ps(-0.0f))); }
@@ -1005,12 +1118,12 @@ union f32x<4> {
 	FORCEINLINE	f32x4 operator- (f32x4 b) const { RETURN_M(_mm_sub_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	f32x4 operator* (f32x4 b) const { RETURN_M(_mm_mul_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	f32x4 operator/ (f32x4 b) const { RETURN_M(_mm_div_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator< (f32x4 b) const { RETURN_MASK(CMPLTF32x4(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator> (f32x4 b) const { RETURN_MASK(CMPGTF32x4(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator<=(f32x4 b) const { RETURN_MASK(CMPLEF32x4(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator>=(f32x4 b) const { RETURN_MASK(CMPGEF32x4(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator==(f32x4 b) const { RETURN_MASK(CMPEQF32x4(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator!=(f32x4 b) const { RETURN_MASK(CMPNEF32x4(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator< (f32x4 b) const { RETURN_MASK(f32x4_lt(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator> (f32x4 b) const { RETURN_MASK(f32x4_gt(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator<=(f32x4 b) const { RETURN_MASK(f32x4_le(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator>=(f32x4 b) const { RETURN_MASK(f32x4_ge(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator==(f32x4 b) const { RETURN_MASK(f32x4_eq(m.ps, b.m.ps)); }
+	FORCEINLINE	b32x4 operator!=(f32x4 b) const { RETURN_MASK(f32x4_ne(m.ps, b.m.ps)); }
 	OPERATORS_FLOAT(F32x4)
 
 	CVT(s32x4);
@@ -1025,11 +1138,11 @@ union f32x<8> {
 	using Pack = f32x;
 	using Mask   = b32x8;
 
-	f32 s[8];
-	
+	Scalar s[8];
 	struct {
 		f32x4 lo, hi;
 	};
+
 #if ARCH_AVX
 	M32 m;
 	FORCEINLINE f32x8 operator-()         const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_set1_ps(-0.0f))); }
@@ -1054,13 +1167,41 @@ union f32x<8> {
 	INDEX_S(f32);
 };
 
+template<>
+union f64x<1> {
+	using Scalar = f64;
+	using Pack   = f64x;
+	using Mask   = b64x1;
+
+	Scalar s[1];
+	Scalar m;
+
+	FORCEINLINE Pack operator-()         const { return {-m}; }
+	FORCEINLINE	Pack operator+ (Pack b) const { return {m + b.m}; }
+	FORCEINLINE	Pack operator- (Pack b) const { return {m - b.m}; }
+	FORCEINLINE	Pack operator* (Pack b) const { return {m * b.m}; }
+	FORCEINLINE	Pack operator/ (Pack b) const { return {m / b.m}; }
+	FORCEINLINE	Mask operator< (Pack b) const { return TOMASK(m <  b.m); }
+	FORCEINLINE	Mask operator> (Pack b) const { return TOMASK(m >  b.m); }
+	FORCEINLINE	Mask operator<=(Pack b) const { return TOMASK(m <= b.m); }
+	FORCEINLINE	Mask operator>=(Pack b) const { return TOMASK(m >= b.m); }
+	FORCEINLINE	Mask operator==(Pack b) const { return TOMASK(m == b.m); }
+	FORCEINLINE	Mask operator!=(Pack b) const { return TOMASK(m != b.m); }
+	OPERATORS_FLOAT(F64x1)
+
+	//CVT(s64x1);
+	//CVT(u64x1);
+	MEMFUNS_DATA(Scalar);
+	INDEX_S(Scalar);
+};
+
 template <>
 union f64x<2> {
 	using Scalar = f64;
 	using Pack = f64x;
 	using Mask   = b64x2;
 
-	f64 s[2];
+	Scalar s[2];
 	M16 m;
 
 	FORCEINLINE f64x2 operator-()         const { RETURN_M(_mm_xor_pd(m.pd, _mm_set1_pd(-0.0f))); }
@@ -1068,12 +1209,12 @@ union f64x<2> {
 	FORCEINLINE	f64x2 operator- (f64x2 b) const { RETURN_M(_mm_sub_pd(m.pd, b.m.pd)); }
 	FORCEINLINE	f64x2 operator* (f64x2 b) const { RETURN_M(_mm_mul_pd(m.pd, b.m.pd)); }
 	FORCEINLINE	f64x2 operator/ (f64x2 b) const { RETURN_M(_mm_div_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator< (f64x2 b) const { RETURN_MASK(CMPLTF64x2(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator> (f64x2 b) const { RETURN_MASK(CMPGTF64x2(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator<=(f64x2 b) const { RETURN_MASK(CMPLEF64x2(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator>=(f64x2 b) const { RETURN_MASK(CMPGEF64x2(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator==(f64x2 b) const { RETURN_MASK(CMPEQF64x2(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator!=(f64x2 b) const { RETURN_MASK(CMPNEF64x2(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator< (f64x2 b) const { RETURN_MASK(f64x2_lt(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator> (f64x2 b) const { RETURN_MASK(f64x2_gt(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator<=(f64x2 b) const { RETURN_MASK(f64x2_le(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator>=(f64x2 b) const { RETURN_MASK(f64x2_ge(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator==(f64x2 b) const { RETURN_MASK(f64x2_eq(m.pd, b.m.pd)); }
+	FORCEINLINE	b64x2 operator!=(f64x2 b) const { RETURN_MASK(f64x2_ne(m.pd, b.m.pd)); }
 	OPERATORS_FLOAT(F64x2)
 
 	//CVT(s64x2);
@@ -1087,7 +1228,7 @@ union f64x<4> {
 	using Pack = f64x;
 	using Mask   = b64x4;
 
-	f64 s[4];
+	Scalar s[4];
 	struct {
 		f64x2 lo, hi;
 	};
@@ -1117,84 +1258,45 @@ union f64x<4> {
 	INDEX_S(f64);
 };
 
-#if 0
 template<>
 union s32x<1> {
-	s32 s[1];
-	s32 m;
-	
-	FORCEINLINE        s32x1  operator-()          const { return {-m}; }
-	FORCEINLINE	       s32x1  operator+ (s32x1 b)  const { return {m +  b.m}; }
-	FORCEINLINE	       s32x1  operator- (s32x1 b)  const { return {m -  b.m}; }
-	FORCEINLINE	       s32x1  operator* (s32x1 b)  const { return {m *  b.m}; }
-	FORCEINLINE	       s32x1  operator/ (s32x1 b)  const { return {m /  b.m}; }
-	FORCEINLINE	       s32x1  operator% (s32x1 b)  const { return {m %  b.m}; }
-	FORCEINLINE	       s32x1  operator^ (s32x1 b)  const { return {m ^  b.m}; }
-	FORCEINLINE	       s32x1  operator& (s32x1 b)  const { return {m &  b.m}; }
-	FORCEINLINE	       s32x1  operator| (s32x1 b)  const { return {m |  b.m}; }
-	FORCEINLINE	       b32x1  operator< (s32x1 b)  const { return {m <  b.m}; }
-	FORCEINLINE	       b32x1  operator> (s32x1 b)  const { return {m >  b.m}; }
-	FORCEINLINE	       b32x1  operator<=(s32x1 b)  const { return {m <= b.m}; }
-	FORCEINLINE	       b32x1  operator>=(s32x1 b)  const { return {m >= b.m}; }
-	FORCEINLINE	       b32x1  operator==(s32x1 b)  const { return {m == b.m}; }
-	FORCEINLINE	       b32x1  operator!=(s32x1 b)  const { return {m != b.m}; }
-	FORCEINLINE	       s32x1  operator+ (s32   b)  const { return {m +  b  }; }
-	FORCEINLINE	       s32x1  operator- (s32   b)  const { return {m -  b  }; }
-	FORCEINLINE	       s32x1  operator* (s32   b)  const { return {m *  b  }; }
-	FORCEINLINE	       s32x1  operator/ (s32   b)  const { return {m /  b  }; }
-	FORCEINLINE	       s32x1  operator% (s32   b)  const { return {m %  b  }; }
-	FORCEINLINE	       s32x1  operator^ (s32   b)  const { return {m ^  b  }; }
-	FORCEINLINE	       s32x1  operator& (s32   b)  const { return {m &  b  }; }
-	FORCEINLINE	       s32x1  operator| (s32   b)  const { return {m |  b  }; }
-	FORCEINLINE	       b32x1  operator< (s32   b)  const { return {m <  b  }; }
-	FORCEINLINE	       b32x1  operator> (s32   b)  const { return {m >  b  }; }
-	FORCEINLINE	       b32x1  operator<=(s32   b)  const { return {m <= b  }; }
-	FORCEINLINE	       b32x1  operator>=(s32   b)  const { return {m >= b  }; }
-	FORCEINLINE	       b32x1  operator==(s32   b)  const { return {m == b  }; }
-	FORCEINLINE	       b32x1  operator!=(s32   b)  const { return {m != b  }; }
-	FORCEINLINE friend s32x1  operator+ (s32 a, s32x1 b) { return {a +  b.m}; }
-	FORCEINLINE friend s32x1  operator- (s32 a, s32x1 b) { return {a -  b.m}; }
-	FORCEINLINE friend s32x1  operator* (s32 a, s32x1 b) { return {a *  b.m}; }
-	FORCEINLINE friend s32x1  operator/ (s32 a, s32x1 b) { return {a /  b.m}; }
-	FORCEINLINE	friend s32x1  operator% (s32 a, s32x1 b) { return {a %  b.m}; }
-	FORCEINLINE	friend s32x1  operator^ (s32 a, s32x1 b) { return {a ^  b.m}; }
-	FORCEINLINE	friend s32x1  operator& (s32 a, s32x1 b) { return {a &  b.m}; }
-	FORCEINLINE	friend s32x1  operator| (s32 a, s32x1 b) { return {a |  b.m}; }
-	FORCEINLINE friend b32x1  operator< (s32 a, s32x1 b) { return {a <  b.m}; }
-	FORCEINLINE friend b32x1  operator> (s32 a, s32x1 b) { return {a >  b.m}; }
-	FORCEINLINE friend b32x1  operator<=(s32 a, s32x1 b) { return {a <= b.m}; }
-	FORCEINLINE friend b32x1  operator>=(s32 a, s32x1 b) { return {a >= b.m}; }
-	FORCEINLINE friend b32x1  operator==(s32 a, s32x1 b) { return {a == b.m}; }
-	FORCEINLINE friend b32x1  operator!=(s32 a, s32x1 b) { return {a != b.m}; }
-	FORCEINLINE        s32x1 &operator+=(s32x1 b)        { return m += b.m, *this; }
-	FORCEINLINE        s32x1 &operator-=(s32x1 b)        { return m -= b.m, *this; }
-	FORCEINLINE        s32x1 &operator*=(s32x1 b)        { return m *= b.m, *this; }
-	FORCEINLINE        s32x1 &operator/=(s32x1 b)        { return m /= b.m, *this; }
-	FORCEINLINE	       s32x1 &operator%=(s32x1 b)        { return m %= b.m, *this; }
-	FORCEINLINE	       s32x1 &operator^=(s32x1 b)        { return m ^= b.m, *this; }
-	FORCEINLINE	       s32x1 &operator&=(s32x1 b)        { return m &= b.m, *this; }
-	FORCEINLINE	       s32x1 &operator|=(s32x1 b)        { return m |= b.m, *this; }
-	FORCEINLINE        s32x1 &operator+=(s32   b)        { return m += b  , *this; }
-	FORCEINLINE        s32x1 &operator-=(s32   b)        { return m -= b  , *this; }
-	FORCEINLINE        s32x1 &operator*=(s32   b)        { return m *= b  , *this; }
-	FORCEINLINE        s32x1 &operator/=(s32   b)        { return m /= b  , *this; }
-	FORCEINLINE	       s32x1 &operator%=(s32   b)        { return m %= b  , *this; }
-	FORCEINLINE	       s32x1 &operator^=(s32   b)        { return m ^= b  , *this; }
-	FORCEINLINE	       s32x1 &operator&=(s32   b)        { return m &= b  , *this; }
-	FORCEINLINE	       s32x1 &operator|=(s32   b)        { return m |= b  , *this; }
-	FORCEINLINE        s32x1 &operator++ ()              { return ++m, *this; }
-	FORCEINLINE        s32x1 &operator-- ()              { return --m, *this; }
-	FORCEINLINE        s32x1  operator++ (int)           { return {m++}; }
-	FORCEINLINE        s32x1  operator-- (int)           { return {m--}; }
+	using Scalar = s32;
+	using Pack   = s32x;
+	using Mask   = b32x1;
 
-	OPERATORS_INT;
+	Scalar s[1];
+	Scalar m;
+	
+	FORCEINLINE        Pack  operator-()            const { return {-m}; }
+	FORCEINLINE        Pack  operator~()            const { return {~m}; }
+	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	
+	OPERATORS_INT(S32x1);
 
 	CVT(f32x1);
 	CVT(u32x1);
 	MEMFUNS_DATA(s32);
 	INDEX_S(s32);
 };
-#endif
 
 template<>
 union s32x<4> {
@@ -1202,31 +1304,31 @@ union s32x<4> {
 	using Pack = s32x;
 	using Mask = b32x4;
 
+	Scalar s[4];
 	M16 m;
-	s32 s[4];
 
-	FORCEINLINE        s32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
-	FORCEINLINE        s32x4  operator~()          const { RETURN_M(_mm_not_ps(m.ps)); }
-	FORCEINLINE	       s32x4  operator+ (s32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator- (s32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator* (s32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator/ (s32x4 b)  const { RETURN_M(_mm_div_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator% (s32x4 b)  const { RETURN_M(_mm_rem_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator^ (s32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x4  operator& (s32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x4  operator| (s32x4 b)  const { RETURN_M( _mm_or_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       s32x4  operator<<(s32x4 b)  const { RETURN_M(_mm_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator>>(s32x4 b)  const { RETURN_M(_mm_srlv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator< (s32x4 b)  const { RETURN_MASK(_mm_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator> (s32x4 b)  const { RETURN_MASK(_mm_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator<=(s32x4 b)  const { RETURN_MASK(_mm_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator>=(s32x4 b)  const { RETURN_MASK(_mm_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator==(s32x4 b)  const { RETURN_MASK(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator!=(s32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       s32x4  operator<<(s32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
-	FORCEINLINE	       s32x4  operator>>(s32   b)  const { RETURN_M(_mm_srai_epi32(m.pi, b)); }
-	FORCEINLINE	friend s32x4  operator<<(s32 a, s32x4 b) { RETURN_MT(s32x4, _mm_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend s32x4  operator>>(s32 a, s32x4 b) { RETURN_MT(s32x4, _mm_sraiv_epi32(a, b.m.pi)); }
+	FORCEINLINE        Pack  operator-()          const { RETURN_M(s32x4_sub(_mm_setzero_pi(), m.pi)); }
+	FORCEINLINE        Pack  operator~()          const { RETURN_M(m16_not(m.ps)); }
+	FORCEINLINE	       Pack  operator+ (Pack b)  const { RETURN_M(s32x4_add(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator- (Pack b)  const { RETURN_M(s32x4_sub(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator* (Pack b)  const { RETURN_M(s32x4_mul(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator/ (Pack b)  const { RETURN_M(s32x4_div(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator% (Pack b)  const { RETURN_M(s32x4_rem(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator<<(Pack b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator>>(Pack b)  const { RETURN_M(s32x4_sr(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator< (Pack b)  const { RETURN_MASK(s32x4_lt(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator> (Pack b)  const { RETURN_MASK(s32x4_gt(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator<=(Pack b)  const { RETURN_MASK(s32x4_le(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator>=(Pack b)  const { RETURN_MASK(s32x4_ge(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator==(Pack b)  const { RETURN_MASK(s32x4_eq(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator!=(Pack b)  const { RETURN_MASK(s32x4_ne(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator<<(s32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
+	FORCEINLINE	       Pack  operator>>(s32   b)  const { RETURN_M(s32x4_sri(m.pi, b)); }
+	FORCEINLINE	friend Pack  operator<<(s32 a, Pack b) { RETURN_MT(Pack, i32x4_sil(a, b.m.pi)); }
+	FORCEINLINE	friend Pack  operator>>(s32 a, Pack b) { RETURN_MT(Pack, s32x4_sir(a, b.m.pi)); }
 	
 	OPERATORS_INT(S32x4);
 
@@ -1242,18 +1344,17 @@ union s32x<8> {
 	using Pack = s32x;
 	using Mask = b32x8;
 
-	s32 s[8];
-
+	Scalar s[8];
+	struct {
+		s32x4 lo, hi;
+	};
 #if ARCH_AVX
 	M32 m;
 #endif
 
-	struct {
-		s32x4 lo, hi;
-	};
 #if ARCH_AVX2
 	FORCEINLINE s32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE s32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
 	FORCEINLINE	s32x8 operator+(s32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	s32x8 operator-(s32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	s32x8 operator*(s32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
@@ -1289,20 +1390,20 @@ union s32x<8> {
 	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	b32x8 operator< (s32x8 b) const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator> (s32x8 b) const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator<=(s32x8 b) const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator>=(s32x8 b) const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator==(s32x8 b) const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator!=(s32x8 b) const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator<<(s32x8 b) const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator>>(s32x8 b) const { RETURN_M(_mm256_srav_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator<<(s32   b) const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
-	FORCEINLINE	s32x8 operator>>(s32   b) const { RETURN_M(_mm256_srai_epi32(m.pi, b)); }
-	FORCEINLINE	friend s32x8 operator<<(s32 a, s32x8 b) { RETURN_MT(s32x8, _mm256_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend s32x8 operator>>(s32 a, s32x8 b) { RETURN_MT(s32x8, _mm256_sraiv_epi32(a, b.m.pi)); }
+	FORCEINLINE	b32x8 operator< (s32x8 b) const { RETURN_MASK(s32x8_lt(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator> (s32x8 b) const { RETURN_MASK(s32x8_gt(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator<=(s32x8 b) const { RETURN_MASK(s32x8_le(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator>=(s32x8 b) const { RETURN_MASK(s32x8_ge(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator==(s32x8 b) const { RETURN_MASK(s32x8_eq(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator!=(s32x8 b) const { RETURN_MASK(s32x8_ne(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator<<(s32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator>>(s32x8 b) const { RETURN_M(s32x8_sr(m.pi, b.m.pi)); }
+	FORCEINLINE	s32x8 operator<<(s32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
+	FORCEINLINE	s32x8 operator>>(s32   b) const { RETURN_M(s32x8_sri(m.pi, b)); }
+	FORCEINLINE	friend s32x8 operator<<(s32 a, s32x8 b) { RETURN_MT(s32x8, i32x8_sil(a, b.m.pi)); }
+	FORCEINLINE	friend s32x8 operator>>(s32 a, s32x8 b) { RETURN_MT(s32x8, s32x8_sir(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE s32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
 	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
@@ -1320,16 +1421,136 @@ union s32x<8> {
 };
 
 template<>
+union s64x<1> {
+	using Scalar = s64;
+	using Pack   = s64x;
+	using Mask   = b64x1;
+
+	Scalar s[1];
+	Scalar m;
+	
+	FORCEINLINE        Pack  operator-()            const { return {-m}; }
+	FORCEINLINE        Pack  operator~()            const { return {~m}; }
+	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	
+	OPERATORS_INT(S64x1);
+
+	CVT(f64x1);
+	CVT(u64x1);
+	MEMFUNS_DATA(s64);
+	INDEX_S(s64);
+};
+
+template<>
+union s64x<2> {
+	using Scalar = s64;
+	using Pack = s64x;
+	using Mask = b64x2;
+
+	Scalar s[2];
+	M16 m;
+
+	FORCEINLINE        Pack  operator-()         const { RETURN_M(s64x2_sub(_mm_setzero_pi(), m.pi)); }
+	FORCEINLINE        Pack  operator~()         const { RETURN_M(m16_not(m.ps)); }
+	FORCEINLINE	       Pack  operator+ (Pack b)  const { RETURN_M(s64x2_add(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator- (Pack b)  const { RETURN_M(s64x2_sub(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator* (Pack b)  const { RETURN_M(s64x2_mul(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator/ (Pack b)  const { RETURN_M(s64x2_div(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator% (Pack b)  const { RETURN_M(s64x2_rem(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
+	FORCEINLINE	       Pack  operator<<(Pack b)  const { RETURN_M(i64x2_sl(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator>>(Pack b)  const { RETURN_M(s64x2_sr(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator< (Pack b)  const { RETURN_MASK(s64x2_lt(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator> (Pack b)  const { RETURN_MASK(s64x2_gt(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator<=(Pack b)  const { RETURN_MASK(s64x2_le(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator>=(Pack b)  const { RETURN_MASK(s64x2_ge(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator==(Pack b)  const { RETURN_MASK(s64x2_eq(m.pi, b.m.pi)); }
+	FORCEINLINE	       Mask  operator!=(Pack b)  const { RETURN_MASK(s64x2_ne(m.pi, b.m.pi)); }
+	FORCEINLINE	       Pack  operator<<(s64   b) const { RETURN_M(i64x2_sli(m.pi, b)); }
+	FORCEINLINE	       Pack  operator>>(s64   b) const { RETURN_M(s64x2_sri(m.pi, b)); }
+	FORCEINLINE	friend Pack  operator<<(s64 a, Pack b) { RETURN_MT(Pack, i64x2_sil(a, b.m.pi)); }
+	FORCEINLINE	friend Pack  operator>>(s64 a, Pack b) { RETURN_MT(Pack, s64x2_sir(a, b.m.pi)); }
+	
+	OPERATORS_INT(S64x2);
+
+	CVT(f64x2);
+	CVT(u64x2);
+	MEMFUNS_DATA(s64);
+	INDEX_S(s64);
+};
+
+template<>
+union u32x<1> {
+	using Scalar = u32;
+	using Pack   = u32x;
+	using Mask   = b32x1;
+
+	Scalar s[1];
+	Scalar m;
+	
+	FORCEINLINE        Pack  operator-()            const { return {-m}; }
+	FORCEINLINE        Pack  operator~()            const { return {~m}; }
+	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	
+	OPERATORS_INT(U32x1);
+
+	CVT(f32x1);
+	CVT(s32x1);
+	MEMFUNS_DATA(u32);
+	INDEX_S(u32);
+};
+
+template<>
 union u32x<4> {
 	using Scalar = u32;
 	using Pack = u32x;
 	using Mask = b32x4;
 
-	u32 s[4];
+	Scalar s[4];
 	M16 m;
 	
 	FORCEINLINE        u32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
-	FORCEINLINE        u32x4  operator~()          const { RETURN_M(_mm_not_ps(m.ps)); }
+	FORCEINLINE        u32x4  operator~()          const { RETURN_M(m16_not(m.ps)); }
 	FORCEINLINE	       u32x4  operator+ (u32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	       u32x4  operator- (u32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	       u32x4  operator* (u32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
@@ -1338,18 +1559,18 @@ union u32x<4> {
 	FORCEINLINE	       u32x4  operator^ (u32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	       u32x4  operator& (u32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	       u32x4  operator| (u32x4 b)  const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x4  operator<<(u32x4 b)  const { RETURN_M(_mm_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator>>(u32x4 b)  const { RETURN_M(_mm_srlv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator< (u32x4 b)  const { RETURN_MASK(_mm_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator> (u32x4 b)  const { RETURN_MASK(_mm_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator<=(u32x4 b)  const { RETURN_MASK(_mm_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator>=(u32x4 b)  const { RETURN_MASK(_mm_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator==(u32x4 b)  const { RETURN_MASK(_mm_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(_mm_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator<<(u32   b)  const { RETURN_M(_mm_slli_epi32(m.pi, b)); }
-	FORCEINLINE	       u32x4  operator>>(u32   b)  const { RETURN_M(_mm_srli_epi32(m.pi, b)); }
-	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_MT(u32x4, _mm_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_MT(u32x4, _mm_srliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator<<(u32x4 b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator>>(u32x4 b)  const { RETURN_M(u32x4_sr(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator< (u32x4 b)  const { RETURN_MASK(u32x4_lt(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator> (u32x4 b)  const { RETURN_MASK(u32x4_gt(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator<=(u32x4 b)  const { RETURN_MASK(u32x4_le(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator>=(u32x4 b)  const { RETURN_MASK(u32x4_ge(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator==(u32x4 b)  const { RETURN_MASK(u32x4_eq(m.pi, b.m.pi)); }
+	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(u32x4_ne(m.pi, b.m.pi)); }
+	FORCEINLINE	       u32x4  operator<<(u32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
+	FORCEINLINE	       u32x4  operator>>(u32   b)  const { RETURN_M(u32x4_sri(m.pi, b)); }
+	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_MT(u32x4, i32x4_sil(a, b.m.pi)); }
+	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_MT(u32x4, u32x4_sir(a, b.m.pi)); }
 
 	OPERATORS_INT(U32x4);
 
@@ -1366,7 +1587,7 @@ union u32x<8> {
 	using Pack = u32x;
 	using Mask = b32x8;
 
-	u32 s[8];
+	Scalar s[8];
 	struct {
 		u32x4 lo, hi;
 	};
@@ -1376,7 +1597,7 @@ union u32x<8> {
 
 #if ARCH_AVX2
 	FORCEINLINE u32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE u32x8 operator~() const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE u32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
 	FORCEINLINE	u32x8 operator+(u32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	u32x8 operator-(u32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
 	FORCEINLINE	u32x8 operator*(u32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
@@ -1412,20 +1633,20 @@ union u32x<8> {
 	FORCEINLINE	u32x8 operator^(u32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	u32x8 operator&(u32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	u32x8 operator|(u32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	b32x8 operator< (u32x8 b) const { RETURN_MASK(_mm256_cmplt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator> (u32x8 b) const { RETURN_MASK(_mm256_cmpgt_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator<=(u32x8 b) const { RETURN_MASK(_mm256_cmple_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator>=(u32x8 b) const { RETURN_MASK(_mm256_cmpge_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator==(u32x8 b) const { RETURN_MASK(_mm256_cmpeq_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator!=(u32x8 b) const { RETURN_MASK(_mm256_cmpne_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator<<(u32x8 b) const { RETURN_M(_mm256_sllv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator>>(u32x8 b) const { RETURN_M(_mm256_srlv_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator<<(u32   b) const { RETURN_M(_mm256_slli_epi32(m.pi, b)); }
-	FORCEINLINE	u32x8 operator>>(u32   b) const { RETURN_M(_mm256_srli_epi32(m.pi, b)); }
-	FORCEINLINE	friend u32x8 operator<<(u32 a, u32x8 b) { RETURN_MT(u32x8, _mm256_slliv_epi32(a, b.m.pi)); }
-	FORCEINLINE	friend u32x8 operator>>(u32 a, u32x8 b) { RETURN_MT(u32x8, _mm256_srliv_epi32(a, b.m.pi)); }
+	FORCEINLINE	b32x8 operator< (u32x8 b) const { RETURN_MASK(u32x8_lt(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator> (u32x8 b) const { RETURN_MASK(u32x8_gt(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator<=(u32x8 b) const { RETURN_MASK(u32x8_le(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator>=(u32x8 b) const { RETURN_MASK(u32x8_ge(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator==(u32x8 b) const { RETURN_MASK(u32x8_eq(m.pi, b.m.pi)); }
+	FORCEINLINE	b32x8 operator!=(u32x8 b) const { RETURN_MASK(u32x8_ne(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator<<(u32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator>>(u32x8 b) const { RETURN_M(u32x8_sr(m.pi, b.m.pi)); }
+	FORCEINLINE	u32x8 operator<<(u32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
+	FORCEINLINE	u32x8 operator>>(u32   b) const { RETURN_M(u32x8_sri(m.pi, b)); }
+	FORCEINLINE	friend u32x8 operator<<(u32 a, u32x8 b) { RETURN_MT(u32x8, i32x8_sil(a, b.m.pi)); }
+	FORCEINLINE	friend u32x8 operator>>(u32 a, u32x8 b) { RETURN_MT(u32x8, u32x8_sir(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE u32x8 operator~()          const { RETURN_M(_mm256_not_ps(m.ps)); }
+	FORCEINLINE u32x8 operator~()          const { RETURN_M(m32_not_ps(m.ps)); }
 	FORCEINLINE	u32x8 operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	u32x8 operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
 	FORCEINLINE	u32x8 operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
@@ -1442,13 +1663,57 @@ union u32x<8> {
 	INDEX_S(u32);
 };
 
+template<>
+union u64x<1> {
+	using Scalar = u64;
+	using Pack   = u64x;
+	using Mask   = b64x1;
+
+	Scalar s[1];
+	Scalar m;
+	
+	FORCEINLINE        Pack  operator-()            const { return {-m}; }
+	FORCEINLINE        Pack  operator~()            const { return {~m}; }
+	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	
+	OPERATORS_INT(U64x1);
+
+	CVT(f64x1);
+	CVT(s64x1);
+	MEMFUNS_DATA(u64);
+	INDEX_S(u64);
+};
+
 FORCEINLINE b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) != 0; }
 FORCEINLINE b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
 
 // clang-format off
 FORCEINLINE constexpr f32x1 F32x1(f32 m) { return {m}; }
-//FORCEINLINE constexpr s32x1 S32x1(s32 m) { return {m}; }
-//FORCEINLINE constexpr u32x1 U32x1(u32 m) { return {m}; }
+FORCEINLINE constexpr s32x1 S32x1(s32 m) { return {m}; }
+FORCEINLINE constexpr u32x1 U32x1(u32 m) { return {m}; }
+
+FORCEINLINE constexpr f64x1 F64x1(f64 m) { return {m}; }
+FORCEINLINE constexpr s64x1 S64x1(s64 m) { return {m}; }
+FORCEINLINE constexpr u64x1 U64x1(u64 m) { return {m}; }
 
 FORCEINLINE constexpr f32x4 F32x4(__m128 m) { RETURN_MT(f32x4, m); }
 FORCEINLINE constexpr s32x4 S32x4(__m128 m) { RETURN_MT(s32x4, m); }
@@ -1462,8 +1727,22 @@ FORCEINLINE f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { RETURN_MT(f32x4, _mm_setr_
 FORCEINLINE s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { RETURN_MT(s32x4, _mm_setr_epi32(i, j, k, l)); }
 FORCEINLINE u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { RETURN_MT(u32x4, _mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l)); }
 FORCEINLINE f64x2 F64x2(f64 i, f64 j) { RETURN_MT(f64x2, _mm_setr_pd(i, j)); }
+FORCEINLINE s64x2 S64x2(s64 i, s64 j) { RETURN_MT(s64x2, s64x2_set(i, j)); }
+
+FORCEINLINE f32x4 F32x4(f32 v) { RETURN_MT(f32x4, f32x4_broadcast(v)); }
+FORCEINLINE s32x4 S32x4(s32 v) { RETURN_MT(s32x4, s32x4_broadcast(v)); }
+FORCEINLINE u32x4 U32x4(u32 v) { RETURN_MT(u32x4, u32x4_broadcast(v)); }
+FORCEINLINE f64x2 F64x2(f64 v) { RETURN_MT(f64x2, f64x2_broadcast(v)); }
+FORCEINLINE s64x2 S64x2(s64 v) { RETURN_MT(s64x2, s64x2_broadcast(v)); }
+//FORCEINLINE u64x2 U64x2(u64 v) { RETURN_MT(u64x2, u64x2_broadcast(v)); }
 
 #if ARCH_AVX
+FORCEINLINE f32x8 F32x8(f32 v) { RETURN_MT(f32x8, f32x8_broadcast(v)); }
+FORCEINLINE s32x8 S32x8(s32 v) { RETURN_MT(s32x8, s32x8_broadcast(v)); }
+FORCEINLINE u32x8 U32x8(u32 v) { RETURN_MT(u32x8, u32x8_broadcast(v)); }
+FORCEINLINE f64x4 F64x4(f64 v) { RETURN_MT(f64x4, f64x4_broadcast(v)); }
+//FORCEINLINE s64x4 S64x4(s64 v) { RETURN_MT(s64x4, s64x4_broadcast(v)); }
+//FORCEINLINE u64x4 U64x4(u64 v) { RETURN_MT(u64x4, u64x4_broadcast(v)); }
 
 FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_MT(f32x8, _mm256_setr_ps(a, b, c, d, e, f, g, h)); }
 FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_MT(s32x8, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
@@ -1475,6 +1754,13 @@ FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT(u32x8, _mm256_setr_m128(
 
 FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_MT(f64x4, _mm256_setr_pd(i, j, k, l)); }
 #else
+FORCEINLINE f32x8 F32x8(f32 v) { RETURN_T2(f32x8, F32x4(v), F32x4(v)); }
+FORCEINLINE s32x8 S32x8(s32 v) { RETURN_T2(s32x8, S32x4(v), S32x4(v)); }
+FORCEINLINE u32x8 U32x8(u32 v) { RETURN_T2(u32x8, U32x4(v), U32x4(v)); }
+FORCEINLINE f64x4 F64x4(f64 v) { RETURN_T2(f64x4, F64x2(v), F64x2(v)); }
+//FORCEINLINE s64x4 S64x4(s64 v) { RETURN_T2(s64x4, S64x2(v), S64x2(v)); }
+//FORCEINLINE u64x4 U64x4(u64 v) { RETURN_T2(u64x4, U64x2(v), U64x2(v)); }
+
 FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_T2(f32x8, F32x4(a, b, c, d), F32x4(e, f, g, h)); }
 FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_T2(s32x8, S32x4(a, b, c, d), S32x4(e, f, g, h)); }
 FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_T2(u32x8, U32x4(a, b, c, d), U32x4(e, f, g, h)); }
@@ -1485,18 +1771,6 @@ FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT2(u32x8, m0.m, m1.m); }
 
 FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_T2(f64x4, F64x2(i, j), F64x2(k, l)); }
 #endif
-
-FORCEINLINE f32x4 F32x4(f32 v) { return F32x4(v,v,v,v); }
-FORCEINLINE s32x4 S32x4(s32 v) { return S32x4(v,v,v,v); }
-FORCEINLINE u32x4 U32x4(u32 v) { return U32x4(v,v,v,v); }
-
-FORCEINLINE f32x8 F32x8(f32 v) { return F32x8(v,v,v,v,v,v,v,v); }
-FORCEINLINE s32x8 S32x8(s32 v) { return S32x8(v,v,v,v,v,v,v,v); }
-FORCEINLINE u32x8 U32x8(u32 v) { return U32x8(v,v,v,v,v,v,v,v); }
-
-FORCEINLINE f64x2 F64x2(f64 v) { return F64x2(v,v); }
-
-FORCEINLINE f64x4 F64x4(f64 v) { return F64x4(v,v,v,v); }
 
 #define X(f32, F32, p) \
 template<> FORCEINLINE f32##x<p> F32##x<p> (f32 val){ return F32##x##p(val); } \
@@ -1636,18 +1910,16 @@ GATHERMASK32x8(u32x8)
 #undef GATHER32x4
 #undef GATHER32x8
 
+#if 0
+
 template <class T>
 T load(void const *src) = delete;
 
+#define LOADx1(type) template<> FORCEINLINE type load(void const *src) { return *(type *)src; }
+
 #define LOAD32x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_ps((f32 const *)src)); }
-LOAD32x4(f32x4)
-LOAD32x4(s32x4)
-LOAD32x4(u32x4)
 
 #define LOAD64x2(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_pd((f64 const *)src)); }
-LOAD64x2(f64x2)
-//LOAD64x2(s64x2)
-//LOAD64x2(u64x2)
 
 #if ARCH_AVX
 #define LOAD32x8(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm256_loadu_ps((f32 const *)src)); }
@@ -1657,6 +1929,33 @@ LOAD64x2(f64x2)
 #define LOAD64x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f64 *)src + 2)); }
 #endif
 
+LOADx1(b32x1)
+LOADx1(b64x1)
+
+LOADx1(b64x2)
+
+LOADx1(b32x4)
+LOADx1(b64x4)
+
+LOADx1(b32x8)
+
+LOADx1(f32x1)
+LOADx1(f64x1)
+
+LOADx1(s32x1)
+LOADx1(s64x1)
+
+LOADx1(u32x1)
+LOADx1(u64x1)
+
+LOAD32x4(f32x4)
+LOAD32x4(s32x4)
+LOAD32x4(u32x4)
+
+LOAD64x2(f64x2)
+//LOAD64x2(s64x2)
+//LOAD64x2(u64x2)
+
 LOAD32x8(f32x8)
 LOAD32x8(s32x8)
 LOAD32x8(u32x8)
@@ -1664,10 +1963,13 @@ LOAD64x4(f64x4)
 //LOAD64x4(s64x4)
 //LOAD64x4(u64x4)
 
+#undef LOADx1
 #undef LOAD32x4
 #undef LOAD32x8
 #undef LOAD64x2
 #undef LOAD64x4
+
+#endif
 
 template <class T>
 T loadMask(void const *src, b32x<widthOf<T>> mask) = delete;
@@ -2071,9 +2373,6 @@ union v4ux<8> {
 	FORCEINLINE v4ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 };
 
-union m3;
-FORCEINLINE m3 transpose(m3 const&);
-
 union m2 {
 	struct {
 		v2f i, j;
@@ -2189,17 +2488,12 @@ union m3 {
 	}
 };
 
-FORCEINLINE m3 transpose(m3 const& m) {
-	return {
-		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
-	};
-}
-
 union m4 {
 	struct {
 		v4f i, j, k, l;
 	};
 	__m128 m[4];
+	v4f vectors[4];
 	f32 s[16];
 	FORCEINLINE v4f operator*(v4f b) const {
 		v4f x = V4f(b.x) * i;
@@ -2332,9 +2626,30 @@ union m4 {
 		};
 		// clang-format on
 	}
+	v4f &operator[](umm i) { return vectors[i]; }
+	v4f const &operator[](umm i) const { return vectors[i]; }
 };
 
 #undef CVT
+
+FORCEINLINE constexpr m3 transpose(m3 const& m) {
+	return {
+		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
+	};
+}
+FORCEINLINE m4 transpose(m4 const& m) {
+	__m128 tmp0 = _mm_unpacklo_ps(m.i.m.m.ps, m.j.m.m.ps);
+	__m128 tmp1 = _mm_unpackhi_ps(m.i.m.m.ps, m.j.m.m.ps);
+	__m128 tmp2 = _mm_unpacklo_ps(m.k.m.m.ps, m.l.m.m.ps);
+	__m128 tmp3 = _mm_unpackhi_ps(m.k.m.m.ps, m.l.m.m.ps);
+
+	m4 result;
+	result.i.m.m.ps = _mm_movelh_ps(tmp0, tmp2);
+	result.j.m.m.ps = _mm_movehl_ps(tmp2, tmp0);
+	result.k.m.m.ps = _mm_movelh_ps(tmp1, tmp3);
+	result.l.m.m.ps = _mm_movehl_ps(tmp3, tmp1);
+	return result;
+}
 
 #define V2(f32, v2f, V2f)                                     \
 	FORCEINLINE constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
@@ -3216,9 +3531,9 @@ FORCEINLINE s32x4 frac(s32x4 v, s32x4 s) {
 	__m128i result = _mm_cvtipd_epi32(vlo);
 	result = _mm_insert_epi64(result, _mm_extract_epi64(_mm_cvtipd_epi32(vhi), 0), 1);
 #endif
-	return {_mm_castpi_ps(_mm_sub_epi32(v.m.pi, _mm_mullo_epi32(result, s.m.pi)))};
+	RETURN_MT(s32x4, _mm_sub_epi32(v.m.pi, _mm_mullo_epi32(result, s.m.pi)));
 }
-FORCEINLINE s32x4 frac(s32x4 v, s32 s) { return frac(v, {_mm_castpi_ps(_mm_set1_epi32(s))}); }
+FORCEINLINE s32x4 frac(s32x4 v, s32 s) { return frac(v, S32x4(s)); }
 
 FORCEINLINE v2s frac(v2s v, v2s s) {
 	M16 vm = {_mm_castpi_ps(_mm_setr_epi32(v.x, v.y, 0, 0))};
@@ -3312,7 +3627,7 @@ FORCEINLINE s32x4 floor(s32x4 v, s32x4 s) {
 	auto phi = _mm_cvtipd_epi32(_mm_div_pd(vhi, shi));
 	__m128i p = _mm_insert_epi64(plo, _mm_extract_epi64(phi, 0), 1);
 #endif
-	v.m.pi = _mm_mullo_epi32(_mm_blendv_epi32(p, n, _mm_cmplt_epi32(v.m.pi, _mm_set1_epi32(0))), s.m.pi);
+	v.m.pi = _mm_mullo_epi32(_mm_blendv_epi32(p, n, s32x4_lt(v.m.pi, _mm_set1_epi32(0))), s.m.pi);
 	return v;
 }
 FORCEINLINE v2s floor(v2s v, v2s s) {
@@ -3344,7 +3659,7 @@ FORCEINLINE v4s floor(v4s v, v4s s) {
 	s32x4 ms	 = S32x4((s32)step);
 	s32x4 pos	 = v.m / ms;
 	s32x4 neg	 = (v.m + 1) / ms - 1;
-	__m128i mask = _mm_cmplt_epi32(v.m.m, _mm_setzero_pi());
+	__m128i mask = s32x4_lt(v.m.m, _mm_setzero_pi());
 	return V4s(S32x4(_mm_blendv_epi32(pos.m, neg.m, mask)) * (s32)step);
 #endif
 }
@@ -3444,7 +3759,7 @@ FORCEINLINE v2fx8 absolute(v2fx8 v) { return V2fx8(absolute(v.x), absolute(v.y))
 
 FORCEINLINE v2s absolute(v2s a) { return {labs(a.x), labs(a.y)}; }
 FORCEINLINE v3s absolute(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
-FORCEINLINE s32x4 absolute(s32x4 a) { return {_mm_castpi_ps(_mm_abs_epi32(a.m.pi))}; }
+FORCEINLINE s32x4 absolute(s32x4 a) { RETURN_MT(s32x4, _mm_abs_epi32(a.m.pi)); }
 FORCEINLINE v4s absolute(v4s a) { return V4s(absolute(a.m)); }
 
 FORCEINLINE f32 setSign(f32 dst, f32 src) {
@@ -4865,46 +5180,30 @@ FORCEINLINE constexpr T linearSample(const T (&arr)[size], float t) noexcept {
 		b = 0;
 	return lerp(arr[a], arr[b], frac(f));
 }
-struct FrustumPlanes {
-	v4f planes[6];
-	FORCEINLINE FrustumPlanes(m4 vp) {
-		planes[0].x = vp.i.w + vp.i.x;
-		planes[0].y = vp.j.w + vp.j.x;
-		planes[0].z = vp.k.w + vp.k.x;
-		planes[0].w = vp.l.w + vp.l.x;
-		planes[1].x = vp.i.w - vp.i.x;
-		planes[1].y = vp.j.w - vp.j.x;
-		planes[1].z = vp.k.w - vp.k.x;
-		planes[1].w = vp.l.w - vp.l.x;
-		planes[2].x = vp.i.w - vp.i.y;
-		planes[2].y = vp.j.w - vp.j.y;
-		planes[2].z = vp.k.w - vp.k.y;
-		planes[2].w = vp.l.w - vp.l.y;
-		planes[3].x = vp.i.w + vp.i.y;
-		planes[3].y = vp.j.w + vp.j.y;
-		planes[3].z = vp.k.w + vp.k.y;
-		planes[3].w = vp.l.w + vp.l.y;
-		planes[5].x = vp.i.w - vp.i.z;
-		planes[5].y = vp.j.w - vp.j.z;
-		planes[5].z = vp.k.w - vp.k.z;
-		planes[5].w = vp.l.w - vp.l.z;
-		planes[4].x = vp.i.z;
-		planes[4].y = vp.j.z;
-		planes[4].z = vp.k.z;
-		planes[4].w = vp.l.z;
-		for (auto& p : planes) {
-			p /= length(v3f{p.x, p.y, p.z});
+using FrustumPlanes = Array<v4f, 6>;
+
+FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 vp) {
+	FrustumPlanes planes;
+	m4 t = transpose(vp);
+	planes[0] = t[3] + t[0];
+	planes[1] = t[3] - t[0];
+	planes[2] = t[3] + t[1];
+	planes[3] = t[3] - t[1];
+	planes[4] = t[3] + t[2];
+	planes[5] = t[3] - t[2];
+	for (auto& p : planes) {
+		p /= length(v3f{p.x, p.y, p.z});
+	}
+	return planes;
+}
+FORCEINLINE bool containsSphere(FrustumPlanes const &planes, v3f position, float radius) {
+	for (auto p : planes) {
+		if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
+			return false;
 		}
 	}
-	FORCEINLINE bool containsSphere(v3f position, float radius) const {
-		for (auto p : planes) {
-			if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
-				return false;
-			}
-		}
-		return true;
-	}
-};
+	return true;
+}
 
 namespace CE {
 
@@ -4996,18 +5295,18 @@ inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 #undef MM_SHUFFLE
 #undef MM256_PERM128
 
-#undef CMPLTF32x4
-#undef CMPGTF32x4
-#undef CMPLEF32x4
-#undef CMPGEF32x4
-#undef CMPEQF32x4
-#undef CMPNEF32x4
-#undef CMPLTF64x2
-#undef CMPGTF64x2
-#undef CMPLEF64x2
-#undef CMPGEF64x2
-#undef CMPEQF64x2
-#undef CMPNEF64x2
+#undef f32x4_lt
+#undef f32x4_gt
+#undef f32x4_le
+#undef f32x4_ge
+#undef f32x4_eq
+#undef f32x4_ne
+#undef f64x2_lt
+#undef f64x2_gt
+#undef f64x2_le
+#undef f64x2_ge
+#undef f64x2_eq
+#undef f64x2_ne
 
 #if COMPILER_MSVC
 #pragma warning(pop)

@@ -107,10 +107,12 @@ inline Optional<u64> parseDecimal(StringView s) {
 template <class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096>
 struct StringBuilder {
 	using String = String<Allocator>;
+	using Char = char;
+
 	static constexpr umm blockSize = blockSize_;
 	struct Block {
-		char buffer[blockSize];
-		char *end = buffer;
+		Char buffer[blockSize];
+		Char *end = buffer;
 		Block *next = 0;
 
 		Block() {}
@@ -122,8 +124,10 @@ struct StringBuilder {
 	Block *allocLast = &first;
 
 	StringBuilder() = default;
-	StringBuilder(StringBuilder const &) = delete;
-	StringBuilder(StringBuilder &&) = default;
+	StringBuilder(StringBuilder const &that) = delete;
+	StringBuilder(StringBuilder &&that) = delete;
+	StringBuilder &operator=(StringBuilder const &that) = delete;
+	StringBuilder &operator=(StringBuilder &&that) = delete;
 	~StringBuilder() {
 		Block *next = 0;
 		for (Block *block = first.next; block != 0; block = next) {
@@ -161,7 +165,7 @@ struct StringBuilder {
 			}
 		}
 	}
-	umm append(Span<char const> span) {
+	umm append(Span<Char const> span) {
 		umm charsToWrite = span.size();
 		while (last->availableSpace() < charsToWrite) {
 			umm spaceInBlock = last->availableSpace();
@@ -178,8 +182,8 @@ struct StringBuilder {
 		last->end += charsToWrite;
 		return span.size();
 	}
-	umm append(char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
-	umm append(char ch, umm count = 1) {
+	umm append(Char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
+	umm append(Char ch, umm count = 1) {
 		umm charsToWrite = count;
 		while (last->availableSpace() < charsToWrite) {
 			umm spaceInBlock = last->availableSpace();
@@ -196,23 +200,23 @@ struct StringBuilder {
 		return count;
 	}
 	umm appendBytes(void const *address, umm size) {
-		append(Span((char *)address, (char *)address + size));
+		append(Span((Char *)address, (Char *)address + size));
 		return size;
 	}
 	template <class T>
 	umm appendBytes(T const &value) {
 		return appendBytes(std::addressof(value), sizeof(value));
 	}
-	umm appendFormat(char const *fmt) {
+	umm appendFormat(Char const *fmt) {
 		return append(Span{fmt, strlen(fmt)});
 	}
 	template <class Arg, class ...Args>
-	umm appendFormat(char const *fmt, Arg const &arg, Args const &...args) {
+	umm appendFormat(Char const *fmt, Arg const &arg, Args const &...args) {
 		if (!*fmt)
 			return 0;
-		char const *c = fmt;
-		char const *fmtBegin = 0;
-		char const *fmtEnd = 0;
+		Char const *c = fmt;
+		Char const *fmtBegin = 0;
+		Char const *fmtEnd = 0;
 
 		bool argAsFormat = false;
 		
@@ -248,12 +252,12 @@ struct StringBuilder {
 		umm charsAppended = append(Span{fmt, fmtBegin});
 
 		if (argAsFormat) {
-			if constexpr (isSame<RemoveReference<Arg>, char const *> || isSame<RemoveReference<Arg>, char *>)
+			if constexpr (isSame<RemoveReference<Arg>, Char const *> || isSame<RemoveReference<Arg>, Char *>)
 				charsAppended += appendFormat(arg, args...);
 			else 
 				INVALID_CODE_PATH("'{fmt}' arg is not a string");
 		} else {
-			toString([&] (char const *src, umm length) {
+			toString([&] (Char const *src, umm length) {
 				charsAppended += length;
 				append(Span{src, length});
 				return StringSpan();
@@ -272,7 +276,7 @@ struct StringBuilder {
 	}
 	StringSpan fill(StringSpan dstString) {
 		ASSERT(dstString.size() >= this->size());
-		char *dstChar = dstString.data();
+		Char *dstChar = dstString.data();
 		for (Block *block = &first; block != 0; block = block->next) {
 			memcpy(dstChar, block->buffer, block->size());
 			dstChar += block->size();

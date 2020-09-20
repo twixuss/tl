@@ -3,8 +3,21 @@
 
 namespace TL {
 
+struct OptionalBase_Trivial {};
+
+template <class Optional>
+struct OptionalBase_NonTrivial {
+	~OptionalBase_NonTrivial() {
+		Optional *opt = (Optional *)this;
+		opt->_hasValue = false;
+		opt->_value.~T();
+	}
+};
+
 template <class T>
-struct Optional {
+struct Optional : Conditional<std::is_trivially_destructible_v<T>, 
+							  OptionalBase_Trivial, 
+							  OptionalBase_NonTrivial<Optional<T>>> {
 	Optional() : _hasValue(false) {}
 	Optional(Optional const &that) {
 		_hasValue = that._hasValue;
@@ -24,21 +37,19 @@ struct Optional {
 	Optional(T &&that) : _value(std::move(that)), _hasValue(true) {}
 	~Optional() { reset(); }
 	Optional &operator=(Optional const &that) { 
-		if (that.has_value()) {
+		if (that.has_value())
 			emplace(*that); 
-		} else {
+		else
 			reset();
-		} 
 		return *this;
 	}
 	Optional &operator=(Optional &&that) { 
 		if (this == std::addressof(that))
 			return *this;
-		if (that.has_value()) {
+		if (that.has_value())
 			emplace(*std::move(that)); 
-		} else {
+		else
 			reset();
-		} 
 		return *this;
 	}
 	Optional &operator=(T const &that) { emplace(that); return *this; }
@@ -75,6 +86,7 @@ struct Optional {
 		T _value;
 	};
 	bool _hasValue;
+#pragma warning(suppress: 4820)
 };
 
 }

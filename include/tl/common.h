@@ -24,6 +24,7 @@
 #endif
 
 #include <utility>
+#include <type_traits>
 
 #if COMPILER_MSVC
 #pragma warning(pop)
@@ -52,30 +53,6 @@
 #endif
 
 namespace TL {
-
-using wchar = wchar_t;
-using s8	= signed char;
-using s16	= signed short;
-using s32	= signed int;
-using s64	= signed long long;
-using u8	= unsigned char;
-using u16	= unsigned short;
-using u32	= unsigned int;
-using u64	= unsigned long long;
-using f32	= float;
-using f64	= double;
-using b32	= s32;
-using b64	= s64;
-using slong = signed long;
-using ulong = unsigned long;
-
-#if ARCH_X64
-using umm = u64;
-using smm = s64;
-#else
-using umm = u32;
-using smm = s32;
-#endif
 
 #define TL_DECLARE_HANDLE(name) typedef struct {} *name;
 
@@ -146,12 +123,12 @@ template <class T> struct EnableIfT<true, T> { using Type = T; };
 template <bool v, class T = void> using EnableIf = typename EnableIfT<v, T>::Type;
 
 template <class T, class ...Args>
-T *construct(T *val, Args &&...args) {
+constexpr T *construct(T *val, Args &&...args) {
 	return new(val) T(std::forward<Args>(args)...);
 }
 
 template <class T, class ...Args>
-T &construct(T &val, Args &&...args) {
+constexpr T &construct(T &val, Args &&...args) {
 	return *new(std::addressof(val)) T(std::forward<Args>(args)...);
 }
 
@@ -225,6 +202,18 @@ FORCEINLINE constexpr bool isNegative(f64 v) { return *(u64 *)&v & 0x80000000000
 
 template <class T> FORCEINLINE constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 
+template <class T>
+constexpr T midpoint(T a, T b) {
+	minmax(a, b, a, b);
+	return a + (b - a) / 2;
+}
+
+template <class T>
+constexpr T *midpoint(T *a, T *b) {
+	minmax(a, b, a, b);
+	return a + ((umm)(b - a) >> 1);
+}
+
 template <class... Callables>
 struct Combine : public Callables... {
 	inline constexpr Combine(Callables &&... c) : Callables(std::move(c))... {}
@@ -237,7 +226,7 @@ inline constexpr auto toInt(Enum e) {
 }
 
 template <class T, umm size>
-constexpr umm countof(T const (&arr)[size]) { return size; }
+constexpr umm countof(T const (&arr)[size]) { (void)arr; return size; }
 
 inline void copyMemory(void *_dst, void const *_src, umm size) {
 	u8 *dst = (u8 *)_dst;
@@ -334,6 +323,10 @@ struct Span {
 	constexpr umm size() const { return umm(_end - _begin); }
 	constexpr T &operator[](umm i) { return _begin[i]; }
 	constexpr T const &operator[](umm i) const { return _begin[i]; }
+	constexpr T &at(umm i) { return _begin[i]; }
+	constexpr T const &at(umm i) const { return _begin[i]; }
+
+	constexpr bool empty() const { return _begin == _end; }
 
 	constexpr operator Span<T const>() const { return {_begin, _end}; }
 
@@ -356,6 +349,12 @@ struct Allocator {
 	void *_state = 0;
 	
 	void *allocate(umm size, umm align = 0) { return _allocate(_state, size, align); }
+
+	template <class T>
+	T *allocate(umm count = 1, umm align = 0) {
+		return (T *)allocate(count * sizeof(T), max(alignof(T), align));
+	}
+
 	void deallocate(void *data) { _deallocate(_state, data); }
 };
 
@@ -369,11 +368,6 @@ inline Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate de
 
 extern Allocator osAllocator;
 
-template <class T>
-static T *allocate(Allocator al, umm count = 1, umm align = 0) {
-	return (T *)al.allocate(count * sizeof(T), max(alignof(T), align));
-}
-
 template <class T, class Allocator>
 static T *allocate(umm count = 1, umm align = 0) {
 	return (T *)Allocator::allocate(count * sizeof(T), max(alignof(T), align));
@@ -382,19 +376,19 @@ static T *allocate(umm count = 1, umm align = 0) {
 struct OsAllocator {
 #if OS_WINDOWS
 #if COMPILER_MSVC
-	static void *allocate(umm size, umm align = 0) { return _aligned_malloc(size, max(align, (umm)8)); }
-	static void deallocate(void *data) { _aligned_free(data); }
+	inline static void *allocate(umm size, umm align = 0) { return _aligned_malloc(size, max(align, (umm)8)); }
+	inline static void deallocate(void *data) { _aligned_free(data); }
 #elif COMPILER_GCC
-	static void *allocate(umm size, umm align = 0) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
-	static void deallocate(void *data) { __mingw_aligned_free(data); }
+	inline static void *allocate(umm size, umm align = 0) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
+	inline static void deallocate(void *data) { __mingw_aligned_free(data); }
 #endif
 #else
-	static void *allocate(umm size, umm align = 0) {
+	inline static void *allocate(umm size, umm align = 0) {
 		void *result = 0;
 		posix_memalign(&result, max(align, (umm)8), size);
 		return result;
 	}
-	static void deallocate(void *data) { free(data); }
+	inline static void deallocate(void *data) { free(data); }
 #endif
 };
 
@@ -402,151 +396,123 @@ struct OsAllocator {
 #define TL_DEFAULT_ALLOCATOR ::TL::OsAllocator
 #endif
 
-constexpr char toLower(char c) {
-	if (c >= 'A' && c <= 'Z')
-		return c + ('a' - 'A');
+inline constexpr char toLower(char c) {
+	if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
+	return c;
+}
+inline constexpr wchar toLower(wchar c) {
+	if (c >= 'A' && c <= 'Z') return (wchar)(c + ('a' - 'A'));
 	return c;
 }
 
 inline constexpr umm length(char const *str) {
 	umm result = 0;
-	while (*str++) {
-		++result;
-	}
+	while (*str++) ++result;
+	return result;	
+}
+inline constexpr umm length(wchar const *str) {
+	umm result = 0;
+	while (*str++) ++result;
 	return result;	
 }
 inline constexpr umm length(char *str) {
 	return length((char const *)str);
-}
-
-inline constexpr umm length(wchar const *str) {
-	umm result = 0;
-	while (*str++) {
-		++result;
-	}
-	return result;	
 }
 inline constexpr umm length(wchar *str) {
 	return length((wchar const *)str);
 }
 
 inline constexpr bool equals(StringView a, StringView b) {
-	if (a.size() != b.size())
-		return false;
-	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp) {
+	if (a.size() != b.size()) return false;
+	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp)
 		if (*ap != *bp)
 			return false;
-	}
 	return true;
 }
 inline constexpr bool equals(char const *a, StringView b) {
-	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp) {
+	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp)
 		if (*a != *bp)
 			return false;
-	}
 	return true;
 }
 inline constexpr bool equals(StringView a, char const *b) {
-	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b) {
+	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b)
 		if (*ap != *b)
 			return false;
-	}
 	return true;
 }
 
-
 inline constexpr bool startsWith(char const *str, char const *subStr) {
-	while (*subStr) {
-		if (*str++ != *subStr++) {
+	while (*subStr)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return true;
 }
 inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr) {
-	while (*subStr && strLength--) {
-		if (*str++ != *subStr++) {
+	while (*subStr && strLength--)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return !*subStr;
 }
 inline constexpr bool startsWith(char const *str, char const *subStr, umm substrLength) {
-	while (substrLength--) {
-		if (*str++ != *subStr++) {
+	while (substrLength--)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return true;
 }
 inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr, umm substrLength) {
-	if (strLength < substrLength)
-		return false;
-	while (strLength-- && substrLength--) {
-		if (*str++ != *subStr++) {
+	if (strLength < substrLength) return false;
+	while (strLength-- && substrLength--)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return true;
 }
 
 inline constexpr bool endsWith(char const *str, char const *subStr) {
 	auto strLen = length(str);
 	auto subStrLen = length(subStr);
-	if (subStrLen > strLen) {
+	if (subStrLen > strLen)
 		return false;
-	}
 	str += strLen - subStrLen;
-	while (*subStr) {
-		if (*str++ != *subStr++) {
+	while (*subStr)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return true;
 }
 
 inline constexpr bool endsWithCI(char const *str, char const *subStr) {
 	auto strLen = length(str);
 	auto subStrLen = length(subStr);
-	if (subStrLen > strLen) {
+	if (subStrLen > strLen)
 		return false;
-	}
 	str += strLen - subStrLen;
-	while (*subStr) {
-		if (toLower(*str++) != toLower(*subStr++)) {
+	while (*subStr)
+		if (toLower(*str++) != toLower(*subStr++))
 			return false;
-		}
-	}
 	return true;
 }
 
 inline constexpr bool endsWith(wchar const *str, wchar const *subStr) {
 	auto strLen = length(str);
 	auto subStrLen = length(subStr);
-	if (subStrLen > strLen) {
+	if (subStrLen > strLen)
 		return false;
-	}
 	str += strLen - subStrLen;
-	while (*subStr) {
-		if (*str++ != *subStr++) {
+	while (*subStr)
+		if (*str++ != *subStr++)
 			return false;
-		}
-	}
 	return true;
 }
 
 inline constexpr bool endsWithCI(wchar const *str, wchar const *subStr) {
 	auto strLen = length(str);
 	auto subStrLen = length(subStr);
-	if (subStrLen > strLen) {
+	if (subStrLen > strLen)
 		return false;
-	}
 	str += strLen - subStrLen;
-	while (*subStr) {
-		if (toLower(*str++) != toLower(*subStr++)) {
+	while (*subStr)
+		if (toLower(*str++) != toLower(*subStr++))
 			return false;
-		}
-	}
 	return true;
 }
 
@@ -650,7 +616,7 @@ StringSpan toString(CopyFn &&copyFn, f64 v, u32 precision = 3) {
 	for (u32 i = 0; i < precision; ++i) {
 		v = v - (f64)(s64)v;
 		v = select(v < 0, v + 1, v) * 10;
-		*c++ = (u32)v + '0';
+		*c++ = (char)((u32)v + '0');
 	}
 	return copyFn(buf, (umm)(c - buf));
 }
@@ -692,6 +658,14 @@ struct StaticList {
 	}
 	template <umm thatCapacity>
 	StaticList &operator=(StaticList<T, thatCapacity> &&that) {
+		clear();
+		return *new (this) StaticList(std::move(that));
+	}
+	StaticList &operator=(StaticList const &that) {
+		clear();
+		return *new (this) StaticList(that);
+	}
+	StaticList &operator=(StaticList &&that) {
 		clear();
 		return *new (this) StaticList(std::move(that));
 	}
@@ -809,316 +783,11 @@ FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
 FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
 FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
 
-enum class CpuFeature : u8 {
-	_3dnow,
-	_3dnowext,
-	abm,
-	adx,
-	aes,
-	avx,
-	avx2,
-	avx512cd,
-	avx512er,
-	avx512f,
-	avx512pf,
-	bmi1,
-	bmi2,
-	clfsh,
-	cmov,
-	cmpxchg16b,
-	cx8,
-	erms,
-	f16c,
-	fma,
-	fsgsbase,
-	fxsr,
-	hle,
-	invpcid,
-	lahf,
-	lzcnt,
-	mmx,
-	mmxext,
-	monitor,
-	movbe,
-	msr,
-	osxsave,
-	pclmulqdq,
-	popcnt,
-	prefetchwt1,
-	rdrand,
-	rdseed,
-	rdtscp,
-	rtm,
-	sep,
-	sha,
-	sse,
-	sse2,
-	sse3,
-	sse41,
-	sse42,
-	sse4a,
-	ssse3,
-	syscall,
-	tbm,
-	xop,
-	xsave,
-
-	count,
-};
-
-struct CpuFeatureIndex {
-	u8 slot;
-	u8 bit;
-};
-
-inline CpuFeatureIndex getCpuFeatureIndex(CpuFeature f) {
-	CpuFeatureIndex result;
-	result.slot = (u32)f >> 5;
-	result.bit = (u32)f & 0x1F;
-	return result;
-}
-
-enum class CpuVendor : u8 {
-	unknown,
-	intel,
-	amd,
-
-	count,
-};
-
-enum class CpuCacheType : u8 {
-	unified, 
-	instruction, 
-	data, 
-	trace, 
-
-	count,
-};
-
-enum class CpuCacheLevel : u8 {
-	l1,
-	l2,
-	l3,
-
-	count,
-};
-
-struct CpuCache {
-	u16 count;
-	u32 size;
-};
-
-struct CpuInfo {
-
-	u32 logicalProcessorCount;
-	CpuCache cache[(u32)CpuCacheLevel::count][(u32)CpuCacheType::count];
-	u32 cacheLineSize;
-	u32 features[ceil((u32)CpuFeature::count, 32u) / 32];
-	CpuVendor vendor;
-	char brand[49];
-
-	inline bool hasFeature(CpuFeature feature) const {
-		CpuFeatureIndex index = getCpuFeatureIndex(feature);
-		if (index.slot >= countof(features))
-			return 0;
-		return features[index.slot] & (1 << index.bit);
-	}
-	u32 totalCacheSize(CpuCacheLevel level) const {
-		u32 index = (u32)level;
-		ASSERT(index < countof(cache));
-		u32 result = 0;
-		for (auto &c : cache[index]) {
-			result += c.size;
-		}
-		return result;
-	}
-};
-
-TL_API char const *toString(CpuFeature);
-TL_API char const *toString(CpuVendor);
-TL_API CpuInfo getCpuInfo();
-
 #ifdef TL_IMPL
 Allocator osAllocator = makeAllocator(0,
 	[](void *, umm size, umm align) -> void * { return OsAllocator::allocate(size, align); },
 	[](void *, void *data)                    { return OsAllocator::deallocate(data); }
 );
-
-#if OS_WINDOWS
-
-CpuInfo getCpuInfo() {
-	CpuInfo result = {};
-
-	DWORD processorInfoLength = 0;
-	if (!GetLogicalProcessorInformation(0, &processorInfoLength)) {
-		DWORD err = GetLastError();
-		ASSERT(err == ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
-	}
-
-	auto buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION *)malloc(processorInfoLength);
-	DEFER { free(buffer); };
-
-	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
-		INVALID_CODE_PATH("GetLogicalProcessorInformation: %u", GetLastError());
-
-	ASSERT(processorInfoLength % sizeof(buffer[0]) == 0);
-
-	
-	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {
-		switch (v) {
-			case CacheUnified: return CpuCacheType::unified;
-			case CacheInstruction: return CpuCacheType::instruction;
-			case CacheData: return CpuCacheType::data;
-			case CacheTrace: return CpuCacheType::trace;
-		}
-		INVALID_CODE_PATH();
-		return {};
-	};
-
-
-	for (auto &info : Span{buffer, processorInfoLength / sizeof(buffer[0])}) {
-		switch (info.Relationship) {
-			case RelationNumaNode:
-			case RelationProcessorPackage: break;
-			case RelationProcessorCore: result.logicalProcessorCount += countBits(info.ProcessorMask); break;
-			case RelationCache: {
-				auto &cache = result.cache[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
-				cache.size += info.Cache.Size;
-				++cache.count;
-				result.cacheLineSize = info.Cache.LineSize;
-				break;
-			}
-			default: INVALID_CODE_PATH("Error: Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.");
-		}
-	}
-
-	s32 ecx1 = 0;
-	s32 edx1 = 0;
-	s32 ebx7 = 0;
-	s32 ecx7 = 0;
-	s32 ecx1ex = 0;
-	s32 edx1ex = 0;
-
-	struct CPUID {
-		s32 eax;
-		s32 ebx;
-		s32 ecx;
-		s32 edx;
-
-		CPUID(s32 func) { __cpuid(data(), func); }
-		CPUID(s32 func, s32 subfunc) { __cpuidex(data(), func, subfunc); }
-
-		s32 *data() { return &eax; }
-	};
-
-	StaticList<CPUID, 64> data;
-	StaticList<CPUID, 64> dataEx;
-
-	s32 highestId = CPUID(0).eax;
-	for (s32 i = 0; i <= highestId; ++i) {
-		data.push_back(CPUID(i, 0));
-	}
-	if (data.size() > 0) {
-		char vendorName[24];
-		((s32 *)vendorName)[0] = data[0].ebx;
-		((s32 *)vendorName)[1] = data[0].edx;
-		((s32 *)vendorName)[2] = data[0].ecx;
-		if (startsWith(vendorName, 24, "GenuineIntel")) {
-			result.vendor = CpuVendor::intel;
-		} else if (startsWith(vendorName, 24, "AuthenticAMD")) {
-			result.vendor = CpuVendor::amd;
-		}
-	}
-	if (data.size() > 1) {
-		ecx1 = data[1].ecx;
-		edx1 = data[1].edx;
-	}
-	if (data.size() > 7) {
-		ebx7 = data[7].ebx;
-		ecx7 = data[7].ecx;
-	}
-
-	s32 highestExId = CPUID(0x80000000).eax;
-	for (s32 i = 0x80000000; i <= highestExId; ++i) {
-		dataEx.push_back(CPUID(i, 0));
-	}
-	if (dataEx.size() > 1) {
-		ecx1ex = dataEx[1].ecx;
-		edx1ex = dataEx[1].edx;
-	}
-	if (dataEx.size() > 4) {
-		result.brand[48] = 0;
-		memcpy(result.brand + sizeof(CPUID) * 0, dataEx[2].data(), sizeof(CPUID));
-		memcpy(result.brand + sizeof(CPUID) * 1, dataEx[3].data(), sizeof(CPUID));
-		memcpy(result.brand + sizeof(CPUID) * 2, dataEx[4].data(), sizeof(CPUID));
-	} else {
-		result.brand[0] = 0;
-	}
-
-	auto set = [&](CpuFeature feature, bool value) {
-		CpuFeatureIndex index = getCpuFeatureIndex(feature);
-		result.features[index.slot] |= (u32)value << index.bit;
-	};
-
-	// clang-format off
-	set(CpuFeature::sse3,		(ecx1	& (1 <<  0)));
-    set(CpuFeature::pclmulqdq,	(ecx1	& (1 <<  1)));
-    set(CpuFeature::monitor,	(ecx1	& (1 <<  3)));
-    set(CpuFeature::ssse3,		(ecx1	& (1 <<  9)));
-    set(CpuFeature::fma,		(ecx1	& (1 << 12)));
-    set(CpuFeature::cmpxchg16b,	(ecx1	& (1 << 13)));
-    set(CpuFeature::sse41,		(ecx1	& (1 << 19)));
-    set(CpuFeature::sse42,		(ecx1	& (1 << 20)));
-    set(CpuFeature::movbe,		(ecx1	& (1 << 22)));
-    set(CpuFeature::popcnt,		(ecx1	& (1 << 23)));
-    set(CpuFeature::aes,		(ecx1	& (1 << 25)));
-    set(CpuFeature::xsave,		(ecx1	& (1 << 26)));
-    set(CpuFeature::osxsave,	(ecx1	& (1 << 27)));
-    set(CpuFeature::avx,		(ecx1	& (1 << 28)));
-    set(CpuFeature::f16c,		(ecx1	& (1 << 29)));
-    set(CpuFeature::rdrand,		(ecx1	& (1 << 30)));
-    set(CpuFeature::msr,		(edx1	& (1 <<  5)));
-    set(CpuFeature::cx8,		(edx1	& (1 <<  8)));
-    set(CpuFeature::sep,		(edx1	& (1 << 11)));
-    set(CpuFeature::cmov,		(edx1	& (1 << 15)));
-    set(CpuFeature::clfsh,		(edx1	& (1 << 19)));
-    set(CpuFeature::mmx,		(edx1	& (1 << 23)));
-    set(CpuFeature::fxsr,		(edx1	& (1 << 24)));
-    set(CpuFeature::sse,		(edx1	& (1 << 25)));
-    set(CpuFeature::sse2,		(edx1	& (1 << 26)));
-    set(CpuFeature::fsgsbase,	(ebx7	& (1 <<  0)));
-    set(CpuFeature::bmi1,		(ebx7	& (1 <<  3)));
-    set(CpuFeature::hle,		(ebx7	& (1 <<  4)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::avx2,		(ebx7	& (1 <<  5)));
-    set(CpuFeature::bmi2,		(ebx7	& (1 <<  8)));
-    set(CpuFeature::erms,		(ebx7	& (1 <<  9)));
-    set(CpuFeature::invpcid,	(ebx7	& (1 << 10)));
-    set(CpuFeature::rtm,		(ebx7	& (1 << 11)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::avx512f,	(ebx7	& (1 << 16)));
-    set(CpuFeature::rdseed,		(ebx7	& (1 << 18)));
-    set(CpuFeature::adx,		(ebx7	& (1 << 19)));
-    set(CpuFeature::avx512pf,	(ebx7	& (1 << 26)));
-    set(CpuFeature::avx512er,	(ebx7	& (1 << 27)));
-    set(CpuFeature::avx512cd,	(ebx7	& (1 << 28)));
-    set(CpuFeature::sha,		(ebx7	& (1 << 29)));
-    set(CpuFeature::prefetchwt1,(ecx7	& (1 <<  0)));
-    set(CpuFeature::lahf,		(ecx1ex	& (1 <<  0)));
-    set(CpuFeature::lzcnt,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::abm,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::sse4a,		(ecx1ex	& (1 <<  6)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::xop,		(ecx1ex	& (1 << 11)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::tbm,		(ecx1ex	& (1 << 21)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::syscall,	(edx1ex	& (1 << 11)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::mmxext,		(edx1ex	& (1 << 22)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor::amd);
-	// clang-format on
-	
-	return result;
-}
-
-#endif // OS_WINDOWS
 
 #endif // TL_IMPL
 

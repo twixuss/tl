@@ -83,6 +83,13 @@
 			#define ARCH_AVX512F 0
 		#endif
 	#endif
+	#ifndef ARCH_AVX512VL
+		#ifdef __AVX512VL__
+			#define ARCH_AVX512VL 1
+		#else
+			#define ARCH_AVX512VL 0
+		#endif
+	#endif
 	#ifndef ARCH_AVX512DQ
 		#ifdef __AVX512DQ__
 			#define ARCH_AVX512DQ 1
@@ -116,3 +123,52 @@
 		#define TL_API extern
 	#endif
 #endif
+
+namespace TL {
+
+#if COMPILER_MSVC
+using s8	= signed __int8;
+using s16	= signed __int16;
+using s32	= signed __int32;
+using s64	= signed __int64;
+using u8	= unsigned __int8;
+using u16	= unsigned __int16;
+using u32	= unsigned __int32;
+using u64	= unsigned __int64;
+#else
+using s8	= signed char;
+using s16	= signed short;
+using s32	= signed int;
+using s64	= signed long long;
+using u8	= unsigned char;
+using u16	= unsigned short;
+using u32	= unsigned int;
+using u64	= unsigned long long;
+#endif
+
+using f32	= float;
+using f64	= double;
+using b32	= s32;
+using b64	= s64;
+using slong = signed long;
+using ulong = unsigned long;
+using wchar = wchar_t;
+
+#if ARCH_X64
+using umm = u64;
+using smm = s64;
+#else
+using umm = u32;
+using smm = s32;
+#endif
+
+static_assert(sizeof(s8)  == 1);
+static_assert(sizeof(s16) == 2);
+static_assert(sizeof(s32) == 4);
+static_assert(sizeof(s64) == 8);
+static_assert(sizeof(u8)  == 1);
+static_assert(sizeof(u16) == 2);
+static_assert(sizeof(u32) == 4);
+static_assert(sizeof(u64) == 8);
+
+}

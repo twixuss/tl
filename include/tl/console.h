@@ -17,7 +17,12 @@ void print(char const *fmt, Args const &...args) {
 #if OS_WINDOWS
 void _print(Span<char const> str) {
 	DWORD charsWritten;
-	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.data(), str.size(), &charsWritten, 0);
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+	while (str.size()) {
+		DWORD charsToWrite = (DWORD)min(str.size(), 0xFFFFFFFF);
+		WriteConsoleA(handle, str.data(), charsToWrite, &charsWritten, 0);
+		str._begin += charsToWrite;
+	}
 }
 #else
 #endif

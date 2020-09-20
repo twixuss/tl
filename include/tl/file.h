@@ -61,7 +61,6 @@ win32_FileParams win32_getFileParams(u32 openFlags) {
 	return result;
 }
 File openFile(char const *path, u32 openFlags) {
-	File result = {};
 	auto params = win32_getFileParams(openFlags);
 	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
@@ -71,7 +70,6 @@ File openFile(char const *path, u32 openFlags) {
 	return (File)handle;
 }
 File openFile(wchar const *path, u32 openFlags) {
-	File result;
 	auto params = win32_getFileParams(openFlags);
 	auto handle = CreateFileW(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
@@ -98,7 +96,7 @@ s64 getCursor(File file) {
 	return curP.QuadPart;
 }
 void read(File file, void *data_, u64 size) {
-	DWORD const maxBytes = ~0;
+	DWORD const maxBytes = (DWORD)~0;
 	DWORD bytesRead;
 	u8 *data = (u8 *)data_;
 	while (size > maxBytes) {
@@ -107,11 +105,11 @@ void read(File file, void *data_, u64 size) {
 		size -= maxBytes;
 	}
 	if (size) {
-		ReadFile((HANDLE)file, data, size, &bytesRead, 0);
+		ReadFile((HANDLE)file, data, (DWORD)size, &bytesRead, 0);
 	}
 }
 void write(File file, void const *data_, u64 size) {
-	DWORD const maxBytes = ~0;
+	DWORD const maxBytes = (DWORD)~0;
 	DWORD bytesWritten;
 	u8 *data = (u8 *)data_;
 	while (size > maxBytes) {
@@ -120,7 +118,7 @@ void write(File file, void const *data_, u64 size) {
 		size -= maxBytes;
 	}
 	if (size) {
-		WriteFile((HANDLE)file, data, size, &bytesWritten, 0);
+		WriteFile((HANDLE)file, data, (DWORD)size, &bytesWritten, 0);
 	}
 }
 void close(File file) {

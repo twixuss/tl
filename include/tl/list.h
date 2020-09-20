@@ -350,7 +350,7 @@ struct Queue {
 	}
 };
 
-template <class T, umm blockSize_ = 4096 / sizeof(T), class Allocator = TL_DEFAULT_ALLOCATOR>
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096 / sizeof(T)>
 struct BlockList {
 	static constexpr umm blockSize = blockSize_;
 	union Storage {

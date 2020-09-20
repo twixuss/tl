@@ -29,8 +29,8 @@
   <Type Name="TL::Span&lt;*&gt;">
     <Intrinsic Name="size" Expression="_end-_begin" />
     <Intrinsic Name="data" Expression="_begin" />
-    <DisplayString>{data(),[size()]}</DisplayString>
-    <StringView>data(),[size()]</StringView>
+    <DisplayString>{data(),[size()]na}</DisplayString>
+    <StringView>data(),[size()]na</StringView>
     <Expand>
       <Item Name="[size]" ExcludeView="simple">size()</Item>
       <ArrayItems>
@@ -52,7 +52,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::AllocListBase&lt;*&gt;" Inheritable="true">
+  <Type Name="TL::ForwardListBase&lt;*&gt;" Inheritable="true">
     <Intrinsic Name="size" Expression="_end - _begin" />
     <Intrinsic Name="capacity" Expression="_allocEnd - _begin" />
     <DisplayString>{{ size={size()}, capacity={capacity()} }}</DisplayString>

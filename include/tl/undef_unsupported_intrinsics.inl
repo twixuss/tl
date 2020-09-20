@@ -1,4 +1,4 @@
-#define UNSUPPORTED static_assert(false);
+#define UNSUPPORTED static_assert(false)
 
 #if !ARCH_AVX
 #define _mm256_add_pd(...) UNSUPPORTED
