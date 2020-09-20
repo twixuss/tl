@@ -22,14 +22,14 @@ struct EntireFile {
 	StringSpan data;
 };
 
-File openFile(char const *path, u32 openFlags);
-File openFile(wchar const *path, u32 openFlags);
-void setCursor(File file, s64 offset, FileCursor origin);
-s64 getCursor(File file);
-s64 length(File file);
-void read(File file, void *data, u64 size);
-void write(File file, void const *data, u64 size);
-void close(File);
+TL_API File openFile(char const *path, u32 openFlags);
+TL_API File openFile(wchar const *path, u32 openFlags);
+TL_API void setCursor(File file, s64 offset, FileCursor origin);
+TL_API s64 getCursor(File file);
+TL_API s64 length(File file);
+TL_API void read(File file, void *data, u64 size);
+TL_API void write(File file, void const *data, u64 size);
+TL_API void close(File);
 
 #ifdef TL_IMPL
 

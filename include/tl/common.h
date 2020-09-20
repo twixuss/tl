@@ -54,7 +54,7 @@
 
 namespace TL {
 
-#define TL_DECLARE_HANDLE(name) typedef struct {} *name;
+#define TL_DECLARE_HANDLE(name) typedef struct tl__##name {} *name;
 
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;

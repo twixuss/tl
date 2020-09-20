@@ -1,4 +1,3 @@
-#define TL_IMPL
 #include "../include/tl/tl.h"
 using namespace TL;
 
