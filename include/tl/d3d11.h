@@ -115,6 +115,12 @@ struct State {
 		swapChain->Present(syncInterval, 0);
 	}
 
+	void resizeBackBuffer(u32 width, u32 height) {
+		release(backBuffer);
+		swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+		createBackBuffer();
+	}
+
 	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
 	void setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
 	void setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
