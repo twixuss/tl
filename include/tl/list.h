@@ -629,6 +629,9 @@ umm indexOf(StaticList<T, capacity> const &list, T const *value) {
 	return value - list._begin;
 }
 
+template <class T> umm countof(List<T> const &list) { return list.size(); }
+template <class T> umm countof(UnorderedList<T> const &list) { return list.size(); }
+
 #pragma warning(pop)
 
 }

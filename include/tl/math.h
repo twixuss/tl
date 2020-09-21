@@ -328,8 +328,8 @@ constexpr f32 sqrt2 = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3 = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
 
-template <class T> FORCEINLINE constexpr auto radians(T deg) { return deg * (T)(pi / 180.0L); }
-template <class T> FORCEINLINE constexpr auto degrees(T rad) { return rad * (T)(180.0L / pi); }
+template <class T> FORCEINLINE constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
+template <class T> FORCEINLINE constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
 template <class T, class SN, class SX, class DN, class DX> FORCEINLINE constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class U, class V> FORCEINLINE constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
 template <class A, class B, class T> FORCEINLINE constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }

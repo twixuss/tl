@@ -19,38 +19,54 @@
 #define TL_HRESULT_HANDLER(hr) ASSERT(SUCCEEDED(hr))
 #endif
 
-#define TL_COM_RELEASE(x)	\
-	do {					\
-		if (x) {			\
-			x->Release();	\
-		}					\
-		x = 0;				\
-	} while(0)
+#define TL_COM_RELEASE(x) (((x) ? (x)->Release() : 0), (x) = 0)
 
 namespace TL { namespace D3D11 {
 
-struct StructuredBuffer {
-	ID3D11Buffer *buffer;
+struct ShaderResource {
 	ID3D11ShaderResourceView *srv;
+};
+
+struct StructuredBuffer : ShaderResource {
+	ID3D11Buffer *buffer;
 	D3D11_USAGE usage;
 	u32 size;
 };
+
+template <class T>
+struct TypedStructuredBuffer : StructuredBuffer {};
+
+struct ConstantBuffer {
+	ID3D11Buffer *buffer;
+	D3D11_USAGE usage;
+	u32 size;
+};
+
+template <class T>
+struct TypedConstantBuffer : ConstantBuffer {};
 
 struct RenderTarget {
 	ID3D11RenderTargetView *rtv;
 	ID3D11Texture2D *tex;
 };
 
-struct Texture {
-	ID3D11ShaderResourceView *srv;
+struct DepthStencil {
+	ID3D11DepthStencilView *dsv;
+	ID3D11Texture2D *tex;
+};
+
+struct Texture : ShaderResource {
 	ID3D11Texture2D *tex;
 	u32 width;
 	u32 height;
 };
 
-struct RenderTexture {
+struct Sampler {
+	ID3D11SamplerState *sampler;
+};
+
+struct RenderTexture : ShaderResource {
 	ID3D11RenderTargetView *rtv;
-	ID3D11ShaderResourceView *srv;
 	ID3D11Texture2D *tex;
 };
 
@@ -58,13 +74,23 @@ void release(StructuredBuffer v) {
 	TL_COM_RELEASE(v.buffer);
 	TL_COM_RELEASE(v.srv);
 }
+void release(ConstantBuffer v) {
+	TL_COM_RELEASE(v.buffer);
+}
 void release(RenderTarget v) {
 	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(DepthStencil v) {
+	TL_COM_RELEASE(v.dsv);
 	TL_COM_RELEASE(v.tex);
 }
 void release(Texture v) {
 	TL_COM_RELEASE(v.srv);
 	TL_COM_RELEASE(v.tex);
+}
+void release(Sampler v) {
+	TL_COM_RELEASE(v.sampler);
 }
 void release(RenderTexture v) {
 	TL_COM_RELEASE(v.rtv);
@@ -88,7 +114,13 @@ struct State {
 	u32 syncInterval = 1;
 
 	void createBackBuffer();
-	StructuredBuffer createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage);
+	StructuredBuffer createStructuredBuffer(D3D11_USAGE usage, u32 count, u32 stride, void const *data = 0);
+	template <class T>
+	TypedStructuredBuffer<T> createStructuredBuffer(D3D11_USAGE usage, u32 count, T const *data = 0) {
+		TypedStructuredBuffer<T> result;
+		(StructuredBuffer &)result = createStructuredBuffer(usage, count, sizeof(T), data);
+		return result;
+	}
 	RenderTexture createRenderTexture(u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, UINT cpuFlags = 0);
 	Texture createTexture(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generateMips = false);
 	template <class Handler = decltype(defaultShaderHandler)>
@@ -117,12 +149,98 @@ struct State {
 			messages->Release();
 		return pixelShader;
 	}
+	ConstantBuffer createConstantBuffer(u32 size, D3D11_USAGE usage, void const *initialData = 0) {
+		D3D11_BUFFER_DESC desc = {};
+		desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		desc.ByteWidth = size;
+		desc.CPUAccessFlags = usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u;
+		desc.Usage = usage;
+
+		D3D11_SUBRESOURCE_DATA data = {};
+		data.pSysMem = initialData;
+
+		ConstantBuffer result = {};
+		TL_HRESULT_HANDLER(device->CreateBuffer(&desc, initialData ? &data : 0, &result.buffer));
+		result.usage = usage;
+		result.size = size;
+		return result;
+	}
+	template <class T>
+	TypedConstantBuffer<T> createConstantBuffer(D3D11_USAGE usage, T const *initialData = 0) {
+		static_assert(alignof(T) >= 16, "constant buffer alignment must be 16 or bigger");
+		TypedConstantBuffer<T> result;
+		(ConstantBuffer &)result = createConstantBuffer(sizeof(T), usage, initialData);
+		return result;
+	}
+
+	DepthStencil createDepthStencil(u32 width, u32 height, DXGI_FORMAT format) {
+		DepthStencil result = {};
+		{
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.ArraySize = 1;
+			desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+			desc.Format = format;
+			desc.Width = width;
+			desc.Height = height;
+			desc.MipLevels = 1;
+			desc.SampleDesc = {1, 0};
+			TL_HRESULT_HANDLER(device->CreateTexture2D(&desc, 0, &result.tex));
+		}
+		{
+			D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
+			desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+			desc.Format = format;
+			TL_HRESULT_HANDLER(device->CreateDepthStencilView(result.tex, &desc, &result.dsv));
+		}
+		return result;
+	}
+	Sampler createSampler(D3D11_TEXTURE_ADDRESS_MODE address, D3D11_FILTER filter) {
+		D3D11_SAMPLER_DESC desc = {};
+		desc.AddressU = address;
+		desc.AddressV = address;
+		desc.AddressW = address;
+		desc.Filter = filter;
+		desc.MaxAnisotropy = D3D11_MAX_MAXANISOTROPY;
+		desc.MaxLOD = FLT_MAX;
+
+		Sampler result = {};
+		TL_HRESULT_HANDLER(device->CreateSamplerState(&desc, &result.sampler));
+		return result;
+	}
 
 	void updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stride, void const *data, u32 firstElement = 0);
+	template <class T>
+	void updateStructuredBuffer(TypedStructuredBuffer<T> &buffer, u32 count, T const *data, u32 firstElement = 0) {
+		updateStructuredBuffer(buffer, count, sizeof(T), data, firstElement);
+	}
+
+	void updateConstantBuffer(ConstantBuffer &buffer, u32 size, void const *data) {
+		if (buffer.usage == D3D11_USAGE_DYNAMIC) {
+			D3D11_MAPPED_SUBRESOURCE mapped;
+			useContext([&] { TL_HRESULT_HANDLER(immediateContext->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)); });
+			memcpy(mapped.pData, data, size);
+			useContext([&] { immediateContext->Unmap(buffer.buffer, 0); });
+		} else if (buffer.usage == D3D11_USAGE_DEFAULT) {
+			useContext([&] { immediateContext->UpdateSubresource(buffer.buffer, 0, 0, data, 0, 0); });
+		} else {
+			INVALID_CODE_PATH("bad buffer.usage");
+		}
+	}
+	template <class T>
+	void updateConstantBuffer(TypedConstantBuffer<T> &buffer, T const *data) {
+		updateConstantBuffer(buffer, sizeof(T), data);
+	}
 
 	void clearRenderTarget(ID3D11RenderTargetView *renderTarget, f32 const rgba[4]);
 	void clearRenderTarget(RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
 	void clearRenderTarget(RenderTexture &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
+
+	void clearDepthStencil(ID3D11DepthStencilView *depthStencil, f32 depth) {
+		useContext([&] {
+			immediateContext->ClearDepthStencilView(depthStencil, depth, D3D11_CLEAR_DEPTH, 0);	
+		});
+	}
+	void clearDepthStencil(DepthStencil &depthStencil, f32 depth) { clearDepthStencil(depthStencil.dsv, depth); }
 
 	template <class Fn>
 	void useContext(Fn &&fn) {
@@ -147,11 +265,29 @@ struct State {
 	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
 	void setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
 	void setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
-	void setShaderResource(StructuredBuffer &buffer, u32 slot, char stage) { 
+	void setShaderResource(ShaderResource const &resource, char stage, u32 slot) {
 		useContext([&] { 
 			switch (stage) {
-				case 'V': immediateContext->VSSetShaderResources(slot, 1, &buffer.srv); break;
-				case 'P': immediateContext->PSSetShaderResources(slot, 1, &buffer.srv); break;
+				case 'V': immediateContext->VSSetShaderResources(slot, 1, &resource.srv); break;
+				case 'P': immediateContext->PSSetShaderResources(slot, 1, &resource.srv); break;
+				default: INVALID_CODE_PATH("bad stage"); break;
+			}
+		});
+	}
+	void setSampler(Sampler const &sampler, char stage, u32 slot) {
+		useContext([&] { 
+			switch (stage) {
+				case 'V': immediateContext->VSSetSamplers(slot, 1, &sampler.sampler); break;
+				case 'P': immediateContext->PSSetSamplers(slot, 1, &sampler.sampler); break;
+				default: INVALID_CODE_PATH("bad stage"); break;
+			}
+		});
+	}
+	void setConstantBuffer(ConstantBuffer const &buffer, char stage, u32 slot) {
+		useContext([&] { 
+			switch (stage) {
+				case 'V': immediateContext->VSSetConstantBuffers(slot, 1, &buffer.buffer); break;
+				case 'P': immediateContext->PSSetConstantBuffers(slot, 1, &buffer.buffer); break;
 				default: INVALID_CODE_PATH("bad stage"); break;
 			}
 		});
@@ -159,8 +295,13 @@ struct State {
     void setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax);
 	void setViewport(f32 x, f32 y, f32 w, f32 h) { setViewport(x, y, w, h, 0, 1); }
 	void setViewport(f32 w, f32 h) { setViewport(0, 0, w, h); }
-	void setRenderTarget(ID3D11RenderTargetView *renderTarget) { useContext([&] { immediateContext->OMSetRenderTargets(1, &renderTarget, 0); }); }
-	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv); }
+	void setRenderTarget(ID3D11RenderTargetView *renderTarget, ID3D11DepthStencilView *depthStencil) { 
+		useContext([&] { 
+			immediateContext->OMSetRenderTargets(1, &renderTarget, depthStencil);
+		});
+	}
+	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv, 0); }
+	void setRenderTarget(RenderTarget &renderTarget, DepthStencil &depthStencil) { setRenderTarget(renderTarget.rtv, depthStencil.dsv); }
 
 	u32 getMaxMsaaSampleCount(DXGI_FORMAT format);
 };
@@ -341,7 +482,7 @@ void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT bac
 	state.createBackBuffer();
 }
 
-StructuredBuffer State::createStructuredBuffer(u32 count, u32 stride, void const *data, D3D11_USAGE usage) {
+StructuredBuffer State::createStructuredBuffer(D3D11_USAGE usage, u32 count, u32 stride, void const *data) {
 	StructuredBuffer result;
 	result.usage = usage;
 	result.size = count * stride;
@@ -458,6 +599,8 @@ void State::updateStructuredBuffer(StructuredBuffer &buffer, u32 count, u32 stri
 		box.back = 1;
 		box.bottom = 1;
 		useContext([&] { immediateContext->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0); });
+	} else {
+		INVALID_CODE_PATH("bad buffer.usage");
 	}
 }
 
