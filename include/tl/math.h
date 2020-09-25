@@ -2179,16 +2179,16 @@ SHUFFLE32x8(u32x8)
 
 #define MEMBERS2S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS2(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE v2 operator[](umm i) const { return this[i]; }                                                      \
-	FORCEINLINE v2 &operator[](umm i) { return this[i]; }
+	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
+	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
 #define MEMBERS3S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS3(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE v3 operator[](umm i) const { return this[i]; }                                                      \
-	FORCEINLINE v3 &operator[](umm i) { return this[i]; }
+	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
+	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
 #define MEMBERS4S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS4(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE v4 operator[](umm i) const { return this[i]; }                                                      \
-	FORCEINLINE v4 &operator[](umm i) { return this[i]; }
+	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
+	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
 
 #define MEMBERS2P(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS2(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
@@ -2649,6 +2649,56 @@ FORCEINLINE m4 transpose(m4 const& m) {
 	result.k.m.m.ps = _mm_movelh_ps(tmp1, tmp3);
 	result.l.m.m.ps = _mm_movehl_ps(tmp3, tmp1);
 	return result;
+}
+
+inline m4 inverse(m4 const &m) {
+	f32 A2323 = m.k.z * m.l.w - m.k.w * m.l.z;
+	f32 A1323 = m.k.y * m.l.w - m.k.w * m.l.y;
+	f32 A1223 = m.k.y * m.l.z - m.k.z * m.l.y;
+	f32 A0323 = m.k.x * m.l.w - m.k.w * m.l.x;
+	f32 A0223 = m.k.x * m.l.z - m.k.z * m.l.x;
+	f32 A0123 = m.k.x * m.l.y - m.k.y * m.l.x;
+	f32 A2313 = m.j.z * m.l.w - m.j.w * m.l.z;
+	f32 A1313 = m.j.y * m.l.w - m.j.w * m.l.y;
+	f32 A1213 = m.j.y * m.l.z - m.j.z * m.l.y;
+	f32 A2312 = m.j.z * m.k.w - m.j.w * m.k.z;
+	f32 A1312 = m.j.y * m.k.w - m.j.w * m.k.y;
+	f32 A1212 = m.j.y * m.k.z - m.j.z * m.k.y;
+	f32 A0313 = m.j.x * m.l.w - m.j.w * m.l.x;
+	f32 A0213 = m.j.x * m.l.z - m.j.z * m.l.x;
+	f32 A0312 = m.j.x * m.k.w - m.j.w * m.k.x;
+	f32 A0212 = m.j.x * m.k.z - m.j.z * m.k.x;
+	f32 A0113 = m.j.x * m.l.y - m.j.y * m.l.x;
+	f32 A0112 = m.j.x * m.k.y - m.j.y * m.k.x;
+
+	f32 det = m.i.x * (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223) 
+		    - m.i.y * (m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223) 
+		    + m.i.z * (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123) 
+		    - m.i.w * (m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123);
+
+	if (det == 0)
+		return {};
+
+	det = 1 / det;
+
+	return m4 {
+	   det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
+	   det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
+	   det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
+	   det * -(m.i.y * A2312 - m.i.z * A1312 + m.i.w * A1212),
+	   det * -(m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223),
+	   det *  (m.i.x * A2323 - m.i.z * A0323 + m.i.w * A0223),
+	   det * -(m.i.x * A2313 - m.i.z * A0313 + m.i.w * A0213),
+	   det *  (m.i.x * A2312 - m.i.z * A0312 + m.i.w * A0212),
+	   det *  (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123),
+	   det * -(m.i.x * A1323 - m.i.y * A0323 + m.i.w * A0123),
+	   det *  (m.i.x * A1313 - m.i.y * A0313 + m.i.w * A0113),
+	   det * -(m.i.x * A1312 - m.i.y * A0312 + m.i.w * A0112),
+	   det * -(m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123),
+	   det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
+	   det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
+	   det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
+	};
 }
 
 #define V2(f32, v2f, V2f)                                     \
@@ -3510,11 +3560,6 @@ FORCEINLINE v3f frac(v3f v) { return frac(V4f(v, 0)).xyz; }
 FORCEINLINE v3fx4 frac(v3fx4 v) { return V3fx4(frac(v.x), frac(v.y), frac(v.z)); }
 FORCEINLINE v3fx8 frac(v3fx8 v) { return V3fx8(frac(v.x), frac(v.y), frac(v.z)); }
 
-FORCEINLINE constexpr s32 frac(s32 v, s32 s) {
-	if (v < 0)
-		return (v + 1) % s + s - 1;
-	return v % s;
-}
 FORCEINLINE s32x4 frac(s32x4 v, s32x4 s) {
 #if ARCH_AVX
 	__m256d vd = _mm256_cvtepi32_pd(v.m.pi);
@@ -4815,7 +4860,7 @@ FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Random random = {}) {
 	v3sx8 tile8 = V3sx8(tile);
 	v3fx8 rel8	= V3fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) - 0.5f + (v3fx8)offset));
+		minDist = min(minDist, min(distanceSqr(rel8, random(tile8 + offset) - 0.5f + (v3fx8)offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
 		minDist = min(minDist, distanceSqr(rel, random(tile + offset) - 0.5f + (v3f)offset));
@@ -4999,72 +5044,6 @@ FORCEINLINE b32x<ps> raycastLine(v2fx<ps> a, v2fx<ps> b, v2fx<ps> c, v2fx<ps> d,
 
 	return result;
 }
-FORCEINLINE bool raycastRect(v2f a, v2f b, v2f tile, v2f size, v2f& point, v2f& normal) {
-	v2f points[4];
-	v2f normals[4];
-	v2f const w = size;
-	// clang-format off
-	bool hits[]{
-		raycastLine(a, b, tile + v2f{-w.x, w.y}, tile + v2f{ w.x, w.y}, points[0], normals[0]),
-		raycastLine(a, b, tile + v2f{ w.x, w.y}, tile + v2f{ w.x,-w.y}, points[1], normals[1]),
-		raycastLine(a, b, tile + v2f{ w.x,-w.y}, tile + v2f{-w.x,-w.y}, points[2], normals[2]),
-		raycastLine(a, b, tile + v2f{-w.x,-w.y}, tile + v2f{-w.x, w.y}, points[3], normals[3]),
-	};
-	// clang-format on
-	f32 minDist	 = FLT_MAX;
-	int minIndex = -1;
-	for (int i = 0; i < 4; ++i) {
-		if (!hits[i])
-			continue;
-		f32 len = lengthSqr(a - points[i]);
-		if (len < minDist) {
-			minDist	 = len;
-			minIndex = i;
-		}
-	}
-	if (minIndex == -1) {
-		return false;
-	}
-	point  = points[minIndex];
-	normal = normals[minIndex];
-	return true;
-}
-template <umm ps>
-FORCEINLINE b32x<ps> raycastRect(v2fx<ps> a, v2fx<ps> b, v2fx<ps> tile, v2fx<ps> size, v2fx<ps>& point, v2fx<ps>& normal, bool backFace = true) {
-	v2fx<ps> points[4];
-	v2fx<ps> normals[4];
-	v2fx<ps> const w = size;
-	// clang-format off
-	b32x<ps> hits[]{
-		raycastLine(a, b, tile + v2fx<ps>{-w.x, w.y}, tile + v2fx<ps>{ w.x, w.y}, points[0], normals[0], backFace),
-		raycastLine(a, b, tile + v2fx<ps>{ w.x, w.y}, tile + v2fx<ps>{ w.x,-w.y}, points[1], normals[1], backFace),
-		raycastLine(a, b, tile + v2fx<ps>{ w.x,-w.y}, tile + v2fx<ps>{-w.x,-w.y}, points[2], normals[2], backFace),
-		raycastLine(a, b, tile + v2fx<ps>{-w.x,-w.y}, tile + v2fx<ps>{-w.x, w.y}, points[3], normals[3], backFace),
-	};
-	// clang-format on
-	f32x<ps> minDist  = F32x<ps>(FLT_MAX);
-	s32x<ps> minIndex = S32x<ps>(-1);
-	for (int i = 0; i < 4; ++i) {
-		f32x<ps> len	  = lengthSqr(a - points[i]);
-		b32x<ps> mask = hits[i] && len < minDist;
-		minDist		  = select(mask, len, minDist);
-		minIndex	  = select(mask, S32x<ps>(i), minIndex);
-	}
-	b32x<ps> masks[4];
-	masks[0] = minIndex == -1;
-	masks[1] = minIndex == 0;
-	masks[2] = minIndex == 1;
-	masks[3] = minIndex == 2;
-
-	point  = select(masks[0], {},
-			 select(masks[1], points[0], 
-			 select(masks[2], points[1], 
-			 select(masks[3], points[2], points[3]))));
-	normal = select(masks[0], {},
-			 select(masks[1], normals[0], select(masks[2], normals[1], select(masks[3], normals[2], normals[3]))));
-
-	return !masks[0];
-}
 FORCEINLINE bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v2f& normal) {
 	v2f dir = normalize(b - a);
 	v2f rdir = 1.0f / dir;
@@ -5138,39 +5117,6 @@ FORCEINLINE bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 	return u >= 0.0f && u <= dot(p21, p21) && v >= 0.0f && v <= dot(p31, p31);
 }
 
-FORCEINLINE bool raycastBlock(v3f a, v3f b, v3f blk, v3f blockDimensions, v3f &point, v3f &normal) {
-	v3f points[6];
-	v3f normals[6];
-	bool results[6]{};
-	f32 x = blockDimensions.x;
-	f32 y = blockDimensions.y;
-	f32 z = blockDimensions.z;
-	// clang-format off
-	results[0]	= raycastPlane(a, b, blk + v3f{ x, y, z}, blk + v3f{ x,-y, z}, blk + v3f{ x, y,-z}, points[0], normals[0]); //+x
-	results[1]	= raycastPlane(a, b, blk + v3f{-x, y, z}, blk + v3f{-x, y,-z}, blk + v3f{-x,-y, z}, points[1], normals[1]); //-x
-	results[2]	= raycastPlane(a, b, blk + v3f{ x, y, z}, blk + v3f{ x, y,-z}, blk + v3f{-x, y, z}, points[2], normals[2]); //+y
-	results[3]	= raycastPlane(a, b, blk + v3f{ x,-y, z}, blk + v3f{-x,-y, z}, blk + v3f{ x,-y,-z}, points[3], normals[3]); //-y
-	results[4]	= raycastPlane(a, b, blk + v3f{ x, y, z}, blk + v3f{-x, y, z}, blk + v3f{ x,-y, z}, points[4], normals[4]); //+z
-	results[5]	= raycastPlane(a, b, blk + v3f{ x, y,-z}, blk + v3f{ x,-y,-z}, blk + v3f{-x, y,-z}, points[5], normals[5]); //-z
-	// clang-format on
-	s32 min		= -1;
-	f32 minDist = FLT_MAX;
-	for (s32 i = 0; i < 6; ++i) {
-		if (results[i]) {
-			auto lenSqr = lengthSqr(a - points[i]);
-			if (lenSqr < minDist) {
-				minDist = lenSqr;
-				min = i;
-			}
-		}
-	}
-	if (min == -1)
-		return false;
-	point = points[min];
-	normal = normals[min];
-	return true;
-}
-
 template <class T, umm size>
 FORCEINLINE constexpr T linearSample(const T (&arr)[size], float t) noexcept {
 	f32 f = frac(t) * size;
@@ -5182,15 +5128,35 @@ FORCEINLINE constexpr T linearSample(const T (&arr)[size], float t) noexcept {
 }
 using FrustumPlanes = Array<v4f, 6>;
 
-FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 vp) {
+FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 m) {
 	FrustumPlanes planes;
-	m4 t = transpose(vp);
-	planes[0] = t[3] + t[0];
-	planes[1] = t[3] - t[0];
-	planes[2] = t[3] + t[1];
-	planes[3] = t[3] - t[1];
-	planes[4] = t[3] + t[2];
-	planes[5] = t[3] - t[2];
+	
+	// http://www.cs.otago.ac.nz/postgrads/alexis/planeExtraction.pdf
+	planes[0].x = m.i.w + m.i.x;
+	planes[0].y = m.j.w + m.j.x;
+	planes[0].z = m.k.w + m.k.x;
+	planes[0].w = m.l.w + m.l.x;
+	planes[1].x = m.i.w - m.i.x;
+	planes[1].y = m.j.w - m.j.x;
+	planes[1].z = m.k.w - m.k.x;
+	planes[1].w = m.l.w - m.l.x;
+	planes[2].x = m.i.w + m.i.y;
+	planes[2].y = m.j.w + m.j.y;
+	planes[2].z = m.k.w + m.k.y;
+	planes[2].w = m.l.w + m.l.y;
+	planes[3].x = m.i.w - m.i.y;
+	planes[3].y = m.j.w - m.j.y;
+	planes[3].z = m.k.w - m.k.y;
+	planes[3].w = m.l.w - m.l.y;
+	planes[4].x = m.i.z;
+	planes[4].y = m.j.z;
+	planes[4].z = m.k.z;
+	planes[4].w = m.l.z;
+	planes[5].x = m.i.w - m.i.z;
+	planes[5].y = m.j.w - m.j.z;
+	planes[5].z = m.k.w - m.k.z;
+	planes[5].w = m.l.w - m.l.z;
+
 	for (auto& p : planes) {
 		p /= length(v3f{p.x, p.y, p.z});
 	}

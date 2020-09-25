@@ -166,6 +166,7 @@ struct StringBuilder {
 		}
 	}
 	umm append(Span<Char const> span) {
+		umm charsWritten = span.size();
 		umm charsToWrite = span.size();
 		while (last->availableSpace() < charsToWrite) {
 			umm spaceInBlock = last->availableSpace();
@@ -173,14 +174,14 @@ struct StringBuilder {
 			charsToWrite -= spaceInBlock;
 			last->end += spaceInBlock;
 			span = {span.begin() + spaceInBlock, span.end()};
-			last = last->next;
-			if (!last) {
-				last = allocLast = allocateBlock();
+			if (!last->next) {
+				last->next = allocLast = allocateBlock();
+				last = last->next;
 			}
 		}
 		memcpy(last->end, span.data(), charsToWrite);
 		last->end += charsToWrite;
-		return span.size();
+		return charsWritten;
 	}
 	umm append(Char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
 	umm append(Char ch, umm count = 1) {
@@ -198,6 +199,12 @@ struct StringBuilder {
 		memset(last->end, ch, charsToWrite);
 		last->end += charsToWrite;
 		return count;
+	}
+	template <class T>
+	umm append(T const &val) {
+		return toString([&] (Char const *src, umm length) {
+			return StringSpan(0, append(Span{src, length}));
+		}, val).size();
 	}
 	umm appendBytes(void const *address, umm size) {
 		append(Span((Char *)address, (Char *)address + size));

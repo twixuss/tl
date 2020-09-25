@@ -197,6 +197,11 @@ FORCEINLINE constexpr u64 ceil(u64 v, u64 s) { return floor((u64)(v + s - 1), s)
 FORCEINLINE constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
 FORCEINLINE constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
+FORCEINLINE constexpr s8  frac(s8  v, s8  s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
+FORCEINLINE constexpr s16 frac(s16 v, s16 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
+FORCEINLINE constexpr s32 frac(s32 v, s32 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
+FORCEINLINE constexpr s64 frac(s64 v, s64 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
+
 FORCEINLINE constexpr bool isNegative(f32 v) { return *(u32 *)&v & 0x80000000; }
 FORCEINLINE constexpr bool isNegative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
 

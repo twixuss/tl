@@ -2,6 +2,10 @@
 #include "system.h"
 #if OS_WINDOWS
 #include "common.h"
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#pragma comment(lib, "user32.lib")
 
 namespace TL {
 
@@ -25,7 +29,7 @@ bool registerRawInput(RawInputDevice deviceFlags) {
 		devices.push_back(mouse);
 	}
 	if (devices.size()) {
-		if (!RegisterRawInputDevices(devices.data(), devices.size(), sizeof(devices[0]))) {
+		if (!RegisterRawInputDevices(devices.data(), (UINT)devices.size(), sizeof(devices[0]))) {
 			return false;
 		}
 	}
@@ -82,6 +86,8 @@ bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleR
 			if (handleRepeated || isRepeated == wentUp) { // Don't handle repeated
 				keyboardButtons[code] = !wentUp;
 			}
+			(void)extended;
+			(void)alt;
 			return true;
 		}
 	}

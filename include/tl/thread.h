@@ -233,9 +233,12 @@ struct Mutex {
 	bool volatile inUse = false;
 };
 
+inline bool tryLock(Mutex &m) {
+	return !lockSetIfEquals(&m.inUse, true, false);
+}
 inline void lock(Mutex &m) {
 	loopUntil([&] {
-		return !lockSetIfEquals(&m.inUse, true, false);
+		return tryLock(m);
 	});
 }
 inline void unlock(Mutex &m) {
@@ -247,6 +250,15 @@ struct RecursiveMutex {
 	u32 counter = 0;
 };
 
+inline bool tryLock(RecursiveMutex &m) {
+	u32 threadId = getCurrentThreadId();
+	if (threadId == m.threadId) {
+		++m.counter;
+		return true;
+	} else {
+		return !lockSetIfEquals(&m.threadId, threadId, (u32)0);
+	}
+}
 inline void lock(RecursiveMutex &m) {
 	u32 threadId = getCurrentThreadId();
 	if (threadId == m.threadId) {
@@ -267,6 +279,214 @@ inline void unlock(RecursiveMutex &m) {
 
 #define SCOPED_LOCK(mutex) lock(mutex); DEFER { unlock(mutex); }
 #define SCOPED_UNLOCK(mutex) unlock(mutex); DEFER { lock(mutex); }
+
+template <class T, class Mutex = Mutex>
+struct MutexQueue {
+	Queue<T> base;
+	Mutex mutex;
+	
+	void push(T &&value) {
+		SCOPED_LOCK(mutex);
+		base.push(std::move(value));
+	}
+	void push(T const &value) {
+		SCOPED_LOCK(mutex);
+		base.push(value);
+	}
+	Optional<T> try_pop() {
+		Optional<T> result;
+		SCOPED_LOCK(mutex);
+		if (base.size()) {
+			result.emplace(std::move(base.front()));
+			base.pop();
+		}
+		return result;
+	}
+	T pop() {
+		Optional<T> opt;
+		loopUntil([&] {
+			opt = try_pop();
+			return opt.has_value();
+		});
+		return opt.value();
+	}
+	void clear() {
+		SCOPED_LOCK(mutex);
+		base.clear();
+	}
+};
+
+struct WorkQueue;
+
+struct ThreadWork {
+	WorkQueue *queue;
+	void (*fn)(void *param);
+	void *param;
+};
+
+struct ThreadPool {
+	Allocator allocator = osAllocator;
+	ThreadHandle *threads = 0;
+	u32 threadCount = 0;
+	u32 volatile initializedThreadCount = 0;
+	u32 volatile deadThreadCount = 0;
+	bool volatile running = false;
+	bool volatile stopping = false;
+	MutexQueue<ThreadWork> allWork;
+};
+bool tryDoWork(ThreadPool *pool);
+
+namespace Detail {
+template <class Tuple, umm... indices>
+static void invoke(void *rawVals) noexcept {
+	Tuple *fnVals((Tuple *)(rawVals));
+	Tuple &tup = *fnVals;
+	std::invoke(std::move(std::get<indices>(tup))...);
+}
+
+template <class Tuple, umm... indices>
+static constexpr auto getInvoke(std::index_sequence<indices...>) noexcept {
+	return &invoke<Tuple, indices...>;
+}
+} // namespace Detail
+
+struct WorkQueue {
+	u32 volatile workToDo = 0;
+	ThreadPool *pool = 0;
+	inline void push(void (*fn)(void *param), void *param) {
+		if (pool->threadCount) {
+			ThreadWork work;
+			work.fn = fn;
+			work.param = param;
+			work.queue = this;
+			pool->allWork.push(work);
+		} else {
+			fn(param);
+		}
+	}
+	template <class Fn, class... Args>
+	void push(Fn &&fn, Args &&... args) {
+		if (pool->threadCount) {
+			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+			auto fnParams = allocate<Tuple>(pool->allocator);
+			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+			constexpr auto invokerProc = Detail::getInvoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+			lockAdd(workToDo, 1);
+			push((void (*)(void *))invokerProc, (void *)fnParams);
+		} else {
+			fn(std::forward<Args>(args)...);
+		}
+	}
+	inline void completeAllWork() {
+		if (pool->threadCount) {
+			loopUntil([&] {
+				tryDoWork(pool);
+				return workToDo == 0;
+			});
+		}
+	}
+
+};
+
+inline WorkQueue makeWorkQueue(ThreadPool *pool) {
+	WorkQueue result = {};
+	result.pool = pool;
+	return result;
+}
+
+inline void doWork(ThreadWork work) {
+	work.fn(work.param);
+	work.queue->pool->allocator.deallocate(work.param);
+	lockAdd(work.queue->workToDo, (u32)-1);
+}
+inline bool tryDoWork(ThreadPool *pool) {
+	if (auto popped = pool->allWork.try_pop()) {
+		doWork(*popped);
+		return true;
+	}
+	return false;
+}
+inline bool doWork(ThreadPool *pool) {
+	ThreadWork work = {};
+	loopUntil([&] {
+		if (pool->stopping) {
+			return true;
+		}
+		if (auto popped = pool->allWork.try_pop()) {
+			work = *popped;
+			return true;
+		}
+		return false;
+	});
+
+	if (work.fn) {
+		doWork(work);
+		return true;
+	} else {
+		return false;
+	}
+}
+
+inline void defaultThreadPoolProc(ThreadPool *pool) {
+	lockAdd(pool->initializedThreadCount, 1);
+	loopUntil([&] { return pool->running || pool->stopping; });
+	while (1) {
+		if (!doWork(pool))
+			break;
+	}
+	lockAdd(pool->deadThreadCount, 1);
+}
+template <class ThreadProc = decltype(defaultThreadPoolProc)>
+bool initThreadPool(ThreadPool *pool, u32 threadCount, ThreadProc &&threadProc = defaultThreadPoolProc) {
+	TIMED_FUNCTION;
+	pool->initializedThreadCount = 0;
+	pool->deadThreadCount = 0;
+	pool->running = false;
+	pool->stopping = false;
+	pool->threadCount = threadCount;
+	if (threadCount) {
+		pool->threads = allocate<ThreadHandle>(pool->allocator, threadCount);
+		
+		struct StartParams {
+			ThreadPool *pool;
+			ThreadProc *proc;
+		};
+		StartParams params;
+		params.pool = pool;
+		params.proc = std::addressof(threadProc);
+		
+		auto startProc = [](void *param) {
+			StartParams *info = (StartParams *)param;
+			(*info->proc)(info->pool);
+		};
+
+		for (u32 i = 0; i < threadCount; ++i) {
+			pool->threads[i] = createThread(startProc, &params);
+			if (!pool->threads[i]) {
+				pool->stopping = true;
+				for (u32 j = 0; j < i; ++j) {
+					destroyThread(pool->threads[j]);
+				}
+				return false;
+			}
+		}
+
+		loopUntil([&] {
+			return pool->initializedThreadCount == pool->threadCount;
+		});
+		pool->running = true;
+	} else {
+		pool->threads = 0;
+	}
+
+	return true;
+}
+inline void deinitThreadPool(ThreadPool *pool, bool waitForThreads = true) {
+	pool->stopping = true;
+	if (waitForThreads) {
+		loopUntil([&] { return pool->deadThreadCount == pool->threadCount; });
+	}
+}
 
 } // namespace TL
 #pragma warning(pop)

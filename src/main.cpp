@@ -1,5 +1,4 @@
 #include "../include/tl/tl.h"
-#include "../include/tl/d3d11.h"
 using namespace TL;
 
 #pragma warning(push, 0)
@@ -257,22 +256,11 @@ void test_int() {
 void string_test() {
 	printf("%s ... ", "string_test");
 	StringBuilder<OsAllocator, 16> builder;
-	memset(builder.first.buffer, 'A', 16);
-	for (u32 i = 0; i < 8; ++i)
-		builder.append('B');
-
-	ASSERT(memcmp(builder.first.buffer, "BBBBBBBBAAAAAAAA", 16) == 0);
-	ASSERT(&builder.first == builder.last);
-	ASSERT(&builder.first == builder.allocLast);
-
-	builder.ensureConsecutiveSpace(16);
-	memset(builder.last->buffer, 'C', 16);
-	for (u32 i = 0; i < 8; ++i)
-		builder.append('D');
-	
-	ASSERT(builder.first.next == builder.last);
-	ASSERT(builder.first.next == builder.allocLast);
-	ASSERT(memcmp(builder.last->buffer, "DDDDDDDDCCCCCCCC", 16) == 0);
+	char *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
+	builder.append(str);
+	auto result = builder.get();
+	ASSERT(result.size() == strlen(str));
+	ASSERT(memcmp(result.data(), str, result.size()) == 0);
 
 	puts("ok");
 }
@@ -376,6 +364,17 @@ void math_test() {
 	test_int<u64x1>();
 	//test_int<u64x2>();
 	//test_int<u64x4>();
+
+	
+	ASSERT((v2f{0,1}[0] == 0));
+	ASSERT((v2f{0,1}[1] == 1));
+	ASSERT((v3f{0,1,2}[0] == 0));
+	ASSERT((v3f{0,1,2}[1] == 1));
+	ASSERT((v3f{0,1,2}[2] == 2));
+	ASSERT((v4f{0,1,2,3}[0] == 0));
+	ASSERT((v4f{0,1,2,3}[1] == 1));
+	ASSERT((v4f{0,1,2,3}[2] == 2));
+	ASSERT((v4f{0,1,2,3}[3] == 3));
 }
 
 
@@ -670,7 +669,37 @@ void common_test() {
 	static_assert(TL::midpoint((s32)0xFFFFFFFF, (s32)0xFFFFFFFD) == (s32)0xFFFFFFFE);
 }
 
+void buffer_test() {
+	CircularBuffer<u32, 256> buffer;
+	for (u32 i = 0; i < 128; ++i) {
+		if (i & 1)
+			buffer.push_back(i);
+		else
+			buffer.push_front(i);
+	}
+
+	umm count = 0;
+	for (auto &x : buffer) {
+		++count;
+	}
+	ASSERT(count == buffer.size());
+	
+	for (u32 i = 0; i < 32; ++i) {
+		buffer.erase(buffer.begin() + 2);
+	}
+	for (u32 i = 0; i < 32; ++i) {
+		buffer.erase(buffer.end() - 3);
+	}
+	for (u32 i = 0; i < 32; ++i) {
+		buffer.pop_front();
+	}
+	for (u32 i = 0; i < 32; ++i) {
+		buffer.pop_back();
+	}
+}
+
 int main() {
+	buffer_test();
 	common_test();
 	sort_test();
 	//sort_perf();

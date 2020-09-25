@@ -29,18 +29,78 @@ TL_API s64 getCursor(File file);
 TL_API s64 length(File file);
 TL_API void read(File file, void *data, u64 size);
 TL_API void write(File file, void const *data, u64 size);
-TL_API void close(File);
+TL_API void truncateToCursor(File file);
+TL_API void close(File file);
+
+inline s64 length(File file) {
+	auto oldCursor = getCursor(file);
+	DEFER { setCursor(file, oldCursor, File_begin); };
+	setCursor(file, 0, File_end);
+	return getCursor(file);
+}
+
+inline EntireFile readEntireFile(File file, Allocator allocator = osAllocator) {
+	auto oldCursor = getCursor(file);
+	DEFER { setCursor(file, oldCursor, File_begin); };
+
+	setCursor(file, 0, File_end);
+	auto size = (umm)getCursor(file);
+	setCursor(file, 0, File_begin);
+
+	auto data = allocator.allocate(size);
+	read(file, data, size);
+
+	EntireFile result;
+	result.allocator = allocator;
+	result.data = {(char *)data, size};
+	return result;
+}
+inline EntireFile readEntireFile(char const *path, Allocator allocator = osAllocator) {
+	File file = openFile(path, File_read);
+	if (file) {
+		DEFER { close(file); };
+		return readEntireFile(file, allocator);
+	} else {
+		return {};
+	}
+}
+inline EntireFile readEntireFile(wchar const *path, Allocator allocator = osAllocator) {
+	File file = openFile(path, File_read);
+	if (file) {
+		DEFER { close(file); };
+		return readEntireFile(file, allocator);
+	} else {
+		return {};
+	}
+}
+inline void freeEntireFile(EntireFile file) {
+	file.allocator.deallocate(file.data.begin());
+}
+inline void truncate(File file, u64 size) {
+	setCursor(file, (s64)size, File_begin);
+	truncateToCursor(file);
+}
+inline void writeEntireFile(File file, void const *data, u64 size) {
+	setCursor(file, 0, File_begin);
+	write(file, data, size);
+	truncateToCursor(file);
+}
+inline void writeEntireFile(char const *path, void const *data, u64 size) {
+	File file = openFile(path, File_write);
+	writeEntireFile(file, data, size);
+	close(file);
+}
 
 #ifdef TL_IMPL
 
 #if OS_WINDOWS
-struct win32_FileParams {
+struct FileParams {
 	DWORD access;
 	DWORD share;
 	DWORD creation;
 };
-win32_FileParams win32_getFileParams(u32 openFlags) {
-	win32_FileParams result;
+FileParams getFileParams(u32 openFlags) {
+	FileParams result;
 	if ((openFlags & File_read) && (openFlags & File_write)) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
 		result.share = 0;
@@ -61,7 +121,7 @@ win32_FileParams win32_getFileParams(u32 openFlags) {
 	return result;
 }
 File openFile(char const *path, u32 openFlags) {
-	auto params = win32_getFileParams(openFlags);
+	auto params = getFileParams(openFlags);
 	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
@@ -70,7 +130,7 @@ File openFile(char const *path, u32 openFlags) {
 	return (File)handle;
 }
 File openFile(wchar const *path, u32 openFlags) {
-	auto params = win32_getFileParams(openFlags);
+	auto params = getFileParams(openFlags);
 	auto handle = CreateFileW(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
@@ -121,6 +181,9 @@ void write(File file, void const *data_, u64 size) {
 		WriteFile((HANDLE)file, data, (DWORD)size, &bytesWritten, 0);
 	}
 }
+void truncateToCursor(File file) {
+	SetEndOfFile((HANDLE)file);
+}
 void close(File file) {
 	CloseHandle((HANDLE)file);
 }
@@ -128,50 +191,5 @@ void close(File file) {
 	XXX;
 #endif
 #endif
-	
-inline s64 length(File file) {
-	auto oldCursor = getCursor(file);
-	DEFER { setCursor(file, oldCursor, File_begin); };
-	setCursor(file, 0, File_end);
-	return getCursor(file);
-}
-
-inline EntireFile readEntireFile(File file, Allocator allocator = osAllocator) {
-	auto oldCursor = getCursor(file);
-	DEFER { setCursor(file, oldCursor, File_begin); };
-
-	setCursor(file, 0, File_end);
-	auto size = (umm)getCursor(file);
-	setCursor(file, 0, File_begin);
-
-	auto data = allocator.allocate(size);
-	read(file, data, size);
-
-	EntireFile result;
-	result.allocator = allocator;
-	result.data = {(char *)data, size};
-	return result;
-}
-inline EntireFile readEntireFile(char const *path, Allocator allocator = osAllocator) {
-	File file = openFile(path, File_read);
-	if (file) {
-		DEFER { close(file); };
-		return readEntireFile(file, allocator);
-	} else {
-		return {};
-	}
-}
-inline EntireFile readEntireFile(wchar const *path, Allocator allocator = osAllocator) {
-	File file = openFile(path, File_read);
-	if (file) {
-		DEFER { close(file); };
-		return readEntireFile(file, allocator);
-	} else {
-		return {};
-	}
-}
-inline void freeEntireFile(EntireFile file) {
-	file.allocator.deallocate(file.data.begin());
-}
 
 }

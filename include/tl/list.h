@@ -348,6 +348,135 @@ struct Queue {
 		}
 		_reallocate(newCapacity);
 	}
+
+	void erase(T *val) {
+		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
+		val->~T();
+
+		umm leftCount = val - _begin;
+		umm rightCount = _end - val - 1;
+
+		if (leftCount <= rightCount) {
+			// move left part +1
+			for (T *dest = val; dest != this->_begin; --dest) {
+				*dest = std::move(dest[-1]);
+			}
+			(this->_begin++)->~T();
+		} else {
+			// move right part -1
+			--this->_end;
+			for (T *dest = val; dest != this->_end; ++dest) {
+				*dest = std::move(dest[1]);
+			}
+			this->_end->~T();
+		}
+	}
+	void erase(T &val) { erase(std::addressof(val)); }
+};
+
+template <class T, umm _capacity>
+struct CircularBuffer {
+	union Storage {
+		T value;
+	};
+	struct Iterator {
+		using value_type = T;
+		CircularBuffer *buffer;
+		umm index;
+		Iterator(CircularBuffer *buffer, umm index) : buffer(buffer), index(index) {}
+		T &operator*() { return buffer->_get(index); }
+		T &operator*() const { return buffer->_get(index); }
+		Iterator operator+(smm v) const { return Iterator(buffer, index + v); }
+		Iterator operator-(smm v) const { return Iterator(buffer, index - v); }
+		smm operator-(Iterator v) const { return index - v.index; }
+		Iterator &operator++() { ++index; return *this; }
+		Iterator &operator--() { --index; return *this; }
+		Iterator operator++(int) { Iterator result = *this; ++*this; return result; }
+		Iterator operator--(int) { Iterator result = *this; --*this; return result; }
+		bool operator>(Iterator const &that) const { return index > that.index; }
+		bool operator<(Iterator const &that) const { return index < that.index; }
+		bool operator>=(Iterator const &that) const { return index >= that.index; }
+		bool operator<=(Iterator const &that) const { return index <= that.index; }
+		bool operator==(Iterator const &that) const { return index == that.index; }
+		bool operator!=(Iterator const &that) const { return index != that.index; }
+	};
+	
+	template <class ...Args>
+	void emplace_back(Args &&...args) {
+		TL_BOUNDS_CHECK(_size != _capacity);
+		new (&_storage[(_begin + _size++) % _capacity].value) T(std::forward<Args>(args)...);
+	}
+	template <class ...Args>
+	void emplace_front(Args &&...args) {
+		TL_BOUNDS_CHECK(_size != _capacity);
+		++_size;
+		if (_begin) --_begin; else  _begin = _capacity - 1;
+		new (&_storage[_begin].value) T(std::forward<Args>(args)...);
+	}
+	void push_back(T const &v) { emplace_back(v); }
+	void push_back(T &&v) { emplace_back(std::move(v)); }
+	void push_front(T const &v) { emplace_front(v); }
+	void push_front(T &&v) { emplace_front(std::move(v)); }
+
+	void pop_back() { _get(--_size).~T(); }
+	void pop_front() { _storage[_begin].value.~T(); _incBegin(); --_size; }
+	
+	Iterator begin() { return Iterator(this, 0); }
+	Iterator end() { return Iterator(this, _size); }
+
+	T &back() { TL_BOUNDS_CHECK(_size); return _get(_size - 1); }
+	T &front() { TL_BOUNDS_CHECK(_size); return _get(0); }
+
+	umm size() const { return _size; }
+	bool empty() const { return _size == 0; }
+
+	T &operator[](umm i) { TL_BOUNDS_CHECK(i < _size); return _get(i); }
+	T const &operator[](umm i) const { TL_BOUNDS_CHECK(i < _size); return _get(i); }
+
+	void erase(Iterator it) {
+		umm index = it.index;
+		TL_BOUNDS_CHECK(index < _size);
+		--_size;
+		if (index > _size / 2) {
+			for (;index < _size; ++index) {
+				_get(index) = std::move(_get(index + 1));
+			}
+			_get(_size).~T();
+		} else {
+			for (;index; --index) {
+				_get(index) = std::move(_get(index - 1));
+			}
+			_get(0).~T();
+			_incBegin();
+		}
+	}
+
+	T &_get(umm i) {
+		return _storage[(_begin + i) % _capacity].value;
+	}
+	void _incBegin() {
+		++_begin;
+		if (_begin == _capacity) 
+			_begin = 0;
+	}
+
+	Storage _storage[_capacity];
+	umm _begin = 0;
+	umm _size = 0;
+};
+template <class T, umm _capacity>
+struct CircularQueue : private CircularBuffer<T, _capacity> {
+	using Base = CircularBuffer<T, _capacity>;
+	using Base::begin;
+	using Base::end;
+	using Base::size;
+	using Base::empty;
+	using Base::erase;
+	using Base::front;
+	using Base::operator[];
+	void push(T const &v) { this->push_back(v); }
+	void push(T &&v) { this->push_back(std::move(v)); }
+	void pop() { this->pop_front(); }
 };
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096 / sizeof(T)>
