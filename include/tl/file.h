@@ -20,6 +20,8 @@ TL_DECLARE_HANDLE(File);
 struct EntireFile {
 	Allocator allocator;
 	StringSpan data;
+
+	operator bool() const { return data.data(); }
 };
 
 TL_API File openFile(char const *path, u32 openFlags);
@@ -74,7 +76,8 @@ inline EntireFile readEntireFile(wchar const *path, Allocator allocator = osAllo
 	}
 }
 inline void freeEntireFile(EntireFile file) {
-	file.allocator.deallocate(file.data.begin());
+	if (file.data.begin())
+		file.allocator.deallocate(file.data.begin());
 }
 inline void truncate(File file, u64 size) {
 	setCursor(file, (s64)size, File_begin);
@@ -85,11 +88,22 @@ inline void writeEntireFile(File file, void const *data, u64 size) {
 	write(file, data, size);
 	truncateToCursor(file);
 }
-inline void writeEntireFile(char const *path, void const *data, u64 size) {
+inline bool writeEntireFile(char const *path, void const *data, u64 size) {
 	File file = openFile(path, File_write);
+	if (!file) return false;
 	writeEntireFile(file, data, size);
 	close(file);
+	return true;
 }
+inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
+	File file = openFile(path, File_write);
+	if (!file) return false;
+	writeEntireFile(file, data, size);
+	close(file);
+	return true;
+}
+inline bool writeEntireFile(char  const *path, StringView view) { return writeEntireFile(path, view.data(), view.size()); }
+inline bool writeEntireFile(wchar const *path, StringView view) { return writeEntireFile(path, view.data(), view.size()); }
 
 #ifdef TL_IMPL
 
@@ -125,8 +139,10 @@ File openFile(char const *path, u32 openFlags) {
 	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
-		handle = INVALID_HANDLE_VALUE;
+		handle = 0;
 	}
+	if (handle == INVALID_HANDLE_VALUE)
+		handle = 0;
 	return (File)handle;
 }
 File openFile(wchar const *path, u32 openFlags) {
@@ -134,8 +150,10 @@ File openFile(wchar const *path, u32 openFlags) {
 	auto handle = CreateFileW(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
-		handle = INVALID_HANDLE_VALUE;
+		handle = 0;
 	}
+	if (handle == INVALID_HANDLE_VALUE)
+		handle = 0;
 	return (File)handle;
 }
 void setCursor(File file, s64 offset, FileCursor origin) {
@@ -143,9 +161,9 @@ void setCursor(File file, s64 offset, FileCursor origin) {
 	newP.QuadPart = offset;
 	DWORD moveMethod;
 	switch (origin) {
-		case TL::File_begin: moveMethod = FILE_BEGIN; break;
-		case TL::File_cursor: moveMethod = FILE_CURRENT; break;
-		case TL::File_end: moveMethod = FILE_END; break;
+		case File_begin: moveMethod = FILE_BEGIN; break;
+		case File_cursor: moveMethod = FILE_CURRENT; break;
+		case File_end: moveMethod = FILE_END; break;
 		default: return;
 	}
 	SetFilePointerEx((HANDLE)file, newP, 0, moveMethod);
