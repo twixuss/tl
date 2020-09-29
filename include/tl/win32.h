@@ -12,7 +12,6 @@ namespace TL {
 enum RawInputDevice {
 	RawInput_mouse = 0x1,
 };
-
 TL_API bool registerRawInput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);

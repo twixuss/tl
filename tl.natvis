@@ -60,7 +60,7 @@
       <ArrayItems>
         <Size>size()</Size>
         <ValuePointer>_begin</ValuePointer>
-        </ArrayItems>
+      </ArrayItems>
     </Expand>
   </Type>
   <Type Name="TL::Queue&lt;*&gt;">
@@ -71,7 +71,17 @@
       <ArrayItems>
         <Size>size()</Size>
         <ValuePointer>_begin</ValuePointer>
-        </ArrayItems>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::StaticList&lt;*&gt;">
+    <Intrinsic Name="size" Expression="_end - _begin" />
+    <DisplayString>{{ size={size()} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>_begin</ValuePointer>
+      </ArrayItems>
     </Expand>
   </Type>
 </AutoVisualizer>

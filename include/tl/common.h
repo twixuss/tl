@@ -335,6 +335,15 @@ struct Span {
 
 	constexpr operator Span<T const>() const { return {_begin, _end}; }
 
+	constexpr bool operator==(Span<T> that) const {
+		if (size() != that.size()) return false;
+		for (auto a = _begin, b = that._begin; a != _end; ++a, ++b) {
+			if (*a != *b)
+				return false;
+		}
+		return true;
+	}
+
 	T *_begin{};
 	T *_end{};
 };

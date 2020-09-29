@@ -88,19 +88,72 @@ String<Allocator> nullTerminate(Span<char const> span) {
 	return result;
 }
 
-inline Optional<u64> parseDecimal(StringView s) {
-	u64 result	  = 0;
-	u64 oldResult = 0;
-	for (auto c : s) {
-		result *= 10;
-		u64 digit = (u64)c - '0';
-		if (digit > 9)
-			return {};
-		result += digit;
-		if (result < oldResult)
-			return {};
-		oldResult = result;
+template <class T>
+struct ParseResult {
+	T value;
+	bool success;
+};
+
+inline ParseResult<s64> parseDecimal(StringView s) {
+	ParseResult<s64> result = {};
+	s64 oldResult = 0;
+	bool negative = false;
+	if (s.front() == '-') {
+		negative = true;
+		s._begin++;
 	}
+	for (auto c : s) {
+		result.value *= 10;
+		s64 digit = (s64)c - '0';
+		if ((u64)digit > 9)
+			return {};
+		result.value += digit;
+		if (result.value < oldResult)
+			return {};
+		oldResult = result.value;
+	}
+	if (negative) {
+		result.value = -result.value;
+	}
+	result.success = true;
+	return result;
+}
+
+inline ParseResult<f64> parseDecimalFloat(StringView s) {
+	ParseResult<f64> result = {};
+	s64 oldResult = 0;
+	bool negative = false;
+	if (s.front() == '-') {
+		negative = true;
+		s._begin++;
+	}
+	bool dot = false;
+	u32 placeAfterDot = 0;
+	for (auto c : s) {
+		if (c == '.') {
+			dot = true;
+			continue;
+		}
+		if (dot) {
+			s64 digit = (s64)c - '0';
+			if ((u64)digit > 9)
+				return {};
+			result.value += (f64)digit / pow(10, placeAfterDot++);
+		} else {
+			result.value *= 10;
+			s64 digit = (s64)c - '0';
+			if ((u64)digit > 9)
+				return {};
+			result.value += digit;
+			if (result.value < oldResult)
+				return {};
+			oldResult = result.value;
+		}
+	}
+	if (negative) {
+		result.value = -result.value;
+	}
+	result.success = true;
 	return result;
 }
 

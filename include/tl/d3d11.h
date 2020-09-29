@@ -113,6 +113,11 @@ inline void release(Blend &v) {
 }
 
 inline void defaultShaderHandler(HRESULT result, char const *messages) {
+#if BUILD_DEBUG
+#if COMPILER_MSVC
+	OutputDebugStringA(messages);
+#endif
+#endif
 	ASSERT(SUCCEEDED(result));
 	(void)messages;
 }
