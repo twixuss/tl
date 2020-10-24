@@ -339,7 +339,14 @@ template <class T> FORCEINLINE constexpr auto pow3(T v) { return v * v * v; }
 template <class T> FORCEINLINE constexpr auto pow4(T v) { return pow2(v * v); }
 // clang-format on
 
-template <class A, class B, class T, class S> FORCEINLINE constexpr auto wrapLerp(A a, B b, T t, S s) {
+template <class T>
+FORCEINLINE constexpr T easeInOut2(T t) {
+	if (t < 0.5f) return 0.5f * pow2(2 * t);
+	else      return 1 - 0.5f * pow2(2 - 2 * t);
+	//return lerp(pow2(t), 1 - pow2(1 - t), t);
+}
+
+template <class A, class B, class T, class S> FORCEINLINE constexpr auto lerpWrap(A a, B b, T t, S s) {
 	a = positiveModulo(a, s);
 	b = positiveModulo(b, s);
 	auto d = a - b;
@@ -3638,13 +3645,6 @@ FORCEINLINE f32x8  ceil(f32x8 v) { RETURN_T2(f32x8,  ceil(v.lo),  ceil(v.hi)); }
 #endif
 
 FORCEINLINE v4f floor(v4f v) { return V4f(floor(v.m)); }
-FORCEINLINE constexpr s32 floor(s32 v, s32 s) {
-	if (v < 0)
-		v = (v + 1) / s - 1;
-	else
-		v /= s;
-	return v * s;
-}
 FORCEINLINE s32x4 floor(s32x4 v, s32x4 s) {
 	__m128i n = _mm_add_epi32(v.m.pi, _mm_set1_epi32(1));//   / s - 1;
 #if ARCH_AVX
@@ -3741,7 +3741,7 @@ FORCEINLINE v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)
 
 #define CEIL(t) \
 	FORCEINLINE t ceil(t v, t s) { return floor(v + s - 1, s); }
-constexpr CEIL(s32) CEIL(v2s) CEIL(v3s) CEIL(v4s);
+CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
 #define CEIL(s32, f32) FORCEINLINE s32 ceilToInt(f32 v) { return (s32)ceil(v); }
@@ -4128,7 +4128,7 @@ template <class T>
 FORCEINLINE auto manhattan(T a, T b) {
 	return sum(abs(a - b));
 }
-FORCEINLINE int maxDistance(v3s a, v3s b) {
+FORCEINLINE s32 maxDistance(v3s a, v3s b) {
 	a = absolute(a - b);
 	return max(max(a.x, a.y), a.z);
 }
@@ -4146,6 +4146,11 @@ FORCEINLINE constexpr auto moveTowards(T a, T b, f32 t) {
 template <class T>
 FORCEINLINE constexpr auto moveAway(T a, T b, f32 t) {
 	return a + normalize(a - b) * t;
+}
+
+template <class T>
+FORCEINLINE constexpr T project(T vector, T normal) {
+	return normal * dot(normal, vector);
 }
 
 FORCEINLINE f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
@@ -4203,175 +4208,28 @@ FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return _rotr(v, shift); }
 FORCEINLINE u64 rotateRight(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
 #endif
 
-#define ROT(u32x4) 								   \
+#define ROT(u32x4) 								        \
 FORCEINLINE u32x4 rotateLeft(u32x4 v, s32 shift = 1) {  \
-	if (shift < 0) {							   \
-		shift = absolute(shift) & 31;			   \
-		return (v >> shift) | (v << (32 - shift)); \
-	} else {									   \
-		shift &= 31;							   \
-		return (v << shift) | (v >> (32 - shift)); \
-	}											   \
-}												   \
+	if (shift < 0) {							        \
+		shift = absolute(shift) & 31;			        \
+		return (v >> shift) | (v << (32 - shift));      \
+	} else {									        \
+		shift &= 31;							        \
+		return (v << shift) | (v >> (32 - shift));      \
+	}											        \
+}												        \
 FORCEINLINE u32x4 rotateRight(u32x4 v, s32 shift = 1) { \
-	if (shift < 0) {							   \
-		shift = absolute(shift) & 31;			   \
-		return (v << shift) | (v >> (32 - shift)); \
-	} else {									   \
-		shift &= 31;							   \
-		return (v >> shift) | (v << (32 - shift)); \
-	}											   \
+	if (shift < 0) {							        \
+		shift = absolute(shift) & 31;			        \
+		return (v << shift) | (v >> (32 - shift));      \
+	} else {									        \
+		shift &= 31;							        \
+		return (v >> shift) | (v << (32 - shift));      \
+	}											        \
 }
 ROT(u32x4)
 ROT(u32x8)
 #undef ROT
-
-#define RANDOMIZE(u32, s32) \
-FORCEINLINE u32 randomize(u32 v) { return v * 0xEB84226F ^ 0x034FB5E7; } \
-FORCEINLINE s32 randomize(s32 v) { return (s32)randomize((u32)v); }
-RANDOMIZE(u32, s32)
-RANDOMIZE(u32x4, s32x4)
-RANDOMIZE(u32x8, s32x8)
-#undef RANDOMIZE
-
-#define RANDOMIZE(v2u)         \
-	FORCEINLINE v2u randomize(v2u v) {     \
-		v += 0x0C252DA0;       \
-		v *= 0x034FB5E7;       \
-		v ^= 0xF5605798;       \
-		v.x = v.x * v.y + v.x; \
-		v.y = v.x * v.y + v.x; \
-		return v;              \
-	}
-RANDOMIZE(v2u) RANDOMIZE(v2ux4) RANDOMIZE(v2ux8);
-#undef RANDOMIZE
-
-#define RANDOMIZE(v3u, V3u)      \
-	FORCEINLINE v3u randomize(v3u v) {       \
-		v += 0x0C252DA0;         \
-		v *= 0x034FB5E7;         \
-		v ^= 0xF5605798;         \
-		v *= V3u(v.z, v.x, v.y); \
-		v *= V3u(v.z, v.x, v.y); \
-		v *= V3u(v.z, v.x, v.y); \
-		return v;                \
-	}
-RANDOMIZE(v3u, V3u) RANDOMIZE(v3ux4, V3ux4) RANDOMIZE(v3ux8, V3ux8);
-#undef RANDOMIZE
-
-#define RANDOMIZE(v4u, V4u)           \
-	FORCEINLINE v4u randomize(v4u v) {            \
-		v += 0x0C252DA0;              \
-		v *= 0x034FB5E7;              \
-		v ^= 0xF5605798;              \
-		v *= V4u(v.w, v.x, v.y, v.z); \
-		v *= V4u(v.w, v.x, v.y, v.z); \
-		v *= V4u(v.w, v.x, v.y, v.z); \
-		return v;                     \
-	}
-RANDOMIZE(v4u, V4u) RANDOMIZE(v4ux4, V4ux4) RANDOMIZE(v4ux8, V4ux8);
-#undef RANDOMIZE
-
-#define RANDOMIZE(v2s, v2u) \
-	FORCEINLINE v2s randomize(v2s v) { return (v2s)randomize((v2u)v); }
-RANDOMIZE(v2s, v2u) RANDOMIZE(v2sx4, v2ux4) RANDOMIZE(v2sx8, v2ux8);
-RANDOMIZE(v3s, v3u) RANDOMIZE(v3sx4, v3ux4) RANDOMIZE(v3sx8, v3ux8);
-RANDOMIZE(v4s, v4u) RANDOMIZE(v4sx4, v4ux4) RANDOMIZE(v4sx8, v4ux8);
-#undef RANDOMIZE
-
-FORCEINLINE u8 randomU8(u8 r) {
-	r += 0x0C;
-	r *= 0x61;
-	r ^= 0xB2;
-	r -= 0x80;
-	r ^= 0xF5;
-	r *= 0xA7;
-	return rotateLeft(r, 4);
-}
-FORCEINLINE u32 randomU32(u32 r) {
-	r += 0x0C252DA0;
-	r *= 0x55555561;
-	r ^= 0xB23E2387;
-	r -= 0x8069BAC0;
-	r ^= 0xF5605798;
-	r *= 0xAAAAAABF;
-	return (r << 16) | (r >> 16);
-}
-FORCEINLINE u32 randomU32(s32 in) { return randomU32((u32)in); }
-FORCEINLINE u32 randomU32(v2s in) {
-	auto x = randomU32(in.x);
-	auto y = randomU32(in.y);
-	return x ^ y;
-}
-FORCEINLINE u32 randomU32(v3s in) {
-	auto x = randomU32(in.x);
-	auto y = randomU32(in.y);
-	auto z = randomU32(in.z);
-	return x + y + z;
-}
-FORCEINLINE u32 randomU32(v4s v) {
-	v = randomize(v);
-	return u32(v.x) + u32(v.y) + u32(v.z) + u32(v.w);
-}
-FORCEINLINE u64 randomU64(v3s in) {
-	auto x = (u64)randomU32(in.x);
-	auto y = (u64)randomU32(in.y);
-	auto z = (u64)randomU32(in.z);
-	return x | (y << 32) + z | (x << 32) + y | (z << 32);
-}
-
-#define RANDOM(v2f, V2f)              \
-	FORCEINLINE v2f random(v2f v) {               \
-		v = frac(v * V2f(_randMul2)); \
-		v += dot(v, v + pi * 4);      \
-		v.x *= v.x;                   \
-		v.y *= v.y;                   \
-		return frac(v);               \
-	}
-RANDOM(v2f, V2f)
-RANDOM(v2fx4, V2fx4)
-RANDOM(v2fx8, V2fx8)
-#undef RANDOM
-
-#define RANDOM(v3f, V3f)                                   \
-	FORCEINLINE v3f random(v3f v) {                                    \
-		v = frac(v * V3f(_randMul3));                      \
-		v += dot(v, v + pi * 4);                           \
-		return frac(V3f(v.x * v.y, v.y * v.z, v.x * v.z)); \
-	}
-RANDOM(v3f, V3f)
-RANDOM(v3fx4, V3fx4)
-RANDOM(v3fx8, V3fx8)
-#undef RANDOM
-
-#define RANDOM(v4f, V4f)                          \
-	FORCEINLINE v4f random(v4f v) {                           \
-		v = frac((v + sqrt2) * V4f(_randMul4));   \
-		v += dot(v, v + pi * 4);                  \
-		return frac(v * V4f(v.y, v.z, v.w, v.x)); \
-	}
-RANDOM(v4f, V4f)
-RANDOM(v4fx4, V4fx4)
-RANDOM(v4fx8, V4fx8)
-#undef RANDOM
-
-// clang-format off
-#define RANDOM(v2f, v2s, v2u) FORCEINLINE v2f random(v2s v) { return (v2f)(randomize((v2u)v) >> 8) * (1.0f / 16777216.0f); }
-RANDOM(v2f, v2s, v2u) RANDOM(v2fx4, v2sx4, v2ux4) RANDOM(v2fx8, v2sx8, v2ux8)
-RANDOM(v3f, v3s, v3u) RANDOM(v3fx4, v3sx4, v3ux4) RANDOM(v3fx8, v3sx8, v3ux8)
-RANDOM(v4f, v4s, v4u) RANDOM(v4fx4, v4sx4, v4ux4) RANDOM(v4fx8, v4sx8, v4ux8)
-#undef RANDOM
-
-#define RANDOM(v2f, v2s) FORCEINLINE v2f operator()(v2s v) const { return random(v); }
-struct Random {
-	RANDOM(v2f, v2s) RANDOM(v2fx4, v2sx4) RANDOM(v2fx8, v2sx8)
-	RANDOM(v3f, v3s) RANDOM(v3fx4, v3sx4) RANDOM(v3fx8, v3sx8)
-	RANDOM(v4f, v4s) RANDOM(v4fx4, v4sx4) RANDOM(v4fx8, v4sx8)
-	RANDOM(v2f, v2f) RANDOM(v2fx4, v2fx4) RANDOM(v2fx8, v2fx8)
-	RANDOM(v3f, v3f) RANDOM(v3fx4, v3fx4) RANDOM(v3fx8, v3fx8)
-	RANDOM(v4f, v4f) RANDOM(v4fx4, v4fx4) RANDOM(v4fx8, v4fx8)
-};
-#undef RANDOM
 
 FORCEINLINE v3f hsvToRgb(f32 h, f32 s, f32 v) {
 	h = frac(h);
@@ -4767,7 +4625,7 @@ FORCEINLINE f32 _voronoiS32(CE::WideArray<T, count1, count4, count8> const& wide
 		static constexpr auto width = widthOf<decltype(offset)>;
 
 		minDist = min(minDist, distanceSqr(widen<width>(rel),
-										   random(widen<width>(tile) + offset) * 0.5f + cvtScalar<float>(offset)));
+										   random(widen<width>(tile) + offset) * 0.5f + cvtScalar<f32>(offset)));
 	});
 	return minDist;
 };
@@ -4810,23 +4668,23 @@ inline static constexpr auto voronoiOffsets3f = CE::cvtScalar<f32>(voronoiOffset
 inline static constexpr auto voronoiOffsets4f = CE::cvtScalar<f32>(voronoiOffsets4s);
 // clang-format on
 
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v2f v, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v2f v, Random &&random) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2f);
 	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt2);
 }
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v3f v, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v3f v, Random &&random) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3f);
 	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt3);
 }
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v4f v, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v4f v, Random &&random) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4f);
 	return sqrt(_voronoiF32(wideOffsets, v, random)) * 0.5f;
 }
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Random &&random) {
 	v2s flr							  = floor(v, cellSize);
 	v2s tile						  = flr / (s32)cellSize;
 	v2f rel							  = (v2f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4847,8 +4705,8 @@ FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Random random = {}) {
 #endif
 	return sqrt(minDist) * (1 / sqrt2);
 }
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Random &&random) {
 	v3s flr							  = floor(v, cellSize);
 	v3s tile						  = flr / (s32)cellSize;
 	v3f rel							  = (v3f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4868,8 +4726,8 @@ FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Random random = {}) {
 #endif
 	return sqrt(minDist) * (1 / sqrt3);
 }
-template <class Random = Random>
-FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Random random = {}) {
+template <class Random>
+FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Random &&random) {
 	v4s flr							  = floor(v, cellSize);
 	v4s tile						  = flr / (s32)cellSize;
 	v4f rel							  = (v4f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4881,7 +4739,7 @@ FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Random random = {}) {
 	v4sx8 tile8 = V4sx8(tile);
 	v4fx8 rel8	= V4fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + cvtScalar<float>(offset)));
+		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + cvtScalar<f32>(offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
 		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + (v4f)offset));
@@ -4908,6 +4766,14 @@ FORCEINLINE line<T> lineBeginDir(T begin, T dir) {
 template<class T>
 struct aabb {
 	T min, max;
+	T size() const { return max - min; }
+	T middle() const { 
+		T sum = max + min;
+		sum *= 0.5f;
+		return sum;
+	}
+	bool operator==(aabb<T> const &that) const { return min == that.min && max == that.max; }
+	bool operator!=(aabb<T> const &that) const { return min != that.min || max != that.max; }
 };
 
 template <class T>
@@ -5107,8 +4973,8 @@ FORCEINLINE bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 	point = a + r * t;
 
 	auto dp1 = point - p1;
-	float u	 = dot(dp1, p21);
-	float v	 = dot(dp1, p31);
+	f32 u	 = dot(dp1, p21);
+	f32 v	 = dot(dp1, p31);
 
 	if (lengthSqr(a - point) > lengthSqr(a - b) || dot(a - point, a - b) <= 0) {
 		return false;
@@ -5118,7 +4984,7 @@ FORCEINLINE bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 }
 
 template <class T, umm size>
-FORCEINLINE constexpr T linearSample(const T (&arr)[size], float t) noexcept {
+FORCEINLINE constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
 	f32 f = frac(t) * size;
 	s32 a = (s32)f;
 	s32 b = a + 1;
@@ -5162,7 +5028,7 @@ FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 m) {
 	}
 	return planes;
 }
-FORCEINLINE bool containsSphere(FrustumPlanes const &planes, v3f position, float radius) {
+FORCEINLINE bool containsSphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 	for (auto p : planes) {
 		if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
 			return false;
@@ -5182,7 +5048,7 @@ FORCEINLINE constexpr u32 countBits(u32 v) {
 	}
 	return s;
 }
-FORCEINLINE constexpr v4s frac(v4s v, u32 step) {
+FORCEINLINE constexpr v4s frac(v4s v, s32 step) {
 	return {
 		TL::frac(v.x, step),
 		TL::frac(v.y, step),

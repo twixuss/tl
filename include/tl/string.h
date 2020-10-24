@@ -3,31 +3,37 @@
 #include "list.h"
 #include "optional.h"
 
+#pragma warning(push)
+#pragma warning(disable: 4820)
+
 namespace TL {
 
-inline wchar *copyString(wchar const *str, Allocator allocator = osAllocator) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline wchar *copyString(wchar const *str) {
 	umm size = (length(str) + 1) * sizeof(wchar);
-	wchar *result = (wchar *)allocator.allocate(size);
+	wchar *result = ALLOCATE_T(Allocator, wchar, size, 0);
 	memcpy(result, str, size);
 	return result;
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-struct String : List<char, Allocator> {
+template <class Char = char, class Allocator = TL_DEFAULT_ALLOCATOR>
+struct String : List<Char, Allocator> {
 	using Base = List;
 	String() = default;
 	explicit String(umm size) : Base(size) {}
-	String(Span<char const> span) : Base(span) {}
+	String(Span<Char const> span) : Base(span) {}
 	String(String const &that) = default;
 	String(String &&that) = default;
-	String(char const *str) : Base(str, strlen(str)) {}
+	String(Char const *str, umm length) : Base(str, length) {}
+	String(Char const *str) : Base(str, length(str)) {}
 	String &operator=(String const &that) = default;
 	String &operator=(String &&that) = default;
-	String &operator=(char const *str) {
-		set(StringView(str, strlen(str)));
+	String &operator=(Char const *str) {
+		set(Span<char const>(str, length(str)));
+		return *this;
 	}
-	String &set(Span<char const> span) { return Base::set(span), *this; }
-	void append(StringView str) {
+	String &set(Span<Char const> span) { return Base::set(span), *this; }
+	void append(Span<char const> str) {
 		auto requiredSize = size() + str.size();
 		if (requiredSize > capacity()) {
 			_grow(requiredSize);
@@ -35,8 +41,8 @@ struct String : List<char, Allocator> {
 		memcpy(_end, str.data(), str.size());
 		_end += str.size();
 	}
-	void append(char const *str) {
-		append(StringView(str, strlen(str)));
+	void append(Char const *str) {
+		append(Span<char const>(str, length(str)));
 	}
 	s32 compare(String const &b) const {
 		s32 result = 0;
@@ -56,35 +62,44 @@ struct String : List<char, Allocator> {
 	}
 };
 
-template <class Allocator, class T>
-String<Allocator> toString(T const &val) {
-	String<Allocator> result;
-	toString([&](char const *src, umm length) {
+template <class Char, class Allocator, class T>
+String<Char, Allocator> toString(T const &val) {
+	String<Char, Allocator> result;
+	toString<Char>(val, [&](Char const *src, umm length) {
 		result.resize(length);
-		memcpy(result.data(), src, length);
-		return StringSpan();
-	}, val); 
+		memcpy(result.data(), src, length * sizeof(Char));
+		return Span<Char>();
+	}); 
 	return result;
 }
 
-template <class Allocator, class T>
-String<Allocator> toStringNT(T const &val) {
-	String<Allocator> result;
-	toString([&](char const *src, umm length) {
+template <class Char, class Allocator, class T>
+String<Char, Allocator> toStringNT(T const &val) {
+	String<Char, Allocator> result;
+	toString<Char>(val, [&](Char const *src, umm length) {
 		result.resize(length + 1);
-		memcpy(result.data(), src, length);
-		result[length] = '\0';
-		return StringSpan();
-	}, val); 
+		memcpy(result.data(), src, length * sizeof(Char));
+		result[length] = (Char)0;
+		return Span<Char>();
+	}); 
 	return result;
 }
 
-template <class Allocator>
-String<Allocator> nullTerminate(Span<char const> span) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+String<char, Allocator> nullTerminate(Span<char const> span) {
 	String<Allocator> result;
 	result.resize(span.size() + 1);
-	memcpy(result.data(), span.data(), span.size());
+	memcpy(result.data(), span.data(), span.size() * sizeof(char));
 	result[span.size()] = '\0';
+	return result;
+}
+
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+String<wchar, Allocator> nullTerminate(Span<wchar const> span) {
+	String<wchar, Allocator> result;
+	result.resize(span.size() + 1);
+	memcpy(result.data(), span.data(), span.size() * sizeof(wchar));
+	result[span.size()] = L'\0';
 	return result;
 }
 
@@ -94,7 +109,7 @@ struct ParseResult {
 	bool success;
 };
 
-inline ParseResult<s64> parseDecimal(StringView s) {
+inline ParseResult<s64> parseDecimal(Span<char const> s) {
 	ParseResult<s64> result = {};
 	s64 oldResult = 0;
 	bool negative = false;
@@ -119,9 +134,8 @@ inline ParseResult<s64> parseDecimal(StringView s) {
 	return result;
 }
 
-inline ParseResult<f64> parseDecimalFloat(StringView s) {
+inline ParseResult<f64> parseDecimalFloat(Span<char const> s) {
 	ParseResult<f64> result = {};
-	s64 oldResult = 0;
 	bool negative = false;
 	if (s.front() == '-') {
 		negative = true;
@@ -144,10 +158,7 @@ inline ParseResult<f64> parseDecimalFloat(StringView s) {
 			s64 digit = (s64)c - '0';
 			if ((u64)digit > 9)
 				return {};
-			result.value += digit;
-			if (result.value < oldResult)
-				return {};
-			oldResult = result.value;
+			result.value += (f64)digit;
 		}
 	}
 	if (negative) {
@@ -157,35 +168,46 @@ inline ParseResult<f64> parseDecimalFloat(StringView s) {
 	return result;
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096>
+template <class Char = char, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096>
 struct StringBuilder {
-	using String = String<Allocator>;
-	using Char = char;
+	using String = String<Char, Allocator>;
 
 	static constexpr umm blockSize = blockSize_;
 	struct Block {
 		Char buffer[blockSize];
-		Char *end = buffer;
+		umm size = 0;
 		Block *next = 0;
 
 		Block() {}
-		umm size() { return (umm)(end - buffer); }
-		umm availableSpace() { return blockSize - size(); }
+		Char *end() { return buffer + size; }
+		umm availableSpace() { return blockSize - size; }
 	};
-	Block first;
+	Block first = {};
 	Block *last = &first;
 	Block *allocLast = &first;
 
 	StringBuilder() = default;
 	StringBuilder(StringBuilder const &that) = delete;
-	StringBuilder(StringBuilder &&that) = delete;
+	StringBuilder(StringBuilder&& that) {
+		first = that.first;
+		if (that.last == &that.first) last = &first;
+		else last = that.last;
+		
+		if (that.allocLast == &that.first) allocLast = &first;
+		else allocLast = that.allocLast;
+
+		that.first.size = 0;
+		that.first.next = 0;
+		that.last = &that.first;
+		that.allocLast = &that.first;
+	}
 	StringBuilder &operator=(StringBuilder const &that) = delete;
 	StringBuilder &operator=(StringBuilder &&that) = delete;
 	~StringBuilder() {
 		Block *next = 0;
 		for (Block *block = first.next; block != 0; block = next) {
 			next = block->next;
-			Allocator::deallocate(block);
+			DEALLOCATE(Allocator, block);
 		}
 	}
 	umm availableSpace() {
@@ -223,41 +245,41 @@ struct StringBuilder {
 		umm charsToWrite = span.size();
 		while (last->availableSpace() < charsToWrite) {
 			umm spaceInBlock = last->availableSpace();
-			memcpy(last->end, span.data(), spaceInBlock);
+			memcpy(last->end(), span.data(), spaceInBlock * sizeof(Char));
 			charsToWrite -= spaceInBlock;
-			last->end += spaceInBlock;
+			last->size += spaceInBlock;
 			span = {span.begin() + spaceInBlock, span.end()};
 			if (!last->next) {
 				last->next = allocLast = allocateBlock();
 				last = last->next;
 			}
 		}
-		memcpy(last->end, span.data(), charsToWrite);
-		last->end += charsToWrite;
+		memcpy(last->end(), span.data(), charsToWrite * sizeof(Char));
+		last->size += charsToWrite;
 		return charsWritten;
 	}
-	umm append(Char const *str) { return append(Span{str ? str : "(null)", str ? strlen(str) : 0}); }
+	umm append(Char const *str) { return append(Span{str ? str : "(null)", str ? length(str) : 0}); }
 	umm append(Char ch, umm count = 1) {
 		umm charsToWrite = count;
 		while (last->availableSpace() < charsToWrite) {
 			umm spaceInBlock = last->availableSpace();
-			memset(last->end, ch, spaceInBlock);
+			populate(last->end(), ch, spaceInBlock);
 			charsToWrite -= spaceInBlock;
-			last->end += spaceInBlock;
+			last->size += spaceInBlock;
 			last = last->next;
 			if (!last) {
 				last = allocLast = allocateBlock();
 			}
 		}
-		memset(last->end, ch, charsToWrite);
-		last->end += charsToWrite;
+		populate(last->end(), ch, charsToWrite);
+		last->size += charsToWrite;
 		return count;
 	}
 	template <class T>
 	umm append(T const &val) {
-		return toString([&] (Char const *src, umm length) {
-			return StringSpan(0, append(Span{src, length}));
-		}, val).size();
+		return toString<Char>(val, [&] (Char const *src, umm length) {
+			return append(Span<Char const>(src, length));
+		});
 	}
 	umm appendBytes(void const *address, umm size) {
 		append(Span((Char *)address, (Char *)address + size));
@@ -268,7 +290,7 @@ struct StringBuilder {
 		return appendBytes(std::addressof(value), sizeof(value));
 	}
 	umm appendFormat(Char const *fmt) {
-		return append(Span{fmt, strlen(fmt)});
+		return append(Span{fmt, length(fmt)});
 	}
 	template <class Arg, class ...Args>
 	umm appendFormat(Char const *fmt, Arg const &arg, Args const &...args) {
@@ -281,23 +303,19 @@ struct StringBuilder {
 		bool argAsFormat = false;
 		
 		while (*c) {
-			if (*c == '{') {
+			if (*c == '%') {
 				fmtBegin = c;
 				++c;
-				if (*c == '{') {
+				if (*c == '`') {
 					append(Span{fmt, c});
 					++c;
 					fmt = c;
 					fmtBegin = 0;
 					continue;
 				}
-				if (*c == '}') {
-					c += 1;
-				} else if (startsWith(c, "fmt}")) {
+				if (startsWith(c, "fmt%")) {
 					argAsFormat = true;
 					c += 4;
-				} else {
-					INVALID_CODE_PATH("bad format");
 				}
 				fmtEnd = c;
 				break;
@@ -312,16 +330,16 @@ struct StringBuilder {
 		umm charsAppended = append(Span{fmt, fmtBegin});
 
 		if (argAsFormat) {
-			if constexpr (isSame<RemoveReference<Arg>, Char const *> || isSame<RemoveReference<Arg>, Char *>)
+			if constexpr (isSame<RemoveReference<std::decay_t<Arg>>, Char const *> || isSame<RemoveReference<std::decay_t<Arg>>, Char *>)
 				charsAppended += appendFormat(arg, args...);
 			else 
-				INVALID_CODE_PATH("'{fmt}' arg is not a string");
+				INVALID_CODE_PATH("'%fmt%' arg is not a string");
 		} else {
-			toString([&] (Char const *src, umm length) {
+			toString<Char>(arg, [&] (Char const *src, umm length) {
 				charsAppended += length;
-				append(Span{src, length});
-				return StringSpan();
-			}, arg);
+				append(Span<Char const>(src, length));
+				return Span<Char>();
+			});
 		}
 
 		charsAppended += appendFormat(fmtEnd, args...);
@@ -330,33 +348,36 @@ struct StringBuilder {
 	umm size() {
 		umm totalSize = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
-			totalSize += block->size();
+			totalSize += block->size;
 		}
 		return totalSize;
 	}
-	StringSpan fill(StringSpan dstString) {
+	Span<Char> fill(Span<Char> dstString) {
 		ASSERT(dstString.size() >= this->size());
 		Char *dstChar = dstString.data();
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dstChar, block->buffer, block->size());
-			dstChar += block->size();
+			memcpy(dstChar, block->buffer, block->size * sizeof(Char));
+			dstChar += block->size;
 		}
-		return StringSpan(dstString.begin(), dstChar);
+		return Span<Char>(dstString.begin(), dstChar);
 	}
-	String get(bool terminate = false) {
-		String result(size() + terminate);
+	String get() {
+		String result(size());
 		fill(result);
-		if (terminate)
-			result.back() = '\0';
 		return result;
 	}
-	String getTerminated() { return get(true); }
+	String getNullTerminated() {
+		String result(size() + 1);
+		fill(result);
+		result.back() = '\0';
+		return result;
+	}
 
 	template <class Fn>
 	void stream(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto blockSize = block->size();
+			auto blockSize = block->size;
 			if (blockSize) {
 				fn(block->buffer, blockSize);
 			}
@@ -365,27 +386,24 @@ struct StringBuilder {
 	}
 
 private:
-	Block *allocateBlock() { return construct(allocate<Block, Allocator>()); }
+	Block *allocateBlock() { return construct(ALLOCATE_T(Allocator, Block, 1, 0)); }
 };
 
-// --- Format options: ---						--- Example ---							--- Result ---
-// {} - append an argument using 'toString'		format("{}", 5)							"5"
-// {ar:N} - align right, N is width				format("{ar:3}", 5)						"  5"
-// {al:N} - align left, N is width				format("{al:3}", 5)						"5  "
-// {fmt} - append an argument as a format		format("{} {fmt}", 1, "{} {}", 2, 3)	"1 2 3"		NOTE: this option should be last in the format string
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
-String<Allocator> format(char const *fmt, Args const &...args) {
-	StringBuilder<Allocator> builder;
+template <class Char, class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
+String<Char, Allocator> format(Char const *fmt, Args const &...args) {
+	StringBuilder<Char, Allocator> builder;
 	builder.appendFormat(fmt, args...);
 	return builder.get();
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
-String<Allocator> formatAndTerminate(char const *fmt, Args const &...args) {
-	StringBuilder<Allocator> builder;
+template <class Char, class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
+String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args) {
+	StringBuilder<Char, Allocator> builder;
 	builder.appendFormat(fmt, args...);
-	builder.append('\0');
+	builder.append((Char)0);
 	return builder.get();
 }
 
 }
+
+#pragma warning(pop)

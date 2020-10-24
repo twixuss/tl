@@ -1,5 +1,6 @@
 #pragma once
 #include "thread.h"
+#include "common.h"
 
 #if OS_WINDOWS
 #pragma warning(push, 0)
@@ -14,6 +15,7 @@
 
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "d3dcompiler")
+#pragma comment(lib, "dxgi")
 
 #ifndef TL_HRESULT_HANDLER
 #define TL_HRESULT_HANDLER(hr) ASSERT(SUCCEEDED(hr))
@@ -45,11 +47,6 @@ struct ConstantBuffer {
 template <class T>
 struct TypedConstantBuffer : ConstantBuffer {};
 
-struct RenderTarget {
-	ID3D11RenderTargetView *rtv = 0;
-	ID3D11Texture2D *tex = 0;
-};
-
 struct DepthStencil {
 	ID3D11DepthStencilView *dsv = 0;
 	ID3D11Texture2D *tex = 0;
@@ -65,9 +62,12 @@ struct Sampler {
 	ID3D11SamplerState *sampler = 0;
 };
 
-struct RenderTexture : ShaderResource {
+struct RenderTarget {
 	ID3D11RenderTargetView *rtv = 0;
 	ID3D11Texture2D *tex = 0;
+};
+
+struct RenderTexture : ShaderResource, RenderTarget {
 };
 
 struct Rasterizer {
@@ -77,6 +77,40 @@ struct Rasterizer {
 struct Blend {
 	ID3D11BlendState *blend = 0;
 };
+
+inline void addRef(StructuredBuffer &v) {
+	v.buffer->AddRef();
+	v.srv->AddRef();
+}
+inline void addRef(ConstantBuffer &v) {
+	v.buffer->AddRef();
+}
+inline void addRef(RenderTarget &v) {
+	v.rtv->AddRef();
+	v.tex->AddRef();
+}
+inline void addRef(DepthStencil &v) {
+	v.dsv->AddRef();
+	v.tex->AddRef();
+}
+inline void addRef(Texture &v) {
+	v.srv->AddRef();
+	v.tex->AddRef();
+}
+inline void addRef(Sampler &v) {
+	v.sampler->AddRef();
+}
+inline void addRef(RenderTexture &v) {
+	v.rtv->AddRef();
+	v.srv->AddRef();
+	v.tex->AddRef();
+}
+inline void addRef(Rasterizer &v) {
+	v.raster->AddRef();
+}
+inline void addRef(Blend &v) {
+	v.blend->AddRef();
+}
 
 inline void release(StructuredBuffer &v) {
 	TL_COM_RELEASE(v.buffer);
@@ -385,7 +419,7 @@ struct State {
 			useContext([&] {
 				immediateContext->UpdateSubresource(result.tex, 0, 0, data, pitch, 0);
 				immediateContext->GenerateMips(result.srv);
-					   });
+			});
 		}
 		return result;
 	}
@@ -418,7 +452,7 @@ struct State {
 	ConstantBuffer createConstantBuffer(u32 size, D3D11_USAGE usage, void const *initialData = 0) {
 		D3D11_BUFFER_DESC desc = {};
 		desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		desc.ByteWidth = size;
+		desc.ByteWidth = ceil(size, 16u);
 		desc.CPUAccessFlags = usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u;
 		desc.Usage = usage;
 
@@ -433,7 +467,6 @@ struct State {
 	}
 	template <class T>
 	TypedConstantBuffer<T> createConstantBuffer(D3D11_USAGE usage, T const *initialData = 0) {
-		static_assert(alignof(T) >= 16, "constant buffer alignment must be 16 or bigger");
 		TypedConstantBuffer<T> result;
 		(ConstantBuffer &)result = createConstantBuffer(sizeof(T), usage, initialData);
 		return result;
@@ -473,10 +506,12 @@ struct State {
 		TL_HRESULT_HANDLER(device->CreateSamplerState(&desc, &result.sampler));
 		return result;
 	}
-	Rasterizer createRasterizer(D3D11_FILL_MODE fill, D3D11_CULL_MODE cull) {
+	Rasterizer createRasterizer(D3D11_FILL_MODE fill, D3D11_CULL_MODE cull, bool enableMs = false, bool enableMsLine = false) {
 		D3D11_RASTERIZER_DESC desc = {};
 		desc.CullMode = cull;
 		desc.FillMode = fill;
+		desc.MultisampleEnable = enableMs;
+		desc.AntialiasedLineEnable = enableMsLine;
 		desc.DepthClipEnable = true;
 
 		Rasterizer result = {};
@@ -490,7 +525,7 @@ struct State {
 		desc.RenderTarget[0].SrcBlend = src;
 		desc.RenderTarget[0].DestBlend = dst;
 		desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+		desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
 		desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
 		desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
@@ -547,7 +582,6 @@ struct State {
 		useContext([&] { immediateContext->ClearRenderTargetView(renderTarget, rgba); });
 	}
 	void clearRenderTarget(RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
-	void clearRenderTarget(RenderTexture &rt, f32 const rgba[4]) { clearRenderTarget(rt.rtv, rgba); }
 
 	void clearDepthStencil(ID3D11DepthStencilView *depthStencil, f32 depth) {
 		useContext([&] {
@@ -577,8 +611,8 @@ struct State {
 	}
 
 	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
-	void setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
-	void setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
+	void setShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
+	void setShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
 	void setShaderResource(ShaderResource const &resource, char stage, u32 slot) {
 		useContext([&] { 
 			switch (stage) {
@@ -623,8 +657,8 @@ struct State {
 			immediateContext->OMSetRenderTargets(1, &renderTarget, depthStencil);
 		});
 	}
-	void setRenderTarget(RenderTarget &renderTarget) { setRenderTarget(renderTarget.rtv, 0); }
-	void setRenderTarget(RenderTarget &renderTarget, DepthStencil &depthStencil) { setRenderTarget(renderTarget.rtv, depthStencil.dsv); }
+	void setRenderTarget(RenderTarget &rt) { setRenderTarget(rt.rtv, 0); }
+	void setRenderTarget(RenderTarget &rt, DepthStencil &ds) { setRenderTarget(rt.rtv, ds.dsv); }
 	void setRasterizer(Rasterizer rasterizer = {}) { 
 		useContext([&] { 
 			immediateContext->RSSetState(rasterizer.raster);
@@ -633,7 +667,7 @@ struct State {
 	void setBlend(Blend blend = {}) { 
 		useContext([&] { 
 			float factor[4]{};
-			immediateContext->OMSetBlendState(blend.blend, factor, ~0);
+			immediateContext->OMSetBlendState(blend.blend, factor, ~0u);
 		});
 	}
 
@@ -658,7 +692,30 @@ inline void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTarge
 	state.immediateContext = immediateContext;
 	state.backBuffer.rtv = backBuffer;
 }
+// 'sampleCount' can be -1 for highest setting, -2 for second highest, etc
 inline void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0) {
+	IDXGIFactory1 *dxgiFactory;
+	TL_HRESULT_HANDLER(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
+
+	IDXGIAdapter1 *selectedAdapter = 0;
+	IDXGIAdapter1 *adapter = 0;
+	for (UINT adapterIndex = 0; dxgiFactory->EnumAdapters1(adapterIndex, &adapter) != DXGI_ERROR_NOT_FOUND; ++adapterIndex) {
+		DXGI_ADAPTER_DESC1 desc;
+		adapter->GetDesc1(&desc);	
+		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+			continue;
+		selectedAdapter = adapter;
+		break;
+	}
+
+	D3D_FEATURE_LEVEL maxFeature = D3D_FEATURE_LEVEL_11_1;
+	if (FAILED(D3D11CreateDevice(selectedAdapter, D3D_DRIVER_TYPE_UNKNOWN, 0, deviceFlags, &maxFeature, 1, D3D11_SDK_VERSION, &state.device, 0, &state.immediateContext))) {
+		TL_HRESULT_HANDLER(D3D11CreateDevice(selectedAdapter, D3D_DRIVER_TYPE_UNKNOWN, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &state.device, 0, &state.immediateContext));
+	}
+
+	u32 maxSampleCount = state.getMaxMsaaSampleCount(backBufferFormat);
+	if ((s32)sampleCount < 0) sampleCount = maxSampleCount / (u32)-(s32)sampleCount;
+
 	DXGI_SWAP_CHAIN_DESC d = {};
 	d.BufferDesc.Width = width;
 	d.BufferDesc.Height = height;
@@ -668,10 +725,7 @@ inline void initState(State &state, HWND window, u32 width, u32 height, DXGI_FOR
 	d.SampleDesc.Count = sampleCount;
 	d.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	d.OutputWindow = window;
-	D3D_FEATURE_LEVEL maxFeature = D3D_FEATURE_LEVEL_11_1;
-	if (FAILED(D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, &maxFeature, 1, D3D11_SDK_VERSION, &d, &state.swapChain, &state.device, 0, &state.immediateContext))) {
-		TL_HRESULT_HANDLER(D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, deviceFlags, 0, 0, D3D11_SDK_VERSION, &d, &state.swapChain, &state.device, 0, &state.immediateContext));
-	}
+	TL_HRESULT_HANDLER(dxgiFactory->CreateSwapChain(state.device, &d, &state.swapChain));
 
 	if (FAILED(state.device->QueryInterface(&state.device2))) { 
 		state.device2 = 0;

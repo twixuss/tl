@@ -4,28 +4,42 @@
 
 namespace TL {
 
-void _print(Span<char const>);
+void _print( char const *string, umm length);
+void _print(wchar const *string, umm length);
 
-template <class ...Args>
-void print(char const *fmt, Args const &...args) {
-	StringBuilder<> builder;
+template <class Char = char, class T>
+inline void print(T const &value) {
+	toString<Char>(value, [](Char const *string, umm length) {
+		_print(string, length);
+	});
+}
+
+template <class Char = char, class ...Args>
+inline void print(Char const *fmt, Args const &...args) {
+	StringBuilder<Char> builder;
 	builder.appendFormat(fmt, args...);
-	_print(builder.get());
+	print(builder.get());
 }
 
 #ifdef TL_IMPL
+
 #if OS_WINDOWS
-void _print(Span<char const> str) {
+
+static HANDLE consoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+
+void _print(char const *string, umm length) {
 	DWORD charsWritten;
-	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-	while (str.size()) {
-		DWORD charsToWrite = (DWORD)min(str.size(), 0xFFFFFFFF);
-		WriteConsoleA(handle, str.data(), charsToWrite, &charsWritten, 0);
-		str._begin += charsToWrite;
-	}
+	WriteConsoleA(consoleOutput, string, (DWORD)length, &charsWritten, 0);
 }
+void _print(wchar const *string, umm length) {
+	DWORD charsWritten;
+	WriteConsoleW(consoleOutput, string, (DWORD)length, &charsWritten, 0);
+}
+
 #else
+
 #endif
+
 #endif
 
 }

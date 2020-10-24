@@ -5,7 +5,7 @@ namespace TL {
 
 template <class T, umm size_>
 struct Array {
-	constexpr umm size() { return size_; }
+	constexpr umm size() const { return size_; }
 
 	constexpr T *data() { return v; }
 	constexpr T *begin() { return v; }
@@ -18,5 +18,10 @@ struct Array {
 	constexpr T const& operator[](umm i) const { return v[i]; }
 	T v[size_];
 };
+
+template <class T, umm size>
+inline constexpr umm countof(Array<T, size> const &arr) {
+	return arr.size();
+}
 
 }

@@ -20,24 +20,24 @@ struct ForwardListBase {
 	}
 	ForwardListBase(T const *begin, umm length) : ForwardListBase(Span(begin, length)) {}
 	ForwardListBase(ForwardListBase &&that) {
-		_begin		   = that._begin;
-		_end		   = that._end;
-		_allocEnd	   = that._allocEnd;
-		that._begin	   = 0;
-		that._end	   = 0;
+		_begin = that._begin;
+		_end = that._end;
+		_allocEnd = that._allocEnd;
+		that._begin = 0;
+		that._end = 0;
 		that._allocEnd = 0;
 	}
 	ForwardListBase(ForwardListBase const &that) {
-		_begin	  = allocate<T, Allocator>(that.size());
+		_begin = ALLOCATE_T(Allocator, T, that.size(), 0);
 		_allocEnd = _end = _begin + that.size();
 		_copyConstruct(that._begin, that._end);
 	}
 	~ForwardListBase() {
 		clear();
 		if (_begin)
-			Allocator::deallocate(_begin);
-		_begin	  = 0;
-		_end	  = 0;
+			DEALLOCATE(Allocator, _begin);
+		_begin = 0;
+		_end = 0;
 		_allocEnd = 0;
 	}
 	ForwardListBase &set(Span<T const> span) {
@@ -59,12 +59,12 @@ struct ForwardListBase {
 	ForwardListBase &operator=(ForwardListBase &&that) {
 		clear();
 		if (_begin)
-			Allocator::deallocate(_begin);
-		_begin		   = that._begin;
-		_end		   = that._end;
-		_allocEnd	   = that._allocEnd;
-		that._begin	   = 0;
-		that._end	   = 0;
+			DEALLOCATE(Allocator, _begin);
+		_begin = that._begin;
+		_end = that._end;
+		_allocEnd = that._allocEnd;
+		that._begin = 0;
+		that._end = 0;
 		that._allocEnd = 0;
 		return *this;
 	}
@@ -127,22 +127,22 @@ struct ForwardListBase {
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
 
-	T *_begin	 = 0;
-	T *_end		 = 0;
+	T *_begin = 0;
+	T *_end = 0;
 	T *_allocEnd = 0;
 
 	void _reallocate(umm newCapacity) {
 		ASSERT(capacity() < newCapacity);
 		umm oldSize = size();
-		T *newBegin = allocate<T, Allocator>(newCapacity);
+		T *newBegin = ALLOCATE_T(Allocator, T, newCapacity, 0);
 		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
 			new (dst) T(std::move(*src));
 			src->~T();
 		}
 		if (_begin)
-			Allocator::deallocate(_begin);
-		_begin	  = newBegin;
-		_end	  = _begin + oldSize;
+			DEALLOCATE(Allocator, _begin);
+		_begin = newBegin;
+		_end = _begin + oldSize;
 		_allocEnd = _begin + newCapacity;
 	}
 	void _grow(umm requiredSize) {
@@ -181,7 +181,7 @@ struct List : ForwardListBase<T, Allocator> {
 			umm newCapacity = capacity() * 2;
 			if (newCapacity == 0)
 				newCapacity = 1;
-			reallocate(newCapacity);
+			this->_reallocate(newCapacity);
 		}
 		new (this->_end) T(std::move(this->_end[-1]));
 		for (T *dest = this->_end - 1; dest > this->_begin; --dest) {
@@ -200,6 +200,9 @@ struct List : ForwardListBase<T, Allocator> {
 		this->_end->~T();
 	}
 	void erase(T &val) { erase(std::addressof(val)); }
+
+	List &operator+=(T const &v) { this->push_back(v); return *this; }
+	List &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
 };
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
@@ -218,7 +221,7 @@ struct UnorderedList : ForwardListBase<T, Allocator> {
 			umm newCapacity = capacity() * 2;
 			if (newCapacity == 0)
 				newCapacity = 1;
-			reallocate(newCapacity);
+			this->_reallocate(newCapacity);
 		}
 		new (this->_end) T(std::move(*this->_begin));
 		++this->_end;
@@ -260,11 +263,11 @@ struct Queue {
 	~Queue() {
 		clear();
 		if (_allocBegin)
-			Allocator::deallocate(_allocBegin);
-		_begin	    = 0;
-		_end	    = 0;
+			DEALLOCATE(Allocator, _allocBegin);
+		_begin = 0;
+		_end = 0;
 		_allocBegin = 0;
-		_allocEnd   = 0;
+		_allocEnd = 0;
 	}
 
 	T *begin() { return _begin; }
@@ -321,23 +324,23 @@ struct Queue {
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
 
-	T *_begin	   = 0;
-	T *_end		   = 0;
+	T *_begin = 0;
+	T *_end = 0;
 	T *_allocBegin = 0;
-	T *_allocEnd   = 0;
+	T *_allocEnd = 0;
 	void _reallocate(umm newCapacity) {
 		umm oldSize = size();
-		T *newBegin = allocate<T, Allocator>(newCapacity);
+		T *newBegin = ALLOCATE_T(Allocator, T, newCapacity, 0);
 		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
 			new (dst) T(std::move(*src));
 			src->~T();
 		}
 		if (_begin)
-			Allocator::deallocate(_allocBegin);
-		_allocBegin	= newBegin;
-		_begin      = newBegin;
-		_end        = _begin + oldSize;
-		_allocEnd   = _begin + newCapacity;
+			DEALLOCATE(Allocator, _allocBegin);
+		_allocBegin = newBegin;
+		_begin = newBegin;
+		_end = _begin + oldSize;
+		_allocEnd = _begin + newCapacity;
 	}
 	void _grow(umm requiredSize) {
 		umm newCapacity = (umm)(_allocEnd - _allocBegin);
@@ -378,6 +381,8 @@ template <class T, umm _capacity>
 struct CircularBuffer {
 	union Storage {
 		T value;
+		Storage() {}
+		~Storage() {}
 	};
 	struct Iterator {
 		using value_type = T;
@@ -401,6 +406,36 @@ struct CircularBuffer {
 		bool operator!=(Iterator const &that) const { return index != that.index; }
 	};
 	
+	CircularBuffer() = default;
+	CircularBuffer(CircularBuffer const &that) {
+		_size = that._size;
+		umm dstIndex = that._begin;
+		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
+			new (&_storage[srcIndex].value) T(that._storage[dstIndex].value);
+			if (++dstIndex == _capacity)
+				dstIndex = 0;
+		}
+	}
+	CircularBuffer(CircularBuffer &&that) {
+		_size = that._size;
+		umm dstIndex = that._begin;
+		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
+			new (&_storage[srcIndex].value) T(std::move(that._storage[dstIndex].value));
+			if (++dstIndex == _capacity)
+				dstIndex = 0;
+		}
+		that._begin = 0;
+		that._size = 0;
+	}
+	CircularBuffer &operator=(CircularBuffer const &that) { clear(); return *new (this) CircularBuffer(that); }
+	CircularBuffer &operator=(CircularBuffer &&that) { clear(); return *new (this) CircularBuffer(std::move(that)); }
+	~CircularBuffer() {
+		for (umm i = 0; i < _size; ++i) {
+			_get(i).~T();
+		}
+		_begin = 0;
+		_size = 0;
+	}
 	template <class ...Args>
 	void emplace_back(Args &&...args) {
 		TL_BOUNDS_CHECK(_size != _capacity);
@@ -410,7 +445,7 @@ struct CircularBuffer {
 	void emplace_front(Args &&...args) {
 		TL_BOUNDS_CHECK(_size != _capacity);
 		++_size;
-		if (_begin) --_begin; else  _begin = _capacity - 1;
+		if (_begin) --_begin; else _begin = _capacity - 1;
 		new (&_storage[_begin].value) T(std::forward<Args>(args)...);
 	}
 	void push_back(T const &v) { emplace_back(v); }
@@ -451,6 +486,14 @@ struct CircularBuffer {
 		}
 	}
 
+	void clear() {
+		for (umm i = 0; i < size(); ++i) {
+			_get(i).~T();
+		}
+		_begin = 0;
+		_size = 0;
+	}
+
 	T &_get(umm i) {
 		return _storage[(_begin + i) % _capacity].value;
 	}
@@ -473,6 +516,7 @@ struct CircularQueue : private CircularBuffer<T, _capacity> {
 	using Base::empty;
 	using Base::erase;
 	using Base::front;
+	using Base::clear;
 	using Base::operator[];
 	void push(T const &v) { this->push_back(v); }
 	void push(T &&v) { this->push_back(std::move(v)); }
@@ -567,7 +611,7 @@ struct BlockList {
 				block->buffer[i].value.~T();
 			}
 			auto next = block->next;
-			Allocator::deallocate(block);
+			DEALLOCATE(Allocator, block);
 			block = next;
 		}
 
@@ -663,7 +707,7 @@ struct BlockList {
 
 private:
 	Block *allocateBlock(Block *previous) {
-		Block *result = construct(allocate<Block, Allocator>());
+		Block *result = construct(ALLOCATE_T(Allocator, Block, 1, 0));
 		result->previous = previous;
 		return result;
 	}
@@ -687,7 +731,7 @@ struct LinkedList {
 		}
 		Iterator operator++(int) {
 			Node *prev = node;
-			node	   = node->next;
+			node = node->next;
 			return prev;
 		}
 		bool operator==(Iterator const &that) const { return node == that.node; }
@@ -702,7 +746,7 @@ struct LinkedList {
 		for (;;) {
 			if (node == 0)
 				break;
-			DEFER { Allocator::deallocate(node); };
+			DEFER { DEALLOCATE(Allocator, node); };
 			node = node->next;
 		}
 		head = last = 0;
@@ -711,10 +755,10 @@ struct LinkedList {
 	template <class... Args>
 	void emplace_back(Args &&... args) {
 		if (head == 0) {
-			head = last = allocate<Node, Allocator>();
+			head = last = ALLOCATE_T(Allocator, Node, 1, 0);
 		} else {
-			last->next = allocate<Node, Allocator>();
-			last	   = last->next;
+			last->next = ALLOCATE_T(Allocator, Node, 1, 0);
+			last = last->next;
 		}
 		last->next = 0;
 
@@ -744,17 +788,17 @@ void erase(UnorderedList<T> &list, T *val) {
 }
 
 template <class T>
-umm indexOf(List<T> const &list, T const *value) {
+umm indexof(List<T> const &list, T const *value) {
 	return value - list._begin;
 }
 
 template <class T>
-umm indexOf(UnorderedList<T> const &list, T const *value) {
+umm indexof(UnorderedList<T> const &list, T const *value) {
 	return value - list._begin;
 }
 
 template <class T, umm capacity>
-umm indexOf(StaticList<T, capacity> const &list, T const *value) {
+umm indexof(StaticList<T, capacity> const &list, T const *value) {
 	return value - list._begin;
 }
 

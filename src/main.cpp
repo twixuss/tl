@@ -255,7 +255,7 @@ void test_int() {
 
 void string_test() {
 	printf("%s ... ", "string_test");
-	StringBuilder<OsAllocator, 16> builder;
+	StringBuilder<char, OsAllocator, 16> builder;
 	char *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
 	builder.append(str);
 	auto result = builder.get();
@@ -604,7 +604,7 @@ struct Timer {
 				else
 					builder.appendFormat("({},0),", log2(size));
 			}
-			puts(builder.getTerminated().data());
+			TL::print(builder.get());
 		});
 	}
 };
@@ -643,12 +643,48 @@ void sort_perf() {
 		origList[i] = i;
 	std::shuffle(origList.begin(), origList.end(), std::mt19937{std::random_device{}()});
 	
-	//TIMER("std::sort") { std::sort(list.begin(), list.end()); };
-	//TIMER("quickSort") { quickSort(list); };
-	//TIMER("mergeSort") { mergeSort(list); };
+	TIMER("std::sort") { std::sort(list.begin(), list.end()); };
+	TIMER("quickSort") { quickSort(list); };
+	TIMER("mergeSort") { mergeSort(list); };
 }
 
 void common_test() {
+	static_assert(TL::floor(-4, 3) == -6);
+	static_assert(TL::floor(-3, 3) == -3);
+	static_assert(TL::floor(-2, 3) == -3);
+	static_assert(TL::floor(-1, 3) == -3);
+	static_assert(TL::floor( 0, 3) == 0);
+	static_assert(TL::floor( 1, 3) == 0);
+	static_assert(TL::floor( 2, 3) == 0);
+	static_assert(TL::floor( 3, 3) == 3);
+	static_assert(TL::floor(0u, 3u) == 0);
+	static_assert(TL::floor(1u, 3u) == 0);
+	static_assert(TL::floor(2u, 3u) == 0);
+	static_assert(TL::floor(3u, 3u) == 3);
+	static_assert(TL::floor(4u, 3u) == 3);
+	static_assert(TL::floor(5u, 3u) == 3);
+	static_assert(TL::floor(6u, 3u) == 6);
+
+	static_assert(TL::ceil(-3, 3) == -3);
+	static_assert(TL::ceil(-2, 3) == 0);
+	static_assert(TL::ceil(-1, 3) == 0);
+	static_assert(TL::ceil( 0, 3) == 0);
+	static_assert(TL::ceil( 1, 3) == 3);
+	static_assert(TL::ceil( 2, 3) == 3);
+	static_assert(TL::ceil( 3, 3) == 3);
+	static_assert(TL::ceil( 4, 3) == 6);
+	static_assert(TL::ceil(0u, 3u) == 0u);
+	static_assert(TL::ceil(1u, 3u) == 3u);
+	static_assert(TL::ceil(2u, 3u) == 3u);
+	static_assert(TL::ceil(3u, 3u) == 3u);
+	static_assert(TL::ceil(4u, 3u) == 6u);
+	static_assert(TL::ceil(5u, 3u) == 6u);
+	static_assert(TL::ceil(6u, 3u) == 6u);
+	static_assert(TL::ceil(7u, 3u) == 9u);
+
+	ASSERT(TL::isNegative(-0.0f));
+	ASSERT(!TL::isNegative(0.0f));
+
 	static_assert(TL::midpoint(0, 0) == 0);
 	static_assert(TL::midpoint(0, 1) == 0);
 	static_assert(TL::midpoint(0, 2) == 1);
@@ -680,6 +716,7 @@ void buffer_test() {
 
 	umm count = 0;
 	for (auto &x : buffer) {
+		(void)x;
 		++count;
 	}
 	ASSERT(count == buffer.size());
@@ -706,6 +743,5 @@ int main() {
 
 	string_test();
 
-	// TODO: fix this shit
 	 math_test();
 }

@@ -34,15 +34,15 @@
 #define ASSERTION_FAILURE(file, line, function, causeString, expression, ...) DEBUG_BREAK
 #endif
 
-#define ASSERT(x, ...)                                    \
-	do {                                                  \
-		if (!(x)) {                                       \
+#define ASSERT(x, ...)                                                                      \
+	do {                                                                                    \
+		if (!(x)) {                                                                         \
 			ASSERTION_FAILURE(__FILE__, __LINE__, __FUNCTION__, "ASSERT", #x, __VA_ARGS__); \
-		}                                                 \
+		}                                                                                   \
 	} while (0)
 
-#define INVALID_CODE_PATH(...)                                   \
-	do {                                                         \
+#define INVALID_CODE_PATH(...)                                                                     \
+	do {                                                                                           \
 		ASSERTION_FAILURE(__FILE__, __LINE__, __FUNCTION__, "INVALID_CODE_PATH", "", __VA_ARGS__); \
 	} while (0)
 
@@ -52,9 +52,17 @@
 #define TL_BOUNDS_CHECK(x) ASSERT(x, "Bounds check failed")
 #endif
 
+#ifdef TL_ALLOCATION_TRACKER
+#ifndef TL_DEALLOCATION_TRACKER
+#error TL_DEALLOCATION_TRACKER must be defined with TL_ALLOCATION_TRACKER
+#endif
+#endif
+
 namespace TL {
 
-#define TL_DECLARE_HANDLE(name) typedef struct tl__##name {} *name;
+#define TL_HANDLE_NAME(name) CONCAT(name, Impl)
+#define TL_DECLARE_HANDLE(name) typedef struct TL_HANDLE_NAME(name) *name;
+#define TL_DEFINE_HANDLE(name) struct TL_HANDLE_NAME(name)
 
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
@@ -104,19 +112,15 @@ template <class T> struct RemoveReferenceT<T &>  { using Type = T; };
 template <class T> struct RemoveReferenceT<T &&> { using Type = T; };
 template <class T> using RemoveReference = typename RemoveReferenceT<T>::Type;
 
-template <class T> struct RemoveConstT		    { using Type = T; };
+template <class T> struct RemoveConstT          { using Type = T; };
 template <class T> struct RemoveConstT<T const> { using Type = T; };
 template <class T> using RemoveConst = typename RemoveConstT<T>::Type;
 
-template <class T> struct RemoveVolatileT		      { using Type = T; };
+template <class T> struct RemoveVolatileT             { using Type = T; };
 template <class T> struct RemoveVolatileT<T volatile> { using Type = T; };
 template <class T> using RemoveVolatile = typename RemoveVolatileT<T>::Type;
 
 template <class T> using RemoveCVRef = RemoveConst<RemoveVolatile<RemoveReference<T>>>;
-
-template <bool v, class T, class F> struct ConditionalT { using Type = T; };
-template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
-template <bool v, class T, class F> using Conditional = typename ConditionalT<v, T, F>::Type;
 
 template <bool v, class T = void> struct EnableIfT {};
 template <class T> struct EnableIfT<true, T> { using Type = T; };
@@ -141,7 +145,6 @@ constexpr T &construct(T &val, Args &&...args) {
 
 #pragma warning(push)
 #pragma warning(disable : 4309)
-// clang-format off
 template<class T> inline constexpr T min() = delete;
 template<class T> inline constexpr T max() = delete;
 template<> inline constexpr u8  min() { return 0; }
@@ -162,21 +165,14 @@ template<> inline constexpr s16 max() { return 0x7FFF; }
 template<> inline constexpr s32 max() { return 0x7FFFFFFF; }
 template<> inline constexpr s64 max() { return 0x7FFFFFFFFFFFFFFF; }
 
-template<> inline constexpr long unsigned min() { return (long unsigned)min<u32>(); }
-template<> inline constexpr long unsigned max() { return (long unsigned)max<u32>(); }
-template<> inline constexpr long   signed min() { return (long   signed)min<s32>(); }
-template<> inline constexpr long   signed max() { return (long   signed)max<s32>(); }
-// clang-format on
+template<> inline constexpr ulong min() { return (ulong)min<ulong_s>(); }
+template<> inline constexpr ulong max() { return (ulong)max<ulong_s>(); }
+template<> inline constexpr slong min() { return (slong)min<slong_s>(); }
+template<> inline constexpr slong max() { return (slong)max<slong_s>(); }
 #pragma warning(pop)
 
-FORCEINLINE constexpr bool isPowerOf2(u8  v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(u16 v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(u32 v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(u64 v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(s8  v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(s16 v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(s32 v) { return v && ((v & (v - 1)) == 0); }
-FORCEINLINE constexpr bool isPowerOf2(s64 v) { return v && ((v & (v - 1)) == 0); }
+template <class T>
+FORCEINLINE constexpr bool isPowerOf2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
 
 template <class T, class U> FORCEINLINE constexpr auto min(T a, U b) { return a < b ? a : b; }
 template <class T, class U> FORCEINLINE constexpr auto max(T a, U b) { return a > b ? a : b; }
@@ -184,23 +180,31 @@ template <class T, class U, class... Rest> FORCEINLINE constexpr auto min(T a, U
 template <class T, class U, class... Rest> FORCEINLINE constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
 template <class T, class U, class V, class W> FORCEINLINE constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 
-FORCEINLINE constexpr u8  floor(u8  v, u8  s) { return (u8 )(v / s * s); }
-FORCEINLINE constexpr u16 floor(u16 v, u16 s) { return (u16)(v / s * s); }
-FORCEINLINE constexpr u32 floor(u32 v, u32 s) { return (u32)(v / s * s); }
-FORCEINLINE constexpr u64 floor(u64 v, u64 s) { return (u64)(v / s * s); }
+template <class T>
+FORCEINLINE constexpr T floor(T v, T s) {
+	if constexpr (isSigned<T>) {
+		return ((v < 0) ? ((v + 1) / s - 1) : (v / s)) * s;
+	} else {
+		return v / s * s;
+	}
+}
 
-FORCEINLINE constexpr u8  ceil(u8  v, u8  s) { return floor((u8 )(v + s - 1), s); }
-FORCEINLINE constexpr u16 ceil(u16 v, u16 s) { return floor((u16)(v + s - 1), s); }
-FORCEINLINE constexpr u32 ceil(u32 v, u32 s) { return floor((u32)(v + s - 1), s); }
-FORCEINLINE constexpr u64 ceil(u64 v, u64 s) { return floor((u64)(v + s - 1), s); }
+template <class T>
+FORCEINLINE constexpr T ceil(T v, T s) {
+	return floor(v + s - 1, s);
+}
 
 FORCEINLINE constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
 FORCEINLINE constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
-FORCEINLINE constexpr s8  frac(s8  v, s8  s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
-FORCEINLINE constexpr s16 frac(s16 v, s16 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
-FORCEINLINE constexpr s32 frac(s32 v, s32 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
-FORCEINLINE constexpr s64 frac(s64 v, s64 s) {  return (v < 0) ? ((v + 1) % s + s - 1) : (v % s); }
+template <class T>
+FORCEINLINE constexpr T frac(T v, T s) {
+	if constexpr(isSigned<T>) {
+		return (v < 0) ? ((v + 1) % s + s - 1) : (v % s);
+	} else {
+		return v % s;
+	}
+}
 
 FORCEINLINE constexpr bool isNegative(f32 v) { return *(u32 *)&v & 0x80000000; }
 FORCEINLINE constexpr bool isNegative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
@@ -266,49 +270,16 @@ private:
 #define DEFER ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]()
 
 template <class T>
-struct Range {
-	struct Iterator {
-		T value;
-		constexpr Iterator(T value) : value(value) {}
-		constexpr Iterator &operator++() { return ++value, *this; }
-		constexpr Iterator operator++(int) { return value++; }
-		constexpr bool operator==(Iterator const &that) const { return value == that.value; }
-		constexpr bool operator!=(Iterator const &that) const { return value != that.value; }
-		constexpr T &operator*() { return value; }
-		constexpr T *operator->() { return &value; }
-	};
-	constexpr Range(T const &begin, T const &end) : _begin(begin), _end(end) {}
-	constexpr Range(T const &end) : _begin(), _end(end) {}
-	constexpr Iterator begin() { return _begin; }
-	constexpr Iterator end() { return _end; }
-	T _begin{};
-	T _end{};
-};
-
-template <class T> Range<T> exclusiveRange(T begin, T end) { return Range<T>(begin, end); }
-template <class T> Range<T> inclusiveRange(T begin, T end) { return Range<T>(begin, end + 1); }
-
-template <class T>
 auto reverse(T &x) {
-	using Ptr = decltype(x.begin());
-	struct Iter {
-		Iter &operator++() { --ptr; return *this; }
-		Iter &operator--() { ++ptr; return *this; }
-		Iter operator++(int) { Iter prev = *this; --ptr; return prev; }
-		Iter operator--(int) { Iter prev = *this; ++ptr; return prev; }
-		bool operator==(Iter const &that) { return ptr == that.ptr; }
-		bool operator!=(Iter const &that) { return ptr != that.ptr; }
-		auto &operator*() { return *ptr; }
-		Ptr ptr;
-	};
+	using Iter = decltype(x.rbegin());
 	struct Range {
 		Iter begin() { return {_begin}; }
 		Iter end() { return {_end}; }
-		Ptr _begin, _end;
+		Iter _begin, _end;
 	};
 	Range r;
-	r._begin = x.end() - 1;
-	r._end = x.begin() - 1;
+	r._begin = x.rbegin();
+	r._end = x.rend();
 	return r;
 }
 
@@ -334,58 +305,69 @@ struct Span {
 	constexpr bool empty() const { return _begin == _end; }
 
 	constexpr operator Span<T const>() const { return {_begin, _end}; }
+	constexpr operator Span<void>() const { return {_begin, _end}; }
+	constexpr operator Span<void const>() const { return {_begin, _end}; }
 
-	constexpr bool operator==(Span<T> that) const {
-		if (size() != that.size()) return false;
-		for (auto a = _begin, b = that._begin; a != _end; ++a, ++b) {
-			if (*a != *b)
-				return false;
-		}
-		return true;
-	}
+	constexpr bool operator==(Span<T> that) const { return _begin == that._begin && _end == that._end; }
 
 	T *_begin{};
 	T *_end{};
 };
 
+template <>
+struct Span<void const> {
+	constexpr Span() = default;
+	constexpr Span(void const *begin, void const *end) : _begin(begin), _end(end) {}
+	constexpr Span(void const *begin, umm size) : Span(begin, (u8 *)begin + size) {}
+	constexpr void const *data() const { return _begin; }
+	constexpr void const *begin() const { return _begin; }
+	constexpr void const *end() const { return _end; }
+	constexpr umm size() const { return umm((u8 *)_end - (u8 *)_begin); }
+	constexpr bool empty() const { return _begin == _end; }
+	constexpr bool operator==(Span<void const> that) const { return _begin == that._begin && _end == that._end; }
+	void const *_begin{};
+	void const *_end{};
+};
+
+template <>
+struct Span<void> {
+	constexpr Span() = default;
+	constexpr Span(void *begin, void *end) : _begin(begin), _end(end) {}
+	constexpr Span(void *begin, umm size) : Span(begin, (u8 *)begin + size) {}
+	constexpr void *data() const { return _begin; }
+	constexpr void *begin() const { return _begin; }
+	constexpr void *end() const { return _end; }
+	constexpr umm size() const { return umm((u8 *)_end - (u8 *)_begin); }
+	constexpr bool empty() const { return _begin == _end; }
+	constexpr operator Span<void const>() const { return {_begin, _end}; }
+	constexpr bool operator==(Span<void> that) const { return _begin == that._begin && _end == that._end; }
+	void *_begin{};
+	void *_end{};
+};
+
 template <class T>
 constexpr umm countof(Span<T const> span) { return span.size(); }
 
-using StringView = Span<char const>;
-using StringSpan = Span<char>;
+#ifdef TL_ALLOCATION_TRACKER
 
-using FnAllocate   = void *(*)(void *state, umm size, umm align);
-using FnDeallocate = void  (*)(void *state, void *data);
+#define ALLOCATE(al, size, align)                    (TL_ALLOCATION_TRACKER<al>((umm)(size), (umm)(align), __FILE__, __LINE__))
+#define ALLOCATE_MSG(al, size, align, message)       (TL_ALLOCATION_TRACKER<al>((umm)(size), (umm)(align), __FILE__, __LINE__, message))
+#define ALLOCATE_T(al, t, count, align)              ((t*)TL_ALLOCATION_TRACKER<al>(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)), __FILE__, __LINE__))
+#define ALLOCATE_T_MSG(al, t, count, align, message) ((t*)TL_ALLOCATION_TRACKER<al>(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)), __FILE__, __LINE__, message))
 
-struct Allocator {
-	FnAllocate   _allocate   = 0;
-	FnDeallocate _deallocate = 0;
-	void *_state = 0;
-	
-	void *allocate(umm size, umm align = 0) { return _allocate(_state, size, align); }
+#define DEALLOCATE(al, data) (TL_DEALLOCATION_TRACKER(data), al::deallocate(data))
 
-	template <class T>
-	T *allocate(umm count = 1, umm align = 0) {
-		return (T *)allocate(count * sizeof(T), max(alignof(T), align));
-	}
+#else
 
-	void deallocate(void *data) { _deallocate(_state, data); }
-};
+#define ALLOCATE(al, size, align)                    al::allocate((umm)(size), (umm)(align))
+#define ALLOCATE_MSG(al, size, align, message)       al::allocate((umm)(size), (umm)(align))
+#define ALLOCATE_T(al, t, count, align)              (t*)al::allocate(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)))
+#define ALLOCATE_T_MSG(al, t, count, align, message) (t*)al::allocate(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)))
 
-inline Allocator makeAllocator(void *state, FnAllocate allocate, FnDeallocate deallocate) {
-	Allocator result;
-	result._allocate = allocate;
-	result._deallocate = deallocate;
-	result._state = state;
-	return result;
-}
+#define DEALLOCATE(al, data) al::deallocate(data)
 
-extern Allocator osAllocator;
+#endif
 
-template <class T, class Allocator>
-static T *allocate(umm count = 1, umm align = 0) {
-	return (T *)Allocator::allocate(count * sizeof(T), max(alignof(T), align));
-}
 
 struct OsAllocator {
 #if OS_WINDOWS
@@ -411,76 +393,92 @@ struct OsAllocator {
 #endif
 
 inline constexpr char toLower(char c) {
-	if (c >= 'A' && c <= 'Z') return (char)(c + ('a' - 'A'));
+	if (c >= 'A' && c <= 'Z')
+		return (char)(c + ('a' - 'A'));
 	return c;
 }
 inline constexpr wchar toLower(wchar c) {
-	if (c >= 'A' && c <= 'Z') return (wchar)(c + ('a' - 'A'));
+	if (c >= L'A' && c <= L'Z')
+		return (wchar)(c + (L'a' - L'A'));
 	return c;
 }
 
 inline constexpr umm length(char const *str) {
 	umm result = 0;
-	while (*str++) ++result;
-	return result;	
+	while (*str++)
+		++result;
+	return result;
 }
 inline constexpr umm length(wchar const *str) {
 	umm result = 0;
-	while (*str++) ++result;
-	return result;	
+	while (*str++)
+		++result;
+	return result;
 }
-inline constexpr umm length(char *str) {
-	return length((char const *)str);
-}
-inline constexpr umm length(wchar *str) {
-	return length((wchar const *)str);
+inline constexpr umm length(char  *str) { return length((char  const *)str); }
+inline constexpr umm length(wchar *str) { return length((wchar const *)str); }
+
+#define COMP_FUNCS(typeA, typeB)                                                                           \
+inline constexpr bool equals(typeA const *a, typeB const *b) {                                             \
+	for (;;)                                                                                               \
+		if (*a++ != *b++)                                                                                  \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool equals(Span<typeA const> a, typeB const *b) {                                        \
+	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b)                                                    \
+		if (*ap != *b)                                                                                     \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool equals(typeA const *a, Span<typeB const> b) {                                        \
+	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp)                                                    \
+		if (*a != *bp)                                                                                     \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool equals(Span<typeA const> a, Span<typeB const> b) {                                   \
+	if (a.size() != b.size())                                                                              \
+		return false;                                                                                      \
+	auto ap = a.begin();                                                                                   \
+	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)                                                   \
+		if (*ap != *bp)                                                                                    \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool startsWith(typeA const *str, typeB const *subStr) {                                  \
+	while (*subStr)                                                                                        \
+		if (*str++ != *subStr++)                                                                           \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool startsWith(typeA const *str, typeB const *subStr, umm substrLength) {                \
+	while (substrLength--)                                                                                 \
+		if (*str++ != *subStr++)                                                                           \
+			return false;                                                                                  \
+	return true;                                                                                           \
+}                                                                                                          \
+inline constexpr bool startsWith(typeA const *str, umm strLength, typeB const *subStr) {                   \
+	while (*subStr && strLength--)                                                                         \
+		if (*str++ != *subStr++)                                                                           \
+			return false;                                                                                  \
+	return !*subStr;                                                                                       \
+}                                                                                                          \
+inline constexpr bool startsWith(typeA const *str, umm strLength, typeB const *subStr, umm substrLength) { \
+	if (strLength < substrLength)                                                                          \
+		return false;                                                                                      \
+	while (strLength-- && substrLength--)                                                                  \
+		if (*str++ != *subStr++)                                                                           \
+			return false;                                                                                  \
+	return true;                                                                                           \
 }
 
-inline constexpr bool equals(StringView a, StringView b) {
-	if (a.size() != b.size()) return false;
-	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp)
-		if (*ap != *bp)
-			return false;
-	return true;
-}
-inline constexpr bool equals(char const *a, StringView b) {
-	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp)
-		if (*a != *bp)
-			return false;
-	return true;
-}
-inline constexpr bool equals(StringView a, char const *b) {
-	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b)
-		if (*ap != *b)
-			return false;
-	return true;
-}
+COMP_FUNCS(char, char)
+COMP_FUNCS(char, wchar)
+COMP_FUNCS(wchar, char)
+COMP_FUNCS(wchar, wchar)
 
-inline constexpr bool startsWith(char const *str, char const *subStr) {
-	while (*subStr)
-		if (*str++ != *subStr++)
-			return false;
-	return true;
-}
-inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr) {
-	while (*subStr && strLength--)
-		if (*str++ != *subStr++)
-			return false;
-	return !*subStr;
-}
-inline constexpr bool startsWith(char const *str, char const *subStr, umm substrLength) {
-	while (substrLength--)
-		if (*str++ != *subStr++)
-			return false;
-	return true;
-}
-inline constexpr bool startsWith(char const *str, umm strLength, char const *subStr, umm substrLength) {
-	if (strLength < substrLength) return false;
-	while (strLength-- && substrLength--)
-		if (*str++ != *subStr++)
-			return false;
-	return true;
-}
+#undef COMP_FUNCS
 
 inline constexpr bool endsWith(char const *str, char const *subStr) {
 	auto strLen = length(str);
@@ -530,39 +528,58 @@ inline constexpr bool endsWithCI(wchar const *str, wchar const *subStr) {
 	return true;
 }
 
-template <class CopyFn>
-inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, char *, umm>;
-
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, char *v) { 
-	return copyFn(v, length(v));
-}
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, char const *v) { 
-	return copyFn(v, length(v));
+inline constexpr void setToLowerCase(Span<wchar> span) {
+	for (auto &c : span) {
+		c = toLower(c);
+	}
 }
 
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, StringSpan v) {
-	return copyFn(v.data(), v.size());
-}
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>> 
-StringSpan toString(CopyFn &&copyFn, Span<char const> v) {
-	return copyFn(v.data(), v.size());
-}
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, bool v) {
-	return copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
-}
+template <class CopyFn, class Char>
+inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, Char *, umm>;
+
+template <class CopyFn, class Char>
+using CopyFnRet = decltype(((CopyFn *)0)->operator()((Char*)0, (umm)0));
+
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
 
-template <class CopyFn, class Int, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, Int v, u32 radix = 10) {
+template <class Int>
+struct FormatInt {
+	Int value;
+	u32 radix;
+	explicit FormatInt(Int value, u32 radix = 10) : value(value), radix(radix) {}
+};
+
+template <class Float>
+struct FormatFloat {
+	Float value;
+	u32 precision;
+	explicit FormatFloat(Float value, u32 precision = 3) : value(value), precision(precision) {}
+};
+
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(char  const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(wchar const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char const *const &v, CopyFn &&copyFn) { return copyFn(v, length(v)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char       *const &v, CopyFn &&copyFn) { return copyFn(v, length(v)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char const> v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char      > v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
+
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(bool v, CopyFn &&copyFn) {
+	if constexpr (isSame<Char, char>)
+		return copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
+	else
+		return copyFn(v ? L"true" : L"false", (umm)(v ? 4 : 5));
+}
+
+template <class Char, class CopyFn, class Int>
+CopyFnRet<CopyFn, Char> toString(FormatInt<Int> f, CopyFn &&copyFn) {
+	Int v = f.value;
+	u32 radix = f.radix;
 	constexpr u32 maxDigits = _intToStringSize<Int>;
-	char buf[maxDigits];
-	char charMap[] = "0123456789ABCDEF";
-	char *lsc = buf + maxDigits - 1;
+	Char buf[maxDigits];
+	constexpr char charMap[] = "0123456789ABCDEF";
+	Char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
 
 	bool negative = false;
@@ -595,48 +612,66 @@ StringSpan toString(CopyFn &&copyFn, Int v, u32 radix = 10) {
 	}
 	return copyFn(lsc + 1, charsWritten);
 }
-
-template <class Int, class = EnableIf<isInteger<Int> && !isChar<Int>>>
-StringSpan toString(Int v, char *outBuf) {
-	return toString([&](char const *src, umm length) { 
-		copyMemory(outBuf, src, length); 
-		return StringSpan(outBuf, length);
-	}, v);
-}
-template <class Int, class = EnableIf<isInteger<Int>>>
-StringSpan toStringNT(Int v, char *outBuf) {
-	return toString([&](char const *src, umm length) { 
-		copyMemory(outBuf, src, length); 
-		outBuf[length] = '\0';
-		return StringSpan(outBuf, length);
-	}, v);
+template <class Char, class CopyFn, class Int, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(Int v, CopyFn &&copyFn) {
+	return toString<Char>(FormatInt(v), std::forward<CopyFn>(copyFn));
 }
 
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, void const *p) {
-	return toString(std::forward<CopyFn>(copyFn), (umm)p, 16);
+template <class Char, class T>
+Span<Char> toStringNT(T v, Char *outBuf) {
+	return toString<Char>(v, [&](Char const *src, umm length) { 
+		copyMemory(outBuf, src, length * sizeof(Char)); 
+		outBuf[length] = (Char)0;
+		return Span<Char>(outBuf, length);
+	});
 }
 
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, f64 v, u32 precision = 3) {
-	char buf[64];
-	char *c = buf;
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(void const *p, CopyFn &&copyFn) {
+	return toString<Char>(FormatInt((umm)p, 16), std::forward<CopyFn>(copyFn));
+}
+
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(FormatFloat<f64> f, CopyFn &&copyFn) {
+	auto v = f.value;
+	auto precision = f.precision;
+	Char buf[64];
+	Char *c = buf;
 	if (isNegative(v)) {
 		*c++ = '-';
 		v = -v;
 	}
-	c += toString((u64)v, c).size();
+	c += toString<Char>((u64)v, [&](Char const *string, umm length){
+		copyMemory(buf, string, length * sizeof(Char));
+		return length;
+	});
 	*c++ = '.';
 	for (u32 i = 0; i < precision; ++i) {
 		v = v - (f64)(s64)v;
-		v = select(v < 0, v + 1, v) * 10;
-		*c++ = (char)((u32)v + '0');
+		v = (v < 0 ? v + 1 : v) * 10;
+		*c++ = (Char)((u32)v + '0');
 	}
 	return copyFn(buf, (umm)(c - buf));
 }
-template <class CopyFn, class = EnableIf<isCopyFn<CopyFn>>>
-StringSpan toString(CopyFn &&copyFn, f32 v, u32 precision = 3) {
-	return toString(copyFn, (f64)v, precision);
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(f64 v, CopyFn &&copyFn) {
+	return toString<Char>(FormatFloat(v), std::forward<CopyFn>(copyFn));
+}
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(f32 v, CopyFn &&copyFn) {
+	return toString<Char>((f64)v, std::forward<CopyFn>(copyFn));
+}
+
+template <class Allocator>
+struct Buffer : Span<void> {
+	using Span<void>::Span;
+	operator bool() const { return data(); }
+};
+
+template <class Allocator>
+inline void free(Buffer<Allocator> buffer) {
+	if (buffer)
+		DEALLOCATE(Allocator, buffer.data());
 }
 
 template <class T, umm _capacity>
@@ -693,7 +728,8 @@ struct StaticList {
 	umm capacity() { return _capacity; }
 	
 	umm size() const { return (umm)(_end - _begin); }
-	bool empty() const { return size() == 0; }
+	bool empty() const { return _end == _begin; }
+	bool full() const { return _end == _begin + _capacity; }
 
 	T *data() { return std::addressof(_begin->v); }
 	T &front() { TL_BOUNDS_CHECK(size()); return _begin->v; }
@@ -708,21 +744,10 @@ struct StaticList {
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
 
-	bool full() const { return size() == _capacity; }
-
-	template <class... Args>
-	bool try_emplace_back(Args &&... args) {
-		if (full())
-			return false;
-		new (_end++) T(std::forward<Args>(args)...);
-		return true;
-	}
-	bool try_push_back(T const &val) { return try_emplace_back(val); }
-	bool try_push_back(T &&val) { return try_emplace_back(std::move(val)); }
-
 	template <class... Args>
 	void emplace_back(Args &&... args) {
-		ASSERT(try_emplace_back(std::forward<Args>(args)...));
+		TL_BOUNDS_CHECK(!full());
+		new (_end++) T(std::forward<Args>(args)...);
 	}
 	void push_back(T const &val) { emplace_back(val); }
 	void push_back(T &&val) { emplace_back(std::move(val)); }
@@ -741,8 +766,8 @@ struct StaticList {
 	}
 
 	void clear() {
-		for (auto &v : *this) {
-			v.~T();
+		for (auto it = _begin; it != _end; ++it) {
+			it->v.~T();
 		}
 		_end = _begin;
 	}
@@ -790,19 +815,14 @@ FORCEINLINE u32 findHighestOneBit(u64 val) {
 	unsigned long result;
 	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
 }
+FORCEINLINE u32 countLeadingZeros(u16 val) { return __lzcnt16(val); }
+FORCEINLINE u32 countLeadingZeros(u32 val) { return __lzcnt(val); }
+FORCEINLINE u32 countLeadingZeros(u64 val) { return (u32)__lzcnt64(val); }
 #endif
 
 FORCEINLINE u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
 FORCEINLINE u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
 FORCEINLINE u32 countBits(s32 v) { return countBits((u32)v); }
 FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
-
-#ifdef TL_IMPL
-Allocator osAllocator = makeAllocator(0,
-	[](void *, umm size, umm align) -> void * { return OsAllocator::allocate(size, align); },
-	[](void *, void *data)                    { return OsAllocator::deallocate(data); }
-);
-
-#endif // TL_IMPL
 
 } // namespace TL

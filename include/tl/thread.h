@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "optional.h"
+#include "list.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4582)
@@ -280,9 +281,9 @@ inline void unlock(RecursiveMutex &m) {
 #define SCOPED_LOCK(mutex) lock(mutex); DEFER { unlock(mutex); }
 #define SCOPED_UNLOCK(mutex) unlock(mutex); DEFER { lock(mutex); }
 
-template <class T, class Mutex = Mutex>
+template <class T, class Mutex = Mutex, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct MutexQueue {
-	Queue<T> base;
+	Queue<T, Allocator> base;
 	Mutex mutex;
 	
 	void push(T &&value) {
@@ -316,25 +317,65 @@ struct MutexQueue {
 	}
 };
 
+template <class T, umm capacity, class Mutex = Mutex>
+struct MutexCircularQueue {
+	void push(T &&value) {
+		SCOPED_LOCK(mutex);
+		base.push(std::move(value));
+	}
+	void push(T const &value) {
+		SCOPED_LOCK(mutex);
+		base.push(value);
+	}
+	Optional<T> try_pop() {
+		Optional<T> result;
+		SCOPED_LOCK(mutex);
+		if (base.size()) {
+			result.emplace(std::move(base.front()));
+			base.pop();
+		}
+		return result;
+	}
+	T pop() {
+		Optional<T> opt;
+		loopUntil([&] {
+			opt = try_pop();
+			return opt.has_value();
+		});
+		return opt.value();
+	}
+	void clear() {
+		SCOPED_LOCK(mutex);
+		base.clear();
+	}
+
+private:
+	CircularQueue<T, capacity> base;
+	Mutex mutex;
+};
+
+template <class Allocator>
 struct WorkQueue;
 
+template <class Allocator>
 struct ThreadWork {
-	WorkQueue *queue;
+	WorkQueue<Allocator> *queue;
 	void (*fn)(void *param);
 	void *param;
 };
 
+template <class Allocator, class Queue = MutexQueue<ThreadWork<Allocator>, Mutex, Allocator>>
 struct ThreadPool {
-	Allocator allocator = osAllocator;
-	ThreadHandle *threads = 0;
+	List<ThreadHandle, Allocator> threads;
 	u32 threadCount = 0;
 	u32 volatile initializedThreadCount = 0;
 	u32 volatile deadThreadCount = 0;
 	bool volatile running = false;
 	bool volatile stopping = false;
-	MutexQueue<ThreadWork> allWork;
+	Queue allWork;
 };
-bool tryDoWork(ThreadPool *pool);
+template <class Allocator>
+bool tryDoWork(ThreadPool<Allocator> *pool);
 
 namespace Detail {
 template <class Tuple, umm... indices>
@@ -350,12 +391,13 @@ static constexpr auto getInvoke(std::index_sequence<indices...>) noexcept {
 }
 } // namespace Detail
 
+template <class Allocator>
 struct WorkQueue {
 	u32 volatile workToDo = 0;
-	ThreadPool *pool = 0;
+	ThreadPool<Allocator> *pool = 0;
 	inline void push(void (*fn)(void *param), void *param) {
 		if (pool->threadCount) {
-			ThreadWork work;
+			ThreadWork<Allocator> work;
 			work.fn = fn;
 			work.param = param;
 			work.queue = this;
@@ -368,7 +410,7 @@ struct WorkQueue {
 	void push(Fn &&fn, Args &&... args) {
 		if (pool->threadCount) {
 			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-			auto fnParams = allocate<Tuple>(pool->allocator);
+			auto fnParams = ALLOCATE_T(Allocator, Tuple, 1, 0);
 			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 			constexpr auto invokerProc = Detail::getInvoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
 			lockAdd(workToDo, 1);
@@ -388,26 +430,30 @@ struct WorkQueue {
 
 };
 
-inline WorkQueue makeWorkQueue(ThreadPool *pool) {
-	WorkQueue result = {};
+template <class Allocator>
+inline WorkQueue<Allocator> makeWorkQueue(ThreadPool<Allocator> *pool) {
+	WorkQueue<Allocator> result = {};
 	result.pool = pool;
 	return result;
 }
 
-inline void doWork(ThreadWork work) {
+template <class Allocator>
+inline void doWork(ThreadWork<Allocator> work) {
 	work.fn(work.param);
-	work.queue->pool->allocator.deallocate(work.param);
+	DEALLOCATE(Allocator, work.param);
 	lockAdd(work.queue->workToDo, (u32)-1);
 }
-inline bool tryDoWork(ThreadPool *pool) {
+template <class Allocator>
+inline bool tryDoWork(ThreadPool<Allocator> *pool) {
 	if (auto popped = pool->allWork.try_pop()) {
 		doWork(*popped);
 		return true;
 	}
 	return false;
 }
-inline bool doWork(ThreadPool *pool) {
-	ThreadWork work = {};
+template <class Allocator>
+inline bool doWork(ThreadPool<Allocator> *pool) {
+	ThreadWork<Allocator> work = {};
 	loopUntil([&] {
 		if (pool->stopping) {
 			return true;
@@ -418,7 +464,6 @@ inline bool doWork(ThreadPool *pool) {
 		}
 		return false;
 	});
-
 	if (work.fn) {
 		doWork(work);
 		return true;
@@ -427,7 +472,8 @@ inline bool doWork(ThreadPool *pool) {
 	}
 }
 
-inline void defaultThreadPoolProc(ThreadPool *pool) {
+template <class Allocator>
+inline void defaultThreadPoolProc(ThreadPool<Allocator> *pool) {
 	lockAdd(pool->initializedThreadCount, 1);
 	loopUntil([&] { return pool->running || pool->stopping; });
 	while (1) {
@@ -436,19 +482,18 @@ inline void defaultThreadPoolProc(ThreadPool *pool) {
 	}
 	lockAdd(pool->deadThreadCount, 1);
 }
-template <class ThreadProc = decltype(defaultThreadPoolProc)>
-bool initThreadPool(ThreadPool *pool, u32 threadCount, ThreadProc &&threadProc = defaultThreadPoolProc) {
-	TIMED_FUNCTION;
+template <class Allocator, class ThreadProc = decltype(defaultThreadPoolProc<Allocator>)>
+bool initThreadPool(ThreadPool<Allocator> *pool, u32 threadCount, ThreadProc &&threadProc = defaultThreadPoolProc<Allocator>) {
 	pool->initializedThreadCount = 0;
 	pool->deadThreadCount = 0;
 	pool->running = false;
 	pool->stopping = false;
 	pool->threadCount = threadCount;
 	if (threadCount) {
-		pool->threads = allocate<ThreadHandle>(pool->allocator, threadCount);
+		pool->threads.reserve(threadCount);
 		
 		struct StartParams {
-			ThreadPool *pool;
+			ThreadPool<Allocator> *pool;
 			ThreadProc *proc;
 		};
 		StartParams params;
@@ -461,14 +506,16 @@ bool initThreadPool(ThreadPool *pool, u32 threadCount, ThreadProc &&threadProc =
 		};
 
 		for (u32 i = 0; i < threadCount; ++i) {
-			pool->threads[i] = createThread(startProc, &params);
-			if (!pool->threads[i]) {
+			auto thread = createThread(startProc, &params);
+			if (!thread) {
 				pool->stopping = true;
-				for (u32 j = 0; j < i; ++j) {
-					destroyThread(pool->threads[j]);
+				for (auto t : pool->threads) {
+					destroyThread(t);
 				}
+				pool->threads.clear();
 				return false;
 			}
+			pool->threads.push_back(thread);
 		}
 
 		loopUntil([&] {
@@ -476,16 +523,18 @@ bool initThreadPool(ThreadPool *pool, u32 threadCount, ThreadProc &&threadProc =
 		});
 		pool->running = true;
 	} else {
-		pool->threads = 0;
+		pool->threads.clear();
 	}
 
 	return true;
 }
-inline void deinitThreadPool(ThreadPool *pool, bool waitForThreads = true) {
+template <class Allocator>
+inline void deinitThreadPool(ThreadPool<Allocator> *pool, bool waitForThreads = true) {
 	pool->stopping = true;
 	if (waitForThreads) {
 		loopUntil([&] { return pool->deadThreadCount == pool->threadCount; });
 	}
+	pool->threads.clear();
 }
 
 } // namespace TL

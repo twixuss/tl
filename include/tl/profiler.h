@@ -98,7 +98,7 @@ List<TimeSpan> const &getRecordedTimeSpans() {
 }
 
 void outputForChrome(char const *path) {
-	StringBuilder<OsAllocator, 8> builder;
+	StringBuilder<> builder;
 	builder.append("{\"otherData\":{},\"traceEvents\":[\n");
 	if (!recordedTimeSpans.empty()) {
 		bool needComma = false;

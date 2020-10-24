@@ -28,12 +28,12 @@
 #define TL_DLL_IMPORT __declspec(dllimport)
 #define TL_DLL_EXPORT __declspec(dllexport)
 
-#define FORCEINLINE			__forceinline
-#define NOINLINE			__declspec(noinline)
-#define DEBUG_BREAK			::__debugbreak()
-#define WRITE_BARRIER		::_WriteBarrier()
-#define READ_BARRIER		::_ReadBarrier()
-#define READ_WRITE_BARRIER	::_ReadWriteBarrier()
+#define FORCEINLINE        __forceinline
+#define NOINLINE           __declspec(noinline)
+#define DEBUG_BREAK        ::__debugbreak()
+#define WRITE_BARRIER      ::_WriteBarrier()
+#define READ_BARRIER       ::_ReadBarrier()
+#define READ_WRITE_BARRIER ::_ReadWriteBarrier()
 
 #define ARCH_X86 0
 #define ARCH_X64 0
@@ -48,7 +48,7 @@
 
 #elif COMPILER_GCC
 
-#define FORCEINLINE	//__attribute__((always_inline))
+#define FORCEINLINE //__attribute__((always_inline))
 #define DEBUG_BREAK ::__builtin_trap()
 #if defined _X86_
 #undef ARCH_X86
@@ -126,32 +126,40 @@
 
 namespace TL {
 
+template <bool v, class T, class F> struct ConditionalT { using Type = T; };
+template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
+template <bool v, class T, class F> using Conditional = typename ConditionalT<v, T, F>::Type;
+
 #if COMPILER_MSVC
-using s8	= signed __int8;
-using s16	= signed __int16;
-using s32	= signed __int32;
-using s64	= signed __int64;
-using u8	= unsigned __int8;
-using u16	= unsigned __int16;
-using u32	= unsigned __int32;
-using u64	= unsigned __int64;
+using s8  = signed __int8;
+using s16 = signed __int16;
+using s32 = signed __int32;
+using s64 = signed __int64;
+using u8  = unsigned __int8;
+using u16 = unsigned __int16;
+using u32 = unsigned __int32;
+using u64 = unsigned __int64;
 #else
-using s8	= signed char;
-using s16	= signed short;
-using s32	= signed int;
-using s64	= signed long long;
-using u8	= unsigned char;
-using u16	= unsigned short;
-using u32	= unsigned int;
-using u64	= unsigned long long;
+using s8  = signed char;
+using s16 = signed short;
+using s32 = signed int;
+using s64 = signed long long;
+using u8  = unsigned char;
+using u16 = unsigned short;
+using u32 = unsigned int;
+using u64 = unsigned long long;
 #endif
 
-using f32	= float;
-using f64	= double;
-using b32	= s32;
-using b64	= s64;
 using slong = signed long;
 using ulong = unsigned long;
+
+using slong_s = Conditional<sizeof(slong) == 4, s32, s64>;
+using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
+
+using f32   = float;
+using f64   = double;
+using b32   = s32;
+using b64   = s64;
 using wchar = wchar_t;
 
 #if ARCH_X64

@@ -17,13 +17,6 @@ enum FileCursor {
 
 TL_DECLARE_HANDLE(File);
 
-struct EntireFile {
-	Allocator allocator;
-	StringSpan data;
-
-	operator bool() const { return data.data(); }
-};
-
 TL_API File openFile(char const *path, u32 openFlags);
 TL_API File openFile(wchar const *path, u32 openFlags);
 TL_API void setCursor(File file, s64 offset, FileCursor origin);
@@ -40,8 +33,11 @@ inline s64 length(File file) {
 	setCursor(file, 0, File_end);
 	return getCursor(file);
 }
+inline void read(File file, Span<void> span) { read(file, span.data(), span.size()); }
+inline void write(File file, Span<void const> span) { write(file, span.data(), span.size());}
 
-inline EntireFile readEntireFile(File file, Allocator allocator = osAllocator) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline Buffer<Allocator> readEntireFile(File file) {
 	auto oldCursor = getCursor(file);
 	DEFER { setCursor(file, oldCursor, File_begin); };
 
@@ -49,35 +45,30 @@ inline EntireFile readEntireFile(File file, Allocator allocator = osAllocator) {
 	auto size = (umm)getCursor(file);
 	setCursor(file, 0, File_begin);
 
-	auto data = allocator.allocate(size);
+	void *data = ALLOCATE(Allocator, size, 0);
 	read(file, data, size);
 
-	EntireFile result;
-	result.allocator = allocator;
-	result.data = {(char *)data, size};
-	return result;
+	return {data, size};
 }
-inline EntireFile readEntireFile(char const *path, Allocator allocator = osAllocator) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline Buffer<Allocator> readEntireFile(char const *path) {
 	File file = openFile(path, File_read);
 	if (file) {
 		DEFER { close(file); };
-		return readEntireFile(file, allocator);
+		return readEntireFile<Allocator>(file);
 	} else {
 		return {};
 	}
 }
-inline EntireFile readEntireFile(wchar const *path, Allocator allocator = osAllocator) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline Buffer<Allocator> readEntireFile(wchar const *path) {
 	File file = openFile(path, File_read);
 	if (file) {
 		DEFER { close(file); };
-		return readEntireFile(file, allocator);
+		return readEntireFile<Allocator>(file);
 	} else {
 		return {};
 	}
-}
-inline void freeEntireFile(EntireFile file) {
-	if (file.data.begin())
-		file.allocator.deallocate(file.data.begin());
 }
 inline void truncate(File file, u64 size) {
 	setCursor(file, (s64)size, File_begin);
@@ -102,8 +93,8 @@ inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
 	close(file);
 	return true;
 }
-inline bool writeEntireFile(char  const *path, StringView view) { return writeEntireFile(path, view.data(), view.size()); }
-inline bool writeEntireFile(wchar const *path, StringView view) { return writeEntireFile(path, view.data(), view.size()); }
+inline bool writeEntireFile(char  const *path, Span<void const> span) { return writeEntireFile(path, span.data(), span.size()); }
+inline bool writeEntireFile(wchar const *path, Span<void const> span) { return writeEntireFile(path, span.data(), span.size()); }
 
 #ifdef TL_IMPL
 

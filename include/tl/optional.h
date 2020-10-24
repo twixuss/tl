@@ -9,8 +9,11 @@ template <class Optional>
 struct OptionalBase_NonTrivial {
 	~OptionalBase_NonTrivial() {
 		Optional *opt = (Optional *)this;
+		if (opt->_hasValue) {
+			using T = decltype(opt->_value);
+			opt->_value.~T();
+		}
 		opt->_hasValue = false;
-		opt->_value.~T();
 	}
 };
 
@@ -22,14 +25,14 @@ struct Optional : Conditional<std::is_trivially_destructible_v<T>,
 	Optional(Optional const &that) {
 		_hasValue = that._hasValue;
 		if (that.has_value())
-			_value = that._value;
+			new (&_value) T(that._value);
 	}
 	Optional(Optional &&that) {
 		if (this == std::addressof(that))
 			return;
 		_hasValue = that._hasValue;
 		if (that.has_value()) {
-			_value = std::move(that._value);
+			new (&_value) T(std::move(that._value));
 			that.reset();
 		}
 	}
