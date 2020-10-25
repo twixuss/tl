@@ -564,13 +564,6 @@ void radixSort(Span<u32> span) {
 	}
 }
 
-u32 xorshift(u32 &x) {
-	x ^= x << 13;
-	x ^= x >> 17;
-	x ^= x << 5;
-	return x;
-}
-
 struct Timer {
 	char const *name;
 	List<u32> *origList;

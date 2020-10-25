@@ -45,10 +45,11 @@ FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
 	return *(T *)&result;
 }
 
-TL_DECLARE_HANDLE(ThreadHandle);
-extern ThreadHandle createThread(void (*fn)(void *), void *param);
-extern void destroyThread(ThreadHandle handle);
-extern u32 getCurrentThreadId();
+TL_DECLARE_HANDLE(Thread);
+TL_API Thread createThread(void (*fn)(void *), void *param);
+TL_API void destroyThread(Thread thread);
+TL_API u32 getCurrentThreadId();
+TL_API u32 getThreadId(Thread thread);
 
 #else
 FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
@@ -187,7 +188,7 @@ void sleepMilliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleepSeconds(u32 seconds) { Sleep(seconds * 1000); }
 void switchThread() { SwitchToThread(); }
 
-ThreadHandle createThread(void (*fn)(void *), void *param) {
+Thread createThread(void (*fn)(void *), void *param) {
 	struct Data {
 		void (*fn)(void *);
 		void *param;
@@ -205,13 +206,16 @@ ThreadHandle createThread(void (*fn)(void *), void *param) {
 		return 0;
 	}, &data, 0, 0);
 	while (!data.acquired);
-	return (ThreadHandle)result;
+	return (Thread)result;
 }
-void destroyThread(ThreadHandle handle) {
-	CloseHandle((HANDLE)handle);
+void destroyThread(Thread thread) {
+	CloseHandle((HANDLE)thread);
 }
 u32 getCurrentThreadId() {
 	return GetCurrentThreadId();
+}
+u32 getThreadId(Thread thread) {
+	return GetThreadId((HANDLE)thread);
 }
 #else // ^^^ OS_WINDOWS ^^^ vvvvvv
 #endif
@@ -366,7 +370,7 @@ struct ThreadWork {
 
 template <class Allocator, class Queue = MutexQueue<ThreadWork<Allocator>, Mutex, Allocator>>
 struct ThreadPool {
-	List<ThreadHandle, Allocator> threads;
+	List<Thread, Allocator> threads;
 	u32 threadCount = 0;
 	u32 volatile initializedThreadCount = 0;
 	u32 volatile deadThreadCount = 0;
@@ -416,10 +420,10 @@ struct WorkQueue {
 			lockAdd(workToDo, 1);
 			push((void (*)(void *))invokerProc, (void *)fnParams);
 		} else {
-			fn(std::forward<Args>(args)...);
+			std::invoke(fn, std::forward<Args>(args)...);
 		}
 	}
-	inline void completeAllWork() {
+	inline void waitForCompletion() {
 		if (pool->threadCount) {
 			loopUntil([&] {
 				tryDoWork(pool);

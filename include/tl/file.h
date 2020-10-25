@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "string.h"
 
 namespace TL {
 
@@ -36,8 +37,15 @@ inline s64 length(File file) {
 inline void read(File file, Span<void> span) { read(file, span.data(), span.size()); }
 inline void write(File file, Span<void const> span) { write(file, span.data(), span.size());}
 
+template <class Char = char, class T>
+inline void writeString(File file, T const &value) {
+	toString<Char>(value, [&](Char const *string, umm length) {
+		write(file, string, length * sizeof(Char));
+	});
+}
+
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(File file) {
+inline Buffer<Allocator> readEntireFile(File file, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	auto oldCursor = getCursor(file);
 	DEFER { setCursor(file, oldCursor, File_begin); };
 
@@ -45,27 +53,27 @@ inline Buffer<Allocator> readEntireFile(File file) {
 	auto size = (umm)getCursor(file);
 	setCursor(file, 0, File_begin);
 
-	void *data = ALLOCATE(Allocator, size, 0);
-	read(file, data, size);
+	void *data = ALLOCATE(Allocator, size + extraPreSpace + extraPostSpace, 0);
+	read(file, (u8 *)data + extraPreSpace, size);
 
-	return {data, size};
+	return {data, size + extraPreSpace + extraPostSpace};
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(char const *path) {
+inline Buffer<Allocator> readEntireFile(char const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		DEFER { close(file); };
-		return readEntireFile<Allocator>(file);
+		return readEntireFile<Allocator>(file, extraPreSpace, extraPostSpace);
 	} else {
 		return {};
 	}
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(wchar const *path) {
+inline Buffer<Allocator> readEntireFile(wchar const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		DEFER { close(file); };
-		return readEntireFile<Allocator>(file);
+		return readEntireFile<Allocator>(file, extraPreSpace, extraPostSpace);
 	} else {
 		return {};
 	}

@@ -4668,81 +4668,81 @@ inline static constexpr auto voronoiOffsets3f = CE::cvtScalar<f32>(voronoiOffset
 inline static constexpr auto voronoiOffsets4f = CE::cvtScalar<f32>(voronoiOffsets4s);
 // clang-format on
 
-template <class Random>
-FORCEINLINE f32 voronoi(v2f v, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v2f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2f);
-	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt2);
+	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * (1 / sqrt2);
 }
-template <class Random>
-FORCEINLINE f32 voronoi(v3f v, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v3f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3f);
-	return sqrt(_voronoiF32(wideOffsets, v, random)) * (1 / sqrt3);
+	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * (1 / sqrt3);
 }
-template <class Random>
-FORCEINLINE f32 voronoi(v4f v, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v4f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4f);
-	return sqrt(_voronoiF32(wideOffsets, v, random)) * 0.5f;
+	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * 0.5f;
 }
-template <class Random>
-FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Randomizer &&randomizer) {
 	v2s flr							  = floor(v, cellSize);
 	v2s tile						  = flr / (s32)cellSize;
 	v2f rel							  = (v2f)(v - flr) / (f32)cellSize - 0.5f;
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2s);
 #if TL_USE_CONSTEXPR_WIDE
-	minDist = _voronoiS32(wideOffsets, tile, rel, random);
+	minDist = _voronoiS32(wideOffsets, tile, rel, randomizer);
 #else
 	f32x8 minDist8 = F32x8(9999);
 	auto tile8	= V2sx8(tile);
 	auto rel8	= V2fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist8 = min(minDist8, distanceSqr(rel8, random(tile8 + offset) * 0.5f + (v2fx8)offset));
+		minDist8 = min(minDist8, distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + (v2fx8)offset));
 	}
 	f32 minDist = min(minDist8);
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + (v2f)offset));
+		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v2f)offset));
 	}
 #endif
 	return sqrt(minDist) * (1 / sqrt2);
 }
-template <class Random>
-FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Randomizer &&randomizer) {
 	v3s flr							  = floor(v, cellSize);
 	v3s tile						  = flr / (s32)cellSize;
 	v3f rel							  = (v3f)(v - flr) / (f32)cellSize - 0.5f;
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3s);
 #if TL_USE_CONSTEXPR_WIDE
-	minDist = _voronoiS32(wideOffsets, tile, rel, random);
+	minDist = _voronoiS32(wideOffsets, tile, rel, randomizer);
 #else
 	f32 minDist = 1000;
 	v3sx8 tile8 = V3sx8(tile);
 	v3fx8 rel8	= V3fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, min(distanceSqr(rel8, random(tile8 + offset) - 0.5f + (v3fx8)offset)));
+		minDist = min(minDist, min(distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) - 0.5f + (v3fx8)offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, random(tile + offset) - 0.5f + (v3f)offset));
+		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) - 0.5f + (v3f)offset));
 	}
 #endif
 	return sqrt(minDist) * (1 / sqrt3);
 }
-template <class Random>
-FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Random &&random) {
+template <class Randomizer>
+FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Randomizer &&randomizer) {
 	v4s flr							  = floor(v, cellSize);
 	v4s tile						  = flr / (s32)cellSize;
 	v4f rel							  = (v4f)(v - flr) / (f32)cellSize - 0.5f;
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4s);
 #if TL_USE_CONSTEXPR_WIDE
-	minDist = _voronoiS32(wideOffsets, tile, rel, random);
+	minDist = _voronoiS32(wideOffsets, tile, rel, randomizer);
 #else
 	f32 minDist = 1000;
 	v4sx8 tile8 = V4sx8(tile);
 	v4fx8 rel8	= V4fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, distanceSqr(rel8, random(tile8 + offset) * 0.5f + cvtScalar<f32>(offset)));
+		minDist = min(minDist, distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + cvtScalar<f32>(offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, random(tile + offset) * 0.5f + (v4f)offset));
+		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v4f)offset));
 	}
 #endif
 	return sqrt(minDist) * 0.5f;
@@ -4919,7 +4919,7 @@ FORCEINLINE bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v
 	f32 tMin = max(min(vMin.x, vMax.x), min(vMin.y, vMax.y));
 	f32 tMax = min(max(vMin.x, vMax.x), max(vMin.y, vMax.y));
 
-	if (tMax <= 0 || tMin >= tMax) {
+	if (tMax <= 0 || tMin >= tMax || tMin > distance(a, b)) {
 		return false;
 	}
 

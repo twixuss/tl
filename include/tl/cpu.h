@@ -314,6 +314,75 @@ CpuInfo getCpuInfo() {
 	return result;
 }
 
+char const *toString(CpuFeature f) {
+#define CASE(x) case TL::CpuFeature::x: return #x;
+	switch (f) {
+		CASE(_3dnow)
+		CASE(_3dnowext)
+		CASE(abm)
+		CASE(adx)
+		CASE(aes)
+		CASE(avx)
+		CASE(avx2)
+		CASE(avx512cd)
+		CASE(avx512er)
+		CASE(avx512f)
+		CASE(avx512pf)
+		CASE(bmi1)
+		CASE(bmi2)
+		CASE(clfsh)
+		CASE(cmov)
+		CASE(cmpxchg16b)
+		CASE(cx8)
+		CASE(erms)
+		CASE(f16c)
+		CASE(fma)
+		CASE(fsgsbase)
+		CASE(fxsr)
+		CASE(hle)
+		CASE(invpcid)
+		CASE(lahf)
+		CASE(lzcnt)
+		CASE(mmx)
+		CASE(mmxext)
+		CASE(monitor)
+		CASE(movbe)
+		CASE(msr)
+		CASE(osxsave)
+		CASE(pclmulqdq)
+		CASE(popcnt)
+		CASE(prefetchwt1)
+		CASE(rdrand)
+		CASE(rdseed)
+		CASE(rdtscp)
+		CASE(rtm)
+		CASE(sep)
+		CASE(sha)
+		CASE(sse)
+		CASE(sse2)
+		CASE(sse3)
+		CASE(sse41)
+		CASE(sse42)
+		CASE(sse4a)
+		CASE(ssse3)
+		CASE(syscall)
+		CASE(tbm)
+		CASE(xop)
+		CASE(xsave)
+		default: return "unknown";
+	}
+#undef CASE
+}
+char const *toString(CpuVendor v) {
+#define CASE(x) case TL::CpuVendor::x: return #x;
+	switch (v) {
+		CASE(intel)
+		CASE(amd)
+		default: return "unknown";
+	}
+#undef CASE
+}
+
 #endif // OS_WINDOWS
 #endif // TL_IMPL
 

@@ -123,9 +123,11 @@ struct ForwardListBase {
 		}
 		_end = _begin;
 	}
-
+	
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
+	operator Span<void>() { return {begin(), end()}; }
+	operator Span<void const>() const { return {begin(), end()}; }
 
 	T *_begin = 0;
 	T *_end = 0;

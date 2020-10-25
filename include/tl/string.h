@@ -62,8 +62,8 @@ struct String : List<Char, Allocator> {
 	}
 };
 
-template <class Char, class Allocator, class T>
-String<Char, Allocator> toString(T const &val) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
+String<Char, Allocator> asString(T const &val) {
 	String<Char, Allocator> result;
 	toString<Char>(val, [&](Char const *src, umm length) {
 		result.resize(length);
@@ -73,8 +73,8 @@ String<Char, Allocator> toString(T const &val) {
 	return result;
 }
 
-template <class Char, class Allocator, class T>
-String<Char, Allocator> toStringNT(T const &val) {
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
+String<Char, Allocator> asStringNT(T const &val) {
 	String<Char, Allocator> result;
 	toString<Char>(val, [&](Char const *src, umm length) {
 		result.resize(length + 1);
@@ -85,21 +85,12 @@ String<Char, Allocator> toStringNT(T const &val) {
 	return result;
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-String<char, Allocator> nullTerminate(Span<char const> span) {
-	String<Allocator> result;
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
+String<Char, Allocator> nullTerminate(Span<Char const> span) {
+	String<Char, Allocator> result;
 	result.resize(span.size() + 1);
-	memcpy(result.data(), span.data(), span.size() * sizeof(char));
-	result[span.size()] = '\0';
-	return result;
-}
-
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-String<wchar, Allocator> nullTerminate(Span<wchar const> span) {
-	String<wchar, Allocator> result;
-	result.resize(span.size() + 1);
-	memcpy(result.data(), span.data(), span.size() * sizeof(wchar));
-	result[span.size()] = L'\0';
+	memcpy(result.data(), span.data(), span.size() * sizeof(Char));
+	result[span.size()] = (Char)0;
 	return result;
 }
 
@@ -290,6 +281,22 @@ struct StringBuilder {
 		return appendBytes(std::addressof(value), sizeof(value));
 	}
 	umm appendFormat(Char const *fmt) {
+		if (!*fmt)
+			return 0;
+		Char const *c = fmt;
+		while (*c) {
+			if (*c == '%') {
+				++c;
+				if (*c != '`') {
+					INVALID_CODE_PATH("bad format");
+				}
+				append(Span{fmt, c});
+				++c;
+				fmt = c;
+			} else {
+				++c;
+			}
+		}
 		return append(Span{fmt, length(fmt)});
 	}
 	template <class Arg, class ...Args>
@@ -389,14 +396,14 @@ private:
 	Block *allocateBlock() { return construct(ALLOCATE_T(Allocator, Block, 1, 0)); }
 };
 
-template <class Char, class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> format(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
 	builder.appendFormat(fmt, args...);
 	return builder.get();
 }
 
-template <class Char, class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
 	builder.appendFormat(fmt, args...);
