@@ -560,7 +560,7 @@ struct NullString<wchar> {
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(char  const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(wchar const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char const *v, CopyFn &&copyFn) { if (!v) v = NullString<Char>::value; return copyFn(v, length(v)); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char       *v, CopyFn &&copyFn) { if (!v) v = NullString<Char>::value; return copyFn(v, length(v)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char       *v, CopyFn &&copyFn) { if (!v) v = (Char *)NullString<Char>::value; return copyFn((Char const *)v, length(v)); }
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char const> v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char      > v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
 

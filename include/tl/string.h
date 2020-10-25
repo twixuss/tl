@@ -93,6 +93,10 @@ String<Char, Allocator> nullTerminate(Span<Char const> span) {
 	result[span.size()] = (Char)0;
 	return result;
 }
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
+String<Char, Allocator> nullTerminate(Span<Char> span) {
+	return nullTerminate<Allocator, Char>((Span<Char const>)span);
+}
 
 template <class T>
 struct ParseResult {
