@@ -373,8 +373,8 @@ constexpr umm countof(Span<T const> span) { return span.size(); }
 
 
 struct OsAllocator {
-	static TL_API void *allocate(umm size, umm align = 0);
-	static TL_API void deallocate(void *data);
+	TL_API static void *allocate(umm size, umm align = 0);
+	TL_API static void deallocate(void *data);
 };
 
 #ifndef TL_DEFAULT_ALLOCATOR

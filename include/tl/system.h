@@ -117,11 +117,7 @@
 		#define TL_API TL_DLL_IMPORT
 	#endif
 #else
-	#ifdef TL_IMPL
-		#define TL_API
-	#else
-		#define TL_API extern
-	#endif
+	#define TL_API
 #endif
 
 namespace TL {
