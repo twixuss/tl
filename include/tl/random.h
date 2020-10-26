@@ -5,100 +5,150 @@ namespace TL {
 struct xorshift32 {
 	u32 v = 1;
 };
+u32 next(xorshift32 &state) {
+	/* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
+	state.v ^= state.v << 13;
+	state.v ^= state.v >> 17;
+	state.v ^= state.v << 5;
+	return state.v;
+}
+
 struct xorshift64 {
 	u64 v = 1;
 };
+u64 next(xorshift64 &state) {
+	state.v ^= state.v << 13;
+	state.v ^= state.v >> 7;
+	state.v ^= state.v << 17;
+	return state.v;
+}
+
 struct xorshift128 {
 	u32 a = 1;
-	u32 b = 0;
-	u32 c = 0;
-	u32 d = 0;
+	u32 b = 1;
+	u32 c = 1;
+	u32 d = 1;
 };
-
-u32 next(xorshift32 &x) {
-	x.v ^= x.v << 13;
-	x.v ^= x.v >> 17;
-	x.v ^= x.v << 5;
-	return x.v;
-}
-u64 next(xorshift64 &x) {
-	x.v ^= x.v << 13;
-	x.v ^= x.v >> 7;
-	x.v ^= x.v << 17;
-	return x.v;
-}
-
-u32 next(xorshift128 &x) {
-	u32 t = x.d;
-	u32 s = x.a;
-	x.d = x.c;
-	x.c = x.b;
-	x.b = s;
+u32 next(xorshift128 &state) {
+	/* Algorithm "xor128" from p. 5 of Marsaglia, "Xorshift RNGs" */
+	u32 t = state.d;
+	u32 s = state.a;
+	state.d = state.c;
+	state.c = state.b;
+	state.b = s;
 	t ^= t << 11;
 	t ^= t >> 8;
-	return x.a = t ^ s ^ (s >> 19);
-}
-#if 0
-
-FORCEINLINE u8 randomU8(u8 r) {
-	r += 0x0C;
-	r *= 0x61;
-	r ^= 0xB2;
-	r -= 0x80;
-	r ^= 0xF5;
-	r *= 0xA7;
-	return rotateLeft(r, 4);
-}
-FORCEINLINE u32 randomU32(u32 r) {
-	r += 0x0C252DA0;
-	r *= 0x55555561;
-	r ^= 0xB23E2387;
-	r -= 0x8069BAC0;
-	r ^= 0xF5605798;
-	r *= 0xAAAAAABF;
-	return (r << 16) | (r >> 16);
-}
-FORCEINLINE u32 randomU32(s32 in) { return randomU32((u32)in); }
-FORCEINLINE u32 randomU32(v2s in) {
-	auto x = randomU32(in.x);
-	auto y = randomU32(in.y);
-	return x ^ y;
-}
-FORCEINLINE u32 randomU32(v3s in) {
-	auto x = randomU32(in.x);
-	auto y = randomU32(in.y);
-	auto z = randomU32(in.z);
-	return x + y + z;
-}
-FORCEINLINE u32 randomU32(v4s v) {
-	v = randomize(v);
-	return u32(v.x) + u32(v.y) + u32(v.z) + u32(v.w);
-}
-FORCEINLINE u64 randomU64(v3s in) {
-	auto x = (u64)randomU32(in.x);
-	auto y = (u64)randomU32(in.y);
-	auto z = (u64)randomU32(in.z);
-	return x | (y << 32) + z | (x << 32) + y | (z << 32);
+	return state.a = t ^ s ^ (s >> 19);
 }
 
-// clang-format off
-#define RANDOM(v2f, v2s, v2u) FORCEINLINE v2f random(v2s v) { return (v2f)(randomize((v2u)v) >> 8) * (1.0f / 16777216.0f); }
-RANDOM(v2f, v2s, v2u) RANDOM(v2fx4, v2sx4, v2ux4) RANDOM(v2fx8, v2sx8, v2ux8)
-RANDOM(v3f, v3s, v3u) RANDOM(v3fx4, v3sx4, v3ux4) RANDOM(v3fx8, v3sx8, v3ux8)
-RANDOM(v4f, v4s, v4u) RANDOM(v4fx4, v4sx4, v4ux4) RANDOM(v4fx8, v4sx8, v4ux8)
-#undef RANDOM
-
-#define RANDOM(v2f, v2s) FORCEINLINE v2f operator()(v2s v) const { return random(v); }
-struct Random {
-	RANDOM(v2f, v2s) RANDOM(v2fx4, v2sx4) RANDOM(v2fx8, v2sx8)
-	RANDOM(v3f, v3s) RANDOM(v3fx4, v3sx4) RANDOM(v3fx8, v3sx8)
-	RANDOM(v4f, v4s) RANDOM(v4fx4, v4sx4) RANDOM(v4fx8, v4sx8)
-	RANDOM(v2f, v2f) RANDOM(v2fx4, v2fx4) RANDOM(v2fx8, v2fx8)
-	RANDOM(v3f, v3f) RANDOM(v3fx4, v3fx4) RANDOM(v3fx8, v3fx8)
-	RANDOM(v4f, v4f) RANDOM(v4fx4, v4fx4) RANDOM(v4fx8, v4fx8)
+struct xorwow {
+    u32 a = 1;
+	u32 b = 1;
+	u32 c = 1;
+	u32 d = 1;
+	u32 e = 1;
+    u32 counter = 0;
 };
-#undef RANDOM
+u32 next(xorwow &state) {
+    /* Algorithm "xorwow" from p. 5 of Marsaglia, "Xorshift RNGs" */
+    u32 t = state.e;
+    u32 s = state.a;
+    state.e = state.d;
+    state.d = state.c;
+    state.c = state.b;
+    state.b = s;
+    t ^= t >> 2;
+    t ^= t << 1;
+    t ^= s ^ (s << 4);
+    state.a = t;
+    state.counter += 362437;
+    return t + state.counter;
+}
 
-#endif
+struct xorshift64s {
+	u64 a = 1;
+};
+u32 next(xorshift64s &state) {
+	u64 x = state.a;
+	x ^= x >> 12;
+	x ^= x << 25;
+	x ^= x >> 27;
+	state.a = x;
+	return x * (u64)0x2545F4914F6CDD1D;
+}
+
+struct xorshift1024s {
+	u64 array[16] = { 1 };
+	u64 index = 0;
+};
+u64 next(xorshift1024s &state) {
+	u32 index = state.index;
+	u64 s = state.array[index++];
+	u64 t = state.array[index &= 15];
+	t ^= t << 31;
+	t ^= t >> 11;
+	t ^= s ^ (s >> 30);
+	state.array[index] = t;
+	state.index = index;
+	return t * (u64)0x106689D45497FDB5;
+}
+
+struct xorshift128p {
+	u64 a = 1;
+	u64 b = 1;
+};
+u64 next(xorshift128p &state) {
+	u64 t = state.a;
+	u64 s = state.b;
+	state.a = s;
+	t ^= t << 23;
+	t ^= t >> 17;
+	t ^= s ^ (s >> 26);
+	state.b = t;
+	return t + s;
+}
+
+struct xoshiro256ss {
+	u64 s[4] = {};
+};
+u64 next(xoshiro256ss &state) {
+	u64 *s = state.s;
+	u64 result = rotateLeft(s[1] * 5, 7) * 9;
+	u64 t = s[1] << 17;
+	s[2] ^= s[0];
+	s[3] ^= s[1];
+	s[1] ^= s[2];
+	s[0] ^= s[3];
+	s[2] ^= t;
+	s[3] = rotateLeft(s[3], 45);
+	return result;
+}
+
+struct xoshiro256p {
+	u64 s[4] = {};
+};
+u64 next(xoshiro256p &state) {
+	u64 *s = state.s;
+	u64 result = s[0] + s[3];
+	u64 t = s[1] << 17;
+	s[2] ^= s[0];
+	s[3] ^= s[1];
+	s[1] ^= s[2];
+	s[0] ^= s[3];
+	s[2] ^= t;
+	s[3] = rotateLeft(s[3], 45);
+	return result;
+}
+
+struct splitmix64 {
+	u64 s;
+};
+u64 next(splitmix64 &state) {
+	u64 result = state.s;
+	state.s = result + 0x9E3779B97f4A7C15;
+	result = (result ^ (result >> 30)) * 0xBF58476D1CE4E5B9;
+	result = (result ^ (result >> 27)) * 0x94D049BB133111EB;
+	return result ^ (result >> 31);
+}
 
 }

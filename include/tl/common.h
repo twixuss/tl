@@ -211,6 +211,26 @@ FORCEINLINE constexpr bool isNegative(f64 v) { return *(u64 *)&v & 0x80000000000
 
 template <class T> FORCEINLINE constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 
+#if COMPILER_GCC
+FORCEINLINE u8  rotateLeft (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
+FORCEINLINE u16 rotateLeft (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
+FORCEINLINE u32 rotateLeft (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
+FORCEINLINE u64 rotateLeft (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
+FORCEINLINE u8  rotateRight(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
+FORCEINLINE u16 rotateRight(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
+FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
+FORCEINLINE u64 rotateRight(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
+#else
+FORCEINLINE u8  rotateLeft (u8  v, s32 shift = 1) { return _rotl8(v, (u8)shift); }
+FORCEINLINE u16 rotateLeft (u16 v, s32 shift = 1) { return _rotl16(v, (u8)shift); }
+FORCEINLINE u32 rotateLeft (u32 v, s32 shift = 1) { return _rotl(v, shift); }
+FORCEINLINE u64 rotateLeft (u64 v, s32 shift = 1) { return _rotl64(v, shift); }
+FORCEINLINE u8  rotateRight(u8  v, s32 shift = 1) { return _rotr8(v, (u8)shift); }
+FORCEINLINE u16 rotateRight(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift); }
+FORCEINLINE u32 rotateRight(u32 v, s32 shift = 1) { return _rotr(v, shift); }
+FORCEINLINE u64 rotateRight(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
+#endif
+
 template <class T>
 constexpr T midpoint(T a, T b) {
 	minmax(a, b, a, b);

@@ -518,20 +518,23 @@ struct State {
 		TL_HRESULT_HANDLER(device->CreateRasterizerState(&desc, &result.raster));
 		return result;
 	}
-	Blend createBlend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst) {
+	Blend createBlend(D3D11_BLEND_OP opColor, D3D11_BLEND srcColor, D3D11_BLEND dstColor, D3D11_BLEND_OP opAlpha, D3D11_BLEND srcAlpha, D3D11_BLEND dstAlpha) {
 		D3D11_BLEND_DESC desc = {};
 		desc.RenderTarget[0].BlendEnable = true;
-		desc.RenderTarget[0].BlendOp = op;
-		desc.RenderTarget[0].SrcBlend = src;
-		desc.RenderTarget[0].DestBlend = dst;
-		desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-		desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-		desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+		desc.RenderTarget[0].BlendOp = opColor;
+		desc.RenderTarget[0].SrcBlend = srcColor;
+		desc.RenderTarget[0].DestBlend = dstColor;
+		desc.RenderTarget[0].BlendOpAlpha = opAlpha;
+		desc.RenderTarget[0].SrcBlendAlpha = srcAlpha;
+		desc.RenderTarget[0].DestBlendAlpha = dstAlpha;
 		desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
 		Blend result = {};
 		TL_HRESULT_HANDLER(device->CreateBlendState(&desc, &result.blend));
 		return result;
+	}
+	Blend createBlend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst) {
+		return createBlend(op, src, dst, D3D11_BLEND_OP_ADD, D3D11_BLEND_ONE, D3D11_BLEND_ZERO);
 	}
 
 	void updateStructuredBuffer(StructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 firstElement = 0) {
