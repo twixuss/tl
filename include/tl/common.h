@@ -169,6 +169,11 @@ template<> inline constexpr ulong min() { return (ulong)min<ulong_s>(); }
 template<> inline constexpr ulong max() { return (ulong)max<ulong_s>(); }
 template<> inline constexpr slong min() { return (slong)min<slong_s>(); }
 template<> inline constexpr slong max() { return (slong)max<slong_s>(); }
+
+template<> inline constexpr f32 min() { return 1.175494351e-38f; }
+template<> inline constexpr f32 max() { return 3.402823466e+38f; }
+template<> inline constexpr f64 min() { return 2.2250738585072014e-308; }
+template<> inline constexpr f64 max() { return 1.7976931348623158e+308; }
 #pragma warning(pop)
 
 template <class T>
@@ -256,6 +261,16 @@ inline constexpr auto toInt(Enum e) {
 
 template <class T, umm size>
 constexpr umm countof(T const (&arr)[size]) { (void)arr; return size; }
+
+template <class T, umm size>
+constexpr T &back(T (&arr)[size]) { return arr[size - 1]; }
+template <class T, umm size>
+constexpr T const &back(T const (&arr)[size]) { return arr[size - 1]; }
+
+template <class T, umm size>
+constexpr T &front(T (&arr)[size]) { return arr[0]; }
+template <class T, umm size>
+constexpr T const &front(T const (&arr)[size]) { return arr[0]; }
 
 inline void copyMemory(void *_dst, void const *_src, umm size) {
 	u8 *dst = (u8 *)_dst;

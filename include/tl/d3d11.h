@@ -1,6 +1,9 @@
 #pragma once
 #include "thread.h"
 #include "common.h"
+#ifdef TL_D3D11_USE_MATH
+#include "math.h"
+#endif
 
 #if OS_WINDOWS
 #pragma warning(push, 0)
@@ -24,6 +27,11 @@
 #define TL_COM_RELEASE(x) (((x) ? (x)->Release() : 0), (x) = 0)
 
 namespace TL { namespace D3D11 {
+
+struct Shader {
+	ID3D11VertexShader *vs = 0;
+	ID3D11PixelShader *ps = 0;
+};
 
 struct ShaderResource {
 	ID3D11ShaderResourceView *srv = 0;
@@ -145,6 +153,9 @@ inline void release(Rasterizer &v) {
 inline void release(Blend &v) {
 	TL_COM_RELEASE(v.blend);
 }
+
+inline bool valid(ShaderResource &v) { return v.srv != 0; }
+inline bool valid(ConstantBuffer &v) { return v.buffer != 0; }
 
 inline void defaultShaderHandler(HRESULT result, char const *messages) {
 #if BUILD_DEBUG
@@ -421,6 +432,8 @@ struct State {
 				immediateContext->GenerateMips(result.srv);
 			});
 		}
+		result.width = width;
+		result.height = height;
 		return result;
 	}
 	template <class Handler = decltype(defaultShaderHandler)>
@@ -500,7 +513,7 @@ struct State {
 		desc.AddressW = address;
 		desc.Filter = filter;
 		desc.MaxAnisotropy = D3D11_MAX_MAXANISOTROPY;
-		desc.MaxLOD = FLT_MAX;
+		desc.MaxLOD = max<f32>();
 
 		Sampler result = {};
 		TL_HRESULT_HANDLER(device->CreateSamplerState(&desc, &result.sampler));
@@ -614,8 +627,10 @@ struct State {
 	}
 
 	void setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { immediateContext->IASetPrimitiveTopology(topology); }); }
-	void setShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
-	void setShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
+	void setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
+	void setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
+	void setShader(ID3D11VertexShader *shader) { setVertexShader(shader); }
+	void setShader(ID3D11PixelShader  *shader) { setPixelShader(shader); }
 	void setShaderResource(ShaderResource const &resource, char stage, u32 slot) {
 		useContext([&] { 
 			switch (stage) {
@@ -687,6 +702,17 @@ struct State {
 		}
 		return sampleCount;
 	}
+	bool valid() { return swapChain != 0; }
+#ifdef TL_D3D11_USE_MATH
+	inline void resizeBackBuffer(v2u size) { resizeBackBuffer(size.x, size.y); }
+	inline void resizeBackBuffer(v2s size) { resizeBackBuffer((v2u)size); }
+	inline void setViewport(v2f position, v2f size) { setViewport(position.x, position.y, size.x, size.y); }
+	inline void setViewport(v2s position, v2s size) { setViewport((v2f)position, (v2f)size); }
+	inline void setViewport(v2u position, v2u size) { setViewport((v2f)position, (v2f)size); }
+	inline void setViewport(v2f size) { setViewport({}, size); }
+	inline void setViewport(v2s size) { setViewport({}, (v2f)size); }
+	inline void setViewport(v2u size) { setViewport({}, (v2f)size); }
+#endif
 };
 
 inline void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {

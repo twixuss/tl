@@ -104,7 +104,71 @@ s64 getPerformanceCounter() {
 	QueryPerformanceCounter(&counter);
 	return counter.QuadPart;
 }
+void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE) {
+    RECT Rect = {};
+    GetWindowRect(Window, &Rect);
+    if (monitor == INVALID_HANDLE_VALUE) {
+		monitor = MonitorFromRect(&Rect, MONITOR_DEFAULTTONEAREST);
+	}
+    MONITORINFO MonitorInfo = {};
+    MonitorInfo.cbSize = sizeof(MonitorInfo);
+    GetMonitorInfoA(monitor, &MonitorInfo);
 
+	auto monitorX = MonitorInfo.rcWork.left;
+	auto monitorY = MonitorInfo.rcWork.top;
+	auto monitorWidth = MonitorInfo.rcWork.right - MonitorInfo.rcWork.left;
+	auto monitorHeight = MonitorInfo.rcWork.bottom - MonitorInfo.rcWork.top;
+	
+    int X = Rect.left - MonitorInfo.rcWork.left;
+    int Y = Rect.top - MonitorInfo.rcWork.top;
+    int Width = Rect.right - Rect.left;
+    int Height = Rect.bottom - Rect.top;
+	
+    X = max(X, 0);
+    Y = max(Y, 0);
+
+	if (move) {
+		if (Width > monitorWidth) Width = monitorWidth;
+		if (Height > monitorHeight) Height = monitorHeight;
+	} else {
+		if (Width > monitorWidth - X) Width = monitorWidth - X;
+		if (Height > monitorHeight - Y) Height = monitorHeight - Y;
+	}
+
+	if (Width == 0)
+		DEBUG_BREAK;
+
+    if (X > monitorWidth - Width) X = monitorWidth - Width;
+    if (Y > monitorHeight - Height) Y = monitorHeight - Height;
+
+    MoveWindow(Window, X + monitorX, Y + monitorY, Width, Height, 0);
+}
+LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit) {
+	if (x < borderWidth) {
+		if (y < borderWidth) {
+			return HTTOPLEFT;
+		} else if (y >= sizeY - borderWidth) {
+			return HTBOTTOMLEFT;
+		} else {
+			return HTLEFT;
+		}
+	} else if (x >= sizeX - borderWidth) {
+		if (y < borderWidth) {
+			return HTTOPRIGHT;
+		} else if (y >= sizeY - borderWidth) {
+			return HTBOTTOMRIGHT;
+		} else {
+			return HTRIGHT;
+		}
+	} else {
+		if (y < borderWidth) {
+			return HTTOP;
+		} else if (y >= sizeY - borderWidth) {
+			return HTBOTTOM;
+		}
+	}
+	return centerHit;
+}
 #endif
 
 }
