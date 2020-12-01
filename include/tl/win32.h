@@ -1,5 +1,8 @@
 #pragma once
 #include "system.h"
+#ifdef TL_WIN32_USE_MATH
+#include "math.h"
+#endif
 #if OS_WINDOWS
 #include "common.h"
 #define WIN32_LEAN_AND_MEAN
@@ -17,6 +20,10 @@ TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWhee
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
 TL_API s64 getPerformanceFrequency();
 TL_API s64 getPerformanceCounter();
+TL_API bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
+#ifdef TL_WIN32_USE_MATH
+TL_API v2u getWindowSize(v2u clientSize, DWORD style, bool menu = false);
+#endif
 
 #ifdef TL_IMPL
 bool registerRawInput(RawInputDevice deviceFlags) {
@@ -92,13 +99,11 @@ bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleR
 	}
 	return false;
 }
-
 s64 getPerformanceFrequency() {
 	LARGE_INTEGER frequency;
 	QueryPerformanceFrequency(&frequency);
 	return frequency.QuadPart;
 }
-
 s64 getPerformanceCounter() {
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
@@ -169,6 +174,26 @@ LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESUL
 	}
 	return centerHit;
 }
+bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM)) {
+	WNDCLASSEXA c = {};
+	c.cbSize = sizeof(c);
+	c.hCursor = cursor;
+	c.hInstance = instance;
+	c.lpfnWndProc = wndProc;
+	c.lpszClassName = name;
+	c.style = style;
+	return RegisterClassExA(&c) != 0;
+}
+#ifdef TL_WIN32_USE_MATH
+v2u getWindowSize(v2u clientSize, DWORD style, bool menu) {
+	RECT r = {0, 0, (LONG)clientSize.x, (LONG)clientSize.y};
+	AdjustWindowRect(&r, style, menu);
+	return {
+		(u32)(r.right - r.left),
+		(u32)(r.bottom - r.top)
+	};
+}
+#endif
 #endif
 
 }
