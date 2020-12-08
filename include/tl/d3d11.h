@@ -28,6 +28,11 @@
 
 namespace TL { namespace D3D11 {
 
+struct Shader {
+	ID3D11VertexShader *vs = 0;
+	ID3D11PixelShader *ps = 0;
+};
+
 struct ShaderResource {
 	ID3D11ShaderResourceView *srv = 0;
 };
@@ -148,6 +153,9 @@ inline void release(Rasterizer &v) {
 inline void release(Blend &v) {
 	TL_COM_RELEASE(v.blend);
 }
+
+inline bool valid(ShaderResource &v) { return v.srv != 0; }
+inline bool valid(ConstantBuffer &v) { return v.buffer != 0; }
 
 inline void defaultShaderHandler(HRESULT result, char const *messages) {
 #if BUILD_DEBUG

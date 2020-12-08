@@ -828,6 +828,12 @@ umm indexof(StaticList<T, capacity> const &list, T const *value) {
 template <class T> umm countof(List<T> const &list) { return list.size(); }
 template <class T> umm countof(UnorderedList<T> const &list) { return list.size(); }
 
+template <class T> T const &front(List<T> const &list) { return list.front(); }
+template <class T> T &front(List<T> &list) { return list.front(); }
+
+template <class T> T const &back(List<T> const &list) { return list.back(); }
+template <class T> T &back(List<T> &list) { return list.back(); }
+
 #pragma warning(pop)
 
 }
