@@ -371,6 +371,26 @@ struct Span<void> {
 template <class T>
 constexpr umm countof(Span<T const> span) { return span.size(); }
 
+template <class T, class Iterator>
+constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
+	for (Iterator it = begin; it != end; ++it) {
+		if (*it == value) {
+			return it;
+		}
+	}
+	return 0;
+}
+
+template <class T, class Iterator, class Compare>
+constexpr Iterator find(Iterator begin, Iterator end, T const &value, Compare &&compare) {
+	for (Iterator it = begin; it != end; ++it) {
+		if (compare(*it, value)) {
+			return it;
+		}
+	}
+	return 0;
+}
+
 #ifdef TL_ALLOCATION_TRACKER
 
 #define ALLOCATE(al, size, align)                    (TL_ALLOCATION_TRACKER<al>((umm)(size), (umm)(align), __FILE__, __LINE__))
