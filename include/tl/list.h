@@ -325,6 +325,9 @@ struct Queue {
 
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
+	operator Span<void>() { return {begin(), end()}; }
+	operator Span<void const>() const { return {begin(), end()}; }
+
 
 	T *_begin = 0;
 	T *_end = 0;
@@ -717,6 +720,8 @@ private:
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct LinkedList {
+	using ValueType = T;
+
 	struct Node {
 		T value;
 		Node *next;
@@ -738,6 +743,7 @@ struct LinkedList {
 		}
 		bool operator==(Iterator const &that) const { return node == that.node; }
 		bool operator!=(Iterator const &that) const { return node != that.node; }
+		T *operator->() { return std::addressof(node->value); }
 	};
 
 	LinkedList() = default;
@@ -754,8 +760,8 @@ struct LinkedList {
 		head = last = 0;
 	}
 
-	template <class... Args>
-	void emplace_back(Args &&... args) {
+	template <class ...Args>
+	void emplace_back(Args &&...args) {
 		if (head == 0) {
 			head = last = ALLOCATE_T(Allocator, Node, 1, 0);
 		} else {
@@ -768,6 +774,21 @@ struct LinkedList {
 	}
 	void push_back(T const &val) { emplace_back(val); }
 	void push_back(T &&val) { emplace_back(std::move(val)); }
+
+	template <class ...Args>
+	void emplace_front(Args &&...args) {
+		if (head == 0) {
+			head = last = ALLOCATE_T(Allocator, Node, 1, 0);
+			head->next = 0;
+		} else {
+			auto prevHead = head;
+			head = ALLOCATE_T(Allocator, Node, 1, 0);
+			head->next = prevHead;
+		}
+		new (&head->value) T(std::forward<Args>(args)...);
+	}
+	void push_front(T const &val) { emplace_front(val); }
+	void push_front(T &&val) { emplace_front(std::move(val)); }
 
 	T &back() { return last->value; }
 	T const &back() const { return last->value; }
