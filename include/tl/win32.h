@@ -21,6 +21,8 @@ TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool 
 TL_API s64 getPerformanceFrequency();
 TL_API s64 getPerformanceCounter();
 TL_API bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
+TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
+TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
 #ifdef TL_WIN32_USE_MATH
 TL_API v2u getWindowSize(v2u clientSize, DWORD style, bool menu = false);
 #endif
@@ -109,7 +111,7 @@ s64 getPerformanceCounter() {
 	QueryPerformanceCounter(&counter);
 	return counter.QuadPart;
 }
-void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE) {
+void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor) {
     RECT Rect = {};
     GetWindowRect(Window, &Rect);
     if (monitor == INVALID_HANDLE_VALUE) {

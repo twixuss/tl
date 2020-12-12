@@ -5,7 +5,6 @@
 #include "math.h"
 #endif
 
-#if OS_WINDOWS
 #pragma warning(push, 0)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -13,8 +12,6 @@
 #include <d3d11_3.h>
 #include <d3dcompiler.h>
 #pragma warning(pop)
-#pragma warning(push)
-#pragma warning(disable: 4820)
 
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "d3dcompiler")
@@ -25,6 +22,9 @@
 #endif
 
 #define TL_COM_RELEASE(x) (((x) ? (x)->Release() : 0), (x) = 0)
+
+#pragma warning(push)
+#pragma warning(disable: 4820) // struct padding
 
 namespace TL { namespace D3D11 {
 
@@ -86,76 +86,216 @@ struct Blend {
 	ID3D11BlendState *blend = 0;
 };
 
-inline void addRef(StructuredBuffer &v) {
-	v.buffer->AddRef();
-	v.srv->AddRef();
-}
-inline void addRef(ConstantBuffer &v) {
-	v.buffer->AddRef();
-}
-inline void addRef(RenderTarget &v) {
-	v.rtv->AddRef();
-	v.tex->AddRef();
-}
-inline void addRef(DepthStencil &v) {
-	v.dsv->AddRef();
-	v.tex->AddRef();
-}
-inline void addRef(Texture &v) {
-	v.srv->AddRef();
-	v.tex->AddRef();
-}
-inline void addRef(Sampler &v) {
-	v.sampler->AddRef();
-}
-inline void addRef(RenderTexture &v) {
-	v.rtv->AddRef();
-	v.srv->AddRef();
-	v.tex->AddRef();
-}
-inline void addRef(Rasterizer &v) {
-	v.raster->AddRef();
-}
-inline void addRef(Blend &v) {
-	v.blend->AddRef();
-}
+struct State {
+	IDXGISwapChain *swapChain;
+	ID3D11Device  *device;
+	ID3D11Device2 *device2;
+	ID3D11Device3 *device3;
+	ID3D11DeviceContext *immediateContext;
+	RenderTarget backBuffer;
+	RecursiveMutex immediateContextMutex;
+	u32 syncInterval = 1;
+};
 
-inline void release(StructuredBuffer &v) {
-	TL_COM_RELEASE(v.buffer);
-	TL_COM_RELEASE(v.srv);
-}
-inline void release(ConstantBuffer &v) {
-	TL_COM_RELEASE(v.buffer);
-}
-inline void release(RenderTarget &v) {
-	TL_COM_RELEASE(v.rtv);
-	TL_COM_RELEASE(v.tex);
-}
-inline void release(DepthStencil &v) {
-	TL_COM_RELEASE(v.dsv);
-	TL_COM_RELEASE(v.tex);
-}
-inline void release(Texture &v) {
-	TL_COM_RELEASE(v.srv);
-	TL_COM_RELEASE(v.tex);
-}
-inline void release(Sampler &v) {
-	TL_COM_RELEASE(v.sampler);
-}
-inline void release(RenderTexture &v) {
-	TL_COM_RELEASE(v.rtv);
-	TL_COM_RELEASE(v.srv);
-	TL_COM_RELEASE(v.tex);
-}
-inline void release(Rasterizer &v) {
-	TL_COM_RELEASE(v.raster);
-}
-inline void release(Blend &v) {
-	TL_COM_RELEASE(v.blend);
-}
+TL_API void addRef(StructuredBuffer &v);
+TL_API void addRef(ConstantBuffer &v);
+TL_API void addRef(RenderTarget &v);
+TL_API void addRef(DepthStencil &v);
+TL_API void addRef(Texture &v);
+TL_API void addRef(Sampler &v);
+TL_API void addRef(RenderTexture &v);
+TL_API void addRef(Rasterizer &v);
+TL_API void addRef(Blend &v);
+
+TL_API void release(StructuredBuffer &v);
+TL_API void release(ConstantBuffer &v);
+TL_API void release(RenderTarget &v);
+TL_API void release(DepthStencil &v);
+TL_API void release(Texture &v);
+TL_API void release(Sampler &v);
+TL_API void release(RenderTexture &v);
+TL_API void release(Rasterizer &v);
+TL_API void release(Blend &v);
 
 inline bool valid(ShaderResource &v) { return v.srv != 0; }
 inline bool valid(ConstantBuffer &v) { return v.buffer != 0; }
+inline bool valid(State &state) { return state.swapChain != 0; }
+
+TL_API void defaultShaderHandler(HRESULT result, char const *messages);
+TL_API u32 getBitsPerPixel(DXGI_FORMAT format);
+
+template <class Fn>
+inline void useContext(State &state, Fn &&fn) {
+	SCOPED_LOCK(state.immediateContextMutex);
+	fn();
+}
+
+TL_API void initBackBuffer(State &state);
+TL_API StructuredBuffer createStructuredBuffer(State &state, D3D11_USAGE usage, u32 count, u32 stride, void const* data = 0);
+template <class T>
+inline TypedStructuredBuffer<T> createStructuredBuffer(State &state, D3D11_USAGE usage, u32 count, T const *data = 0) {
+	TypedStructuredBuffer<T> result;
+	(StructuredBuffer &)result = createStructuredBuffer(state, usage, count, sizeof(T), data);
+	return result;
+}
+TL_API RenderTexture createRenderTexture(State &state, u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, u32 cpuFlags = 0);
+TL_API Texture createTexture(State &state, u32 width, u32 height, DXGI_FORMAT format, void const* data, bool generateMips = false);
+template <class Handler = decltype(defaultShaderHandler)>
+ID3D11VertexShader *createVertexShader(State &state, char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
+	ID3DBlob* byteCode = 0;
+	ID3DBlob* messages = 0;
+	HRESULT result = D3DCompile(source, sourceSize, name, 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, 0, 0, &byteCode, &messages);
+	handler(result, messages ? (char *)messages->GetBufferPointer() : 0);
+	ID3D11VertexShader *vertexShader;
+	TL_HRESULT_HANDLER(state.device->CreateVertexShader(byteCode->GetBufferPointer(), byteCode->GetBufferSize(), 0, &vertexShader));
+	byteCode->Release();
+	if (messages)
+		messages->Release();
+	return vertexShader;
+}
+template <class Handler = decltype(defaultShaderHandler)>
+ID3D11PixelShader *createPixelShader(State &state, char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
+	ID3DBlob* byteCode = 0;
+	ID3DBlob* messages = 0;
+	HRESULT result = D3DCompile(source, sourceSize, name, 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, 0, 0, &byteCode, &messages);
+	handler(result, messages ? (char *)messages->GetBufferPointer() : 0);
+	ID3D11PixelShader *pixelShader;
+	TL_HRESULT_HANDLER(state.device->CreatePixelShader(byteCode->GetBufferPointer(), byteCode->GetBufferSize(), 0, &pixelShader));
+	byteCode->Release();
+	if (messages)
+		messages->Release();
+	return pixelShader;
+}
+TL_API ConstantBuffer createConstantBuffer(State &state, u32 size, D3D11_USAGE usage, void const *initialData = 0);
+template <class T>
+inline TypedConstantBuffer<T> createConstantBuffer(State &state, D3D11_USAGE usage, T const *initialData = 0) {
+	TypedConstantBuffer<T> result;
+	(ConstantBuffer &)result = createConstantBuffer(state, sizeof(T), usage, initialData);
+	return result;
+}
+TL_API DepthStencil createDepthStencil(State &state, u32 width, u32 height, DXGI_FORMAT format);
+TL_API Sampler createSampler(State &state, D3D11_TEXTURE_ADDRESS_MODE address, D3D11_FILTER filter);
+TL_API Rasterizer createRasterizer(State &state, D3D11_FILL_MODE fill, D3D11_CULL_MODE cull, bool enableMs = false, bool enableMsLine = false);
+TL_API Blend createBlend(State &state, D3D11_BLEND_OP opColor, D3D11_BLEND srcColor, D3D11_BLEND dstColor, D3D11_BLEND_OP opAlpha, D3D11_BLEND srcAlpha, D3D11_BLEND dstAlpha);
+TL_API Blend createBlend(State &state, D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst);
+TL_API void updateStructuredBuffer(State &state, StructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 firstElement = 0);
+template <class T>
+inline void updateStructuredBuffer(State &state, TypedStructuredBuffer<T> &buffer, u32 count, T const *data, u32 firstElement = 0) {
+	updateStructuredBuffer(buffer, count, sizeof(T), data, firstElement);
+}
+TL_API void updateConstantBuffer(State &state, ConstantBuffer &buffer, u32 size, void const *data);
+template <class T>
+inline void updateConstantBuffer(State &state, TypedConstantBuffer<T> &buffer, T const *data) {
+	updateConstantBuffer(state, buffer, sizeof(T), data);
+}
+TL_API void clearRenderTarget(State &state, ID3D11RenderTargetView* renderTarget, f32 const rgba[4]);
+TL_API void clearDepthStencil(State &state, ID3D11DepthStencilView *depthStencil, f32 depth);
+inline void clearRenderTarget(State &state, RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(state, rt.rtv, rgba); }
+inline void clearDepthStencil(State &state, DepthStencil &depthStencil, f32 depth) { clearDepthStencil(state, depthStencil.dsv, depth); }
+TL_API void draw(State &state, u32 vertexCount, u32 offset = 0);
+TL_API void present(State &state);
+TL_API void resizeBackBuffer(State &state, u32 width, u32 height);
+TL_API void setTopology(State &state, D3D11_PRIMITIVE_TOPOLOGY topology);
+TL_API void setVertexShader(State &state, ID3D11VertexShader *shader);
+TL_API void setPixelShader(State &state, ID3D11PixelShader *shader);
+inline void setShader(State &state, ID3D11VertexShader *shader) { setVertexShader(state, shader); }
+inline void setShader(State &state, ID3D11PixelShader  *shader) { setPixelShader(state, shader); }
+TL_API void setShaderResource(State &state, ShaderResource const &resource, char stage, u32 slot);
+TL_API void setSampler(State &state, Sampler const &sampler, char stage, u32 slot);
+TL_API void setConstantBuffer(State &state, ConstantBuffer const &buffer, char stage, u32 slot);
+TL_API void setViewport(State &state, f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax);
+inline void setViewport(State &state, f32 x, f32 y, f32 w, f32 h) { setViewport(state, x, y, w, h, 0, 1); }
+inline void setViewport(State &state, f32 w, f32 h) { setViewport(state, 0, 0, w, h); }
+TL_API void setRenderTarget(State &state, ID3D11RenderTargetView *renderTarget, ID3D11DepthStencilView *depthStencil);
+inline void setRenderTarget(State &state, RenderTarget &rt) { setRenderTarget(state, rt.rtv, 0); }
+inline void setRenderTarget(State &state, RenderTarget &rt, DepthStencil &ds) { setRenderTarget(state, rt.rtv, ds.dsv); }
+TL_API void setRasterizer(State &state, Rasterizer rasterizer = {});
+TL_API void setBlend(State &state, Blend blend = {});
+TL_API u32 getMaxMsaaSampleCount(State &state, DXGI_FORMAT format);
+#ifdef TL_D3D11_USE_MATH
+inline void resizeBackBuffer(State &state, v2u size) { resizeBackBuffer(state, size.x, size.y); }
+inline void resizeBackBuffer(State &state, v2s size) { resizeBackBuffer(state, (v2u)size); }
+inline void setViewport(State &state, v2f position, v2f size) { setViewport(state, position.x, position.y, size.x, size.y); }
+inline void setViewport(State &state, v2s position, v2s size) { setViewport(state, (v2f)position, (v2f)size); }
+inline void setViewport(State &state, v2u position, v2u size) { setViewport(state, (v2f)position, (v2f)size); }
+inline void setViewport(State &state, v2f size) { setViewport(state, {}, size); }
+inline void setViewport(State &state, v2s size) { setViewport(state, {}, (v2f)size); }
+inline void setViewport(State &state, v2u size) { setViewport(state, {}, (v2f)size); }
+#endif
+
+TL_API void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext);
+// 'sampleCount' can be -1 for highest setting, -2 for second highest, etc
+TL_API void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0);
+
+#ifdef TL_IMPL
+
+void addRef(StructuredBuffer &v) {
+	v.buffer->AddRef();
+	v.srv->AddRef();
+}
+void addRef(ConstantBuffer &v) {
+	v.buffer->AddRef();
+}
+void addRef(RenderTarget &v) {
+	v.rtv->AddRef();
+	v.tex->AddRef();
+}
+void addRef(DepthStencil &v) {
+	v.dsv->AddRef();
+	v.tex->AddRef();
+}
+void addRef(Texture &v) {
+	v.srv->AddRef();
+	v.tex->AddRef();
+}
+void addRef(Sampler &v) {
+	v.sampler->AddRef();
+}
+void addRef(RenderTexture &v) {
+	v.rtv->AddRef();
+	v.srv->AddRef();
+	v.tex->AddRef();
+}
+void addRef(Rasterizer &v) {
+	v.raster->AddRef();
+}
+void addRef(Blend &v) {
+	v.blend->AddRef();
+}
+
+void release(StructuredBuffer &v) {
+	TL_COM_RELEASE(v.buffer);
+	TL_COM_RELEASE(v.srv);
+}
+void release(ConstantBuffer &v) {
+	TL_COM_RELEASE(v.buffer);
+}
+void release(RenderTarget &v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(DepthStencil &v) {
+	TL_COM_RELEASE(v.dsv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(Texture &v) {
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(Sampler &v) {
+	TL_COM_RELEASE(v.sampler);
+}
+void release(RenderTexture &v) {
+	TL_COM_RELEASE(v.rtv);
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(Rasterizer &v) {
+	TL_COM_RELEASE(v.raster);
+}
+void release(Blend &v) {
+	TL_COM_RELEASE(v.blend);
+}
 
 inline void defaultShaderHandler(HRESULT result, char const *messages) {
 #if BUILD_DEBUG
@@ -312,29 +452,11 @@ inline u32 getBitsPerPixel(DXGI_FORMAT format) {
     }
 }
 
-struct State {
-	IDXGISwapChain *swapChain;
-	ID3D11Device  *device;
-	ID3D11Device2 *device2;
-	ID3D11Device3 *device3;
-	ID3D11DeviceContext *immediateContext;
-	RenderTarget backBuffer;
-	RecursiveMutex immediateContextMutex;
-	u32 syncInterval = 1;
-};
-
-inline bool valid(State &state) { return state.swapChain != 0; }
-
-template <class Fn>
-void useContext(State &state, Fn &&fn) {
-	SCOPED_LOCK(state.immediateContextMutex);
-	fn();
-}
 void initBackBuffer(State &state) {
 	TL_HRESULT_HANDLER(state.swapChain->GetBuffer(0, IID_PPV_ARGS(&state.backBuffer.tex)));
 	TL_HRESULT_HANDLER(state.device->CreateRenderTargetView(state.backBuffer.tex, 0, &state.backBuffer.rtv));
 }
-StructuredBuffer createStructuredBuffer(State &state, D3D11_USAGE usage, u32 count, u32 stride, void const* data = 0) {
+StructuredBuffer createStructuredBuffer(State &state, D3D11_USAGE usage, u32 count, u32 stride, void const* data) {
 	StructuredBuffer result;
 	result.usage = usage;
 	result.size = count * stride;
@@ -366,13 +488,7 @@ StructuredBuffer createStructuredBuffer(State &state, D3D11_USAGE usage, u32 cou
 	}
 	return result;
 }
-template <class T>
-TypedStructuredBuffer<T> createStructuredBuffer(State &state, D3D11_USAGE usage, u32 count, T const *data = 0) {
-	TypedStructuredBuffer<T> result;
-	(StructuredBuffer &)result = createStructuredBuffer(usage, count, sizeof(T), data);
-	return result;
-}
-RenderTexture createRenderTexture(State &state, u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, UINT cpuFlags = 0) {
+RenderTexture createRenderTexture(State &state, u32 width, u32 height, u32 sampleCount, DXGI_FORMAT format, u32 cpuFlags) {
 	RenderTexture result;
 	{
 		D3D11_TEXTURE2D_DESC d = {};
@@ -399,7 +515,7 @@ RenderTexture createRenderTexture(State &state, u32 width, u32 height, u32 sampl
 	}
 	return result;
 }
-Texture createTexture(State &state, u32 width, u32 height, DXGI_FORMAT format, void const* data, bool generateMips = false) {
+Texture createTexture(State &state, u32 width, u32 height, DXGI_FORMAT format, void const* data, bool generateMips) {
 	Texture result;
 
 	u32 bpp = getBitsPerPixel(format);
@@ -442,33 +558,7 @@ Texture createTexture(State &state, u32 width, u32 height, DXGI_FORMAT format, v
 	}
 	return result;
 }
-template <class Handler = decltype(defaultShaderHandler)>
-ID3D11VertexShader *createVertexShader(State &state, char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
-	ID3DBlob* byteCode = 0;
-	ID3DBlob* messages = 0;
-	HRESULT result = D3DCompile(source, sourceSize, name, 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, 0, 0, &byteCode, &messages);
-	handler(result, messages ? (char *)messages->GetBufferPointer() : 0);
-	ID3D11VertexShader *vertexShader;
-	TL_HRESULT_HANDLER(state.device->CreateVertexShader(byteCode->GetBufferPointer(), byteCode->GetBufferSize(), 0, &vertexShader));
-	byteCode->Release();
-	if (messages)
-		messages->Release();
-	return vertexShader;
-}
-template <class Handler = decltype(defaultShaderHandler)>
-ID3D11PixelShader *createPixelShader(State &state, char const *source, umm sourceSize, char const *name, char const *entryPoint, char const *target, Handler &&handler = defaultShaderHandler) {
-	ID3DBlob* byteCode = 0;
-	ID3DBlob* messages = 0;
-	HRESULT result = D3DCompile(source, sourceSize, name, 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, 0, 0, &byteCode, &messages);
-	handler(result, messages ? (char *)messages->GetBufferPointer() : 0);
-	ID3D11PixelShader *pixelShader;
-	TL_HRESULT_HANDLER(state.device->CreatePixelShader(byteCode->GetBufferPointer(), byteCode->GetBufferSize(), 0, &pixelShader));
-	byteCode->Release();
-	if (messages)
-		messages->Release();
-	return pixelShader;
-}
-ConstantBuffer createConstantBuffer(State &state, u32 size, D3D11_USAGE usage, void const *initialData = 0) {
+ConstantBuffer createConstantBuffer(State &state, u32 size, D3D11_USAGE usage, void const *initialData) {
 	D3D11_BUFFER_DESC desc = {};
 	desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	desc.ByteWidth = ceil(size, 16u);
@@ -482,12 +572,6 @@ ConstantBuffer createConstantBuffer(State &state, u32 size, D3D11_USAGE usage, v
 	TL_HRESULT_HANDLER(state.device->CreateBuffer(&desc, initialData ? &data : 0, &result.buffer));
 	result.usage = usage;
 	result.size = size;
-	return result;
-}
-template <class T>
-TypedConstantBuffer<T> createConstantBuffer(State &state, D3D11_USAGE usage, T const *initialData = 0) {
-	TypedConstantBuffer<T> result;
-	(ConstantBuffer &)result = createConstantBuffer(sizeof(T), usage, initialData);
 	return result;
 }
 DepthStencil createDepthStencil(State &state, u32 width, u32 height, DXGI_FORMAT format) {
@@ -524,7 +608,7 @@ Sampler createSampler(State &state, D3D11_TEXTURE_ADDRESS_MODE address, D3D11_FI
 	TL_HRESULT_HANDLER(state.device->CreateSamplerState(&desc, &result.sampler));
 	return result;
 }
-Rasterizer createRasterizer(State &state, D3D11_FILL_MODE fill, D3D11_CULL_MODE cull, bool enableMs = false, bool enableMsLine = false) {
+Rasterizer createRasterizer(State &state, D3D11_FILL_MODE fill, D3D11_CULL_MODE cull, bool enableMs, bool enableMsLine) {
 	D3D11_RASTERIZER_DESC desc = {};
 	desc.CullMode = cull;
 	desc.FillMode = fill;
@@ -554,7 +638,7 @@ Blend createBlend(State &state, D3D11_BLEND_OP opColor, D3D11_BLEND srcColor, D3
 Blend createBlend(State &state, D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst) {
 	return createBlend(state, op, src, dst, D3D11_BLEND_OP_ADD, D3D11_BLEND_ONE, D3D11_BLEND_ZERO);
 }
-void updateStructuredBuffer(State &state, StructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 firstElement = 0) {
+void updateStructuredBuffer(State &state, StructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 firstElement) {
 	u32 size = count * stride;
 	u32 offset = firstElement * stride;
 	ASSERT(size + offset <= buffer.size);
@@ -576,10 +660,6 @@ void updateStructuredBuffer(State &state, StructuredBuffer& buffer, u32 count, u
 		INVALID_CODE_PATH("bad buffer.usage");
 	}
 }
-template <class T>
-void updateStructuredBuffer(State &state, TypedStructuredBuffer<T> &buffer, u32 count, T const *data, u32 firstElement = 0) {
-	updateStructuredBuffer(buffer, count, sizeof(T), data, firstElement);
-}
 void updateConstantBuffer(State &state, ConstantBuffer &buffer, u32 size, void const *data) {
 	if (buffer.usage == D3D11_USAGE_DYNAMIC) {
 		D3D11_MAPPED_SUBRESOURCE mapped;
@@ -592,21 +672,15 @@ void updateConstantBuffer(State &state, ConstantBuffer &buffer, u32 size, void c
 		INVALID_CODE_PATH("bad buffer.usage");
 	}
 }
-template <class T>
-void updateConstantBuffer(State &state, TypedConstantBuffer<T> &buffer, T const *data) {
-	updateConstantBuffer(buffer, sizeof(T), data);
-}
 void clearRenderTarget(State &state, ID3D11RenderTargetView* renderTarget, f32 const rgba[4]) {
 	useContext(state, [&] { state.immediateContext->ClearRenderTargetView(renderTarget, rgba); });
 }
-void clearRenderTarget(State &state, RenderTarget &rt, f32 const rgba[4]) { clearRenderTarget(state, rt.rtv, rgba); }
 void clearDepthStencil(State &state, ID3D11DepthStencilView *depthStencil, f32 depth) {
 	useContext(state, [&] {
 		state.immediateContext->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, 0);	
 	});
 }
-void clearDepthStencil(State &state, DepthStencil &depthStencil, f32 depth) { clearDepthStencil(state, depthStencil.dsv, depth); }
-void draw(State &state, u32 vertexCount, u32 offset = 0) { 
+void draw(State &state, u32 vertexCount, u32 offset) { 
 	useContext(state, [&] { state.immediateContext->Draw(vertexCount, offset); });
 }
 void present(State &state) {
@@ -618,8 +692,8 @@ void resizeBackBuffer(State &state, u32 width, u32 height) {
 	initBackBuffer(state);
 }
 void setTopology(State &state, D3D11_PRIMITIVE_TOPOLOGY topology) { useContext(state, [&] { state.immediateContext->IASetPrimitiveTopology(topology); }); }
-void setShader(State &state, ID3D11VertexShader *shader) { useContext(state, [&] { state.immediateContext->VSSetShader(shader, 0, 0); }); }
-void setShader(State &state, ID3D11PixelShader  *shader) { useContext(state, [&] { state.immediateContext->PSSetShader(shader, 0, 0); }); }
+void setVertexShader(State &state, ID3D11VertexShader *shader) { useContext(state, [&] { state.immediateContext->VSSetShader(shader, 0, 0); }); }
+void setPixelShader(State &state, ID3D11PixelShader  *shader) { useContext(state, [&] { state.immediateContext->PSSetShader(shader, 0, 0); }); }
 void setShaderResource(State &state, ShaderResource const &resource, char stage, u32 slot) {
 	useContext(state, [&] { 
 		switch (stage) {
@@ -657,21 +731,17 @@ void setViewport(State &state, f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 dep
 	v.MaxDepth = depthMax;
 	useContext(state, [&] { state.immediateContext->RSSetViewports(1, &v); });
 }
-void setViewport(State &state, f32 x, f32 y, f32 w, f32 h) { setViewport(state, x, y, w, h, 0, 1); }
-void setViewport(State &state, f32 w, f32 h) { setViewport(state, 0, 0, w, h); }
 void setRenderTarget(State &state, ID3D11RenderTargetView *renderTarget, ID3D11DepthStencilView *depthStencil) { 
 	useContext(state, [&] { 
 		state.immediateContext->OMSetRenderTargets(1, &renderTarget, depthStencil);
 	});
 }
-void setRenderTarget(State &state, RenderTarget &rt) { setRenderTarget(state, rt.rtv, 0); }
-void setRenderTarget(State &state, RenderTarget &rt, DepthStencil &ds) { setRenderTarget(state, rt.rtv, ds.dsv); }
-void setRasterizer(State &state, Rasterizer rasterizer = {}) { 
+void setRasterizer(State &state, Rasterizer rasterizer) { 
 	useContext(state, [&] { 
 		state.immediateContext->RSSetState(rasterizer.raster);
 	});
 }
-void setBlend(State &state, Blend blend = {}) { 
+void setBlend(State &state, Blend blend) { 
 	useContext(state, [&] { 
 		float factor[4]{};
 		state.immediateContext->OMSetBlendState(blend.blend, factor, ~0u);
@@ -690,16 +760,6 @@ u32 getMaxMsaaSampleCount(State &state, DXGI_FORMAT format) {
 	}
 	return sampleCount;
 }
-#ifdef TL_D3D11_USE_MATH
-inline void resizeBackBuffer(State &state, v2u size) { resizeBackBuffer(state, size.x, size.y); }
-inline void resizeBackBuffer(State &state, v2s size) { resizeBackBuffer(state, (v2u)size); }
-inline void setViewport(State &state, v2f position, v2f size) { setViewport(state, position.x, position.y, size.x, size.y); }
-inline void setViewport(State &state, v2s position, v2s size) { setViewport(state, (v2f)position, (v2f)size); }
-inline void setViewport(State &state, v2u position, v2u size) { setViewport(state, (v2f)position, (v2f)size); }
-inline void setViewport(State &state, v2f size) { setViewport(state, {}, size); }
-inline void setViewport(State &state, v2s size) { setViewport(state, {}, (v2f)size); }
-inline void setViewport(State &state, v2u size) { setViewport(state, {}, (v2f)size); }
-#endif
 
 inline void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *backBuffer, ID3D11Device *device, ID3D11DeviceContext *immediateContext) {
 	state.swapChain = swapChain;
@@ -708,7 +768,7 @@ inline void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTarge
 	state.backBuffer.rtv = backBuffer;
 }
 // 'sampleCount' can be -1 for highest setting, -2 for second highest, etc
-inline void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags = 0) {
+inline void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags) {
 	IDXGIFactory1 *dxgiFactory;
 	TL_HRESULT_HANDLER(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
 
@@ -752,6 +812,7 @@ inline void initState(State &state, HWND window, u32 width, u32 height, DXGI_FOR
 	initBackBuffer(state);
 }
 
+#endif
+
 }}
 #pragma warning(pop)
-#endif
