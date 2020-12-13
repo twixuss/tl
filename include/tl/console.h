@@ -1,6 +1,6 @@
 #pragma once
+
 #include "system.h"
-#include "string.h"
 
 namespace TL {
 
@@ -8,13 +8,26 @@ TL_API void _print( char const *string, umm length);
 TL_API void _print(wchar const *string, umm length);
 
 template <class Char = char, class T>
+inline void print(T const &value);
+
+template <class Char = char, class ...Args>
+inline void print(Char const *fmt, Args const &...args);
+
+}
+
+#include "common.h"
+#include "string.h"
+
+namespace TL {
+
+template <class Char, class T>
 inline void print(T const &value) {
 	toString<Char>(value, [](Char const *string, umm length) {
 		_print(string, length);
 	});
 }
 
-template <class Char = char, class ...Args>
+template <class Char, class ...Args>
 inline void print(Char const *fmt, Args const &...args) {
 	StringBuilder<Char> builder;
 	builder.appendFormat(fmt, args...);

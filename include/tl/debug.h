@@ -16,6 +16,7 @@ struct CallStackEntry {
 using StackTrace = List<CallStackEntry>;
 
 TL_API StackTrace getStackTrace();
+TL_API bool isDebuggerAttached();
 
 }
 
@@ -25,6 +26,7 @@ TL_API StackTrace getStackTrace();
 
 #pragma warning(push, 0)
 #include <DbgHelp.h>
+#include <debugapi.h>
 #pragma warning(pop)
 
 #pragma comment(lib, "dbghelp")
@@ -99,6 +101,10 @@ StackTrace getStackTrace() {
 	SymCleanup(process);
 
 	return result;
+}
+
+bool isDebuggerAttached() {
+	return IsDebuggerPresent();
 }
 
 }

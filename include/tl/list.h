@@ -507,6 +507,7 @@ struct CircularBuffer {
 	umm _begin = 0;
 	umm _size = 0;
 };
+
 template <class T, umm _capacity>
 struct CircularQueue : private CircularBuffer<T, _capacity> {
 	using Base = CircularBuffer<T, _capacity>;

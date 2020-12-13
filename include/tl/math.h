@@ -346,15 +346,6 @@ FORCEINLINE constexpr T easeInOut2(T t) {
 	//return lerp(pow2(t), 1 - pow2(1 - t), t);
 }
 
-template <class A, class B, class T, class S> FORCEINLINE constexpr auto lerpWrap(A a, B b, T t, S s) {
-	a = positiveModulo(a, s);
-	b = positiveModulo(b, s);
-	auto d = a - b;
-	return select(absolute(d) > half(s), 
-				  positiveModulo(lerp(a, b+sign(d)*s, t), s), 
-				  lerp(a, b, t));
-}
-
 namespace CE {
 
 template <class To, class From>
@@ -4036,6 +4027,16 @@ ATAN2_APPROX(f32, v2f)
 ATAN2_APPROX(f32x4, v2fx4)
 ATAN2_APPROX(f32x8, v2fx8)
 #undef ATAN2_APPROX
+
+template <class A, class B, class T, class S>
+FORCEINLINE constexpr auto lerpWrap(A a, B b, T t, S s) {
+	a = positiveModulo(a, s);
+	b = positiveModulo(b, s);
+	auto d = a - b;
+	return select(absolute(d) > half(s), 
+				  positiveModulo(lerp(a, b+sign(d)*s, t), s), 
+				  lerp(a, b, t));
+}
 
 FORCEINLINE f32 dot(f32 a, f32 b) { return a * b; }
 FORCEINLINE f32 dot(f32x4 a, f32x4 b) { return {_mm_cvtss_f32(_mm_dp_ps(a.m.ps, b.m.ps, 0xFF))}; }

@@ -53,8 +53,8 @@ inline Buffer<Allocator> readEntireFile(File file, umm extraPreSpace = 0, umm ex
 	auto size = (umm)getCursor(file);
 	setCursor(file, 0, File_begin);
 
-	void *data = ALLOCATE(Allocator, size + extraPreSpace + extraPostSpace, 0);
-	read(file, (u8 *)data + extraPreSpace, size);
+	u8 *data = ALLOCATE_T(Allocator, u8, size + extraPreSpace + extraPostSpace, 0);
+	read(file, data + extraPreSpace, size);
 
 	return {data, size + extraPreSpace + extraPostSpace};
 }
