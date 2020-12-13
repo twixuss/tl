@@ -126,8 +126,6 @@ struct ForwardListBase {
 	
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
-	operator Span<void>() { return {begin(), end()}; }
-	operator Span<void const>() const { return {begin(), end()}; }
 
 	T *_begin = 0;
 	T *_end = 0;
@@ -179,8 +177,8 @@ struct List : ForwardListBase<T, Allocator> {
 	List &set(Span<char const> span) { return Base::set(span), *this; }
 	template <class... Args>
 	void push_front(Args &&... args) {
-		if (remainingCapacity() == 0) {
-			umm newCapacity = capacity() * 2;
+		if (this->remainingCapacity() == 0) {
+			umm newCapacity = this->capacity() * 2;
 			if (newCapacity == 0)
 				newCapacity = 1;
 			this->_reallocate(newCapacity);
@@ -219,8 +217,8 @@ struct UnorderedList : ForwardListBase<T, Allocator> {
 	UnorderedList &operator=(UnorderedList &&that) = default;
 	template <class... Args>
 	void push_front(Args &&... args) {
-		if (remainingCapacity() == 0) {
-			umm newCapacity = capacity() * 2;
+		if (this->remainingCapacity() == 0) {
+			umm newCapacity = this->capacity() * 2;
 			if (newCapacity == 0)
 				newCapacity = 1;
 			this->_reallocate(newCapacity);
@@ -304,7 +302,7 @@ struct Queue {
 	void push(T &&val) { emplace(std::move(val)); }
 	void pop() { TL_BOUNDS_CHECK(size()); (_begin++)->~T(); }
 	void resize(umm newSize) {
-		if (newSize > capacity())
+		if (newSize > this->capacity())
 			_reallocate(newSize);
 		if (newSize > size()) {
 			for (T *t = _end; t < _begin + newSize; ++t)
@@ -325,9 +323,6 @@ struct Queue {
 
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
-	operator Span<void>() { return {begin(), end()}; }
-	operator Span<void const>() const { return {begin(), end()}; }
-
 
 	T *_begin = 0;
 	T *_end = 0;
@@ -599,7 +594,7 @@ struct BlockList {
 			}
 		}
 
-		return *this
+		return *this;
 	}
 	BlockList &operator=(BlockList &&that) {
 		clear();

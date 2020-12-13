@@ -1,6 +1,11 @@
 #pragma once
 
 #include "common.h"
+#include "list.h"
+
+#pragma warning(push)
+#pragma warning(disable: 4820)
+#pragma warning(disable: 4996)
 
 namespace TL { namespace net {
 
@@ -27,8 +32,8 @@ TL_API bool connect(Socket s, char const *ip, u16 port);
 TL_API void send(Socket s, void const *data, u32 size);
 TL_API Span<u8> receive(Socket s, u32 maxSize);
 
-inline void send(Socket s, Span<void const> span) {
-	send(s, span.data(), span.size());
+inline void send(Socket s, Span<u8 const> span) {
+	send(s, span.data(), (u32)span.size());
 }
 template <class T>
 inline void sendBytes(Socket s, T const &val) {
@@ -52,10 +57,13 @@ TL_API void run(Server *server, void *context = 0);
 #ifdef TL_IMPL
 #if OS_WINDOWS
 
+#pragma warning(push, 0)
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
+#pragma warning(pop)
 
-#pragma comment(lib,  "iphlpapi")
+#pragma comment(lib, "iphlpapi")
+#pragma comment(lib, "ws2_32")
 
 namespace TL { namespace net {
 
@@ -96,12 +104,12 @@ bool connect(Socket s, char const *ip, u16 port) {
 }
 
 void send(Socket s, void const *data, u32 size) {
-	::send((SOCKET)s, (char *)data, size, 0);
+	::send((SOCKET)s, (char *)data, (int)size, 0);
 }
 
 Span<u8> receive(Socket s, u32 maxSize) {
 	u8 *data = ALLOCATE_T(TL_DEFAULT_ALLOCATOR, u8, maxSize, 0);
-	int bytesReceived = ::recv((SOCKET)s, (char *)data, maxSize, 0);
+	int bytesReceived = ::recv((SOCKET)s, (char *)data, (int)maxSize, 0);
 	if (bytesReceived <= 0) {
 		DEALLOCATE(TL_DEFAULT_ALLOCATOR, data);
 		return {};
@@ -134,7 +142,7 @@ void run(Server *server, void *context) {
 	server->running = true;
 	while (server->running) {
 		fd_set fdSet;
-		fdSet.fd_count = server->clients.size() + 1;
+		fdSet.fd_count = (u_int)server->clients.size() + 1;
 		fdSet.fd_array[0] = (SOCKET)server->listener;
 		for (u32 i = 0; i < server->clients.size(); ++i) {
 			fdSet.fd_array[i + 1] = (SOCKET)server->clients[i];
@@ -170,7 +178,7 @@ void run(Server *server, void *context) {
 					server->clients.erase(std::find(server->clients.begin(), server->clients.end(), (Socket)socket));
 					continue;
 				}
-				server->onClientMessageReceived(server, context, (Socket)socket, buf, bytesReceived);
+				server->onClientMessageReceived(server, context, (Socket)socket, buf, (u32)bytesReceived);
 			}
 		}
 	}
@@ -180,3 +188,5 @@ void run(Server *server, void *context) {
 
 #endif
 #endif
+
+#pragma warning(pop)

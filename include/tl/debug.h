@@ -2,6 +2,9 @@
 #include "list.h"
 #include "string.h"
 
+#pragma warning(push)
+#pragma warning(disable: 4820)
+
 namespace TL {
 
 struct CallStackEntry {
@@ -20,7 +23,10 @@ TL_API StackTrace getStackTrace();
 
 #if OS_WINDOWS
 
+#pragma warning(push, 0)
 #include <DbgHelp.h>
+#pragma warning(pop)
+
 #pragma comment(lib, "dbghelp")
 
 namespace TL {
@@ -70,7 +76,7 @@ StackTrace getStackTrace() {
 		CallStackEntry entry;
 
 		char demangledName[256];
-		auto demangledNameLength = UnDecorateSymbolName(symbol->Name, demangledName, countof(demangledName), UNDNAME_NAME_ONLY);
+		auto demangledNameLength = UnDecorateSymbolName(symbol->Name, demangledName, (DWORD)countof(demangledName), UNDNAME_NAME_ONLY);
 		if (demangledNameLength) {
 			entry.name = {demangledName, demangledNameLength};
 		}
@@ -100,3 +106,5 @@ StackTrace getStackTrace() {
 #endif
 
 #endif
+
+#pragma warning(pop)

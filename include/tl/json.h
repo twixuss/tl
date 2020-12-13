@@ -27,7 +27,6 @@ struct hash<TL::Span<char const>> {
 }
 
 namespace TL {
-
 namespace Json {
 
 enum Type {
@@ -155,6 +154,19 @@ struct Token {
 	Span<char const> view;
 };
 
+TL_API List<Token> lex(Span<char const> json);
+TL_API Object parse(Token *&t);
+TL_API Object parse(List<Token> tokens);
+TL_API Object parse(Span<char const> json);
+
+}
+}
+
+#ifdef TL_IMPL
+
+namespace TL {
+namespace Json {
+
 List<Token> lex(Span<char const> json) {
 	List<Token> result;
 	auto c = json.begin();
@@ -184,17 +196,17 @@ List<Token> lex(Span<char const> json) {
 				continue;
 			}
 		}
-		if (isdigit(*c) || *c == '-') {
+		if (isDigit(*c) || *c == '-') {
 			Token token;
 			token.type = Token_number;
 			token.view._begin = c;
 			++c;
 			while (1) { 
-				if (isdigit(*c) || *c == '.') {
+				if (isDigit(*c) || *c == '.') {
 					++c; 
 				} else if (*c == 'e') {
 					c += 2;
-					while (isdigit(*c)) {
+					while (isDigit(*c)) {
 						++c;
 					}
 					break;
@@ -283,7 +295,8 @@ Object parse(Span<char const> json) {
 }
 
 }
-
 }
+
+#endif
 
 #pragma warning(pop)

@@ -1,6 +1,9 @@
 #pragma once
 #include "common.h"
 
+#pragma warning(push)
+#pragma warning(disable: 4061)
+
 namespace TL {
 
 enum class CpuFeature : u8 {
@@ -314,6 +317,8 @@ CpuInfo getCpuInfo() {
 	return result;
 }
 
+#endif // OS_WINDOWS
+
 char const *toString(CpuFeature f) {
 #define CASE(x) case TL::CpuFeature::x: return #x;
 	switch (f) {
@@ -383,7 +388,8 @@ char const *toString(CpuVendor v) {
 #undef CASE
 }
 
-#endif // OS_WINDOWS
 #endif // TL_IMPL
 
 }
+
+#pragma warning(pop)

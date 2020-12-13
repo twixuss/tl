@@ -28,6 +28,8 @@
 
 #if COMPILER_MSVC
 #pragma warning(pop)
+#pragma warning(push)
+#pragma warning(disable: 4820)
 #endif
 
 #ifndef ASSERTION_FAILURE
@@ -336,12 +338,9 @@ struct Span {
 	constexpr T const &operator[](umm i) const { return _begin[i]; }
 	constexpr T &at(umm i) { return _begin[i]; }
 	constexpr T const &at(umm i) const { return _begin[i]; }
-
 	constexpr bool empty() const { return _begin == _end; }
 
 	constexpr operator Span<T const>() const { return {_begin, _end}; }
-	constexpr operator Span<void>() const { return {_begin, _end}; }
-	constexpr operator Span<void const>() const { return {_begin, _end}; }
 
 	constexpr bool operator==(Span<T> that) const { return _begin == that._begin && _end == that._end; }
 
@@ -349,39 +348,8 @@ struct Span {
 	T *_end{};
 };
 
-template <>
-struct Span<void const> {
-	constexpr Span() = default;
-	constexpr Span(void const *begin, void const *end) : _begin(begin), _end(end) {}
-	constexpr Span(void const *begin, umm size) : Span(begin, (u8 *)begin + size) {}
-	constexpr void const *data() const { return _begin; }
-	constexpr void const *begin() const { return _begin; }
-	constexpr void const *end() const { return _end; }
-	constexpr umm size() const { return umm((u8 *)_end - (u8 *)_begin); }
-	constexpr bool empty() const { return _begin == _end; }
-	constexpr explicit operator Span<char const>() const { return {(char const *)_begin, (char const *)_end}; }
-	constexpr bool operator==(Span<void const> that) const { return _begin == that._begin && _end == that._end; }
-	void const *_begin{};
-	void const *_end{};
-};
-
-template <>
-struct Span<void> {
-	constexpr Span() = default;
-	constexpr Span(void *begin, void *end) : _begin(begin), _end(end) {}
-	constexpr Span(void *begin, umm size) : Span(begin, (u8 *)begin + size) {}
-	constexpr void *data() const { return _begin; }
-	constexpr void *begin() const { return _begin; }
-	constexpr void *end() const { return _end; }
-	constexpr umm size() const { return umm((u8 *)_end - (u8 *)_begin); }
-	constexpr bool empty() const { return _begin == _end; }
-	constexpr explicit operator Span<char>() const { return {(char *)_begin, (char *)_end}; }
-	constexpr explicit operator Span<char const>() const { return {(char const *)_begin, (char const *)_end}; }
-	constexpr operator Span<void const>() const { return {_begin, _end}; }
-	constexpr bool operator==(Span<void> that) const { return _begin == that._begin && _end == that._end; }
-	void *_begin{};
-	void *_end{};
-};
+template <class T> constexpr Span<u8> toBytes(Span<T> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<u8 const> toBytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
 
 template <class T>
 constexpr umm countof(Span<T const> span) { return span.size(); }
@@ -435,6 +403,10 @@ struct OsAllocator {
 #ifndef TL_DEFAULT_ALLOCATOR
 #define TL_DEFAULT_ALLOCATOR ::TL::OsAllocator
 #endif
+
+inline constexpr bool isDigit(char c) {
+	return c >= '0' && c <= '9';
+}
 
 inline constexpr char toLower(char c) {
 	if (c >= 'A' && c <= 'Z')
@@ -718,8 +690,8 @@ CopyFnRet<CopyFn, Char> toString(f32 v, CopyFn &&copyFn) {
 }
 
 template <class Allocator>
-struct Buffer : Span<void> {
-	using Span<void>::Span;
+struct Buffer : Span<u8> {
+	using Span<u8>::Span;
 	operator bool() const { return data() != 0; }
 };
 
@@ -883,22 +855,34 @@ FORCEINLINE u32 countBits(s64 v) { return countBits((u64)v); }
 #ifdef TL_IMPL
 
 #if OS_WINDOWS
+
 #if COMPILER_MSVC
-	void *OsAllocator::allocate(umm size, umm align) { return _aligned_malloc(size, max(align, (umm)8)); }
-	void OsAllocator::deallocate(void *data) { _aligned_free(data); }
+
+void *OsAllocator::allocate(umm size, umm align) { return _aligned_malloc(size, max(align, (umm)8)); }
+void OsAllocator::deallocate(void *data) { _aligned_free(data); }
+
 #elif COMPILER_GCC
-	void *OsAllocator::allocate(umm size, umm align) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
-	void OsAllocator::deallocate(void *data) { __mingw_aligned_free(data); }
+
+void *OsAllocator::allocate(umm size, umm align) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
+void OsAllocator::deallocate(void *data) { __mingw_aligned_free(data); }
+
 #endif
+
 #else
-	void *OsAllocator::allocate(umm size, umm align) {
-		void *result = 0;
-		posix_memalign(&result, max(align, sizeof(void *)), size);
-		return result;
-	}
-	void OsAllocator::deallocate(void *data) { free(data); }
+
+void *OsAllocator::allocate(umm size, umm align) {
+	void *result = 0;
+	posix_memalign(&result, max(align, sizeof(void *)), size);
+	return result;
+}
+void OsAllocator::deallocate(void *data) { free(data); }
+
 #endif
 
 #endif
 
 } // namespace TL
+
+#if COMPILER_MSVC
+#pragma warning(pop)
+#endif

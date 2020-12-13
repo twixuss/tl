@@ -5,7 +5,7 @@ namespace TL {
 struct xorshift32 {
 	u32 v = 1;
 };
-u32 next(xorshift32 &state) {
+inline u32 next(xorshift32 &state) {
 	/* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
 	state.v ^= state.v << 13;
 	state.v ^= state.v >> 17;
@@ -16,7 +16,7 @@ u32 next(xorshift32 &state) {
 struct xorshift64 {
 	u64 v = 1;
 };
-u64 next(xorshift64 &state) {
+inline u64 next(xorshift64 &state) {
 	state.v ^= state.v << 13;
 	state.v ^= state.v >> 7;
 	state.v ^= state.v << 17;
@@ -29,7 +29,7 @@ struct xorshift128 {
 	u32 c = 1;
 	u32 d = 1;
 };
-u32 next(xorshift128 &state) {
+inline u32 next(xorshift128 &state) {
 	/* Algorithm "xor128" from p. 5 of Marsaglia, "Xorshift RNGs" */
 	u32 t = state.d;
 	u32 s = state.a;
@@ -49,7 +49,7 @@ struct xorwow {
 	u32 e = 1;
     u32 counter = 0;
 };
-u32 next(xorwow &state) {
+inline u32 next(xorwow &state) {
     /* Algorithm "xorwow" from p. 5 of Marsaglia, "Xorshift RNGs" */
     u32 t = state.e;
     u32 s = state.a;
@@ -68,7 +68,7 @@ u32 next(xorwow &state) {
 struct xorshift64s {
 	u64 a = 1;
 };
-u32 next(xorshift64s &state) {
+inline u64 next(xorshift64s &state) {
 	u64 x = state.a;
 	x ^= x >> 12;
 	x ^= x << 25;
@@ -81,8 +81,8 @@ struct xorshift1024s {
 	u64 array[16] = { 1 };
 	u64 index = 0;
 };
-u64 next(xorshift1024s &state) {
-	u32 index = state.index;
+inline u64 next(xorshift1024s &state) {
+	u64 index = state.index;
 	u64 s = state.array[index++];
 	u64 t = state.array[index &= 15];
 	t ^= t << 31;
@@ -97,7 +97,7 @@ struct xorshift128p {
 	u64 a = 1;
 	u64 b = 1;
 };
-u64 next(xorshift128p &state) {
+inline u64 next(xorshift128p &state) {
 	u64 t = state.a;
 	u64 s = state.b;
 	state.a = s;
@@ -111,7 +111,7 @@ u64 next(xorshift128p &state) {
 struct xoshiro256ss {
 	u64 s[4] = {};
 };
-u64 next(xoshiro256ss &state) {
+inline u64 next(xoshiro256ss &state) {
 	u64 *s = state.s;
 	u64 result = rotateLeft(s[1] * 5, 7) * 9;
 	u64 t = s[1] << 17;
@@ -127,7 +127,7 @@ u64 next(xoshiro256ss &state) {
 struct xoshiro256p {
 	u64 s[4] = {};
 };
-u64 next(xoshiro256p &state) {
+inline u64 next(xoshiro256p &state) {
 	u64 *s = state.s;
 	u64 result = s[0] + s[3];
 	u64 t = s[1] << 17;
@@ -143,7 +143,7 @@ u64 next(xoshiro256p &state) {
 struct splitmix64 {
 	u64 s;
 };
-u64 next(splitmix64 &state) {
+inline u64 next(splitmix64 &state) {
 	u64 result = state.s;
 	state.s = result + 0x9E3779B97f4A7C15;
 	result = (result ^ (result >> 30)) * 0xBF58476D1CE4E5B9;

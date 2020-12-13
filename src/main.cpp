@@ -256,7 +256,7 @@ void test_int() {
 void string_test() {
 	printf("%s ... ", "string_test");
 	StringBuilder<char, OsAllocator, 16> builder;
-	char *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
+	char const *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
 	builder.append(str);
 	auto result = builder.get();
 	ASSERT(result.size() == strlen(str));
@@ -423,8 +423,8 @@ void quickSort(Span<T> span, Predicate &&predicate) {
 	};
 
 	T *p = partition(span.begin(), span.end());
-	quickSort(Span<T>{span.begin(), p});
-	quickSort(Span<T>{p, span.end()});
+	quickSort(Span<T>{span.begin(), p}, predicate);
+	quickSort(Span<T>{p, span.end()}, predicate);
 }
 template <class T>
 void quickSort(Span<T> span) {

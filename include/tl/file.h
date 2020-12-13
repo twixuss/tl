@@ -34,8 +34,8 @@ inline s64 length(File file) {
 	setCursor(file, 0, File_end);
 	return getCursor(file);
 }
-inline void read(File file, Span<void> span) { read(file, span.data(), span.size()); }
-inline void write(File file, Span<void const> span) { write(file, span.data(), span.size());}
+inline void read(File file, Span<u8> span) { read(file, span.data(), span.size()); }
+inline void write(File file, Span<u8 const> span) { write(file, span.data(), span.size());}
 
 template <class Char = char, class T>
 inline void writeString(File file, T const &value) {
@@ -101,8 +101,8 @@ inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
 	close(file);
 	return true;
 }
-inline bool writeEntireFile(char  const *path, Span<void const> span) { return writeEntireFile(path, span.data(), span.size()); }
-inline bool writeEntireFile(wchar const *path, Span<void const> span) { return writeEntireFile(path, span.data(), span.size()); }
+inline bool writeEntireFile(char  const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
+inline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
 
 #ifdef TL_IMPL
 

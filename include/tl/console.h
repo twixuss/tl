@@ -4,8 +4,8 @@
 
 namespace TL {
 
-void _print( char const *string, umm length);
-void _print(wchar const *string, umm length);
+TL_API void _print( char const *string, umm length);
+TL_API void _print(wchar const *string, umm length);
 
 template <class Char = char, class T>
 inline void print(T const &value) {

@@ -18,7 +18,7 @@ inline wchar *copyString(wchar const *str) {
 
 template <class Char = char, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct String : List<Char, Allocator> {
-	using Base = List;
+	using Base = List<Char, Allocator>;
 	String() = default;
 	explicit String(umm size) : Base(size) {}
 	String(Span<Char const> span) : Base(span) {}
@@ -34,19 +34,19 @@ struct String : List<Char, Allocator> {
 	}
 	String &set(Span<Char const> span) { return Base::set(span), *this; }
 	void append(Span<char const> str) {
-		auto requiredSize = size() + str.size();
-		if (requiredSize > capacity()) {
+		auto requiredSize = this->size() + str.size();
+		if (requiredSize > this->capacity()) {
 			_grow(requiredSize);
 		}
-		memcpy(_end, str.data(), str.size());
-		_end += str.size();
+		memcpy(this->_end, str.data(), str.size());
+		this->_end += str.size();
 	}
 	void append(Char const *str) {
 		append(Span<char const>(str, length(str)));
 	}
 	s32 compare(String const &b) const {
 		s32 result = 0;
-        for (umm i = 0; i < min(size(), b.size()); ++i) {
+        for (umm i = 0; i < min(this->size(), b.size()); ++i) {
             if ((*this)[i] != b[i]) {
                 return (*this)[i] < b[i] ? -1 : +1;
             }
@@ -54,9 +54,9 @@ struct String : List<Char, Allocator> {
 
 		if (result)
 			return result;
-		if (size() < b.size())
+		if (this->size() < b.size())
 			return -1;
-		if (size() > b.size())
+		if (this->size() > b.size())
 			return 1;
 		return 0;
 	}
