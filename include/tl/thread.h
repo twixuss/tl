@@ -321,8 +321,9 @@ struct MutexQueue {
 	}
 };
 
+// TODO: this is horrible
 template <class T, umm capacity, class Mutex = Mutex>
-struct MutexCircularQueue {
+struct StaticMutexCircularQueue {
 	void push(T &&value) {
 		SCOPED_LOCK(mutex);
 		base.push(std::move(value));
@@ -354,7 +355,7 @@ struct MutexCircularQueue {
 	}
 
 private:
-	CircularQueue<T, capacity> base;
+	StaticCircularQueue<T, capacity> base;
 	Mutex mutex;
 };
 

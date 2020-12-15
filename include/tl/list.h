@@ -378,7 +378,7 @@ struct Queue {
 };
 
 template <class T, umm _capacity>
-struct CircularBuffer {
+struct StaticCircularBuffer {
 	union Storage {
 		T value;
 		Storage() {}
@@ -386,9 +386,9 @@ struct CircularBuffer {
 	};
 	struct Iterator {
 		using value_type = T;
-		CircularBuffer *buffer;
+		StaticCircularBuffer *buffer;
 		umm index;
-		Iterator(CircularBuffer *buffer, umm index) : buffer(buffer), index(index) {}
+		Iterator(StaticCircularBuffer *buffer, umm index) : buffer(buffer), index(index) {}
 		T &operator*() { return buffer->_get(index); }
 		T &operator*() const { return buffer->_get(index); }
 		Iterator operator+(smm v) const { return Iterator(buffer, index + v); }
@@ -406,8 +406,8 @@ struct CircularBuffer {
 		bool operator!=(Iterator const &that) const { return index != that.index; }
 	};
 	
-	CircularBuffer() = default;
-	CircularBuffer(CircularBuffer const &that) {
+	StaticCircularBuffer() = default;
+	StaticCircularBuffer(StaticCircularBuffer const &that) {
 		_size = that._size;
 		umm dstIndex = that._begin;
 		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
@@ -416,7 +416,7 @@ struct CircularBuffer {
 				dstIndex = 0;
 		}
 	}
-	CircularBuffer(CircularBuffer &&that) {
+	StaticCircularBuffer(StaticCircularBuffer &&that) {
 		_size = that._size;
 		umm dstIndex = that._begin;
 		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
@@ -427,9 +427,9 @@ struct CircularBuffer {
 		that._begin = 0;
 		that._size = 0;
 	}
-	CircularBuffer &operator=(CircularBuffer const &that) { clear(); return *new (this) CircularBuffer(that); }
-	CircularBuffer &operator=(CircularBuffer &&that) { clear(); return *new (this) CircularBuffer(std::move(that)); }
-	~CircularBuffer() {
+	StaticCircularBuffer &operator=(StaticCircularBuffer const &that) { clear(); return *new (this) StaticCircularBuffer(that); }
+	StaticCircularBuffer &operator=(StaticCircularBuffer &&that) { clear(); return *new (this) StaticCircularBuffer(std::move(that)); }
+	~StaticCircularBuffer() {
 		for (umm i = 0; i < _size; ++i) {
 			_get(i).~T();
 		}
@@ -464,6 +464,7 @@ struct CircularBuffer {
 
 	umm size() const { return _size; }
 	bool empty() const { return _size == 0; }
+	bool full() const { return _size == _capacity; }
 
 	T &operator[](umm i) { TL_BOUNDS_CHECK(i < _size); return _get(i); }
 	T const &operator[](umm i) const { TL_BOUNDS_CHECK(i < _size); return _get(i); }
@@ -508,9 +509,170 @@ struct CircularBuffer {
 	umm _size = 0;
 };
 
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
+struct CircularBuffer {
+	struct Iterator {
+		using value_type = T;
+		CircularBuffer *buffer;
+		umm index;
+		Iterator(CircularBuffer *buffer, umm index) : buffer(buffer), index(index) {}
+		T &operator*() { return buffer->_get(index); }
+		T &operator*() const { return buffer->_get(index); }
+		Iterator operator+(smm v) const { return Iterator(buffer, index + v); }
+		Iterator operator-(smm v) const { return Iterator(buffer, index - v); }
+		smm operator-(Iterator v) const { return index - v.index; }
+		Iterator &operator++() { ++index; return *this; }
+		Iterator &operator--() { --index; return *this; }
+		Iterator operator++(int) { Iterator result = *this; ++*this; return result; }
+		Iterator operator--(int) { Iterator result = *this; --*this; return result; }
+		bool operator>(Iterator const &that) const { return index > that.index; }
+		bool operator<(Iterator const &that) const { return index < that.index; }
+		bool operator>=(Iterator const &that) const { return index >= that.index; }
+		bool operator<=(Iterator const &that) const { return index <= that.index; }
+		bool operator==(Iterator const &that) const { return index == that.index; }
+		bool operator!=(Iterator const &that) const { return index != that.index; }
+	};
+	
+	CircularBuffer() = default;
+	explicit CircularBuffer(umm capacity) {
+		_allocBegin = ALLOCATE_T(Allocator, T, capacity, 0);
+		_allocEnd = _allocBegin + capacity;
+	}
+	CircularBuffer(CircularBuffer const &that) {
+		_size = that._size;
+		_allocBegin = ALLOCATE_T(Allocator, T, _size, 0);
+		_allocEnd = _allocBegin + _size;
+
+		umm dstIndex = that._firstIndex;
+		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
+			new (&_allocBegin[srcIndex]) T(that._allocBegin[dstIndex]);
+			if (++dstIndex == that.capacity())
+				dstIndex = 0;
+		}
+	}
+	CircularBuffer(CircularBuffer &&that) {
+		_allocBegin = that._allocBegin;
+		_allocEnd = that._allocEnd;
+		_firstIndex = that._firstIndex;
+		_size = that._size;
+
+		that._allocBegin = 0;
+		that._allocEnd = 0;
+		that._firstIndex = 0;
+		that._size = 0;
+	}
+	CircularBuffer &operator=(CircularBuffer const &that) { clear(); return *new (this) CircularBuffer(that); }
+	CircularBuffer &operator=(CircularBuffer &&that) { clear(); return *new (this) CircularBuffer(std::move(that)); }
+	~CircularBuffer() {
+		if (!_allocBegin)
+			return;
+
+		clear();
+
+		DEALLOCATE(Allocator, _allocBegin);
+
+		_allocBegin = 0;
+		_allocEnd = 0;
+	}
+	template <class ...Args>
+	void emplace_back(Args &&...args) {
+		_growIfFull();
+		new (&_allocBegin[(_firstIndex + _size++) % capacity()]) T(std::forward<Args>(args)...);
+	}
+	template <class ...Args>
+	void emplace_front(Args &&...args) {
+		_growIfFull();
+		++_size;
+		if (_firstIndex) --_firstIndex; else _firstIndex = capacity() - 1;
+		new (&_allocBegin[_firstIndex]) T(std::forward<Args>(args)...);
+	}
+	void push_back(T const &v) { emplace_back(v); }
+	void push_back(T &&v) { emplace_back(std::move(v)); }
+	void push_front(T const &v) { emplace_front(v); }
+	void push_front(T &&v) { emplace_front(std::move(v)); }
+
+	void pop_back() { _get(--_size).~T(); }
+	void pop_front() { _allocBegin[_firstIndex].~T(); _incBegin(); --_size; }
+	
+	void reserve(umm count) {
+		if (count <= capacity())
+			return;
+		
+		T *newBegin = ALLOCATE_T(Allocator, T, count, 0);
+
+		for (umm i = 0; i < _size; ++i) {
+			new (&newBegin[i]) T(std::move(_get(i)));
+		}
+
+		DEALLOCATE(Allocator, _allocBegin);
+
+		_firstIndex = 0;
+		_allocBegin = newBegin;
+		_allocEnd = _allocBegin + count;
+	}
+
+	Iterator begin() { return Iterator(this, 0); }
+	Iterator end() { return Iterator(this, _size); }
+
+	T &back() { TL_BOUNDS_CHECK(_size); return _get(_size - 1); }
+	T &front() { TL_BOUNDS_CHECK(_size); return _get(0); }
+
+	umm capacity() const { return (umm)(_allocEnd - _allocBegin); }
+	umm size() const { return _size; }
+	bool empty() const { return _size == 0; }
+	bool full() const { return _size == capacity(); }
+
+	T &operator[](umm i) { TL_BOUNDS_CHECK(i < _size); return _get(i); }
+	T const &operator[](umm i) const { TL_BOUNDS_CHECK(i < _size); return _get(i); }
+
+	void erase(Iterator it) {
+		umm index = it.index;
+		TL_BOUNDS_CHECK(index < _size);
+		--_size;
+		if (index > _size / 2) {
+			for (;index < _size; ++index) {
+				_get(index) = std::move(_get(index + 1));
+			}
+			_get(_size).~T();
+		} else {
+			for (;index; --index) {
+				_get(index) = std::move(_get(index - 1));
+			}
+			_get(0).~T();
+			_incBegin();
+		}
+	}
+
+	void clear() {
+		for (umm i = 0; i < size(); ++i) {
+			_get(i).~T();
+		}
+		_firstIndex = 0;
+		_size = 0;
+	}
+
+	T &_get(umm i) {
+		return _allocBegin[(_firstIndex + i) % capacity()];
+	}
+	void _incBegin() {
+		++_firstIndex;
+		if (_firstIndex == capacity())
+			_firstIndex = 0;
+	}
+	void _growIfFull() {
+		if (full())
+			reserve(max(capacity() * 2, (umm)1));
+	}
+
+	T *_allocBegin = 0;
+	T *_allocEnd = 0;
+	umm _firstIndex = 0;
+	umm _size = 0;
+};
+
 template <class T, umm _capacity>
-struct CircularQueue : private CircularBuffer<T, _capacity> {
-	using Base = CircularBuffer<T, _capacity>;
+struct StaticCircularQueue : private StaticCircularBuffer<T, _capacity> {
+	using Base = StaticCircularBuffer<T, _capacity>;
 	using Base::begin;
 	using Base::end;
 	using Base::size;
@@ -524,21 +686,21 @@ struct CircularQueue : private CircularBuffer<T, _capacity> {
 	void pop() { this->pop_front(); }
 };
 
-template <class T, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096 / sizeof(T)>
+template <class T, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockCapacity_ = 4096 / sizeof(T)>
 struct BlockList {
-	static constexpr umm blockSize = blockSize_;
+	static constexpr umm blockCapacity = blockCapacity_;
 	union Storage {
 		T value;
 	};
 	struct Block {
-		Storage buffer[blockSize];
+		Storage buffer[blockCapacity];
 		Storage *end = buffer;
 		Block *next = 0;
 		Block *previous = 0;
 
 		Block() {}
 		umm size() const { return (umm)(end - buffer); }
-		umm availableSpace() const { return blockSize - size(); }
+		umm availableSpace() const { return blockCapacity - size(); }
 	};
 	Block first;
 	Block *last = &first;
@@ -647,11 +809,11 @@ struct BlockList {
 		umm space = availableSpace();
 		while (space < amount) {
 			allocLast = allocLast->next = allocateBlock(allocLast);
-			space += blockSize;
+			space += blockCapacity;
 		}
 	}
 	void ensureConsecutiveSpace(umm amount) {
-		ASSERT(amount <= blockSize, "reserving this amount of consecutive space is impossible");
+		ASSERT(amount <= blockCapacity, "reserving this amount of consecutive space is impossible");
 		if (last->availableSpace() < amount) {
 			if (last->next) {
 				last = last->next;
@@ -698,9 +860,9 @@ struct BlockList {
 	void stream(Fn &&fn) const {
 		auto block = &first;
 		do {
-			auto blockSize = block->size();
-			if (blockSize) {
-				fn(block->buffer, blockSize);
+			auto blockCapacity = block->size();
+			if (blockCapacity) {
+				fn(block->buffer, blockCapacity);
 			}
 			block = block->next;
 		} while (block);

@@ -88,7 +88,7 @@ void bind(Socket s, u16 port) {
    addr.sin_family = AF_INET;
    addr.sin_port = ::htons(port);
    addr.sin_addr.S_un.S_addr = INADDR_ANY;
-   ::bind((SOCKET)s, (SOCKADDR*)& addr, sizeof(addr));
+   ::bind((SOCKET)s, (SOCKADDR *)&addr, sizeof(addr));
 }
 
 void listen(Socket s) {

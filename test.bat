@@ -7,12 +7,14 @@ pushd %bindir%
 set task=main_sse
 call:doTask
 if %errorlevel% neq 0 goto fail
-set task=main_avx
-call:doTask
-if %errorlevel% neq 0 goto fail
-set task=main_avx2
-call:doTask
-if %errorlevel% neq 0 goto fail
+
+::set task=main_avx
+::call:doTask
+::if %errorlevel% neq 0 goto fail
+
+::set task=main_avx2
+::call:doTask
+::if %errorlevel% neq 0 goto fail
 
 goto success
 
