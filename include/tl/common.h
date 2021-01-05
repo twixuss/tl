@@ -341,6 +341,10 @@ struct Span {
 	constexpr bool empty() const { return _begin == _end; }
 
 	constexpr operator Span<T const>() const { return {_begin, _end}; }
+	
+	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(T)}; }
+	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(T)}; }
+	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(T)}; } // Yes, there are three one-byte types
 
 	constexpr bool operator==(Span<T> that) const { return _begin == that._begin && _end == that._end; }
 
@@ -350,6 +354,8 @@ struct Span {
 
 template <class T> constexpr Span<u8> toBytes(Span<T> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
 template <class T> constexpr Span<u8 const> toBytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<char> toChars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<char const> toChars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
 
 template <class T>
 constexpr umm countof(Span<T const> span) { return span.size(); }
@@ -544,10 +550,35 @@ inline constexpr bool endsWithCI(wchar const *str, wchar const *subStr) {
 	return true;
 }
 
+inline constexpr void setToLowerCase(Span<char> span) {
+	for (auto &c : span) {
+		c = toLower(c);
+	}
+}
 inline constexpr void setToLowerCase(Span<wchar> span) {
 	for (auto &c : span) {
 		c = toLower(c);
 	}
+}
+
+template <class T, class Compare>
+inline constexpr bool isAnyOf(T &value, Span<T> span, Compare &&compare) {
+	for (auto &c : span) {
+		if (compare(value, c)) {
+			return true;
+		}
+	}
+	return false;
+}
+template <class T>
+inline constexpr bool isAnyOf(T &value, Span<T> span) {
+	return isAnyOf(value, span, [](T &a, T &b) { return a == b; });
+}
+
+inline constexpr Span<char> skipChars(Span<char> span, Span<char> charsToSkip) {
+	while (isAnyOf(span.front(), charsToSkip))
+		++span._begin;
+	return span;
 }
 
 template <class CopyFn, class Char>

@@ -27,6 +27,8 @@ TL_API void read(File file, void *data, u64 size);
 TL_API void write(File file, void const *data, u64 size);
 TL_API void truncateToCursor(File file);
 TL_API void close(File file);
+TL_API bool fileExists(char const *path);
+TL_API bool fileExists(wchar const *path);
 
 inline s64 length(File file) {
 	auto oldCursor = getCursor(file);
@@ -104,7 +106,19 @@ inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
 inline bool writeEntireFile(char  const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
 inline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
 
+}
+
 #ifdef TL_IMPL
+
+#pragma push_macro("OS_WINDOWS")
+#pragma warning(push, 0)
+#include <Shlwapi.h>
+#pragma warning(pop)
+#pragma pop_macro("OS_WINDOWS")
+
+#pragma comment(lib, "shlwapi")
+
+namespace TL {
 
 #if OS_WINDOWS
 struct FileParams {
@@ -204,9 +218,18 @@ void truncateToCursor(File file) {
 void close(File file) {
 	CloseHandle((HANDLE)file);
 }
+
+bool fileExists(char const *path) {
+	return PathFileExistsA(path);
+}
+bool fileExists(wchar const *path) {
+	return PathFileExistsW(path);
+}
+
 #else
 	XXX;
 #endif
-#endif
 
 }
+
+#endif
