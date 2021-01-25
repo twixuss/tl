@@ -18,6 +18,15 @@ enum FileCursor {
 
 TL_DECLARE_HANDLE(File);
 
+struct FileTracker {
+	char const *path;
+	u64 last_write_time; // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+
+	Allocator allocator;
+	void (*on_update)(FileTracker &tracker, void *state);
+	void *on_update_state;
+};
+
 TL_API File openFile(char const *path, u32 openFlags);
 TL_API File openFile(wchar const *path, u32 openFlags);
 TL_API void setCursor(File file, s64 offset, FileCursor origin);
@@ -29,10 +38,53 @@ TL_API void truncateToCursor(File file);
 TL_API void close(File file);
 TL_API bool fileExists(char const *path);
 TL_API bool fileExists(wchar const *path);
+TL_API u64 get_file_write_time(char const *path);
+TL_API List<String<char>> get_files_in_directory(char const *directory);
+
+inline void update_file_tracker(FileTracker &tracker) {
+	u64 last_write_time = get_file_write_time(tracker.path);
+	if (last_write_time > tracker.last_write_time) {
+		tracker.last_write_time = last_write_time;
+		tracker.on_update(tracker, tracker.on_update_state);
+	}
+}
+
+inline FileTracker create_file_tracker(char const *path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+	FileTracker result = {};
+	result.on_update = on_update;
+	result.on_update_state = state;
+	result.path = path;
+	update_file_tracker(result);
+	return result;
+}
+inline FileTracker create_file_tracker(char const *path, void (*on_update)(FileTracker &tracker)) {
+	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
+}
+template <class Fn>
+inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
+	auto allocator = get_allocator();
+
+	auto params = allocator.allocate<Fn>();
+	new(params) Fn(std::forward<Fn>(on_update));
+
+	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
+		Fn &fn = *(Fn *)state;
+		fn(tracker);
+	}, params);
+	result.allocator = allocator;
+	return result;
+}
+
+inline void free_file_tracker(FileTracker &tracker) {
+	if (tracker.allocator) {
+		tracker.allocator.free(tracker.on_update_state);
+	}
+	tracker = {};
+}
 
 inline s64 length(File file) {
 	auto oldCursor = getCursor(file);
-	DEFER { setCursor(file, oldCursor, File_begin); };
+	defer { setCursor(file, oldCursor, File_begin); };
 	setCursor(file, 0, File_end);
 	return getCursor(file);
 }
@@ -47,9 +99,9 @@ inline void writeString(File file, T const &value) {
 }
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(File file, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(File file, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	auto oldCursor = getCursor(file);
-	DEFER { setCursor(file, oldCursor, File_begin); };
+	defer { setCursor(file, oldCursor, File_begin); };
 
 	setCursor(file, 0, File_end);
 	auto size = (umm)getCursor(file);
@@ -61,21 +113,21 @@ inline Buffer<Allocator> readEntireFile(File file, umm extraPreSpace = 0, umm ex
 	return {data, size + extraPreSpace + extraPostSpace};
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(char const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(char const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	File file = openFile(path, File_read);
 	if (file) {
-		DEFER { close(file); };
-		return readEntireFile<Allocator>(file, extraPreSpace, extraPostSpace);
+		defer { close(file); };
+		return read_entire_file<Allocator>(file, extraPreSpace, extraPostSpace);
 	} else {
 		return {};
 	}
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> readEntireFile(wchar const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(wchar const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
 	File file = openFile(path, File_read);
 	if (file) {
-		DEFER { close(file); };
-		return readEntireFile<Allocator>(file, extraPreSpace, extraPostSpace);
+		defer { close(file); };
+		return read_entire_file<Allocator>(file, extraPreSpace, extraPostSpace);
 	} else {
 		return {};
 	}
@@ -121,13 +173,13 @@ inline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return wri
 namespace TL {
 
 #if OS_WINDOWS
-struct FileParams {
+struct OpenFileParams {
 	DWORD access;
 	DWORD share;
 	DWORD creation;
 };
-FileParams getFileParams(u32 openFlags) {
-	FileParams result;
+OpenFileParams getOpenFileParams(u32 openFlags) {
+	OpenFileParams result;
 	if ((openFlags & File_read) && (openFlags & File_write)) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
 		result.share = 0;
@@ -148,7 +200,7 @@ FileParams getFileParams(u32 openFlags) {
 	return result;
 }
 File openFile(char const *path, u32 openFlags) {
-	auto params = getFileParams(openFlags);
+	auto params = getOpenFileParams(openFlags);
 	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
@@ -159,7 +211,7 @@ File openFile(char const *path, u32 openFlags) {
 	return (File)handle;
 }
 File openFile(wchar const *path, u32 openFlags) {
-	auto params = getFileParams(openFlags);
+	auto params = getOpenFileParams(openFlags);
 	auto handle = CreateFileW(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
 		CloseHandle(handle);
@@ -224,6 +276,54 @@ bool fileExists(char const *path) {
 }
 bool fileExists(wchar const *path) {
 	return PathFileExistsW(path);
+}
+u64 get_file_write_time(char const *path) {
+	HANDLE file = CreateFileA(path, 0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+	if (file == INVALID_HANDLE_VALUE)
+		return 0;
+	
+	defer { CloseHandle(file); };
+
+	FILETIME last_write_time;
+	if (!GetFileTime(file, 0, 0, &last_write_time))
+		return 0;
+
+	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
+}
+List<String<char>> get_files_in_directory(char const *directory) {
+	auto directory_len = length(directory);
+	auto allocator = get_allocator();
+	char *directory_with_star;
+	if (directory[directory_len - 1] == '\\' || directory[directory_len - 1] == '/') {
+		directory_with_star = allocator.allocate<char>(directory_len + 2);
+		memcpy(directory_with_star, directory, directory_len);
+		directory_with_star[directory_len + 0] = '*';
+		directory_with_star[directory_len + 1] = 0;
+	} else {
+		directory_with_star = allocator.allocate<char>(directory_len + 3);
+		memcpy(directory_with_star, directory, directory_len);
+		directory_with_star[directory_len + 0] = '/';
+		directory_with_star[directory_len + 1] = '*';
+		directory_with_star[directory_len + 2] = 0;
+	}
+	defer { allocator.free(directory_with_star); };
+
+	WIN32_FIND_DATA find_data;
+	HANDLE handle = FindFirstFileA(directory_with_star, &find_data);
+    if (handle == INVALID_HANDLE_VALUE) {
+		return {};
+	}
+
+	u32 file_index = 0;
+	List<String<char>> result;
+    do {
+		if (file_index++ < 2) {
+			continue; // Skip . and ..
+		}
+        result += find_data.cFileName;
+    } while (FindNextFileA(handle, &find_data));
+    FindClose(handle);
+	return result;
 }
 
 #else

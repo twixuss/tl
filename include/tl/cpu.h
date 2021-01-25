@@ -122,7 +122,7 @@ struct CpuInfo {
 	}
 	u32 totalCacheSize(CpuCacheLevel level) const {
 		u32 index = (u32)level;
-		ASSERT(index < countof(cache));
+		assert(index < countof(cache));
 		u32 result = 0;
 		for (auto &c : cache[index]) {
 			result += c.size;
@@ -134,7 +134,7 @@ struct CpuInfo {
 
 TL_API char const *toString(CpuFeature);
 TL_API char const *toString(CpuVendor);
-TL_API CpuInfo getCpuInfo();
+TL_API CpuInfo get_cpu_info();
 
 #ifdef TL_IMPL
 #if OS_WINDOWS
@@ -157,22 +157,22 @@ CpuidRegisters cpuid(s32 func, s32 subfunc) {
 	return result;
 }
 
-CpuInfo getCpuInfo() {
+CpuInfo get_cpu_info() {
 	CpuInfo result = {};
 
 	DWORD processorInfoLength = 0;
 	if (!GetLogicalProcessorInformation(0, &processorInfoLength)) {
 		DWORD err = GetLastError();
-		ASSERT(err == ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
+		assert(err == ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
 	}
 
 	auto buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION *)malloc(processorInfoLength);
-	DEFER { free(buffer); };
+	defer { free(buffer); };
 
 	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
 		INVALID_CODE_PATH("GetLogicalProcessorInformation: %u", GetLastError());
 
-	ASSERT(processorInfoLength % sizeof(buffer[0]) == 0);
+	assert(processorInfoLength % sizeof(buffer[0]) == 0);
 
 	
 	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {

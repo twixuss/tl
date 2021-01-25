@@ -70,20 +70,20 @@ struct Optional : Conditional<std::is_trivially_destructible_v<T>,
 		new (std::addressof(_value)) T(std::forward<Args>(args)...);
 		_hasValue = true;
 	}
-	T &value() & { ASSERT(_hasValue); return _value; }
-	T &&value() && { ASSERT(_hasValue); return _value; }
-	T const &value() const & { ASSERT(_hasValue); return std::move(_value); }
-	T const &&value() const && { ASSERT(_hasValue); return std::move(_value); }
+	T &value() & { assert(_hasValue); return _value; }
+	T &&value() && { assert(_hasValue); return _value; }
+	T const &value() const & { assert(_hasValue); return std::move(_value); }
+	T const &&value() const && { assert(_hasValue); return std::move(_value); }
 	T *operator->() { return std::addressof(_value); }
 	T const *operator->() const { return std::addressof(_value); }
 
 	operator bool() const { return _hasValue; }
 	bool has_value() const { return _hasValue; }
 
-	T &operator*() & { ASSERT(_hasValue); return _value; }
-	T &&operator*() && { ASSERT(_hasValue); return std::move(_value); }
-	T const &operator*() const & { ASSERT(_hasValue); return _value; }
-	T const &&operator*() const && { ASSERT(_hasValue); return std::move(_value); }
+	T &operator*() & { assert(_hasValue); return _value; }
+	T &&operator*() && { assert(_hasValue); return std::move(_value); }
+	T const &operator*() const & { assert(_hasValue); return _value; }
+	T const &&operator*() const && { assert(_hasValue); return std::move(_value); }
 
 	union {
 		T _value;

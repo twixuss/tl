@@ -1,8 +1,6 @@
 #pragma once
 #include "system.h"
-#ifdef TL_WIN32_USE_MATH
 #include "math.h"
-#endif
 #if OS_WINDOWS
 #include "common.h"
 #define WIN32_LEAN_AND_MEAN
@@ -15,20 +13,24 @@ namespace TL {
 enum RawInputDevice {
 	RawInput_mouse = 0x1,
 };
-TL_API bool registerRawInput(RawInputDevice deviceFlags);
+TL_API bool init_rawinput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
 TL_API s64 getPerformanceFrequency();
-TL_API s64 getPerformanceCounter();
+TL_API s64 get_performance_counter();
 TL_API bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
 TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
-#ifdef TL_WIN32_USE_MATH
 TL_API v2u getWindowSize(v2u clientSize, DWORD style, bool menu = false);
-#endif
+TL_API void hide_cursor();
+TL_API void show_cursor();
+TL_API void set_cursor_position(s32 x, s32 y);
+inline void set_cursor_position(v2s position) {
+	set_cursor_position(position.x, position.y);
+}
 
 #ifdef TL_IMPL
-bool registerRawInput(RawInputDevice deviceFlags) {
+bool init_rawinput(RawInputDevice deviceFlags) {
 	StaticList<RAWINPUTDEVICE, 1> devices;
 	if (deviceFlags & RawInput_mouse) {
 		RAWINPUTDEVICE mouse = {};
@@ -106,7 +108,7 @@ s64 getPerformanceFrequency() {
 	QueryPerformanceFrequency(&frequency);
 	return frequency.QuadPart;
 }
-s64 getPerformanceCounter() {
+s64 get_performance_counter() {
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
 	return counter.QuadPart;
@@ -143,7 +145,7 @@ void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor) {
 	}
 
 	if (Width == 0)
-		DEBUG_BREAK;
+		debug_break();
 
     if (X > monitorWidth - Width) X = monitorWidth - Width;
     if (Y > monitorHeight - Height) Y = monitorHeight - Height;
@@ -186,7 +188,6 @@ bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURS
 	c.style = style;
 	return RegisterClassExA(&c) != 0;
 }
-#ifdef TL_WIN32_USE_MATH
 v2u getWindowSize(v2u clientSize, DWORD style, bool menu) {
 	RECT r = {0, 0, (LONG)clientSize.x, (LONG)clientSize.y};
 	AdjustWindowRect(&r, style, menu);
@@ -195,7 +196,15 @@ v2u getWindowSize(v2u clientSize, DWORD style, bool menu) {
 		(u32)(r.bottom - r.top)
 	};
 }
-#endif
+void hide_cursor() {
+	while (ShowCursor(false) >= 0) {}
+}
+void show_cursor() {
+	while (ShowCursor(true) < 0) {}
+}
+void set_cursor_position(s32 x, s32 y) {
+	SetCursorPos(x, y);
+}
 #endif
 
 }

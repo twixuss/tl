@@ -1,9 +1,10 @@
 #include "../include/tl/tl.h"
+#include "../include/tl/math_random.h"
 using namespace TL;
 
-#include "math.cpp"
 
 #pragma warning(push, 0)
+#include "math.cpp"
 #include <stdio.h>
 #include <assert.h>
 #include <excpt.h>
@@ -14,7 +15,6 @@ using namespace TL;
 #include <chrono>
 #include <thread>
 #include <typeinfo>
-#pragma warning(pop)
 
 void string_test() {
 	printf("%s ... ", "string_test");
@@ -22,8 +22,8 @@ void string_test() {
 	char const *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
 	builder.append(str);
 	auto result = builder.get();
-	ASSERT(result.size() == strlen(str));
-	ASSERT(memcmp(result.data(), str, result.size()) == 0);
+	assert(result.size() == strlen(str));
+	assert(memcmp(result.data(), str, result.size()) == 0);
 
 	puts("ok");
 }
@@ -136,7 +136,7 @@ void mergeSort(Span<T> span, Allocator al = osAllocator) {
 		al.allocate<T>(span.size()),
 		span.size()
 	};
-	DEFER { al.deallocate(temp.data()); }
+	defer { al.deallocate(temp.data()); }
 
 	Span<T> *src = &span;
 	Span<T> *dst = &temp;
@@ -250,7 +250,7 @@ struct Timer {
 	}
 };
 
-#define TIMER(name) Timer CONCAT(_timer_, __LINE__)(name, &origList); DEFER { CONCAT(_timer_, __LINE__).thread.join(); }; CONCAT(_timer_, __LINE__) += [&](auto &list)
+#define TIMER(name) Timer CONCAT(_timer_, __LINE__)(name, &origList); defer { CONCAT(_timer_, __LINE__).thread.join(); }; CONCAT(_timer_, __LINE__) += [&](auto &list)
 
 void sort_test() {
 	List<u32> origList;
@@ -268,7 +268,7 @@ void sort_test() {
 		list = origList;				      \
 		name(list);                           \
 		for (u32 i = 0; i < list.size(); ++i) \
-			ASSERT(list[i] == i * scale);	  \
+			assert(list[i] == i * scale);	  \
 		puts("ok");                           \
 	}										  \
 
@@ -294,65 +294,69 @@ void sort_perf() {
 void buffer_test() {
 	{
 		CircularBuffer<char> buffer(8);
-		ASSERT(buffer.empty());
+		assert(buffer.empty());
 
 		buffer.push_back('a');
 		buffer.push_back('b');
 		buffer.push_back('c');
 		buffer.push_back('d');
 	
-		ASSERT(!buffer.empty());
-		ASSERT(!buffer.full());
-		ASSERT(memequ(buffer._allocBegin, "abcd", 4));
-		ASSERT(buffer.back() == 'd');
-		ASSERT(buffer.front() == 'a');
+		assert(!buffer.empty());
+		assert(!buffer.full());
+		assert(memequ(buffer._allocBegin, "abcd", 4));
+		assert(buffer.back() == 'd');
+		assert(buffer.front() == 'a');
 
 		buffer.push_front('e');
 		buffer.push_front('f');
 		buffer.push_front('g');
 		buffer.push_front('h');
 	
-		ASSERT(!buffer.empty());
-		ASSERT(buffer.full());
-		ASSERT(memequ(buffer._allocBegin, "abcdhgfe", 8));
-		ASSERT(buffer.back() == 'd');
-		ASSERT(buffer.front() == 'h');
+		assert(!buffer.empty());
+		assert(buffer.full());
+		assert(memequ(buffer._allocBegin, "abcdhgfe", 8));
+		assert(buffer.back() == 'd');
+		assert(buffer.front() == 'h');
 
 		buffer.erase(buffer.begin());
-		ASSERT(buffer.size() == 7);
-		ASSERT(buffer.front() == 'g');
+		assert(buffer.size() == 7);
+		assert(buffer.front() == 'g');
 
 		buffer.erase(buffer.end() - 1);
-		ASSERT(buffer.size() == 6);
-		ASSERT(buffer.back() == 'c');
+		assert(buffer.size() == 6);
+		assert(buffer.back() == 'c');
 	}
 	{
 		CircularBuffer<char> buffer;
 
 		buffer.push_back('a');
-		ASSERT(buffer.capacity() == 1);
-		ASSERT(memequ(buffer._allocBegin, "a", 1));
+		assert(buffer.capacity() == 1);
+		assert(memequ(buffer._allocBegin, "a", 1));
 
 		buffer.push_back('b');
-		ASSERT(buffer.capacity() == 2);
-		ASSERT(memequ(buffer._allocBegin, "ab", 2));
+		assert(buffer.capacity() == 2);
+		assert(memequ(buffer._allocBegin, "ab", 2));
 
 		buffer.push_back('c');
-		ASSERT(buffer.capacity() == 4);
-		ASSERT(memequ(buffer._allocBegin, "abc", 3));
+		assert(buffer.capacity() == 4);
+		assert(memequ(buffer._allocBegin, "abc", 3));
 
 		buffer.push_front('d');
-		ASSERT(buffer.capacity() == 4);
-		ASSERT(memequ(buffer._allocBegin, "abcd", 4));
+		assert(buffer.capacity() == 4);
+		assert(memequ(buffer._allocBegin, "abcd", 4));
 
 		buffer.push_front('e');
-		ASSERT(buffer.capacity() == 8);
-		ASSERT(memequ(buffer._allocBegin, "dabc", 4));
-		ASSERT(buffer._allocBegin[7] == 'e');
+		assert(buffer.capacity() == 8);
+		assert(memequ(buffer._allocBegin, "dabc", 4));
+		assert(buffer._allocBegin[7] == 'e');
 	}
 }
 
+f32 result__;
+
 int main() {
+	result__ = voronoi(v2f{.1f, .2f});
+
 	buffer_test();
 	sort_test();
 	//sort_perf();
@@ -361,3 +365,4 @@ int main() {
 
 	math_test();
 }
+#pragma warning(pop)

@@ -268,6 +268,9 @@ _mm_setr_epi32(                                                  \
 #define MM256_PERM128(a, b) ((a) | ((b) << 4))
 #define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
 
+#define TL_MM_FLOOR _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC
+#define TL_MM_CEIL  _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC
+
 #if ARCH_AVX2
 #else
 #endif
@@ -276,9 +279,9 @@ union M16 {
 	__m128  ps;
 	__m128i pi;
 	__m128d pd;
-	FORCEINLINE constexpr M16 &operator=(__m128  ps) { this->ps = ps; return *this; }
-	FORCEINLINE constexpr M16 &operator=(__m128i pi) { this->pi = pi; return *this; }
-	FORCEINLINE constexpr M16 &operator=(__m128d pd) { this->pd = pd; return *this; }
+	forceinline constexpr M16 &operator=(__m128  ps) { this->ps = ps; return *this; }
+	forceinline constexpr M16 &operator=(__m128i pi) { this->pi = pi; return *this; }
+	forceinline constexpr M16 &operator=(__m128d pd) { this->pd = pd; return *this; }
 };
 
 #if ARCH_AVX
@@ -286,9 +289,9 @@ union M32 {
 	__m256  ps;
 	__m256i pi;
 	__m256d pd;
-	FORCEINLINE constexpr M32 &operator=(__m256  ps) { this->ps = ps; return *this; }
-	FORCEINLINE constexpr M32 &operator=(__m256i pi) { this->pi = pi; return *this; }
-	FORCEINLINE constexpr M32 &operator=(__m256d pd) { this->pd = pd; return *this; }
+	forceinline constexpr M32 &operator=(__m256  ps) { this->ps = ps; return *this; }
+	forceinline constexpr M32 &operator=(__m256i pi) { this->pi = pi; return *this; }
+	forceinline constexpr M32 &operator=(__m256d pd) { this->pd = pd; return *this; }
 };
 #else
 union M32 {
@@ -301,9 +304,9 @@ union M64 {
 	__m512  ps;
 	__m512i pi;
 	__m512d pd;
-	FORCEINLINE constexpr M64 &operator=(__m512  ps) { this->ps = ps; return *this; }
-	FORCEINLINE constexpr M64 &operator=(__m512i pi) { this->pi = pi; return *this; }
-	FORCEINLINE constexpr M64 &operator=(__m512d pd) { this->pd = pd; return *this; }
+	forceinline constexpr M64 &operator=(__m512  ps) { this->ps = ps; return *this; }
+	forceinline constexpr M64 &operator=(__m512i pi) { this->pi = pi; return *this; }
+	forceinline constexpr M64 &operator=(__m512d pd) { this->pd = pd; return *this; }
 };
 #else
 union M64 {
@@ -323,24 +326,37 @@ static constexpr u32 simdWidth = 16;
 // clang-format off
 
 constexpr f32 pi    = f32(3.1415926535897932384626433832795L);
+constexpr f32 tau   = f32(6.283185307179586476925286766559L);
 constexpr f32 invPi = f32(0.31830988618379067153776752674503L);
 constexpr f32 sqrt2 = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3 = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
 
-template <class T> FORCEINLINE constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
-template <class T> FORCEINLINE constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-template <class T, class SN, class SX, class DN, class DX> FORCEINLINE constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
-template <class T, class U, class V> FORCEINLINE constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
-template <class A, class B, class T> FORCEINLINE constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
-template <class M, class T> FORCEINLINE T &maskAssign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
-template <class T> FORCEINLINE constexpr auto pow2(T v) { return v * v; }
-template <class T> FORCEINLINE constexpr auto pow3(T v) { return v * v * v; }
-template <class T> FORCEINLINE constexpr auto pow4(T v) { return pow2(v * v); }
+template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
+template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
+template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
+template <class A, class B, class T> forceinline constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
+template <class M, class T> forceinline T &maskAssign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
+template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
+template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
+template <class T> forceinline constexpr auto pow4(T v) { return pow2(v * v); }
 // clang-format on
 
 template <class T>
-FORCEINLINE constexpr T easeInOut2(T t) {
+inline constexpr T smooth_min(T a, T b, f32 k) {
+	f32 h = max(0, min(1, (b - a) / k + .5f));
+	f32 m = h * (1 - h) * k;
+	return lerp(b, a, h) - m * .5f; 
+}
+
+template <class T>
+inline constexpr T smooth_max(T a, T b, f32 k) {
+	return smooth_min(a, b, -k); 
+}
+
+template <class T>
+forceinline constexpr T easeInOut2(T t) {
 	if (t < 0.5f) return 0.5f * pow2(2 * t);
 	else      return 1 - 0.5f * pow2(2 - 2 * t);
 	//return lerp(pow2(t), 1 - pow2(1 - t), t);
@@ -349,7 +365,7 @@ FORCEINLINE constexpr T easeInOut2(T t) {
 namespace CE {
 
 template <class To, class From>
-FORCEINLINE constexpr To cvt(From v) {
+forceinline constexpr To cvt(From v) {
 	return (To)v;
 }
 
@@ -491,25 +507,25 @@ template <umm width> struct HalfT<v4sx<width>> { using Type = v4sx<width/2>; };
 template <umm width> struct HalfT<v4ux<width>> { using Type = v4ux<width/2>; };
 template <class T> using Half = typename HalfT<T>::Type;
 
-FORCEINLINE constexpr b32x1 B32x1(b32 = 0);
-FORCEINLINE constexpr b64x1 B64x1(b64 = 0);
+forceinline constexpr b32x1 B32x1(b32 = 0);
+forceinline constexpr b64x1 B64x1(b64 = 0);
 
-template<umm width> FORCEINLINE b32x<width> B32x(b32 = 0);
-template<umm width> FORCEINLINE f32x<width> F32x(f32 = 0);
-template<umm width> FORCEINLINE s32x<width> S32x(s32 = 0);
-template<umm width> FORCEINLINE u32x<width> U32x(u32 = 0);
+template<umm width> forceinline b32x<width> B32x(b32 = 0);
+template<umm width> forceinline f32x<width> F32x(f32 = 0);
+template<umm width> forceinline s32x<width> S32x(s32 = 0);
+template<umm width> forceinline u32x<width> U32x(u32 = 0);
 
-FORCEINLINE b64x2 B64x2(b32 = 0);
+forceinline b64x2 B64x2(b32 = 0);
 
-FORCEINLINE b32x4 B32x4(b32 = 0);
-FORCEINLINE b64x4 B64x4(b32 = 0);
+forceinline b32x4 B32x4(b32 = 0);
+forceinline b64x4 B64x4(b32 = 0);
 
-FORCEINLINE b32x8 B32x8(b32 = 0);
+forceinline b32x8 B32x8(b32 = 0);
 
-#define Cx1(scl, con) FORCEINLINE constexpr scl##x1 con##x1(scl = 0)
-#define Cx2(scl, con) FORCEINLINE scl##x2 con##x2(scl = 0); FORCEINLINE scl##x2 con##x2(scl, scl)
-#define Cx4(scl, con) FORCEINLINE scl##x4 con##x4(scl = 0); FORCEINLINE scl##x4 con##x4(scl, scl, scl, scl); FORCEINLINE scl##x4 con##x4(scl##x2, scl##x2)
-#define Cx8(scl, con) FORCEINLINE scl##x8 con##x8(scl = 0); FORCEINLINE scl##x8 con##x8(scl, scl, scl, scl, scl, scl, scl, scl); FORCEINLINE scl##x8 con##x8(scl##x4, scl##x4)
+#define Cx1(scl, con) forceinline constexpr scl##x1 con##x1(scl = 0)
+#define Cx2(scl, con) forceinline scl##x2 con##x2(scl = 0); forceinline scl##x2 con##x2(scl, scl)
+#define Cx4(scl, con) forceinline scl##x4 con##x4(scl = 0); forceinline scl##x4 con##x4(scl, scl, scl, scl); forceinline scl##x4 con##x4(scl##x2, scl##x2)
+#define Cx8(scl, con) forceinline scl##x8 con##x8(scl = 0); forceinline scl##x8 con##x8(scl, scl, scl, scl, scl, scl, scl, scl); forceinline scl##x8 con##x8(scl##x4, scl##x4)
 #define Cons(scl, con) Cx1(scl, con); Cx2(scl, con); Cx4(scl, con); Cx8(scl, con)
 
 Cons(f32, F32);
@@ -526,152 +542,152 @@ Cons(u64, U64);
 #undef Cons
 
 #define ConV2\
-	FORCEINLINE constexpr v2f V2f(f32 = 0);\
-	FORCEINLINE constexpr v2f V2f(f32 x, f32 y);\
-	FORCEINLINE v2fx4 V2fx4(f32 = 0); FORCEINLINE constexpr v2fx4 V2fx4(f32x4);\
-	FORCEINLINE v2fx8 V2fx8(f32 = 0); FORCEINLINE constexpr v2fx8 V2fx8(f32x8 v);\
-	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32 = 0);\
-	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32, f32);\
-	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>);\
-	template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>, f32x<ps>);\
-	template<umm ps> FORCEINLINE v2fx<ps> V2fx(v2f);
+	forceinline constexpr v2f V2f(f32 = 0);\
+	forceinline constexpr v2f V2f(f32 x, f32 y);\
+	forceinline v2fx4 V2fx4(f32 = 0); forceinline constexpr v2fx4 V2fx4(f32x4);\
+	forceinline v2fx8 V2fx8(f32 = 0); forceinline constexpr v2fx8 V2fx8(f32x8 v);\
+	template<umm ps> forceinline v2fx<ps> V2fx(f32 = 0);\
+	template<umm ps> forceinline v2fx<ps> V2fx(f32, f32);\
+	template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>);\
+	template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>, f32x<ps>);\
+	template<umm ps> forceinline v2fx<ps> V2fx(v2f);
 
-FORCEINLINE constexpr v2f V2f(f32 = 0);
-FORCEINLINE constexpr v2s V2s(s32 = 0);
-FORCEINLINE constexpr v2u V2u(u32 = 0);
+forceinline constexpr v2f V2f(f32 = 0);
+forceinline constexpr v2s V2s(s32 = 0);
+forceinline constexpr v2u V2u(u32 = 0);
 
-FORCEINLINE constexpr v3f V3f(f32 = 0);
-FORCEINLINE constexpr v3s V3s(s32 = 0);
-FORCEINLINE constexpr v3u V3u(u32 = 0);
+forceinline constexpr v3f V3f(f32 = 0);
+forceinline constexpr v3s V3s(s32 = 0);
+forceinline constexpr v3u V3u(u32 = 0);
 
-FORCEINLINE constexpr v4f V4f(f32 = 0);
-FORCEINLINE constexpr v4s V4s(s32 = 0);
-FORCEINLINE constexpr v4u V4u(u32 = 0);
+forceinline constexpr v4f V4f(f32 = 0);
+forceinline constexpr v4s V4s(s32 = 0);
+forceinline constexpr v4u V4u(u32 = 0);
 
-template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32 = 0);
-template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32 = 0);
-template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32 = 0);
-template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32 = 0);
-template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32 = 0);
-template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32 = 0);
-template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32 = 0);
-template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32 = 0);
-template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32 = 0);
+template<umm ps> forceinline v2fx<ps> V2fx(f32 = 0);
+template<umm ps> forceinline v2sx<ps> V2sx(s32 = 0);
+template<umm ps> forceinline v2ux<ps> V2ux(u32 = 0);
+template<umm ps> forceinline v3fx<ps> V3fx(f32 = 0);
+template<umm ps> forceinline v3sx<ps> V3sx(s32 = 0);
+template<umm ps> forceinline v3ux<ps> V3ux(u32 = 0);
+template<umm ps> forceinline v4fx<ps> V4fx(f32 = 0);
+template<umm ps> forceinline v4sx<ps> V4sx(s32 = 0);
+template<umm ps> forceinline v4ux<ps> V4ux(u32 = 0);
 
-template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32, f32);
-template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32, s32);
-template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32, u32);
-template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32, f32, f32);
-template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32, s32, s32);
-template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32, u32, u32);
-template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32, f32, f32, f32);
-template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32, s32, s32, s32);
-template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32, u32, u32, u32);
+template<umm ps> forceinline v2fx<ps> V2fx(f32, f32);
+template<umm ps> forceinline v2sx<ps> V2sx(s32, s32);
+template<umm ps> forceinline v2ux<ps> V2ux(u32, u32);
+template<umm ps> forceinline v3fx<ps> V3fx(f32, f32, f32);
+template<umm ps> forceinline v3sx<ps> V3sx(s32, s32, s32);
+template<umm ps> forceinline v3ux<ps> V3ux(u32, u32, u32);
+template<umm ps> forceinline v4fx<ps> V4fx(f32, f32, f32, f32);
+template<umm ps> forceinline v4sx<ps> V4sx(s32, s32, s32, s32);
+template<umm ps> forceinline v4ux<ps> V4ux(u32, u32, u32, u32);
 
-template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>);
-template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32x<ps>);
-template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32x<ps>);
-template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32x<ps>);
-template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32x<ps>);
-template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32x<ps>);
-template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32x<ps>);
-template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32x<ps>);
-template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32x<ps>);
+template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>);
+template<umm ps> forceinline v2sx<ps> V2sx(s32x<ps>);
+template<umm ps> forceinline v2ux<ps> V2ux(u32x<ps>);
+template<umm ps> forceinline v3fx<ps> V3fx(f32x<ps>);
+template<umm ps> forceinline v3sx<ps> V3sx(s32x<ps>);
+template<umm ps> forceinline v3ux<ps> V3ux(u32x<ps>);
+template<umm ps> forceinline v4fx<ps> V4fx(f32x<ps>);
+template<umm ps> forceinline v4sx<ps> V4sx(s32x<ps>);
+template<umm ps> forceinline v4ux<ps> V4ux(u32x<ps>);
 
-template<umm ps> FORCEINLINE v2fx<ps> V2fx(f32x<ps>, f32x<ps>);
-template<umm ps> FORCEINLINE v2sx<ps> V2sx(s32x<ps>, s32x<ps>);
-template<umm ps> FORCEINLINE v2ux<ps> V2ux(u32x<ps>, u32x<ps>);
-template<umm ps> FORCEINLINE v3fx<ps> V3fx(f32x<ps>, f32x<ps>, f32x<ps>);
-template<umm ps> FORCEINLINE v3sx<ps> V3sx(s32x<ps>, s32x<ps>, s32x<ps>);
-template<umm ps> FORCEINLINE v3ux<ps> V3ux(u32x<ps>, u32x<ps>, u32x<ps>);
-template<umm ps> FORCEINLINE v4fx<ps> V4fx(f32x<ps>, f32x<ps>, f32x<ps>, f32x<ps>);
-template<umm ps> FORCEINLINE v4sx<ps> V4sx(s32x<ps>, s32x<ps>, s32x<ps>, s32x<ps>);
-template<umm ps> FORCEINLINE v4ux<ps> V4ux(u32x<ps>, u32x<ps>, u32x<ps>, u32x<ps>);
+template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>, f32x<ps>);
+template<umm ps> forceinline v2sx<ps> V2sx(s32x<ps>, s32x<ps>);
+template<umm ps> forceinline v2ux<ps> V2ux(u32x<ps>, u32x<ps>);
+template<umm ps> forceinline v3fx<ps> V3fx(f32x<ps>, f32x<ps>, f32x<ps>);
+template<umm ps> forceinline v3sx<ps> V3sx(s32x<ps>, s32x<ps>, s32x<ps>);
+template<umm ps> forceinline v3ux<ps> V3ux(u32x<ps>, u32x<ps>, u32x<ps>);
+template<umm ps> forceinline v4fx<ps> V4fx(f32x<ps>, f32x<ps>, f32x<ps>, f32x<ps>);
+template<umm ps> forceinline v4sx<ps> V4sx(s32x<ps>, s32x<ps>, s32x<ps>, s32x<ps>);
+template<umm ps> forceinline v4ux<ps> V4ux(u32x<ps>, u32x<ps>, u32x<ps>, u32x<ps>);
 
-template<umm ps> FORCEINLINE v2fx<ps> V2fx(v2f);
-template<umm ps> FORCEINLINE v2sx<ps> V2sx(v2s);
-template<umm ps> FORCEINLINE v2ux<ps> V2ux(v2u);
-template<umm ps> FORCEINLINE v3fx<ps> V3fx(v3f);
-template<umm ps> FORCEINLINE v3sx<ps> V3sx(v3s);
-template<umm ps> FORCEINLINE v3ux<ps> V3ux(v3u);
-template<umm ps> FORCEINLINE v4fx<ps> V4fx(v4f);
-template<umm ps> FORCEINLINE v4sx<ps> V4sx(v4s);
-template<umm ps> FORCEINLINE v4ux<ps> V4ux(v4u);
+template<umm ps> forceinline v2fx<ps> V2fx(v2f);
+template<umm ps> forceinline v2sx<ps> V2sx(v2s);
+template<umm ps> forceinline v2ux<ps> V2ux(v2u);
+template<umm ps> forceinline v3fx<ps> V3fx(v3f);
+template<umm ps> forceinline v3sx<ps> V3sx(v3s);
+template<umm ps> forceinline v3ux<ps> V3ux(v3u);
+template<umm ps> forceinline v4fx<ps> V4fx(v4f);
+template<umm ps> forceinline v4sx<ps> V4sx(v4s);
+template<umm ps> forceinline v4ux<ps> V4ux(v4u);
 
-FORCEINLINE constexpr v2f V2f(f32 x, f32 y);
-FORCEINLINE constexpr v2s V2s(s32 x, s32 y);
-FORCEINLINE constexpr v2u V2u(u32 x, u32 y);
+forceinline constexpr v2f V2f(f32 x, f32 y);
+forceinline constexpr v2s V2s(s32 x, s32 y);
+forceinline constexpr v2u V2u(u32 x, u32 y);
 
-FORCEINLINE constexpr v3f V3f(f32 x, f32 y, f32 z);
-FORCEINLINE constexpr v3s V3s(s32 x, s32 y, s32 z);
-FORCEINLINE constexpr v3u V3u(u32 x, u32 y, u32 z);
+forceinline constexpr v3f V3f(f32 x, f32 y, f32 z);
+forceinline constexpr v3s V3s(s32 x, s32 y, s32 z);
+forceinline constexpr v3u V3u(u32 x, u32 y, u32 z);
 
-FORCEINLINE constexpr v4f V4f(f32x4);
-FORCEINLINE constexpr v4s V4s(s32x4);
-FORCEINLINE constexpr v4u V4u(u32x4);
+forceinline constexpr v4f V4f(f32x4);
+forceinline constexpr v4s V4s(s32x4);
+forceinline constexpr v4u V4u(u32x4);
 
-FORCEINLINE v2fx4 V2fx4(f32 = 0);
-FORCEINLINE v2sx4 V2sx4(s32 = 0);
-FORCEINLINE v2ux4 V2ux4(u32 = 0);
+forceinline v2fx4 V2fx4(f32 = 0);
+forceinline v2sx4 V2sx4(s32 = 0);
+forceinline v2ux4 V2ux4(u32 = 0);
 
-FORCEINLINE constexpr v2fx4 V2fx4(f32x4);
-FORCEINLINE constexpr v2sx4 V2sx4(s32x4);
-FORCEINLINE constexpr v2ux4 V2ux4(u32x4);
+forceinline constexpr v2fx4 V2fx4(f32x4);
+forceinline constexpr v2sx4 V2sx4(s32x4);
+forceinline constexpr v2ux4 V2ux4(u32x4);
 
-FORCEINLINE constexpr v3fx4 V3fx4(f32x4);
-FORCEINLINE constexpr v3sx4 V3sx4(s32x4);
-FORCEINLINE constexpr v3ux4 V3ux4(u32x4);
+forceinline constexpr v3fx4 V3fx4(f32x4);
+forceinline constexpr v3sx4 V3sx4(s32x4);
+forceinline constexpr v3ux4 V3ux4(u32x4);
 
-FORCEINLINE v3fx4 V3fx4(f32 v);
-FORCEINLINE v3sx4 V3sx4(s32 v);
-FORCEINLINE v3ux4 V3ux4(u32 v);
+forceinline v3fx4 V3fx4(f32 v);
+forceinline v3sx4 V3sx4(s32 v);
+forceinline v3ux4 V3ux4(u32 v);
 
-FORCEINLINE v2fx8 V2fx8(f32 v);
-FORCEINLINE v2sx8 V2sx8(s32 v);
-FORCEINLINE v2ux8 V2ux8(u32 v);
+forceinline v2fx8 V2fx8(f32 v);
+forceinline v2sx8 V2sx8(s32 v);
+forceinline v2ux8 V2ux8(u32 v);
 
-FORCEINLINE constexpr v2fx8 V2fx8(f32x8 v);
-FORCEINLINE constexpr v2sx8 V2sx8(s32x8 v);
-FORCEINLINE constexpr v2ux8 V2ux8(u32x8 v);
+forceinline constexpr v2fx8 V2fx8(f32x8 v);
+forceinline constexpr v2sx8 V2sx8(s32x8 v);
+forceinline constexpr v2ux8 V2ux8(u32x8 v);
 
-FORCEINLINE v3fx8 V3fx8(f32 v);
-FORCEINLINE v3sx8 V3sx8(s32 v);
-FORCEINLINE v3ux8 V3ux8(u32 v);
+forceinline v3fx8 V3fx8(f32 v);
+forceinline v3sx8 V3sx8(s32 v);
+forceinline v3ux8 V3ux8(u32 v);
 
-FORCEINLINE constexpr v3fx8 V3fx8(f32x8 v);
-FORCEINLINE constexpr v3sx8 V3sx8(s32x8 v);
-FORCEINLINE constexpr v3ux8 V3ux8(u32x8 v);
+forceinline constexpr v3fx8 V3fx8(f32x8 v);
+forceinline constexpr v3sx8 V3sx8(s32x8 v);
+forceinline constexpr v3ux8 V3ux8(u32x8 v);
 
-FORCEINLINE v4fx4 V4fx4(f32);
-FORCEINLINE v4sx4 V4sx4(s32);
-FORCEINLINE v4ux4 V4ux4(u32);
+forceinline v4fx4 V4fx4(f32);
+forceinline v4sx4 V4sx4(s32);
+forceinline v4ux4 V4ux4(u32);
 
-FORCEINLINE constexpr v4fx4 V4fx4(f32x4);
-FORCEINLINE constexpr v4sx4 V4sx4(s32x4);
-FORCEINLINE constexpr v4ux4 V4ux4(u32x4);
+forceinline constexpr v4fx4 V4fx4(f32x4);
+forceinline constexpr v4sx4 V4sx4(s32x4);
+forceinline constexpr v4ux4 V4ux4(u32x4);
 
-FORCEINLINE v4fx8 V4fx8(f32);
-FORCEINLINE v4sx8 V4sx8(s32);
-FORCEINLINE v4ux8 V4ux8(u32);
+forceinline v4fx8 V4fx8(f32);
+forceinline v4sx8 V4sx8(s32);
+forceinline v4ux8 V4ux8(u32);
 
-FORCEINLINE constexpr v4fx8 V4fx8(f32x8);
-FORCEINLINE constexpr v4sx8 V4sx8(s32x8);
-FORCEINLINE constexpr v4ux8 V4ux8(u32x8);
+forceinline constexpr v4fx8 V4fx8(f32x8);
+forceinline constexpr v4sx8 V4sx8(s32x8);
+forceinline constexpr v4ux8 V4ux8(u32x8);
 
-FORCEINLINE constexpr m4 M4();
-FORCEINLINE constexpr m4 M4(v4f i, v4f j, v4f k, v4f l);
-FORCEINLINE constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
+forceinline constexpr m4 M4();
+forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l);
+forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
 				f32 ly, f32 lz, f32 lw);
 
-FORCEINLINE void sincos(f32 v, f32& sinOut, f32& cosOut);
-FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut);
-FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut);
-FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
+forceinline void sincos(f32 v, f32& sinOut, f32& cosOut);
+forceinline void sincos(v2f v, v2f& sinOut, v2f& cosOut);
+forceinline void sincos(v3f v, v3f& sinOut, v3f& cosOut);
+forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 
-#define MOP(op, vec)			FORCEINLINE vec& operator op##=(vec b) { return *this = *this op b; }
-#define MOPS(op, vec, scl, con)	FORCEINLINE vec& operator op##=(scl b) { return *this op##= con(b); }
-#define OPS(op, vec, scl, con)	FORCEINLINE vec operator op(scl b) const { return *this op con(b); }
-#define SOP(op, vec, scl, con)	FORCEINLINE friend vec operator op(scl a, vec b) { return con(a) op b; }
+#define MOP(op, vec)			forceinline vec& operator op##=(vec b) { return *this = *this op b; }
+#define MOPS(op, vec, scl, con)	forceinline vec& operator op##=(scl b) { return *this op##= con(b); }
+#define OPS(op, vec, scl, con)	forceinline vec operator op(scl b) const { return *this op con(b); }
+#define SOP(op, vec, scl, con)	forceinline friend vec operator op(scl a, vec b) { return con(a) op b; }
 
 #define MEMFUNS_BASIC_SCL(vec, scl, con) \
 	SOP(+, vec, scl, con)                \
@@ -695,59 +711,59 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	MEMFUNS_BASIC_SCL(vec, scl, con)
 
 #define NEQ(vec) \
-	FORCEINLINE bool operator!=(vec b) const { return !(*this == b); }
+	forceinline bool operator!=(vec b) const { return !(*this == b); }
 
 #define MEMFUNS_DATA(scl)               \
-	FORCEINLINE constexpr scl* data() { return s; } \
-	FORCEINLINE constexpr scl const* data() const { return s; }
+	forceinline constexpr scl* data() { return s; } \
+	forceinline constexpr scl const* data() const { return s; }
 
 #define INDEX_S(scl)                                          \
-	FORCEINLINE constexpr scl operator[](umm i) const { return s[i]; } \
-	FORCEINLINE constexpr scl& operator[](umm i) { return s[i]; }
+	forceinline constexpr scl operator[](umm i) const { return s[i]; } \
+	forceinline constexpr scl& operator[](umm i) { return s[i]; }
 
 #define MEMFUNS_INT(vec, scl, con)                              \
-	FORCEINLINE vec& operator%=(vec b) { return *this = *this % b; }        \
-	FORCEINLINE vec& operator^=(vec b) { return *this = *this ^ b; }        \
-	FORCEINLINE vec& operator|=(vec b) { return *this = *this | b; }        \
-	FORCEINLINE vec& operator&=(vec b) { return *this = *this & b; }        \
-	FORCEINLINE vec& operator<<=(vec b) { return *this = *this << b; }      \
-	FORCEINLINE vec& operator>>=(vec b) { return *this = *this >> b; }      \
-	FORCEINLINE vec operator%(scl b) const { return *this % con(b); }       \
-	FORCEINLINE vec operator^(scl b) const { return *this ^ con(b); }       \
-	FORCEINLINE vec operator|(scl b) const { return *this | con(b); }       \
-	FORCEINLINE vec operator&(scl b) const { return *this & con(b); }       \
-	FORCEINLINE vec& operator%=(scl b) { return *this %= con(b); }          \
-	FORCEINLINE vec& operator^=(scl b) { return *this ^= con(b); }          \
-	FORCEINLINE vec& operator|=(scl b) { return *this |= con(b); }          \
-	FORCEINLINE vec& operator&=(scl b) { return *this &= con(b); }          \
-	FORCEINLINE vec& operator<<=(scl b) { return *this = *this << b; }      \
-	FORCEINLINE vec& operator>>=(scl b) { return *this = *this >> b; }      \
-	FORCEINLINE friend vec operator%(scl a, vec b) { return con(a) % b; }   \
-	FORCEINLINE friend vec operator^(scl a, vec b) { return con(a) ^ b; }   \
-	FORCEINLINE friend vec operator|(scl a, vec b) { return con(a) | b; }   \
-	FORCEINLINE friend vec operator&(scl a, vec b) { return con(a) & b; }   \
-	FORCEINLINE friend vec operator<<(scl a, vec b) { return con(a) << b; } \
-	FORCEINLINE friend vec operator>>(scl a, vec b) { return con(a) >> b; }
+	forceinline vec& operator%=(vec b) { return *this = *this % b; }        \
+	forceinline vec& operator^=(vec b) { return *this = *this ^ b; }        \
+	forceinline vec& operator|=(vec b) { return *this = *this | b; }        \
+	forceinline vec& operator&=(vec b) { return *this = *this & b; }        \
+	forceinline vec& operator<<=(vec b) { return *this = *this << b; }      \
+	forceinline vec& operator>>=(vec b) { return *this = *this >> b; }      \
+	forceinline vec operator%(scl b) const { return *this % con(b); }       \
+	forceinline vec operator^(scl b) const { return *this ^ con(b); }       \
+	forceinline vec operator|(scl b) const { return *this | con(b); }       \
+	forceinline vec operator&(scl b) const { return *this & con(b); }       \
+	forceinline vec& operator%=(scl b) { return *this %= con(b); }          \
+	forceinline vec& operator^=(scl b) { return *this ^= con(b); }          \
+	forceinline vec& operator|=(scl b) { return *this |= con(b); }          \
+	forceinline vec& operator&=(scl b) { return *this &= con(b); }          \
+	forceinline vec& operator<<=(scl b) { return *this = *this << b; }      \
+	forceinline vec& operator>>=(scl b) { return *this = *this >> b; }      \
+	forceinline friend vec operator%(scl a, vec b) { return con(a) % b; }   \
+	forceinline friend vec operator^(scl a, vec b) { return con(a) ^ b; }   \
+	forceinline friend vec operator|(scl a, vec b) { return con(a) | b; }   \
+	forceinline friend vec operator&(scl a, vec b) { return con(a) & b; }   \
+	forceinline friend vec operator<<(scl a, vec b) { return con(a) << b; } \
+	forceinline friend vec operator>>(scl a, vec b) { return con(a) >> b; }
 
 #define MEMFUNS_SHIFT_SCL(vec, scl, con)                    \
-	FORCEINLINE vec operator<<(scl b) const { return *this << con(b); } \
-	FORCEINLINE vec operator>>(scl b) const { return *this >> con(b); }
+	forceinline vec operator<<(scl b) const { return *this << con(b); } \
+	forceinline vec operator>>(scl b) const { return *this >> con(b); }
 
 #define MEMFUNS_SHIFT_SCL_M(vec, scl, con)              \
-	FORCEINLINE vec operator<<(scl b) const { return con(m << b); } \
-	FORCEINLINE vec operator>>(scl b) const { return con(m >> b); }
+	forceinline vec operator<<(scl b) const { return con(m << b); } \
+	forceinline vec operator>>(scl b) const { return con(m >> b); }
 
 #define MEMFUNS_SHIFT_SCL_2(vec, scl)                        \
-	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b}; } \
-	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b}; }
+	forceinline vec operator<<(scl b) const { return {x << b, y << b}; } \
+	forceinline vec operator>>(scl b) const { return {x >> b, y >> b}; }
 
 #define MEMFUNS_SHIFT_SCL_3(vec, scl)                                \
-	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b, z << b}; } \
-	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b, z >> b}; }
+	forceinline vec operator<<(scl b) const { return {x << b, y << b, z << b}; } \
+	forceinline vec operator>>(scl b) const { return {x >> b, y >> b, z >> b}; }
 
 #define MEMFUNS_SHIFT_SCL_4(vec, scl)                                        \
-	FORCEINLINE vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
-	FORCEINLINE vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+	forceinline vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
+	forceinline vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 
 
 #define RETURN_T(t,x)    t _result{}; _result = x; return _result
@@ -764,17 +780,17 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 
 
 #define OPERATOR_SCALAR(op, extend) \
-	FORCEINLINE Pack operator op(Scalar b) { return *this op extend(b); } \
-	FORCEINLINE friend Pack operator op(Scalar a, Pack b) { return extend(a) op b; }
+	forceinline Pack operator op(Scalar b) { return *this op extend(b); } \
+	forceinline friend Pack operator op(Scalar a, Pack b) { return extend(a) op b; }
 
 // is first is not friend, s32x4's operator!= refuses to compile
 #define OPERATOR_COMPARE(op, extend) \
-	FORCEINLINE friend Mask operator op(Pack a, Scalar b) { return a op extend(b); } \
-	FORCEINLINE friend Mask operator op(Scalar a, Pack b) { return extend(a) op b; }
+	forceinline friend Mask operator op(Pack a, Scalar b) { return a op extend(b); } \
+	forceinline friend Mask operator op(Scalar a, Pack b) { return extend(a) op b; }
 
 #define OPERATOR_MODIFY(op, extend) \
-	FORCEINLINE Pack &operator op##=(Pack b) { return *this = *this op b; } \
-	FORCEINLINE Pack &operator op##=(Scalar b) { return *this = *this op extend(b); }
+	forceinline Pack &operator op##=(Pack b) { return *this = *this op b; } \
+	forceinline Pack &operator op##=(Scalar b) { return *this = *this op extend(b); }
 
 
 #define OPERATOR_ALL_VER(op, extend) \
@@ -782,17 +798,17 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	OPERATOR_SCALAR(op, extend)
 
 #define OPERATOR_XCREMENT(extend) \
-	FORCEINLINE Pack &operator++()   { return *this = *this + extend(1); } \
-	FORCEINLINE Pack &operator--()   { return *this = *this - extend(1); } \
-	FORCEINLINE Pack  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
-	FORCEINLINE Pack  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
+	forceinline Pack &operator++()   { return *this = *this + extend(1); } \
+	forceinline Pack &operator--()   { return *this = *this - extend(1); } \
+	forceinline Pack  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
+	forceinline Pack  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
 
 #define OPERATORS_BOOL(extend)                                           \
-	FORCEINLINE Pack operator!() const { return ~*this; }               \
-	FORCEINLINE Pack operator&&(Pack b) const { return *this & b; }     \
-	FORCEINLINE Pack operator||(Pack b) const { return *this | b; }     \
-	FORCEINLINE Scalar operator[](umm index) const { return s[index]; } \
-	FORCEINLINE Scalar &operator[](umm index) { return s[index]; } \
+	forceinline Pack operator!() const { return ~*this; }               \
+	forceinline Pack operator&&(Pack b) const { return *this & b; }     \
+	forceinline Pack operator||(Pack b) const { return *this | b; }     \
+	forceinline Scalar operator[](umm index) const { return s[index]; } \
+	forceinline Scalar &operator[](umm index) { return s[index]; } \
 	OPERATOR_COMPARE(==, extend) \
 	OPERATOR_COMPARE(!=, extend) \
 	OPERATOR_ALL_VER(^, extend) \
@@ -802,43 +818,43 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	OPERATOR_SCALAR(||, extend)
 
 #define FALLBACK_BOOL                                                                  \
-	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
-	FORCEINLINE Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
-	FORCEINLINE Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
-	FORCEINLINE Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
-	FORCEINLINE Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
-	FORCEINLINE Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
+	forceinline Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
+	forceinline Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
+	forceinline Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
+	forceinline Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
+	forceinline Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
+	forceinline Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
 
 #define B1_IMPL(extend) \
 	Scalar s[1];\
 	Scalar m;\
-	FORCEINLINE Pack operator~() const { return {~m}; }\
-	FORCEINLINE Pack operator==(Pack b) const { return {~(m ^ b.m)}; }\
-	FORCEINLINE Pack operator!=(Pack b) const { return {m ^ b.m}; }\
-	FORCEINLINE Pack operator^ (Pack b) const { return {m ^ b.m}; }\
-	FORCEINLINE Pack operator& (Pack b) const { return {m & b.m}; }\
-	FORCEINLINE Pack operator| (Pack b) const { return {m | b.m}; }\
+	forceinline Pack operator~() const { return {~m}; }\
+	forceinline Pack operator==(Pack b) const { return {~(m ^ b.m)}; }\
+	forceinline Pack operator!=(Pack b) const { return {m ^ b.m}; }\
+	forceinline Pack operator^ (Pack b) const { return {m ^ b.m}; }\
+	forceinline Pack operator& (Pack b) const { return {m & b.m}; }\
+	forceinline Pack operator| (Pack b) const { return {m | b.m}; }\
 	OPERATORS_BOOL(extend)
 
 #define B128_IMPL(extend) \
 	M16 m;\
-	FORCEINLINE Pack operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }\
-	FORCEINLINE Pack operator==(Pack b) const { RETURN_M(s32x4_eq(m.pi, b.m.pi)); }\
-	FORCEINLINE Pack operator!=(Pack b) const { RETURN_M(s32x4_ne(m.pi, b.m.pi)); }\
-	FORCEINLINE Pack operator^ (Pack b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator& (Pack b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator| (Pack b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }\
+	forceinline Pack operator~() const { RETURN_M(_mm_xor_ps(m.ps, _mm_setone_ps())); }\
+	forceinline Pack operator==(Pack b) const { RETURN_M(s32x4_eq(m.pi, b.m.pi)); }\
+	forceinline Pack operator!=(Pack b) const { RETURN_M(s32x4_ne(m.pi, b.m.pi)); }\
+	forceinline Pack operator^ (Pack b) const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }\
+	forceinline Pack operator& (Pack b) const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }\
+	forceinline Pack operator| (Pack b) const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }\
 	OPERATORS_BOOL(extend)
 
 #if ARCH_AVX
 #define B256_IMPL(extend) \
 	M32 m;\
-	FORCEINLINE Pack operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }\
-	FORCEINLINE Pack operator==(Pack b) const { RETURN_M(b256_cmpeq(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator!=(Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator^ (Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator& (Pack b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }\
-	FORCEINLINE Pack operator| (Pack b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }\
+	forceinline Pack operator~() const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_setone_ps())); }\
+	forceinline Pack operator==(Pack b) const { RETURN_M(b256_cmpeq(m.ps, b.m.ps)); }\
+	forceinline Pack operator!=(Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
+	forceinline Pack operator^ (Pack b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }\
+	forceinline Pack operator& (Pack b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }\
+	forceinline Pack operator| (Pack b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }\
 	OPERATORS_BOOL(extend)
 #else
 #define B256_IMPL(extend) \
@@ -876,49 +892,49 @@ FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	OPERATOR_ALL_VER(|, extend) \
 	OPERATOR_MODIFY(>>, extend) \
 	OPERATOR_MODIFY(<<, extend) \
-	FORCEINLINE Mask operator!() const { return *this == 0; } \
+	forceinline Mask operator!() const { return *this == 0; } \
 	OPERATOR_XCREMENT(extend)
 
 
 #define FALLBACK_FLOAT                                                                  \
-	FORCEINLINE Pack operator-() const { RETURN_2(-lo, -hi); }                        \
-	FORCEINLINE Pack operator+ (Pack b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
-	FORCEINLINE Pack operator- (Pack b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
-	FORCEINLINE Pack operator* (Pack b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
-	FORCEINLINE Pack operator/ (Pack b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
-	FORCEINLINE Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
-	FORCEINLINE Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
-	FORCEINLINE Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
-	FORCEINLINE Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
-	FORCEINLINE Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
-	FORCEINLINE Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+	forceinline Pack operator-() const { RETURN_2(-lo, -hi); }                        \
+	forceinline Pack operator+ (Pack b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
+	forceinline Pack operator- (Pack b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
+	forceinline Pack operator* (Pack b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
+	forceinline Pack operator/ (Pack b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
+	forceinline Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
+	forceinline Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
+	forceinline Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
+	forceinline Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
+	forceinline Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
+	forceinline Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
 
 #define FALLBACK_INT_NO_BITWISE                                                                  \
-	FORCEINLINE Pack operator-() const { RETURN_2(-lo, -hi); }                                 \
-	FORCEINLINE Pack operator+(Pack b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
-	FORCEINLINE Pack operator-(Pack b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
-	FORCEINLINE Pack operator*(Pack b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
-	FORCEINLINE Pack operator/(Pack b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
-	FORCEINLINE Pack operator%(Pack b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
-	FORCEINLINE Pack operator<<(Pack b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
-	FORCEINLINE Pack operator>>(Pack b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
-	FORCEINLINE Pack operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
-	FORCEINLINE Pack operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
-	FORCEINLINE friend Pack operator<<(Scalar a, Pack b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
-	FORCEINLINE friend Pack operator>>(Scalar a, Pack b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
-	FORCEINLINE Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
-	FORCEINLINE Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
-	FORCEINLINE Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
-	FORCEINLINE Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
-	FORCEINLINE Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
-	FORCEINLINE Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
+	forceinline Pack operator-() const { RETURN_2(-lo, -hi); }                                 \
+	forceinline Pack operator+(Pack b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
+	forceinline Pack operator-(Pack b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
+	forceinline Pack operator*(Pack b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
+	forceinline Pack operator/(Pack b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
+	forceinline Pack operator%(Pack b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
+	forceinline Pack operator<<(Pack b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
+	forceinline Pack operator>>(Pack b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
+	forceinline Pack operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
+	forceinline Pack operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
+	forceinline friend Pack operator<<(Scalar a, Pack b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
+	forceinline friend Pack operator>>(Scalar a, Pack b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
+	forceinline Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
+	forceinline Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
+	forceinline Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
+	forceinline Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
+	forceinline Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
+	forceinline Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
 
 #define FALLBACK_INT                                                                 \
 	FALLBACK_INT_NO_BITWISE                                                          \
-	FORCEINLINE Pack operator~() const { RETURN_2(~lo, ~hi); }                     \
-	FORCEINLINE Pack operator^(Pack b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
-	FORCEINLINE Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
-	FORCEINLINE Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
+	forceinline Pack operator~() const { RETURN_2(~lo, ~hi); }                     \
+	forceinline Pack operator^(Pack b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
+	forceinline Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
+	forceinline Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
 
 #define TOMASK(expr) {(expr) ? -1 : 0}
 
@@ -985,85 +1001,85 @@ union b64x<4> {
 #undef B128_IMPL
 #undef B256_IMPL
 
-FORCEINLINE constexpr b32x1 B32x1(b32 v) { return TOMASK(v); }
-FORCEINLINE constexpr b64x1 B64x1(b64 v) { return TOMASK(v); }
+forceinline constexpr b32x1 B32x1(b32 v) { return TOMASK(v); }
+forceinline constexpr b64x1 B64x1(b64 v) { return TOMASK(v); }
 
-FORCEINLINE b32x4 B32x4(b32 v) { RETURN_MT(b32x4, v ? _mm_setone_ps() : _mm_setzero_ps()); }
-FORCEINLINE b64x2 B64x2(b32 v) { RETURN_MT(b64x2, v ? _mm_setone_pd() : _mm_setzero_pd()); }
+forceinline b32x4 B32x4(b32 v) { RETURN_MT(b32x4, v ? _mm_setone_ps() : _mm_setzero_ps()); }
+forceinline b64x2 B64x2(b32 v) { RETURN_MT(b64x2, v ? _mm_setone_pd() : _mm_setzero_pd()); }
 
 #if ARCH_AVX
-FORCEINLINE b32x8 B32x8(b32 v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
-FORCEINLINE b64x4 B64x4(b32 v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
-FORCEINLINE b32x8 B32x8(bool v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
-FORCEINLINE b64x4 B64x4(bool v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
+forceinline b32x8 B32x8(b32 v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
+forceinline b64x4 B64x4(b32 v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
+forceinline b32x8 B32x8(bool v) { RETURN_MT(b32x8, v ? _mm256_setone_ps() : _mm256_setzero_ps()); }
+forceinline b64x4 B64x4(bool v) { RETURN_MT(b64x4, v ? _mm256_setone_pd() : _mm256_setzero_pd()); }
 #else
-FORCEINLINE b32x8 B32x8(b32 v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
-FORCEINLINE b64x4 B64x4(b32 v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
-FORCEINLINE b32x8 B32x8(bool v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
-FORCEINLINE b64x4 B64x4(bool v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
+forceinline b32x8 B32x8(b32 v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
+forceinline b64x4 B64x4(b32 v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
+forceinline b32x8 B32x8(bool v) { RETURN_T2(b32x8, B32x4(v), B32x4(v)); }
+forceinline b64x4 B64x4(bool v) { RETURN_T2(b64x4, B64x2(v), B64x2(v)); }
 #endif
 
-FORCEINLINE b32x1 andNot(b32x1 a, b32x1 b) { return {a.m & ~b.m}; }
-FORCEINLINE b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.ps, a.m.ps)); }
+forceinline b32x1 andNot(b32x1 a, b32x1 b) { return {a.m & ~b.m}; }
+forceinline b32x4 andNot(b32x4 a, b32x4 b) { RETURN_MT(b32x4, _mm_andnot_ps(b.m.ps, a.m.ps)); }
 
-FORCEINLINE b64x1 andNot(b64x1 a, b64x1 b) { return {a.m & ~b.m}; }
-FORCEINLINE b64x2 andNot(b64x2 a, b64x2 b) { RETURN_MT(b64x2, _mm_andnot_pd(b.m.pd, a.m.pd)); }
+forceinline b64x1 andNot(b64x1 a, b64x1 b) { return {a.m & ~b.m}; }
+forceinline b64x2 andNot(b64x2 a, b64x2 b) { RETURN_MT(b64x2, _mm_andnot_pd(b.m.pd, a.m.pd)); }
 #if ARCH_AVX
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_MT(b32x8, _mm256_andnot_ps(b.m.ps, a.m.ps)); }
-FORCEINLINE b64x4 andNot(b64x4 a, b64x4 b) { RETURN_MT(b64x4, _mm256_andnot_pd(b.m.pd, a.m.pd)); }
+forceinline b32x8 andNot(b32x8 a, b32x8 b) { RETURN_MT(b32x8, _mm256_andnot_ps(b.m.ps, a.m.ps)); }
+forceinline b64x4 andNot(b64x4 a, b64x4 b) { RETURN_MT(b64x4, _mm256_andnot_pd(b.m.pd, a.m.pd)); }
 #else
-FORCEINLINE b32x8 andNot(b32x8 a, b32x8 b) { RETURN_T2(b32x8, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
-FORCEINLINE b64x4 andNot(b64x4 a, b64x4 b) { RETURN_T2(b64x4, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
+forceinline b32x8 andNot(b32x8 a, b32x8 b) { RETURN_T2(b32x8, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
+forceinline b64x4 andNot(b64x4 a, b64x4 b) { RETURN_T2(b64x4, andNot(a.lo, b.lo), andNot(a.hi, b.hi)); }
 #endif
 
-FORCEINLINE u64 compressMask(b32x1 a) { return a.m != 0; }
-FORCEINLINE u64 compressMask(b64x1 a) { return a.m != 0; }
-FORCEINLINE u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
-FORCEINLINE u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
+forceinline u64 compressMask(b32x1 a) { return a.m != 0; }
+forceinline u64 compressMask(b64x1 a) { return a.m != 0; }
+forceinline u64 compressMask(b32x4 a) { return _mm_movemask_ps(a.m.ps); }
+forceinline u64 compressMask(b64x2 a) { return _mm_movemask_pd(a.m.pd); }
 #if ARCH_AVX
-FORCEINLINE u64 compressMask(b32x8 a) { return _mm256_movemask_ps(a.m.ps); }
-FORCEINLINE u64 compressMask(b64x4 a) { return _mm256_movemask_pd(a.m.pd); }
+forceinline u64 compressMask(b32x8 a) { return _mm256_movemask_ps(a.m.ps); }
+forceinline u64 compressMask(b64x4 a) { return _mm256_movemask_pd(a.m.pd); }
 #else
-FORCEINLINE u64 compressMask(b32x8 a) { return (compressMask(a.lo) << 4) | compressMask(a.hi); }
-FORCEINLINE u64 compressMask(b64x4 a) { return (compressMask(a.lo) << 2) | compressMask(a.hi); }
+forceinline u64 compressMask(b32x8 a) { return (compressMask(a.lo) << 4) | compressMask(a.hi); }
+forceinline u64 compressMask(b64x4 a) { return (compressMask(a.lo) << 2) | compressMask(a.hi); }
 #endif
 
-FORCEINLINE bool allTrue(bool v) { return v; }
-FORCEINLINE bool allTrue(b32x1 v) { return v.m != 0; }
-FORCEINLINE bool allTrue(b64x1 v) { return v.m != 0; }
-FORCEINLINE bool allTrue(b64x2 v) { return compressMask(v) == 0x3; }
-FORCEINLINE bool allTrue(b32x4 v) { return compressMask(v) == 0xF; }
-FORCEINLINE bool allTrue(b64x4 a) { return compressMask(a) == 0xF; }
-FORCEINLINE bool allTrue(b32x8 a) { return compressMask(a) == 0xFF; }
+forceinline bool allTrue(bool v) { return v; }
+forceinline bool allTrue(b32x1 v) { return v.m != 0; }
+forceinline bool allTrue(b64x1 v) { return v.m != 0; }
+forceinline bool allTrue(b64x2 v) { return compressMask(v) == 0x3; }
+forceinline bool allTrue(b32x4 v) { return compressMask(v) == 0xF; }
+forceinline bool allTrue(b64x4 a) { return compressMask(a) == 0xF; }
+forceinline bool allTrue(b32x8 a) { return compressMask(a) == 0xFF; }
 
-FORCEINLINE bool allFalse(bool v) { return !v; }
-FORCEINLINE bool allFalse(b32x1 v) { return v.m == 0; }
-FORCEINLINE bool allFalse(b64x1 v) { return v.m == 0; }
-FORCEINLINE bool allFalse(b64x2 v) { return compressMask(v) == 0; }
-FORCEINLINE bool allFalse(b32x4 v) { return compressMask(v) == 0; }
-FORCEINLINE bool allFalse(b64x4 a) { return compressMask(a) == 0; }
-FORCEINLINE bool allFalse(b32x8 a) { return compressMask(a) == 0; }
+forceinline bool allFalse(bool v) { return !v; }
+forceinline bool allFalse(b32x1 v) { return v.m == 0; }
+forceinline bool allFalse(b64x1 v) { return v.m == 0; }
+forceinline bool allFalse(b64x2 v) { return compressMask(v) == 0; }
+forceinline bool allFalse(b32x4 v) { return compressMask(v) == 0; }
+forceinline bool allFalse(b64x4 a) { return compressMask(a) == 0; }
+forceinline bool allFalse(b32x8 a) { return compressMask(a) == 0; }
 
-template <class T> FORCEINLINE bool anyTrue (T v) { return !allFalse(v); }
-template <class T> FORCEINLINE bool anyFalse(T v) { return !allTrue (v); }
+template <class T> forceinline bool anyTrue (T v) { return !allFalse(v); }
+template <class T> forceinline bool anyFalse(T v) { return !allTrue (v); }
 
 #define MASK_IMPL(TrueMask, trueMask, true)							 \
 	struct TrueMask {												 \
-		FORCEINLINE constexpr operator bool() const { return true; } \
-		FORCEINLINE constexpr operator u8 () const { return true; }	 \
-		FORCEINLINE constexpr operator u16() const { return true; }	 \
-		FORCEINLINE constexpr operator u32() const { return true; }	 \
-		FORCEINLINE constexpr operator u64() const { return true; }	 \
-		FORCEINLINE constexpr operator s8 () const { return true; }	 \
-		FORCEINLINE constexpr operator s16() const { return true; }	 \
-		FORCEINLINE constexpr operator s32() const { return true; }	 \
-		FORCEINLINE constexpr operator s64() const { return true; }	 \
-		FORCEINLINE operator b32x1() const { return B32x1(true); }	 \
-		FORCEINLINE operator b32x4() const { return B32x4(true); }	 \
-		FORCEINLINE operator b32x8() const { return B32x8(true); }	 \
-		FORCEINLINE operator b64x1() const { return B64x1(true); }	 \
-		FORCEINLINE operator b64x2() const { return B64x2(true); }	 \
-		FORCEINLINE operator b64x4() const { return B64x4(true); }	 \
+		forceinline constexpr operator bool() const { return true; } \
+		forceinline constexpr operator u8 () const { return true; }	 \
+		forceinline constexpr operator u16() const { return true; }	 \
+		forceinline constexpr operator u32() const { return true; }	 \
+		forceinline constexpr operator u64() const { return true; }	 \
+		forceinline constexpr operator s8 () const { return true; }	 \
+		forceinline constexpr operator s16() const { return true; }	 \
+		forceinline constexpr operator s32() const { return true; }	 \
+		forceinline constexpr operator s64() const { return true; }	 \
+		forceinline operator b32x1() const { return B32x1(true); }	 \
+		forceinline operator b32x4() const { return B32x4(true); }	 \
+		forceinline operator b32x8() const { return B32x8(true); }	 \
+		forceinline operator b64x1() const { return B64x1(true); }	 \
+		forceinline operator b64x2() const { return B64x2(true); }	 \
+		forceinline operator b64x4() const { return B64x4(true); }	 \
 	};																 \
 	inline static constexpr TrueMask trueMask
 
@@ -1072,7 +1088,7 @@ MASK_IMPL(TrueMask, trueMask, ~0);
 
 #undef MASK_IMPL
 
-#define CVT(other) explicit FORCEINLINE operator other() const
+#define CVT(other) explicit forceinline operator other() const
 
 template<>
 union f32x<1> {
@@ -1083,17 +1099,17 @@ union f32x<1> {
 	Scalar s[1];
 	f32 m;
 
-	FORCEINLINE f32x1 operator-()         const { return {-m}; }
-	FORCEINLINE	f32x1 operator+ (f32x1 b) const { return {m + b.m}; }
-	FORCEINLINE	f32x1 operator- (f32x1 b) const { return {m - b.m}; }
-	FORCEINLINE	f32x1 operator* (f32x1 b) const { return {m * b.m}; }
-	FORCEINLINE	f32x1 operator/ (f32x1 b) const { return {m / b.m}; }
-	FORCEINLINE	b32x1 operator< (f32x1 b) const { return TOMASK(m <  b.m); }
-	FORCEINLINE	b32x1 operator> (f32x1 b) const { return TOMASK(m >  b.m); }
-	FORCEINLINE	b32x1 operator<=(f32x1 b) const { return TOMASK(m <= b.m); }
-	FORCEINLINE	b32x1 operator>=(f32x1 b) const { return TOMASK(m >= b.m); }
-	FORCEINLINE	b32x1 operator==(f32x1 b) const { return TOMASK(m == b.m); }
-	FORCEINLINE	b32x1 operator!=(f32x1 b) const { return TOMASK(m != b.m); }
+	forceinline f32x1 operator-()         const { return {-m}; }
+	forceinline	f32x1 operator+ (f32x1 b) const { return {m + b.m}; }
+	forceinline	f32x1 operator- (f32x1 b) const { return {m - b.m}; }
+	forceinline	f32x1 operator* (f32x1 b) const { return {m * b.m}; }
+	forceinline	f32x1 operator/ (f32x1 b) const { return {m / b.m}; }
+	forceinline	b32x1 operator< (f32x1 b) const { return TOMASK(m <  b.m); }
+	forceinline	b32x1 operator> (f32x1 b) const { return TOMASK(m >  b.m); }
+	forceinline	b32x1 operator<=(f32x1 b) const { return TOMASK(m <= b.m); }
+	forceinline	b32x1 operator>=(f32x1 b) const { return TOMASK(m >= b.m); }
+	forceinline	b32x1 operator==(f32x1 b) const { return TOMASK(m == b.m); }
+	forceinline	b32x1 operator!=(f32x1 b) const { return TOMASK(m != b.m); }
 	OPERATORS_FLOAT(F32x1)
 
 	CVT(s32x1);
@@ -1111,17 +1127,17 @@ union f32x<4> {
 	Scalar s[4];
 	M16 m;
 	
-	FORCEINLINE f32x4 operator-()         const { RETURN_M(_mm_xor_ps(m.ps, _mm_set1_ps(-0.0f))); }
-	FORCEINLINE	f32x4 operator+ (f32x4 b) const { RETURN_M(_mm_add_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x4 operator- (f32x4 b) const { RETURN_M(_mm_sub_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x4 operator* (f32x4 b) const { RETURN_M(_mm_mul_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x4 operator/ (f32x4 b) const { RETURN_M(_mm_div_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator< (f32x4 b) const { RETURN_MASK(f32x4_lt(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator> (f32x4 b) const { RETURN_MASK(f32x4_gt(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator<=(f32x4 b) const { RETURN_MASK(f32x4_le(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator>=(f32x4 b) const { RETURN_MASK(f32x4_ge(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator==(f32x4 b) const { RETURN_MASK(f32x4_eq(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x4 operator!=(f32x4 b) const { RETURN_MASK(f32x4_ne(m.ps, b.m.ps)); }
+	forceinline f32x4 operator-()         const { RETURN_M(_mm_xor_ps(m.ps, _mm_set1_ps(-0.0f))); }
+	forceinline	f32x4 operator+ (f32x4 b) const { RETURN_M(_mm_add_ps(m.ps, b.m.ps)); }
+	forceinline	f32x4 operator- (f32x4 b) const { RETURN_M(_mm_sub_ps(m.ps, b.m.ps)); }
+	forceinline	f32x4 operator* (f32x4 b) const { RETURN_M(_mm_mul_ps(m.ps, b.m.ps)); }
+	forceinline	f32x4 operator/ (f32x4 b) const { RETURN_M(_mm_div_ps(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator< (f32x4 b) const { RETURN_MASK(f32x4_lt(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator> (f32x4 b) const { RETURN_MASK(f32x4_gt(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator<=(f32x4 b) const { RETURN_MASK(f32x4_le(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator>=(f32x4 b) const { RETURN_MASK(f32x4_ge(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator==(f32x4 b) const { RETURN_MASK(f32x4_eq(m.ps, b.m.ps)); }
+	forceinline	b32x4 operator!=(f32x4 b) const { RETURN_MASK(f32x4_ne(m.ps, b.m.ps)); }
 	OPERATORS_FLOAT(F32x4)
 
 	CVT(s32x4);
@@ -1143,17 +1159,17 @@ union f32x<8> {
 
 #if ARCH_AVX
 	M32 m;
-	FORCEINLINE f32x8 operator-()         const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_set1_ps(-0.0f))); }
-	FORCEINLINE	f32x8 operator+ (f32x8 b) const { RETURN_M(_mm256_add_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x8 operator- (f32x8 b) const { RETURN_M(_mm256_sub_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x8 operator* (f32x8 b) const { RETURN_M(_mm256_mul_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	f32x8 operator/ (f32x8 b) const { RETURN_M(_mm256_div_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	b32x8 operator< (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LT_OQ )); }
-	FORCEINLINE	b32x8 operator> (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GT_OQ )); }
-	FORCEINLINE	b32x8 operator<=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LE_OQ )); }
-	FORCEINLINE	b32x8 operator>=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GE_OQ )); }
-	FORCEINLINE	b32x8 operator==(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_EQ_OQ )); }
-	FORCEINLINE	b32x8 operator!=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_NEQ_OQ)); }
+	forceinline f32x8 operator-()         const { RETURN_M(_mm256_xor_ps(m.ps, _mm256_set1_ps(-0.0f))); }
+	forceinline	f32x8 operator+ (f32x8 b) const { RETURN_M(_mm256_add_ps(m.ps, b.m.ps)); }
+	forceinline	f32x8 operator- (f32x8 b) const { RETURN_M(_mm256_sub_ps(m.ps, b.m.ps)); }
+	forceinline	f32x8 operator* (f32x8 b) const { RETURN_M(_mm256_mul_ps(m.ps, b.m.ps)); }
+	forceinline	f32x8 operator/ (f32x8 b) const { RETURN_M(_mm256_div_ps(m.ps, b.m.ps)); }
+	forceinline	b32x8 operator< (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LT_OQ )); }
+	forceinline	b32x8 operator> (f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GT_OQ )); }
+	forceinline	b32x8 operator<=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_LE_OQ )); }
+	forceinline	b32x8 operator>=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_GE_OQ )); }
+	forceinline	b32x8 operator==(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_EQ_OQ )); }
+	forceinline	b32x8 operator!=(f32x8 b) const { RETURN_MASK(_mm256_cmp_ps(m.ps, b.m.ps, _CMP_NEQ_OQ)); }
 #else
 	FALLBACK_FLOAT;
 #endif
@@ -1174,17 +1190,17 @@ union f64x<1> {
 	Scalar s[1];
 	Scalar m;
 
-	FORCEINLINE Pack operator-()         const { return {-m}; }
-	FORCEINLINE	Pack operator+ (Pack b) const { return {m + b.m}; }
-	FORCEINLINE	Pack operator- (Pack b) const { return {m - b.m}; }
-	FORCEINLINE	Pack operator* (Pack b) const { return {m * b.m}; }
-	FORCEINLINE	Pack operator/ (Pack b) const { return {m / b.m}; }
-	FORCEINLINE	Mask operator< (Pack b) const { return TOMASK(m <  b.m); }
-	FORCEINLINE	Mask operator> (Pack b) const { return TOMASK(m >  b.m); }
-	FORCEINLINE	Mask operator<=(Pack b) const { return TOMASK(m <= b.m); }
-	FORCEINLINE	Mask operator>=(Pack b) const { return TOMASK(m >= b.m); }
-	FORCEINLINE	Mask operator==(Pack b) const { return TOMASK(m == b.m); }
-	FORCEINLINE	Mask operator!=(Pack b) const { return TOMASK(m != b.m); }
+	forceinline Pack operator-()         const { return {-m}; }
+	forceinline	Pack operator+ (Pack b) const { return {m + b.m}; }
+	forceinline	Pack operator- (Pack b) const { return {m - b.m}; }
+	forceinline	Pack operator* (Pack b) const { return {m * b.m}; }
+	forceinline	Pack operator/ (Pack b) const { return {m / b.m}; }
+	forceinline	Mask operator< (Pack b) const { return TOMASK(m <  b.m); }
+	forceinline	Mask operator> (Pack b) const { return TOMASK(m >  b.m); }
+	forceinline	Mask operator<=(Pack b) const { return TOMASK(m <= b.m); }
+	forceinline	Mask operator>=(Pack b) const { return TOMASK(m >= b.m); }
+	forceinline	Mask operator==(Pack b) const { return TOMASK(m == b.m); }
+	forceinline	Mask operator!=(Pack b) const { return TOMASK(m != b.m); }
 	OPERATORS_FLOAT(F64x1)
 
 	//CVT(s64x1);
@@ -1202,17 +1218,17 @@ union f64x<2> {
 	Scalar s[2];
 	M16 m;
 
-	FORCEINLINE f64x2 operator-()         const { RETURN_M(_mm_xor_pd(m.pd, _mm_set1_pd(-0.0f))); }
-	FORCEINLINE	f64x2 operator+ (f64x2 b) const { RETURN_M(_mm_add_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x2 operator- (f64x2 b) const { RETURN_M(_mm_sub_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x2 operator* (f64x2 b) const { RETURN_M(_mm_mul_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x2 operator/ (f64x2 b) const { RETURN_M(_mm_div_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator< (f64x2 b) const { RETURN_MASK(f64x2_lt(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator> (f64x2 b) const { RETURN_MASK(f64x2_gt(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator<=(f64x2 b) const { RETURN_MASK(f64x2_le(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator>=(f64x2 b) const { RETURN_MASK(f64x2_ge(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator==(f64x2 b) const { RETURN_MASK(f64x2_eq(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x2 operator!=(f64x2 b) const { RETURN_MASK(f64x2_ne(m.pd, b.m.pd)); }
+	forceinline f64x2 operator-()         const { RETURN_M(_mm_xor_pd(m.pd, _mm_set1_pd(-0.0f))); }
+	forceinline	f64x2 operator+ (f64x2 b) const { RETURN_M(_mm_add_pd(m.pd, b.m.pd)); }
+	forceinline	f64x2 operator- (f64x2 b) const { RETURN_M(_mm_sub_pd(m.pd, b.m.pd)); }
+	forceinline	f64x2 operator* (f64x2 b) const { RETURN_M(_mm_mul_pd(m.pd, b.m.pd)); }
+	forceinline	f64x2 operator/ (f64x2 b) const { RETURN_M(_mm_div_pd(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator< (f64x2 b) const { RETURN_MASK(f64x2_lt(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator> (f64x2 b) const { RETURN_MASK(f64x2_gt(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator<=(f64x2 b) const { RETURN_MASK(f64x2_le(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator>=(f64x2 b) const { RETURN_MASK(f64x2_ge(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator==(f64x2 b) const { RETURN_MASK(f64x2_eq(m.pd, b.m.pd)); }
+	forceinline	b64x2 operator!=(f64x2 b) const { RETURN_MASK(f64x2_ne(m.pd, b.m.pd)); }
 	OPERATORS_FLOAT(F64x2)
 
 	//CVT(s64x2);
@@ -1233,17 +1249,17 @@ union f64x<4> {
 
 #if ARCH_AVX
 	M32 m;
-	FORCEINLINE f64x4 operator-()         const { RETURN_M(_mm256_xor_pd(m.pd, _mm256_set1_pd(-0.0f))); }
-	FORCEINLINE	f64x4 operator+ (f64x4 b) const { RETURN_M(_mm256_add_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x4 operator- (f64x4 b) const { RETURN_M(_mm256_sub_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x4 operator* (f64x4 b) const { RETURN_M(_mm256_mul_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	f64x4 operator/ (f64x4 b) const { RETURN_M(_mm256_div_pd(m.pd, b.m.pd)); }
-	FORCEINLINE	b64x4 operator< (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LT_OQ )); }
-	FORCEINLINE	b64x4 operator> (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GT_OQ )); }
-	FORCEINLINE	b64x4 operator<=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LE_OQ )); }
-	FORCEINLINE	b64x4 operator>=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GE_OQ )); }
-	FORCEINLINE	b64x4 operator==(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_EQ_OQ )); }
-	FORCEINLINE	b64x4 operator!=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_NEQ_OQ)); }
+	forceinline f64x4 operator-()         const { RETURN_M(_mm256_xor_pd(m.pd, _mm256_set1_pd(-0.0f))); }
+	forceinline	f64x4 operator+ (f64x4 b) const { RETURN_M(_mm256_add_pd(m.pd, b.m.pd)); }
+	forceinline	f64x4 operator- (f64x4 b) const { RETURN_M(_mm256_sub_pd(m.pd, b.m.pd)); }
+	forceinline	f64x4 operator* (f64x4 b) const { RETURN_M(_mm256_mul_pd(m.pd, b.m.pd)); }
+	forceinline	f64x4 operator/ (f64x4 b) const { RETURN_M(_mm256_div_pd(m.pd, b.m.pd)); }
+	forceinline	b64x4 operator< (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LT_OQ )); }
+	forceinline	b64x4 operator> (f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GT_OQ )); }
+	forceinline	b64x4 operator<=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_LE_OQ )); }
+	forceinline	b64x4 operator>=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_GE_OQ )); }
+	forceinline	b64x4 operator==(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_EQ_OQ )); }
+	forceinline	b64x4 operator!=(f64x4 b) const { RETURN_MASK(_mm256_cmp_pd(m.pd, b.m.pd, _CMP_NEQ_OQ)); }
 #else                                                                                        
 	FALLBACK_FLOAT;
 #endif
@@ -1265,28 +1281,28 @@ union s32x<1> {
 	Scalar s[1];
 	Scalar m;
 	
-	FORCEINLINE        Pack  operator-()            const { return {-m}; }
-	FORCEINLINE        Pack  operator~()            const { return {~m}; }
-	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
-	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
-	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
-	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
-	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
-	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
-	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
-	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
-	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
-	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
-	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
-	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
-	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
-	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
-	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
-	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
-	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
-	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
-	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
-	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	forceinline        Pack  operator-()            const { return {-m}; }
+	forceinline        Pack  operator~()            const { return {~m}; }
+	forceinline	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	forceinline	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	forceinline	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	forceinline	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	forceinline	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	forceinline	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	forceinline	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	forceinline	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	forceinline	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	forceinline	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	forceinline	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	forceinline	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	forceinline	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	forceinline	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	forceinline	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	forceinline	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	forceinline	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	forceinline	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	forceinline	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	forceinline	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
 	
 	OPERATORS_INT(S32x1);
 
@@ -1305,28 +1321,28 @@ union s32x<4> {
 	Scalar s[4];
 	M16 m;
 
-	FORCEINLINE        Pack  operator-()          const { RETURN_M(s32x4_sub(_mm_setzero_pi(), m.pi)); }
-	FORCEINLINE        Pack  operator~()          const { RETURN_M(m16_not(m.ps)); }
-	FORCEINLINE	       Pack  operator+ (Pack b)  const { RETURN_M(s32x4_add(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator- (Pack b)  const { RETURN_M(s32x4_sub(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator* (Pack b)  const { RETURN_M(s32x4_mul(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator/ (Pack b)  const { RETURN_M(s32x4_div(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator% (Pack b)  const { RETURN_M(s32x4_rem(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator<<(Pack b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator>>(Pack b)  const { RETURN_M(s32x4_sr(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator< (Pack b)  const { RETURN_MASK(s32x4_lt(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator> (Pack b)  const { RETURN_MASK(s32x4_gt(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator<=(Pack b)  const { RETURN_MASK(s32x4_le(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator>=(Pack b)  const { RETURN_MASK(s32x4_ge(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator==(Pack b)  const { RETURN_MASK(s32x4_eq(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator!=(Pack b)  const { RETURN_MASK(s32x4_ne(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator<<(s32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
-	FORCEINLINE	       Pack  operator>>(s32   b)  const { RETURN_M(s32x4_sri(m.pi, b)); }
-	FORCEINLINE	friend Pack  operator<<(s32 a, Pack b) { RETURN_MT(Pack, i32x4_sil(a, b.m.pi)); }
-	FORCEINLINE	friend Pack  operator>>(s32 a, Pack b) { RETURN_MT(Pack, s32x4_sir(a, b.m.pi)); }
+	forceinline        Pack  operator-()          const { RETURN_M(s32x4_sub(_mm_setzero_pi(), m.pi)); }
+	forceinline        Pack  operator~()          const { RETURN_M(m16_not(m.ps)); }
+	forceinline	       Pack  operator+ (Pack b)  const { RETURN_M(s32x4_add(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator- (Pack b)  const { RETURN_M(s32x4_sub(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator* (Pack b)  const { RETURN_M(s32x4_mul(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator/ (Pack b)  const { RETURN_M(s32x4_div(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator% (Pack b)  const { RETURN_M(s32x4_rem(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
+	forceinline	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
+	forceinline	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
+	forceinline	       Pack  operator<<(Pack b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator>>(Pack b)  const { RETURN_M(s32x4_sr(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator< (Pack b)  const { RETURN_MASK(s32x4_lt(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator> (Pack b)  const { RETURN_MASK(s32x4_gt(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator<=(Pack b)  const { RETURN_MASK(s32x4_le(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator>=(Pack b)  const { RETURN_MASK(s32x4_ge(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator==(Pack b)  const { RETURN_MASK(s32x4_eq(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator!=(Pack b)  const { RETURN_MASK(s32x4_ne(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator<<(s32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
+	forceinline	       Pack  operator>>(s32   b)  const { RETURN_M(s32x4_sri(m.pi, b)); }
+	forceinline	friend Pack  operator<<(s32 a, Pack b) { RETURN_MT(Pack, i32x4_sil(a, b.m.pi)); }
+	forceinline	friend Pack  operator>>(s32 a, Pack b) { RETURN_MT(Pack, s32x4_sir(a, b.m.pi)); }
 	
 	OPERATORS_INT(S32x4);
 
@@ -1351,13 +1367,13 @@ union s32x<8> {
 #endif
 
 #if ARCH_AVX2
-	FORCEINLINE s32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
-	FORCEINLINE	s32x8 operator+(s32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator-(s32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator*(s32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+	forceinline s32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	forceinline s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
+	forceinline	s32x8 operator+(s32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	forceinline	s32x8 operator-(s32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	forceinline	s32x8 operator*(s32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
 #if COMPILER_GCC
-	FORCEINLINE s32x8 operator/(s32x8 b) const {
+	forceinline s32x8 operator/(s32x8 b) const {
 		return {
 			s[0] / b.s[0],
 			s[1] / b.s[1],
@@ -1369,7 +1385,7 @@ union s32x<8> {
 			s[7] / b.s[7],
 		};
 	}
-	FORCEINLINE s32x8 operator%(s32x8 b) const {
+	forceinline s32x8 operator%(s32x8 b) const {
 		return {
 			s[0] % b.s[0],
 			s[1] % b.s[1],
@@ -1382,29 +1398,29 @@ union s32x<8> {
 		};
 	}
 #else
-	FORCEINLINE	s32x8 operator/(s32x8 b) const { RETURN_M(_mm256_div_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator%(s32x8 b) const { RETURN_M(_mm256_rem_epi32(m.pi, b.m.pi)); }
+	forceinline	s32x8 operator/(s32x8 b) const { RETURN_M(_mm256_div_epi32(m.pi, b.m.pi)); }
+	forceinline	s32x8 operator%(s32x8 b) const { RETURN_M(_mm256_rem_epi32(m.pi, b.m.pi)); }
 #endif
-	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	b32x8 operator< (s32x8 b) const { RETURN_MASK(s32x8_lt(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator> (s32x8 b) const { RETURN_MASK(s32x8_gt(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator<=(s32x8 b) const { RETURN_MASK(s32x8_le(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator>=(s32x8 b) const { RETURN_MASK(s32x8_ge(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator==(s32x8 b) const { RETURN_MASK(s32x8_eq(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator!=(s32x8 b) const { RETURN_MASK(s32x8_ne(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator<<(s32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator>>(s32x8 b) const { RETURN_M(s32x8_sr(m.pi, b.m.pi)); }
-	FORCEINLINE	s32x8 operator<<(s32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
-	FORCEINLINE	s32x8 operator>>(s32   b) const { RETURN_M(s32x8_sri(m.pi, b)); }
-	FORCEINLINE	friend s32x8 operator<<(s32 a, s32x8 b) { RETURN_MT(s32x8, i32x8_sil(a, b.m.pi)); }
-	FORCEINLINE	friend s32x8 operator>>(s32 a, s32x8 b) { RETURN_MT(s32x8, s32x8_sir(a, b.m.pi)); }
+	forceinline	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	forceinline	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	forceinline	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	forceinline	b32x8 operator< (s32x8 b) const { RETURN_MASK(s32x8_lt(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator> (s32x8 b) const { RETURN_MASK(s32x8_gt(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator<=(s32x8 b) const { RETURN_MASK(s32x8_le(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator>=(s32x8 b) const { RETURN_MASK(s32x8_ge(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator==(s32x8 b) const { RETURN_MASK(s32x8_eq(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator!=(s32x8 b) const { RETURN_MASK(s32x8_ne(m.pi, b.m.pi)); }
+	forceinline	s32x8 operator<<(s32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
+	forceinline	s32x8 operator>>(s32x8 b) const { RETURN_M(s32x8_sr(m.pi, b.m.pi)); }
+	forceinline	s32x8 operator<<(s32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
+	forceinline	s32x8 operator>>(s32   b) const { RETURN_M(s32x8_sri(m.pi, b)); }
+	forceinline	friend s32x8 operator<<(s32 a, s32x8 b) { RETURN_MT(s32x8, i32x8_sil(a, b.m.pi)); }
+	forceinline	friend s32x8 operator>>(s32 a, s32x8 b) { RETURN_MT(s32x8, s32x8_sir(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
-	FORCEINLINE	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	forceinline s32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
+	forceinline	s32x8 operator^(s32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	forceinline	s32x8 operator&(s32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	forceinline	s32x8 operator|(s32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 	FALLBACK_INT_NO_BITWISE;
 #else
 	FALLBACK_INT;
@@ -1427,28 +1443,28 @@ union s64x<1> {
 	Scalar s[1];
 	Scalar m;
 	
-	FORCEINLINE        Pack  operator-()            const { return {-m}; }
-	FORCEINLINE        Pack  operator~()            const { return {~m}; }
-	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
-	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
-	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
-	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
-	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
-	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
-	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
-	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
-	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
-	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
-	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
-	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
-	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
-	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
-	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
-	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
-	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
-	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
-	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
-	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	forceinline        Pack  operator-()            const { return {-m}; }
+	forceinline        Pack  operator~()            const { return {~m}; }
+	forceinline	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	forceinline	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	forceinline	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	forceinline	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	forceinline	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	forceinline	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	forceinline	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	forceinline	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	forceinline	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	forceinline	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	forceinline	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	forceinline	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	forceinline	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	forceinline	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	forceinline	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	forceinline	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	forceinline	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	forceinline	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	forceinline	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	forceinline	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
 	
 	OPERATORS_INT(S64x1);
 
@@ -1467,28 +1483,28 @@ union s64x<2> {
 	Scalar s[2];
 	M16 m;
 
-	FORCEINLINE        Pack  operator-()         const { RETURN_M(s64x2_sub(_mm_setzero_pi(), m.pi)); }
-	FORCEINLINE        Pack  operator~()         const { RETURN_M(m16_not(m.ps)); }
-	FORCEINLINE	       Pack  operator+ (Pack b)  const { RETURN_M(s64x2_add(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator- (Pack b)  const { RETURN_M(s64x2_sub(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator* (Pack b)  const { RETURN_M(s64x2_mul(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator/ (Pack b)  const { RETURN_M(s64x2_div(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator% (Pack b)  const { RETURN_M(s64x2_rem(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
-	FORCEINLINE	       Pack  operator<<(Pack b)  const { RETURN_M(i64x2_sl(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator>>(Pack b)  const { RETURN_M(s64x2_sr(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator< (Pack b)  const { RETURN_MASK(s64x2_lt(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator> (Pack b)  const { RETURN_MASK(s64x2_gt(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator<=(Pack b)  const { RETURN_MASK(s64x2_le(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator>=(Pack b)  const { RETURN_MASK(s64x2_ge(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator==(Pack b)  const { RETURN_MASK(s64x2_eq(m.pi, b.m.pi)); }
-	FORCEINLINE	       Mask  operator!=(Pack b)  const { RETURN_MASK(s64x2_ne(m.pi, b.m.pi)); }
-	FORCEINLINE	       Pack  operator<<(s64   b) const { RETURN_M(i64x2_sli(m.pi, b)); }
-	FORCEINLINE	       Pack  operator>>(s64   b) const { RETURN_M(s64x2_sri(m.pi, b)); }
-	FORCEINLINE	friend Pack  operator<<(s64 a, Pack b) { RETURN_MT(Pack, i64x2_sil(a, b.m.pi)); }
-	FORCEINLINE	friend Pack  operator>>(s64 a, Pack b) { RETURN_MT(Pack, s64x2_sir(a, b.m.pi)); }
+	forceinline        Pack  operator-()         const { RETURN_M(s64x2_sub(_mm_setzero_pi(), m.pi)); }
+	forceinline        Pack  operator~()         const { RETURN_M(m16_not(m.ps)); }
+	forceinline	       Pack  operator+ (Pack b)  const { RETURN_M(s64x2_add(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator- (Pack b)  const { RETURN_M(s64x2_sub(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator* (Pack b)  const { RETURN_M(s64x2_mul(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator/ (Pack b)  const { RETURN_M(s64x2_div(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator% (Pack b)  const { RETURN_M(s64x2_rem(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator^ (Pack b)  const { RETURN_M(m16_xor(m.ps, b.m.ps)); }
+	forceinline	       Pack  operator& (Pack b)  const { RETURN_M(m16_and(m.ps, b.m.ps)); }
+	forceinline	       Pack  operator| (Pack b)  const { RETURN_M(m16_or (m.ps, b.m.ps)); }
+	forceinline	       Pack  operator<<(Pack b)  const { RETURN_M(i64x2_sl(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator>>(Pack b)  const { RETURN_M(s64x2_sr(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator< (Pack b)  const { RETURN_MASK(s64x2_lt(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator> (Pack b)  const { RETURN_MASK(s64x2_gt(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator<=(Pack b)  const { RETURN_MASK(s64x2_le(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator>=(Pack b)  const { RETURN_MASK(s64x2_ge(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator==(Pack b)  const { RETURN_MASK(s64x2_eq(m.pi, b.m.pi)); }
+	forceinline	       Mask  operator!=(Pack b)  const { RETURN_MASK(s64x2_ne(m.pi, b.m.pi)); }
+	forceinline	       Pack  operator<<(s64   b) const { RETURN_M(i64x2_sli(m.pi, b)); }
+	forceinline	       Pack  operator>>(s64   b) const { RETURN_M(s64x2_sri(m.pi, b)); }
+	forceinline	friend Pack  operator<<(s64 a, Pack b) { RETURN_MT(Pack, i64x2_sil(a, b.m.pi)); }
+	forceinline	friend Pack  operator>>(s64 a, Pack b) { RETURN_MT(Pack, s64x2_sir(a, b.m.pi)); }
 	
 	OPERATORS_INT(S64x2);
 
@@ -1507,28 +1523,28 @@ union u32x<1> {
 	Scalar s[1];
 	Scalar m;
 	
-	FORCEINLINE        Pack  operator-()            const { return {-m}; }
-	FORCEINLINE        Pack  operator~()            const { return {~m}; }
-	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
-	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
-	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
-	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
-	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
-	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
-	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
-	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
-	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
-	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
-	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
-	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
-	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
-	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
-	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
-	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
-	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
-	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
-	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
-	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	forceinline        Pack  operator-()            const { return {-m}; }
+	forceinline        Pack  operator~()            const { return {~m}; }
+	forceinline	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	forceinline	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	forceinline	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	forceinline	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	forceinline	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	forceinline	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	forceinline	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	forceinline	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	forceinline	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	forceinline	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	forceinline	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	forceinline	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	forceinline	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	forceinline	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	forceinline	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	forceinline	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	forceinline	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	forceinline	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	forceinline	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	forceinline	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
 	
 	OPERATORS_INT(U32x1);
 
@@ -1547,28 +1563,28 @@ union u32x<4> {
 	Scalar s[4];
 	M16 m;
 	
-	FORCEINLINE        u32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
-	FORCEINLINE        u32x4  operator~()          const { RETURN_M(m16_not(m.ps)); }
-	FORCEINLINE	       u32x4  operator+ (u32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator- (u32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator* (u32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator/ (u32x4 b)  const { RETURN_M(_mm_div_epu32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator% (u32x4 b)  const { RETURN_M(_mm_rem_epu32  (m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator^ (u32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x4  operator& (u32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x4  operator| (u32x4 b)  const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	       u32x4  operator<<(u32x4 b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator>>(u32x4 b)  const { RETURN_M(u32x4_sr(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator< (u32x4 b)  const { RETURN_MASK(u32x4_lt(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator> (u32x4 b)  const { RETURN_MASK(u32x4_gt(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator<=(u32x4 b)  const { RETURN_MASK(u32x4_le(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator>=(u32x4 b)  const { RETURN_MASK(u32x4_ge(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator==(u32x4 b)  const { RETURN_MASK(u32x4_eq(m.pi, b.m.pi)); }
-	FORCEINLINE	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(u32x4_ne(m.pi, b.m.pi)); }
-	FORCEINLINE	       u32x4  operator<<(u32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
-	FORCEINLINE	       u32x4  operator>>(u32   b)  const { RETURN_M(u32x4_sri(m.pi, b)); }
-	FORCEINLINE	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_MT(u32x4, i32x4_sil(a, b.m.pi)); }
-	FORCEINLINE	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_MT(u32x4, u32x4_sir(a, b.m.pi)); }
+	forceinline        u32x4  operator-()          const { RETURN_M(_mm_sub_epi32(_mm_setzero_pi(), m.pi)); }
+	forceinline        u32x4  operator~()          const { RETURN_M(m16_not(m.ps)); }
+	forceinline	       u32x4  operator+ (u32x4 b)  const { RETURN_M(_mm_add_epi32  (m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator- (u32x4 b)  const { RETURN_M(_mm_sub_epi32  (m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator* (u32x4 b)  const { RETURN_M(_mm_mullo_epi32(m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator/ (u32x4 b)  const { RETURN_M(_mm_div_epu32  (m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator% (u32x4 b)  const { RETURN_M(_mm_rem_epu32  (m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator^ (u32x4 b)  const { RETURN_M(_mm_xor_ps(m.ps, b.m.ps)); }
+	forceinline	       u32x4  operator& (u32x4 b)  const { RETURN_M(_mm_and_ps(m.ps, b.m.ps)); }
+	forceinline	       u32x4  operator| (u32x4 b)  const { RETURN_M(_mm_or_ps (m.ps, b.m.ps)); }
+	forceinline	       u32x4  operator<<(u32x4 b)  const { RETURN_M(i32x4_sl(m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator>>(u32x4 b)  const { RETURN_M(u32x4_sr(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator< (u32x4 b)  const { RETURN_MASK(u32x4_lt(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator> (u32x4 b)  const { RETURN_MASK(u32x4_gt(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator<=(u32x4 b)  const { RETURN_MASK(u32x4_le(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator>=(u32x4 b)  const { RETURN_MASK(u32x4_ge(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator==(u32x4 b)  const { RETURN_MASK(u32x4_eq(m.pi, b.m.pi)); }
+	forceinline	       b32x4  operator!=(u32x4 b)  const { RETURN_MASK(u32x4_ne(m.pi, b.m.pi)); }
+	forceinline	       u32x4  operator<<(u32   b)  const { RETURN_M(i32x4_sli(m.pi, b)); }
+	forceinline	       u32x4  operator>>(u32   b)  const { RETURN_M(u32x4_sri(m.pi, b)); }
+	forceinline	friend u32x4  operator<<(u32 a, u32x4 b) { RETURN_MT(u32x4, i32x4_sil(a, b.m.pi)); }
+	forceinline	friend u32x4  operator>>(u32 a, u32x4 b) { RETURN_MT(u32x4, u32x4_sir(a, b.m.pi)); }
 
 	OPERATORS_INT(U32x4);
 
@@ -1594,13 +1610,13 @@ union u32x<8> {
 #endif
 
 #if ARCH_AVX2
-	FORCEINLINE u32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
-	FORCEINLINE u32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
-	FORCEINLINE	u32x8 operator+(u32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator-(u32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator*(u32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
+	forceinline u32x8 operator-() const { RETURN_M(_mm256_sub_epi32(_mm256_setzero_pi(), m.pi)); }
+	forceinline u32x8 operator~() const { RETURN_M(m32_not_ps(m.ps)); }
+	forceinline	u32x8 operator+(u32x8 b) const { RETURN_M(_mm256_add_epi32  (m.pi, b.m.pi)); }
+	forceinline	u32x8 operator-(u32x8 b) const { RETURN_M(_mm256_sub_epi32  (m.pi, b.m.pi)); }
+	forceinline	u32x8 operator*(u32x8 b) const { RETURN_M(_mm256_mullo_epi32(m.pi, b.m.pi)); }
 #if COMPILER_GCC
-	FORCEINLINE u32x8 operator/(u32x8 b) const {
+	forceinline u32x8 operator/(u32x8 b) const {
 		return {
 			s[0] / b.s[0],
 			s[1] / b.s[1],
@@ -1612,7 +1628,7 @@ union u32x<8> {
 			s[7] / b.s[7],
 		};
 	}
-	FORCEINLINE u32x8 operator%(u32x8 b) const {
+	forceinline u32x8 operator%(u32x8 b) const {
 		return {
 			s[0] % b.s[0],
 			s[1] % b.s[1],
@@ -1625,29 +1641,29 @@ union u32x<8> {
 		};
 	}
 #else
-	FORCEINLINE	u32x8 operator/(u32x8 b) const { RETURN_M(_mm256_div_epu32  (m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator%(u32x8 b) const { RETURN_M(_mm256_rem_epu32  (m.pi, b.m.pi)); }
+	forceinline	u32x8 operator/(u32x8 b) const { RETURN_M(_mm256_div_epu32  (m.pi, b.m.pi)); }
+	forceinline	u32x8 operator%(u32x8 b) const { RETURN_M(_mm256_rem_epu32  (m.pi, b.m.pi)); }
 #endif
-	FORCEINLINE	u32x8 operator^(u32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	u32x8 operator&(u32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	u32x8 operator|(u32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
-	FORCEINLINE	b32x8 operator< (u32x8 b) const { RETURN_MASK(u32x8_lt(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator> (u32x8 b) const { RETURN_MASK(u32x8_gt(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator<=(u32x8 b) const { RETURN_MASK(u32x8_le(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator>=(u32x8 b) const { RETURN_MASK(u32x8_ge(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator==(u32x8 b) const { RETURN_MASK(u32x8_eq(m.pi, b.m.pi)); }
-	FORCEINLINE	b32x8 operator!=(u32x8 b) const { RETURN_MASK(u32x8_ne(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator<<(u32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator>>(u32x8 b) const { RETURN_M(u32x8_sr(m.pi, b.m.pi)); }
-	FORCEINLINE	u32x8 operator<<(u32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
-	FORCEINLINE	u32x8 operator>>(u32   b) const { RETURN_M(u32x8_sri(m.pi, b)); }
-	FORCEINLINE	friend u32x8 operator<<(u32 a, u32x8 b) { RETURN_MT(u32x8, i32x8_sil(a, b.m.pi)); }
-	FORCEINLINE	friend u32x8 operator>>(u32 a, u32x8 b) { RETURN_MT(u32x8, u32x8_sir(a, b.m.pi)); }
+	forceinline	u32x8 operator^(u32x8 b) const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	forceinline	u32x8 operator&(u32x8 b) const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	forceinline	u32x8 operator|(u32x8 b) const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	forceinline	b32x8 operator< (u32x8 b) const { RETURN_MASK(u32x8_lt(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator> (u32x8 b) const { RETURN_MASK(u32x8_gt(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator<=(u32x8 b) const { RETURN_MASK(u32x8_le(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator>=(u32x8 b) const { RETURN_MASK(u32x8_ge(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator==(u32x8 b) const { RETURN_MASK(u32x8_eq(m.pi, b.m.pi)); }
+	forceinline	b32x8 operator!=(u32x8 b) const { RETURN_MASK(u32x8_ne(m.pi, b.m.pi)); }
+	forceinline	u32x8 operator<<(u32x8 b) const { RETURN_M(i32x8_sl(m.pi, b.m.pi)); }
+	forceinline	u32x8 operator>>(u32x8 b) const { RETURN_M(u32x8_sr(m.pi, b.m.pi)); }
+	forceinline	u32x8 operator<<(u32   b) const { RETURN_M(i32x8_sli(m.pi, b)); }
+	forceinline	u32x8 operator>>(u32   b) const { RETURN_M(u32x8_sri(m.pi, b)); }
+	forceinline	friend u32x8 operator<<(u32 a, u32x8 b) { RETURN_MT(u32x8, i32x8_sil(a, b.m.pi)); }
+	forceinline	friend u32x8 operator>>(u32 a, u32x8 b) { RETURN_MT(u32x8, u32x8_sir(a, b.m.pi)); }
 #elif ARCH_AVX
-	FORCEINLINE u32x8 operator~()          const { RETURN_M(m32_not_ps(m.ps)); }
-	FORCEINLINE	u32x8 operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	u32x8 operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
-	FORCEINLINE	u32x8 operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
+	forceinline u32x8 operator~()          const { RETURN_M(m32_not_ps(m.ps)); }
+	forceinline	u32x8 operator^ (u32x8 b)  const { RETURN_M(_mm256_xor_ps(m.ps, b.m.ps)); }
+	forceinline	u32x8 operator& (u32x8 b)  const { RETURN_M(_mm256_and_ps(m.ps, b.m.ps)); }
+	forceinline	u32x8 operator| (u32x8 b)  const { RETURN_M(_mm256_or_ps (m.ps, b.m.ps)); }
 	FALLBACK_INT_NO_BITWISE;
 #else
 	FALLBACK_INT;
@@ -1670,28 +1686,28 @@ union u64x<1> {
 	Scalar s[1];
 	Scalar m;
 	
-	FORCEINLINE        Pack  operator-()            const { return {-m}; }
-	FORCEINLINE        Pack  operator~()            const { return {~m}; }
-	FORCEINLINE	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
-	FORCEINLINE	       Pack  operator- (Pack b)     const { return {m - b.m}; }
-	FORCEINLINE	       Pack  operator* (Pack b)     const { return {m * b.m}; }
-	FORCEINLINE	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
-	FORCEINLINE	       Pack  operator% (Pack b)     const { return {m % b.m}; }
-	FORCEINLINE	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
-	FORCEINLINE	       Pack  operator& (Pack b)     const { return {m & b.m}; }
-	FORCEINLINE	       Pack  operator| (Pack b)     const { return {m | b.m}; }
-	FORCEINLINE	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
-	FORCEINLINE	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
-	FORCEINLINE	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
-	FORCEINLINE	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
-	FORCEINLINE	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
-	FORCEINLINE	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
-	FORCEINLINE	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
-	FORCEINLINE	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
-	FORCEINLINE	       Pack  operator<<(Scalar b)   const { return {m << b}; }
-	FORCEINLINE	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
-	FORCEINLINE	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
-	FORCEINLINE	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
+	forceinline        Pack  operator-()            const { return {-m}; }
+	forceinline        Pack  operator~()            const { return {~m}; }
+	forceinline	       Pack  operator+ (Pack b)     const { return {m + b.m}; }
+	forceinline	       Pack  operator- (Pack b)     const { return {m - b.m}; }
+	forceinline	       Pack  operator* (Pack b)     const { return {m * b.m}; }
+	forceinline	       Pack  operator/ (Pack b)     const { return {m / b.m}; }
+	forceinline	       Pack  operator% (Pack b)     const { return {m % b.m}; }
+	forceinline	       Pack  operator^ (Pack b)     const { return {m ^ b.m}; }
+	forceinline	       Pack  operator& (Pack b)     const { return {m & b.m}; }
+	forceinline	       Pack  operator| (Pack b)     const { return {m | b.m}; }
+	forceinline	       Pack  operator<<(Pack b)     const { return {m << b.m}; }
+	forceinline	       Pack  operator>>(Pack b)     const { return {m >> b.m}; }
+	forceinline	       Mask  operator< (Pack b)     const { return TOMASK(m <  b.m); }
+	forceinline	       Mask  operator> (Pack b)     const { return TOMASK(m >  b.m); }
+	forceinline	       Mask  operator<=(Pack b)     const { return TOMASK(m <= b.m); }
+	forceinline	       Mask  operator>=(Pack b)     const { return TOMASK(m >= b.m); }
+	forceinline	       Mask  operator==(Pack b)     const { return TOMASK(m == b.m); }
+	forceinline	       Mask  operator!=(Pack b)     const { return TOMASK(m != b.m); }
+	forceinline	       Pack  operator<<(Scalar b)   const { return {m << b}; }
+	forceinline	       Pack  operator>>(Scalar b)   const { return {m >> b}; }
+	forceinline	friend Pack  operator<<(Scalar a, Pack b) { return {a << b.m}; }
+	forceinline	friend Pack  operator>>(Scalar a, Pack b) { return {a >> b.m}; }
 	
 	OPERATORS_INT(U64x1);
 
@@ -1701,77 +1717,77 @@ union u64x<1> {
 	INDEX_S(u64);
 };
 
-FORCEINLINE b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) != 0; }
-FORCEINLINE b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
+forceinline b32x4 B32x4(b32 a, b32 b, b32 c, b32 d) { return S32x4(a, b, c, d) != 0; }
+forceinline b32x8 B32x8(b32 a, b32 b, b32 c, b32 d, b32 e, b32 f, b32 g, b32 h) { return S32x8(a, b, c, d, e, f, g, h) != 0; }
 
 // clang-format off
-FORCEINLINE constexpr f32x1 F32x1(f32 m) { return {m}; }
-FORCEINLINE constexpr s32x1 S32x1(s32 m) { return {m}; }
-FORCEINLINE constexpr u32x1 U32x1(u32 m) { return {m}; }
+forceinline constexpr f32x1 F32x1(f32 m) { return {m}; }
+forceinline constexpr s32x1 S32x1(s32 m) { return {m}; }
+forceinline constexpr u32x1 U32x1(u32 m) { return {m}; }
 
-FORCEINLINE constexpr f64x1 F64x1(f64 m) { return {m}; }
-FORCEINLINE constexpr s64x1 S64x1(s64 m) { return {m}; }
-FORCEINLINE constexpr u64x1 U64x1(u64 m) { return {m}; }
+forceinline constexpr f64x1 F64x1(f64 m) { return {m}; }
+forceinline constexpr s64x1 S64x1(s64 m) { return {m}; }
+forceinline constexpr u64x1 U64x1(u64 m) { return {m}; }
 
-FORCEINLINE constexpr f32x4 F32x4(__m128 m) { RETURN_MT(f32x4, m); }
-FORCEINLINE constexpr s32x4 S32x4(__m128 m) { RETURN_MT(s32x4, m); }
-FORCEINLINE constexpr u32x4 U32x4(__m128 m) { RETURN_MT(u32x4, m); }
+forceinline constexpr f32x4 F32x4(__m128 m) { RETURN_MT(f32x4, m); }
+forceinline constexpr s32x4 S32x4(__m128 m) { RETURN_MT(s32x4, m); }
+forceinline constexpr u32x4 U32x4(__m128 m) { RETURN_MT(u32x4, m); }
 
-FORCEINLINE constexpr f32x4 F32x4(M16 m) { RETURN_MT(f32x4, m.ps); }
-FORCEINLINE constexpr s32x4 S32x4(M16 m) { RETURN_MT(s32x4, m.ps); }
-FORCEINLINE constexpr u32x4 U32x4(M16 m) { RETURN_MT(u32x4, m.ps); }
+forceinline constexpr f32x4 F32x4(M16 m) { RETURN_MT(f32x4, m.ps); }
+forceinline constexpr s32x4 S32x4(M16 m) { RETURN_MT(s32x4, m.ps); }
+forceinline constexpr u32x4 U32x4(M16 m) { RETURN_MT(u32x4, m.ps); }
 
-FORCEINLINE f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { RETURN_MT(f32x4, _mm_setr_ps(i, j, k, l)); }
-FORCEINLINE s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { RETURN_MT(s32x4, _mm_setr_epi32(i, j, k, l)); }
-FORCEINLINE u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { RETURN_MT(u32x4, _mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l)); }
-FORCEINLINE f64x2 F64x2(f64 i, f64 j) { RETURN_MT(f64x2, _mm_setr_pd(i, j)); }
-FORCEINLINE s64x2 S64x2(s64 i, s64 j) { RETURN_MT(s64x2, s64x2_set(i, j)); }
+forceinline f32x4 F32x4(f32 i, f32 j, f32 k, f32 l) { RETURN_MT(f32x4, _mm_setr_ps(i, j, k, l)); }
+forceinline s32x4 S32x4(s32 i, s32 j, s32 k, s32 l) { RETURN_MT(s32x4, _mm_setr_epi32(i, j, k, l)); }
+forceinline u32x4 U32x4(u32 i, u32 j, u32 k, u32 l) { RETURN_MT(u32x4, _mm_setr_epi32((s32)i, (s32)j, (s32)k, (s32)l)); }
+forceinline f64x2 F64x2(f64 i, f64 j) { RETURN_MT(f64x2, _mm_setr_pd(i, j)); }
+forceinline s64x2 S64x2(s64 i, s64 j) { RETURN_MT(s64x2, s64x2_set(i, j)); }
 
-FORCEINLINE f32x4 F32x4(f32 v) { RETURN_MT(f32x4, f32x4_broadcast(v)); }
-FORCEINLINE s32x4 S32x4(s32 v) { RETURN_MT(s32x4, s32x4_broadcast(v)); }
-FORCEINLINE u32x4 U32x4(u32 v) { RETURN_MT(u32x4, u32x4_broadcast(v)); }
-FORCEINLINE f64x2 F64x2(f64 v) { RETURN_MT(f64x2, f64x2_broadcast(v)); }
-FORCEINLINE s64x2 S64x2(s64 v) { RETURN_MT(s64x2, s64x2_broadcast(v)); }
-//FORCEINLINE u64x2 U64x2(u64 v) { RETURN_MT(u64x2, u64x2_broadcast(v)); }
+forceinline f32x4 F32x4(f32 v) { RETURN_MT(f32x4, f32x4_broadcast(v)); }
+forceinline s32x4 S32x4(s32 v) { RETURN_MT(s32x4, s32x4_broadcast(v)); }
+forceinline u32x4 U32x4(u32 v) { RETURN_MT(u32x4, u32x4_broadcast(v)); }
+forceinline f64x2 F64x2(f64 v) { RETURN_MT(f64x2, f64x2_broadcast(v)); }
+forceinline s64x2 S64x2(s64 v) { RETURN_MT(s64x2, s64x2_broadcast(v)); }
+//forceinline u64x2 U64x2(u64 v) { RETURN_MT(u64x2, u64x2_broadcast(v)); }
 
 #if ARCH_AVX
-FORCEINLINE f32x8 F32x8(f32 v) { RETURN_MT(f32x8, f32x8_broadcast(v)); }
-FORCEINLINE s32x8 S32x8(s32 v) { RETURN_MT(s32x8, s32x8_broadcast(v)); }
-FORCEINLINE u32x8 U32x8(u32 v) { RETURN_MT(u32x8, u32x8_broadcast(v)); }
-FORCEINLINE f64x4 F64x4(f64 v) { RETURN_MT(f64x4, f64x4_broadcast(v)); }
-//FORCEINLINE s64x4 S64x4(s64 v) { RETURN_MT(s64x4, s64x4_broadcast(v)); }
-//FORCEINLINE u64x4 U64x4(u64 v) { RETURN_MT(u64x4, u64x4_broadcast(v)); }
+forceinline f32x8 F32x8(f32 v) { RETURN_MT(f32x8, f32x8_broadcast(v)); }
+forceinline s32x8 S32x8(s32 v) { RETURN_MT(s32x8, s32x8_broadcast(v)); }
+forceinline u32x8 U32x8(u32 v) { RETURN_MT(u32x8, u32x8_broadcast(v)); }
+forceinline f64x4 F64x4(f64 v) { RETURN_MT(f64x4, f64x4_broadcast(v)); }
+//forceinline s64x4 S64x4(s64 v) { RETURN_MT(s64x4, s64x4_broadcast(v)); }
+//forceinline u64x4 U64x4(u64 v) { RETURN_MT(u64x4, u64x4_broadcast(v)); }
 
-FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_MT(f32x8, _mm256_setr_ps(a, b, c, d, e, f, g, h)); }
-FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_MT(s32x8, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
-FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_MT(u32x8, _mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)e, (s32)f, (s32)g, (s32)h)); }
+forceinline f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_MT(f32x8, _mm256_setr_ps(a, b, c, d, e, f, g, h)); }
+forceinline s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_MT(s32x8, _mm256_setr_epi32(a, b, c, d, e, f, g, h)); }
+forceinline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_MT(u32x8, _mm256_setr_epi32((s32)a, (s32)b, (s32)c, (s32)d, (s32)e, (s32)f, (s32)g, (s32)h)); }
 
-FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT(f32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
-FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT(s32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
-FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT(u32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
+forceinline f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT(f32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
+forceinline s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT(s32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
+forceinline u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT(u32x8, _mm256_setr_m128(m0.m.ps, m1.m.ps)); }
 
-FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_MT(f64x4, _mm256_setr_pd(i, j, k, l)); }
+forceinline f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_MT(f64x4, _mm256_setr_pd(i, j, k, l)); }
 #else
-FORCEINLINE f32x8 F32x8(f32 v) { RETURN_T2(f32x8, F32x4(v), F32x4(v)); }
-FORCEINLINE s32x8 S32x8(s32 v) { RETURN_T2(s32x8, S32x4(v), S32x4(v)); }
-FORCEINLINE u32x8 U32x8(u32 v) { RETURN_T2(u32x8, U32x4(v), U32x4(v)); }
-FORCEINLINE f64x4 F64x4(f64 v) { RETURN_T2(f64x4, F64x2(v), F64x2(v)); }
-//FORCEINLINE s64x4 S64x4(s64 v) { RETURN_T2(s64x4, S64x2(v), S64x2(v)); }
-//FORCEINLINE u64x4 U64x4(u64 v) { RETURN_T2(u64x4, U64x2(v), U64x2(v)); }
+forceinline f32x8 F32x8(f32 v) { RETURN_T2(f32x8, F32x4(v), F32x4(v)); }
+forceinline s32x8 S32x8(s32 v) { RETURN_T2(s32x8, S32x4(v), S32x4(v)); }
+forceinline u32x8 U32x8(u32 v) { RETURN_T2(u32x8, U32x4(v), U32x4(v)); }
+forceinline f64x4 F64x4(f64 v) { RETURN_T2(f64x4, F64x2(v), F64x2(v)); }
+//forceinline s64x4 S64x4(s64 v) { RETURN_T2(s64x4, S64x2(v), S64x2(v)); }
+//forceinline u64x4 U64x4(u64 v) { RETURN_T2(u64x4, U64x2(v), U64x2(v)); }
 
-FORCEINLINE f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_T2(f32x8, F32x4(a, b, c, d), F32x4(e, f, g, h)); }
-FORCEINLINE s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_T2(s32x8, S32x4(a, b, c, d), S32x4(e, f, g, h)); }
-FORCEINLINE u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_T2(u32x8, U32x4(a, b, c, d), U32x4(e, f, g, h)); }
+forceinline f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) { RETURN_T2(f32x8, F32x4(a, b, c, d), F32x4(e, f, g, h)); }
+forceinline s32x8 S32x8(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h) { RETURN_T2(s32x8, S32x4(a, b, c, d), S32x4(e, f, g, h)); }
+forceinline u32x8 U32x8(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f, u32 g, u32 h) { RETURN_T2(u32x8, U32x4(a, b, c, d), U32x4(e, f, g, h)); }
 
-FORCEINLINE f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT2(f32x8, m0.m, m1.m); }
-FORCEINLINE s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT2(s32x8, m0.m, m1.m); }
-FORCEINLINE u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT2(u32x8, m0.m, m1.m); }
+forceinline f32x8 F32x8(f32x4 m0, f32x4 m1) { RETURN_MT2(f32x8, m0.m, m1.m); }
+forceinline s32x8 S32x8(s32x4 m0, s32x4 m1) { RETURN_MT2(s32x8, m0.m, m1.m); }
+forceinline u32x8 U32x8(u32x4 m0, u32x4 m1) { RETURN_MT2(u32x8, m0.m, m1.m); }
 
-FORCEINLINE f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_T2(f64x4, F64x2(i, j), F64x2(k, l)); }
+forceinline f64x4 F64x4(f64 i, f64 j, f64 k, f64 l) { RETURN_T2(f64x4, F64x2(i, j), F64x2(k, l)); }
 #endif
 
 #define X(f32, F32, p) \
-template<> FORCEINLINE f32##x<p> F32##x<p> (f32 val){ return F32##x##p(val); } \
+template<> forceinline f32##x<p> F32##x<p> (f32 val){ return F32##x##p(val); } \
 
 #define P(f32, F32) \
 X(f32, F32, 4) \
@@ -1785,40 +1801,40 @@ P(u32, U32)
 #undef P
 #undef X
 
-FORCEINLINE f32x4::operator s32x4() const { RETURN_MT(s32x4, _mm_cvtps_epi32(m.ps)); }
-FORCEINLINE f32x4::operator u32x4() const { RETURN_MT(u32x4, _mm_cvtps_epi32(m.ps)); }
-FORCEINLINE s32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_cvtepi32_ps(m.pi)); }
-FORCEINLINE s32x4::operator u32x4() const { RETURN_MT(u32x4, m.ps); }
-FORCEINLINE u32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3])); }
-FORCEINLINE u32x4::operator s32x4() const { RETURN_MT(s32x4, m.ps); }
-FORCEINLINE f64x4::operator u32x4() const { RETURN_MT(u32x4, _mm_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3])); }
+forceinline f32x4::operator s32x4() const { RETURN_MT(s32x4, _mm_cvtps_epi32(m.ps)); }
+forceinline f32x4::operator u32x4() const { RETURN_MT(u32x4, _mm_cvtps_epi32(m.ps)); }
+forceinline s32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_cvtepi32_ps(m.pi)); }
+forceinline s32x4::operator u32x4() const { RETURN_MT(u32x4, m.ps); }
+forceinline u32x4::operator f32x4() const { RETURN_MT(f32x4, _mm_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3])); }
+forceinline u32x4::operator s32x4() const { RETURN_MT(s32x4, m.ps); }
+forceinline f64x4::operator u32x4() const { RETURN_MT(u32x4, _mm_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3])); }
 
 #if ARCH_AVX
-FORCEINLINE f32x8::operator s32x8() const { RETURN_MT(s32x8, _mm256_castpi_ps(_mm256_cvtps_epi32(m.ps))); }
-FORCEINLINE s32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_cvtepi32_ps(m.pi)); }
-FORCEINLINE u32x4::operator f64x4() const { RETURN_MT(f64x4, _mm256_castpd_ps(_mm256_setr_pd((f64)s[0], (f64)s[1], (f64)s[2], (f64)s[3]))); }
-FORCEINLINE f32x8::operator u32x8() const { RETURN_MT(u32x8, _mm256_castpi_ps(_mm256_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3], (u32)s[4], (u32)s[5], (u32)s[6], (u32)s[7]))); }
-FORCEINLINE s32x8::operator u32x8() const { RETURN_MT(u32x8, m.ps); }
-FORCEINLINE u32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3], (f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7])); }
-FORCEINLINE u32x8::operator s32x8() const { RETURN_MT(s32x8, m.ps); }
+forceinline f32x8::operator s32x8() const { RETURN_MT(s32x8, _mm256_castpi_ps(_mm256_cvtps_epi32(m.ps))); }
+forceinline s32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_cvtepi32_ps(m.pi)); }
+forceinline u32x4::operator f64x4() const { RETURN_MT(f64x4, _mm256_castpd_ps(_mm256_setr_pd((f64)s[0], (f64)s[1], (f64)s[2], (f64)s[3]))); }
+forceinline f32x8::operator u32x8() const { RETURN_MT(u32x8, _mm256_castpi_ps(_mm256_setr_epi32((u32)s[0], (u32)s[1], (u32)s[2], (u32)s[3], (u32)s[4], (u32)s[5], (u32)s[6], (u32)s[7]))); }
+forceinline s32x8::operator u32x8() const { RETURN_MT(u32x8, m.ps); }
+forceinline u32x8::operator f32x8() const { RETURN_MT(f32x8, _mm256_setr_ps((f32)s[0], (f32)s[1], (f32)s[2], (f32)s[3], (f32)s[4], (f32)s[5], (f32)s[6], (f32)s[7])); }
+forceinline u32x8::operator s32x8() const { RETURN_MT(s32x8, m.ps); }
 #else
-FORCEINLINE f32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
-FORCEINLINE s32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
-FORCEINLINE f32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
-FORCEINLINE s32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
-FORCEINLINE u32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
-FORCEINLINE u32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
-//FORCEINLINE u32x4::operator f64x4() const { RETURN_T2(f64x4, (f64x2)lo, (f64x2)hi); }
+forceinline f32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
+forceinline s32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
+forceinline f32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
+forceinline s32x8::operator u32x8() const { RETURN_T2(u32x8, (u32x4)lo, (u32x4)hi); }
+forceinline u32x8::operator f32x8() const { RETURN_T2(f32x8, (f32x4)lo, (f32x4)hi); }
+forceinline u32x8::operator s32x8() const { RETURN_T2(s32x8, (s32x4)lo, (s32x4)hi); }
+//forceinline u32x4::operator f64x4() const { RETURN_T2(f64x4, (f64x2)lo, (f64x2)hi); }
 #endif
 
 #if ARCH_AVX2
-#define GATHER32x4(type) FORCEINLINE void gather(type &dst, void const *src, s32x4 offsets) { dst.m.ps = _mm_i32gather_ps((f32 const *)src, offsets.m.pi, 1); }
-#define GATHER32x8(type) FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) { dst.m.ps = _mm256_i32gather_ps((f32 const *)src, offsets.m.pi, 1); }
-#define GATHERMASK32x4(type) FORCEINLINE void gatherMask(type &dst, void const *src, s32x4 offsets, b32x4 mask, type def) { dst.m.ps = _mm_mask_i32gather_ps(def.m.ps, (f32*)src, offsets.m.pi, mask.m.ps, 1); }
-#define GATHERMASK32x8(type) FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) { dst.m.ps = _mm256_mask_i32gather_ps(def.m.ps, (f32*)src, offsets.m.pi, mask.m.ps, 1); }
+#define GATHER32x4(type) forceinline void gather(type &dst, void const *src, s32x4 offsets) { dst.m.ps = _mm_i32gather_ps((f32 const *)src, offsets.m.pi, 1); }
+#define GATHER32x8(type) forceinline void gather(type &dst, void const *src, s32x8 offsets) { dst.m.ps = _mm256_i32gather_ps((f32 const *)src, offsets.m.pi, 1); }
+#define GATHERMASK32x4(type) forceinline void gatherMask(type &dst, void const *src, s32x4 offsets, b32x4 mask, type def) { dst.m.ps = _mm_mask_i32gather_ps(def.m.ps, (f32*)src, offsets.m.pi, mask.m.ps, 1); }
+#define GATHERMASK32x8(type) forceinline void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) { dst.m.ps = _mm256_mask_i32gather_ps(def.m.ps, (f32*)src, offsets.m.pi, mask.m.ps, 1); }
 #else
 #define GATHER32x4(type)												\
-FORCEINLINE void gather(type &dst, void const *src, s32x4 offsets) {	\
+forceinline void gather(type &dst, void const *src, s32x4 offsets) {	\
 	dst.m.ps = _mm_setr_ps(												\
 		*(f32*)((u8 *)src + _mm_extract_epi32(offsets.m.pi, 0)),		\
 		*(f32*)((u8 *)src + _mm_extract_epi32(offsets.m.pi, 1)),		\
@@ -1826,7 +1842,7 @@ FORCEINLINE void gather(type &dst, void const *src, s32x4 offsets) {	\
 		*(f32*)((u8 *)src + _mm_extract_epi32(offsets.m.pi, 3)));		\
 }
 #define GATHERMASK32x4(type)																											\
-FORCEINLINE void gatherMask(type &dst, void const *src, s32x4 offsets, b32x4 mask, type def) {												\
+forceinline void gatherMask(type &dst, void const *src, s32x4 offsets, b32x4 mask, type def) {												\
 	dst.m.ps = _mm_setr_ps(																												\
 		_mm_extract_epi32(mask.m.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.m.pi, 0)) : _mm_extract_epi32(def.m.pi, 0),	\
 		_mm_extract_epi32(mask.m.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.m.pi, 1)) : _mm_extract_epi32(def.m.pi, 1),	\
@@ -1835,7 +1851,7 @@ FORCEINLINE void gatherMask(type &dst, void const *src, s32x4 offsets, b32x4 mas
 }
 #if ARCH_AVX
 #define GATHER32x8(type)												\
-FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {	\
+forceinline void gather(type &dst, void const *src, s32x8 offsets) {	\
 	dst.m.ps = _mm256_setr_ps(											\
 		*(f32*)((u8 *)(src) + _mm256_extract_epi32(offsets.m.pi, 0)),	\
 		*(f32*)((u8 *)(src) + _mm256_extract_epi32(offsets.m.pi, 1)),	\
@@ -1847,7 +1863,7 @@ FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {	\
 		*(f32*)((u8 *)(src) + _mm256_extract_epi32(offsets.m.pi, 7)));	\
 }
 #define GATHERMASK32x8(type)																															\
-FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {																\
+forceinline void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {																\
 	f32 buf[8];																																			\
 	_mm256_storeu_ps(buf, def.m.ps);																													\
 	dst.m.ps = _mm256_setr_ps(																															\
@@ -1862,7 +1878,7 @@ FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mas
 }
 #else
 #define GATHER32x8(type)											   \
-FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {   \
+forceinline void gather(type &dst, void const *src, s32x8 offsets) {   \
 	dst.lo.m.ps = _mm_setr_ps(										   \
 		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 0)),  \
 		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 1)),  \
@@ -1875,7 +1891,7 @@ FORCEINLINE void gather(type &dst, void const *src, s32x8 offsets) {   \
 		*(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.hi.m.pi, 3))); \
 }
 #define GATHERMASK32x8(type)																												    \
-FORCEINLINE void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {												    \
+forceinline void gatherMask(type &dst, void const *src, s32x8 offsets, b32x8 mask, type def) {												    \
 	dst.lo.m.ps = _mm_setr_ps(																												    \
 		_mm_extract_epi32(mask.lo.m.pi, 0) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 0)) : _mm_extract_epi32(def.lo.m.pi, 0),	\
 		_mm_extract_epi32(mask.lo.m.pi, 1) ? *(f32*)((u8 *)(src) + _mm_extract_epi32(offsets.lo.m.pi, 1)) : _mm_extract_epi32(def.lo.m.pi, 1),	\
@@ -1913,18 +1929,18 @@ GATHERMASK32x8(u32x8)
 template <class T>
 T load(void const *src) = delete;
 
-#define LOADx1(type) template<> FORCEINLINE type load(void const *src) { return *(type *)src; }
+#define LOADx1(type) template<> forceinline type load(void const *src) { return *(type *)src; }
 
-#define LOAD32x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_ps((f32 const *)src)); }
+#define LOAD32x4(type) template<> forceinline type load(void const *src) { RETURN_MT(type, _mm_loadu_ps((f32 const *)src)); }
 
-#define LOAD64x2(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm_loadu_pd((f64 const *)src)); }
+#define LOAD64x2(type) template<> forceinline type load(void const *src) { RETURN_MT(type, _mm_loadu_pd((f64 const *)src)); }
 
 #if ARCH_AVX
-#define LOAD32x8(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm256_loadu_ps((f32 const *)src)); }
-#define LOAD64x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_MT(type, _mm256_loadu_pd((f64 const *)src)); }
+#define LOAD32x8(type) template<> forceinline type load(void const *src) { RETURN_MT(type, _mm256_loadu_ps((f32 const *)src)); }
+#define LOAD64x4(type) template<> forceinline type load(void const *src) { RETURN_MT(type, _mm256_loadu_pd((f64 const *)src)); }
 #else
-#define LOAD32x8(type) template<> FORCEINLINE type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f32 *)src + 4)); }
-#define LOAD64x4(type) template<> FORCEINLINE type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f64 *)src + 2)); }
+#define LOAD32x8(type) template<> forceinline type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f32 *)src + 4)); }
+#define LOAD64x4(type) template<> forceinline type load(void const *src) { RETURN_T2(type, load<Half<type>>(src), load<Half<type>>((f64 *)src + 2)); }
 #endif
 
 LOADx1(b32x1)
@@ -1973,18 +1989,18 @@ template <class T>
 T loadMask(void const *src, b32x<widthOf<T>> mask) = delete;
 
 #if ARCH_AVX
-#define LOADMASK32x4(type) template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) { RETURN_MT(type, _mm_maskload_ps((f32 *)src, mask.m.pi)); }
-#define LOADMASK32x8(type) template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) { RETURN_MT(type, _mm256_maskload_ps((f32 *)src, mask.m.pi)); }
+#define LOADMASK32x4(type) template<> forceinline type loadMask(void const *src, b32x<4> mask) { RETURN_MT(type, _mm_maskload_ps((f32 *)src, mask.m.pi)); }
+#define LOADMASK32x8(type) template<> forceinline type loadMask(void const *src, b32x<8> mask) { RETURN_MT(type, _mm256_maskload_ps((f32 *)src, mask.m.pi)); }
 #else
 #define LOADMASK32x4(type)															        \
-template<> FORCEINLINE type loadMask(void const *src, b32x<4> mask) {				        \
+template<> forceinline type loadMask(void const *src, b32x<4> mask) {				        \
 	RETURN_MT(type, _mm_setr_ps(_mm_extract_epi32(mask.m.pi, 0) ? ((f32 *)src)[0] : 0.0f,   \
 						        _mm_extract_epi32(mask.m.pi, 1) ? ((f32 *)src)[1] : 0.0f,   \
 						        _mm_extract_epi32(mask.m.pi, 2) ? ((f32 *)src)[2] : 0.0f,   \
 						        _mm_extract_epi32(mask.m.pi, 3) ? ((f32 *)src)[3] : 0.0f)); \
 }
 #define LOADMASK32x8(type)														                        \
-template<> FORCEINLINE type loadMask(void const *src, b32x<8> mask) {			                        \
+template<> forceinline type loadMask(void const *src, b32x<8> mask) {			                        \
 	RETURN_T2(type, loadMask<Half<type>>(src, mask.lo), loadMask<Half<type>>((f32 *)src + 4, mask.hi)); \
 }
 #endif
@@ -2000,18 +2016,18 @@ LOADMASK32x8(u32x8)
 #undef LOADMASK32x8
 
 #if ARCH_AVX
-#define STOREMASK32x4(type) FORCEINLINE void storeMask(void *dst, type src, b32x<4> mask) { _mm_maskstore_ps((f32 *)dst, mask.m.pi, src.m.ps); }
-#define STOREMASK32x8(type) FORCEINLINE void storeMask(void *dst, type src, b32x<8> mask) { _mm256_maskstore_ps((f32 *)dst, mask.m.pi, src.m.ps); }
+#define STOREMASK32x4(type) forceinline void storeMask(void *dst, type src, b32x<4> mask) { _mm_maskstore_ps((f32 *)dst, mask.m.pi, src.m.ps); }
+#define STOREMASK32x8(type) forceinline void storeMask(void *dst, type src, b32x<8> mask) { _mm256_maskstore_ps((f32 *)dst, mask.m.pi, src.m.ps); }
 #else
 #define STOREMASK32x4(type)																\
-FORCEINLINE void storeMask(void *dst, type src, b32x<4> mask) {							\
+forceinline void storeMask(void *dst, type src, b32x<4> mask) {							\
 	if (_mm_extract_epi32(mask.m.pi, 0)) ((f32 *)dst)[0] = _mm_extract_ps(src.m.ps, 0);	\
 	if (_mm_extract_epi32(mask.m.pi, 1)) ((f32 *)dst)[1] = _mm_extract_ps(src.m.ps, 1);	\
 	if (_mm_extract_epi32(mask.m.pi, 2)) ((f32 *)dst)[2] = _mm_extract_ps(src.m.ps, 2);	\
 	if (_mm_extract_epi32(mask.m.pi, 3)) ((f32 *)dst)[3] = _mm_extract_ps(src.m.ps, 3);	\
 }
 #define STOREMASK32x8(type)										\
-FORCEINLINE void storeMask(void *dst, type src, b32x<8> mask) {	\
+forceinline void storeMask(void *dst, type src, b32x<8> mask) {	\
 	storeMask((f32 *)dst + 0, src.lo, mask.lo);                 \
 	storeMask((f32 *)dst + 4, src.hi, mask.hi);                 \
 }
@@ -2027,18 +2043,18 @@ STOREMASK32x8(u32x8)
 #undef STOREMASK32x4
 #undef STOREMASK32x8
 
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE f32x4 shuffle(f32x4 v) { RETURN_MT(f32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE s32x4 shuffle(s32x4 v) { RETURN_MT(s32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
-template<u8 s0, u8 s1, u8 s2, u8 s3> FORCEINLINE u32x4 shuffle(u32x4 v) { RETURN_MT(u32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
-//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE f32x8 shuffle(f32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
-//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE s32x8 shuffle(s32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
-//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> FORCEINLINE u32x8 shuffle(u32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
+template<u8 s0, u8 s1, u8 s2, u8 s3> forceinline f32x4 shuffle(f32x4 v) { RETURN_MT(f32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
+template<u8 s0, u8 s1, u8 s2, u8 s3> forceinline s32x4 shuffle(s32x4 v) { RETURN_MT(s32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
+template<u8 s0, u8 s1, u8 s2, u8 s3> forceinline u32x4 shuffle(u32x4 v) { RETURN_MT(u32x4, _mm_shuffle_ps(v.m.ps, v.m.ps, _MM_SHUFFLE(s3, s2, s1, s0))); }
+//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> forceinline f32x8 shuffle(f32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
+//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> forceinline s32x8 shuffle(s32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
+//template<u8 s0, u8 s1, u8 s2, u8 s3, u8 s4, u8 s5, u8 s6, u8 s7> forceinline u32x8 shuffle(u32x8 v) { v.m = ASM::shuffle32(v.m, U32x8(s0,s1,s2,s3,s4,s5,s6,s7).m); return v; }
 
 #if ARCH_AVX
-#define SHUFFLE32x4(type) FORCEINLINE type shuffle(type v, s32x4 s) { RETURN_MT(type, _mm_permutevar_ps(v.m.ps, s.m.pi)); }
+#define SHUFFLE32x4(type) forceinline type shuffle(type v, s32x4 s) { RETURN_MT(type, _mm_permutevar_ps(v.m.ps, s.m.pi)); }
 #else
 #define SHUFFLE32x4(type) \
-FORCEINLINE type shuffle(type v, s32x4 s) {\
+forceinline type shuffle(type v, s32x4 s) {\
 	__m128 idx = _mm_and_ps(s.m.ps, _mm_castpi_ps(_mm_set1_epi32(3)));\
 	idx = _mm_castpi_ps(_mm_mullo_epi16(_mm_castps_pi(_mm_or_ps(idx, _mm_castpi_ps(_mm_slli_pi(_mm_castps_pi(idx), 2)))), _mm_set1_epi16(4)));\
 	RETURN_MT(type, _mm_castpi_ps(_mm_shuffle_epi8(v.m.pi, _mm_add_epi8(_mm_castps_pi(_mm_or_ps(idx, _mm_castpi_ps(_mm_slli_pi(_mm_castps_pi(idx), 1)))), _mm_setr_epi8(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)))));\
@@ -2046,7 +2062,7 @@ FORCEINLINE type shuffle(type v, s32x4 s) {\
 #endif
 
 #if ARCH_AVX2
-#define SHUFFLE32x8(type) FORCEINLINE type shuffle(type v, s32x8 s) { RETURN_MT(type, _mm256_permutevar8x32_ps(v.m.ps, s.m.pi)); }
+#define SHUFFLE32x8(type) forceinline type shuffle(type v, s32x8 s) { RETURN_MT(type, _mm256_permutevar8x32_ps(v.m.ps, s.m.pi)); }
 #else
 #define SHUFFLE32x8(type)
 #endif
@@ -2064,13 +2080,13 @@ SHUFFLE32x8(u32x8)
 // clang-format on
 
 #define UOP2(op, ty, con) \
-	FORCEINLINE ty operator op() const { return {op x, op y}; }
+	forceinline ty operator op() const { return {op x, op y}; }
 #define UOP3(op, ty, con) \
-	FORCEINLINE ty operator op() const { return {op x, op y, op z}; }
+	forceinline ty operator op() const { return {op x, op y, op z}; }
 #define UOP4(op, ty, con) \
-	FORCEINLINE ty operator op() const { return {op x, op y, op z, op w}; }
+	forceinline ty operator op() const { return {op x, op y, op z, op w}; }
 #define UOP4M(op, ty, con) \
-	FORCEINLINE ty operator op() const { return con(op m); }
+	forceinline ty operator op() const { return con(op m); }
 
 #define UOP2C(op, ty, con) constexpr UOP2(op, ty, con)
 #define UOP3C(op, ty, con) constexpr UOP3(op, ty, con)
@@ -2081,29 +2097,29 @@ SHUFFLE32x8(u32x8)
 #define UOP4P(op, ty, con) UOP4(op, ty, con)
 
 #define BOP2(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return {x op b.x, y op b.y}; }
+	forceinline ty operator op(ty b) const { return {x op b.x, y op b.y}; }
 #define BOP3(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z}; }
+	forceinline ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z}; }
 #define BOP4(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z, w op b.w}; }
+	forceinline ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z, w op b.w}; }
 
 #define BOP2P(op, ty, con) BOP2(op, ty, con)
 #define BOP3P(op, ty, con) BOP3(op, ty, con)
 #define BOP4P(op, ty, con) BOP4(op, ty, con)
 
 #define BOP4M(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return con(m op b.m); }
+	forceinline ty operator op(ty b) const { return con(m op b.m); }
 
 #define BOP2C(op, ty, con) constexpr BOP2(op, ty, con)
 #define BOP3C(op, ty, con) constexpr BOP3(op, ty, con)
 #define BOP4C(op, ty, con) constexpr BOP4(op, ty, con)
 
 #define BOP2CMP(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y)}; }
+	forceinline ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y)}; }
 #define BOP3CMP(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y), _mask<ty>(z op b.z)}; }
+	forceinline ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y), _mask<ty>(z op b.z)}; }
 #define BOP4CMP(op, ty, con)                                                                         \
-	FORCEINLINE ty operator op(ty b) const {                                                                     \
+	forceinline ty operator op(ty b) const {                                                                     \
 		return {_mask<ty>(x op b.x), _mask<ty>(y op b.y), _mask<ty>(z op b.z), _mask<ty>(w op b.w)}; \
 	}
 
@@ -2114,7 +2130,7 @@ SHUFFLE32x8(u32x8)
 	BOP4P(op, ty, con) // mask operator op(ty b) const { return {x op b.x con y op b.y con z op b.z con w op b.w}; }
 
 #define BOP4MCMP(op, ty, con) \
-	FORCEINLINE ty operator op(ty b) const { return con(m op b.m); }
+	forceinline ty operator op(ty b) const { return con(m op b.m); }
 
 #define BOP2CCMP(op, ty, con) constexpr BOP2CMP(op, ty, con)
 #define BOP3CCMP(op, ty, con) constexpr BOP3CMP(op, ty, con)
@@ -2130,9 +2146,9 @@ SHUFFLE32x8(u32x8)
 #define BOPSS32(op, ty, con) BOPSS32_(CONCAT(B, op), CONCAT(U, op), ty, con)
 #define BOPSU32(op, ty, con) BOPSU32_(CONCAT(B, op), CONCAT(U, op), ty, con)
 
-#define VECCMP2(bool, v2) FORCEINLINE bool operator==(v2 b) const { return x == b.x && y == b.y; }
-#define VECCMP3(bool, v3) FORCEINLINE bool operator==(v3 b) const { return x == b.x && y == b.y && z == b.z; }
-#define VECCMP4(bool, v4) FORCEINLINE bool operator==(v4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
+#define VECCMP2(bool, v2) forceinline bool operator==(v2 b) const { return x == b.x && y == b.y; }
+#define VECCMP3(bool, v3) forceinline bool operator==(v3 b) const { return x == b.x && y == b.y && z == b.z; }
+#define VECCMP4(bool, v4) forceinline bool operator==(v4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
 
 #define MEMBERS2(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...) \
 	struct {                                                                                                   \
@@ -2177,35 +2193,35 @@ SHUFFLE32x8(u32x8)
 
 #define MEMBERS2S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS2(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
-	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
+	forceinline f32 operator[](umm i) const { return s[i]; }                                                      \
+	forceinline f32 &operator[](umm i) { return s[i]; }
 #define MEMBERS3S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS3(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
-	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
+	forceinline f32 operator[](umm i) const { return s[i]; }                                                      \
+	forceinline f32 &operator[](umm i) { return s[i]; }
 #define MEMBERS4S(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS4(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	FORCEINLINE f32 operator[](umm i) const { return s[i]; }                                                      \
-	FORCEINLINE f32 &operator[](umm i) { return s[i]; }
+	forceinline f32 operator[](umm i) const { return s[i]; }                                                      \
+	forceinline f32 &operator[](umm i) { return s[i]; }
 
 #define MEMBERS2P(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS2(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
 	f32x4 p[2];                                                                                                     \
 	v2 u[width];                                                                                                    \
-	FORCEINLINE v2 operator[](umm i) const { return u[i]; }                                                         \
-	FORCEINLINE v2 &operator[](umm i) { return u[i]; }
+	forceinline v2 operator[](umm i) const { return u[i]; }                                                         \
+	forceinline v2 &operator[](umm i) { return u[i]; }
 #define MEMBERS3P(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS3(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
 	f32x4 p[3];                                                                                                     \
 	v3 u[width];                                                                                                    \
-	FORCEINLINE v3 operator[](umm i) const { return u[i]; }                                                         \
-	FORCEINLINE v3 &operator[](umm i) { return u[i]; }
+	forceinline v3 operator[](umm i) const { return u[i]; }                                                         \
+	forceinline v3 &operator[](umm i) { return u[i]; }
 #define MEMBERS4P(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
 	MEMBERS4(width, bool, f32, v2, v3, v4, f32x4, v2x4, v3x4, v4x4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
 	f32x4 p[4];                                                                                                     \
 	v4 u[width];                                                                                                    \
-	FORCEINLINE v4 operator[](umm i) const { return u[i]; }                                                         \
-	FORCEINLINE v4 &operator[](umm i) { return u[i]; }
+	forceinline v4 operator[](umm i) const { return u[i]; }                                                         \
+	forceinline v4 &operator[](umm i) { return u[i]; }
 
 // clang-format off
 #define IMPL_v2f32x1() MEMFUNS_DATA(f32) MEMFUNS_BASIC(v2f, f32, V2f) BOPSF32(OP2C, v2f, V2f)
@@ -2251,12 +2267,12 @@ SHUFFLE32x8(u32x8)
 #define VECIMPL(dim, SorP, packSize, type) TYPES_##type##x##packSize(MEMBERS##dim##SorP, packSize, dim)
 
 
-template<> union v2fx<1> { VECIMPL(2, S, 1, f32); };
-template<> union v3fx<1> { VECIMPL(3, S, 1, f32); };
+template<> union v2fx<1> { VECIMPL(2, S, 1, f32); v2f yx() const { return {y, x}; } };
+template<> union v3fx<1> { VECIMPL(3, S, 1, f32); v3f yzx() const { return {y, z, x}; } };
 template<> union v4fx<1> { VECIMPL(4, S, 1, f32); };
 
 template<> union v2sx<1> { VECIMPL(2, S, 1, s32); };
-template<> union v3sx<1> { VECIMPL(3, S, 1, s32); };
+template<> union v3sx<1> { VECIMPL(3, S, 1, s32); v2s xz() const { return {x, z}; } };
 #if 1
 template<> union v4sx<1> { VECIMPL(4, S, 1, s32); };
 #else
@@ -2311,7 +2327,7 @@ template<> union v3ux<1> { VECIMPL(3, S, 1, u32); };
 template<> union v4ux<1> { VECIMPL(4, S, 1, u32); };
 
 template<> union v2fx<4> { VECIMPL(2, P, 4, f32); };
-template<> union v3fx<4> { VECIMPL(3, P, 4, f32); };
+template<> union v3fx<4> { VECIMPL(3, P, 4, f32); v3fx4 yzx() const { return {y, z, x}; } };
 template<> union v4fx<4> { VECIMPL(4, P, 4, f32); };
 
 template<> union v2sx<4> { VECIMPL(2, P, 4, s32); };
@@ -2323,7 +2339,7 @@ template<> union v3ux<4> { VECIMPL(3, P, 4, u32); };
 template<> union v4ux<4> { VECIMPL(4, P, 4, u32); };
 
 template<> union v2fx<8> { VECIMPL(2, P, 8, f32); };
-template<> union v3fx<8> { VECIMPL(3, P, 8, f32); };
+template<> union v3fx<8> { VECIMPL(3, P, 8, f32); v3fx8 yzx() const { return {y, z, x}; } };
 template<> union v4fx<8> { VECIMPL(4, P, 8, f32); };
 // clang-format on
 
@@ -2331,44 +2347,44 @@ template<>
 union v2sx<8> {
 	VECIMPL(2, P, 8, s32);
 	BOPSS32(OP2P, v2sx8, V2sx8);
-	FORCEINLINE v2sx8 operator<<(s32 b) const { return {x << b, y << b}; }
-	FORCEINLINE v2sx8 operator>>(s32 b) const { return {x >> b, y >> b}; }
+	forceinline v2sx8 operator<<(s32 b) const { return {x << b, y << b}; }
+	forceinline v2sx8 operator>>(s32 b) const { return {x >> b, y >> b}; }
 };
 template<>
 union v3sx<8> {
 	VECIMPL(3, P, 8, s32);
 	BOPSS32(OP3P, v3sx8, V3sx8);
-	FORCEINLINE v3sx8 operator<<(s32 b) const { return {x << b, y << b, z << b}; }
-	FORCEINLINE v3sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b}; }
+	forceinline v3sx8 operator<<(s32 b) const { return {x << b, y << b, z << b}; }
+	forceinline v3sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b}; }
 };
 template<>
 union v4sx<8> {
 	VECIMPL(4, P, 8, s32);
 	BOPSS32(OP4P, v4sx8, V4sx8);
-	FORCEINLINE v4sx8 operator<<(s32 b) const { return {x << b, y << b, z << b, w << b}; }
-	FORCEINLINE v4sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+	forceinline v4sx8 operator<<(s32 b) const { return {x << b, y << b, z << b, w << b}; }
+	forceinline v4sx8 operator>>(s32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 };
 
 template<>
 union v2ux<8> {
 	VECIMPL(2, P, 8, u32);
 	BOPSU32(OP2P, v2ux8, V2ux8);
-	FORCEINLINE v2ux8 operator<<(u32 b) const { return {x << b, y << b}; }
-	FORCEINLINE v2ux8 operator>>(u32 b) const { return {x >> b, y >> b}; }
+	forceinline v2ux8 operator<<(u32 b) const { return {x << b, y << b}; }
+	forceinline v2ux8 operator>>(u32 b) const { return {x >> b, y >> b}; }
 };
 template<>
 union v3ux<8> {
 	VECIMPL(3, P, 8, u32);
 	BOPSU32(OP3P, v3ux8, V3ux8);
-	FORCEINLINE v3ux8 operator<<(u32 b) const { return {x << b, y << b, z << b}; }
-	FORCEINLINE v3ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b}; }
+	forceinline v3ux8 operator<<(u32 b) const { return {x << b, y << b, z << b}; }
+	forceinline v3ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b}; }
 };
 template<>
 union v4ux<8> {
 	VECIMPL(4, P, 8, u32);
 	BOPSU32(OP4P, v4ux8, V4ux8);
-	FORCEINLINE v4ux8 operator<<(u32 b) const { return {x << b, y << b, z << b, w << b}; }
-	FORCEINLINE v4ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+	forceinline v4ux8 operator<<(u32 b) const { return {x << b, y << b, z << b, w << b}; }
+	forceinline v4ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 };
 
 union m2 {
@@ -2376,20 +2392,20 @@ union m2 {
 		v2f i, j;
 	};
 	f32 s[4];
-	FORCEINLINE v2f operator*(v2f b) const {
+	forceinline v2f operator*(v2f b) const {
 		v2f x = V2f(b.x) * i;
 		v2f y = V2f(b.y) * j;
 		return x + y;
 	}
-	FORCEINLINE m2 operator*(m2 b) const { return {*this * b.i, *this * b.j}; }
-	FORCEINLINE m2& operator*=(m2 b) { return *this = *this * b; }
-	static FORCEINLINE m2 identity() { 
+	forceinline m2 operator*(m2 b) const { return {*this * b.i, *this * b.j}; }
+	forceinline m2& operator*=(m2 b) { return *this = *this * b; }
+	static forceinline m2 identity() { 
 		return {
 			1, 0,
 			0, 1,
 		};
 	}
-	static FORCEINLINE m2 scaling(f32 x, f32 y) {
+	static forceinline m2 scale(f32 x, f32 y) {
 		// clang-format off
 		return {
 			x, 0,
@@ -2397,9 +2413,9 @@ union m2 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m2 scaling(v2f v) { return scaling(v.x, v.y); }
-	static FORCEINLINE m2 scaling(f32 v) { return scaling(v, v); }
-	static FORCEINLINE m2 rotation(f32 a) {
+	static forceinline m2 scale(v2f v) { return scale(v.x, v.y); }
+	static forceinline m2 scale(f32 v) { return scale(v, v); }
+	static forceinline m2 rotation(f32 a) {
 		f32 s, c;
 		sincos(a, s, c);
 		// clang-format off
@@ -2416,22 +2432,22 @@ union m3 {
 		v3f i, j, k;
 	};
 	f32 s[9];
-	FORCEINLINE v3f operator*(v3f b) const {
+	forceinline v3f operator*(v3f b) const {
 		v3f x = V3f(b.x) * i;
 		v3f y = V3f(b.y) * j;
 		v3f z = V3f(b.z) * k;
 		return x + y + z;
 	}
-	FORCEINLINE m3 operator*(m3 b) const { return {*this * b.i, *this * b.j, *this * b.k}; }
-	FORCEINLINE m3& operator*=(m3 b) { return *this = *this * b; }
-	static FORCEINLINE m3 identity() { 
+	forceinline m3 operator*(m3 b) const { return {*this * b.i, *this * b.j, *this * b.k}; }
+	forceinline m3& operator*=(m3 b) { return *this = *this * b; }
+	static forceinline m3 identity() { 
 		return {
 			1, 0, 0,
 			0, 1, 0,
 			0, 0, 1,
 		};
 	}
-	static FORCEINLINE m3 scaling(f32 x, f32 y, f32 z) {
+	static forceinline m3 scale(f32 x, f32 y, f32 z) {
 		// clang-format off
 		return {
 			x, 0, 0,
@@ -2440,10 +2456,10 @@ union m3 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m3 scaling(v3f v) { return scaling(v.x, v.y, v.z); }
-	static FORCEINLINE m3 scaling(v2f xy, f32 z) { return scaling(xy.x, xy.y, z); }
-	static FORCEINLINE m3 scaling(f32 v) { return scaling(v, v, v); }
-	static FORCEINLINE m3 translation(f32 x, f32 y) {
+	static forceinline m3 scale(v3f v) { return scale(v.x, v.y, v.z); }
+	static forceinline m3 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
+	static forceinline m3 scale(f32 v) { return scale(v, v, v); }
+	static forceinline m3 translation(f32 x, f32 y) {
 		// clang-format off
 		return {
 			1, 0, 0,
@@ -2452,9 +2468,9 @@ union m3 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m3 translation(v2f v) { return translation(v.x, v.y); }
-	static FORCEINLINE m3 translation(f32 v) { return translation(v, v); }
-	static FORCEINLINE m3 rotationX(f32 a) {
+	static forceinline m3 translation(v2f v) { return translation(v.x, v.y); }
+	static forceinline m3 translation(f32 v) { return translation(v, v); }
+	static forceinline m3 rotationX(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2464,7 +2480,7 @@ union m3 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m3 rotationY(f32 a) {
+	static forceinline m3 rotationY(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2474,7 +2490,7 @@ union m3 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m3 rotationZ(f32 a) {
+	static forceinline m3 rotationZ(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2493,14 +2509,14 @@ union m4 {
 	__m128 m[4];
 	v4f vectors[4];
 	f32 s[16];
-	FORCEINLINE v4f operator*(v4f b) const {
+	forceinline v4f operator*(v4f const &b) const {
 		v4f x = V4f(b.x) * i;
 		v4f y = V4f(b.y) * j;
 		v4f z = V4f(b.z) * k;
 		v4f w = V4f(b.w) * l;
 		return x + y + z + w;
 	}
-	FORCEINLINE v3f operator*(v3f b) const {
+	forceinline v3f operator*(v3f const &b) const {
 		auto x = V4f(b.x) * i;
 		auto y = V4f(b.y) * j;
 		auto z = V4f(b.z) * k;
@@ -2509,9 +2525,9 @@ union m4 {
 		memcpy(&result, &r, 12);
 		return result;
 	}
-	FORCEINLINE m4 operator*(m4 b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
-	FORCEINLINE m4& operator*=(m4 b) { return *this = *this * b; }
-	static FORCEINLINE m4 scaling(f32 x, f32 y, f32 z) {
+	forceinline m4 operator*(m4 const &b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
+	forceinline m4& operator*=(m4 const &b) { return *this = *this * b; }
+	static forceinline m4 scale(f32 x, f32 y, f32 z) {
 		// clang-format off
 		return {
 			x, 0, 0, 0,
@@ -2521,11 +2537,11 @@ union m4 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
-	static FORCEINLINE m4 scaling(v3f v) { return scaling(v.x, v.y, v.z); }
-	static FORCEINLINE m4 scaling(v2f xy, f32 z) { return scaling(xy.x, xy.y, z); }
-	static FORCEINLINE m4 scaling(f32 v) { return scaling(v, v, v); }
-	static FORCEINLINE m4 translation(f32 x, f32 y, f32 z) {
+	static forceinline m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
+	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
+	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
+	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
+	static forceinline m4 translation(f32 x, f32 y, f32 z) {
 		// clang-format off
 		return {
 			1, 0, 0, 0,
@@ -2535,10 +2551,10 @@ union m4 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
-	static FORCEINLINE m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
-	static FORCEINLINE m4 translation(f32 v) { return translation(v, v, v); }
-	static FORCEINLINE m4 perspective(f32 aspect, f32 fov, f32 nz, f32 fz) {
+	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
+	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
+	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
+	static forceinline m4 perspectiveLH(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 h	   = 1.0f / tanf(fov * 0.5f);
 		f32 w	   = h / aspect;
 		f32 fzdfmn = fz / (fz - nz);
@@ -2551,7 +2567,34 @@ union m4 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m4 rotationX(f32 a) {
+	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		f32 xymax = nz * tan(fov * 0.5f);
+		f32 width = xymax * 2;
+		f32 height = xymax * 2;
+		f32 depth = fz - nz;
+		f32 q = -(fz + nz) / depth;
+		f32 qn = -2 * (fz * nz) / depth;
+		f32 h = nz / xymax;
+		f32 w = h / aspect;
+
+		return {
+			w, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, q, -1,
+			0, 0, qn, 0,
+		};
+	}
+	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
+		f32 h = 1.0f / (height * 0.5f);
+		f32 rz = fz - nz;
+		return {
+			h / aspect, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, 1.0f / rz, 0,
+			0, 0, -nz / rz, 1,
+		};
+	}
+	static forceinline m4 rotationX(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2562,7 +2605,7 @@ union m4 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m4 rotationY(f32 a) {
+	static forceinline m4 rotationY(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2573,7 +2616,7 @@ union m4 {
 		};
 		// clang-format on
 	}
-	static FORCEINLINE m4 rotationZ(f32 a) {
+	static forceinline m4 rotationZ(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
@@ -2585,7 +2628,7 @@ union m4 {
 		// clang-format on
 	}
 	// Roll, Pitch, Yaw (ZXY)
-	static FORCEINLINE m4 rotationZXY(v3f v) {
+	static forceinline m4 rotationZXY(v3f v) {
 		v3f sin;
 		v3f cos;
 		sincos(v, sin, cos);
@@ -2604,8 +2647,9 @@ union m4 {
 		};
 		// clang-format on
 	}
+	static forceinline m4 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
 	// Yaw, Pitch, Roll (YXZ)
-	static FORCEINLINE m4 rotationYXZ(v3f v) {
+	static forceinline m4 rotationYXZ(v3f v) {
 		v3f sin;
 		v3f cos;
 		sincos(v, sin, cos);
@@ -2624,18 +2668,19 @@ union m4 {
 		};
 		// clang-format on
 	}
+	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
 	v4f &operator[](umm i) { return vectors[i]; }
 	v4f const &operator[](umm i) const { return vectors[i]; }
 };
 
 #undef CVT
 
-FORCEINLINE constexpr m3 transpose(m3 const& m) {
+forceinline constexpr m3 transpose(m3 const& m) {
 	return {
 		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
 	};
 }
-FORCEINLINE m4 transpose(m4 const& m) {
+forceinline m4 transpose(m4 const& m) {
 	__m128 tmp0 = _mm_unpacklo_ps(m.i.m.m.ps, m.j.m.m.ps);
 	__m128 tmp1 = _mm_unpackhi_ps(m.i.m.m.ps, m.j.m.m.ps);
 	__m128 tmp2 = _mm_unpacklo_ps(m.k.m.m.ps, m.l.m.m.ps);
@@ -2700,32 +2745,32 @@ inline m4 inverse(m4 const &m) {
 }
 
 #define V2(f32, v2f, V2f)                                     \
-	FORCEINLINE constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
-	FORCEINLINE constexpr v2f V2f(f32 v) { return {v, v}; }
+	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
+	forceinline constexpr v2f V2f(f32 v) { return {v, v}; }
 V2(f32, v2f, V2f);
 V2(s32, v2s, V2s);
 V2(u32, v2u, V2u);
 #undef V2
 
 #define V3(f32, v2f, v3f, V3f)                                          \
-	FORCEINLINE constexpr v3f V3f(f32 x, f32 y, f32 z) { return {x, y, z}; } \
-	FORCEINLINE constexpr v3f V3f(f32 v) { return {v, v, v}; }               \
-	FORCEINLINE constexpr v3f V3f(v2f xy, f32 z) { return {xy.x, xy.y, z}; } \
-	FORCEINLINE constexpr v3f V3f(f32 x, v2f yz) { return {x, yz.x, yz.y}; }
+	forceinline constexpr v3f V3f(f32 x, f32 y, f32 z) { return {x, y, z}; } \
+	forceinline constexpr v3f V3f(f32 v) { return {v, v, v}; }               \
+	forceinline constexpr v3f V3f(v2f xy, f32 z) { return {xy.x, xy.y, z}; } \
+	forceinline constexpr v3f V3f(f32 x, v2f yz) { return {x, yz.x, yz.y}; }
 V3(f32, v2f, v3f, V3f);
 V3(s32, v2s, v3s, V3s);
 V3(u32, v2u, v3u, V3u);
 #undef V3
 
 #define V4(f32, v2f, v3f, v4f, V4f, f32x4)                                        \
-	FORCEINLINE constexpr v4f V4f(f32 x, f32 y, f32 z, f32 w) { return {x, y, z, w}; } \
-	FORCEINLINE constexpr v4f V4f(f32 v) { return {v, v, v, v}; }                      \
-	FORCEINLINE constexpr v4f V4f(v2f xy, v2f zw) { return {xy.x, xy.y, zw.x, zw.y}; } \
-	FORCEINLINE constexpr v4f V4f(v2f xy, f32 z, f32 w) { return {xy.x, xy.y, z, w}; } \
-	FORCEINLINE constexpr v4f V4f(f32 x, f32 y, v2f zw) { return {x, y, zw.x, zw.y}; } \
-	FORCEINLINE constexpr v4f V4f(v3f xyz, f32 w) { return {xyz.x, xyz.y, xyz.z, w}; } \
-	FORCEINLINE constexpr v4f V4f(f32 x, v3f yzw) { return {x, yzw.x, yzw.y, yzw.z}; } \
-	FORCEINLINE constexpr v4f V4f(f32x4 v) {                                           \
+	forceinline constexpr v4f V4f(f32 x, f32 y, f32 z, f32 w) { return {x, y, z, w}; } \
+	forceinline constexpr v4f V4f(f32 v) { return {v, v, v, v}; }                      \
+	forceinline constexpr v4f V4f(v2f xy, v2f zw) { return {xy.x, xy.y, zw.x, zw.y}; } \
+	forceinline constexpr v4f V4f(v2f xy, f32 z, f32 w) { return {xy.x, xy.y, z, w}; } \
+	forceinline constexpr v4f V4f(f32 x, f32 y, v2f zw) { return {x, y, zw.x, zw.y}; } \
+	forceinline constexpr v4f V4f(v3f xyz, f32 w) { return {xyz.x, xyz.y, xyz.z, w}; } \
+	forceinline constexpr v4f V4f(f32 x, v3f yzw) { return {x, yzw.x, yzw.y, yzw.z}; } \
+	forceinline constexpr v4f V4f(f32x4 v) {                                           \
 		v4f r{};                                                                  \
 		return r.m = v, r;                                                        \
 	}
@@ -2735,7 +2780,7 @@ V4(u32, v2u, v3u, v4u, V4u, u32x4);
 #undef V4
 
 // clang-format off
-#define C(v4f, V4f) FORCEINLINE constexpr v4f V4f(v4f v) { return v; }
+#define C(v4f, V4f) forceinline constexpr v4f V4f(v4f v) { return v; }
 C(v2f, V2f) C(v2s, V2s) C(v2u, V2u);
 C(v3f, V3f) C(v3s, V3s) C(v3u, V3u);
 C(v4f, V4f) C(v4s, V4s) C(v4u, V4u);
@@ -2749,34 +2794,34 @@ C(v4fx8, V4fx8) C(v4sx8, V4sx8) C(v4ux8, V4ux8);
 // clang-format on
 
 #define V2x4(v2fx4, V2fx4, v2f, f32, f32x4, F32x4)                                            \
-	FORCEINLINE v2fx4 V2fx4(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly) { \
+	forceinline v2fx4 V2fx4(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly) { \
 		return {                                                                              \
 			F32x4(ix, jx, kx, lx),                                                            \
 			F32x4(iy, jy, ky, ly),                                                            \
 		};                                                                                    \
 	}                                                                                         \
-	FORCEINLINE v2fx4 V2fx4(v2f i, v2f j, v2f k, v2f l) {                                     \
+	forceinline v2fx4 V2fx4(v2f i, v2f j, v2f k, v2f l) {                                     \
 		return {                                                                              \
 			F32x4(i.x, j.x, k.x, l.x),                                                        \
 			F32x4(i.y, j.y, k.y, l.y),                                                        \
 		};                                                                                    \
 	}                                                                                         \
-	FORCEINLINE constexpr v2fx4 V2fx4(f32x4 x, f32x4 y) {                                     \
+	forceinline constexpr v2fx4 V2fx4(f32x4 x, f32x4 y) {                                     \
 		v2fx4 r{};                                                                            \
 		r.x = x;                                                                              \
 		r.y = y;                                                                              \
 		return r;                                                                             \
 	}                                                                                         \
-	FORCEINLINE constexpr v2fx4 V2fx4(M16 x, M16 y) {                                       \
+	forceinline constexpr v2fx4 V2fx4(M16 x, M16 y) {                                       \
 		v2fx4 r{};                                                                            \
 		r.x.m = x;                                                                            \
 		r.y.m = y;                                                                            \
 		return r;                                                                             \
 	}                                                                                         \
-	FORCEINLINE v2fx4 V2fx4(f32 x, f32 y) { return V2fx4(F32x4(x), F32x4(y)); }               \
-	FORCEINLINE v2fx4 V2fx4(f32 v) { return V2fx4(F32x4(v), F32x4(v)); }                      \
-	FORCEINLINE constexpr v2fx4 V2fx4(f32x4 v) { return V2fx4(v, v); }                        \
-	FORCEINLINE v2fx4 V2fx4(v2f v) { return V2fx4(F32x4(v.x), F32x4(v.y)); }
+	forceinline v2fx4 V2fx4(f32 x, f32 y) { return V2fx4(F32x4(x), F32x4(y)); }               \
+	forceinline v2fx4 V2fx4(f32 v) { return V2fx4(F32x4(v), F32x4(v)); }                      \
+	forceinline constexpr v2fx4 V2fx4(f32x4 v) { return V2fx4(v, v); }                        \
+	forceinline v2fx4 V2fx4(v2f v) { return V2fx4(F32x4(v.x), F32x4(v.y)); }
 
 V2x4(v2fx4, V2fx4, v2f, f32, f32x4, F32x4);
 V2x4(v2sx4, V2sx4, v2s, s32, s32x4, S32x4);
@@ -2784,7 +2829,7 @@ V2x4(v2ux4, V2ux4, v2u, u32, u32x4, U32x4);
 #undef V2x4
 
 #define V3x4(v3fx4, V3fx4, v3f, f32, f32x4, F32x4)                                                                  \
-	FORCEINLINE v3fx4 V3fx4(f32 ix, f32 iy, f32 iz, f32 jx, f32 jy, f32 jz, f32 kx, f32 ky, f32 kz, f32 lx, f32 ly, \
+	forceinline v3fx4 V3fx4(f32 ix, f32 iy, f32 iz, f32 jx, f32 jy, f32 jz, f32 kx, f32 ky, f32 kz, f32 lx, f32 ly, \
 							f32 lz) {                                                                               \
 		return {                                                                                                    \
 			F32x4(ix, jx, kx, lx),                                                                                  \
@@ -2792,31 +2837,31 @@ V2x4(v2ux4, V2ux4, v2u, u32, u32x4, U32x4);
 			F32x4(iz, jz, kz, lz),                                                                                  \
 		};                                                                                                          \
 	}                                                                                                               \
-	FORCEINLINE v3fx4 V3fx4(v3f i, v3f j, v3f k, v3f l) {                                                           \
+	forceinline v3fx4 V3fx4(v3f i, v3f j, v3f k, v3f l) {                                                           \
 		return {                                                                                                    \
 			F32x4(i.x, j.x, k.x, l.x),                                                                              \
 			F32x4(i.y, j.y, k.y, l.y),                                                                              \
 			F32x4(i.z, j.z, k.z, l.z),                                                                              \
 		};                                                                                                          \
 	}                                                                                                               \
-	FORCEINLINE constexpr v3fx4 V3fx4(f32x4 x, f32x4 y, f32x4 z) {                                                  \
+	forceinline constexpr v3fx4 V3fx4(f32x4 x, f32x4 y, f32x4 z) {                                                  \
 		v3fx4 r{};                                                                                                  \
 		r.x = x;                                                                                                    \
 		r.y = y;                                                                                                    \
 		r.z = z;                                                                                                    \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE constexpr v3fx4 V3fx4(M16 x, M16 y, M16 z) {                                                     \
+	forceinline constexpr v3fx4 V3fx4(M16 x, M16 y, M16 z) {                                                     \
 		v3fx4 r{};                                                                                                  \
 		r.x.m = x;                                                                                                  \
 		r.y.m = y;                                                                                                  \
 		r.z.m = z;                                                                                                  \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE v3fx4 V3fx4(f32 x, f32 y, f32 z) { return {F32x4(x), F32x4(y), F32x4(z)}; }                         \
-	FORCEINLINE v3fx4 V3fx4(f32 v) { return V3fx4(v, v, v); }                                                       \
-	FORCEINLINE constexpr v3fx4 V3fx4(f32x4 v) { return {v, v, v}; }                                                \
-	FORCEINLINE v3fx4 V3fx4(v3f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z)}; }
+	forceinline v3fx4 V3fx4(f32 x, f32 y, f32 z) { return {F32x4(x), F32x4(y), F32x4(z)}; }                         \
+	forceinline v3fx4 V3fx4(f32 v) { return V3fx4(v, v, v); }                                                       \
+	forceinline constexpr v3fx4 V3fx4(f32x4 v) { return {v, v, v}; }                                                \
+	forceinline v3fx4 V3fx4(v3f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z)}; }
 
 V3x4(v3fx4, V3fx4, v3f, f32, f32x4, F32x4);
 V3x4(v3sx4, V3sx4, v3s, s32, s32x4, S32x4);
@@ -2824,15 +2869,15 @@ V3x4(v3ux4, V3ux4, v3u, u32, u32x4, U32x4);
 #undef V3x4
 
 #define V4x4(v4fx4, V4fx4, v4f, f32, f32x4, F32x4)                                                                  \
-	FORCEINLINE v4fx4 V4fx4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, \
+	forceinline v4fx4 V4fx4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, \
 							f32 kw, f32 lx, f32 ly, f32 lz, f32 lw) {                                               \
 		return {F32x4(ix, jx, kx, lx), F32x4(iy, jy, ky, ly), F32x4(iz, jz, kz, lz), F32x4(iw, jw, kw, lw)};        \
 	}                                                                                                               \
-	FORCEINLINE v4fx4 V4fx4(v4f i, v4f j, v4f k, v4f l) {                                                           \
+	forceinline v4fx4 V4fx4(v4f i, v4f j, v4f k, v4f l) {                                                           \
 		return {F32x4(i.x, j.x, k.x, l.x), F32x4(i.y, j.y, k.y, l.y), F32x4(i.z, j.z, k.z, l.z),                    \
 				F32x4(i.w, j.w, k.w, l.w)};                                                                         \
 	}                                                                                                               \
-	FORCEINLINE constexpr v4fx4 V4fx4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) {                                         \
+	forceinline constexpr v4fx4 V4fx4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) {                                         \
 		v4fx4 r{};                                                                                                  \
 		r.x = x;                                                                                                    \
 		r.y = y;                                                                                                    \
@@ -2840,7 +2885,7 @@ V3x4(v3ux4, V3ux4, v3u, u32, u32x4, U32x4);
 		r.w = w;                                                                                                    \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE constexpr v4fx4 V4fx4(M16 x, M16 y, M16 z, M16 w) {                                             \
+	forceinline constexpr v4fx4 V4fx4(M16 x, M16 y, M16 z, M16 w) {                                             \
 		v4fx4 r{};                                                                                                  \
 		r.x.m = x;                                                                                                  \
 		r.y.m = y;                                                                                                  \
@@ -2848,10 +2893,10 @@ V3x4(v3ux4, V3ux4, v3u, u32, u32x4, U32x4);
 		r.w.m = w;                                                                                                  \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE v4fx4 V4fx4(f32 x, f32 y, f32 z, f32 w) { return {F32x4(x), F32x4(y), F32x4(z), F32x4(w)}; }        \
-	FORCEINLINE v4fx4 V4fx4(f32 v) { return V4fx4(v, v, v, v); }                                                    \
-	FORCEINLINE constexpr v4fx4 V4fx4(f32x4 v) { return {v, v, v, v}; }                                             \
-	FORCEINLINE v4fx4 V4fx4(v4f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)}; }
+	forceinline v4fx4 V4fx4(f32 x, f32 y, f32 z, f32 w) { return {F32x4(x), F32x4(y), F32x4(z), F32x4(w)}; }        \
+	forceinline v4fx4 V4fx4(f32 v) { return V4fx4(v, v, v, v); }                                                    \
+	forceinline constexpr v4fx4 V4fx4(f32x4 v) { return {v, v, v, v}; }                                             \
+	forceinline v4fx4 V4fx4(v4f v) { return {F32x4(v.x), F32x4(v.y), F32x4(v.z), F32x4(v.w)}; }
 
 V4x4(v4fx4, V4fx4, v4f, f32, f32x4, F32x4);
 V4x4(v4sx4, V4sx4, v4s, s32, s32x4, S32x4);
@@ -2859,23 +2904,23 @@ V4x4(v4ux4, V4ux4, v4u, u32, u32x4, U32x4);
 #undef V4x4
 
 #define V2x8(v2fx8, V2fx8, v2f, f32, f32x8, F32x8)                                                                  \
-	FORCEINLINE constexpr v2fx8 V2fx8(f32x8 x, f32x8 y) {                                                           \
+	forceinline constexpr v2fx8 V2fx8(f32x8 x, f32x8 y) {                                                           \
 		v2fx8 r{};                                                                                                  \
 		r.x = x;                                                                                                    \
 		r.y = y;                                                                                                    \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE v2fx8 V2fx8(f32 x, f32 y) { return {F32x8(x), F32x8(y)}; }                                          \
-	FORCEINLINE v2fx8 V2fx8(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly, f32 ax, f32 ay, f32 bx, \
+	forceinline v2fx8 V2fx8(f32 x, f32 y) { return {F32x8(x), F32x8(y)}; }                                          \
+	forceinline v2fx8 V2fx8(f32 ix, f32 iy, f32 jx, f32 jy, f32 kx, f32 ky, f32 lx, f32 ly, f32 ax, f32 ay, f32 bx, \
 							f32 by, f32 cx, f32 cy, f32 dx, f32 dy) {                                               \
 		return V2fx8(F32x8(ix, jx, kx, lx, ax, bx, cx, dx), F32x8(iy, jy, ky, ly, ay, by, cy, dy));                 \
 	}                                                                                                               \
-	FORCEINLINE v2fx8 V2fx8(v2f i, v2f j, v2f k, v2f l, v2f a, v2f b, v2f c, v2f d) {                               \
+	forceinline v2fx8 V2fx8(v2f i, v2f j, v2f k, v2f l, v2f a, v2f b, v2f c, v2f d) {                               \
 		return V2fx8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y)); \
 	}                                                                                                               \
-	FORCEINLINE v2fx8 V2fx8(f32 v) { return V2fx8(F32x8(v), F32x8(v)); }                                            \
-	FORCEINLINE constexpr v2fx8 V2fx8(f32x8 v) { return V2fx8(v, v); }                                              \
-	FORCEINLINE v2fx8 V2fx8(v2f v) { return V2fx8(v.x, v.y); }
+	forceinline v2fx8 V2fx8(f32 v) { return V2fx8(F32x8(v), F32x8(v)); }                                            \
+	forceinline constexpr v2fx8 V2fx8(f32x8 v) { return V2fx8(v, v); }                                              \
+	forceinline v2fx8 V2fx8(v2f v) { return V2fx8(v.x, v.y); }
 
 V2x8(v2fx8, V2fx8, v2f, f32, f32x8, F32x8);
 V2x8(v2sx8, V2sx8, v2s, s32, s32x8, S32x8);
@@ -2883,34 +2928,34 @@ V2x8(v2ux8, V2ux8, v2u, u32, u32x8, U32x8);
 #undef V2x8
 
 #define V3x8(v3fx8, V3fx8, v3f, f32, f32x8, F32x8, v3x4)                                                            \
-	FORCEINLINE constexpr v3fx8 V3fx8(f32x8 x, f32x8 y, f32x8 z) {                                                  \
+	forceinline constexpr v3fx8 V3fx8(f32x8 x, f32x8 y, f32x8 z) {                                                  \
 		v3fx8 r{};                                                                                                  \
 		r.x = x;                                                                                                    \
 		r.y = y;                                                                                                    \
 		r.z = z;                                                                                                    \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE v3fx8 V3fx8(f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz, f32 cx, f32 cy, f32 cz, f32 dx, f32 dy, \
+	forceinline v3fx8 V3fx8(f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz, f32 cx, f32 cy, f32 cz, f32 dx, f32 dy, \
 							f32 dz, f32 ex, f32 ey, f32 ez, f32 fx, f32 fy, f32 fz, f32 gx, f32 gy, f32 gz, f32 hx, \
 							f32 hy, f32 hz) {                                                                       \
 		return V3fx8(F32x8(ax, bx, cx, dx, ex, fx, gx, hx), F32x8(ay, by, cy, dy, ey, fy, gy, hy),                  \
 					 F32x8(az, bz, cz, dz, ez, fz, gz, hz));                                                        \
 	}                                                                                                               \
-	FORCEINLINE v3fx8 V3fx8(v3f i, v3f j, v3f k, v3f l, v3f a, v3f b, v3f c, v3f d) {                               \
+	forceinline v3fx8 V3fx8(v3f i, v3f j, v3f k, v3f l, v3f a, v3f b, v3f c, v3f d) {                               \
 		return V3fx8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),  \
 					 F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z));                                                \
 	}                                                                                                               \
-	FORCEINLINE v3fx8 V3fx8(f32 x, f32 y, f32 z) { return V3fx8(F32x8(x), F32x8(y), F32x8(z)); }                                  \
-	FORCEINLINE v3fx8 V3fx8(f32 v) { return V3fx8(v, v, v); }                                  \
-	FORCEINLINE constexpr v3fx8 V3fx8(f32x8 v) { return V3fx8(v, v, v); }                                           \
-	FORCEINLINE v3fx8 V3fx8(v3f v) { return V3fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }
+	forceinline v3fx8 V3fx8(f32 x, f32 y, f32 z) { return V3fx8(F32x8(x), F32x8(y), F32x8(z)); }                                  \
+	forceinline v3fx8 V3fx8(f32 v) { return V3fx8(v, v, v); }                                  \
+	forceinline constexpr v3fx8 V3fx8(f32x8 v) { return V3fx8(v, v, v); }                                           \
+	forceinline v3fx8 V3fx8(v3f v) { return V3fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z)); }
 V3x8(v3fx8, V3fx8, v3f, f32, f32x8, F32x8, v3fx4);
 V3x8(v3sx8, V3sx8, v3s, s32, s32x8, S32x8, v3sx4);
 V3x8(v3ux8, V3ux8, v3u, u32, u32x8, U32x8, v3ux4);
 #undef V3x8
 
 #define V4x8(v4fx8, V4fx8, v4f, f32, f32x8, F32x8)                                                                  \
-	FORCEINLINE constexpr v4fx8 V4fx8(f32x8 x, f32x8 y, f32x8 z, f32x8 w) {                                         \
+	forceinline constexpr v4fx8 V4fx8(f32x8 x, f32x8 y, f32x8 z, f32x8 w) {                                         \
 		v4fx8 r{};                                                                                                  \
 		r.x = x;                                                                                                    \
 		r.y = y;                                                                                                    \
@@ -2918,20 +2963,20 @@ V3x8(v3ux8, V3ux8, v3u, u32, u32x8, U32x8, v3ux4);
 		r.w = w;                                                                                                    \
 		return r;                                                                                                   \
 	}                                                                                                               \
-	FORCEINLINE v4fx8 V4fx8(f32 ax, f32 ay, f32 az, f32 aw, f32 bx, f32 by, f32 bz, f32 bw, f32 cx, f32 cy, f32 cz, \
+	forceinline v4fx8 V4fx8(f32 ax, f32 ay, f32 az, f32 aw, f32 bx, f32 by, f32 bz, f32 bw, f32 cx, f32 cy, f32 cz, \
 							f32 cw, f32 dx, f32 dy, f32 dz, f32 dw, f32 ex, f32 ey, f32 ez, f32 ew, f32 fx, f32 fy, \
 							f32 fz, f32 fw, f32 gx, f32 gy, f32 gz, f32 gw, f32 hx, f32 hy, f32 hz, f32 hw) {       \
 		return V4fx8(F32x8(ax, bx, cx, dx, ex, fx, gx, hx), F32x8(ay, by, cy, dy, ey, fy, gy, hy),                  \
 					 F32x8(az, bz, cz, dz, ez, fz, gz, hz), F32x8(aw, bw, cw, dw, ew, fw, gw, hw));                 \
 	}                                                                                                               \
-	FORCEINLINE v4fx8 V4fx8(v4f i, v4f j, v4f k, v4f l, v4f a, v4f b, v4f c, v4f d) {                               \
+	forceinline v4fx8 V4fx8(v4f i, v4f j, v4f k, v4f l, v4f a, v4f b, v4f c, v4f d) {                               \
 		return V4fx8(F32x8(i.x, j.x, k.x, l.x, a.x, b.x, c.x, d.x), F32x8(i.y, j.y, k.y, l.y, a.y, b.y, c.y, d.y),  \
 					 F32x8(i.z, j.z, k.z, l.z, a.z, b.z, c.z, d.z), F32x8(i.w, j.w, k.w, l.w, a.w, b.w, c.w, d.w)); \
 	}                                                                                                               \
-	FORCEINLINE v4fx8 V4fx8(f32 x, f32 y, f32 z, f32 w) { return V4fx8(F32x8(x), F32x8(y), F32x8(z), F32x8(w)); }                                  \
-	FORCEINLINE v4fx8 V4fx8(f32 v) { return V4fx8(v, v, v, v); }                                  \
-	FORCEINLINE constexpr v4fx8 V4fx8(f32x8 v) { return V4fx8(v, v, v, v); }                                        \
-	FORCEINLINE v4fx8 V4fx8(v4f v) { return V4fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }
+	forceinline v4fx8 V4fx8(f32 x, f32 y, f32 z, f32 w) { return V4fx8(F32x8(x), F32x8(y), F32x8(z), F32x8(w)); }                                  \
+	forceinline v4fx8 V4fx8(f32 v) { return V4fx8(v, v, v, v); }                                  \
+	forceinline constexpr v4fx8 V4fx8(f32x8 v) { return V4fx8(v, v, v, v); }                                        \
+	forceinline v4fx8 V4fx8(v4f v) { return V4fx8(F32x8(v.x), F32x8(v.y), F32x8(v.z), F32x8(v.w)); }
 
 V4x8(v4fx8, V4fx8, v4f, f32, f32x8, F32x8);
 V4x8(v4sx8, V4sx8, v4s, s32, s32x8, S32x8);
@@ -2939,21 +2984,21 @@ V4x8(v4ux8, V4ux8, v4u, u32, u32x8, U32x8);
 #undef V4x8
 
 #define X(v2f, v3f, v4f, V2fx, V3fx, V4fx, p, f32) 														       \
-template<> FORCEINLINE v2f##x<p> V2fx<p>(v2f v) { return V2fx##p(v); }										   \
-template<> FORCEINLINE v3f##x<p> V3fx<p>(v3f v) { return V3fx##p(v); }										   \
-template<> FORCEINLINE v4f##x<p> V4fx<p>(v4f v) { return V4fx##p(v); }										   \
-template<> FORCEINLINE v2f##x<p> V2fx<p>(f32 v) { return V2fx##p(v); }										   \
-template<> FORCEINLINE v3f##x<p> V3fx<p>(f32 v) { return V3fx##p(v); }										   \
-template<> FORCEINLINE v4f##x<p> V4fx<p>(f32 v) { return V4fx##p(v); }										   \
-template<> FORCEINLINE v2f##x<p> V2fx<p>(f32##x##p v) { return V2fx##p(v); }								   \
-template<> FORCEINLINE v3f##x<p> V3fx<p>(f32##x##p v) { return V3fx##p(v); }								   \
-template<> FORCEINLINE v4f##x<p> V4fx<p>(f32##x##p v) { return V4fx##p(v); }								   \
-template<> FORCEINLINE v2f##x<p> V2fx<p>(f32 x, f32 y) { return V2fx##p(x, y); }							   \
-template<> FORCEINLINE v3f##x<p> V3fx<p>(f32 x, f32 y, f32 z) { return V3fx##p(x, y, z); }					   \
-template<> FORCEINLINE v4f##x<p> V4fx<p>(f32 x, f32 y, f32 z, f32 w) { return V4fx##p(x, y, z, w); }		   \
-template<> FORCEINLINE v2f##x<p> V2fx<p>(f32##x##p x, f32##x##p y) { return V2fx##p(x, y); }				   \
-template<> FORCEINLINE v3f##x<p> V3fx<p>(f32##x##p x, f32##x##p y, f32##x##p z) { return V3fx##p(x, y, z); }   \
-template<> FORCEINLINE v4f##x<p> V4fx<p>(f32##x##p x, f32##x##p y, f32##x##p z, f32##x##p w) { return V4fx##p(x, y, z, w); }
+template<> forceinline v2f##x<p> V2fx<p>(v2f v) { return V2fx##p(v); }										   \
+template<> forceinline v3f##x<p> V3fx<p>(v3f v) { return V3fx##p(v); }										   \
+template<> forceinline v4f##x<p> V4fx<p>(v4f v) { return V4fx##p(v); }										   \
+template<> forceinline v2f##x<p> V2fx<p>(f32 v) { return V2fx##p(v); }										   \
+template<> forceinline v3f##x<p> V3fx<p>(f32 v) { return V3fx##p(v); }										   \
+template<> forceinline v4f##x<p> V4fx<p>(f32 v) { return V4fx##p(v); }										   \
+template<> forceinline v2f##x<p> V2fx<p>(f32##x##p v) { return V2fx##p(v); }								   \
+template<> forceinline v3f##x<p> V3fx<p>(f32##x##p v) { return V3fx##p(v); }								   \
+template<> forceinline v4f##x<p> V4fx<p>(f32##x##p v) { return V4fx##p(v); }								   \
+template<> forceinline v2f##x<p> V2fx<p>(f32 x, f32 y) { return V2fx##p(x, y); }							   \
+template<> forceinline v3f##x<p> V3fx<p>(f32 x, f32 y, f32 z) { return V3fx##p(x, y, z); }					   \
+template<> forceinline v4f##x<p> V4fx<p>(f32 x, f32 y, f32 z, f32 w) { return V4fx##p(x, y, z, w); }		   \
+template<> forceinline v2f##x<p> V2fx<p>(f32##x##p x, f32##x##p y) { return V2fx##p(x, y); }				   \
+template<> forceinline v3f##x<p> V3fx<p>(f32##x##p x, f32##x##p y, f32##x##p z) { return V3fx##p(x, y, z); }   \
+template<> forceinline v4f##x<p> V4fx<p>(f32##x##p x, f32##x##p y, f32##x##p z, f32##x##p w) { return V4fx##p(x, y, z, w); }
 
 #define P(v2f, v3f, v4f, V2fx, V3fx, V4fx, f32) \
 X(v2f, v3f, v4f, V2fx, V3fx, V4fx, 4, f32)	    \
@@ -2968,33 +3013,33 @@ P(v2u, v3u, v4u, V2ux, V3ux, V4ux, u32)
 
 // clang-format off
 #define CVT(v2f, v2s, V2s, s32, v2u, V2u, u32)                \
-	FORCEINLINE v2f::operator v2s() const { return V2s((s32)x, (s32)y); } \
-	FORCEINLINE v2f::operator v2u() const { return V2u((u32)x, (u32)y); }
+	forceinline v2f::operator v2s() const { return V2s((s32)x, (s32)y); } \
+	forceinline v2f::operator v2u() const { return V2u((u32)x, (u32)y); }
 CVT(v2f, v2s, V2s, s32, v2u, V2u, u32) CVT(v2fx4, v2sx4, V2sx4, s32x4, v2ux4, V2ux4, u32x4) CVT(v2fx8, v2sx8, V2sx8, s32x8, v2ux8, V2ux8, u32x8);
 CVT(v2s, v2f, V2f, f32, v2u, V2u, u32) CVT(v2sx4, v2fx4, V2fx4, f32x4, v2ux4, V2ux4, u32x4) CVT(v2sx8, v2fx8, V2fx8, f32x8, v2ux8, V2ux8, u32x8);
 CVT(v2u, v2f, V2f, f32, v2s, V2s, s32) CVT(v2ux4, v2fx4, V2fx4, f32x4, v2sx4, V2sx4, s32x4) CVT(v2ux8, v2fx8, V2fx8, f32x8, v2sx8, V2sx8, s32x8);
 #undef CVT
 
 #define CVT(v3f, v3s, V3s, s32, v3u, V3u, u32)                        \
-	FORCEINLINE v3f::operator v3s() const { return V3s((s32)x, (s32)y, (s32)z); } \
-	FORCEINLINE v3f::operator v3u() const { return V3u((u32)x, (u32)y, (u32)z); }
+	forceinline v3f::operator v3s() const { return V3s((s32)x, (s32)y, (s32)z); } \
+	forceinline v3f::operator v3u() const { return V3u((u32)x, (u32)y, (u32)z); }
 CVT(v3f, v3s, V3s, s32, v3u, V3u, u32) CVT(v3fx4, v3sx4, V3sx4, s32x4, v3ux4, V3ux4, u32x4) CVT(v3fx8, v3sx8, V3sx8, s32x8, v3ux8, V3ux8, u32x8);
 CVT(v3s, v3f, V3f, f32, v3u, V3u, u32) CVT(v3sx4, v3fx4, V3fx4, f32x4, v3ux4, V3ux4, u32x4) CVT(v3sx8, v3fx8, V3fx8, f32x8, v3ux8, V3ux8, u32x8);
 CVT(v3u, v3f, V3f, f32, v3s, V3s, s32) CVT(v3ux4, v3fx4, V3fx4, f32x4, v3sx4, V3sx4, s32x4) CVT(v3ux8, v3fx8, V3fx8, f32x8, v3sx8, V3sx8, s32x8);
 #undef CVT
 
 #define CVT(v4f, v4s, V4s, s32, v4u, V4u, u32)                                \
-	FORCEINLINE v4f::operator v4s() const { return V4s((s32)x, (s32)y, (s32)z, (s32)w); } \
-	FORCEINLINE v4f::operator v4u() const { return V4u((u32)x, (u32)y, (u32)z, (u32)w); }
+	forceinline v4f::operator v4s() const { return V4s((s32)x, (s32)y, (s32)z, (s32)w); } \
+	forceinline v4f::operator v4u() const { return V4u((u32)x, (u32)y, (u32)z, (u32)w); }
 CVT(v4f, v4s, V4s, s32, v4u, V4u, u32) CVT(v4fx4, v4sx4, V4sx4, s32x4, v4ux4, V4ux4, u32x4) CVT(v4fx8, v4sx8, V4sx8, s32x8, v4ux8, V4ux8, u32x8);
 CVT(v4s, v4f, V4f, f32, v4u, V4u, u32) CVT(v4sx4, v4fx4, V4fx4, f32x4, v4ux4, V4ux4, u32x4) CVT(v4sx8, v4fx8, V4fx8, f32x8, v4ux8, V4ux8, u32x8);
 CVT(v4u, v4f, V4f, f32, v4s, V4s, s32) CVT(v4ux4, v4fx4, V4fx4, f32x4, v4sx4, V4sx4, s32x4) CVT(v4ux8, v4fx8, V4fx8, f32x8, v4sx8, V4sx8, s32x8);
 #undef CVT
 // clang-format on
 
-FORCEINLINE constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
-FORCEINLINE constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
-FORCEINLINE constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
+forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
+forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
+forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
 	m4 r{};
 	r.m[0] = i;
 	r.m[1] = j;
@@ -3002,12 +3047,12 @@ FORCEINLINE constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
 	r.m[3] = l;
 	return r;
 }
-FORCEINLINE constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
+forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
 				f32 ly, f32 lz, f32 lw) {
 	return {ix, iy, iz, iw, jx, jy, jz, jw, kx, ky, kz, kw, lx, ly, lz, lw};
 }
 
-FORCEINLINE m4 M4(m3 v) {
+forceinline m4 M4(m3 v) {
 	return {
 		V4f(v.i, 0),
 		V4f(v.j, 0),
@@ -3021,7 +3066,7 @@ namespace CE {
 // clang-format off
 
 #define F32x4(f32x4, F32x4, f32)					 \
-FORCEINLINE constexpr f32x4 F32x4(f32 a, f32 b, f32 c, f32 d) {	 \
+forceinline constexpr f32x4 F32x4(f32 a, f32 b, f32 c, f32 d) {	 \
 	f32x4 r{};										 \
 	r[0] = a;										 \
 	r[1] = b;										 \
@@ -3035,7 +3080,7 @@ F32x4(u32x4, U32x4, u32)
 #undef F32x4
 
 #define F32x8(f32x8, F32x8, f32)												\
-FORCEINLINE constexpr f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) {	\
+forceinline constexpr f32x8 F32x8(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h) {	\
 	f32x8 r{};																	\
 	r[0] = a;																	\
 	r[1] = b;																	\
@@ -3053,54 +3098,54 @@ F32x8(u32x8, U32x8, u32)
 #undef F32x8
 
 #define V2x4(v2f, v2fx4, V2fx4, f32x4, F32x4)																								\
-	FORCEINLINE constexpr v2fx4 V2fx4(f32x4 x, f32x4 y) { v2fx4 r{}; r.x = x; r.y = y; return r; }														\
-	FORCEINLINE constexpr v2fx4 V2fx4(v2f a, v2f b, v2f c, v2f d) { return CE::V2fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y)); }	\
-	FORCEINLINE constexpr v2fx4 V2fx4(v2f v) { return CE::V2fx4(v, v, v, v); }
+	forceinline constexpr v2fx4 V2fx4(f32x4 x, f32x4 y) { v2fx4 r{}; r.x = x; r.y = y; return r; }														\
+	forceinline constexpr v2fx4 V2fx4(v2f a, v2f b, v2f c, v2f d) { return CE::V2fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y)); }	\
+	forceinline constexpr v2fx4 V2fx4(v2f v) { return CE::V2fx4(v, v, v, v); }
 V2x4(v2f, v2fx4, V2fx4, f32x4, F32x4)
 V2x4(v2s, v2sx4, V2sx4, s32x4, S32x4)
 V2x4(v2u, v2ux4, V2ux4, u32x4, U32x4)
 #undef V2x4
 
 #define V3x4(v3f, v3fx4, V3fx4, f32x4, F32x4)																																\
-	FORCEINLINE constexpr v3fx4 V3fx4(f32x4 x, f32x4 y, f32x4 z) { v3fx4 r{}; r.x = x; r.y = y; r.z = z; return r; }																	\
-	FORCEINLINE constexpr v3fx4 V3fx4(v3f a, v3f b, v3f c, v3f d) {  return CE::V3fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y), CE::F32x4(a.z, b.z, c.z, d.z)); }	\
-	FORCEINLINE constexpr v3fx4 V3fx4(v3f v) { return CE::V3fx4(v, v, v, v); }
+	forceinline constexpr v3fx4 V3fx4(f32x4 x, f32x4 y, f32x4 z) { v3fx4 r{}; r.x = x; r.y = y; r.z = z; return r; }																	\
+	forceinline constexpr v3fx4 V3fx4(v3f a, v3f b, v3f c, v3f d) {  return CE::V3fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y), CE::F32x4(a.z, b.z, c.z, d.z)); }	\
+	forceinline constexpr v3fx4 V3fx4(v3f v) { return CE::V3fx4(v, v, v, v); }
 V3x4(v3f, v3fx4, V3fx4, f32x4, F32x4)
 V3x4(v3s, v3sx4, V3sx4, s32x4, S32x4)
 V3x4(v3u, v3ux4, V3ux4, u32x4, U32x4)
 #undef V3x4
 
 #define V4x4(v4f, v4fx4, V4fx4, f32x4, F32x4)																																							\
-	FORCEINLINE constexpr v4fx4 V4fx4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) { v4fx4 r{}; r.x = x; r.y = y; r.z = z; r.w = w; return r; }																				\
-	FORCEINLINE constexpr v4fx4 V4fx4(v4f a, v4f b, v4f c, v4f d) { return CE::V4fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y), CE::F32x4(a.z, b.z, c.z, d.z), CE::F32x4(a.w, b.w, c.w, d.w)); }	\
-	FORCEINLINE constexpr v4fx4 V4fx4(v4f v) { return CE::V4fx4(v, v, v, v); }
+	forceinline constexpr v4fx4 V4fx4(f32x4 x, f32x4 y, f32x4 z, f32x4 w) { v4fx4 r{}; r.x = x; r.y = y; r.z = z; r.w = w; return r; }																				\
+	forceinline constexpr v4fx4 V4fx4(v4f a, v4f b, v4f c, v4f d) { return CE::V4fx4(CE::F32x4(a.x, b.x, c.x, d.x), CE::F32x4(a.y, b.y, c.y, d.y), CE::F32x4(a.z, b.z, c.z, d.z), CE::F32x4(a.w, b.w, c.w, d.w)); }	\
+	forceinline constexpr v4fx4 V4fx4(v4f v) { return CE::V4fx4(v, v, v, v); }
 V4x4(v4f, v4fx4, V4fx4, f32x4, F32x4)
 V4x4(v4s, v4sx4, V4sx4, s32x4, S32x4)
 V4x4(v4u, v4ux4, V4ux4, u32x4, U32x4)
 #undef V4x4
 
 #define V2x8(v2f, v2fx8, V2fx8, f32x8, F32x8)																								\
-	FORCEINLINE constexpr v2fx8 V2fx8(f32x8 x, f32x8 y) { v2fx8 r{}; r.x = x; r.y = y; return r; }														\
-	FORCEINLINE constexpr v2fx8 V2fx8(v2f a, v2f b, v2f c, v2f d, v2f e, v2f f, v2f g, v2f h) { return CE::V2fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y)); }	\
-	FORCEINLINE constexpr v2fx8 V2fx8(v2f v) { return CE::V2fx8(v, v, v, v, v, v, v, v); }
+	forceinline constexpr v2fx8 V2fx8(f32x8 x, f32x8 y) { v2fx8 r{}; r.x = x; r.y = y; return r; }														\
+	forceinline constexpr v2fx8 V2fx8(v2f a, v2f b, v2f c, v2f d, v2f e, v2f f, v2f g, v2f h) { return CE::V2fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y)); }	\
+	forceinline constexpr v2fx8 V2fx8(v2f v) { return CE::V2fx8(v, v, v, v, v, v, v, v); }
 V2x8(v2f, v2fx8, V2fx8, f32x8, F32x8)
 V2x8(v2s, v2sx8, V2sx8, s32x8, S32x8)
 V2x8(v2u, v2ux8, V2ux8, u32x8, U32x8)
 #undef V2x8
 
 #define V3x8(v3f, v3fx8, V3fx8, f32x8, F32x8)																																\
-	FORCEINLINE constexpr v3fx8 V3fx8(f32x8 x, f32x8 y, f32x8 z) { v3fx8 r{}; r.x = x; r.y = y; r.z = z; return r; }																	\
-	FORCEINLINE constexpr v3fx8 V3fx8(v3f a, v3f b, v3f c, v3f d, v3f e, v3f f, v3f g, v3f h) {  return CE::V3fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y), CE::F32x8(a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z)); }	\
-	FORCEINLINE constexpr v3fx8 V3fx8(v3f v) { return CE::V3fx8(v, v, v, v, v, v, v, v); }
+	forceinline constexpr v3fx8 V3fx8(f32x8 x, f32x8 y, f32x8 z) { v3fx8 r{}; r.x = x; r.y = y; r.z = z; return r; }																	\
+	forceinline constexpr v3fx8 V3fx8(v3f a, v3f b, v3f c, v3f d, v3f e, v3f f, v3f g, v3f h) {  return CE::V3fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y), CE::F32x8(a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z)); }	\
+	forceinline constexpr v3fx8 V3fx8(v3f v) { return CE::V3fx8(v, v, v, v, v, v, v, v); }
 V3x8(v3f, v3fx8, V3fx8, f32x8, F32x8)
 V3x8(v3s, v3sx8, V3sx8, s32x8, S32x8)
 V3x8(v3u, v3ux8, V3ux8, u32x8, U32x8)
 #undef V3x8
 
 #define V4x8(v4f, v4fx8, V4fx8, f32x8, F32x8)																																							\
-	FORCEINLINE constexpr v4fx8 V4fx8(f32x8 x, f32x8 y, f32x8 z, f32x8 w) { v4fx8 r{}; r.x = x; r.y = y; r.z = z; r.w = w; return r; }																				\
-	FORCEINLINE constexpr v4fx8 V4fx8(v4f a, v4f b, v4f c, v4f d, v4f e, v4f f, v4f g, v4f h) { return CE::V4fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y), CE::F32x8(a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z), CE::F32x8(a.w, b.w, c.w, d.w, e.w, f.w, g.w, h.w)); }	\
-	FORCEINLINE constexpr v4fx8 V4fx8(v4f v) { return CE::V4fx8(v, v, v, v, v, v, v, v); }
+	forceinline constexpr v4fx8 V4fx8(f32x8 x, f32x8 y, f32x8 z, f32x8 w) { v4fx8 r{}; r.x = x; r.y = y; r.z = z; r.w = w; return r; }																				\
+	forceinline constexpr v4fx8 V4fx8(v4f a, v4f b, v4f c, v4f d, v4f e, v4f f, v4f g, v4f h) { return CE::V4fx8(CE::F32x8(a.x, b.x, c.x, d.x, e.x, f.x, g.x, h.x), CE::F32x8(a.y, b.y, c.y, d.y, e.y, f.y, g.y, h.y), CE::F32x8(a.z, b.z, c.z, d.z, e.z, f.z, g.z, h.z), CE::F32x8(a.w, b.w, c.w, d.w, e.w, f.w, g.w, h.w)); }	\
+	forceinline constexpr v4fx8 V4fx8(v4f v) { return CE::V4fx8(v, v, v, v, v, v, v, v); }
 V4x8(v4f, v4fx8, V4fx8, f32x8, F32x8)
 V4x8(v4s, v4sx8, V4sx8, s32x8, S32x8)
 V4x8(v4u, v4ux8, V4ux8, u32x8, U32x8)
@@ -3233,13 +3278,13 @@ CVT(v4u, v4f, f32) CVT(v4u, v4s, s32) CVT(v4ux4, v4fx4, f32x4) CVT(v4ux4, v4sx4,
 #define SHUFFLE(a, s0, s1, b, s2, s3) _mm_shuffle_ps(a, b, _MM_SHUFFLE(s3, s2, s1, s0))
 
 // clang-format off
-FORCEINLINE v2f pack(v2f v) { return v; }
-FORCEINLINE v3f pack(v3f v) { return v; }
-FORCEINLINE v4f pack(v4f v) { return v; }
-FORCEINLINE v2f unpack(v2f v) { return v; }
-FORCEINLINE v3f unpack(v3f v) { return v; }
-FORCEINLINE v4f unpack(v4f v) { return v; }
-FORCEINLINE v2fx4 pack(v2fx4 v) { 
+forceinline v2f pack(v2f v) { return v; }
+forceinline v3f pack(v3f v) { return v; }
+forceinline v4f pack(v4f v) { return v; }
+forceinline v2f unpack(v2f v) { return v; }
+forceinline v3f unpack(v3f v) { return v; }
+forceinline v4f unpack(v4f v) { return v; }
+forceinline v2fx4 pack(v2fx4 v) { 
 #if ARCH_AVX2
     *(__m256*)&v = _mm256_permutevar8x32_ps(*(__m256*)&v, _mm256_setr_epi32(0,2,4,6,1,3,5,7));
 	return v;
@@ -3253,7 +3298,7 @@ FORCEINLINE v2fx4 pack(v2fx4 v) {
 	return r;
 #endif
 }
-FORCEINLINE v3fx4 pack(v3fx4 v) { 
+forceinline v3fx4 pack(v3fx4 v) { 
 	v3fx4 r;
 #if 0
 	gather(*(f32x8*)&r, S32x8(0,3,6,9,1,4,7,10)*sizeof(f32), &v);
@@ -3267,7 +3312,7 @@ FORCEINLINE v3fx4 pack(v3fx4 v) {
 #endif
 	return r;
 }
-FORCEINLINE v4fx4 pack(v4fx4 v) { 
+forceinline v4fx4 pack(v4fx4 v) { 
 	v4fx4 r;
 #if ARCH_AVX2
 	__m256 &v0 = ((__m256 *)&v)[0];
@@ -3295,7 +3340,7 @@ FORCEINLINE v4fx4 pack(v4fx4 v) {
 #endif
 	return r;
 }
-FORCEINLINE v2fx8 pack(v2fx8 v) {
+forceinline v2fx8 pack(v2fx8 v) {
 	v2fx8 r;
 	for (u32 i = 0; i < 2; ++i) {
 		for (u32 j = 0; j < 8; ++j) {
@@ -3304,7 +3349,7 @@ FORCEINLINE v2fx8 pack(v2fx8 v) {
 	}
 	return r;
 }
-FORCEINLINE v3fx8 pack(v3fx8 v) { 
+forceinline v3fx8 pack(v3fx8 v) { 
 	v3fx8 r;
 	for (u32 i = 0; i < 3; ++i) {
 		for (u32 j = 0; j < 8; ++j) {
@@ -3313,7 +3358,7 @@ FORCEINLINE v3fx8 pack(v3fx8 v) {
 	}
 	return r;
 }
-FORCEINLINE v4fx8 pack(v4fx8 v) { 
+forceinline v4fx8 pack(v4fx8 v) { 
 	v4fx8 r;
 	for (u32 i = 0; i < 4; ++i) {
 		for (u32 j = 0; j < 8; ++j) {
@@ -3322,13 +3367,13 @@ FORCEINLINE v4fx8 pack(v4fx8 v) {
 	}
 	return r;
 }
-FORCEINLINE v2fx4 unpack(v2fx4 v) { 
+forceinline v2fx4 unpack(v2fx4 v) { 
 	v2fx4 r;
 	r.x.m.ps = _mm_unpacklo_ps(v.x.m.ps, v.y.m.ps);
 	r.y.m.ps = _mm_unpackhi_ps(v.x.m.ps, v.y.m.ps);
 	return r;
 }
-FORCEINLINE v3fx4 unpack(v3fx4 v) { 
+forceinline v3fx4 unpack(v3fx4 v) { 
 	auto xy = SHUFFLE(v.x.m.ps, 0, 2, v.y.m.ps, 0, 2);
 	auto yz = SHUFFLE(v.y.m.ps, 1, 3, v.z.m.ps, 1, 3);
 	auto xz = SHUFFLE(v.x.m.ps, 1, 3, v.z.m.ps, 0, 2);
@@ -3337,10 +3382,10 @@ FORCEINLINE v3fx4 unpack(v3fx4 v) {
 	v.z.m.ps = SHUFFLE(xz, 3, 1, yz, 1, 3);
 	return v;
 }
-FORCEINLINE v4fx4 unpack(v4fx4 v) {
+forceinline v4fx4 unpack(v4fx4 v) {
 	return pack(v);
 }
-FORCEINLINE v2fx8 unpack(v2fx8 v) { 
+forceinline v2fx8 unpack(v2fx8 v) { 
 	v2fx8 r;
 #if ARCH_AVX
 	__m256 m02 = _mm256_unpacklo_ps(v.x.m.ps, v.y.m.ps);
@@ -3356,7 +3401,7 @@ FORCEINLINE v2fx8 unpack(v2fx8 v) {
 #endif
 	return r;
 }
-FORCEINLINE v3fx8 unpack(v3fx8 v) {
+forceinline v3fx8 unpack(v3fx8 v) {
 #if ARCH_AVX
 	auto xy = _mm256_shuffle_ps(v.x.m.ps, v.y.m.ps, MM_SHUFFLE(0, 2, 0, 2));
 	auto yz = _mm256_shuffle_ps(v.y.m.ps, v.z.m.ps, MM_SHUFFLE(1, 3, 1, 3));
@@ -3378,7 +3423,7 @@ FORCEINLINE v3fx8 unpack(v3fx8 v) {
 	return r;
 #endif
 }
-FORCEINLINE v4fx8 unpack(v4fx8 v) {
+forceinline v4fx8 unpack(v4fx8 v) {
 	v4fx8 r;
 	for (u32 i = 0; i < 8; ++i) {
 		for (u32 j = 0; j < 4; ++j){
@@ -3390,49 +3435,49 @@ FORCEINLINE v4fx8 unpack(v4fx8 v) {
 // clang-format on
 
 // clang-format off
-FORCEINLINE f32x4 min(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_min_ps(a.m.ps, b.m.ps)); }
-FORCEINLINE f32x4 max(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_max_ps(a.m.ps, b.m.ps)); }
-FORCEINLINE s32x4 min(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_min_epi32(a.m.pi, b.m.pi)); }
-FORCEINLINE s32x4 max(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_max_epi32(a.m.pi, b.m.pi)); }
-FORCEINLINE u32x4 min(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_min_epu32(a.m.pi, b.m.pi)); }
-FORCEINLINE u32x4 max(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_max_epu32(a.m.pi, b.m.pi)); }
+forceinline f32x4 min(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_min_ps(a.m.ps, b.m.ps)); }
+forceinline f32x4 max(f32x4 a, f32x4 b) { RETURN_MT(f32x4, _mm_max_ps(a.m.ps, b.m.ps)); }
+forceinline s32x4 min(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_min_epi32(a.m.pi, b.m.pi)); }
+forceinline s32x4 max(s32x4 a, s32x4 b) { RETURN_MT(s32x4, _mm_max_epi32(a.m.pi, b.m.pi)); }
+forceinline u32x4 min(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_min_epu32(a.m.pi, b.m.pi)); }
+forceinline u32x4 max(u32x4 a, u32x4 b) { RETURN_MT(u32x4, _mm_max_epu32(a.m.pi, b.m.pi)); }
 
 #if ARCH_AVX
-FORCEINLINE f32x8 min(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_min_ps(a.m.ps, b.m.ps)); }
-FORCEINLINE f32x8 max(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_max_ps(a.m.ps, b.m.ps)); }
+forceinline f32x8 min(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_min_ps(a.m.ps, b.m.ps)); }
+forceinline f32x8 max(f32x8 a, f32x8 b) {  RETURN_MT(f32x8, _mm256_max_ps(a.m.ps, b.m.ps)); }
 #else
-FORCEINLINE f32x8 min(f32x8 a, f32x8 b) { RETURN_T2(f32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
-FORCEINLINE f32x8 max(f32x8 a, f32x8 b) { RETURN_T2(f32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
+forceinline f32x8 min(f32x8 a, f32x8 b) { RETURN_T2(f32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+forceinline f32x8 max(f32x8 a, f32x8 b) { RETURN_T2(f32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
 #endif
 
 #if ARCH_AVX2
-FORCEINLINE s32x8 min(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_min_epi32(a.m.pi, b.m.pi)); }
-FORCEINLINE s32x8 max(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_max_epi32(a.m.pi, b.m.pi)); }
-FORCEINLINE u32x8 min(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_min_epu32(a.m.pi, b.m.pi)); }
-FORCEINLINE u32x8 max(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_max_epu32(a.m.pi, b.m.pi)); }
+forceinline s32x8 min(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_min_epi32(a.m.pi, b.m.pi)); }
+forceinline s32x8 max(s32x8 a, s32x8 b) { RETURN_MT(s32x8, _mm256_max_epi32(a.m.pi, b.m.pi)); }
+forceinline u32x8 min(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_min_epu32(a.m.pi, b.m.pi)); }
+forceinline u32x8 max(u32x8 a, u32x8 b) { RETURN_MT(u32x8, _mm256_max_epu32(a.m.pi, b.m.pi)); }
 #else
-FORCEINLINE s32x8 min(s32x8 a, s32x8 b) { RETURN_T2(s32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
-FORCEINLINE s32x8 max(s32x8 a, s32x8 b) { RETURN_T2(s32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
-FORCEINLINE u32x8 min(u32x8 a, u32x8 b) { RETURN_T2(u32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
-FORCEINLINE u32x8 max(u32x8 a, u32x8 b) { RETURN_T2(u32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
+forceinline s32x8 min(s32x8 a, s32x8 b) { RETURN_T2(s32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+forceinline s32x8 max(s32x8 a, s32x8 b) { RETURN_T2(s32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
+forceinline u32x8 min(u32x8 a, u32x8 b) { RETURN_T2(u32x8, min(a.lo, b.lo), min(a.hi, b.hi)); }
+forceinline u32x8 max(u32x8 a, u32x8 b) { RETURN_T2(u32x8, max(a.lo, b.lo), max(a.hi, b.hi)); }
 #endif
 
-FORCEINLINE f32 min(f32x4 a) { 
+forceinline f32 min(f32x4 a) { 
 	auto x2 = _mm_min_ps(a.m.ps, _mm_shuffle_ps(a.m.ps, a.m.ps, MM_SHUFFLE(2,3,0,0)));
 	return _mm_cvtss_f32(_mm_min_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
 }
-FORCEINLINE f32 max(f32x4 a) { 
+forceinline f32 max(f32x4 a) { 
 	auto x2 = _mm_max_ps(a.m.ps, _mm_shuffle_ps(a.m.ps, a.m.ps, MM_SHUFFLE(2,3,0,0)));
 	return _mm_cvtss_f32(_mm_max_ss(x2, _mm_shuffle_ps(x2, x2, MM_SHUFFLE(1,0,0,0))));
 }
 
-FORCEINLINE f32 min(f32x8 a) { return min(min(a.lo, a.hi)); }
-FORCEINLINE f32 max(f32x8 a) { return max(max(a.lo, a.hi)); }
+forceinline f32 min(f32x8 a) { return min(min(a.lo, a.hi)); }
+forceinline f32 max(f32x8 a) { return max(max(a.lo, a.hi)); }
 
 #define MINMAX(v2f, V2f)						  \
-	FORCEINLINE auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }\
-	FORCEINLINE auto max(v2f a, v2f b) { return V2f(max(a.x, b.x), max(a.y, b.y)); }\
-	FORCEINLINE void minmax(v2f a, v2f b, v2f& mn, v2f& mx) { \
+	forceinline auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }\
+	forceinline auto max(v2f a, v2f b) { return V2f(max(a.x, b.x), max(a.y, b.y)); }\
+	forceinline void minmax(v2f a, v2f b, v2f& mn, v2f& mx) { \
 		minmax(a.x, b.x, mn.x, mx.x);		  \
 		minmax(a.y, b.y, mn.y, mx.y); 		  \
 	}
@@ -3442,9 +3487,9 @@ MINMAX(v2fx8, V2fx8) MINMAX(v2sx8, V2sx8) MINMAX(v2ux8, V2ux8);
 #undef MINMAX
 
 #define MINMAX(v3f, V3f)						  \
-	FORCEINLINE auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }\
-	FORCEINLINE auto max(v3f a, v3f b) { return V3f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }\
-	FORCEINLINE void minmax(v3f a, v3f b, v3f& mn, v3f& mx) { \
+	forceinline auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }\
+	forceinline auto max(v3f a, v3f b) { return V3f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }\
+	forceinline void minmax(v3f a, v3f b, v3f& mn, v3f& mx) { \
 		minmax(a.x, b.x, mn.x, mx.x);		  \
 		minmax(a.y, b.y, mn.y, mx.y); 		  \
 		minmax(a.z, b.z, mn.z, mx.z); 		  \
@@ -3455,9 +3500,9 @@ MINMAX(v3fx8, V3fx8) MINMAX(v3sx8, V3sx8) MINMAX(v3ux8, V3ux8);
 #undef MINMAX
 
 #define MINMAX(v4f, V4f)						  \
-	FORCEINLINE auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }\
-	FORCEINLINE auto max(v4f a, v4f b) { return V4f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }\
-	FORCEINLINE void minmax(v4f a, v4f b, v4f& mn, v4f& mx) { \
+	forceinline auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }\
+	forceinline auto max(v4f a, v4f b) { return V4f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }\
+	forceinline void minmax(v4f a, v4f b, v4f& mn, v4f& mx) { \
 		minmax(a.x, b.x, mn.x, mx.x);		  \
 		minmax(a.y, b.y, mn.y, mx.y); 		  \
 		minmax(a.z, b.z, mn.z, mx.z); 		  \
@@ -3469,32 +3514,32 @@ MINMAX(v4fx8, V4fx8) MINMAX(v4sx8, V4sx8) MINMAX(v4ux8, V4ux8);
 #undef MINMAX
 // clang-format on
 
-#define HALF(f32) FORCEINLINE f32 half(f32 v) { return v * 0.5f; }
+#define HALF(f32) forceinline f32 half(f32 v) { return v * 0.5f; }
 HALF(f32) HALF(f32x4) HALF(f32x8);
 HALF(v2f) HALF(v2fx4) HALF(v2fx8);
 HALF(v3f) HALF(v3fx4) HALF(v3fx8);
 HALF(v4f) HALF(v4fx4) HALF(v4fx8);
 #undef HALF
 
-#define HALF(s32) FORCEINLINE s32 half(s32 v) { return v / 2; }
+#define HALF(s32) forceinline s32 half(s32 v) { return v / 2; }
 HALF(s32) HALF(s32x4) HALF(s32x8);
 HALF(v2s) HALF(v2sx4) HALF(v2sx8);
 HALF(v3s) HALF(v3sx4) HALF(v3sx8);
 HALF(v4s) HALF(v4sx4) HALF(v4sx8);
 #undef HALF
 
-#define HALF(u32) FORCEINLINE u32 half(u32 v) { return v >> 1; }
+#define HALF(u32) forceinline u32 half(u32 v) { return v >> 1; }
 HALF(u32) HALF(u32x4) HALF(u32x8);
 HALF(v2u) HALF(v2ux4) HALF(v2ux8);
 HALF(v3u) HALF(v3ux4) HALF(v3ux8);
 HALF(v4u) HALF(v4ux4) HALF(v4ux8);
 #undef HALF
 
-#define SELECT32x4(type) FORCEINLINE type select(b32x4 mask, type a, type b) { RETURN_MT(type, _mm_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
+#define SELECT32x4(type) forceinline type select(b32x4 mask, type a, type b) { RETURN_MT(type, _mm_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
 #if ARCH_AVX
-#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { RETURN_MT(type, _mm256_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
+#define SELECT32x8(type) forceinline type select(b32x8 mask, type a, type b) { RETURN_MT(type, _mm256_blendv_ps(b.m.ps, a.m.ps, mask.m.ps)); }
 #else
-#define SELECT32x8(type) FORCEINLINE type select(b32x8 mask, type a, type b) { RETURN_T2(type, select(mask.lo, a.lo, b.lo), select(mask.hi, a.hi, b.hi)); }
+#define SELECT32x8(type) forceinline type select(b32x8 mask, type a, type b) { RETURN_T2(type, select(mask.lo, a.lo, b.lo), select(mask.hi, a.hi, b.hi)); }
 #endif
 
 SELECT32x4(f32x4)
@@ -3507,58 +3552,45 @@ SELECT32x8(u32x8)
 #undef SELECT32x4
 #undef SELECT32x8
 
-FORCEINLINE v2fx4 select(b32x4 mask, v2fx4 a, v2fx4 b) { return V2fx4(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
-FORCEINLINE v2fx8 select(b32x8 mask, v2fx8 a, v2fx8 b) { return V2fx8(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
-FORCEINLINE v3fx4 select(b32x4 mask, v3fx4 a, v3fx4 b) { return V3fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
-FORCEINLINE v3fx8 select(b32x8 mask, v3fx8 a, v3fx8 b) { return V3fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
-FORCEINLINE v4fx4 select(b32x4 mask, v4fx4 a, v4fx4 b) { return V4fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
-FORCEINLINE v4fx8 select(b32x8 mask, v4fx8 a, v4fx8 b) { return V4fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
+forceinline v2fx4 select(b32x4 mask, v2fx4 a, v2fx4 b) { return V2fx4(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
+forceinline v2fx8 select(b32x8 mask, v2fx8 a, v2fx8 b) { return V2fx8(select(mask, a.x, b.x), select(mask, a.y, b.y)); }
+forceinline v3fx4 select(b32x4 mask, v3fx4 a, v3fx4 b) { return V3fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
+forceinline v3fx8 select(b32x8 mask, v3fx8 a, v3fx8 b) { return V3fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z)); }
+forceinline v4fx4 select(b32x4 mask, v4fx4 a, v4fx4 b) { return V4fx4(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
+forceinline v4fx8 select(b32x8 mask, v4fx8 a, v4fx8 b) { return V4fx8(select(mask, a.x, b.x), select(mask, a.y, b.y), select(mask, a.z, b.z), select(mask, a.w, b.w)); }
 
-FORCEINLINE f32x4 select(b32x4 mask, f32 a, f32x4 b) { return select(mask, F32x4(a), b); }
-FORCEINLINE f32x8 select(b32x8 mask, f32 a, f32x8 b) { return select(mask, F32x8(a), b); }
-FORCEINLINE s32x4 select(b32x4 mask, s32 a, s32x4 b) { return select(mask, S32x4(a), b); }
-FORCEINLINE s32x8 select(b32x8 mask, s32 a, s32x8 b) { return select(mask, S32x8(a), b); }
-FORCEINLINE u32x4 select(b32x4 mask, u32 a, u32x4 b) { return select(mask, U32x4(a), b); }
-FORCEINLINE u32x8 select(b32x8 mask, u32 a, u32x8 b) { return select(mask, U32x8(a), b); }
+forceinline f32 floor(f32 v) { return ::floorf(v); }
+forceinline f64 floor(f64 v) { return ::floor(v); }
+forceinline f32x4 floor(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_FLOOR)); }
+#if ARCH_AVX
+forceinline f32x8 floor(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_FLOOR)); }
+#else
+forceinline f32x8 floor(f32x8 v) { RETURN_T2(f32x8, floor(v.lo), floor(v.hi)); }
+#endif
+forceinline v2f floor(v2f v) { return { floor(v.x), floor(v.y) }; }
+forceinline v3f floor(v3f v) { return { floor(v.x), floor(v.y), floor(v.z) }; }
+forceinline v4f floor(v4f v) { return V4f(floor(v.m)); }
 
-FORCEINLINE f32x4 select(b32x4 mask, f32x4 a, f32 b) { return select(mask, a, F32x4(b)); }
-FORCEINLINE f32x8 select(b32x8 mask, f32x8 a, f32 b) { return select(mask, a, F32x8(b)); }
-FORCEINLINE s32x4 select(b32x4 mask, s32x4 a, s32 b) { return select(mask, a, S32x4(b)); }
-FORCEINLINE s32x8 select(b32x8 mask, s32x8 a, s32 b) { return select(mask, a, S32x8(b)); }
-FORCEINLINE u32x4 select(b32x4 mask, u32x4 a, u32 b) { return select(mask, a, U32x4(b)); }
-FORCEINLINE u32x8 select(b32x8 mask, u32x8 a, u32 b) { return select(mask, a, U32x8(b)); }
-
-FORCEINLINE f32x4 select(b32x4 mask, f32 a, f32 b) { return select(mask, F32x4(a), F32x4(b)); }
-FORCEINLINE f32x8 select(b32x8 mask, f32 a, f32 b) { return select(mask, F32x8(a), F32x8(b)); }
-FORCEINLINE s32x4 select(b32x4 mask, s32 a, s32 b) { return select(mask, S32x4(a), S32x4(b)); }
-FORCEINLINE s32x8 select(b32x8 mask, s32 a, s32 b) { return select(mask, S32x8(a), S32x8(b)); }
-FORCEINLINE u32x4 select(b32x4 mask, u32 a, u32 b) { return select(mask, U32x4(a), U32x4(b)); }
-FORCEINLINE u32x8 select(b32x8 mask, u32 a, u32 b) { return select(mask, U32x8(a), U32x8(b)); }
-
-#define FRAC(constexpr, f32, s32)	\
-FORCEINLINE constexpr f32 frac(f32 v) {	\
-	v = v - (f32)(s32)v;			\
-	return select(v < 0, v + 1, v);	\
-}
-FRAC(constexpr, f32, s32)
-FRAC(constexpr, f64, s64)
-FRAC(, f32x4, s32x4)
-FRAC(, f32x8, s32x8)
+#define FRAC(f32) forceinline f32 frac(f32 v) { return v - floor(v); }
+FRAC(f32)
+FRAC(f64)
+FRAC(f32x4)
+FRAC(f32x8)
 #undef FRAC
 
-FORCEINLINE v4f frac(v4f v) { return V4f(frac(v.m)); }
-FORCEINLINE v4fx4 frac(v4fx4 v) { return V4fx4(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
-FORCEINLINE v4fx8 frac(v4fx8 v) { return V4fx8(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
+forceinline v4f frac(v4f v) { return V4f(frac(v.m)); }
+forceinline v4fx4 frac(v4fx4 v) { return V4fx4(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
+forceinline v4fx8 frac(v4fx8 v) { return V4fx8(frac(v.x), frac(v.y), frac(v.z), frac(v.w)); }
 
-FORCEINLINE v2f frac(v2f v) { return frac(V4f(v, 0, 0)).xy; }
-FORCEINLINE v2fx4 frac(v2fx4 v) { return V2fx4(frac(v.x), frac(v.y)); }
-FORCEINLINE v2fx8 frac(v2fx8 v) { return V2fx8(frac(v.x), frac(v.y)); }
+forceinline v2f frac(v2f v) { return frac(V4f(v, 0, 0)).xy; }
+forceinline v2fx4 frac(v2fx4 v) { return V2fx4(frac(v.x), frac(v.y)); }
+forceinline v2fx8 frac(v2fx8 v) { return V2fx8(frac(v.x), frac(v.y)); }
 
-FORCEINLINE v3f frac(v3f v) { return frac(V4f(v, 0)).xyz; }
-FORCEINLINE v3fx4 frac(v3fx4 v) { return V3fx4(frac(v.x), frac(v.y), frac(v.z)); }
-FORCEINLINE v3fx8 frac(v3fx8 v) { return V3fx8(frac(v.x), frac(v.y), frac(v.z)); }
+forceinline v3f frac(v3f v) { return frac(V4f(v, 0)).xyz; }
+forceinline v3fx4 frac(v3fx4 v) { return V3fx4(frac(v.x), frac(v.y), frac(v.z)); }
+forceinline v3fx8 frac(v3fx8 v) { return V3fx8(frac(v.x), frac(v.y), frac(v.z)); }
 
-FORCEINLINE s32x4 frac(s32x4 v, s32x4 s) {
+forceinline s32x4 frac(s32x4 v, s32x4 s) {
 #if ARCH_AVX
 	__m256d vd = _mm256_cvtepi32_pd(v.m.pi);
 	__m256d sd = _mm256_cvtepi32_pd(s.m.pi);
@@ -3576,9 +3608,9 @@ FORCEINLINE s32x4 frac(s32x4 v, s32x4 s) {
 #endif
 	RETURN_MT(s32x4, _mm_sub_epi32(v.m.pi, _mm_mullo_epi32(result, s.m.pi)));
 }
-FORCEINLINE s32x4 frac(s32x4 v, s32 s) { return frac(v, S32x4(s)); }
+forceinline s32x4 frac(s32x4 v, s32 s) { return frac(v, S32x4(s)); }
 
-FORCEINLINE v2s frac(v2s v, v2s s) {
+forceinline v2s frac(v2s v, v2s s) {
 	M16 vm = {_mm_castpi_ps(_mm_setr_epi32(v.x, v.y, 0, 0))};
 	M16 sm = {_mm_castpi_ps(_mm_setr_epi32(s.x, s.y, 0, 0))};
 	__m128d vlo = _mm_cvtepi32_pd(vm.pi);
@@ -3587,14 +3619,14 @@ FORCEINLINE v2s frac(v2s v, v2s s) {
 	result = _mm_sub_epi32(vm.pi, _mm_mullo_epi32(result, sm.pi));
 	return *(v2s *)&result;
 }
-FORCEINLINE v3s frac(v3s v, v3s s) {
+forceinline v3s frac(v3s v, v3s s) {
 	return {
 		frac(v.x, s.x),
 		frac(v.y, s.y),
 		frac(v.z, s.z),
 	};
 }
-FORCEINLINE v4s frac(v4s v, v4s step) {
+forceinline v4s frac(v4s v, v4s step) {
 	return {
 		frac(v.x, step.x),
 		frac(v.y, step.y),
@@ -3602,41 +3634,18 @@ FORCEINLINE v4s frac(v4s v, v4s step) {
 		frac(v.w, step.w),
 	};
 }
-FORCEINLINE v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
-FORCEINLINE v3s frac(v3s v, s32 s) { return frac(v, V3s(s)); }
-FORCEINLINE v4s frac(v4s v, s32 s) { return frac(v, V4s(s)); }
+forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
+forceinline v3s frac(v3s v, s32 s) { return frac(v, V3s(s)); }
+forceinline v4s frac(v4s v, s32 s) { return frac(v, V4s(s)); }
 
-FORCEINLINE f32 floor(f32 v) { return ::floorf(v); }
-FORCEINLINE f64 floor(f64 v) { return ::floor(v); }
-FORCEINLINE v2f floor(v2f v) {
-	return {
-		floor(v.x),
-		floor(v.y),
-	};
-}
-FORCEINLINE v3f floor(v3f v) {
-	return {
-		floor(v.x),
-		floor(v.y),
-		floor(v.z),
-	};
-}
-
-#define TL_MM_FLOOR _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC
-#define TL_MM_CEIL  _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC
-
-FORCEINLINE f32x4 floor(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_FLOOR)); }
-FORCEINLINE f32x4  ceil(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_CEIL )); }
+forceinline f32x4  ceil(f32x4 v) { RETURN_MT(f32x4, _mm_round_ps(v.m.ps, TL_MM_CEIL )); }
 #if ARCH_AVX
-FORCEINLINE f32x8 floor(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_FLOOR)); }
-FORCEINLINE f32x8  ceil(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_CEIL )); }
+forceinline f32x8  ceil(f32x8 v) { RETURN_MT(f32x8, _mm256_round_ps(v.m.ps, TL_MM_CEIL )); }
 #else
-FORCEINLINE f32x8 floor(f32x8 v) { RETURN_T2(f32x8, floor(v.lo), floor(v.hi)); }
-FORCEINLINE f32x8  ceil(f32x8 v) { RETURN_T2(f32x8,  ceil(v.lo),  ceil(v.hi)); }
+forceinline f32x8  ceil(f32x8 v) { RETURN_T2(f32x8,  ceil(v.lo),  ceil(v.hi)); }
 #endif
 
-FORCEINLINE v4f floor(v4f v) { return V4f(floor(v.m)); }
-FORCEINLINE s32x4 floor(s32x4 v, s32x4 s) {
+forceinline s32x4 floor(s32x4 v, s32x4 s) {
 	__m128i n = _mm_add_epi32(v.m.pi, _mm_set1_epi32(1));//   / s - 1;
 #if ARCH_AVX
 	__m256d vd = _mm256_cvtepi32_pd(v.m.pi);
@@ -3666,7 +3675,7 @@ FORCEINLINE s32x4 floor(s32x4 v, s32x4 s) {
 	v.m.pi = _mm_mullo_epi32(_mm_blendv_epi32(p, n, s32x4_lt(v.m.pi, _mm_set1_epi32(0))), s.m.pi);
 	return v;
 }
-FORCEINLINE v2s floor(v2s v, v2s s) {
+forceinline v2s floor(v2s v, v2s s) {
 	auto result = floor(S32x4(v.x, v.y, 0, 0), S32x4(s.x, s.y, 0, 0));
 	return *(v2s *)&result;
 	return {
@@ -3674,14 +3683,14 @@ FORCEINLINE v2s floor(v2s v, v2s s) {
 		floor(v.y, s.y),
 	};
 }
-FORCEINLINE v3s floor(v3s v, v3s s) {
+forceinline v3s floor(v3s v, v3s s) {
 	return {
 		floor(v.x, s.x),
 		floor(v.y, s.y),
 		floor(v.z, s.z),
 	};
 }
-FORCEINLINE v4s floor(v4s v, v4s s) {
+forceinline v4s floor(v4s v, v4s s) {
 #if 1
 	// ~10 cy
 	return {
@@ -3700,42 +3709,39 @@ FORCEINLINE v4s floor(v4s v, v4s s) {
 #endif
 }
 
-FORCEINLINE s32x4 floor(s32x4 v, s32 s) { return floor(v, S32x4(s)); }
-FORCEINLINE v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
-FORCEINLINE v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
-FORCEINLINE v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
+forceinline s32x4 floor(s32x4 v, s32 s) { return floor(v, S32x4(s)); }
+forceinline v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
+forceinline v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
+forceinline v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
 
-FORCEINLINE s32 floorToInt(f32 v) { return (s32)floor(v); }
-FORCEINLINE s64 floorToInt(f64 v) { return (s64)floor(v); }
-FORCEINLINE v2s floorToInt(v2f v) {
+forceinline s32 floorToInt(f32 v) { return (s32)floor(v); }
+forceinline s64 floorToInt(f64 v) { return (s64)floor(v); }
+forceinline v2s floorToInt(v2f v) {
 	return {
 		floorToInt(v.x),
 		floorToInt(v.y),
 	};
 }
-FORCEINLINE v3s floorToInt(v3f v) {
+forceinline v3s floorToInt(v3f v) {
 	return {
 		floorToInt(v.x),
 		floorToInt(v.y),
 		floorToInt(v.z),
 	};
 }
-FORCEINLINE s32x4 floorToInt(f32x4 v) { return (s32x4)floor(v); }
-FORCEINLINE v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
+forceinline s32x4 floorToInt(f32x4 v) { return (s32x4)floor(v); }
+forceinline v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
 
-FORCEINLINE f32 ceil(f32 v) { return ceilf(v); }
-FORCEINLINE f64 ceil(f64 v) { return ::ceil(v); }
-
-FORCEINLINE v2f ceil(v2f v) { return {ceil(v.x), ceil(v.y)}; }
-FORCEINLINE v3f ceil(v3f v) { return {ceil(v.x), ceil(v.y), ceil(v.z)}; }
-FORCEINLINE v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)}; }
+forceinline v2f ceil(v2f v) { return {ceil(v.x), ceil(v.y)}; }
+forceinline v3f ceil(v3f v) { return {ceil(v.x), ceil(v.y), ceil(v.z)}; }
+forceinline v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)}; }
 
 #define CEIL(t) \
-	FORCEINLINE t ceil(t v, t s) { return floor(v + s - 1, s); }
+	forceinline t ceil(t v, t s) { return floor(v + s - 1, s); }
 CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
-#define CEIL(s32, f32) FORCEINLINE s32 ceilToInt(f32 v) { return (s32)ceil(v); }
+#define CEIL(s32, f32) forceinline s32 ceilToInt(f32 v) { return (s32)ceil(v); }
 
 CEIL(s32, f32)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
 CEIL(s64, f64)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
@@ -3743,203 +3749,203 @@ CEIL(v2s, v2f)// CEIL(v2sx4, v2fx4) CEIL(v2sx4, v2fx4);
 CEIL(v3s, v3f)// CEIL(v3sx4, v3fx4) CEIL(v3sx4, v3fx4);
 CEIL(v4s, v4f)// CEIL(v4sx4, v4fx4) CEIL(v4sx4, v4fx4);
 
-FORCEINLINE v2fx4 floor(v2fx4 v) { return V2fx4(floor(v.x), floor(v.y)); }
-FORCEINLINE v2fx8 floor(v2fx8 v) { return V2fx8(floor(v.x), floor(v.y)); }
-FORCEINLINE v3fx4 floor(v3fx4 v) { return V3fx4(floor(v.x), floor(v.y), floor(v.z)); }
-FORCEINLINE v3fx8 floor(v3fx8 v) { return V3fx8(floor(v.x), floor(v.y), floor(v.z)); }
-FORCEINLINE v4fx4 floor(v4fx4 v) { return V4fx4(floor(v.x), floor(v.y), floor(v.z), floor(v.w)); }
-FORCEINLINE v4fx8 floor(v4fx8 v) { return V4fx8(floor(v.x), floor(v.y), floor(v.z), floor(v.w)); }
-FORCEINLINE v2fx4 ceil(v2fx4 v) { return V2fx4(ceil(v.x), ceil(v.y)); }
-FORCEINLINE v2fx8 ceil(v2fx8 v) { return V2fx8(ceil(v.x), ceil(v.y)); }
-FORCEINLINE v3fx4 ceil(v3fx4 v) { return V3fx4(ceil(v.x), ceil(v.y), ceil(v.z)); }
-FORCEINLINE v3fx8 ceil(v3fx8 v) { return V3fx8(ceil(v.x), ceil(v.y), ceil(v.z)); }
-FORCEINLINE v4fx4 ceil(v4fx4 v) { return V4fx4(ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)); }
-FORCEINLINE v4fx8 ceil(v4fx8 v) { return V4fx8(ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)); }
+forceinline v2fx4 floor(v2fx4 v) { return V2fx4(floor(v.x), floor(v.y)); }
+forceinline v2fx8 floor(v2fx8 v) { return V2fx8(floor(v.x), floor(v.y)); }
+forceinline v3fx4 floor(v3fx4 v) { return V3fx4(floor(v.x), floor(v.y), floor(v.z)); }
+forceinline v3fx8 floor(v3fx8 v) { return V3fx8(floor(v.x), floor(v.y), floor(v.z)); }
+forceinline v4fx4 floor(v4fx4 v) { return V4fx4(floor(v.x), floor(v.y), floor(v.z), floor(v.w)); }
+forceinline v4fx8 floor(v4fx8 v) { return V4fx8(floor(v.x), floor(v.y), floor(v.z), floor(v.w)); }
+forceinline v2fx4 ceil(v2fx4 v) { return V2fx4(ceil(v.x), ceil(v.y)); }
+forceinline v2fx8 ceil(v2fx8 v) { return V2fx8(ceil(v.x), ceil(v.y)); }
+forceinline v3fx4 ceil(v3fx4 v) { return V3fx4(ceil(v.x), ceil(v.y), ceil(v.z)); }
+forceinline v3fx8 ceil(v3fx8 v) { return V3fx8(ceil(v.x), ceil(v.y), ceil(v.z)); }
+forceinline v4fx4 ceil(v4fx4 v) { return V4fx4(ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)); }
+forceinline v4fx8 ceil(v4fx8 v) { return V4fx8(ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)); }
 
-#define ROUND(f32) FORCEINLINE f32 round(f32 v) { return floor(v + 0.5f); }
+#define ROUND(f32) forceinline f32 round(f32 v) { return floor(v + 0.5f); }
 ROUND(f32) ROUND(f32x4) ROUND(f32x8) ROUND(v2f) ROUND(v3f) ROUND(v4f);
 #undef ROUND
-FORCEINLINE v2fx4 round(v2fx4 v) { v.x = round(v.x); v.y = round(v.y); return v; }
-FORCEINLINE v2fx8 round(v2fx8 v) { v.x = round(v.x); v.y = round(v.y); return v; }
-FORCEINLINE v3fx4 round(v3fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
-FORCEINLINE v3fx8 round(v3fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
-FORCEINLINE v4fx4 round(v4fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
-FORCEINLINE v4fx8 round(v4fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
+forceinline v2fx4 round(v2fx4 v) { v.x = round(v.x); v.y = round(v.y); return v; }
+forceinline v2fx8 round(v2fx8 v) { v.x = round(v.x); v.y = round(v.y); return v; }
+forceinline v3fx4 round(v3fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
+forceinline v3fx8 round(v3fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); return v; }
+forceinline v4fx4 round(v4fx4 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
+forceinline v4fx8 round(v4fx8 v) { v.x = round(v.x); v.y = round(v.y); v.z = round(v.z); v.w = round(v.w); return v; }
 
-FORCEINLINE s32 roundToInt(f32 v) { return (s32)lroundf(v); }
-FORCEINLINE s64 roundToInt(f64 v) { return llround(v); }
-FORCEINLINE v2s roundToInt(v2f v) { return {roundToInt(v.x), roundToInt(v.y)}; }
-FORCEINLINE v3s roundToInt(v3f v) { return {roundToInt(v.x), roundToInt(v.y), roundToInt(v.z)}; }
-FORCEINLINE v4s roundToInt(v4f v) { return (v4s)round(v); }
-FORCEINLINE v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
+forceinline s32 roundToInt(f32 v) { return (s32)lroundf(v); }
+forceinline s64 roundToInt(f64 v) { return llround(v); }
+forceinline v2s roundToInt(v2f v) { return {roundToInt(v.x), roundToInt(v.y)}; }
+forceinline v3s roundToInt(v3f v) { return {roundToInt(v.x), roundToInt(v.y), roundToInt(v.z)}; }
+forceinline v4s roundToInt(v4f v) { return (v4s)round(v); }
+forceinline v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
 
-FORCEINLINE f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
-FORCEINLINE u32 absolute(u32 v) { return v; }
-FORCEINLINE s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
+forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
+forceinline u32 absolute(u32 v) { return v; }
+forceinline s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
 
-FORCEINLINE f32x4 absolute(f32x4 v) { RETURN_MT(f32x4, _mm_and_ps(v.m.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
-FORCEINLINE f64x2 absolute(f64x2 v) { RETURN_MT(f64x2, _mm_and_pd(v.m.pd, _mm_castpi_pd(_mm_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
+forceinline f32x4 absolute(f32x4 v) { RETURN_MT(f32x4, _mm_and_ps(v.m.ps, _mm_castpi_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
+forceinline f64x2 absolute(f64x2 v) { RETURN_MT(f64x2, _mm_and_pd(v.m.pd, _mm_castpi_pd(_mm_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
 #if ARCH_AVX
-FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_MT(f32x8, _mm256_and_ps(v.m.ps, _mm256_castpi_ps(_mm256_set1_epi32(0x7FFFFFFF)))); }
-FORCEINLINE f64x4 absolute(f64x4 v) { RETURN_MT(f64x4, _mm256_and_pd(v.m.pd, _mm256_castpi_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
+forceinline f32x8 absolute(f32x8 v) { RETURN_MT(f32x8, _mm256_and_ps(v.m.ps, _mm256_castpi_ps(_mm256_set1_epi32(0x7FFFFFFF)))); }
+forceinline f64x4 absolute(f64x4 v) { RETURN_MT(f64x4, _mm256_and_pd(v.m.pd, _mm256_castpi_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF)))); }
 #else
-FORCEINLINE f32x8 absolute(f32x8 v) { RETURN_T2(f32x8, absolute(v.lo), absolute(v.hi)); }
-FORCEINLINE f64x4 absolute(f64x4 v) { RETURN_T2(f64x4, absolute(v.lo), absolute(v.hi)); }
+forceinline f32x8 absolute(f32x8 v) { RETURN_T2(f32x8, absolute(v.lo), absolute(v.hi)); }
+forceinline f64x4 absolute(f64x4 v) { RETURN_T2(f64x4, absolute(v.lo), absolute(v.hi)); }
 #endif
 
-FORCEINLINE v2f absolute(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
-FORCEINLINE v3f absolute(v3f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z)}; }
-FORCEINLINE v4f absolute(v4f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w)}; }
-FORCEINLINE v2fx4 absolute(v2fx4 v) { return V2fx4(absolute(v.x), absolute(v.y)); }
-FORCEINLINE v2fx8 absolute(v2fx8 v) { return V2fx8(absolute(v.x), absolute(v.y)); }
+forceinline v2f absolute(v2f v) { return {fabsf(v.x), fabsf(v.y)}; }
+forceinline v3f absolute(v3f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z)}; }
+forceinline v4f absolute(v4f v) { return {fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w)}; }
+forceinline v2fx4 absolute(v2fx4 v) { return V2fx4(absolute(v.x), absolute(v.y)); }
+forceinline v2fx8 absolute(v2fx8 v) { return V2fx8(absolute(v.x), absolute(v.y)); }
 
-FORCEINLINE v2s absolute(v2s a) { return {labs(a.x), labs(a.y)}; }
-FORCEINLINE v3s absolute(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
-FORCEINLINE s32x4 absolute(s32x4 a) { RETURN_MT(s32x4, _mm_abs_epi32(a.m.pi)); }
-FORCEINLINE v4s absolute(v4s a) { return V4s(absolute(a.m)); }
+forceinline v2s absolute(v2s a) { return {labs(a.x), labs(a.y)}; }
+forceinline v3s absolute(v3s a) { return {labs(a.x), labs(a.y), labs(a.z)}; }
+forceinline s32x4 absolute(s32x4 a) { RETURN_MT(s32x4, _mm_abs_epi32(a.m.pi)); }
+forceinline v4s absolute(v4s a) { return V4s(absolute(a.m)); }
 
-FORCEINLINE f32 setSign(f32 dst, f32 src) {
+forceinline f32 setSign(f32 dst, f32 src) {
     *(u32*)&dst &= 0x7FFFFFFF;
     *(u32*)&dst |= *(u32*)&src & 0x80000000;
     return dst;
 }
-FORCEINLINE f64 setSign(f64 dst, f64 src) {
+forceinline f64 setSign(f64 dst, f64 src) {
     *(u64*)&dst &= 0x7FFFFFFFFFFFFFFF;
     *(u64*)&dst |= *(u64*)&src & 0x8000000000000000;
     return dst;
 }
 template<umm ps>
-FORCEINLINE f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
+forceinline f32x<ps> setSign(f32x<ps> dst, f32x<ps> src) {
     *(u32x<ps>*)&dst &= U32x<ps>(0x7FFFFFFF);
     *(u32x<ps>*)&dst |= *(u32x<ps>*)&src & U32x<ps>(0x80000000);
     return dst;
 }
 
-FORCEINLINE s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-FORCEINLINE s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-FORCEINLINE s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-FORCEINLINE s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 
-FORCEINLINE f32 sign(f32 v) { return setSign(1.0f, v); }
-FORCEINLINE v2f sign(v2f v) { v.x = setSign(1.0f, v.x); v.y = setSign(1.0f, v.y); return v; }
-template<umm ps> FORCEINLINE f32x<ps> sign(f32x<ps> v) { return setSign(F32x<ps>(1.0f), v); }
-template<umm ps> FORCEINLINE v2fx<ps> sign(v2fx<ps> v) { v.x = setSign(F32x<ps>(1.0f), v.x); v.y = setSign(F32x<ps>(1.0f), v.y); return v; }
+forceinline f32 sign(f32 v) { return setSign(1.0f, v); }
+forceinline v2f sign(v2f v) { v.x = setSign(1.0f, v.x); v.y = setSign(1.0f, v.y); return v; }
+template<umm ps> forceinline f32x<ps> sign(f32x<ps> v) { return setSign(F32x<ps>(1.0f), v); }
+template<umm ps> forceinline v2fx<ps> sign(v2fx<ps> v) { v.x = setSign(F32x<ps>(1.0f), v.x); v.y = setSign(F32x<ps>(1.0f), v.y); return v; }
 
-#define TRUNC(f32) FORCEINLINE f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
+#define TRUNC(f32) forceinline f32 trunc(f32 v) { return v > 0 ? floor(v) : ceil(v); }
 TRUNC(f32)
 TRUNC(f64)
 #undef TRUNC
 
 template<umm ps>
-FORCEINLINE f32x<ps> trunc(f32x<ps> v) { return select(v > 0, floor(v), ceil(v)); }
+forceinline f32x<ps> trunc(f32x<ps> v) { return select(v > 0, floor(v), ceil(v)); }
 
 #define MOD(f32) \
-FORCEINLINE f32 modulo(f32 a, f32 b) { return setSign(a - trunc(a / b) * b, a); } \
-FORCEINLINE f32 positiveModulo(f32 a, f32 b) { return frac(a / b) * b; }
+forceinline f32 modulo(f32 a, f32 b) { return setSign(a - trunc(a / b) * b, a); } \
+forceinline f32 positiveModulo(f32 a, f32 b) { return frac(a / b) * b; }
 MOD(f32)
 MOD(f64)
 #undef MOD
 
-FORCEINLINE f32 sqrt(f32 v) { return sqrtf(v); }
-FORCEINLINE v2f sqrt(v2f v) { return V2f(sqrtf(v.x), sqrtf(v.y)); }
-FORCEINLINE v3f sqrt(v3f v) { return V3f(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z)); }
-FORCEINLINE f32x4 reciprocal(f32x4 v) { RETURN_MT(f32x4, _mm_rcp_ps(v.m.ps)); }
-FORCEINLINE f32x4 sqrt(f32x4 v) { RETURN_MT(f32x4, _mm_sqrt_ps(v.m.ps)); }
+forceinline f32 sqrt(f32 v) { return sqrtf(v); }
+forceinline v2f sqrt(v2f v) { return V2f(sqrtf(v.x), sqrtf(v.y)); }
+forceinline v3f sqrt(v3f v) { return V3f(sqrtf(v.x), sqrtf(v.y), sqrtf(v.z)); }
+forceinline f32x4 reciprocal(f32x4 v) { RETURN_MT(f32x4, _mm_rcp_ps(v.m.ps)); }
+forceinline f32x4 sqrt(f32x4 v) { RETURN_MT(f32x4, _mm_sqrt_ps(v.m.ps)); }
 #if ARCH_AVX
-FORCEINLINE f32x8 sqrt(f32x8 v) { RETURN_MT(f32x8, _mm256_sqrt_ps(v.m.ps)); }
-FORCEINLINE f32x8 reciprocal(f32x8 v) { RETURN_MT(f32x8, _mm256_rcp_ps(v.m.ps)); }
+forceinline f32x8 sqrt(f32x8 v) { RETURN_MT(f32x8, _mm256_sqrt_ps(v.m.ps)); }
+forceinline f32x8 reciprocal(f32x8 v) { RETURN_MT(f32x8, _mm256_rcp_ps(v.m.ps)); }
 #else
-FORCEINLINE f32x8 sqrt(f32x8 v) { RETURN_T2(f32x8, sqrt(v.lo), sqrt(v.hi)); }
-FORCEINLINE f32x8 reciprocal(f32x8 v) { RETURN_T2(f32x8, reciprocal(v.lo), reciprocal(v.hi)); }
+forceinline f32x8 sqrt(f32x8 v) { RETURN_T2(f32x8, sqrt(v.lo), sqrt(v.hi)); }
+forceinline f32x8 reciprocal(f32x8 v) { RETURN_T2(f32x8, reciprocal(v.lo), reciprocal(v.hi)); }
 #endif
-FORCEINLINE v4f sqrt(v4f v) { return V4f(sqrt(v.m)); }
+forceinline v4f sqrt(v4f v) { return V4f(sqrt(v.m)); }
 
-FORCEINLINE f32 reciprocal(f32 v) { return 1.0f / v; }
+forceinline f32 reciprocal(f32 v) { return 1.0f / v; }
 
-FORCEINLINE f32 sin(f32 v) { return ::sinf(v); }
-FORCEINLINE f32 cos(f32 v) { return ::cosf(v); }
+forceinline f32 sin(f32 v) { return ::sinf(v); }
+forceinline f32 cos(f32 v) { return ::cosf(v); }
 
 #if COMPILER_GCC
-FORCEINLINE f32x4 sin(f32x4 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3])}; }
-FORCEINLINE f32x4 cos(f32x4 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3])}; }
-FORCEINLINE f32x8 sin(f32x8 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3]),sin(v.s[4]),sin(v.s[5]),sin(v.s[6]),sin(v.s[7])}; }
-FORCEINLINE f32x8 cos(f32x8 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3]),cos(v.s[4]),cos(v.s[5]),cos(v.s[6]),cos(v.s[7])}; }
+forceinline f32x4 sin(f32x4 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3])}; }
+forceinline f32x4 cos(f32x4 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3])}; }
+forceinline f32x8 sin(f32x8 v) { return {sin(v.s[0]),sin(v.s[1]),sin(v.s[2]),sin(v.s[3]),sin(v.s[4]),sin(v.s[5]),sin(v.s[6]),sin(v.s[7])}; }
+forceinline f32x8 cos(f32x8 v) { return {cos(v.s[0]),cos(v.s[1]),cos(v.s[2]),cos(v.s[3]),cos(v.s[4]),cos(v.s[5]),cos(v.s[6]),cos(v.s[7])}; }
 #else
-FORCEINLINE f32x4 sin(f32x4 v) { RETURN_MT(f32x4, _mm_sin_ps(v.m.ps)); }
-FORCEINLINE f32x4 cos(f32x4 v) { RETURN_MT(f32x4, _mm_cos_ps(v.m.ps)); }
+forceinline f32x4 sin(f32x4 v) { RETURN_MT(f32x4, _mm_sin_ps(v.m.ps)); }
+forceinline f32x4 cos(f32x4 v) { RETURN_MT(f32x4, _mm_cos_ps(v.m.ps)); }
 #if ARCH_AVX
-FORCEINLINE f32x8 sin(f32x8 v) { RETURN_MT(f32x8, _mm256_sin_ps(v.m.ps)); }
-FORCEINLINE f32x8 cos(f32x8 v) { RETURN_MT(f32x8, _mm256_cos_ps(v.m.ps)); }
+forceinline f32x8 sin(f32x8 v) { RETURN_MT(f32x8, _mm256_sin_ps(v.m.ps)); }
+forceinline f32x8 cos(f32x8 v) { RETURN_MT(f32x8, _mm256_cos_ps(v.m.ps)); }
 #else
-FORCEINLINE f32x8 sin(f32x8 v) { RETURN_T2(f32x8, sin(v.lo), sin(v.hi)); }
-FORCEINLINE f32x8 cos(f32x8 v) { RETURN_T2(f32x8, cos(v.lo), cos(v.hi)); }
+forceinline f32x8 sin(f32x8 v) { RETURN_T2(f32x8, sin(v.lo), sin(v.hi)); }
+forceinline f32x8 cos(f32x8 v) { RETURN_T2(f32x8, cos(v.lo), cos(v.hi)); }
 #endif
 #endif
 
-FORCEINLINE v4f sin(v4f v) { return V4f(sin(v.m)); }
-FORCEINLINE v2f sin(v2f v) { return sin(V4f(v, 0, 0)).xy; }
-FORCEINLINE v3f sin(v3f v) { return sin(V4f(v, 0)).xyz; }
+forceinline v4f sin(v4f v) { return V4f(sin(v.m)); }
+forceinline v2f sin(v2f v) { return sin(V4f(v, 0, 0)).xy; }
+forceinline v3f sin(v3f v) { return sin(V4f(v, 0)).xyz; }
 
-FORCEINLINE v4f cos(v4f v) { return V4f(cos(v.m)); }
-FORCEINLINE v2f cos(v2f v) { return cos(V4f(v, 0, 0)).xy; }
-FORCEINLINE v3f cos(v3f v) { return cos(V4f(v, 0)).xyz; }
+forceinline v4f cos(v4f v) { return V4f(cos(v.m)); }
+forceinline v2f cos(v2f v) { return cos(V4f(v, 0, 0)).xy; }
+forceinline v3f cos(v3f v) { return cos(V4f(v, 0)).xyz; }
 
-FORCEINLINE void sincos(f32 v, f32& sinOut, f32& cosOut) {
+forceinline void sincos(f32 v, f32& sinOut, f32& cosOut) {
 	sinOut = sin(v);
 	cosOut = cos(v);
 }
 
 #if COMPILER_GCC
-FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) {
+forceinline void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) {
 	sincos(v.s[0], sinOut.s[0], cosOut.s[0]);
 	sincos(v.s[1], sinOut.s[1], cosOut.s[1]);
 	sincos(v.s[2], sinOut.s[2], cosOut.s[2]);
 	sincos(v.s[3], sinOut.s[3], cosOut.s[3]);
 }
 #else
-FORCEINLINE void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m.ps = _mm_sincos_ps(&cosOut.m.ps, v.m.ps); }
+forceinline void sincos(f32x4 v, f32x4& sinOut, f32x4& cosOut) { sinOut.m.ps = _mm_sincos_ps(&cosOut.m.ps, v.m.ps); }
 #endif
 
 #if ARCH_AVX && !COMPILER_GCC
-FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sinOut.m.ps = _mm256_sincos_ps(&cosOut.m.ps, v.m.ps); }
+forceinline void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sinOut.m.ps = _mm256_sincos_ps(&cosOut.m.ps, v.m.ps); }
 #else
-FORCEINLINE void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sincos(v.lo, sinOut.lo, cosOut.lo); sincos(v.hi, sinOut.hi, cosOut.hi); }
+forceinline void sincos(f32x8 v, f32x8& sinOut, f32x8& cosOut) { sincos(v.lo, sinOut.lo, cosOut.lo); sincos(v.hi, sinOut.hi, cosOut.hi); }
 #endif
 
 #if COMPILER_GCC
-FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
+forceinline void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
 	sinOut = sin(v);
 	cosOut = cos(v);
 }
-FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
+forceinline void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
 	sinOut = sin(v);
 	cosOut = cos(v);
 }
-FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) {
+forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut) {
 	sinOut = sin(v);
 	cosOut = cos(v);
 }
 #else
 
-FORCEINLINE void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
+forceinline void sincos(v2f v, v2f& sinOut, v2f& cosOut) {
 	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, 0, 0));
 	memcpy(&sinOut, &s, sizeof(sinOut));
 	memcpy(&cosOut, &c, sizeof(cosOut));
 }
-FORCEINLINE void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
+forceinline void sincos(v3f v, v3f& sinOut, v3f& cosOut) {
 	__m128 c, s = _mm_sincos_ps(&c, _mm_setr_ps(v.x, v.y, v.z, 0));
 	memcpy(&sinOut, &s, sizeof(sinOut));
 	memcpy(&cosOut, &c, sizeof(cosOut));
 }
-FORCEINLINE void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
+forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut) { sincos(v.m, sinOut.m, cosOut.m); }
 #endif
 
-FORCEINLINE v2f sincos(f32 v) { return {cos(v), sin(v)}; }
-FORCEINLINE v2fx4 sincos(f32x4 v) { v2fx4 result; sincos(v, result.y, result.x); return result; }
-FORCEINLINE v2fx8 sincos(f32x8 v) { v2fx8 result; sincos(v, result.y, result.x); return result; }
+forceinline v2f sincos(f32 v) { return {cos(v), sin(v)}; }
+forceinline v2fx4 sincos(f32x4 v) { v2fx4 result; sincos(v, result.y, result.x); return result; }
+forceinline v2fx8 sincos(f32x8 v) { v2fx8 result; sincos(v, result.y, result.x); return result; }
 
 #define SINCOS(v2f, F32x4)				 \
-FORCEINLINE void sincos(f32 v, v2f& result) { \
+forceinline void sincos(f32 v, v2f& result) { \
 	result.y = F32x4(sin(v));			 \
 	result.x = F32x4(cos(v));			 \
 }										   
@@ -3947,52 +3953,52 @@ SINCOS(v2fx4, F32x4) SINCOS(v2fx8, F32x8)
 #undef SINCOS
 
 #define SINCOS(v2fx4, f32x4)				 \
-FORCEINLINE void sincos(f32x4 v, v2fx4& result) { \
+forceinline void sincos(f32x4 v, v2fx4& result) { \
 	result.y = sin(v);					     \
 	result.x = cos(v);					     \
 }
 SINCOS(v2f, f32) SINCOS(v2fx4, f32x4) SINCOS(v2fx8, f32x8)
 #undef SINCOS
 
-template<umm ps> FORCEINLINE f32x<ps> modulo(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a * reciprocal(b)) * b, a); }
-template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE f32x<ps> positiveModulo(f32x<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v2fx<ps> positiveModulo(v2fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v3fx<ps> positiveModulo(v3fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
-template<umm ps> FORCEINLINE v4fx<ps> positiveModulo(v4fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline f32x<ps> modulo(f32x<ps> a, f32x<ps> b) { return setSign(a - trunc(a * reciprocal(b)) * b, a); }
+template<umm ps> forceinline f32x<ps> positiveModulo(f32x<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v2fx<ps> positiveModulo(v2fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v3fx<ps> positiveModulo(v3fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v4fx<ps> positiveModulo(v4fx<ps> a, f32x<ps> b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline f32x<ps> positiveModulo(f32x<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v2fx<ps> positiveModulo(v2fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v3fx<ps> positiveModulo(v3fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
+template<umm ps> forceinline v4fx<ps> positiveModulo(v4fx<ps> a, f32 b) { return frac(a * reciprocal(b)) * b; }
 
-#define SIN_BHASKARA(f32x4) 															\
-FORCEINLINE f32x4 sinBhaskara(f32x4 v) {												\
-	v = positiveModulo(v, pi * 2);														\
-	auto mask = v >= pi;																\
-	v = select(mask, v - pi, v);														\
-	return (16*v*(pi-v))*reciprocal(5*pi*pi-4*v*(pi-v)) * select(mask, -1.0f, 1.0f);	\
+#define SIN_BHASKARA(f32x4, F32x4) 																		\
+forceinline f32x4 sin_bhaskara(f32x4 v) {															\
+	v = positiveModulo(v, pi * 2);																	\
+	auto mask = v >= pi;																			\
+	v = select(mask, v - pi, v);																	\
+	return (16*v*(pi-v))*reciprocal(5*pi*pi-4*v*(pi-v)) * select(mask, F32x4(-1.0f), F32x4(1.0f));	\
 }
-SIN_BHASKARA(f32)
-SIN_BHASKARA(f32x4)
-SIN_BHASKARA(f32x8)
+SIN_BHASKARA(f32, )
+SIN_BHASKARA(f32x4, F32x4)
+SIN_BHASKARA(f32x8, F32x8)
 #undef SIN_BHASKARA
 
-#define COS_BHASKARA(f32x4) FORCEINLINE f32x4 cosBhaskara(f32x4 v) { return sinBhaskara(v + pi*0.5f); }
+#define COS_BHASKARA(f32x4) forceinline f32x4 cos_bhaskara(f32x4 v) { return sin_bhaskara(v + pi*0.5f); }
 COS_BHASKARA(f32)
 COS_BHASKARA(f32x4)
 COS_BHASKARA(f32x8)
 #undef COS_BHASKARA
 
-#define SINCOS_BHASKARA(v2fx4, V2fx4, f32x4) FORCEINLINE v2fx4 sincosBhaskara(f32x4 v) { return V2fx4(cosBhaskara(v), sinBhaskara(v)); }
+#define SINCOS_BHASKARA(v2fx4, V2fx4, f32x4) forceinline v2fx4 sincos_bhaskara(f32x4 v) { return V2fx4(cos_bhaskara(v), sin_bhaskara(v)); }
 SINCOS_BHASKARA(v2f  , V2f  , f32)
 SINCOS_BHASKARA(v2fx4, V2fx4, f32x4)
 SINCOS_BHASKARA(v2fx8, V2fx8, f32x8)
 #undef SINCOS_BHASKARA
 
-FORCEINLINE f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
-FORCEINLINE f32 atan2(v2f v) { return atan2(v.y, v.x); }
+forceinline f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
+forceinline f32 atan2(v2f v) { return atan2(v.y, v.x); }
 
 #if COMPILER_GCC
-FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) {
+forceinline f32x4 atan2(f32x4 y, f32x4 x) {
 	return {
 		atan2(y.s[0], x.s[0]),
 		atan2(y.s[1], x.s[1]),
@@ -4001,35 +4007,35 @@ FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) {
 	};
 }
 #else
-FORCEINLINE f32x4 atan2(f32x4 y, f32x4 x) { RETURN_MT(f32x4, _mm_atan2_ps(y.m.ps, x.m.ps)); }
+forceinline f32x4 atan2(f32x4 y, f32x4 x) { RETURN_MT(f32x4, _mm_atan2_ps(y.m.ps, x.m.ps)); }
 #endif
 
 #if ARCH_AVX && !COMPILER_GCC
-FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_MT(f32x8, _mm256_atan2_ps(y.m.ps, x.m.ps)); }
+forceinline f32x8 atan2(f32x8 y, f32x8 x) { RETURN_MT(f32x8, _mm256_atan2_ps(y.m.ps, x.m.ps)); }
 #else
-FORCEINLINE f32x8 atan2(f32x8 y, f32x8 x) { RETURN_T2(f32x8, atan2(y.lo, x.lo), atan2(y.hi, x.hi)); }
+forceinline f32x8 atan2(f32x8 y, f32x8 x) { RETURN_T2(f32x8, atan2(y.lo, x.lo), atan2(y.hi, x.hi)); }
 #endif
 
-FORCEINLINE f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
-FORCEINLINE f32x8 atan2(v2fx8 v) { return atan2(v.y, v.x); }
+forceinline f32x4 atan2(v2fx4 v) { return atan2(v.y, v.x); }
+forceinline f32x8 atan2(v2fx8 v) { return atan2(v.y, v.x); }
 
-#define ATAN2_APPROX(f32, v2f)										 \
-FORCEINLINE f32 atan2Approx(f32 y, f32 x) {							 \
+#define ATAN2_APPROX(f32, F32, v2f)										 \
+forceinline f32 atan2Approx(f32 y, f32 x) {							 \
 	auto ay = absolute(y) + 1e-10f;									 \
 	auto mask = x < 0;												 \
 	auto r = select(mask, (x + ay) / (ay - x), (x - ay) / (ay + x)); \
-	auto angle = select(mask, pi * 0.75f, pi * 0.25f);				 \
+	auto angle = select(mask, F32(pi * 0.75f), F32(pi * 0.25f));	 \
 	angle += (0.1963f * r * r - 0.9817f) * r;						 \
 	return select(y < 0, -angle, angle);							 \
 }																	 \
-FORCEINLINE f32 atan2Approx(v2f v) { return atan2Approx(v.y, v.x); }
-ATAN2_APPROX(f32, v2f)
-ATAN2_APPROX(f32x4, v2fx4)
-ATAN2_APPROX(f32x8, v2fx8)
+forceinline f32 atan2Approx(v2f v) { return atan2Approx(v.y, v.x); }
+ATAN2_APPROX(f32, , v2f)
+ATAN2_APPROX(f32x4, F32x4, v2fx4)
+ATAN2_APPROX(f32x8, F32x8, v2fx8)
 #undef ATAN2_APPROX
 
 template <class A, class B, class T, class S>
-FORCEINLINE constexpr auto lerpWrap(A a, B b, T t, S s) {
+forceinline constexpr auto lerpWrap(A a, B b, T t, S s) {
 	a = positiveModulo(a, s);
 	b = positiveModulo(b, s);
 	auto d = a - b;
@@ -4038,35 +4044,35 @@ FORCEINLINE constexpr auto lerpWrap(A a, B b, T t, S s) {
 				  lerp(a, b, t));
 }
 
-FORCEINLINE f32 dot(f32 a, f32 b) { return a * b; }
-FORCEINLINE f32 dot(f32x4 a, f32x4 b) { return {_mm_cvtss_f32(_mm_dp_ps(a.m.ps, b.m.ps, 0xFF))}; }
-FORCEINLINE s32 dot(s32x4 a, s32x4 b) {
+forceinline f32 dot(f32 a, f32 b) { return a * b; }
+forceinline f32 dot(f32x4 a, f32x4 b) { return {_mm_cvtss_f32(_mm_dp_ps(a.m.ps, b.m.ps, 0xFF))}; }
+forceinline s32 dot(s32x4 a, s32x4 b) {
 	a *= b;
 	return a[0] + a[1] + a[2] + a[3];
 }
-FORCEINLINE u32 dot(u32x4 a, u32x4 b) {
+forceinline u32 dot(u32x4 a, u32x4 b) {
 	a *= b;
 	return a[0] + a[1] + a[2] + a[3];
 }
 
-#define DOT(f32, v2f) FORCEINLINE f32 dot(v2f a, v2f b) { return a *= b, a.x + a.y; }
+#define DOT(f32, v2f) forceinline f32 dot(v2f a, v2f b) { return a *= b, a.x + a.y; }
 DOT(f32, v2f) DOT(f32x4, v2fx4) DOT(f32x8, v2fx8);
 DOT(s32, v2s) DOT(s32x4, v2sx4) DOT(s32x8, v2sx8);
 DOT(u32, v2u) DOT(u32x4, v2ux4) DOT(u32x8, v2ux8);
 #undef DOT
 
-#define DOT(f32, v3f) FORCEINLINE f32 dot(v3f a, v3f b) { return a *= b, a.x + a.y + a.z; }
+#define DOT(f32, v3f) forceinline f32 dot(v3f a, v3f b) { return a *= b, a.x + a.y + a.z; }
 DOT(f32, v3f) DOT(f32x4, v3fx4) DOT(f32x8, v3fx8);
 DOT(s32, v3s) DOT(s32x4, v3sx4) DOT(s32x8, v3sx8);
 DOT(u32, v3u) DOT(u32x4, v3ux4) DOT(u32x8, v3ux8);
 #undef DOT
 
-FORCEINLINE f32 dot(v4f a, v4f b) { return dot(a.m, b.m); }
-FORCEINLINE s32 dot(v4s a, v4s b) { return dot(a.m, b.m); }
-FORCEINLINE u32 dot(v4u a, v4u b) { return dot(a.m, b.m); }
+forceinline f32 dot(v4f a, v4f b) { return dot(a.m, b.m); }
+forceinline s32 dot(v4s a, v4s b) { return dot(a.m, b.m); }
+forceinline u32 dot(v4u a, v4u b) { return dot(a.m, b.m); }
 
 #define DOT(f32, v4f)                 \
-	FORCEINLINE f32 dot(v4f a, v4f b) {           \
+	forceinline f32 dot(v4f a, v4f b) {           \
 		a *= b;                       \
 		return a.x + a.y + a.z + a.w; \
 	}
@@ -4076,17 +4082,17 @@ DOT(u32x4, v4ux4) DOT(u32x8, v4ux8);
 #undef DOT
 
 template <class T>
-FORCEINLINE auto reflect(T v, T n) {
+forceinline auto reflect(T v, T n) {
 	return v - dot(v, n) * n * 2;
 }
 
-FORCEINLINE v2f cross(v2f a) { return {a.y, -a.x}; }
-FORCEINLINE v2fx4 cross(v2fx4 a) { return {a.y, -a.x}; }
-FORCEINLINE v2fx8 cross(v2fx8 a) { return {a.y, -a.x}; }
-FORCEINLINE v2s cross(v2s a) { return {a.y, -a.x}; }
-FORCEINLINE v2sx4 cross(v2sx4 a) { return {a.y, -a.x}; }
-FORCEINLINE v2sx8 cross(v2sx8 a) { return {a.y, -a.x}; }
-FORCEINLINE v3f cross(v3f a, v3f b) {
+forceinline v2f cross(v2f a) { return {a.y, -a.x}; }
+forceinline v2fx4 cross(v2fx4 a) { return {a.y, -a.x}; }
+forceinline v2fx8 cross(v2fx8 a) { return {a.y, -a.x}; }
+forceinline v2s cross(v2s a) { return {a.y, -a.x}; }
+forceinline v2sx4 cross(v2sx4 a) { return {a.y, -a.x}; }
+forceinline v2sx8 cross(v2sx8 a) { return {a.y, -a.x}; }
+forceinline v3f cross(v3f a, v3f b) {
 	// clang-format off
 	return {
 		a.y * b.z - a.z * b.y, 
@@ -4096,48 +4102,48 @@ FORCEINLINE v3f cross(v3f a, v3f b) {
 	// clang-format on
 }
 
-FORCEINLINE f32 sum(v2f v) { return v.x + v.y; }
+forceinline f32 sum(v2f v) { return v.x + v.y; }
 
 template <class T>
-FORCEINLINE auto lengthSqr(T a) {
+forceinline auto length_squared(T a) {
 	return dot(a, a);
 }
 template <class T>
-FORCEINLINE auto length(T a) {
-	return sqrt(lengthSqr(a));
+forceinline auto length(T a) {
+	return sqrt(dot(a, a));
 }
 template <class T>
-FORCEINLINE auto normalize(T a) {
+forceinline auto normalize(T a) {
 	return a * (1.0f / length(a));
 }
 template <class T>
-FORCEINLINE auto normalize(T a, T fallback) {
-	auto lsq = lengthSqr(a);
+forceinline auto normalize(T a, T fallback) {
+	auto lsq = length_squared(a);
 	if (lsq == decltype(lsq){})
 		return fallback;
 	return a * (1.0f / sqrt(lsq));
 }
 template <class T>
-FORCEINLINE auto distanceSqr(T a, T b) {
-	return lengthSqr(a - b);
+forceinline auto distance_squared(T a, T b) {
+	return length_squared(a - b);
 }
 template <class T>
-FORCEINLINE auto distance(T a, T b) {
-	return sqrt(distanceSqr(a, b));
+forceinline auto distance(T a, T b) {
+	return sqrt(distance_squared(a, b));
 }
 template <class T>
-FORCEINLINE auto manhattan(T a, T b) {
+forceinline auto manhattan(T a, T b) {
 	return sum(abs(a - b));
 }
-FORCEINLINE s32 maxDistance(v3s a, v3s b) {
+forceinline s32 maxDistance(v3s a, v3s b) {
 	a = absolute(a - b);
 	return max(max(a.x, a.y), a.z);
 }
 
 template <class T>
-FORCEINLINE constexpr auto moveTowards(T a, T b, f32 t) {
+forceinline constexpr auto move_toward(T a, T b, f32 t) {
 	auto d = b - a;
-	if (lengthSqr(d) > t * t) {
+	if (length_squared(d) > t * t) {
 		return a + normalize(d) * t;
 	} else {
 		return b;
@@ -4145,16 +4151,16 @@ FORCEINLINE constexpr auto moveTowards(T a, T b, f32 t) {
 }
 
 template <class T>
-FORCEINLINE constexpr auto moveAway(T a, T b, f32 t) {
+forceinline constexpr auto moveAway(T a, T b, f32 t) {
 	return a + normalize(a - b) * t;
 }
 
 template <class T>
-FORCEINLINE constexpr T project(T vector, T normal) {
+forceinline constexpr T project(T vector, T normal) {
 	return normal * dot(normal, vector);
 }
 
-FORCEINLINE f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
+forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
 /*
 f32 noise(s32 x) {
 	x = (x << 13) ^ x;
@@ -4165,12 +4171,12 @@ f32 noise(v2s v) {
 	n	   = (n << 13) ^ n;
 	return (1.0f - ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 2147483648.0f);
 }
-FORCEINLINE f32 cosNoise(f32 v) {
+forceinline f32 cosNoise(f32 v) {
 	auto fl = (s32)floor(v);
 	return lerp(noise(fl), noise(fl + 1), cos01(frac(v)));
 }
 template <class Interp, class Sample>
-FORCEINLINE f32 interpolate(v2f p, Interp&& interp, Sample&& sample) {
+forceinline f32 interpolate(v2f p, Interp&& interp, Sample&& sample) {
 	auto x	= (s32)floor(p.x);
 	auto y	= (s32)floor(p.y);
 	auto fr = frac(p.x);
@@ -4178,7 +4184,7 @@ FORCEINLINE f32 interpolate(v2f p, Interp&& interp, Sample&& sample) {
 				  frac(p.y));
 }
 template <class Interp, class Sample>
-FORCEINLINE f32 interpolate(v2s p, s32 s, Interp&& interp, Sample&& sample) {
+forceinline f32 interpolate(v2s p, s32 s, Interp&& interp, Sample&& sample) {
 	auto fl = floor(p, s);
 	auto fr = frac(p.x, s) / f32(s);
 	return interp(interp(sample(fl + v2s{0, 0}), sample(fl + v2s{1, 0}), fr),
@@ -4190,7 +4196,7 @@ inline static constexpr v3f _randMul3{pi * 10, sqrt2 * 20, sqrt3 * 15};
 inline static constexpr v4f _randMul4{pi * 10, sqrt2 * 20, sqrt3 * 15, sqrt5 * 10};
 
 #define ROT(u32x4) 								        \
-FORCEINLINE u32x4 rotateLeft(u32x4 v, s32 shift = 1) {  \
+forceinline u32x4 rotateLeft(u32x4 v, s32 shift = 1) {  \
 	if (shift < 0) {							        \
 		shift = absolute(shift) & 31;			        \
 		return (v >> shift) | (v << (32 - shift));      \
@@ -4199,7 +4205,7 @@ FORCEINLINE u32x4 rotateLeft(u32x4 v, s32 shift = 1) {  \
 		return (v << shift) | (v >> (32 - shift));      \
 	}											        \
 }												        \
-FORCEINLINE u32x4 rotateRight(u32x4 v, s32 shift = 1) { \
+forceinline u32x4 rotateRight(u32x4 v, s32 shift = 1) { \
 	if (shift < 0) {							        \
 		shift = absolute(shift) & 31;			        \
 		return (v << shift) | (v >> (32 - shift));      \
@@ -4212,7 +4218,7 @@ ROT(u32x4)
 ROT(u32x8)
 #undef ROT
 
-FORCEINLINE v3f hsvToRgb(f32 h, f32 s, f32 v) {
+forceinline v3f hsvToRgb(f32 h, f32 s, f32 v) {
 	h = frac(h);
 	f32 c = v * s;
 	f32 x = c * (1 - absolute(modulo(h * 6, 2) - 1));
@@ -4226,9 +4232,9 @@ FORCEINLINE v3f hsvToRgb(f32 h, f32 s, f32 v) {
 
 	return m;
 }
-FORCEINLINE v3f hsvToRgb(v3f hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
+forceinline v3f hsvToRgb(v3f hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
 template<umm ps>
-FORCEINLINE v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
+forceinline v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	h = frac(h);
 	f32x<ps> c = v * s;
 	f32x<ps> x = c * (1 - abs(modulo(h * 6, F32x<ps>(2)) - 1));
@@ -4253,7 +4259,7 @@ FORCEINLINE v3fx<ps> hsvToRgb(f32x<ps> h, f32x<ps> s, f32x<ps> v) {
 	return m;
 }
 template<umm ps>
-FORCEINLINE v3fx<ps> hsvToRgb(v3fx<ps> hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
+forceinline v3fx<ps> hsvToRgb(v3fx<ps> hsv) { return hsvToRgb(hsv.x, hsv.y, hsv.z); }
 
 inline v3f rgbToHsv(f32 r, f32 g, f32 b) {
 	f32 cMax = max(max(r, g), b);
@@ -4280,7 +4286,7 @@ inline v3f rgbToHsv(f32 r, f32 g, f32 b) {
 
     return result;
 }
-FORCEINLINE v3f rgbToHsv(v3f rgb) { return rgbToHsv(rgb.x, rgb.y, rgb.z); }
+forceinline v3f rgbToHsv(v3f rgb) { return rgbToHsv(rgb.x, rgb.y, rgb.z); }
 
 template<class T> inline static constexpr bool isVector = false;
 template<umm w> inline static constexpr bool isVector<v2fx<w>> = true;
@@ -4295,41 +4301,41 @@ template<umm w> inline static constexpr bool isVector<v4ux<w>> = true;
 // clang-format on
 
 template <umm width, class T>
-FORCEINLINE auto widen(T v) = delete;
+forceinline auto widen(T v) = delete;
 
 // clang-format off
-template<> FORCEINLINE auto widen<1>(v2f v) { return v; }
-template<> FORCEINLINE auto widen<1>(v3f v) { return v; }
-template<> FORCEINLINE auto widen<1>(v4f v) { return v; }
-template<> FORCEINLINE auto widen<1>(v2s v) { return v; }
-template<> FORCEINLINE auto widen<1>(v3s v) { return v; }
-template<> FORCEINLINE auto widen<1>(v4s v) { return v; }
-template<> FORCEINLINE auto widen<1>(v2u v) { return v; }
-template<> FORCEINLINE auto widen<1>(v3u v) { return v; }
-template<> FORCEINLINE auto widen<1>(v4u v) { return v; }
-template<> FORCEINLINE auto widen<4>(v2f v) { return V2fx4(v); }
-template<> FORCEINLINE auto widen<4>(v3f v) { return V3fx4(v); }
-template<> FORCEINLINE auto widen<4>(v4f v) { return V4fx4(v); }
-template<> FORCEINLINE auto widen<4>(v2s v) { return V2sx4(v); }
-template<> FORCEINLINE auto widen<4>(v3s v) { return V3sx4(v); }
-template<> FORCEINLINE auto widen<4>(v4s v) { return V4sx4(v); }
-template<> FORCEINLINE auto widen<4>(v2u v) { return V2ux4(v); }
-template<> FORCEINLINE auto widen<4>(v3u v) { return V3ux4(v); }
-template<> FORCEINLINE auto widen<4>(v4u v) { return V4ux4(v); }
-template<> FORCEINLINE auto widen<8>(v2f v) { return V2fx8(v); }
-template<> FORCEINLINE auto widen<8>(v3f v) { return V3fx8(v); }
-template<> FORCEINLINE auto widen<8>(v4f v) { return V4fx8(v); }
-template<> FORCEINLINE auto widen<8>(v2s v) { return V2sx8(v); }
-template<> FORCEINLINE auto widen<8>(v3s v) { return V3sx8(v); }
-template<> FORCEINLINE auto widen<8>(v4s v) { return V4sx8(v); }
-template<> FORCEINLINE auto widen<8>(v2u v) { return V2ux8(v); }
-template<> FORCEINLINE auto widen<8>(v3u v) { return V3ux8(v); }
-template<> FORCEINLINE auto widen<8>(v4u v) { return V4ux8(v); }
+template<> forceinline auto widen<1>(v2f v) { return v; }
+template<> forceinline auto widen<1>(v3f v) { return v; }
+template<> forceinline auto widen<1>(v4f v) { return v; }
+template<> forceinline auto widen<1>(v2s v) { return v; }
+template<> forceinline auto widen<1>(v3s v) { return v; }
+template<> forceinline auto widen<1>(v4s v) { return v; }
+template<> forceinline auto widen<1>(v2u v) { return v; }
+template<> forceinline auto widen<1>(v3u v) { return v; }
+template<> forceinline auto widen<1>(v4u v) { return v; }
+template<> forceinline auto widen<4>(v2f v) { return V2fx4(v); }
+template<> forceinline auto widen<4>(v3f v) { return V3fx4(v); }
+template<> forceinline auto widen<4>(v4f v) { return V4fx4(v); }
+template<> forceinline auto widen<4>(v2s v) { return V2sx4(v); }
+template<> forceinline auto widen<4>(v3s v) { return V3sx4(v); }
+template<> forceinline auto widen<4>(v4s v) { return V4sx4(v); }
+template<> forceinline auto widen<4>(v2u v) { return V2ux4(v); }
+template<> forceinline auto widen<4>(v3u v) { return V3ux4(v); }
+template<> forceinline auto widen<4>(v4u v) { return V4ux4(v); }
+template<> forceinline auto widen<8>(v2f v) { return V2fx8(v); }
+template<> forceinline auto widen<8>(v3f v) { return V3fx8(v); }
+template<> forceinline auto widen<8>(v4f v) { return V4fx8(v); }
+template<> forceinline auto widen<8>(v2s v) { return V2sx8(v); }
+template<> forceinline auto widen<8>(v3s v) { return V3sx8(v); }
+template<> forceinline auto widen<8>(v4s v) { return V4sx8(v); }
+template<> forceinline auto widen<8>(v2u v) { return V2ux8(v); }
+template<> forceinline auto widen<8>(v3u v) { return V3ux8(v); }
+template<> forceinline auto widen<8>(v4u v) { return V4ux8(v); }
 // clang-format on
 
 namespace CE {
 #define WIDEN(ty, tyx4, conx4) \
-	FORCEINLINE constexpr tyx4 widen(ty a, ty b, ty c, ty d) { return CE::conx4(a, b, c, d); }
+	forceinline constexpr tyx4 widen(ty a, ty b, ty c, ty d) { return CE::conx4(a, b, c, d); }
 WIDEN(v2f, v2fx4, V2fx4)
 WIDEN(v2s, v2sx4, V2sx4)
 WIDEN(v2u, v2ux4, V2ux4)
@@ -4341,7 +4347,7 @@ WIDEN(v4s, v4sx4, V4sx4)
 WIDEN(v4u, v4ux4, V4ux4)
 #undef WIDEN
 #define WIDEN(ty, tyx8, conx8) \
-	FORCEINLINE constexpr tyx8 widen(ty a, ty b, ty c, ty d, ty e, ty f, ty g, ty h) { return CE::conx8(a, b, c, d, e, f, g, h); }
+	forceinline constexpr tyx8 widen(ty a, ty b, ty c, ty d, ty e, ty f, ty g, ty h) { return CE::conx8(a, b, c, d, e, f, g, h); }
 WIDEN(v2f, v2fx8, V2fx8)
 WIDEN(v2s, v2sx8, V2sx8)
 WIDEN(v2u, v2ux8, V2ux8)
@@ -4355,18 +4361,18 @@ WIDEN(v4u, v4ux8, V4ux8)
 } // namespace CE
 
 template <class To, class T>
-FORCEINLINE auto cvtScalar(T v) = delete;
+forceinline auto cvtScalar(T v) = delete;
 
 // clang-format off
-template<> FORCEINLINE auto cvtScalar<f32>(v2s v)   { return (v2f)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v3s v)   { return (v3f)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v4s v)   { return (v4f)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v2sx4 v) { return (v2fx4)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v3sx4 v) { return (v3fx4)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v4sx4 v) { return (v4fx4)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v2sx8 v) { return (v2fx8)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v3sx8 v) { return (v3fx8)v; }
-template<> FORCEINLINE auto cvtScalar<f32>(v4sx8 v) { return (v4fx8)v; }
+template<> forceinline auto cvtScalar<f32>(v2s v)   { return (v2f)v; }
+template<> forceinline auto cvtScalar<f32>(v3s v)   { return (v3f)v; }
+template<> forceinline auto cvtScalar<f32>(v4s v)   { return (v4f)v; }
+template<> forceinline auto cvtScalar<f32>(v2sx4 v) { return (v2fx4)v; }
+template<> forceinline auto cvtScalar<f32>(v3sx4 v) { return (v3fx4)v; }
+template<> forceinline auto cvtScalar<f32>(v4sx4 v) { return (v4fx4)v; }
+template<> forceinline auto cvtScalar<f32>(v2sx8 v) { return (v2fx8)v; }
+template<> forceinline auto cvtScalar<f32>(v3sx8 v) { return (v3fx8)v; }
+template<> forceinline auto cvtScalar<f32>(v4sx8 v) { return (v4fx8)v; }
 // clang-format on
 
 template <class T, umm size>
@@ -4411,7 +4417,7 @@ template<> struct Convert<v4u, s32> { using Type = v4s; };
 namespace CE {
 
 template <class ToScalar, class From, umm size>
-FORCEINLINE constexpr auto cvtScalar(Array<From, size> const& arr) {
+forceinline constexpr auto cvtScalar(Array<From, size> const& arr) {
 	using To = typename Convert<From, ToScalar>::Type;
 	Array<To, size> result{};
 	for (umm i = 0; i < size; ++i) {
@@ -4428,7 +4434,7 @@ struct WideArray {
 	T8 t8[count8]{};
 	T4 t4[count4]{};
 	T1 t1[count1]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4 + count1]) {
+	forceinline constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4 + count1]) {
 		for (umm i = 0; i < count8; ++i) {
 			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
 							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
@@ -4441,9 +4447,9 @@ struct WideArray {
 			t1[i] = arr[count8 * 8 + count4 * 4 + i];
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count8 * 8 + count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count8 * 8 + count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
 		for (auto const& t : t4)
@@ -4456,14 +4462,14 @@ template <class T, umm count1>
 struct WideArray<T, count1, 0, 0> {
 	using T1 = T;
 	T1 t1[count1]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count1]) {
+	forceinline constexpr WideArray(T const (&arr)[count1]) {
 		for (umm i = 0; i < count1; ++i) {
 			t1[i] = arr[i];
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count1> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t1)
 			cb(t);
 	}
@@ -4472,14 +4478,14 @@ template <class T, umm count4>
 struct WideArray<T, 0, count4, 0> {
 	using T4 = typename WideType<T, 4>::Type;
 	T4 t4[count4]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count4 * 4]) {
+	forceinline constexpr WideArray(T const (&arr)[count4 * 4]) {
 		for (umm i = 0; i < count4; ++i) {
 			t4[i] = CE::widen(arr[i * 4 + 0], arr[i * 4 + 1], arr[i * 4 + 2], arr[i * 4 + 3]);
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count4 * 4> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count4 * 4> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t4)
 			cb(t);
 	}
@@ -4490,7 +4496,7 @@ struct WideArray<T, count1, count4, 0> {
 	using T1 = T;
 	T4 t4[count4]{};
 	T1 t1[count1]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count4 * 4 + count1]) {
+	forceinline constexpr WideArray(T const (&arr)[count4 * 4 + count1]) {
 		for (umm i = 0; i < count4; ++i) {
 			t4[i] = CE::widen(arr[i * 4 + 0], arr[i * 4 + 1], arr[i * 4 + 2], arr[i * 4 + 3]);
 		}
@@ -4498,9 +4504,9 @@ struct WideArray<T, count1, count4, 0> {
 			t1[i] = arr[count4 * 4 + i];
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count4 * 4 + count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t4)
 			cb(t);
 		for (auto const& t : t1)
@@ -4511,15 +4517,15 @@ template <class T, umm count8>
 struct WideArray<T, 0, 0, count8> {
 	using T8 = typename WideType<T, 8>::Type;
 	T8 t8[count8]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count8 * 8]) {
+	forceinline constexpr WideArray(T const (&arr)[count8 * 8]) {
 		for (umm i = 0; i < count8; ++i) {
 			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
 							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count8 * 8> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count8 * 8> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
 	}
@@ -4530,7 +4536,7 @@ struct WideArray<T, count1, 0, count8> {
 	using T1 = T;
 	T8 t8[count8]{};
 	T1 t1[count1]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count8 * 8 + count1]) {
+	forceinline constexpr WideArray(T const (&arr)[count8 * 8 + count1]) {
 		for (umm i = 0; i < count8; ++i) {
 			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
 							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
@@ -4539,9 +4545,9 @@ struct WideArray<T, count1, 0, count8> {
 			t1[i] = arr[count8 * 8 + i];
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count8 * 8 + count1> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count8 * 8 + count1> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
 		for (auto const& t : t1)
@@ -4554,7 +4560,7 @@ struct WideArray<T, 0, count4, count8> {
 	using T4 = typename WideType<T, 4>::Type;
 	T8 t8[count8]{};
 	T4 t4[count4]{};
-	FORCEINLINE constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4]) {
+	forceinline constexpr WideArray(T const (&arr)[count8 * 8 + count4 * 4]) {
 		for (umm i = 0; i < count8; ++i) {
 			t8[i] = CE::widen(arr[i * 8 + 0], arr[i * 8 + 1], arr[i * 8 + 2], arr[i * 8 + 3], arr[i * 8 + 4],
 							  arr[i * 8 + 5], arr[i * 8 + 6], arr[i * 8 + 7]);
@@ -4564,9 +4570,9 @@ struct WideArray<T, 0, count4, count8> {
 							  arr[count8 * 8 + i * 4 + 3]);
 		}
 	}
-	FORCEINLINE constexpr WideArray(Array<T, count8 * 8 + count4 * 4> const& arr) : WideArray(arr.v) {}
+	forceinline constexpr WideArray(Array<T, count8 * 8 + count4 * 4> const& arr) : WideArray(arr.v) {}
 	template <class Cb>
-	FORCEINLINE constexpr void forEach(Cb cb) const {
+	forceinline constexpr void forEach(Cb cb) const {
 		for (auto const& t : t8)
 			cb(t);
 		for (auto const& t : t4)
@@ -4574,7 +4580,7 @@ struct WideArray<T, 0, count4, count8> {
 	}
 };
 template <class T, umm size>
-FORCEINLINE constexpr auto makeWide(Array<T, size> const& arr) {
+forceinline constexpr auto makeWide(Array<T, size> const& arr) {
 	constexpr umm count8 = size / 8;
 	constexpr umm count4 = (size - count8 * 8) / 4;
 	constexpr umm count1 = size - count8 * 8 - count4 * 4;
@@ -4584,28 +4590,29 @@ FORCEINLINE constexpr auto makeWide(Array<T, size> const& arr) {
 
 // for some reason compiler generates bad code for WideArray::forEach, so we don't use it by
 // default. it's ~50-100 cycles faster if iterate raw arrays
+#if 0
 #ifndef TL_USE_CONSTEXPR_WIDE
 #define TL_USE_CONSTEXPR_WIDE 0
 #endif
 template <class T, class Random, umm count1, umm count4, umm count8>
-FORCEINLINE f32 _voronoiF32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T v, Random random) {
+forceinline f32 _voronoiF32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T v, Random random) {
 	T tile		= floor(v);
 	T rel		= v - tile;
 	f32 minDist = 1000;
 	wideOffsets.forEach([&](auto const& offset) {
 		static constexpr auto offsetW = widthOf<decltype(offset)>;
 
-		minDist = min(minDist, distanceSqr(widen<offsetW>(rel), random(widen<offsetW>(tile) + offset) + offset));
+		minDist = min(minDist, distance_squared(widen<offsetW>(rel), random(widen<offsetW>(tile) + offset) + offset));
 	});
 	return minDist;
 };
 template <class T, class U, class Random, umm count1, umm count4, umm count8>
-FORCEINLINE f32 _voronoiS32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T tile, U rel, Random random) {
+forceinline f32 _voronoiS32(CE::WideArray<T, count1, count4, count8> const& wideOffsets, T tile, U rel, Random random) {
 	f32 minDist = 1000;
 	wideOffsets.forEach([&](auto const& offset) {
 		static constexpr auto width = widthOf<decltype(offset)>;
 
-		minDist = min(minDist, distanceSqr(widen<width>(rel),
+		minDist = min(minDist, distance_squared(widen<width>(rel),
 										   random(widen<width>(tile) + offset) * 0.5f + cvtScalar<f32>(offset)));
 	});
 	return minDist;
@@ -4648,24 +4655,23 @@ inline static constexpr auto voronoiOffsets2f = CE::cvtScalar<f32>(voronoiOffset
 inline static constexpr auto voronoiOffsets3f = CE::cvtScalar<f32>(voronoiOffsets3s);
 inline static constexpr auto voronoiOffsets4f = CE::cvtScalar<f32>(voronoiOffsets4s);
 // clang-format on
-
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v2f v, Randomizer &&randomizer) {
+forceinline f32 voronoi(v2f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets2f);
 	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * (1 / sqrt2);
 }
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v3f v, Randomizer &&randomizer) {
+forceinline f32 voronoi(v3f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets3f);
 	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * (1 / sqrt3);
 }
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v4f v, Randomizer &&randomizer) {
+forceinline f32 voronoi(v4f v, Randomizer &&randomizer) {
 	static constexpr auto wideOffsets = CE::makeWide(voronoiOffsets4f);
 	return sqrt(_voronoiF32(wideOffsets, v, randomizer)) * 0.5f;
 }
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Randomizer &&randomizer) {
+forceinline f32 voronoi(v2s v, u32 cellSize, Randomizer &&randomizer) {
 	v2s flr							  = floor(v, cellSize);
 	v2s tile						  = flr / (s32)cellSize;
 	v2f rel							  = (v2f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4677,17 +4683,17 @@ FORCEINLINE f32 voronoi(v2s v, u32 cellSize, Randomizer &&randomizer) {
 	auto tile8	= V2sx8(tile);
 	auto rel8	= V2fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist8 = min(minDist8, distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + (v2fx8)offset));
+		minDist8 = min(minDist8, distance_squared(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + (v2fx8)offset));
 	}
 	f32 minDist = min(minDist8);
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v2f)offset));
+		minDist = min(minDist, distance_squared(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v2f)offset));
 	}
 #endif
 	return sqrt(minDist) * (1 / sqrt2);
 }
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Randomizer &&randomizer) {
+forceinline f32 voronoi(v3s v, u32 cellSize, Randomizer &&randomizer) {
 	v3s flr							  = floor(v, cellSize);
 	v3s tile						  = flr / (s32)cellSize;
 	v3f rel							  = (v3f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4699,16 +4705,16 @@ FORCEINLINE f32 voronoi(v3s v, u32 cellSize, Randomizer &&randomizer) {
 	v3sx8 tile8 = V3sx8(tile);
 	v3fx8 rel8	= V3fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, min(distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) - 0.5f + (v3fx8)offset)));
+		minDist = min(minDist, min(distance_squared(rel8, randomizer((v2fx8)(tile8 + offset)) - 0.5f + (v3fx8)offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) - 0.5f + (v3f)offset));
+		minDist = min(minDist, distance_squared(rel, randomizer((v2f)(tile + offset)) - 0.5f + (v3f)offset));
 	}
 #endif
 	return sqrt(minDist) * (1 / sqrt3);
 }
 template <class Randomizer>
-FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Randomizer &&randomizer) {
+forceinline f32 voronoi(v4s v, u32 cellSize, Randomizer &&randomizer) {
 	v4s flr							  = floor(v, cellSize);
 	v4s tile						  = flr / (s32)cellSize;
 	v4f rel							  = (v4f)(v - flr) / (f32)cellSize - 0.5f;
@@ -4720,14 +4726,16 @@ FORCEINLINE f32 voronoi(v4s v, u32 cellSize, Randomizer &&randomizer) {
 	v4sx8 tile8 = V4sx8(tile);
 	v4fx8 rel8	= V4fx8(rel);
 	for (auto offset : wideOffsets.t8) {
-		minDist = min(minDist, distanceSqr(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + cvtScalar<f32>(offset)));
+		minDist = min(minDist, distance_squared(rel8, randomizer((v2fx8)(tile8 + offset)) * 0.5f + cvtScalar<f32>(offset)));
 	}
 	for (auto offset : wideOffsets.t1) {
-		minDist = min(minDist, distanceSqr(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v4f)offset));
+		minDist = min(minDist, distance_squared(rel, randomizer((v2f)(tile + offset)) * 0.5f + (v4f)offset));
 	}
 #endif
 	return sqrt(minDist) * 0.5f;
 }
+
+#endif
 
 template<class T>
 struct line {
@@ -4735,12 +4743,12 @@ struct line {
 };
 
 template <class T>
-FORCEINLINE line<T> lineBeginEnd(T begin, T end) {
+forceinline line<T> lineBeginEnd(T begin, T end) {
 	return {begin, end};
 }
 
 template <class T>
-FORCEINLINE line<T> lineBeginDir(T begin, T dir) {
+forceinline line<T> lineBeginDir(T begin, T dir) {
 	return {begin, begin + dir};
 }
 
@@ -4758,25 +4766,25 @@ struct aabb {
 };
 
 template <class T>
-FORCEINLINE aabb<T> aabbMinMax(T min, T max) {
+forceinline aabb<T> aabbMinMax(T min, T max) {
 	return {min, max};
 }
 template <class T>
-FORCEINLINE aabb<T> aabbMinDim(T min, T dim) {
+forceinline aabb<T> aabbMinDim(T min, T dim) {
 	return {min, min + dim};
 }
 template <class T>
-FORCEINLINE aabb<T> aabbCenterDim(T center, T dim) {
+forceinline aabb<T> aabbCenterDim(T center, T dim) {
 	dim = half(dim);
 	return {center - dim, center + dim};
 }
 template <class T>
-FORCEINLINE aabb<T> aabbCenterRadius(T center, T radius) {
+forceinline aabb<T> aabbCenterRadius(T center, T radius) {
 	return {center - radius, center + radius};
 }
 
 #define IN_BOUNDS2(bool, v2fA, v2fB) 			\
-	FORCEINLINE bool inBounds(v2fA v, aabb<v2fB> b) { \
+	forceinline bool inBounds(v2fA v, aabb<v2fB> b) { \
 		return 								    \
 			(v.x >= b.min.x) && 			    \
 			(v.y >= b.min.y) && 			    \
@@ -4784,7 +4792,7 @@ FORCEINLINE aabb<T> aabbCenterRadius(T center, T radius) {
 			(v.y < b.max.y); 				    \
 	}
 #define IN_BOUNDS3(bool, v3fA, v3fB) 			\
-	FORCEINLINE bool inBounds(v3fA v, aabb<v3fB> b) { \
+	forceinline bool inBounds(v3fA v, aabb<v3fB> b) { \
 		return 								    \
 			(v.x >= b.min.x) && 			    \
 			(v.y >= b.min.y) &&				    \
@@ -4803,7 +4811,7 @@ IN_BOUNDS3(bool, v3u, v3u) IN_BOUNDS3(b32x4, v3ux4, v3u) IN_BOUNDS3(b32x8, v3ux8
 #undef IN_BOUNDS3
 
 #define INTERSECTS2(bool, v2f)						 \
-	FORCEINLINE bool intersects(aabb<v2f> a, aabb<v2f> b) { \
+	forceinline bool intersects(aabb<v2f> a, aabb<v2f> b) { \
 		return 										 \
 			(a.min.x < b.max.x) && 					 \
 			(a.min.y < b.max.y) && 					 \
@@ -4811,7 +4819,7 @@ IN_BOUNDS3(bool, v3u, v3u) IN_BOUNDS3(b32x4, v3ux4, v3u) IN_BOUNDS3(b32x8, v3ux8
 			(a.max.y > b.min.y); 					 \
 	}
 #define INTERSECTS3(bool, v3f)						 \
-	FORCEINLINE bool intersects(aabb<v3f> a, aabb<v3f> b) { \
+	forceinline bool intersects(aabb<v3f> a, aabb<v3f> b) { \
 		return 										 \
 			(a.min.x < b.max.x) && 					 \
 			(a.min.y < b.max.y) && 					 \
@@ -4829,7 +4837,7 @@ INTERSECTS3(bool, v3u) INTERSECTS3(b32x4, v3ux4) INTERSECTS3(b32x8, v3ux8);
 #undef INTERSECTS2
 #undef INTERSECTS3
 
-FORCEINLINE bool intersects(line<v2f> line, aabb<v2f> aabb) {
+forceinline bool intersects(line<v2f> line, aabb<v2f> aabb) {
 	v2f dir = normalize(line.b - line.a);
 	v2f rdir = 1.0f / dir;
 	v2f vMin = (aabb.min - line.a) * rdir;
@@ -4841,7 +4849,7 @@ FORCEINLINE bool intersects(line<v2f> line, aabb<v2f> aabb) {
 	return tMax > 0 && tMin < tMax;
 }
 template <umm ps>
-FORCEINLINE b32x<ps> intersects(line<v2fx<ps>> line, aabb<v2fx<ps>> aabb) {
+forceinline b32x<ps> intersects(line<v2fx<ps>> line, aabb<v2fx<ps>> aabb) {
 	auto dir = normalize(line.b - line.a);
 	auto rdir = 1.0f / dir;
 	auto vMin = (aabb.min - line.a) * rdir;
@@ -4853,7 +4861,7 @@ FORCEINLINE b32x<ps> intersects(line<v2fx<ps>> line, aabb<v2fx<ps>> aabb) {
 	return tMax > 0 && tMin < tMax;
 }
 
-FORCEINLINE bool raycastLine(v2f a, v2f b, v2f c, v2f d, v2f& point, v2f& normal) {
+forceinline bool raycastLine(v2f a, v2f b, v2f c, v2f d, v2f& point, v2f& normal) {
 	v2f ba = b - a;
 	v2f dc = d - c;
 	v2f ac = a - c;
@@ -4871,7 +4879,7 @@ FORCEINLINE bool raycastLine(v2f a, v2f b, v2f c, v2f d, v2f& point, v2f& normal
 	return false;
 }
 template <umm ps>
-FORCEINLINE b32x<ps> raycastLine(v2fx<ps> a, v2fx<ps> b, v2fx<ps> c, v2fx<ps> d, v2fx<ps>& point, v2fx<ps>& normal, bool backFace = true) {
+forceinline b32x<ps> raycastLine(v2fx<ps> a, v2fx<ps> b, v2fx<ps> c, v2fx<ps> d, v2fx<ps>& point, v2fx<ps>& normal, bool backFace = true) {
 	v2fx<ps> ba = b - a;
 	v2fx<ps> dc = d - c;
 	v2fx<ps> ac = a - c;
@@ -4891,7 +4899,7 @@ FORCEINLINE b32x<ps> raycastLine(v2fx<ps> a, v2fx<ps> b, v2fx<ps> c, v2fx<ps> d,
 
 	return result;
 }
-FORCEINLINE bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v2f& normal) {
+forceinline bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v2f& normal) {
 	v2f dir = normalize(b - a);
 	v2f rdir = 1.0f / dir;
 	v2f vMin = (boxMin - a) * rdir;
@@ -4916,9 +4924,9 @@ FORCEINLINE bool raycastAABB(v2f a, v2f b, v2f boxMin, v2f boxMax, v2f& point, v
 	}
 	return true;
 }
-FORCEINLINE bool raycastAABB(v2f a, v2f b, aabb<v2f> box, v2f& point, v2f& normal) { return raycastAABB(a, b, box.min, box.max, point, normal); }
+forceinline bool raycastAABB(v2f a, v2f b, aabb<v2f> box, v2f& point, v2f& normal) { return raycastAABB(a, b, box.min, box.max, point, normal); }
 template <umm ps>
-FORCEINLINE b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, v2fx<ps> boxMin, v2fx<ps> boxMax, v2fx<ps>& point, v2fx<ps>& normal) {
+forceinline b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, v2fx<ps> boxMin, v2fx<ps> boxMax, v2fx<ps>& point, v2fx<ps>& normal) {
 	auto dir = normalize(b - a);
 	auto rdir = 1.0f / dir;
 	auto vMin = (boxMin - a) * rdir;
@@ -4936,8 +4944,8 @@ FORCEINLINE b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, v2fx<ps> boxMin, v2fx<p
 	return tMax > 0 && tMin < tMax;
 }
 template <umm ps>
-FORCEINLINE b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, aabb<v2fx<ps>> box, v2fx<ps>& point, v2fx<ps>& normal) { return raycastAABB(a, b, box.min, box.max, point, normal); }
-FORCEINLINE bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, v3f& normal) {
+forceinline b32x<ps> raycastAABB(v2fx<ps> a, v2fx<ps> b, aabb<v2fx<ps>> box, v2fx<ps>& point, v2fx<ps>& normal) { return raycastAABB(a, b, box.min, box.max, point, normal); }
+forceinline bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, v3f& normal) {
 	auto p21 = p2 - p1;
 	auto p31 = p3 - p1;
 	normal	 = normalize(cross(p21, p31));
@@ -4957,15 +4965,65 @@ FORCEINLINE bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 	f32 u	 = dot(dp1, p21);
 	f32 v	 = dot(dp1, p31);
 
-	if (lengthSqr(a - point) > lengthSqr(a - b) || dot(a - point, a - b) <= 0) {
+	if (length_squared(a - point) > length_squared(a - b) || dot(a - point, a - b) <= 0) {
 		return false;
 	}
 
 	return u >= 0.0f && u <= dot(p21, p21) && v >= 0.0f && v <= dot(p31, p31);
 }
 
+struct Triangle {
+	v3f a = {};
+	v3f b = {};
+	v3f c = {};
+};
+
+struct RaycastHit {
+	bool hit = false;
+	Triangle triangle;
+	v3f position = {};
+	v3f normal = {};
+};
+
+inline RaycastHit raycast_triangle(v3f orig, v3f dir, v3f v0, v3f v1, v3f v2) {
+    v3f e1 = v1 - v0;
+    v3f e2 = v2 - v0;
+    // Вычисление вектора нормали к плоскости
+    v3f pvec = cross(dir, e2);
+    f32 det = dot(e1, pvec);
+
+    // Луч параллелен плоскости
+    if (det < 1e-8 && det > -1e-8) {
+		return {};
+    }
+
+    f32 inv_det = 1 / det;
+    v3f tvec = orig - v0;
+    f32 u = dot(tvec, pvec) * inv_det;
+    if (u < 0 || u > 1) {
+		return {};
+    }
+
+    v3f qvec = cross(tvec, e1);
+    f32 v = dot(dir, qvec) * inv_det;
+    if (v < 0 || u + v > 1) {
+		return {};
+    }
+    f32 t = dot(e2, qvec) * inv_det;
+
+	if (t < 0)
+		return {};
+
+	RaycastHit hit;
+	hit.hit = true;
+	hit.triangle = {v0, v1, v2};
+	hit.position = orig + dir * t;
+	hit.normal = normalize(cross(e1, e2));
+	return hit;
+}
+
 template <class T, umm size>
-FORCEINLINE constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
+forceinline constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
 	f32 f = frac(t) * size;
 	s32 a = (s32)f;
 	s32 b = a + 1;
@@ -4975,7 +5033,7 @@ FORCEINLINE constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
 }
 using FrustumPlanes = Array<v4f, 6>;
 
-FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 m) {
+forceinline FrustumPlanes makeFrustumPlanes(m4 m) {
 	FrustumPlanes planes;
 	
 	// http://www.cs.otago.ac.nz/postgrads/alexis/planeExtraction.pdf
@@ -5009,7 +5067,7 @@ FORCEINLINE FrustumPlanes makeFrustumPlanes(m4 m) {
 	}
 	return planes;
 }
-FORCEINLINE bool containsSphere(FrustumPlanes const &planes, v3f position, f32 radius) {
+forceinline bool containsSphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 	for (auto p : planes) {
 		if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
 			return false;
@@ -5020,7 +5078,7 @@ FORCEINLINE bool containsSphere(FrustumPlanes const &planes, v3f position, f32 r
 
 namespace CE {
 
-FORCEINLINE constexpr u32 countBits(u32 v) {
+forceinline constexpr u32 countBits(u32 v) {
 	u32 s = 0;
 	u32 r = v;
 	for (u32 i = 0; i < 32; ++i) {
@@ -5029,7 +5087,7 @@ FORCEINLINE constexpr u32 countBits(u32 v) {
 	}
 	return s;
 }
-FORCEINLINE constexpr v4s frac(v4s v, s32 step) {
+forceinline constexpr v4s frac(v4s v, s32 step) {
 	return {
 		TL::frac(v.x, step),
 		TL::frac(v.y, step),
@@ -5060,21 +5118,21 @@ FORCEINLINE constexpr v4s frac(v4s v, s32 step) {
 #define V4f_64 V4fx16
 
 #define MAX_PACK_IMPL(p)								\
-FORCEINLINE f32x<p/4> F32xm(f32 v = 0) { return F32_##p(v); } \
-FORCEINLINE s32x<p/4> S32xm(s32 v = 0) { return S32_##p(v); } \
-FORCEINLINE u32x<p/4> U32xm(u32 v = 0) { return U32_##p(v); } \
-FORCEINLINE v2fx<p/4> V2fxm(f32 v = 0) { return V2f_##p(v); } \
-FORCEINLINE v3fx<p/4> V3fxm(f32 v = 0) { return V3f_##p(v); } \
-FORCEINLINE v4fx<p/4> V4fxm(f32 v = 0) { return V4f_##p(v); } \
-FORCEINLINE v2fx<p/4> V2fxm(v2f v) { return V2f_##p(v); } \
-FORCEINLINE v3fx<p/4> V3fxm(v3f v) { return V3f_##p(v); } \
-FORCEINLINE v4fx<p/4> V4fxm(v4f v) { return V4f_##p(v); } \
-FORCEINLINE v2fx<p/4> V2fxm(f32 x, f32 y) { return V2f_##p(x, y); } \
-FORCEINLINE v3fx<p/4> V3fxm(f32 x, f32 y, f32 z) { return V3f_##p(x, y, z); } \
-FORCEINLINE v4fx<p/4> V4fxm(f32 x, f32 y, f32 z, f32 w) { return V4f_##p(x, y, z, w); } \
-FORCEINLINE v2fx<p/4> V2fxm(f32xm x, f32xm y) { return V2f_##p(x, y); } \
-FORCEINLINE v3fx<p/4> V3fxm(f32xm x, f32xm y, f32xm z) { return V3f_##p(x, y, z); } \
-FORCEINLINE v4fx<p/4> V4fxm(f32xm x, f32xm y, f32xm z, f32xm w) { return V4f_##p(x, y, z, w); }
+forceinline f32x<p/4> F32xm(f32 v = 0) { return F32_##p(v); } \
+forceinline s32x<p/4> S32xm(s32 v = 0) { return S32_##p(v); } \
+forceinline u32x<p/4> U32xm(u32 v = 0) { return U32_##p(v); } \
+forceinline v2fx<p/4> V2fxm(f32 v = 0) { return V2f_##p(v); } \
+forceinline v3fx<p/4> V3fxm(f32 v = 0) { return V3f_##p(v); } \
+forceinline v4fx<p/4> V4fxm(f32 v = 0) { return V4f_##p(v); } \
+forceinline v2fx<p/4> V2fxm(v2f v) { return V2f_##p(v); } \
+forceinline v3fx<p/4> V3fxm(v3f v) { return V3f_##p(v); } \
+forceinline v4fx<p/4> V4fxm(v4f v) { return V4f_##p(v); } \
+forceinline v2fx<p/4> V2fxm(f32 x, f32 y) { return V2f_##p(x, y); } \
+forceinline v3fx<p/4> V3fxm(f32 x, f32 y, f32 z) { return V3f_##p(x, y, z); } \
+forceinline v4fx<p/4> V4fxm(f32 x, f32 y, f32 z, f32 w) { return V4f_##p(x, y, z, w); } \
+forceinline v2fx<p/4> V2fxm(f32xm x, f32xm y) { return V2f_##p(x, y); } \
+forceinline v3fx<p/4> V3fxm(f32xm x, f32xm y, f32xm z) { return V3f_##p(x, y, z); } \
+forceinline v4fx<p/4> V4fxm(f32xm x, f32xm y, f32xm z, f32xm w) { return V4f_##p(x, y, z, w); }
 
 #ifndef TL_MATH_MAX_PACK
 #if ARCH_AVX512F
@@ -5093,10 +5151,38 @@ static_assert(TL_MATH_MAX_PACK == 16 || TL_MATH_MAX_PACK == 32 ||TL_MATH_MAX_PAC
 MAX_PACK_IMPL_(TL_MATH_MAX_PACK)
 
 #undef MAX_PACK_IMPL_
+
 #undef MAX_PACK_IMPL
 
 template <class T>
 inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
+
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> toString(v3f f, CopyFn &&copyFn) {
+	Char buffer[256];
+	Char *buffer_end = buffer;
+	*buffer_end++ = '{';
+	toString<Char>(f.x, [&](Char const *data, umm size) {
+		memcpy(buffer_end, data, size);
+		buffer_end += size;
+		buffer_end[0] = ',';
+		buffer_end[1] = ' ';
+		buffer_end += 2;
+	});
+	toString<Char>(f.y, [&](Char const *data, umm size) {
+		memcpy(buffer_end, data, size);
+		buffer_end += size;
+		buffer_end[0] = ',';
+		buffer_end[1] = ' ';
+		buffer_end += 2;
+	});
+	toString<Char>(f.z, [&](Char const *data, umm size) {
+		memcpy(buffer_end, data, size);
+		buffer_end += size;
+	});
+	*buffer_end++ = '}';
+	return copyFn(buffer, (umm)(buffer_end - buffer));
+}
 
 } // namespace TL
 

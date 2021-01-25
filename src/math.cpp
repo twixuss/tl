@@ -15,7 +15,7 @@ void _assert(Mask mask, char const *expression, u32 line) {
 	if (!allTrue(mask)) {
 		puts("\nAssertion failed");
 		puts(expression);
-		DEBUG_BREAK;
+		debug_break();
 		exit(-1);
 	}
 	puts("ok");
@@ -81,7 +81,7 @@ void _assertEqual(T result, T check, char const *expression, u32 line, char cons
 #pragma warning(suppress: 4774)
 			printf(message, args...);
 		}
-		DEBUG_BREAK;
+		debug_break();
 		exit(-1);
 	}
 	clearLine();
@@ -176,16 +176,16 @@ template <class T>
 void test_bool() {
 	static_assert(widthOf<T> != 0);
 	
-	ASSERT(allFalse((T)falseMask));
-	ASSERT(allTrue((T)trueMask));
+	assert(allFalse((T)falseMask));
+	assert(allTrue((T)trueMask));
 	
-	ASSERT(!anyTrue((T)falseMask));
-	ASSERT(!anyFalse((T)trueMask));
+	assert(!anyTrue((T)falseMask));
+	assert(!anyFalse((T)trueMask));
 
-	ASSERT(compressMask((T)falseMask) == 0);
-	ASSERT(compressMask((T)trueMask) == ((1 << widthOf<T>) - 1));
+	assert(compressMask((T)falseMask) == 0);
+	assert(compressMask((T)trueMask) == ((1 << widthOf<T>) - 1));
 	
-	ASSERT(allTrue(andNot((T)trueMask, (T)falseMask)));
+	assert(allTrue(andNot((T)trueMask, (T)falseMask)));
 
 	TEST_PREFIX;
 	TEST_UNARY(~);
@@ -276,8 +276,24 @@ void math_test() {
 	static_assert(TL::ceil(6u, 3u) == 6u);
 	static_assert(TL::ceil(7u, 3u) == 9u);
 
-	ASSERT(TL::isNegative(-0.0f));
-	ASSERT(!TL::isNegative(0.0f));
+	assert(TL::is_negative(-0.0f));
+	assert(!TL::is_negative(0.0f));
+	
+	assert(TL::log( 1u, 2u) == 0);
+	assert(TL::log( 2u, 2u) == 1);
+	assert(TL::log( 3u, 2u) == 1);
+	assert(TL::log( 4u, 2u) == 2);
+	assert(TL::log( 5u, 2u) == 2);
+	assert(TL::log( 6u, 2u) == 2);
+	assert(TL::log( 7u, 2u) == 2);
+	assert(TL::log( 8u, 2u) == 3);
+	assert(TL::log(  1u, 10u) == 0);
+	assert(TL::log(  9u, 10u) == 0);
+	assert(TL::log( 10u, 10u) == 1);
+	assert(TL::log( 11u, 10u) == 1);
+	assert(TL::log( 99u, 10u) == 1);
+	assert(TL::log(100u, 10u) == 2);
+	assert(TL::log(101u, 10u) == 2);
 
 	static_assert(TL::midpoint(0, 0) == 0);
 	static_assert(TL::midpoint(0, 1) == 0);
@@ -399,13 +415,13 @@ void math_test() {
 	//test_int<u64x4>();
 
 	
-	ASSERT((v2f{0,1}[0] == 0));
-	ASSERT((v2f{0,1}[1] == 1));
-	ASSERT((v3f{0,1,2}[0] == 0));
-	ASSERT((v3f{0,1,2}[1] == 1));
-	ASSERT((v3f{0,1,2}[2] == 2));
-	ASSERT((v4f{0,1,2,3}[0] == 0));
-	ASSERT((v4f{0,1,2,3}[1] == 1));
-	ASSERT((v4f{0,1,2,3}[2] == 2));
-	ASSERT((v4f{0,1,2,3}[3] == 3));
+	assert((v2f{0,1}[0] == 0));
+	assert((v2f{0,1}[1] == 1));
+	assert((v3f{0,1,2}[0] == 0));
+	assert((v3f{0,1,2}[1] == 1));
+	assert((v3f{0,1,2}[2] == 2));
+	assert((v4f{0,1,2,3}[0] == 0));
+	assert((v4f{0,1,2,3}[1] == 1));
+	assert((v4f{0,1,2,3}[2] == 2));
+	assert((v4f{0,1,2,3}[3] == 3));
 }

@@ -18,7 +18,7 @@
 #pragma comment(lib, "dxgi")
 
 #ifndef TL_HRESULT_HANDLER
-#define TL_HRESULT_HANDLER(hr) ASSERT(SUCCEEDED(hr))
+#define TL_HRESULT_HANDLER(hr) assert(SUCCEEDED(hr))
 #endif
 
 #define TL_COM_RELEASE(x) (((x) ? (x)->Release() : 0), (x) = 0)
@@ -306,7 +306,7 @@ inline void defaultShaderHandler(HRESULT result, char const *messages) {
 	OutputDebugStringA(messages);
 #endif
 #endif
-	ASSERT(SUCCEEDED(result));
+	assert(SUCCEEDED(result));
 	(void)messages;
 }
 
@@ -522,7 +522,7 @@ Texture State::createTexture(u32 width, u32 height, DXGI_FORMAT format, void con
 	Texture result;
 
 	u32 bpp = getBitsPerPixel(format);
-	ASSERT(bpp % 8 == 0);
+	assert(bpp % 8 == 0);
 	u32 pitch = width * bpp / 8;
 
 	{
@@ -644,7 +644,7 @@ Blend State::createBlend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst) {
 void State::updateStructuredBuffer(StructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 firstElement) {
 	u32 size = count * stride;
 	u32 offset = firstElement * stride;
-	ASSERT(size + offset <= buffer.size);
+	assert(size + offset <= buffer.size);
 	if (buffer.usage == D3D11_USAGE_DYNAMIC) {
 		D3D11_MAPPED_SUBRESOURCE mapped;
 		useContext([&] { TL_HRESULT_HANDLER(immediateContext->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)); });
@@ -774,7 +774,7 @@ void initState(State &state, IDXGISwapChain *swapChain, ID3D11RenderTargetView *
 void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT backBufferFormat, u32 bufferCount, bool windowed, u32 sampleCount, u32 deviceFlags) {
 	IDXGIFactory1 *dxgiFactory;
 	TL_HRESULT_HANDLER(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
-	DEFER { TL_COM_RELEASE(dxgiFactory); };
+	defer { TL_COM_RELEASE(dxgiFactory); };
 
 	IDXGIAdapter1 *adapter = 0;
 	for (UINT adapterIndex = 0; dxgiFactory->EnumAdapters1(adapterIndex, &adapter) != DXGI_ERROR_NOT_FOUND; ++adapterIndex) {

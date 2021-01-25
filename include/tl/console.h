@@ -43,10 +43,16 @@ static HANDLE consoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 void _print(char const *string, umm length) {
 	DWORD charsWritten;
 	WriteConsoleA(consoleOutput, string, (DWORD)length, &charsWritten, 0);
+#ifdef TL_CONSOLE_DEBUG
+	OutputDebugStringA(null_terminate(Span{string, length}).data());
+#endif
 }
 void _print(wchar const *string, umm length) {
 	DWORD charsWritten;
 	WriteConsoleW(consoleOutput, string, (DWORD)length, &charsWritten, 0);
+#ifdef TL_CONSOLE_DEBUG
+	OutputDebugStringW(null_terminate(Span{string, length}).data());
+#endif
 }
 
 #else

@@ -97,8 +97,8 @@ struct ForwardListBase {
 	T const &back() const { TL_BOUNDS_CHECK(size()); return _end[-1]; }
 	T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return _begin[i]; }
 
-	void push_back(T const &val) { emplace_back(val); }
-	void push_back(T &&val) { emplace_back(std::move(val)); }
+	T &push_back(T const &val) { return emplace_back(val); }
+	T &push_back(T &&val) { return emplace_back(std::move(val)); }
 	void pop_back() { TL_BOUNDS_CHECK(size()); (--_end)->~T(); }
 	void reserve(umm count) {
 		if (count > capacity())
@@ -124,6 +124,24 @@ struct ForwardListBase {
 		_end = _begin;
 	}
 	
+	T *insert(Span<T const> span, T *where) {
+		TL_BOUNDS_CHECK(_begin <= where && where <= _end);
+
+		umm where_index = where - _begin;
+		umm required_size = size() + span.size();
+		_grow_if_needed(required_size);
+		where = _begin + where_index; 
+		
+		for (auto src = where; src != _end; ++src) {
+			new (src + span.size()) T(std::move(*src));
+		}
+		for (umm i = 0; i < span.size(); ++i) {
+			where[i] = span[i];
+		}
+		_end += span.size();
+		return where;
+	}
+
 	operator Span<T>() { return {begin(), end()}; }
 	operator Span<T const>() const { return {begin(), end()}; }
 
@@ -132,7 +150,7 @@ struct ForwardListBase {
 	T *_allocEnd = 0;
 
 	void _reallocate(umm newCapacity) {
-		ASSERT(capacity() < newCapacity);
+		assert(capacity() < newCapacity);
 		umm oldSize = size();
 		T *newBegin = ALLOCATE_T(Allocator, T, newCapacity, 0);
 		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
@@ -145,7 +163,11 @@ struct ForwardListBase {
 		_end = _begin + oldSize;
 		_allocEnd = _begin + newCapacity;
 	}
-	void _grow(umm requiredSize) {
+	// Returns memory offset between beginning of new allocated space and 
+	// beginning of old allocated space, so old_begin + offset = new_begin
+	bool _grow_if_needed(umm requiredSize) {
+		if (requiredSize <= capacity())
+			return false;
 		umm newCapacity = capacity();
 		if (newCapacity == 0)
 			newCapacity = 1;
@@ -153,15 +175,24 @@ struct ForwardListBase {
 			newCapacity *= 2;
 		}
 		_reallocate(newCapacity);
+		return true;
 	}
 	template <class... Args>
-	void emplace_back(Args &&... args) {
-		if (remainingCapacity() == 0) {
-			_grow(size() + 1);
-		}
-		new ((void *)_end++) T(std::forward<Args>(args)...);
+	T &emplace_back(Args &&...args) {
+		_grow_if_needed(size() + 1);
+		return *new ((void *)_end++) T(std::forward<Args>(args)...);
 	}
 };
+
+template <class T, class Allocator>
+Span<T> as_span(ForwardListBase<T, Allocator> &list) {
+	return (Span<T>)list;
+}
+
+template <class T, class Allocator>
+Span<T const> as_span(ForwardListBase<T, Allocator> const &list) {
+	return (Span<T const>)list;
+}
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct List : ForwardListBase<T, Allocator> {
@@ -172,11 +203,16 @@ struct List : ForwardListBase<T, Allocator> {
 	List(Span<T const> span) : Base(span) {}
 	List(List const &that) = default;
 	List(List &&that) = default;
+	List(std::initializer_list<T> v) : List(Span(v.begin(), v.end())) {}
 	List &operator=(List const &that) = default;
 	List &operator=(List &&that) = default;
+	List &operator=(std::initializer_list<T> v) { 
+		// @Speed
+		return *this = List<T>(Span(v.begin(), v.end())); 
+	}
 	List &set(Span<char const> span) { return Base::set(span), *this; }
 	template <class... Args>
-	void push_front(Args &&... args) {
+	T &push_front(Args &&... args) {
 		if (this->remainingCapacity() == 0) {
 			umm newCapacity = this->capacity() * 2;
 			if (newCapacity == 0)
@@ -188,10 +224,10 @@ struct List : ForwardListBase<T, Allocator> {
 			*dest = std::move(dest[-1]);
 		}
 		++this->_end;
-		new (this->_begin) T(std::forward<Args>(args)...);
+		return *new (this->_begin) T(std::forward<Args>(args)...);
 	}
 	void erase(T *val) {
-		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
+		assert(this->_begin <= val && val < this->_end, "value is not in container");
 		val->~T();
 		--this->_end;
 		for (T *dest = val; dest != this->_end; ++dest) {
@@ -200,9 +236,12 @@ struct List : ForwardListBase<T, Allocator> {
 		this->_end->~T();
 	}
 	void erase(T &val) { erase(std::addressof(val)); }
-
+	
 	List &operator+=(T const &v) { this->push_back(v); return *this; }
 	List &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
+	List &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
+	List &operator+=(List<T> const &v) { this->insert(as_span(v), this->end()); return *this; }
+	List &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
 };
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
@@ -228,7 +267,7 @@ struct UnorderedList : ForwardListBase<T, Allocator> {
 		new (this->_begin) T(std::forward<Args>(args)...);
 	}
 	void erase(T *val) {
-		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
+		assert(this->_begin <= val && val < this->_end, "value is not in container");
 		val->~T();
 		new (val) T(std::move(*(this->_end-- - 1)));
 	}
@@ -353,7 +392,7 @@ struct Queue {
 	}
 
 	void erase(T *val) {
-		ASSERT(this->_begin <= val && val < this->_end, "value is not in container");
+		assert(this->_begin <= val && val < this->_end, "value is not in container");
 		val->~T();
 
 		umm leftCount = val - _begin;
@@ -813,7 +852,7 @@ struct BlockList {
 		}
 	}
 	void ensureConsecutiveSpace(umm amount) {
-		ASSERT(amount <= blockCapacity, "reserving this amount of consecutive space is impossible");
+		assert(amount <= blockCapacity, "reserving this amount of consecutive space is impossible");
 		if (last->availableSpace() < amount) {
 			if (last->next) {
 				last = last->next;
@@ -912,7 +951,7 @@ struct LinkedList {
 		for (;;) {
 			if (node == 0)
 				break;
-			DEFER { DEALLOCATE(Allocator, node); };
+			defer { DEALLOCATE(Allocator, node); };
 			node = node->next;
 		}
 		head = last = 0;

@@ -151,4 +151,27 @@ inline u64 next(splitmix64 &state) {
 	return result ^ (result >> 31);
 }
 
+static constexpr f32 random_u32_to_f32 = 1.0f / ((1 << 24) - 1);
+static constexpr f64 random_u64_to_f64 = 1.0 / ((1llu << 53) - 1);
+
+inline f32 to_f32_01(u32 v) { return (f32)(v >> 8) * (1.0f / ((1 << 24) - 1)); }
+inline f32 to_f32_01(u64 v) { return (f32)(v >> 11) * (1.0 / ((1llu << 53) - 1)); }
+
+template <class State> u8  next_u8 (State &state) { return (u8)next(state); }
+template <class State> u16 next_u16(State &state) { return (u16)next(state); }
+template <class State> u32 next_u32(State &state) { return (u32)next(state); }
+template <class State>
+u64 next_u64(State &state) { 
+	if constexpr(sizeof(next(state)) == 4) {
+		return next(state) | (next(state) << 32);
+	}
+	return next(state);
+}
+template <class State> s8  next_s8 (State &state) { return (TL::s8 )next_u8 (state); }
+template <class State> s16 next_s16(State &state) { return (TL::s16)next_u16(state); }
+template <class State> s32 next_s32(State &state) { return (TL::s32)next_u32(state); }
+template <class State> s64 next_s64(State &state) { return (TL::s64)next_u64(state); }
+template <class State> f32 next_f32(State &state) { return to_f32_01(next_u32(state)); }
+template <class State> f64 next_f64(State &state) { return to_f32_01(next_u64(state)); }
+
 }

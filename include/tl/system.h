@@ -28,9 +28,9 @@
 #define TL_DLL_IMPORT __declspec(dllimport)
 #define TL_DLL_EXPORT __declspec(dllexport)
 
-#define FORCEINLINE        __forceinline
-#define NOINLINE           __declspec(noinline)
-#define DEBUG_BREAK        ::__debugbreak()
+#define forceinline        __forceinline
+#define no_inline           __declspec(noinline)
+#define debug_break()      ::__debugbreak()
 #define WRITE_BARRIER      ::_WriteBarrier()
 #define READ_BARRIER       ::_ReadBarrier()
 #define READ_WRITE_BARRIER ::_ReadWriteBarrier()
@@ -48,8 +48,8 @@
 
 #elif COMPILER_GCC
 
-#define FORCEINLINE //__attribute__((always_inline))
-#define DEBUG_BREAK ::__builtin_trap()
+#define forceinline //__attribute__((always_inline))
+#define debug_break() ::__builtin_trap()
 #if defined _X86_
 #undef ARCH_X86
 #define ARCH_X86 1

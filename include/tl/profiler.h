@@ -26,7 +26,7 @@ TL_API void outputForChrome(char const *path);
 #endif
 
 #if TL_ENABLE_PROFILER
-#define TL_TIMED_BLOCK(name) ::TL::Profiler::begin(name, __FILE__, __LINE__); DEFER{ ::TL::Profiler::end(); }
+#define TL_TIMED_BLOCK(name) ::TL::Profiler::begin(name, __FILE__, __LINE__); defer{ ::TL::Profiler::end(); }
 #define TL_TIMED_FUNCTION TL_TIMED_BLOCK(__FUNCTION__)
 #else
 #define TL_TIMED_BLOCK(name)
@@ -53,9 +53,9 @@ Mutex currentTimeSpansMutex;
 u32 undoneSpanCount;
 
 void begin(char const *name, char const *file, u32 line) {
-	u32 threadId = getCurrentThreadId();
+	u32 threadId = get_current_thread_id();
 	TimeSpan span;
-	span.begin = getPerformanceCounter();
+	span.begin = get_performance_counter();
 	span.name = name;
 	span.file = file;
 	span.line = line;
@@ -65,12 +65,12 @@ void begin(char const *name, char const *file, u32 line) {
 	//	startTime = (f64)span.begin * 1000.0 / performanceFrequency;
 	//}
 
-	lockAdd(undoneSpanCount, 1);
+	atomic_add(undoneSpanCount, 1);
 	SCOPED_LOCK(currentTimeSpansMutex);
 	currentTimeSpans[threadId].push_back(span);
 }
 void end() {
-	u32 threadId = getCurrentThreadId();
+	u32 threadId = get_current_thread_id();
 
 	lock(currentTimeSpansMutex);
 	auto &list = currentTimeSpans[threadId];
@@ -79,9 +79,9 @@ void end() {
 	TimeSpan span = list.back();
 	list.pop_back();
 
-	span.end = getPerformanceCounter();
+	span.end = get_performance_counter();
 
-	lockAdd(undoneSpanCount, (u32)-1);
+	atomic_add(undoneSpanCount, (u32)-1);
 	SCOPED_LOCK(recordedTimeSpansMutex);
 	recordedTimeSpans.push_back(span);
 }
@@ -91,7 +91,7 @@ void reset() {
 }
 
 void waitForCompletion() {
-	loopUntil([]{ return undoneSpanCount == 0; });
+	loop_until([]{ return undoneSpanCount == 0; });
 }
 List<TimeSpan> const &getRecordedTimeSpans() {
 	return recordedTimeSpans;

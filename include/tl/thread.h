@@ -12,19 +12,19 @@
 
 namespace TL {
 
-TL_API void sleepMilliseconds(u32 milliseconds);
-TL_API void sleepSeconds(u32 seconds);
+TL_API void sleep_milliseconds(u32 milliseconds);
+TL_API void sleep_seconds(u32 seconds);
 #if OS_WINDOWS
-TL_API void switchThread();
-FORCEINLINE void spinIteration() { _mm_pause(); }
+TL_API void switch_thread();
+forceinline void spin_iteration() { _mm_pause(); }
 
-FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
-FORCEINLINE s16 lockAdd(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
-FORCEINLINE s32 lockAdd(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
-FORCEINLINE s64 lockAdd(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
+forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
+forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
+forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
+forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
 
 template <class T>
-FORCEINLINE T lockSet(T volatile *dst, T src) {
+forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
 	     if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src); 
 	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
@@ -35,45 +35,55 @@ FORCEINLINE T lockSet(T volatile *dst, T src) {
 }
 
 template <class T>
-FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
+forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
 	s64 result;
 	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&newValue, *(long long*)&comparand);
 	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)dst, *(long     *)&newValue, *(long     *)&comparand);
 	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)dst, *(short    *)&newValue, *(short    *)&comparand);
 	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)dst, *(char     *)&newValue, *(char     *)&comparand);
-	else static_assert(false, "lockSetIfEquals is not available for this size");
+	else static_assert(false, "atomic_set_if_equals is not available for this size");
 	return *(T *)&result;
 }
 
 TL_DECLARE_HANDLE(Thread);
-TL_API Thread createThread(void (*fn)(void *), void *param);
-TL_API void destroyThread(Thread thread);
-TL_API u32 getCurrentThreadId();
-TL_API u32 getThreadId(Thread thread);
+TL_API Thread create_thread(void (*fn)(void *), void *param);
+TL_API void destroy_thread(Thread thread);
+TL_API u32 get_current_thread_id();
+TL_API u32 get_thread_id(Thread thread);
+TL_API void join(Thread thread);
+
+inline Thread create_thread(Function function) {
+	return create_thread(function.function, function.param);
+}
+
+template <class Fn, class ...Args>
+Thread create_thread(Fn &&fn, Args &&...args) {
+	return create_thread(create_function(std::forward<Fn>(fn), std::forward<Args>(args)...));
+}
 
 #else
-FORCEINLINE s8  lockAdd(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
-FORCEINLINE s16 lockAdd(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
-FORCEINLINE s32 lockAdd(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
-FORCEINLINE s64 lockAdd(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
+forceinline s8  atomic_add(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
+forceinline s16 atomic_add(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
+forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
+forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
 
 template <class T>
-FORCEINLINE T lockSetIfEquals(T volatile *dst, T newValue, T comparand) {
+forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
 	return __sync_val_compare_and_swap(dst, comparand, newValue);
 }
 #endif
 
-FORCEINLINE u8  lockAdd(u8  volatile *a, u8  b) { return (u8 )lockAdd((s8  *)a, (s8 )b); }
-FORCEINLINE u16 lockAdd(u16 volatile *a, u16 b) { return (u16)lockAdd((s16 *)a, (s16)b); }
-FORCEINLINE u32 lockAdd(u32 volatile *a, u32 b) { return (u32)lockAdd((s32 *)a, (s32)b); }
-FORCEINLINE u64 lockAdd(u64 volatile *a, u64 b) { return (u64)lockAdd((s64 *)a, (s64)b); }
+forceinline u8  atomic_add(u8  volatile *a, u8  b) { return (u8 )atomic_add((s8  *)a, (s8 )b); }
+forceinline u16 atomic_add(u16 volatile *a, u16 b) { return (u16)atomic_add((s16 *)a, (s16)b); }
+forceinline u32 atomic_add(u32 volatile *a, u32 b) { return (u32)atomic_add((s32 *)a, (s32)b); }
+forceinline u64 atomic_add(u64 volatile *a, u64 b) { return (u64)atomic_add((s64 *)a, (s64)b); }
 
-FORCEINLINE s16 lockAdd(s16 volatile &a, s16 b) { return lockAdd(&a, b); }
-FORCEINLINE s32 lockAdd(s32 volatile &a, s32 b) { return lockAdd(&a, b); }
-FORCEINLINE s64 lockAdd(s64 volatile &a, s64 b) { return lockAdd(&a, b); }
-FORCEINLINE u16 lockAdd(u16 volatile &a, u16 b) { return lockAdd(&a, b); }
-FORCEINLINE u32 lockAdd(u32 volatile &a, u32 b) { return lockAdd(&a, b); }
-FORCEINLINE u64 lockAdd(u64 volatile &a, u64 b) { return lockAdd(&a, b); }
+forceinline s16 atomic_add(s16 volatile &a, s16 b) { return atomic_add(&a, b); }
+forceinline s32 atomic_add(s32 volatile &a, s32 b) { return atomic_add(&a, b); }
+forceinline s64 atomic_add(s64 volatile &a, s64 b) { return atomic_add(&a, b); }
+forceinline u16 atomic_add(u16 volatile &a, u16 b) { return atomic_add(&a, b); }
+forceinline u32 atomic_add(u32 volatile &a, u32 b) { return atomic_add(&a, b); }
+forceinline u64 atomic_add(u64 volatile &a, u64 b) { return atomic_add(&a, b); }
 
 #if 0
 template <class T>
@@ -101,7 +111,7 @@ struct AtomicIntBase : AtomicBase<Int> {
 	AtomicIntBase &operator--() { return lockDecrement(&value), *this; }
 	AtomicIntBase operator++(int) { return lockIncrement(&value) - 1; }
 	AtomicIntBase operator--(int) { return lockDecrement(&value) + 1; }
-	Int operator+=(Int that) { return lockAdd(value, that) + that; }
+	Int operator+=(Int that) { return atomic_add(value, that) + that; }
 	Int operator-=(Int that) { return lockSubtract(value, that) - that; }
 };
 
@@ -131,7 +141,7 @@ struct CircularQueue {
 	void push(T &&val) { emplace(std::move(val)); }
 	void push(T const &val) { emplace(val); }
 	T pop() {
-		ASSERT (poppableCount);
+		assert (poppableCount);
 		--poppableCount;
 		T result = std::move(begin->val);
 		begin->val.~T();
@@ -184,11 +194,11 @@ private:
 
 #if OS_WINDOWS
 
-void sleepMilliseconds(u32 milliseconds) { Sleep(milliseconds); }
-void sleepSeconds(u32 seconds) { Sleep(seconds * 1000); }
-void switchThread() { SwitchToThread(); }
+void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
+void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
+void switch_thread() { SwitchToThread(); }
 
-Thread createThread(void (*fn)(void *), void *param) {
+Thread create_thread(void (*fn)(void *), void *param) {
 	struct Data {
 		void (*fn)(void *);
 		void *param;
@@ -208,82 +218,86 @@ Thread createThread(void (*fn)(void *), void *param) {
 	while (!data.acquired);
 	return (Thread)result;
 }
-void destroyThread(Thread thread) {
+void destroy_thread(Thread thread) {
 	CloseHandle((HANDLE)thread);
 }
-u32 getCurrentThreadId() {
+u32 get_current_thread_id() {
 	return GetCurrentThreadId();
 }
-u32 getThreadId(Thread thread) {
+u32 get_thread_id(Thread thread) {
 	return GetThreadId((HANDLE)thread);
 }
+void join(Thread thread) {
+	WaitForSingleObjectEx((HANDLE)thread, INFINITE, false);
+}
+
 #else // ^^^ OS_WINDOWS ^^^ vvvvvv
 #endif
 #endif // TL_IMPL
 
 template <class Predicate>
-void loopUntil(Predicate &&predicate) {
-	u32 tryCount = 0;
+void loop_until(Predicate &&predicate) {
+	u32 try_count = 0;
 	while (!predicate()) {
-		spinIteration();
-		if (tryCount >= 64)
-			switchThread();
-		if (tryCount >= 4096)
-			sleepMilliseconds(1);
-		++tryCount;
+		spin_iteration();
+		if (try_count >= 64)
+			switch_thread();
+		if (try_count >= 4096)
+			sleep_milliseconds(1);
+		++try_count;
 	}
 }
 
 struct Mutex {
-	bool volatile inUse = false;
+	bool volatile in_use = false;
 };
 
-inline bool tryLock(Mutex &m) {
-	return !lockSetIfEquals(&m.inUse, true, false);
+inline bool try_lock(Mutex &m) {
+	return !atomic_set_if_equals(&m.in_use, true, false);
 }
 inline void lock(Mutex &m) {
-	loopUntil([&] {
-		return tryLock(m);
+	loop_until([&] {
+		return try_lock(m);
 	});
 }
 inline void unlock(Mutex &m) {
-	m.inUse = false;
+	m.in_use = false;
 }
 
 struct RecursiveMutex {
-	u32 volatile threadId = 0;
+	u32 volatile thread_id = 0;
 	u32 counter = 0;
 };
 
-inline bool tryLock(RecursiveMutex &m) {
-	u32 threadId = getCurrentThreadId();
-	if (threadId == m.threadId) {
+inline bool try_lock(RecursiveMutex &m) {
+	u32 thread_id = get_current_thread_id();
+	if (thread_id == m.thread_id) {
 		++m.counter;
 		return true;
 	} else {
-		return !lockSetIfEquals(&m.threadId, threadId, (u32)0);
+		return !atomic_set_if_equals(&m.thread_id, thread_id, (u32)0);
 	}
 }
 inline void lock(RecursiveMutex &m) {
-	u32 threadId = getCurrentThreadId();
-	if (threadId == m.threadId) {
+	u32 thread_id = get_current_thread_id();
+	if (thread_id == m.thread_id) {
 		++m.counter;
 	} else {
-		loopUntil([&] {
-			return !lockSetIfEquals(&m.threadId, threadId, (u32)0);
+		loop_until([&] {
+			return !atomic_set_if_equals(&m.thread_id, thread_id, (u32)0);
 		});
 	}
 }
 inline void unlock(RecursiveMutex &m) {
 	if (m.counter == 0) {
-		m.threadId = 0;
+		m.thread_id = 0;
 	} else {
 		--m.counter;
 	}
 }
 
-#define SCOPED_LOCK(mutex) lock(mutex); DEFER { unlock(mutex); }
-#define SCOPED_UNLOCK(mutex) unlock(mutex); DEFER { lock(mutex); }
+#define SCOPED_LOCK(mutex) lock(mutex); defer { unlock(mutex); }
+#define SCOPED_UNLOCK(mutex) unlock(mutex); defer { lock(mutex); }
 
 template <class T, class Mutex = Mutex, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct MutexQueue {
@@ -309,7 +323,7 @@ struct MutexQueue {
 	}
 	T pop() {
 		Optional<T> opt;
-		loopUntil([&] {
+		loop_until([&] {
 			opt = try_pop();
 			return opt.has_value();
 		});
@@ -343,7 +357,7 @@ struct StaticMutexCircularQueue {
 	}
 	T pop() {
 		Optional<T> opt;
-		loopUntil([&] {
+		loop_until([&] {
 			opt = try_pop();
 			return opt.has_value();
 		});
@@ -369,66 +383,57 @@ struct ThreadWork {
 	void *param;
 };
 
-template <class Allocator, class Queue = MutexQueue<ThreadWork<Allocator>, Mutex, Allocator>>
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class Queue = MutexQueue<ThreadWork<Allocator>, Mutex, Allocator>>
 struct ThreadPool {
 	List<Thread, Allocator> threads;
-	u32 threadCount = 0;
-	u32 volatile initializedThreadCount = 0;
-	u32 volatile deadThreadCount = 0;
+	u32 thread_count = 0;
+	u32 volatile initialized_thread_count = 0;
+	u32 volatile dead_thread_count = 0;
 	bool volatile running = false;
 	bool volatile stopping = false;
-	Queue allWork;
+	Queue all_work;
 };
 template <class Allocator>
-bool tryDoWork(ThreadPool<Allocator> *pool);
-
-namespace Detail {
-template <class Tuple, umm... indices>
-static void invoke(void *rawVals) noexcept {
-	Tuple *fnVals((Tuple *)(rawVals));
-	Tuple &tup = *fnVals;
-	std::invoke(std::move(std::get<indices>(tup))...);
-}
-
-template <class Tuple, umm... indices>
-static constexpr auto getInvoke(std::index_sequence<indices...>) noexcept {
-	return &invoke<Tuple, indices...>;
-}
-} // namespace Detail
+bool try_do_work(ThreadPool<Allocator> *pool);
 
 template <class Allocator>
 struct WorkQueue {
-	u32 volatile workToDo = 0;
+	u32 volatile work_to_do = 0;
 	ThreadPool<Allocator> *pool = 0;
 	inline void push(void (*fn)(void *param), void *param) {
-		if (pool->threadCount) {
+		if (pool->thread_count) {
 			ThreadWork<Allocator> work;
 			work.fn = fn;
 			work.param = param;
 			work.queue = this;
-			pool->allWork.push(work);
+			pool->all_work.push(work);
 		} else {
 			fn(param);
 		}
 	}
-	template <class Fn, class... Args>
-	void push(Fn &&fn, Args &&... args) {
-		if (pool->threadCount) {
+	template <class Fn, class ...Args>
+	void push(Fn &&fn, Args &&...args) {
+		if (pool->thread_count) {
 			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
 			auto fnParams = ALLOCATE_T(Allocator, Tuple, 1, 0);
 			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
-			constexpr auto invokerProc = Detail::getInvoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-			lockAdd(workToDo, 1);
+			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+			atomic_add(work_to_do, 1);
 			push((void (*)(void *))invokerProc, (void *)fnParams);
 		} else {
 			std::invoke(fn, std::forward<Args>(args)...);
 		}
 	}
-	inline void waitForCompletion() {
-		if (pool->threadCount) {
-			loopUntil([&] {
-				tryDoWork(pool);
-				return workToDo == 0;
+	template <class Fn>
+	WorkQueue &operator+=(Fn &&fn) {
+		push(std::forward<Fn>(fn));
+		return *this;
+	}
+	inline void wait_for_completion() {
+		if (pool->thread_count) {
+			loop_until([&] {
+				try_do_work(pool);
+				return work_to_do == 0;
 			});
 		}
 	}
@@ -436,41 +441,41 @@ struct WorkQueue {
 };
 
 template <class Allocator>
-inline WorkQueue<Allocator> makeWorkQueue(ThreadPool<Allocator> *pool) {
+inline WorkQueue<Allocator> make_work_queue(ThreadPool<Allocator> &pool) {
 	WorkQueue<Allocator> result = {};
-	result.pool = pool;
+	result.pool = &pool;
 	return result;
 }
 
 template <class Allocator>
-inline void doWork(ThreadWork<Allocator> work) {
+inline void do_work(ThreadWork<Allocator> work) {
 	work.fn(work.param);
 	DEALLOCATE(Allocator, work.param);
-	lockAdd(work.queue->workToDo, (u32)-1);
+	atomic_add(work.queue->work_to_do, (u32)-1);
 }
 template <class Allocator>
-inline bool tryDoWork(ThreadPool<Allocator> *pool) {
-	if (auto popped = pool->allWork.try_pop()) {
-		doWork(*popped);
+inline bool try_do_work(ThreadPool<Allocator> *pool) {
+	if (auto popped = pool->all_work.try_pop()) {
+		do_work(*popped);
 		return true;
 	}
 	return false;
 }
 template <class Allocator>
-inline bool doWork(ThreadPool<Allocator> *pool) {
+inline bool do_work(ThreadPool<Allocator> *pool) {
 	ThreadWork<Allocator> work = {};
-	loopUntil([&] {
+	loop_until([&] {
 		if (pool->stopping) {
 			return true;
 		}
-		if (auto popped = pool->allWork.try_pop()) {
+		if (auto popped = pool->all_work.try_pop()) {
 			work = *popped;
 			return true;
 		}
 		return false;
 	});
 	if (work.fn) {
-		doWork(work);
+		do_work(work);
 		return true;
 	} else {
 		return false;
@@ -478,31 +483,31 @@ inline bool doWork(ThreadPool<Allocator> *pool) {
 }
 
 template <class Allocator>
-inline void defaultThreadPoolProc(ThreadPool<Allocator> *pool) {
-	lockAdd(pool->initializedThreadCount, 1);
-	loopUntil([&] { return pool->running || pool->stopping; });
+inline void default_thread_pool_proc(ThreadPool<Allocator> *pool) {
+	atomic_add(pool->initialized_thread_count, 1);
+	loop_until([&] { return pool->running || pool->stopping; });
 	while (1) {
-		if (!doWork(pool))
+		if (!do_work(pool))
 			break;
 	}
-	lockAdd(pool->deadThreadCount, 1);
+	atomic_add(pool->dead_thread_count, 1);
 }
-template <class Allocator, class ThreadProc = decltype(defaultThreadPoolProc<Allocator>)>
-bool initThreadPool(ThreadPool<Allocator> *pool, u32 threadCount, ThreadProc &&threadProc = defaultThreadPoolProc<Allocator>) {
-	pool->initializedThreadCount = 0;
-	pool->deadThreadCount = 0;
-	pool->running = false;
-	pool->stopping = false;
-	pool->threadCount = threadCount;
-	if (threadCount) {
-		pool->threads.reserve(threadCount);
+template <class Allocator, class ThreadProc = decltype(default_thread_pool_proc<Allocator>)>
+bool init_thread_pool(ThreadPool<Allocator> &pool, u32 thread_count, ThreadProc &&threadProc = default_thread_pool_proc<Allocator>) {
+	pool.initialized_thread_count = 0;
+	pool.dead_thread_count = 0;
+	pool.running = false;
+	pool.stopping = false;
+	pool.thread_count = thread_count;
+	if (thread_count) {
+		pool.threads.reserve(thread_count);
 		
 		struct StartParams {
 			ThreadPool<Allocator> *pool;
 			ThreadProc *proc;
 		};
 		StartParams params;
-		params.pool = pool;
+		params.pool = &pool;
 		params.proc = std::addressof(threadProc);
 		
 		auto startProc = [](void *param) {
@@ -510,25 +515,25 @@ bool initThreadPool(ThreadPool<Allocator> *pool, u32 threadCount, ThreadProc &&t
 			(*info->proc)(info->pool);
 		};
 
-		for (u32 i = 0; i < threadCount; ++i) {
-			auto thread = createThread(startProc, &params);
+		for (u32 i = 0; i < thread_count; ++i) {
+			auto thread = create_thread(startProc, &params);
 			if (!thread) {
-				pool->stopping = true;
-				for (auto t : pool->threads) {
-					destroyThread(t);
+				pool.stopping = true;
+				for (auto t : pool.threads) {
+					destroy_thread(t);
 				}
-				pool->threads.clear();
+				pool.threads.clear();
 				return false;
 			}
-			pool->threads.push_back(thread);
+			pool.threads.push_back(thread);
 		}
 
-		loopUntil([&] {
-			return pool->initializedThreadCount == pool->threadCount;
+		loop_until([&] {
+			return pool.initialized_thread_count == pool.thread_count;
 		});
-		pool->running = true;
+		pool.running = true;
 	} else {
-		pool->threads.clear();
+		pool.threads.clear();
 	}
 
 	return true;
@@ -537,7 +542,7 @@ template <class Allocator>
 inline void deinitThreadPool(ThreadPool<Allocator> *pool, bool waitForThreads = true) {
 	pool->stopping = true;
 	if (waitForThreads) {
-		loopUntil([&] { return pool->deadThreadCount == pool->threadCount; });
+		loop_until([&] { return pool->dead_thread_count == pool->thread_count; });
 	}
 	pool->threads.clear();
 }

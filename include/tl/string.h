@@ -33,14 +33,7 @@ struct String : List<Char, Allocator> {
 		return *this;
 	}
 	String &set(Span<Char const> span) { return Base::set(span), *this; }
-	void append(Span<char const> str) {
-		auto requiredSize = this->size() + str.size();
-		if (requiredSize > this->capacity()) {
-			_grow(requiredSize);
-		}
-		memcpy(this->_end, str.data(), str.size());
-		this->_end += str.size();
-	}
+	void append(Span<Char const> str) { *this += str; }
 	void append(Char const *str) {
 		append(Span<char const>(str, length(str)));
 	}
@@ -60,7 +53,17 @@ struct String : List<Char, Allocator> {
 			return 1;
 		return 0;
 	}
+	bool operator==(char const *that) const {
+		return as_span(*this) == as_span(that);
+	}
 };
+
+template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
+constexpr String<char, Allocator> concatenate(Args &&...args) {
+	String<char, Allocator> result;
+	int x[] = {0, (result.append(as_span(std::forward<Args>(args))), 0)...};
+	return result;
+}
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
 String<Char, Allocator> asString(T const &val) {
@@ -86,7 +89,7 @@ String<Char, Allocator> asStringNT(T const &val) {
 }
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
-String<Char, Allocator> nullTerminate(Span<Char const> span) {
+String<Char, Allocator> null_terminate(Span<Char const> span) {
 	String<Char, Allocator> result;
 	result.resize(span.size() + 1);
 	memcpy(result.data(), span.data(), span.size() * sizeof(Char));
@@ -94,8 +97,8 @@ String<Char, Allocator> nullTerminate(Span<Char const> span) {
 	return result;
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
-String<Char, Allocator> nullTerminate(Span<Char> span) {
-	return nullTerminate<Allocator, Char>((Span<Char const>)span);
+String<Char, Allocator> null_terminate(Span<Char> span) {
+	return null_terminate<Allocator, Char>((Span<Char const>)span);
 }
 
 template <class T>
@@ -224,11 +227,11 @@ struct StringBuilder {
 		}
 	}
 	void ensureConsecutiveSpace(umm amount) {
-		ASSERT(amount <= blockSize);
+		assert(amount <= blockSize);
 		if (last->availableSpace() < amount) {
 			if (last->next) {
 				last = last->next;
-				ASSERT(last->availableSpace() == blockSize); // @DEBUG
+				assert(last->availableSpace() == blockSize); // @DEBUG
 			} else {
 				last->next = allocateBlock();
 				last = allocLast = last->next;
@@ -333,7 +336,7 @@ struct StringBuilder {
 			}
 			++c;
 		}
-		//ASSERT(fmtBegin && fmtEnd, "invalid format");
+		//assert(fmtBegin && fmtEnd, "invalid format");
 		if (!(fmtBegin && fmtEnd)) {
 			return appendFormat(fmt);
 		}
@@ -364,7 +367,7 @@ struct StringBuilder {
 		return totalSize;
 	}
 	Span<Char> fill(Span<Char> dstString) {
-		ASSERT(dstString.size() >= this->size());
+		assert(dstString.size() >= this->size());
 		Char *dstChar = dstString.data();
 		for (Block *block = &first; block != 0; block = block->next) {
 			memcpy(dstChar, block->buffer, block->size * sizeof(Char));

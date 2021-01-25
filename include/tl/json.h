@@ -9,23 +9,6 @@
 #pragma warning(disable: 4583) // destructor not called implicitly
 #pragma warning(disable: 4061 4062) // incomplete switch
 
-namespace std {
-
-template <>
-struct hash<TL::Span<char const>> {
-	TL::umm operator()(TL::Span<char const> const &v) const {
-		using namespace TL;
-		umm hash = 0x0F1E2D3C4B5A6978;
-		umm index = 0;
-		for (auto c : v) {
-			hash ^= (umm)c << (index & ((sizeof(umm) - 1) * 8));
-		}
-		return hash;
-	}
-};
-
-}
-
 namespace TL {
 namespace Json {
 
@@ -101,13 +84,13 @@ struct Object {
 	Object &operator=(Object &&that) { this->~Object(); return *new (this) Object(std::move(that)); }
 	Object &operator=(f64 value) {
 		if (type != Type_null)
-			ASSERT(type == Type_number);
+			assert(type == Type_number);
 		number.value = value;
 		return *this;
 	}
 	Object &operator=(Span<char const> value) {
 		if (type != Type_null)
-			ASSERT(type == Type_string);
+			assert(type == Type_string);
 		string.view = value;
 		return *this;
 	}
@@ -123,7 +106,7 @@ struct Object {
 		type = Type_null;
 	}
 	Object &operator[](Span<char const> name) {
-		ASSERT(type == Type_object);
+		assert(type == Type_object);
 		return object.members[name];
 	}
 	template <umm size>
@@ -131,7 +114,7 @@ struct Object {
 		return (*this)[Span<char const>(name, length(name))];
 	}
 	Object &operator[](umm i) {
-		ASSERT(type == Type_array);
+		assert(type == Type_array);
 		return array.elements[i];
 	}
 	Object &operator[](Object const &i) {
@@ -235,7 +218,7 @@ Object parse(Token *&t) {
 				if (t->type == '"') {
 					Span<char const> memberName = t->view;
 					++t;
-					ASSERT(t++->type == ':');
+					assert(t++->type == ':');
 					result.object.members[memberName] = parse(t);
 				} else {
 					INVALID_CODE_PATH();
@@ -245,7 +228,7 @@ Object parse(Token *&t) {
 					++t;
 					break;
 				} else {
-					ASSERT(t++->type == ',');
+					assert(t++->type == ',');
 				}
 			}
 		}
@@ -274,7 +257,7 @@ Object parse(Token *&t) {
 					++t;
 					break;
 				} else {
-					ASSERT(t++->type == ',');
+					assert(t++->type == ',');
 				}
 			}
 		}
@@ -285,8 +268,8 @@ Object parse(Token *&t) {
 	}
 }
 Object parse(List<Token> tokens) {
-	ASSERT(tokens.front().type == '{');
-	ASSERT(tokens.back().type == '}');
+	assert(tokens.front().type == '{');
+	assert(tokens.back().type == '}');
 	Token *t = tokens.begin();
 	return parse(t);
 }

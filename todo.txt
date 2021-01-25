@@ -1,0 +1,1 @@
+Extract simd intrinsics from math.h into math_simd.h
