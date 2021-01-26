@@ -3714,23 +3714,23 @@ forceinline v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
 forceinline v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
 forceinline v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
 
-forceinline s32 floorToInt(f32 v) { return (s32)floor(v); }
-forceinline s64 floorToInt(f64 v) { return (s64)floor(v); }
-forceinline v2s floorToInt(v2f v) {
+forceinline s32 floor_to_int(f32 v) { return (s32)floor(v); }
+forceinline s64 floor_to_int(f64 v) { return (s64)floor(v); }
+forceinline v2s floor_to_int(v2f v) {
 	return {
-		floorToInt(v.x),
-		floorToInt(v.y),
+		floor_to_int(v.x),
+		floor_to_int(v.y),
 	};
 }
-forceinline v3s floorToInt(v3f v) {
+forceinline v3s floor_to_int(v3f v) {
 	return {
-		floorToInt(v.x),
-		floorToInt(v.y),
-		floorToInt(v.z),
+		floor_to_int(v.x),
+		floor_to_int(v.y),
+		floor_to_int(v.z),
 	};
 }
-forceinline s32x4 floorToInt(f32x4 v) { return (s32x4)floor(v); }
-forceinline v4s floorToInt(v4f v) { return V4s(floorToInt(v.m)); }
+forceinline s32x4 floor_to_int(f32x4 v) { return (s32x4)floor(v); }
+forceinline v4s floor_to_int(v4f v) { return V4s(floor_to_int(v.m)); }
 
 forceinline v2f ceil(v2f v) { return {ceil(v.x), ceil(v.y)}; }
 forceinline v3f ceil(v3f v) { return {ceil(v.x), ceil(v.y), ceil(v.z)}; }
@@ -3741,7 +3741,7 @@ forceinline v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)
 CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
-#define CEIL(s32, f32) forceinline s32 ceilToInt(f32 v) { return (s32)ceil(v); }
+#define CEIL(s32, f32) forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
 
 CEIL(s32, f32)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
 CEIL(s64, f64)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
@@ -5158,30 +5158,22 @@ template <class T>
 inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(v3f f, CopyFn &&copyFn) {
-	Char buffer[256];
-	Char *buffer_end = buffer;
-	*buffer_end++ = '{';
-	toString<Char>(f.x, [&](Char const *data, umm size) {
-		memcpy(buffer_end, data, size);
-		buffer_end += size;
-		buffer_end[0] = ',';
-		buffer_end[1] = ' ';
-		buffer_end += 2;
+CopyFnRet<CopyFn, Char> to_string(v3f f, CopyFn &&copyFn) {
+	StaticList<Char, 256> buffer;
+	buffer += '{';
+	to_string<Char>(f.x, [&](Span<Char const> span) {
+		buffer += span;
+		buffer += as_span(", ");
 	});
-	toString<Char>(f.y, [&](Char const *data, umm size) {
-		memcpy(buffer_end, data, size);
-		buffer_end += size;
-		buffer_end[0] = ',';
-		buffer_end[1] = ' ';
-		buffer_end += 2;
+	to_string<Char>(f.y, [&](Span<Char const> span) {
+		buffer += span;
+		buffer += as_span(", ");
 	});
-	toString<Char>(f.z, [&](Char const *data, umm size) {
-		memcpy(buffer_end, data, size);
-		buffer_end += size;
+	to_string<Char>(f.z, [&](Span<Char const> span) {
+		buffer += span;
 	});
-	*buffer_end++ = '}';
-	return copyFn(buffer, (umm)(buffer_end - buffer));
+	buffer += '}';
+	return copyFn(as_span(buffer));
 }
 
 } // namespace TL

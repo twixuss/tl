@@ -103,7 +103,7 @@ struct State {
 	
 	template <class Fn>
 	inline void useContext(Fn &&fn) {
-		SCOPED_LOCK(immediateContextMutex);
+		scoped_lock(immediateContextMutex);
 		fn();
 	}
 	TL_API void initBackBuffer();

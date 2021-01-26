@@ -66,7 +66,7 @@ void begin(char const *name, char const *file, u32 line) {
 	//}
 
 	atomic_add(undoneSpanCount, 1);
-	SCOPED_LOCK(currentTimeSpansMutex);
+	scoped_lock(currentTimeSpansMutex);
 	currentTimeSpans[threadId].push_back(span);
 }
 void end() {
@@ -82,7 +82,7 @@ void end() {
 	span.end = get_performance_counter();
 
 	atomic_add(undoneSpanCount, (u32)-1);
-	SCOPED_LOCK(recordedTimeSpansMutex);
+	scoped_lock(recordedTimeSpansMutex);
 	recordedTimeSpans.push_back(span);
 }
 void reset() {

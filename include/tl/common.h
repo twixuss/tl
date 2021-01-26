@@ -37,15 +37,16 @@
 #define ASSERTION_FAILURE(causeString, expression, ...) debug_break()
 #endif
 
-#define assert(x, ...)                                                                      \
-	do {                                                                                    \
-		if (!(x)) {                                                                         \
-			ASSERTION_FAILURE("assert", #x, __VA_ARGS__); \
-		}                                                                                   \
+#define assert_always(x, ...)                              \
+	do {                                                   \
+		if (!(x)) {                                        \
+			ASSERTION_FAILURE("assert", #x, __VA_ARGS__);  \
+		}                                                  \
 	} while (0)
+#define assert(x, ...) assert_always(x, ...)  
 
-#define INVALID_CODE_PATH(...)                                                                     \
-	do {                                                                                           \
+#define INVALID_CODE_PATH(...)                                   \
+	do {                                                         \
 		ASSERTION_FAILURE("INVALID_CODE_PATH", "", __VA_ARGS__); \
 	} while (0)
 
@@ -695,10 +696,10 @@ inline constexpr Span<char> skipChars(Span<char> span, Span<char> charsToSkip) {
 }
 
 template <class CopyFn, class Char>
-inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, Char *, umm>;
+inline constexpr bool isCopyFn = std::is_invocable_v<CopyFn, Span<Char const>>;
 
 template <class CopyFn, class Char>
-using CopyFnRet = decltype(((CopyFn *)0)->operator()((Char*)0, (umm)0));
+using CopyFnRet = decltype(((CopyFn *)0)->operator()(Span<Char>((Char*)0, (umm)0)));
 
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
@@ -729,23 +730,23 @@ struct NullString<wchar> {
 	inline static constexpr wchar value[] = L"(null)";
 };
 
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(char  const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(wchar const &v, CopyFn &&copyFn) { Char c = (Char)v; return copyFn(&c, 1); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char const *v, CopyFn &&copyFn) { if (!v) v = NullString<Char>::value; return copyFn(v, length(v)); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Char       *v, CopyFn &&copyFn) { if (!v) v = (Char *)NullString<Char>::value; return copyFn((Char const *)v, length(v)); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char const> v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> toString(Span<Char      > v, CopyFn &&copyFn) { return copyFn(v.data(), v.size()); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(char  const &v, CopyFn &&copy_fn) { Char c = (Char)v; return copy_fn(Span(&c, 1)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(wchar const &v, CopyFn &&copy_fn) { Char c = (Char)v; return copy_fn(Span(&c, 1)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Char const *v, CopyFn &&copy_fn) { if (!v) v = NullString<Char>::value; return copy_fn(as_span(v)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Char       *v, CopyFn &&copy_fn) { if (!v) v = (Char *)NullString<Char>::value; return copy_fn(as_span(v)); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Span<Char const> v, CopyFn &&copy_fn) { return copy_fn(v); }
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Span<Char      > v, CopyFn &&copy_fn) { return copy_fn(v); }
 
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(bool v, CopyFn &&copyFn) {
+CopyFnRet<CopyFn, Char> to_string(bool v, CopyFn &&copy_fn) {
 	if constexpr (isSame<Char, char>)
-		return copyFn(v ? "true" : "false", (umm)(v ? 4 : 5));
+		return copy_fn(as_span(v ? "true" : "false"));
 	else
-		return copyFn(v ? L"true" : L"false", (umm)(v ? 4 : 5));
+		return copy_fn(as_span(v ? L"true" : L"false"));
 }
 
 template <class Char, class CopyFn, class Int>
-CopyFnRet<CopyFn, Char> toString(FormatInt<Int> f, CopyFn &&copyFn) {
+CopyFnRet<CopyFn, Char> to_string(FormatInt<Int> f, CopyFn &&copy_fn) {
 	Int v = f.value;
 	u32 radix = f.radix;
 	constexpr u32 maxDigits = _intToStringSize<Int>;
@@ -789,16 +790,17 @@ CopyFnRet<CopyFn, Char> toString(FormatInt<Int> f, CopyFn &&copyFn) {
 		}
 		charsWritten = total_digits;
 	}
-	return copyFn(lsc + 1, charsWritten);
+	return copy_fn(Span(lsc + 1, charsWritten));
 }
-template <class Char, class CopyFn, class Int, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(Int v, CopyFn &&copyFn) {
-	return toString<Char>(FormatInt(v), std::forward<CopyFn>(copyFn));
+
+template <class Char, class Int, class CopyFn, class = EnableIf<isInteger<Int> && isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> to_string(Int v, CopyFn &&copy_fn) {
+	return to_string<Char>(FormatInt(v), std::forward<CopyFn>(copy_fn));
 }
 
 template <class Char, class T>
 Span<Char> toStringNT(T v, Char *outBuf) {
-	return toString<Char>(v, [&](Char const *src, umm length) { 
+	return to_string<Char>(v, [&](Char const *src, umm length) { 
 		copyMemory(outBuf, src, length * sizeof(Char)); 
 		outBuf[length] = (Char)0;
 		return Span<Char>(outBuf, length);
@@ -806,39 +808,17 @@ Span<Char> toStringNT(T v, Char *outBuf) {
 }
 
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(void const *p, CopyFn &&copyFn) {
-	return toString<Char>(FormatInt((umm)p, 16, true), std::forward<CopyFn>(copyFn));
+CopyFnRet<CopyFn, Char> to_string(void const *p, CopyFn &&copy_fn) {
+	return to_string<Char>(FormatInt((umm)p, 16, true), std::forward<CopyFn>(copy_fn));
 }
 
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(FormatFloat<f64> f, CopyFn &&copyFn) {
-	auto v = f.value;
-	auto precision = f.precision;
-	Char buf[64];
-	Char *c = buf;
-	if (is_negative(v)) {
-		*c++ = '-';
-		v = -v;
-	}
-	c += toString<Char>((u64)v, [&](Char const *string, umm length){
-		copyMemory(c, string, length * sizeof(Char));
-		return length;
-	});
-	*c++ = '.';
-	for (u32 i = 0; i < precision; ++i) {
-		v = v - (f64)(s64)v;
-		v = (v < 0 ? v + 1 : v) * 10;
-		*c++ = (Char)((u32)v + '0');
-	}
-	return copyFn(buf, (umm)(c - buf));
+CopyFnRet<CopyFn, Char> to_string(f64 v, CopyFn &&copy_fn) {
+	return to_string<Char>(FormatFloat(v), std::forward<CopyFn>(copy_fn));
 }
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(f64 v, CopyFn &&copyFn) {
-	return toString<Char>(FormatFloat(v), std::forward<CopyFn>(copyFn));
-}
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> toString(f32 v, CopyFn &&copyFn) {
-	return toString<Char>((f64)v, std::forward<CopyFn>(copyFn));
+CopyFnRet<CopyFn, Char> to_string(f32 v, CopyFn &&copy_fn) {
+	return to_string<Char>((f64)v, std::forward<CopyFn>(copy_fn));
 }
 
 
@@ -1093,7 +1073,7 @@ struct StaticList : Conditional<std::is_trivially_destructible_v<T>, StaticList_
 
 	constexpr StaticList &operator+=(T const &v) { this->push_back(v); return *this; }
 	constexpr StaticList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
-	constexpr StaticList &operator+=(Span<T const> v) const { this->insert(v, this->end()); return *this; }
+	constexpr StaticList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	template <umm capacity>
 	constexpr StaticList &operator+=(StaticList<T, capacity> const &v) { this->insert(as_span(v), this->end()); return *this; }
 	constexpr StaticList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
@@ -1247,6 +1227,27 @@ Span<T> as_span(UnorderedStaticList<T, capacity> &list) {
 	return (Span<T>)list;
 }
 
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> to_string(FormatFloat<f64> f, CopyFn &&copy_fn) {
+	auto v = f.value;
+	auto precision = f.precision;
+	StaticList<Char, 64> buf;
+	if (is_negative(v)) {
+		buf += '-';
+		v = -v;
+	}
+	to_string<Char>((u64)v, [&](Span<Char const> span){
+		buf += span;
+	});
+	buf += '.';
+	for (u32 i = 0; i < precision; ++i) {
+		v = v - (f64)(s64)v;
+		v = (v < 0 ? v + 1 : v) * 10;
+		buf += (Char)((u32)v + '0');
+	}
+	return copy_fn(as_span(buf));
+}
+
 #if COMPILER_GCC
 forceinline u32 findLowestOneBit(u32 val) { val ? __builtin_ffs(val) : ~0; }
 forceinline u32 findLowestOneBit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
@@ -1328,7 +1329,11 @@ Allocator default_allocator = {
 
 namespace TL {
 
-thread_local List<Allocator> allocators = {default_allocator};
+thread_local List<Allocator> allocators;
+
+void init_allocator() {
+	allocators = {default_allocator};
+}
 
 Allocator get_allocator() {
 	return allocators.back();

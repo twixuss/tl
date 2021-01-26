@@ -19,6 +19,7 @@ inline wchar *copyString(wchar const *str) {
 template <class Char = char, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct String : List<Char, Allocator> {
 	using Base = List<Char, Allocator>;
+	using Base::operator[];
 	String() = default;
 	explicit String(umm size) : Base(size) {}
 	String(Span<Char const> span) : Base(span) {}
@@ -68,10 +69,8 @@ constexpr String<char, Allocator> concatenate(Args &&...args) {
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
 String<Char, Allocator> asString(T const &val) {
 	String<Char, Allocator> result;
-	toString<Char>(val, [&](Char const *src, umm length) {
-		result.resize(length);
-		memcpy(result.data(), src, length * sizeof(Char));
-		return Span<Char>();
+	to_string<Char>(val, [&](Span<Char const> span) {
+		result = span;
 	}); 
 	return result;
 }
@@ -79,22 +78,17 @@ String<Char, Allocator> asString(T const &val) {
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
 String<Char, Allocator> asStringNT(T const &val) {
 	String<Char, Allocator> result;
-	toString<Char>(val, [&](Char const *src, umm length) {
-		result.resize(length + 1);
-		memcpy(result.data(), src, length * sizeof(Char));
-		result[length] = (Char)0;
-		return Span<Char>();
+	to_string<Char>(val, [&](Span<Char const> span) {
+		result.resize(span.size() + 1);
+		memcpy(result.data(), span.data(), span.size() * sizeof(Char));
+		result[span.size()] = (Char)0;
 	}); 
 	return result;
 }
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
 String<Char, Allocator> null_terminate(Span<Char const> span) {
-	String<Char, Allocator> result;
-	result.resize(span.size() + 1);
-	memcpy(result.data(), span.data(), span.size() * sizeof(Char));
-	result[span.size()] = (Char)0;
-	return result;
+	return asStringNT<Allocator, Char>(span);
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
 String<Char, Allocator> null_terminate(Span<Char> span) {
@@ -275,8 +269,8 @@ struct StringBuilder {
 	}
 	template <class T>
 	umm append(T const &val) {
-		return toString<Char>(val, [&] (Char const *src, umm length) {
-			return append(Span<Char const>(src, length));
+		return to_string<Char>(val, [&](Span<Char const> span) {
+			return append(span);
 		});
 	}
 	umm appendBytes(void const *address, umm size) {
@@ -349,10 +343,9 @@ struct StringBuilder {
 			else 
 				INVALID_CODE_PATH("'%fmt%' arg is not a string");
 		} else {
-			toString<Char>(arg, [&] (Char const *src, umm length) {
-				charsAppended += length;
-				append(Span<Char const>(src, length));
-				return Span<Char>();
+			to_string<Char>(arg, [&] (Span<Char const> span) {
+				charsAppended += span.size();
+				append(span);
 			});
 		}
 

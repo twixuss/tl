@@ -217,32 +217,35 @@ CompiledShader compile_shader(GLuint shader) {
 }
 
 CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char const> source) {
-	char version_string[64] = "#version ";
+	StaticList<char, 64> version_string;
+	version_string += as_span("#version ");
 
-	toString<char>(version, [&](char const *str, umm len) {
-		strncat(version_string, str, len);
+	to_string<char>(version, [&](Span<char const> span) {
+		version_string += span;
 	});
 	if (core) {
-		strcat(version_string, " core");
+		version_string += as_span(" core");
 	}
-	strcat(version_string, "\n");
+	version_string += '\n';
+	version_string += 0;
 
-
-	char stage_string[64] = "#define ";
+	StaticList<char, 64> stage_string;
+	stage_string += as_span("#define ");
 	switch (shaderType) {
-		case GL_VERTEX_SHADER: strcat(stage_string, "VERTEX_SHADER"); break;
-		case GL_FRAGMENT_SHADER: strcat(stage_string, "FRAGMENT_SHADER"); break;
+		case GL_VERTEX_SHADER: stage_string += as_span("VERTEX_SHADER"); break;
+		case GL_FRAGMENT_SHADER: stage_string += as_span("FRAGMENT_SHADER"); break;
 	}
-	strcat(stage_string, "\n");
+	stage_string += '\n';
+	stage_string += 0;
 
 	char const *lines[3] {
-		version_string,
-		stage_string,
+		version_string.data(),
+		stage_string.data(),
 		source.data()
 	};
 	int const lengths[3] {
-		(int)length(version_string),
-		(int)length(stage_string),
+		(int)version_string.size(),
+		(int)stage_string.size(),
 		(int)source.size()
 	};
 	
@@ -293,14 +296,16 @@ struct ImmediateVertex {
 	v4f color;
 };
 
-GLenum immediate_type = ~0;
-List<ImmediateVertex> immediate_vertices;
-GLuint immediate_shader;
-GLuint immediate_vertex_buffer;
-GLuint immediate_vertex_array;
+static GLenum immediate_type = ~0;
+static List<ImmediateVertex> immediate_vertices;
+static GLuint immediate_shader;
+static GLuint immediate_vertex_buffer;
+static GLuint immediate_vertex_array;
 
-HDC client_dc;
-HGLRC context;
+static HDC client_dc;
+static HGLRC context;
+
+static StaticList<int, 16> context_attribs;
 
 bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 	client_dc = GetDC(window);
@@ -375,14 +380,14 @@ bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 
 	if (wglCreateContextAttribsARB) {
 		HGLRC share = {};
-		int attribs[] = {
+		context_attribs = {
 			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
 			WGL_CONTEXT_MINOR_VERSION_ARB, 0,
 			WGL_CONTEXT_FLAGS_ARB, debug ? WGL_CONTEXT_DEBUG_BIT_ARB : 0,
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0,
 		};
-		HGLRC new_context = wglCreateContextAttribsARB(client_dc, share, attribs);
+		HGLRC new_context = wglCreateContextAttribsARB(client_dc, share, context_attribs.data());
 		if (new_context) {
 			wglMakeCurrent(client_dc, new_context);
 			wglDeleteContext(context);
@@ -399,6 +404,15 @@ bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 	}
 
 	immediate_init();
+
+	return true;
+}
+
+bool init_opengl_thread() {
+
+	HGLRC thread_context = wglCreateContextAttribsARB(client_dc, context, context_attribs.data());
+	if (!thread_context)
+		return false;
 
 	return true;
 }

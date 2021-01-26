@@ -25,6 +25,11 @@ void string_test() {
 	assert(result.size() == strlen(str));
 	assert(memcmp(result.data(), str, result.size()) == 0);
 
+	auto copyFn = [&](Span<char const> span){return true;};
+	static_assert(isCopyFn<decltype(copyFn), char>);
+	using TTT = CopyFnRet<decltype(copyFn), char>;
+	to_string<char>(v3f{}, copyFn);
+
 	puts("ok");
 }
 

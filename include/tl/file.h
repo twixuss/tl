@@ -93,8 +93,8 @@ inline void write(File file, Span<u8 const> span) { write(file, span.data(), spa
 
 template <class Char = char, class T>
 inline void writeString(File file, T const &value) {
-	toString<Char>(value, [&](Char const *string, umm length) {
-		write(file, string, length * sizeof(Char));
+	to_string<Char>(value, [&](Span<Char const> span) {
+		write(file, span.data(), span.size() * sizeof(Char));
 	});
 }
 

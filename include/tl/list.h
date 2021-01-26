@@ -339,7 +339,10 @@ struct Queue {
 
 	void push(T const &val) { emplace(val); }
 	void push(T &&val) { emplace(std::move(val)); }
-	void pop() { TL_BOUNDS_CHECK(size()); (_begin++)->~T(); }
+	void pop() { 
+		TL_BOUNDS_CHECK(size());
+		_begin++->~T();
+	}
 	void resize(umm newSize) {
 		if (newSize > this->capacity())
 			_reallocate(newSize);

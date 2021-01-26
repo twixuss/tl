@@ -263,6 +263,11 @@ inline void lock(Mutex &m) {
 inline void unlock(Mutex &m) {
 	m.in_use = false;
 }
+inline void wait_for_unlock(Mutex &m) {
+	loop_until([&] {
+		return !m.in_use;
+	});
+}
 
 struct RecursiveMutex {
 	u32 volatile thread_id = 0;
@@ -296,7 +301,7 @@ inline void unlock(RecursiveMutex &m) {
 	}
 }
 
-#define SCOPED_LOCK(mutex) lock(mutex); defer { unlock(mutex); }
+#define scoped_lock(mutex) lock(mutex); defer { unlock(mutex); }
 #define SCOPED_UNLOCK(mutex) unlock(mutex); defer { lock(mutex); }
 
 template <class T, class Mutex = Mutex, class Allocator = TL_DEFAULT_ALLOCATOR>
@@ -304,17 +309,19 @@ struct MutexQueue {
 	Queue<T, Allocator> base;
 	Mutex mutex;
 	
+	void push_no_lock(T &&value) { base.push(std::move(value)); }
+	void push_no_lock(T const &value) { base.push(value); }
 	void push(T &&value) {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.push(std::move(value));
 	}
 	void push(T const &value) {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.push(value);
 	}
 	Optional<T> try_pop() {
 		Optional<T> result;
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		if (base.size()) {
 			result.emplace(std::move(base.front()));
 			base.pop();
@@ -330,25 +337,29 @@ struct MutexQueue {
 		return opt.value();
 	}
 	void clear() {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.clear();
 	}
 };
+
+template <class T, class Mutex, class Allocator>
+Span<T> as_span(MutexQueue<T, Mutex, Allocator> &queue) { return { queue.base.begin(), queue.base.end() }; }
+
 
 // TODO: this is horrible
 template <class T, umm capacity, class Mutex = Mutex>
 struct StaticMutexCircularQueue {
 	void push(T &&value) {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.push(std::move(value));
 	}
 	void push(T const &value) {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.push(value);
 	}
 	Optional<T> try_pop() {
 		Optional<T> result;
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		if (base.size()) {
 			result.emplace(std::move(base.front()));
 			base.pop();
@@ -364,7 +375,7 @@ struct StaticMutexCircularQueue {
 		return opt.value();
 	}
 	void clear() {
-		SCOPED_LOCK(mutex);
+		scoped_lock(mutex);
 		base.clear();
 	}
 

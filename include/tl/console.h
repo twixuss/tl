@@ -22,8 +22,8 @@ namespace TL {
 
 template <class Char, class T>
 inline void print(T const &value) {
-	toString<Char>(value, [](Char const *string, umm length) {
-		_print(string, length);
+	to_string<Char>(value, [](Span<Char const> span) {
+		_print(span.data(), span.size());
 	});
 }
 

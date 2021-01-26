@@ -132,8 +132,8 @@ struct CpuInfo {
 #pragma warning(suppress: 4820)
 };
 
-TL_API char const *toString(CpuFeature);
-TL_API char const *toString(CpuVendor);
+TL_API char const *to_string(CpuFeature);
+TL_API char const *to_string(CpuVendor);
 TL_API CpuInfo get_cpu_info();
 
 #ifdef TL_IMPL
@@ -319,7 +319,7 @@ CpuInfo get_cpu_info() {
 
 #endif // OS_WINDOWS
 
-char const *toString(CpuFeature f) {
+char const *to_string(CpuFeature f) {
 #define CASE(x) case TL::CpuFeature::x: return #x;
 	switch (f) {
 		CASE(_3dnow)
@@ -378,7 +378,7 @@ char const *toString(CpuFeature f) {
 	}
 #undef CASE
 }
-char const *toString(CpuVendor v) {
+char const *to_string(CpuVendor v) {
 #define CASE(x) case TL::CpuVendor::x: return #x;
 	switch (v) {
 		CASE(intel)

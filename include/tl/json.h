@@ -1,6 +1,7 @@
 #pragma once
 #include "system.h"
 #include "list.h"
+#include "std_hash.h"
 #include <unordered_map>
 
 #pragma warning(push)

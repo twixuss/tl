@@ -2,6 +2,7 @@
 #include "random.h"
 #include "math.h"
 #include "bits.h"
+#include "simd/bits.h"
 
 namespace TL {
 
@@ -20,8 +21,17 @@ forceinline u32 random_u32(u32 seed) {
 forceinline u32 random_u32(s32 seed) { return random_u32((u32)seed); }
 forceinline s32 random_s32(u32 seed) { return (s32)random_u32(seed); }
 forceinline s32 random_s32(s32 seed) { return (s32)random_u32(seed); }
-forceinline f32 random_f32(u32 seed) { return to_f32_01(random_u32(seed)); }
-forceinline f32 random_f32(s32 seed) { return to_f32_01(random_u32(seed)); }
+forceinline f32 random_f32(u32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
+forceinline f32 random_f32(s32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
+
+forceinline u32x8 random_u32x8(u32x8 seed) {
+	return seed + reverse_bits(seed) + reverse_bytes(seed);
+}
+forceinline u32x8 random_u32x8(s32x8 seed) { return random_u32x8((u32x8)seed); }
+forceinline s32x8 random_s32x8(u32x8 seed) { return (s32x8)random_u32x8(seed); }
+forceinline s32x8 random_s32x8(s32x8 seed) { return (s32x8)random_u32x8(seed); }
+forceinline f32x8 random_f32x8(u32x8 seed) { return normalize_range_f32<f32x8>(random_u32x8(seed)); }
+forceinline f32x8 random_f32x8(s32x8 seed) { return normalize_range_f32<f32x8>(random_u32x8(seed)); }
 
 forceinline f32 random_f32(v2f value) {
 	v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45);
@@ -66,6 +76,21 @@ forceinline v2f random_v2f(v2s value) {
 	return {
 		random_f32((value.x + reverse_bits(value.y)) ^ 0xABCDEF01), 
 		random_f32((value.y - reverse_bits(value.x)) ^ 0x12435687)
+	};
+}
+
+forceinline v3f random_v3f(v3s value) {
+	return {
+		random_f32((value.x + reverse_bits(value.y)) ^ 0xAFE3DA15), 
+		random_f32((value.y + reverse_bits(value.z)) ^ 0x200EE364),
+		random_f32((value.z + reverse_bits(value.x)) ^ 0x512621F6),
+	};
+}
+forceinline v3fx8 random_v3fx8(v3sx8 value) {
+	return {
+		random_f32x8((value.x + reverse_bits(value.y)) ^ 0xAFE3DA15), 
+		random_f32x8((value.y + reverse_bits(value.z)) ^ 0x200EE364),
+		random_f32x8((value.z + reverse_bits(value.x)) ^ 0x512621F6),
 	};
 }
 
@@ -164,6 +189,50 @@ forceinline f32 voronoi(v2s coordinate, s32 step_size) {
 	}
 	
 	return sqrt(min_distance_squared) * voronoi_inv_largest_distance_possible_2d;
+}
+forceinline f32 voronoi(v3s coordinate, s32 step_size) {
+	v3s scaled_tile = floor(coordinate, step_size);
+	v3s tile_position = scaled_tile / step_size;
+	v3f local_position = (v3f)(coordinate - scaled_tile) / step_size;
+	
+	v3sx8 tile_position_x8  = V3sx8(tile_position);
+	v3fx8 local_position_x8 = V3fx8(local_position);
+
+	f32   min_distance_squared    = 1000;
+	f32x8 min_distance_squared_x8 = F32x8(min_distance_squared);
+
+	static constexpr v3sx8 offsets_x8[] = {
+		{
+			-1,-1,-1,-1,-1,-1,-1,-1,
+			-1,-1,-1, 0, 0, 0, 1, 1,
+			-1, 0, 1,-1, 0, 1,-1, 0,
+		},
+		{
+			-1, 0, 0, 0, 0, 0, 0, 0,
+			 1,-1,-1,-1, 0, 0, 0, 1,
+			 1,-1, 0, 1,-1, 0, 1,-1,
+		},
+		{
+			0, 0, 1, 1, 1, 1, 1, 1,
+			1, 1,-1,-1,-1, 0, 0, 0,
+			0, 1,-1, 0, 1,-1, 0, 1,
+		}
+	};
+	static constexpr v3s offsets_x1[] = {
+		{ 1, 1,-1},
+		{ 1, 1, 0},
+		{ 1, 1, 1},
+	};
+	
+	for (auto offset_x8 : offsets_x8) {
+		min_distance_squared_x8 = min(min_distance_squared_x8, distance_squared(local_position_x8, random_v3fx8(tile_position_x8 + offset_x8) + (v3fx8)offset_x8));
+	}
+	for (auto offset : offsets_x1) {
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v3f(tile_position + offset) + (v3f)offset));
+	}
+	min_distance_squared = min(min_distance_squared, min(min_distance_squared_x8));
+	
+	return sqrt(min_distance_squared) * voronoi_inv_largest_distance_possible_3d;
 }
 
 forceinline f32 noise(v2f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
