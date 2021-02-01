@@ -64,7 +64,7 @@ template <class Fn>
 inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
 	auto allocator = get_allocator();
 
-	auto params = allocator.allocate<Fn>();
+	auto params = allocate<Fn>(allocator);
 	new(params) Fn(std::forward<Fn>(on_update));
 
 	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
@@ -77,7 +77,7 @@ inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
 
 inline void free_file_tracker(FileTracker &tracker) {
 	if (tracker.allocator) {
-		tracker.allocator.free(tracker.on_update_state);
+		free(tracker.allocator, tracker.on_update_state);
 	}
 	tracker = {};
 }
@@ -295,18 +295,18 @@ List<String<char>> get_files_in_directory(char const *directory) {
 	auto allocator = get_allocator();
 	char *directory_with_star;
 	if (directory[directory_len - 1] == '\\' || directory[directory_len - 1] == '/') {
-		directory_with_star = allocator.allocate<char>(directory_len + 2);
+		directory_with_star = allocate<char>(allocator, directory_len + 2);
 		memcpy(directory_with_star, directory, directory_len);
 		directory_with_star[directory_len + 0] = '*';
 		directory_with_star[directory_len + 1] = 0;
 	} else {
-		directory_with_star = allocator.allocate<char>(directory_len + 3);
+		directory_with_star = allocate<char>(allocator, directory_len + 3);
 		memcpy(directory_with_star, directory, directory_len);
 		directory_with_star[directory_len + 0] = '/';
 		directory_with_star[directory_len + 1] = '*';
 		directory_with_star[directory_len + 2] = 0;
 	}
-	defer { allocator.free(directory_with_star); };
+	defer { free(allocator, directory_with_star); };
 
 	WIN32_FIND_DATA find_data;
 	HANDLE handle = FindFirstFileA(directory_with_star, &find_data);

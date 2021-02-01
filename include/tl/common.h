@@ -50,10 +50,10 @@
 		ASSERTION_FAILURE("INVALID_CODE_PATH", "", __VA_ARGS__); \
 	} while (0)
 
-#ifdef TL_NO_BOUNDS_CHECK
-#define TL_BOUNDS_CHECK(x)
-#else
+#ifdef TL_DEBUG
 #define TL_BOUNDS_CHECK(x) assert(x, "Bounds check failed")
+#else
+#define TL_BOUNDS_CHECK(x)
 #endif
 
 #ifdef TL_ALLOCATION_TRACKER
@@ -196,7 +196,7 @@ template<> inline constexpr f64 max() { return 1.7976931348623158e+308; }
 #pragma warning(pop)
 
 template <class T>
-forceinline constexpr bool isPowerOf2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
+forceinline constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
 
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
 template <class T, class U> forceinline constexpr auto max(T a, U b) { return a > b ? a : b; }
@@ -204,6 +204,25 @@ template <class T, class U, class... Rest> forceinline constexpr auto min(T a, U
 template <class T, class U, class... Rest> forceinline constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
 template <class T, class U, class V, class W> forceinline constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 template <class T, class U> forceinline constexpr void minmax(T& mn, U &mx) { minmax(mn, mx, mn, mx); }
+
+template <class T, umm size>
+forceinline constexpr auto min(T (&array)[size]) {
+	T result = array[0];
+	for (umm i = 1; i < size; ++i) {
+		result = min(result, array[i]);
+	}
+	return result;
+}
+
+template <class T, umm size>
+forceinline constexpr auto max(T (&array)[size]) {
+	T result = array[0];
+	for (umm i = 1; i < size; ++i) {
+		result = max(result, array[i]);
+	}
+	return result;
+}
+
 
 template <class T>
 forceinline constexpr T floor(T v, T s) {
@@ -235,13 +254,26 @@ forceinline f32 log(f32 x, f32 base) {
 	return ::logf(x) / ::logf(base);
 }
 
+namespace CE {
+
 // https://stackoverflow.com/a/24748637
 #define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
-forceinline s32 log2(u64 n) { return 31 - _lzcnt_u64(n); }
-forceinline s32 log2(u32 n) { return 31 - _lzcnt_u32(n); }
-forceinline s32 log2(u16 n) { return 31 - _lzcnt_u32(n); }
-forceinline s32 log2(u8  n) { return 31 - _lzcnt_u32(n); }
+constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
 #undef S
+
+}
+
+forceinline u32 count_leading_zeros(u16 val) { return _lzcnt_u32(val); }
+forceinline u32 count_leading_zeros(u32 val) { return _lzcnt_u32(val); }
+forceinline u32 count_leading_zeros(u64 val) { return _lzcnt_u64(val); }
+
+forceinline s32 log2(u64 n) { return 31 - count_leading_zeros(n); }
+forceinline s32 log2(u32 n) { return 31 - count_leading_zeros(n); }
+forceinline s32 log2(u16 n) { return 31 - count_leading_zeros((u32)n); }
+forceinline s32 log2(u8  n) { return 31 - count_leading_zeros((u32)n); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
@@ -281,6 +313,8 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 
 forceinline f32 ceil(f32 v) { return ::ceilf(v); }
 forceinline f64 ceil(f64 v) { return ::ceil(v); }
+forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
+forceinline s64 ceil_to_int(f64 v) { return (s64)ceil(v); }
 
 forceinline constexpr bool is_negative(f32 v) { return *(u32 *)&v & 0x80000000; }
 forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
@@ -334,7 +368,7 @@ inline constexpr auto toInt(Enum e) {
 }
 
 template <class T, umm size>
-constexpr umm countof(T const (&arr)[size]) { (void)arr; return size; }
+constexpr umm count_of(T const (&arr)[size]) { (void)arr; return size; }
 
 template <class T, umm size>
 constexpr T &back(T (&arr)[size]) { return arr[size - 1]; }
@@ -460,7 +494,7 @@ template <class T> constexpr Span<u8 const> toBytes(Span<T const> span) { return
 template <class T> constexpr Span<char> to_chars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
 template <class T> constexpr Span<char const> to_chars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
 
-template <class T> constexpr umm countof(Span<T const> span) { return span.size(); }
+template <class T> constexpr umm count_of(Span<T const> span) { return span.size(); }
 template <class T> constexpr umm length (Span<T const> span) { return span.size(); }
 
 template <class T>
@@ -784,7 +818,7 @@ CopyFnRet<CopyFn, Char> to_string(FormatInt<Int> f, CopyFn &&copy_fn) {
 		(void)negative;
 	}
 	if (f.leading_zeros) {
-		u32 total_digits = ceil(log((f32)max<Int>(), (f32)f.radix));
+		u32 total_digits = ceil_to_int(log((f32)max<Int>(), (f32)f.radix));
 		for (u32 i = charsWritten; i < total_digits; ++i) {
 			*lsc-- = '0';
 		}
@@ -845,24 +879,24 @@ enum AllocatorMode {
 struct Allocator {
 	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state);
 	void *state;
-
-	void *allocate(umm size, umm align = 0) {
-		return func(Allocator_allocate, size, align, 0, state);
-	}
-	void *reallocate(void *data) {
-		return func(Allocator_reallocate, 0, 0, data, state);
-	}
-	void free(void *data) {
-		func(Allocator_free, 0, 0, data, state);
-	}
-	template <class T>
-	T *allocate(umm count = 1, umm align = alignof(T)) {
-		return (T *)allocate(sizeof(T) * count, align);
-	}
 	operator bool() {
 		return func != 0;
 	}
 };
+
+inline void *allocate(Allocator allocator, umm size, umm align = 0) {
+	return allocator.func(Allocator_allocate, size, align, 0, allocator.state);
+}
+inline void *reallocate(Allocator allocator, void *data) {
+	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state);
+}
+inline void free(Allocator allocator, void *data) {
+	allocator.func(Allocator_free, 0, 0, data, allocator.state);
+}
+template <class T>
+T *allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
+	return (T *)allocate(allocator, sizeof(T) * count, align);
+}
 
 extern TL_API Allocator default_allocator;
 extern TL_API Allocator get_allocator();
@@ -913,7 +947,7 @@ Function create_function(Fn &&fn, Args &&...args) {
 		auto allocator = get_allocator();
 
 		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-		auto params = allocator.allocate<Tuple>();
+		auto params = allocate<Tuple>(allocator);
 		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 
 		Function result = {};
@@ -925,53 +959,33 @@ Function create_function(Fn &&fn, Args &&...args) {
 }
 inline void free_function(Function &function) {
 	if (function.allocator)
-		function.allocator.free(function.param);
+		free(function.allocator, function.param);
 	function = {};
 }
 
-template <class T, umm _capacity>
-struct StaticList_Base {
-};
-
-template <class T, umm _capacity>
-struct StaticList_Trivial : StaticList_Base<T, _capacity> {
-	constexpr void clear() {
-		_end = _begin;
-	}
-
-	struct Storage {
-		T v;
+template <class T>
+struct Storage_Trivial {
+	union {
+		T value;
 	};
-	Storage _begin[_capacity];
-	Storage *_end = _begin;
 };
 
-template <class T, umm _capacity>
-struct StaticList_NonTrivial : StaticList_Base<T, _capacity> {
-	~StaticList_NonTrivial() {
-		this->clear();
-	}
-	constexpr void clear() {
-		for (auto it = _begin; it != _end; ++it) {
-			it->v.~T();
-		}
-		_end = _begin;
-	}
-
-	union Storage {
-		T v;
-		constexpr Storage() {}
-		~Storage() {}
+template <class T>
+struct Storage_NonTrivial {
+	union {
+		T value;
 	};
-	Storage _begin[_capacity];
-	Storage *_end = _begin;
+	forceinline constexpr Storage_NonTrivial() {}
+	forceinline ~Storage_NonTrivial() {}
 };
 
-template <class T, umm _capacity>
-struct StaticList : Conditional<std::is_trivially_destructible_v<T>, StaticList_Trivial<T, _capacity>, StaticList_NonTrivial<T, _capacity>> {
-	using Base = Conditional<std::is_trivially_destructible_v<T>, StaticList_Trivial<T, _capacity>, StaticList_NonTrivial<T, _capacity>>;
+template <class T>
+struct Storage : Conditional<std::is_trivial_v<T>, Storage_Trivial<T>, Storage_NonTrivial<T>> {};
 
-	constexpr StaticList() = default;
+template <class T, umm _capacity>
+struct StaticList {
+	using Storage = Storage<T>;
+	forceinline constexpr StaticList() = default;
 	template <umm thatCapacity>
 	constexpr StaticList(StaticList<T, thatCapacity> const &that) {
 		for (auto &src : that) {
@@ -1000,6 +1014,9 @@ struct StaticList : Conditional<std::is_trivially_destructible_v<T>, StaticList_
 			push_back(std::move(src));
 		}
 	}
+	forceinline ~StaticList() {
+		this->clear();
+	}
 	template <umm thatCapacity>
 	constexpr StaticList &operator=(StaticList<T, thatCapacity> const &that) {
 		this->clear();
@@ -1023,75 +1040,73 @@ struct StaticList : Conditional<std::is_trivially_destructible_v<T>, StaticList_
 		return *new (this) StaticList(that);
 	}
 
-	constexpr T *begin() { return &this->_begin->v; }
-	constexpr T *end() { return &this->_end->v; }
-	constexpr T const *begin() const { return &this->_begin->v; }
-	constexpr T const *end() const { return &this->_end->v; }
+	forceinline constexpr T *begin() { return &this->_begin->value; }
+	forceinline constexpr T *end() { return &this->_end->value; }
+	forceinline constexpr T const *begin() const { return &this->_begin->value; }
+	forceinline constexpr T const *end() const { return &this->_end->value; }
 
-	constexpr umm capacity() { return _capacity; }
+	forceinline constexpr umm capacity() { return _capacity; }
 	
-	constexpr umm size() const { return (umm)(this->_end - this->_begin); }
-	constexpr bool empty() const { return this->_end == this->_begin; }
-	constexpr bool full() const { return this->_end == this->_begin + _capacity; }
+	forceinline constexpr umm size() const { return (umm)(this->_end - this->_begin); }
+	forceinline constexpr bool empty() const { return this->_end == this->_begin; }
+	forceinline constexpr bool full() const { return this->_end == this->_begin + _capacity; }
 
-	constexpr T *data() { return std::addressof(this->_begin->v); }
-	constexpr T &front() { TL_BOUNDS_CHECK(size()); return this->_begin->v; }
-	constexpr T &back() { TL_BOUNDS_CHECK(size()); return this->_end[-1].v; }
-	constexpr T &operator[](umm i) { TL_BOUNDS_CHECK(size()); return this->_begin[i].v; }
+	forceinline constexpr T *data() { return std::addressof(this->_begin->value); }
+	forceinline constexpr T &front() { TL_BOUNDS_CHECK(size()); return this->_begin->value; }
+	forceinline constexpr T &back() { TL_BOUNDS_CHECK(size()); return this->_end[-1].value; }
+	forceinline constexpr T &operator[](umm i) { TL_BOUNDS_CHECK(size()); return this->_begin[i].value; }
 
-	constexpr T const *data() const { return std::addressof(this->_begin->v); }
-	constexpr T const &front() const { TL_BOUNDS_CHECK(size()); return this->_begin->v; }
-	constexpr T const &back() const { TL_BOUNDS_CHECK(size()); return this->_end[-1].v; }
-	constexpr T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return this->_begin[i].v; }
+	forceinline constexpr T const *data() const { return std::addressof(this->_begin->value); }
+	forceinline constexpr T const &front() const { TL_BOUNDS_CHECK(size()); return this->_begin->value; }
+	forceinline constexpr T const &back() const { TL_BOUNDS_CHECK(size()); return this->_end[-1].value; }
+	forceinline constexpr T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return this->_begin[i].value; }
 	
 	constexpr void resize(umm newSize) {
 		TL_BOUNDS_CHECK(newSize <= capacity());
 		if (newSize > size()) {
 			for (auto t = this->_end; t < this->_begin + newSize; ++t)
-				new (&t->v) T();
+				new (&t->value) T();
 			this->_end = this->_begin + newSize;
 		} else if (newSize < size()) {
 			for (auto t = this->_begin + newSize; t < this->_end; ++t)
-				t->v.~T();
+				t->value.~T();
 			this->_end = this->_begin + newSize;
 		}
 	}
 	constexpr T *insert(Span<T const> span, T *_where) {
-		auto where = (typename Base::Storage *)_where;
+		auto where = (Storage *)_where;
 		TL_BOUNDS_CHECK(this->_begin <= where && where <= this->_end);
 		TL_BOUNDS_CHECK(size() + span.size() <= capacity());
 
 		for (auto src = where; src != this->_end; ++src) {
-			new (&src[span.size()].v) T(std::move(src->v));
+			new (&src[span.size()].value) T(std::move(src->value));
 		}
 		for (umm i = 0; i < span.size(); ++i) {
-			where[i].v = span[i];
+			where[i].value = span[i];
 		}
 		this->_end += span.size();
 		return _where;
 	}
 
-	constexpr StaticList &operator+=(T const &v) { this->push_back(v); return *this; }
-	constexpr StaticList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
-	constexpr StaticList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
+	forceinline constexpr StaticList &operator+=(T const &that) { this->push_back(that); return *this; }
+	forceinline constexpr StaticList &operator+=(T &&that) { this->push_back(std::move(that)); return *this; }
+	forceinline constexpr StaticList &operator+=(Span<T const> that) { this->insert(that, this->end()); return *this; }
 	template <umm capacity>
-	constexpr StaticList &operator+=(StaticList<T, capacity> const &v) { this->insert(as_span(v), this->end()); return *this; }
-	constexpr StaticList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
+	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { this->insert(as_span(that), this->end()); return *this; }
+	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { this->insert(Span(that.begin(), that.end()), this->end()); return *this; }
 
-	constexpr operator Span<T>() { return {begin(), end()}; }
-	constexpr operator Span<T const>() const { return {begin(), end()}; }
+	forceinline constexpr operator Span<T>() { return {begin(), end()}; }
+	forceinline constexpr operator Span<T const>() const { return {begin(), end()}; }
 
 	template <class... Args>
-	constexpr T &emplace_back(Args &&... args) {
+	forceinline constexpr T &push_back(Args &&... args) {
 		TL_BOUNDS_CHECK(!full());
 		return *new (this->_end++) T(std::forward<Args>(args)...);
 	}
-	constexpr T &push_back(T const &val) { return emplace_back(val); }
-	constexpr T &push_back(T &&val) { return emplace_back(std::move(val)); }
 
 	constexpr void pop_back() {
 		TL_BOUNDS_CHECK(size());
-		this->_end-- [-1].v.~T();
+		this->_end-- [-1].value.~T();
 	}
 	constexpr void pop_front() {
 		TL_BOUNDS_CHECK(size());
@@ -1099,131 +1114,44 @@ struct StaticList : Conditional<std::is_trivially_destructible_v<T>, StaticList_
 		for (auto dst = this->_begin; dst != this->_end; ++dst) {
 			dst[0] = std::move(dst[1]);
 		}
-		this->_end->v.~T();
+		this->_end->value.~T();
 	}
-};
-
-template <class T, umm capacity>
-Span<T> as_span(StaticList<T, capacity> &list) {
-	return (Span<T>)list;
-}
-
-template <class T, umm _capacity>
-struct UnorderedStaticList {
-	UnorderedStaticList() = default;
-	template <umm thatCapacity>
-	UnorderedStaticList(UnorderedStaticList<T, thatCapacity> const &that) {
-		for (auto &src : that) {
-			push_back(src);
-		}
-	}
-	template <umm thatCapacity>
-	UnorderedStaticList(UnorderedStaticList<T, thatCapacity> &&that) {
-		for (auto &src : that) {
-			push_back(std::move(src));
-		}
-		that.clear();
-	}
-	UnorderedStaticList(UnorderedStaticList const &that) {
-		for (auto &src : that) {
-			push_back(src);
-		}
-	}
-	UnorderedStaticList(UnorderedStaticList &&that) {
-		for (auto &src : that) {
-			push_back(std::move(src));
-		}
-	}
-	template <umm thatCapacity>
-	UnorderedStaticList &operator=(UnorderedStaticList<T, thatCapacity> const &that) {
-		clear();
-		return *new (this) UnorderedStaticList(that);
-	}
-	template <umm thatCapacity>
-	UnorderedStaticList &operator=(UnorderedStaticList<T, thatCapacity> &&that) {
-		clear();
-		return *new (this) UnorderedStaticList(std::move(that));
-	}
-	UnorderedStaticList &operator=(UnorderedStaticList const &that) {
-		clear();
-		return *new (this) UnorderedStaticList(that);
-	}
-	UnorderedStaticList &operator=(UnorderedStaticList &&that) {
-		clear();
-		return *new (this) UnorderedStaticList(std::move(that));
-	}
-	~UnorderedStaticList() { clear(); }
-
-	T *begin() { return &_begin->v; }
-	T *end() { return &_end->v; }
-	T const *begin() const { return &_begin->v; }
-	T const *end() const { return &_end->v; }
-
-	umm capacity() { return _capacity; }
+	forceinline constexpr void pop_back_unordered() { erase_unordered(&back()); }
+	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
 	
-	umm size() const { return (umm)(_end - _begin); }
-	bool empty() const { return _end == _begin; }
-	bool full() const { return _end == _begin + _capacity; }
-
-	T *data() { return std::addressof(_begin->v); }
-	T &front() { TL_BOUNDS_CHECK(size()); return _begin->v; }
-	T &back() { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
-	T &operator[](umm i) { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
-
-	T const *data() const { return std::addressof(_begin->v); }
-	T const &front() const { TL_BOUNDS_CHECK(size()); return _begin->v; }
-	T const &back() const { TL_BOUNDS_CHECK(size()); return _end[-1].v; }
-	T const &operator[](umm i) const { TL_BOUNDS_CHECK(size()); return _begin[i].v; }
-
-	operator Span<T>() { return {begin(), end()}; }
-	operator Span<T const>() const { return {begin(), end()}; }
-
-	template <class... Args>
-	T &emplace_back(Args &&... args) {
-		TL_BOUNDS_CHECK(!full());
-		return *new (_end++) T(std::forward<Args>(args)...);
-	}
-	T &push_back(T const &val) { return emplace_back(val); }
-	T &push_back(T &&val) { return emplace_back(std::move(val)); }
-
-	void pop_back() {
+	void erase(T *ptr) {
 		TL_BOUNDS_CHECK(size());
-		_end-- [-1].v.~T();
-	}
-	void pop_front() {
-		TL_BOUNDS_CHECK(size());
+		Storage *s = (Storage *)ptr;
 		--_end;
-		for (auto dst = _begin; dst != _end; ++dst) {
-			dst[0] = std::move(dst[1]);
+		for (auto dst = s; dst != _end; ++dst) {
+			dst->value = std::move(dst[1].value);
 		}
-		_end->v.~T();
+		--_end->value.~T();
 	}
+	void erase_unordered(T *ptr) {
+		TL_BOUNDS_CHECK(size());
+		Storage *s = (Storage *)ptr;
+		s->value = std::move((--_end)->value);
+		_end->value.~T();
+	}
+	forceinline void erase(T &value) { erase(std::addressof(value)); }
+	forceinline void erase_at(umm index) { erase(data() + index); }
+	forceinline void erase_unordered(T &value) { erase_unordered(std::addressof(value)); }
+	forceinline void erase_at_unordered(umm index) { erase_unordered(data() + index); }
 
-	void clear() {
+	constexpr void clear() {
 		for (auto it = _begin; it != _end; ++it) {
-			it->v.~T();
+			it->value.~T();
 		}
 		_end = _begin;
 	}
-
-	void erase(T *ptr) {
-		Storage *s = (Storage *)ptr;
-		s->v = std::move((_end--)->v);
-		_end->v.~T();
-	}
-
-private:
-	union Storage {
-		T v;
-		Storage() {}
-		~Storage() {}
-	};
+	
 	Storage _begin[_capacity];
 	Storage *_end = _begin;
 };
 
 template <class T, umm capacity>
-Span<T> as_span(UnorderedStaticList<T, capacity> &list) {
+Span<T> as_span(StaticList<T, capacity> &list) {
 	return (Span<T>)list;
 }
 
@@ -1270,15 +1198,12 @@ forceinline u32 findHighestOneBit(u64 val) {
 	unsigned long result;
 	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
 }
-forceinline u32 countLeadingZeros(u16 val) { return __lzcnt16(val); }
-forceinline u32 countLeadingZeros(u32 val) { return __lzcnt(val); }
-forceinline u32 countLeadingZeros(u64 val) { return (u32)__lzcnt64(val); }
 #endif
 
-forceinline u32 countBits(u32 v) { return (u32)_mm_popcnt_u32(v); }
-forceinline u32 countBits(u64 v) { return (u32)_mm_popcnt_u64(v); }
-forceinline u32 countBits(s32 v) { return countBits((u32)v); }
-forceinline u32 countBits(s64 v) { return countBits((u64)v); }
+forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
+forceinline u32 count_bits(u64 v) { return (u32)_mm_popcnt_u64(v); }
+forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
+forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
 
 #ifdef TL_IMPL
 

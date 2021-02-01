@@ -78,7 +78,7 @@ StackTrace getStackTrace() {
 		CallStackEntry entry;
 
 		char demangledName[256];
-		auto demangledNameLength = UnDecorateSymbolName(symbol->Name, demangledName, (DWORD)countof(demangledName), UNDNAME_NAME_ONLY);
+		auto demangledNameLength = UnDecorateSymbolName(symbol->Name, demangledName, (DWORD)count_of(demangledName), UNDNAME_NAME_ONLY);
 		if (demangledNameLength) {
 			entry.name = {demangledName, demangledNameLength};
 		}

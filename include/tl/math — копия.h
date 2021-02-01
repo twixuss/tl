@@ -391,17 +391,25 @@ using v4f = v4fx<1>;
 using v4s = v4sx<1>;
 using v4u = v4ux<1>;
 #else
-template<umm pack> union v2fx; using v2fx2 = v2fx<2>; using v2fx4 = v2fx<4>; using v2fx8 = v2fx<8>;
-template<umm pack> union v2sx; using v2sx2 = v2sx<2>; using v2sx4 = v2sx<4>; using v2sx8 = v2sx<8>;
-template<umm pack> union v2ux; using v2ux2 = v2ux<2>; using v2ux4 = v2ux<4>; using v2ux8 = v2ux<8>;
+template<class T, umm pack> union v2; using v2fx2 = v2<f32, 2>; using v2fx4 = v2<f32, 4>; using v2fx8 = v2<f32, 8>;
+template<class T, umm pack> union v2; using v2sx2 = v2<s32, 2>; using v2sx4 = v2<s32, 4>; using v2sx8 = v2<s32, 8>;
+template<class T, umm pack> union v2; using v2ux2 = v2<u32, 2>; using v2ux4 = v2<u32, 4>; using v2ux8 = v2<u32, 8>;
 template<class T, umm pack> union v3; using v3fx2 = v3<f32, 2>; using v3fx4 = v3<f32, 4>; using v3fx8 = v3<f32, 8>;
-template<umm pack> union v3sx; using v3sx2 = v3sx<2>; using v3sx4 = v3sx<4>; using v3sx8 = v3sx<8>;
-template<umm pack> union v3ux; using v3ux2 = v3ux<2>; using v3ux4 = v3ux<4>; using v3ux8 = v3ux<8>;
-template<umm pack> union v4fx; using v4fx2 = v4fx<2>; using v4fx4 = v4fx<4>; using v4fx8 = v4fx<8>;
-template<umm pack> union v4sx; using v4sx2 = v4sx<2>; using v4sx4 = v4sx<4>; using v4sx8 = v4sx<8>;
-template<umm pack> union v4ux; using v4ux2 = v4ux<2>; using v4ux4 = v4ux<4>; using v4ux8 = v4ux<8>;
+template<class T, umm pack> union v3; using v3sx2 = v3<s32, 2>; using v3sx4 = v3<s32, 4>; using v3sx8 = v3<s32, 8>;
+template<class T, umm pack> union v3; using v3ux2 = v3<u32, 2>; using v3ux4 = v3<u32, 4>; using v3ux8 = v3<u32, 8>;
+template<class T, umm pack> union v4; using v4fx2 = v4<f32, 2>; using v4fx4 = v4<f32, 4>; using v4fx8 = v4<f32, 8>;
+template<class T, umm pack> union v4; using v4sx2 = v4<s32, 2>; using v4sx4 = v4<s32, 4>; using v4sx8 = v4<s32, 8>;
+template<class T, umm pack> union v4; using v4ux2 = v4<u32, 2>; using v4ux4 = v4<u32, 4>; using v4ux8 = v4<u32, 8>;
 
+template <umm pack> using v2fx = v3<f32, pack>;
 template <umm pack> using v3fx = v3<f32, pack>;
+template <umm pack> using v4fx = v3<f32, pack>;
+template <umm pack> using v2sx = v3<s32, pack>;
+template <umm pack> using v3sx = v3<s32, pack>;
+template <umm pack> using v4sx = v3<s32, pack>;
+template <umm pack> using v2ux = v3<u32, pack>;
+template <umm pack> using v3ux = v3<u32, pack>;
+template <umm pack> using v4ux = v3<u32, pack>;
 
 using b32xm = b32x<simdWidth / sizeof(b32)>;
 using f32xm = f32x<simdWidth / sizeof(f32)>;
@@ -409,15 +417,15 @@ using f64xm = f64x<simdWidth / sizeof(f64)>;
 using s32xm = s32x<simdWidth / sizeof(s32)>;
 using u32xm = u32x<simdWidth / sizeof(u32)>;
 
-using v2fxm = v2fx<simdWidth / sizeof(f32)>;
-using v2sxm = v2sx<simdWidth / sizeof(s32)>;
-using v2uxm = v2ux<simdWidth / sizeof(u32)>;
+using v2fxm = v2<f32, simdWidth / sizeof(f32)>;
+using v2sxm = v2<s32, simdWidth / sizeof(s32)>;
+using v2uxm = v2<u32, simdWidth / sizeof(u32)>;
 using v3fxm = v3<f32, simdWidth / sizeof(f32)>;
-using v3sxm = v3sx<simdWidth / sizeof(s32)>;
-using v3uxm = v3ux<simdWidth / sizeof(u32)>;
-using v4fxm = v4fx<simdWidth / sizeof(f32)>;
-using v4sxm = v4sx<simdWidth / sizeof(s32)>;
-using v4uxm = v4ux<simdWidth / sizeof(u32)>;
+using v3sxm = v3<s32, simdWidth / sizeof(s32)>;
+using v3uxm = v3<u32, simdWidth / sizeof(u32)>;
+using v4fxm = v4<f32, simdWidth / sizeof(f32)>;
+using v4sxm = v4<s32, simdWidth / sizeof(s32)>;
+using v4uxm = v4<u32, simdWidth / sizeof(u32)>;
 
 using v2f = v2fx<1>;
 using v2s = v2sx<1>;
@@ -433,21 +441,6 @@ using v4u = v4ux<1>;
 
 union m3;
 union m4;
-
-template <class T> 
-inline static constexpr u32 _dimension = 0;
-template <class T>
-inline static constexpr u32 dimension_of = _dimension<RemoveCVRef<T>>;
-
-template <umm width> inline static constexpr u32 _dimension<v2fx<width>> = 2;
-template <umm width> inline static constexpr u32 _dimension<v2sx<width>> = 2;
-template <umm width> inline static constexpr u32 _dimension<v2ux<width>> = 2;
-template <umm width> inline static constexpr u32 _dimension<v3fx<width>> = 3;
-template <umm width> inline static constexpr u32 _dimension<v3sx<width>> = 3;
-template <umm width> inline static constexpr u32 _dimension<v3ux<width>> = 3;
-template <umm width> inline static constexpr u32 _dimension<v4fx<width>> = 4;
-template <umm width> inline static constexpr u32 _dimension<v4sx<width>> = 4;
-template <umm width> inline static constexpr u32 _dimension<v4ux<width>> = 4;
 
 template <class T>
 inline static constexpr umm _widthOf = 0;
@@ -467,15 +460,9 @@ template<umm width> inline static constexpr umm _widthOf<s64x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<u32x<width>> = width;
 template<umm width> inline static constexpr umm _widthOf<u64x<width>> = width;
 
-template<umm width> inline static constexpr umm _widthOf<v2fx<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v2sx<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v2ux<width>> = width;
+template<class T, umm width> inline static constexpr umm _widthOf<v2<T, width>> = width;
 template<class T, umm width> inline static constexpr umm _widthOf<v3<T, width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v3sx<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v3ux<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v4fx<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v4sx<width>> = width;
-template<umm width> inline static constexpr umm _widthOf<v4ux<width>> = width;
+template<class T, umm width> inline static constexpr umm _widthOf<v4<T, width>> = width;
 // clang-format on
 
 template <class T> struct HalfT {};
@@ -483,15 +470,9 @@ template <umm width> struct HalfT<f32x<width>> { using Type = f32x<width/2>; };
 template <umm width> struct HalfT<s32x<width>> { using Type = s32x<width/2>; };
 template <umm width> struct HalfT<u32x<width>> { using Type = u32x<width/2>; };
 template <umm width> struct HalfT<f64x<width>> { using Type = f64x<width/2>; };
-template <umm width> struct HalfT<v2fx<width>> { using Type = v2fx<width/2>; };
-template <umm width> struct HalfT<v2sx<width>> { using Type = v2sx<width/2>; };
-template <umm width> struct HalfT<v2ux<width>> { using Type = v2ux<width/2>; };
+template <class T, umm width> struct HalfT<v2<T, width>> { using Type = v2<T, width/2>; };
 template <class T, umm width> struct HalfT<v3<T, width>> { using Type = v3<T, width/2>; };
-template <umm width> struct HalfT<v3sx<width>> { using Type = v3sx<width/2>; };
-template <umm width> struct HalfT<v3ux<width>> { using Type = v3ux<width/2>; };
-template <umm width> struct HalfT<v4fx<width>> { using Type = v4fx<width/2>; };
-template <umm width> struct HalfT<v4sx<width>> { using Type = v4sx<width/2>; };
-template <umm width> struct HalfT<v4ux<width>> { using Type = v4ux<width/2>; };
+template <class T, umm width> struct HalfT<v4<T, width>> { using Type = v4<T, width/2>; };
 template <class T> using Half = typename HalfT<T>::Type;
 
 forceinline constexpr b32x1 B32x1(b32 = 0);
@@ -2278,60 +2259,665 @@ SHUFFLE32x8(u32x8)
 
 #define VECIMPL(dim, SorP, packSize, type) TYPES_##type##x##packSize(MEMBERS##dim##SorP, packSize, dim)
 
-union v3s64;
-
 #define fice forceinline constexpr
 
-template<> union v2fx<1> { VECIMPL(2, S, 1, f32); v2f yx() const { return {y, x}; } };
-template<> union v3<f32, 1> {
-	using v2 = v2fx<1>;
+#define VEC_2 \
+struct { Scalar x, y; }; \
+Scalar s[2];
 
-	struct { f32 x, y, z; };
-	v2 xy;
-	struct { f32 _pad; v2 yz; };
-	f32 s[3];
+#define VEC_3 \
+struct { Scalar x, y, z; }; \
+v2 xy; \
+struct { Scalar _pad; v2 yz; }; \
+Scalar s[3];
 
-	fice v3f yzx() const { return {y, z, x}; }
-	fice v3f zxy() const { return {z, x, y}; }
+#define VEC_4 \
+struct { Scalar x, y, z, w; }; \
+v2 xy; \
+v3 xyz; \
+struct { Scalar _pad; v2 yz; v3 yzw; }; \
+struct { v2 _pad2; v2 zw; }; \
+Scalar s[4];
 
-	fice v3f operator+() const { return *this; }
-	fice v3f operator-() const { return {-x, -y, -z}; }
-	fice v3f operator+(v3f b) const { return {x + b.x, y + b.y, z + b.z}; }
-	fice v3f operator-(v3f b) const { return {x - b.x, y - b.y, z - b.z}; }
-	fice v3f operator*(v3f b) const { return {x * b.x, y * b.y, z * b.z}; }
-	fice v3f operator/(v3f b) const { return {x / b.x, y / b.y, z / b.z}; }
-	fice v3f operator+(f32 b) const { return {x + b, y + b, z + b}; }
-	fice v3f operator-(f32 b) const { return {x - b, y - b, z - b}; }
-	fice v3f operator*(f32 b) const { return {x * b, y * b, z * b}; }
-	fice v3f operator/(f32 b) const { return {x / b, y / b, z / b}; }
-	fice friend v3f operator+(f32 a, v3f b) { return {a + b.x, a + b.y, a + b.z};}
-	fice friend v3f operator-(f32 a, v3f b) { return {a - b.x, a - b.y, a - b.z};}
-	fice friend v3f operator*(f32 a, v3f b) { return {a * b.x, a * b.y, a * b.z};}
-	fice friend v3f operator/(f32 a, v3f b) { return {a / b.x, a / b.y, a / b.z};}
-	fice v3f &operator+=(v3f b) { return x += b.x, y += b.y, z += b.z, *this;}
-	fice v3f &operator-=(v3f b) { return x -= b.x, y -= b.y, z -= b.z, *this;}
-	fice v3f &operator*=(v3f b) { return x *= b.x, y *= b.y, z *= b.z, *this;}
-	fice v3f &operator/=(v3f b) { return x /= b.x, y /= b.y, z /= b.z, *this;}
-	fice v3f &operator+=(f32 b) { return x += b, y += b, z += b, *this;}
-	fice v3f &operator-=(f32 b) { return x -= b, y -= b, z -= b, *this;}
-	fice v3f &operator*=(f32 b) { return x *= b, y *= b, z *= b, *this;}
-	fice v3f &operator/=(f32 b) { return x /= b, y /= b, z /= b, *this;}
+#define SWIZZLE_2(scl, pack) \
+SWIZZLE(v2, scl, pack, xx, x, x) \
+SWIZZLE(v2, scl, pack, yx, y, x) \
+SWIZZLE(v2, scl, pack, yy, y, y) \
+SWIZZLE(v3, scl, pack, xxx, x, x, x) \
+SWIZZLE(v3, scl, pack, xxy, x, x, y) \
+SWIZZLE(v3, scl, pack, xyx, x, y, x) \
+SWIZZLE(v3, scl, pack, xyy, x, y, y) \
+SWIZZLE(v3, scl, pack, yxx, y, x, x) \
+SWIZZLE(v3, scl, pack, yxy, y, x, y) \
+SWIZZLE(v3, scl, pack, yyx, y, y, x) \
+SWIZZLE(v3, scl, pack, yyy, y, y, y) \
+SWIZZLE(v4, scl, pack, xxxx, x, x, x, x) \
+SWIZZLE(v4, scl, pack, xxxy, x, x, x, y) \
+SWIZZLE(v4, scl, pack, xxyx, x, x, y, x) \
+SWIZZLE(v4, scl, pack, xxyy, x, x, y, y) \
+SWIZZLE(v4, scl, pack, xyxx, x, y, x, x) \
+SWIZZLE(v4, scl, pack, xyxy, x, y, x, y) \
+SWIZZLE(v4, scl, pack, xyyx, x, y, y, x) \
+SWIZZLE(v4, scl, pack, xyyy, x, y, y, y) \
+SWIZZLE(v4, scl, pack, yxxx, y, x, x, x) \
+SWIZZLE(v4, scl, pack, yxxy, y, x, x, y) \
+SWIZZLE(v4, scl, pack, yxyx, y, x, y, x) \
+SWIZZLE(v4, scl, pack, yxyy, y, x, y, y) \
+SWIZZLE(v4, scl, pack, yyxx, y, y, x, x) \
+SWIZZLE(v4, scl, pack, yyxy, y, y, x, y) \
+SWIZZLE(v4, scl, pack, yyyx, y, y, y, x) \
+SWIZZLE(v4, scl, pack, yyyy, y, y, y, y)
 
-	explicit operator v3sx<1>()const;
+#define SWIZZLE_3(scl, pack) \
+SWIZZLE(v2, scl, pack, xx, x, x) \
+SWIZZLE(v2, scl, pack, xz, x, z) \
+SWIZZLE(v2, scl, pack, yx, y, x) \
+SWIZZLE(v2, scl, pack, yy, y, y) \
+SWIZZLE(v2, scl, pack, zx, z, x) \
+SWIZZLE(v2, scl, pack, zy, z, y) \
+SWIZZLE(v2, scl, pack, zz, z, z) \
+SWIZZLE(v3, scl, pack, xxx, x, x, x) \
+SWIZZLE(v3, scl, pack, xxy, x, x, y) \
+SWIZZLE(v3, scl, pack, xxz, x, x, z) \
+SWIZZLE(v3, scl, pack, xyx, x, y, x) \
+SWIZZLE(v3, scl, pack, xyy, x, y, y) \
+SWIZZLE(v3, scl, pack, xzx, x, z, x) \
+SWIZZLE(v3, scl, pack, xzy, x, z, y) \
+SWIZZLE(v3, scl, pack, xzz, x, z, z) \
+SWIZZLE(v3, scl, pack, yxx, y, x, x) \
+SWIZZLE(v3, scl, pack, yxy, y, x, y) \
+SWIZZLE(v3, scl, pack, yxz, y, x, z) \
+SWIZZLE(v3, scl, pack, yyx, y, y, x) \
+SWIZZLE(v3, scl, pack, yyy, y, y, y) \
+SWIZZLE(v3, scl, pack, yyz, y, y, z) \
+SWIZZLE(v3, scl, pack, yzx, y, z, x) \
+SWIZZLE(v3, scl, pack, yzy, y, z, y) \
+SWIZZLE(v3, scl, pack, yzz, y, z, z) \
+SWIZZLE(v3, scl, pack, zxx, z, x, x) \
+SWIZZLE(v3, scl, pack, zxy, z, x, y) \
+SWIZZLE(v3, scl, pack, zxz, z, x, z) \
+SWIZZLE(v3, scl, pack, zyx, z, y, x) \
+SWIZZLE(v3, scl, pack, zyy, z, y, y) \
+SWIZZLE(v3, scl, pack, zyz, z, y, z) \
+SWIZZLE(v3, scl, pack, zzx, z, z, x) \
+SWIZZLE(v3, scl, pack, zzy, z, z, y) \
+SWIZZLE(v3, scl, pack, zzz, z, z, z) \
+SWIZZLE(v4, scl, pack, xxxx, x, x, x, x) \
+SWIZZLE(v4, scl, pack, xxxy, x, x, x, y) \
+SWIZZLE(v4, scl, pack, xxxz, x, x, x, z) \
+SWIZZLE(v4, scl, pack, xxyx, x, x, y, x) \
+SWIZZLE(v4, scl, pack, xxyy, x, x, y, y) \
+SWIZZLE(v4, scl, pack, xxyz, x, x, y, z) \
+SWIZZLE(v4, scl, pack, xxzx, x, x, z, x) \
+SWIZZLE(v4, scl, pack, xxzy, x, x, z, y) \
+SWIZZLE(v4, scl, pack, xxzz, x, x, z, z) \
+SWIZZLE(v4, scl, pack, xyxx, x, y, x, x) \
+SWIZZLE(v4, scl, pack, xyxy, x, y, x, y) \
+SWIZZLE(v4, scl, pack, xyxz, x, y, x, z) \
+SWIZZLE(v4, scl, pack, xyyx, x, y, y, x) \
+SWIZZLE(v4, scl, pack, xyyy, x, y, y, y) \
+SWIZZLE(v4, scl, pack, xyyz, x, y, y, z) \
+SWIZZLE(v4, scl, pack, xyzx, x, y, z, x) \
+SWIZZLE(v4, scl, pack, xyzy, x, y, z, y) \
+SWIZZLE(v4, scl, pack, xyzz, x, y, z, z) \
+SWIZZLE(v4, scl, pack, xzxx, x, z, x, x) \
+SWIZZLE(v4, scl, pack, xzxy, x, z, x, y) \
+SWIZZLE(v4, scl, pack, xzxz, x, z, x, z) \
+SWIZZLE(v4, scl, pack, xzyx, x, z, y, x) \
+SWIZZLE(v4, scl, pack, xzyy, x, z, y, y) \
+SWIZZLE(v4, scl, pack, xzyz, x, z, y, z) \
+SWIZZLE(v4, scl, pack, xzzx, x, z, z, x) \
+SWIZZLE(v4, scl, pack, xzzy, x, z, z, y) \
+SWIZZLE(v4, scl, pack, xzzz, x, z, z, z) \
+SWIZZLE(v4, scl, pack, yxxx, y, x, x, x) \
+SWIZZLE(v4, scl, pack, yxxy, y, x, x, y) \
+SWIZZLE(v4, scl, pack, yxxz, y, x, x, z) \
+SWIZZLE(v4, scl, pack, yxyx, y, x, y, x) \
+SWIZZLE(v4, scl, pack, yxyy, y, x, y, y) \
+SWIZZLE(v4, scl, pack, yxyz, y, x, y, z) \
+SWIZZLE(v4, scl, pack, yxzx, y, x, z, x) \
+SWIZZLE(v4, scl, pack, yxzy, y, x, z, y) \
+SWIZZLE(v4, scl, pack, yxzz, y, x, z, z) \
+SWIZZLE(v4, scl, pack, yyxx, y, y, x, x) \
+SWIZZLE(v4, scl, pack, yyxy, y, y, x, y) \
+SWIZZLE(v4, scl, pack, yyxz, y, y, x, z) \
+SWIZZLE(v4, scl, pack, yyyx, y, y, y, x) \
+SWIZZLE(v4, scl, pack, yyyy, y, y, y, y) \
+SWIZZLE(v4, scl, pack, yyyz, y, y, y, z) \
+SWIZZLE(v4, scl, pack, yyzx, y, y, z, x) \
+SWIZZLE(v4, scl, pack, yyzy, y, y, z, y) \
+SWIZZLE(v4, scl, pack, yyzz, y, y, z, z) \
+SWIZZLE(v4, scl, pack, yzxx, y, z, x, x) \
+SWIZZLE(v4, scl, pack, yzxy, y, z, x, y) \
+SWIZZLE(v4, scl, pack, yzxz, y, z, x, z) \
+SWIZZLE(v4, scl, pack, yzyx, y, z, y, x) \
+SWIZZLE(v4, scl, pack, yzyy, y, z, y, y) \
+SWIZZLE(v4, scl, pack, yzyz, y, z, y, z) \
+SWIZZLE(v4, scl, pack, yzzx, y, z, z, x) \
+SWIZZLE(v4, scl, pack, yzzy, y, z, z, y) \
+SWIZZLE(v4, scl, pack, yzzz, y, z, z, z) \
+SWIZZLE(v4, scl, pack, zxxx, z, x, x, x) \
+SWIZZLE(v4, scl, pack, zxxy, z, x, x, y) \
+SWIZZLE(v4, scl, pack, zxxz, z, x, x, z) \
+SWIZZLE(v4, scl, pack, zxyx, z, x, y, x) \
+SWIZZLE(v4, scl, pack, zxyy, z, x, y, y) \
+SWIZZLE(v4, scl, pack, zxyz, z, x, y, z) \
+SWIZZLE(v4, scl, pack, zxzx, z, x, z, x) \
+SWIZZLE(v4, scl, pack, zxzy, z, x, z, y) \
+SWIZZLE(v4, scl, pack, zxzz, z, x, z, z) \
+SWIZZLE(v4, scl, pack, zyxx, z, y, x, x) \
+SWIZZLE(v4, scl, pack, zyxy, z, y, x, y) \
+SWIZZLE(v4, scl, pack, zyxz, z, y, x, z) \
+SWIZZLE(v4, scl, pack, zyyx, z, y, y, x) \
+SWIZZLE(v4, scl, pack, zyyy, z, y, y, y) \
+SWIZZLE(v4, scl, pack, zyyz, z, y, y, z) \
+SWIZZLE(v4, scl, pack, zyzx, z, y, z, x) \
+SWIZZLE(v4, scl, pack, zyzy, z, y, z, y) \
+SWIZZLE(v4, scl, pack, zyzz, z, y, z, z) \
+SWIZZLE(v4, scl, pack, zzxx, z, z, x, x) \
+SWIZZLE(v4, scl, pack, zzxy, z, z, x, y) \
+SWIZZLE(v4, scl, pack, zzxz, z, z, x, z) \
+SWIZZLE(v4, scl, pack, zzyx, z, z, y, x) \
+SWIZZLE(v4, scl, pack, zzyy, z, z, y, y) \
+SWIZZLE(v4, scl, pack, zzyz, z, z, y, z) \
+SWIZZLE(v4, scl, pack, zzzx, z, z, z, x) \
+SWIZZLE(v4, scl, pack, zzzy, z, z, z, y) \
+SWIZZLE(v4, scl, pack, zzzz, z, z, z, z)
+
+#define SWIZZLE_4(scl, pack) \
+SWIZZLE(v2, scl, pack, xx, x, x) \
+SWIZZLE(v2, scl, pack, xz, x, z) \
+SWIZZLE(v2, scl, pack, xw, x, w) \
+SWIZZLE(v2, scl, pack, yx, y, x) \
+SWIZZLE(v2, scl, pack, yy, y, y) \
+SWIZZLE(v2, scl, pack, yw, y, w) \
+SWIZZLE(v2, scl, pack, zx, z, x) \
+SWIZZLE(v2, scl, pack, zy, z, y) \
+SWIZZLE(v2, scl, pack, zz, z, z) \
+SWIZZLE(v2, scl, pack, wx, w, x) \
+SWIZZLE(v2, scl, pack, wy, w, y) \
+SWIZZLE(v2, scl, pack, wz, w, z) \
+SWIZZLE(v2, scl, pack, ww, w, w) \
+SWIZZLE(v3, scl, pack, xxx, x, x, x) \
+SWIZZLE(v3, scl, pack, xxy, x, x, y) \
+SWIZZLE(v3, scl, pack, xxz, x, x, z) \
+SWIZZLE(v3, scl, pack, xxw, x, x, w) \
+SWIZZLE(v3, scl, pack, xyx, x, y, x) \
+SWIZZLE(v3, scl, pack, xyy, x, y, y) \
+SWIZZLE(v3, scl, pack, xyw, x, y, w) \
+SWIZZLE(v3, scl, pack, xzx, x, z, x) \
+SWIZZLE(v3, scl, pack, xzy, x, z, y) \
+SWIZZLE(v3, scl, pack, xzz, x, z, z) \
+SWIZZLE(v3, scl, pack, xzw, x, z, w) \
+SWIZZLE(v3, scl, pack, xwx, x, w, x) \
+SWIZZLE(v3, scl, pack, xwy, x, w, y) \
+SWIZZLE(v3, scl, pack, xwz, x, w, z) \
+SWIZZLE(v3, scl, pack, xww, x, w, w) \
+SWIZZLE(v3, scl, pack, yxx, y, x, x) \
+SWIZZLE(v3, scl, pack, yxy, y, x, y) \
+SWIZZLE(v3, scl, pack, yxz, y, x, z) \
+SWIZZLE(v3, scl, pack, yxw, y, x, w) \
+SWIZZLE(v3, scl, pack, yyx, y, y, x) \
+SWIZZLE(v3, scl, pack, yyy, y, y, y) \
+SWIZZLE(v3, scl, pack, yyz, y, y, z) \
+SWIZZLE(v3, scl, pack, yyw, y, y, w) \
+SWIZZLE(v3, scl, pack, yzx, y, z, x) \
+SWIZZLE(v3, scl, pack, yzy, y, z, y) \
+SWIZZLE(v3, scl, pack, yzz, y, z, z) \
+SWIZZLE(v3, scl, pack, ywx, y, w, x) \
+SWIZZLE(v3, scl, pack, ywy, y, w, y) \
+SWIZZLE(v3, scl, pack, ywz, y, w, z) \
+SWIZZLE(v3, scl, pack, yww, y, w, w) \
+SWIZZLE(v3, scl, pack, zxx, z, x, x) \
+SWIZZLE(v3, scl, pack, zxy, z, x, y) \
+SWIZZLE(v3, scl, pack, zxz, z, x, z) \
+SWIZZLE(v3, scl, pack, zxw, z, x, w) \
+SWIZZLE(v3, scl, pack, zyx, z, y, x) \
+SWIZZLE(v3, scl, pack, zyy, z, y, y) \
+SWIZZLE(v3, scl, pack, zyz, z, y, z) \
+SWIZZLE(v3, scl, pack, zyw, z, y, w) \
+SWIZZLE(v3, scl, pack, zzx, z, z, x) \
+SWIZZLE(v3, scl, pack, zzy, z, z, y) \
+SWIZZLE(v3, scl, pack, zzz, z, z, z) \
+SWIZZLE(v3, scl, pack, zzw, z, z, w) \
+SWIZZLE(v3, scl, pack, zwx, z, w, x) \
+SWIZZLE(v3, scl, pack, zwy, z, w, y) \
+SWIZZLE(v3, scl, pack, zwz, z, w, z) \
+SWIZZLE(v3, scl, pack, zww, z, w, w) \
+SWIZZLE(v3, scl, pack, wxx, w, x, x) \
+SWIZZLE(v3, scl, pack, wxy, w, x, y) \
+SWIZZLE(v3, scl, pack, wxz, w, x, z) \
+SWIZZLE(v3, scl, pack, wxw, w, x, w) \
+SWIZZLE(v3, scl, pack, wyx, w, y, x) \
+SWIZZLE(v3, scl, pack, wyy, w, y, y) \
+SWIZZLE(v3, scl, pack, wyz, w, y, z) \
+SWIZZLE(v3, scl, pack, wyw, w, y, w) \
+SWIZZLE(v3, scl, pack, wzx, w, z, x) \
+SWIZZLE(v3, scl, pack, wzy, w, z, y) \
+SWIZZLE(v3, scl, pack, wzz, w, z, z) \
+SWIZZLE(v3, scl, pack, wzw, w, z, w) \
+SWIZZLE(v3, scl, pack, wwx, w, w, x) \
+SWIZZLE(v3, scl, pack, wwy, w, w, y) \
+SWIZZLE(v3, scl, pack, wwz, w, w, z) \
+SWIZZLE(v3, scl, pack, www, w, w, w) \
+SWIZZLE(v4, scl, pack, xxxx, x, x, x, x) \
+SWIZZLE(v4, scl, pack, xxxy, x, x, x, y) \
+SWIZZLE(v4, scl, pack, xxxz, x, x, x, z) \
+SWIZZLE(v4, scl, pack, xxxw, x, x, x, w) \
+SWIZZLE(v4, scl, pack, xxyx, x, x, y, x) \
+SWIZZLE(v4, scl, pack, xxyy, x, x, y, y) \
+SWIZZLE(v4, scl, pack, xxyz, x, x, y, z) \
+SWIZZLE(v4, scl, pack, xxyw, x, x, y, w) \
+SWIZZLE(v4, scl, pack, xxzx, x, x, z, x) \
+SWIZZLE(v4, scl, pack, xxzy, x, x, z, y) \
+SWIZZLE(v4, scl, pack, xxzz, x, x, z, z) \
+SWIZZLE(v4, scl, pack, xxzw, x, x, z, w) \
+SWIZZLE(v4, scl, pack, xxwx, x, x, w, x) \
+SWIZZLE(v4, scl, pack, xxwy, x, x, w, y) \
+SWIZZLE(v4, scl, pack, xxwz, x, x, w, z) \
+SWIZZLE(v4, scl, pack, xxww, x, x, w, w) \
+SWIZZLE(v4, scl, pack, xyxx, x, y, x, x) \
+SWIZZLE(v4, scl, pack, xyxy, x, y, x, y) \
+SWIZZLE(v4, scl, pack, xyxz, x, y, x, z) \
+SWIZZLE(v4, scl, pack, xyxw, x, y, x, w) \
+SWIZZLE(v4, scl, pack, xyyx, x, y, y, x) \
+SWIZZLE(v4, scl, pack, xyyy, x, y, y, y) \
+SWIZZLE(v4, scl, pack, xyyz, x, y, y, z) \
+SWIZZLE(v4, scl, pack, xyyw, x, y, y, w) \
+SWIZZLE(v4, scl, pack, xyzx, x, y, z, x) \
+SWIZZLE(v4, scl, pack, xyzy, x, y, z, y) \
+SWIZZLE(v4, scl, pack, xyzz, x, y, z, z) \
+SWIZZLE(v4, scl, pack, xyzw, x, y, z, w) \
+SWIZZLE(v4, scl, pack, xywx, x, y, w, x) \
+SWIZZLE(v4, scl, pack, xywy, x, y, w, y) \
+SWIZZLE(v4, scl, pack, xywz, x, y, w, z) \
+SWIZZLE(v4, scl, pack, xyww, x, y, w, w) \
+SWIZZLE(v4, scl, pack, xzxx, x, z, x, x) \
+SWIZZLE(v4, scl, pack, xzxy, x, z, x, y) \
+SWIZZLE(v4, scl, pack, xzxz, x, z, x, z) \
+SWIZZLE(v4, scl, pack, xzxw, x, z, x, w) \
+SWIZZLE(v4, scl, pack, xzyx, x, z, y, x) \
+SWIZZLE(v4, scl, pack, xzyy, x, z, y, y) \
+SWIZZLE(v4, scl, pack, xzyz, x, z, y, z) \
+SWIZZLE(v4, scl, pack, xzyw, x, z, y, w) \
+SWIZZLE(v4, scl, pack, xzzx, x, z, z, x) \
+SWIZZLE(v4, scl, pack, xzzy, x, z, z, y) \
+SWIZZLE(v4, scl, pack, xzzz, x, z, z, z) \
+SWIZZLE(v4, scl, pack, xzzw, x, z, z, w) \
+SWIZZLE(v4, scl, pack, xzwx, x, z, w, x) \
+SWIZZLE(v4, scl, pack, xzwy, x, z, w, y) \
+SWIZZLE(v4, scl, pack, xzwz, x, z, w, z) \
+SWIZZLE(v4, scl, pack, xzww, x, z, w, w) \
+SWIZZLE(v4, scl, pack, xwxx, x, w, x, x) \
+SWIZZLE(v4, scl, pack, xwxy, x, w, x, y) \
+SWIZZLE(v4, scl, pack, xwxz, x, w, x, z) \
+SWIZZLE(v4, scl, pack, xwxw, x, w, x, w) \
+SWIZZLE(v4, scl, pack, xwyx, x, w, y, x) \
+SWIZZLE(v4, scl, pack, xwyy, x, w, y, y) \
+SWIZZLE(v4, scl, pack, xwyz, x, w, y, z) \
+SWIZZLE(v4, scl, pack, xwyw, x, w, y, w) \
+SWIZZLE(v4, scl, pack, xwzx, x, w, z, x) \
+SWIZZLE(v4, scl, pack, xwzy, x, w, z, y) \
+SWIZZLE(v4, scl, pack, xwzz, x, w, z, z) \
+SWIZZLE(v4, scl, pack, xwzw, x, w, z, w) \
+SWIZZLE(v4, scl, pack, xwwx, x, w, w, x) \
+SWIZZLE(v4, scl, pack, xwwy, x, w, w, y) \
+SWIZZLE(v4, scl, pack, xwwz, x, w, w, z) \
+SWIZZLE(v4, scl, pack, xwww, x, w, w, w) \
+SWIZZLE(v4, scl, pack, yxxx, y, x, x, x) \
+SWIZZLE(v4, scl, pack, yxxy, y, x, x, y) \
+SWIZZLE(v4, scl, pack, yxxz, y, x, x, z) \
+SWIZZLE(v4, scl, pack, yxxw, y, x, x, w) \
+SWIZZLE(v4, scl, pack, yxyx, y, x, y, x) \
+SWIZZLE(v4, scl, pack, yxyy, y, x, y, y) \
+SWIZZLE(v4, scl, pack, yxyz, y, x, y, z) \
+SWIZZLE(v4, scl, pack, yxyw, y, x, y, w) \
+SWIZZLE(v4, scl, pack, yxzx, y, x, z, x) \
+SWIZZLE(v4, scl, pack, yxzy, y, x, z, y) \
+SWIZZLE(v4, scl, pack, yxzz, y, x, z, z) \
+SWIZZLE(v4, scl, pack, yxzw, y, x, z, w) \
+SWIZZLE(v4, scl, pack, yxwx, y, x, w, x) \
+SWIZZLE(v4, scl, pack, yxwy, y, x, w, y) \
+SWIZZLE(v4, scl, pack, yxwz, y, x, w, z) \
+SWIZZLE(v4, scl, pack, yxww, y, x, w, w) \
+SWIZZLE(v4, scl, pack, yyxx, y, y, x, x) \
+SWIZZLE(v4, scl, pack, yyxy, y, y, x, y) \
+SWIZZLE(v4, scl, pack, yyxz, y, y, x, z) \
+SWIZZLE(v4, scl, pack, yyxw, y, y, x, w) \
+SWIZZLE(v4, scl, pack, yyyx, y, y, y, x) \
+SWIZZLE(v4, scl, pack, yyyy, y, y, y, y) \
+SWIZZLE(v4, scl, pack, yyyz, y, y, y, z) \
+SWIZZLE(v4, scl, pack, yyyw, y, y, y, w) \
+SWIZZLE(v4, scl, pack, yyzx, y, y, z, x) \
+SWIZZLE(v4, scl, pack, yyzy, y, y, z, y) \
+SWIZZLE(v4, scl, pack, yyzz, y, y, z, z) \
+SWIZZLE(v4, scl, pack, yyzw, y, y, z, w) \
+SWIZZLE(v4, scl, pack, yywx, y, y, w, x) \
+SWIZZLE(v4, scl, pack, yywy, y, y, w, y) \
+SWIZZLE(v4, scl, pack, yywz, y, y, w, z) \
+SWIZZLE(v4, scl, pack, yyww, y, y, w, w) \
+SWIZZLE(v4, scl, pack, yzxx, y, z, x, x) \
+SWIZZLE(v4, scl, pack, yzxy, y, z, x, y) \
+SWIZZLE(v4, scl, pack, yzxz, y, z, x, z) \
+SWIZZLE(v4, scl, pack, yzxw, y, z, x, w) \
+SWIZZLE(v4, scl, pack, yzyx, y, z, y, x) \
+SWIZZLE(v4, scl, pack, yzyy, y, z, y, y) \
+SWIZZLE(v4, scl, pack, yzyz, y, z, y, z) \
+SWIZZLE(v4, scl, pack, yzyw, y, z, y, w) \
+SWIZZLE(v4, scl, pack, yzzx, y, z, z, x) \
+SWIZZLE(v4, scl, pack, yzzy, y, z, z, y) \
+SWIZZLE(v4, scl, pack, yzzz, y, z, z, z) \
+SWIZZLE(v4, scl, pack, yzzw, y, z, z, w) \
+SWIZZLE(v4, scl, pack, yzwx, y, z, w, x) \
+SWIZZLE(v4, scl, pack, yzwy, y, z, w, y) \
+SWIZZLE(v4, scl, pack, yzwz, y, z, w, z) \
+SWIZZLE(v4, scl, pack, yzww, y, z, w, w) \
+SWIZZLE(v4, scl, pack, ywxx, y, w, x, x) \
+SWIZZLE(v4, scl, pack, ywxy, y, w, x, y) \
+SWIZZLE(v4, scl, pack, ywxz, y, w, x, z) \
+SWIZZLE(v4, scl, pack, ywxw, y, w, x, w) \
+SWIZZLE(v4, scl, pack, ywyx, y, w, y, x) \
+SWIZZLE(v4, scl, pack, ywyy, y, w, y, y) \
+SWIZZLE(v4, scl, pack, ywyz, y, w, y, z) \
+SWIZZLE(v4, scl, pack, ywyw, y, w, y, w) \
+SWIZZLE(v4, scl, pack, ywzx, y, w, z, x) \
+SWIZZLE(v4, scl, pack, ywzy, y, w, z, y) \
+SWIZZLE(v4, scl, pack, ywzz, y, w, z, z) \
+SWIZZLE(v4, scl, pack, ywzw, y, w, z, w) \
+SWIZZLE(v4, scl, pack, ywwx, y, w, w, x) \
+SWIZZLE(v4, scl, pack, ywwy, y, w, w, y) \
+SWIZZLE(v4, scl, pack, ywwz, y, w, w, z) \
+SWIZZLE(v4, scl, pack, ywww, y, w, w, w) \
+SWIZZLE(v4, scl, pack, zxxx, z, x, x, x) \
+SWIZZLE(v4, scl, pack, zxxy, z, x, x, y) \
+SWIZZLE(v4, scl, pack, zxxz, z, x, x, z) \
+SWIZZLE(v4, scl, pack, zxxw, z, x, x, w) \
+SWIZZLE(v4, scl, pack, zxyx, z, x, y, x) \
+SWIZZLE(v4, scl, pack, zxyy, z, x, y, y) \
+SWIZZLE(v4, scl, pack, zxyz, z, x, y, z) \
+SWIZZLE(v4, scl, pack, zxyw, z, x, y, w) \
+SWIZZLE(v4, scl, pack, zxzx, z, x, z, x) \
+SWIZZLE(v4, scl, pack, zxzy, z, x, z, y) \
+SWIZZLE(v4, scl, pack, zxzz, z, x, z, z) \
+SWIZZLE(v4, scl, pack, zxzw, z, x, z, w) \
+SWIZZLE(v4, scl, pack, zxwx, z, x, w, x) \
+SWIZZLE(v4, scl, pack, zxwy, z, x, w, y) \
+SWIZZLE(v4, scl, pack, zxwz, z, x, w, z) \
+SWIZZLE(v4, scl, pack, zxww, z, x, w, w) \
+SWIZZLE(v4, scl, pack, zyxx, z, y, x, x) \
+SWIZZLE(v4, scl, pack, zyxy, z, y, x, y) \
+SWIZZLE(v4, scl, pack, zyxz, z, y, x, z) \
+SWIZZLE(v4, scl, pack, zyxw, z, y, x, w) \
+SWIZZLE(v4, scl, pack, zyyx, z, y, y, x) \
+SWIZZLE(v4, scl, pack, zyyy, z, y, y, y) \
+SWIZZLE(v4, scl, pack, zyyz, z, y, y, z) \
+SWIZZLE(v4, scl, pack, zyyw, z, y, y, w) \
+SWIZZLE(v4, scl, pack, zyzx, z, y, z, x) \
+SWIZZLE(v4, scl, pack, zyzy, z, y, z, y) \
+SWIZZLE(v4, scl, pack, zyzz, z, y, z, z) \
+SWIZZLE(v4, scl, pack, zyzw, z, y, z, w) \
+SWIZZLE(v4, scl, pack, zywx, z, y, w, x) \
+SWIZZLE(v4, scl, pack, zywy, z, y, w, y) \
+SWIZZLE(v4, scl, pack, zywz, z, y, w, z) \
+SWIZZLE(v4, scl, pack, zyww, z, y, w, w) \
+SWIZZLE(v4, scl, pack, zzxx, z, z, x, x) \
+SWIZZLE(v4, scl, pack, zzxy, z, z, x, y) \
+SWIZZLE(v4, scl, pack, zzxz, z, z, x, z) \
+SWIZZLE(v4, scl, pack, zzxw, z, z, x, w) \
+SWIZZLE(v4, scl, pack, zzyx, z, z, y, x) \
+SWIZZLE(v4, scl, pack, zzyy, z, z, y, y) \
+SWIZZLE(v4, scl, pack, zzyz, z, z, y, z) \
+SWIZZLE(v4, scl, pack, zzyw, z, z, y, w) \
+SWIZZLE(v4, scl, pack, zzzx, z, z, z, x) \
+SWIZZLE(v4, scl, pack, zzzy, z, z, z, y) \
+SWIZZLE(v4, scl, pack, zzzz, z, z, z, z) \
+SWIZZLE(v4, scl, pack, zzzw, z, z, z, w) \
+SWIZZLE(v4, scl, pack, zzwx, z, z, w, x) \
+SWIZZLE(v4, scl, pack, zzwy, z, z, w, y) \
+SWIZZLE(v4, scl, pack, zzwz, z, z, w, z) \
+SWIZZLE(v4, scl, pack, zzww, z, z, w, w) \
+SWIZZLE(v4, scl, pack, zwxx, z, w, x, x) \
+SWIZZLE(v4, scl, pack, zwxy, z, w, x, y) \
+SWIZZLE(v4, scl, pack, zwxz, z, w, x, z) \
+SWIZZLE(v4, scl, pack, zwxw, z, w, x, w) \
+SWIZZLE(v4, scl, pack, zwyx, z, w, y, x) \
+SWIZZLE(v4, scl, pack, zwyy, z, w, y, y) \
+SWIZZLE(v4, scl, pack, zwyz, z, w, y, z) \
+SWIZZLE(v4, scl, pack, zwyw, z, w, y, w) \
+SWIZZLE(v4, scl, pack, zwzx, z, w, z, x) \
+SWIZZLE(v4, scl, pack, zwzy, z, w, z, y) \
+SWIZZLE(v4, scl, pack, zwzz, z, w, z, z) \
+SWIZZLE(v4, scl, pack, zwzw, z, w, z, w) \
+SWIZZLE(v4, scl, pack, zwwx, z, w, w, x) \
+SWIZZLE(v4, scl, pack, zwwy, z, w, w, y) \
+SWIZZLE(v4, scl, pack, zwwz, z, w, w, z) \
+SWIZZLE(v4, scl, pack, zwww, z, w, w, w) \
+SWIZZLE(v4, scl, pack, wxxx, w, x, x, x) \
+SWIZZLE(v4, scl, pack, wxxy, w, x, x, y) \
+SWIZZLE(v4, scl, pack, wxxz, w, x, x, z) \
+SWIZZLE(v4, scl, pack, wxxw, w, x, x, w) \
+SWIZZLE(v4, scl, pack, wxyx, w, x, y, x) \
+SWIZZLE(v4, scl, pack, wxyy, w, x, y, y) \
+SWIZZLE(v4, scl, pack, wxyz, w, x, y, z) \
+SWIZZLE(v4, scl, pack, wxyw, w, x, y, w) \
+SWIZZLE(v4, scl, pack, wxzx, w, x, z, x) \
+SWIZZLE(v4, scl, pack, wxzy, w, x, z, y) \
+SWIZZLE(v4, scl, pack, wxzz, w, x, z, z) \
+SWIZZLE(v4, scl, pack, wxzw, w, x, z, w) \
+SWIZZLE(v4, scl, pack, wxwx, w, x, w, x) \
+SWIZZLE(v4, scl, pack, wxwy, w, x, w, y) \
+SWIZZLE(v4, scl, pack, wxwz, w, x, w, z) \
+SWIZZLE(v4, scl, pack, wxww, w, x, w, w) \
+SWIZZLE(v4, scl, pack, wyxx, w, y, x, x) \
+SWIZZLE(v4, scl, pack, wyxy, w, y, x, y) \
+SWIZZLE(v4, scl, pack, wyxz, w, y, x, z) \
+SWIZZLE(v4, scl, pack, wyxw, w, y, x, w) \
+SWIZZLE(v4, scl, pack, wyyx, w, y, y, x) \
+SWIZZLE(v4, scl, pack, wyyy, w, y, y, y) \
+SWIZZLE(v4, scl, pack, wyyz, w, y, y, z) \
+SWIZZLE(v4, scl, pack, wyyw, w, y, y, w) \
+SWIZZLE(v4, scl, pack, wyzx, w, y, z, x) \
+SWIZZLE(v4, scl, pack, wyzy, w, y, z, y) \
+SWIZZLE(v4, scl, pack, wyzz, w, y, z, z) \
+SWIZZLE(v4, scl, pack, wyzw, w, y, z, w) \
+SWIZZLE(v4, scl, pack, wywx, w, y, w, x) \
+SWIZZLE(v4, scl, pack, wywy, w, y, w, y) \
+SWIZZLE(v4, scl, pack, wywz, w, y, w, z) \
+SWIZZLE(v4, scl, pack, wyww, w, y, w, w) \
+SWIZZLE(v4, scl, pack, wzxx, w, z, x, x) \
+SWIZZLE(v4, scl, pack, wzxy, w, z, x, y) \
+SWIZZLE(v4, scl, pack, wzxz, w, z, x, z) \
+SWIZZLE(v4, scl, pack, wzxw, w, z, x, w) \
+SWIZZLE(v4, scl, pack, wzyx, w, z, y, x) \
+SWIZZLE(v4, scl, pack, wzyy, w, z, y, y) \
+SWIZZLE(v4, scl, pack, wzyz, w, z, y, z) \
+SWIZZLE(v4, scl, pack, wzyw, w, z, y, w) \
+SWIZZLE(v4, scl, pack, wzzx, w, z, z, x) \
+SWIZZLE(v4, scl, pack, wzzy, w, z, z, y) \
+SWIZZLE(v4, scl, pack, wzzz, w, z, z, z) \
+SWIZZLE(v4, scl, pack, wzzw, w, z, z, w) \
+SWIZZLE(v4, scl, pack, wzwx, w, z, w, x) \
+SWIZZLE(v4, scl, pack, wzwy, w, z, w, y) \
+SWIZZLE(v4, scl, pack, wzwz, w, z, w, z) \
+SWIZZLE(v4, scl, pack, wzww, w, z, w, w) \
+SWIZZLE(v4, scl, pack, wwxx, w, w, x, x) \
+SWIZZLE(v4, scl, pack, wwxy, w, w, x, y) \
+SWIZZLE(v4, scl, pack, wwxz, w, w, x, z) \
+SWIZZLE(v4, scl, pack, wwxw, w, w, x, w) \
+SWIZZLE(v4, scl, pack, wwyx, w, w, y, x) \
+SWIZZLE(v4, scl, pack, wwyy, w, w, y, y) \
+SWIZZLE(v4, scl, pack, wwyz, w, w, y, z) \
+SWIZZLE(v4, scl, pack, wwyw, w, w, y, w) \
+SWIZZLE(v4, scl, pack, wwzx, w, w, z, x) \
+SWIZZLE(v4, scl, pack, wwzy, w, w, z, y) \
+SWIZZLE(v4, scl, pack, wwzz, w, w, z, z) \
+SWIZZLE(v4, scl, pack, wwzw, w, w, z, w) \
+SWIZZLE(v4, scl, pack, wwwx, w, w, w, x) \
+SWIZZLE(v4, scl, pack, wwwy, w, w, w, y) \
+SWIZZLE(v4, scl, pack, wwwz, w, w, w, z) \
+SWIZZLE(v4, scl, pack, wwww, w, w, w, w)
+
+#define UNARY_OPERATOR_2(op) fice v2 operator op() const { return {op x, op y}; }
+#define UNARY_OPERATOR_3(op) fice v3 operator op() const { return {op x, op y, op z}; }
+#define UNARY_OPERATOR_4(op) fice v4 operator op() const { return {op x, op y, op z, op w}; }
+
+#define BINARY_OPERATOR_2(op) \
+fice v2 operator op(v2 b) const { return {x op b.x, y op b.y}; } \
+fice v2 operator op(Scalar b) const { return {x op b, y op b}; } \
+fice friend v2 operator op(Scalar a, v2 b) { return {a op b.x, a op b.y};} \
+fice v2 &operator op##=(v2 b) { return x op##= b.x, y op##= b.y, *this;} \
+fice v2 &operator op##=(Scalar b) { return x op##= b, y op##= b, *this;}
+
+#define BINARY_OPERATOR_3(op) \
+fice v3 operator op(v3 b) const { return {x op b.x, y op b.y, z op b.z}; } \
+fice v3 operator op(Scalar b) const { return {x op b, y op b, z op b}; } \
+fice friend v3 operator op(Scalar a, v3 b) { return {a op b.x, a op b.y, a op b.z};} \
+fice v3 &operator op##=(v3 b) { return x op##= b.x, y op##= b.y, z op##= b.z, *this;} \
+fice v3 &operator op##=(Scalar b) { return x op##= b, y op##= b, z op##= b, *this;}
+
+#define BINARY_OPERATOR_4(op) \
+fice v4 operator op(v4 b) const { return {x op b.x, y op b.y, z op b.z, w op b.w}; } \
+fice v4 operator op(Scalar b) const { return {x op b, y op b, z op b, w op b}; } \
+fice friend v4 operator op(Scalar a, v4 b) { return {a op b.x, a op b.y, a op b.z, a op b.w};} \
+fice v4 &operator op##=(v4 b) { return x op##= b.x, y op##= b.y, z op##= b.z, w op##= b.w, *this;} \
+fice v4 &operator op##=(Scalar b) { return x op##= b, y op##= b, z op##= b, w op##= b, *this;}
+
+#define VEC_FLOAT(scalar, pack, dimension) \
+VEC_##dimension \
+SWIZZLE_##dimension(scalar, pack) \
+UNARY_OPERATOR_##dimension(+)	   \
+UNARY_OPERATOR_##dimension(-)	   \
+BINARY_OPERATOR_##dimension(+)	   \
+BINARY_OPERATOR_##dimension(-)	   \
+BINARY_OPERATOR_##dimension(*)	   \
+BINARY_OPERATOR_##dimension(/)
+
+#define VEC_INT(scalar, pack, dimension)        \
+VEC_##dimension \
+SWIZZLE_##dimension(scalar, pack) \
+UNARY_OPERATOR_##dimension(+)	\
+UNARY_OPERATOR_##dimension(-)	\
+UNARY_OPERATOR_##dimension(!)	\
+UNARY_OPERATOR_##dimension(~)	\
+BINARY_OPERATOR_##dimension(+)  \
+BINARY_OPERATOR_##dimension(-)  \
+BINARY_OPERATOR_##dimension(*)  \
+BINARY_OPERATOR_##dimension(/)  \
+BINARY_OPERATOR_##dimension(%)  \
+BINARY_OPERATOR_##dimension(^)  \
+BINARY_OPERATOR_##dimension(&)  \
+BINARY_OPERATOR_##dimension(|)  \
+BINARY_OPERATOR_##dimension(<<) \
+BINARY_OPERATOR_##dimension(>>)
+
+#define SWIZZLE(type, scl, pack, fn, ...) forceinline constexpr type fn() const;
+
+union v3s64;
+template<>
+union v2<f32, 1> { 
+	using v3 = v3<f32, 1>;
+	using v4 = v4<f32, 1>;
+	using Scalar = f32;
+
+	VEC_FLOAT(f32, 1, 2)
+	
+	operator v2sx<1>()const;
+	operator v2ux<1>()const;
 };
-template<> union v4fx<1> { VECIMPL(4, S, 1, f32); };
+template<>
+union v3<f32, 1> {
+	using v2 = v2<f32, 1>;
+	using v4 = v4<f32, 1>;
+	using Scalar = f32;
 
-template<> union v2sx<1> { VECIMPL(2, S, 1, s32); };
-template<> union v3sx<1> { 
-	VECIMPL(3, S, 1, s32); 
-	v2s xz() const { return {x, z}; } 
-	v3s zxy() const { return {z,x,y}; }
-	explicit operator v3s64() const;
+	VEC_FLOAT(f32, 1, 3)
+
+	operator v3sx<1>()const;
+	operator v3ux<1>()const;
 };
-template<> union v4sx<1> { VECIMPL(4, S, 1, s32); };
-template<> union v2ux<1> { VECIMPL(2, S, 1, u32); };
-template<> union v3ux<1> { VECIMPL(3, S, 1, u32); };
-template<> union v4ux<1> { VECIMPL(4, S, 1, u32); };
+template<>
+union v4<f32, 1> {
+	using v2 = v2<f32, 1>;
+	using v3 = v3<f32, 1>;
+	using Scalar = f32;
+
+	VEC_FLOAT(f32, 1, 4)
+
+	operator v4sx<1>()const;
+	operator v4ux<1>()const;
+};
+
+template<>
+union v2<s32, 1> { 
+	using v3 = v3<s32, 1>;
+	using v4 = v4<s32, 1>;
+	using Scalar = s32;
+
+	VEC_INT(s32, 1, 2)
+
+	operator v2fx<1>()const;
+	operator v2ux<1>()const;
+};
+
+template<>
+union v3<s32, 1> { 
+	using v2 = v2<s32, 1>;
+	using v4 = v4<s32, 1>;
+	using Scalar = s32;
+
+	VEC_INT(s32, 1, 3)
+
+	operator v3fx<1>()const;
+	operator v3ux<1>()const;
+};
+
+template<>
+union v4<s32, 1> { 
+	using v2 = v2<s32, 1>;
+	using v3 = v3<s32, 1>;
+	using Scalar = s32;
+
+	VEC_INT(s32, 1, 4)
+
+	operator v4fx<1>()const;
+	operator v4ux<1>()const;
+};
+
+template<>
+union v2<u32, 1> { 
+	using v3 = v3<u32, 1>;
+	using v4 = v4<u32, 1>;
+	using Scalar = u32;
+
+	VEC_INT(u32, 1, 2)
+
+	operator v2sx<1>()const;
+	operator v2fx<1>()const;
+};
+
+template<>
+union v3<u32, 1> { 
+	using v2 = v2<u32, 1>;
+	using v4 = v4<u32, 1>;
+	using Scalar = u32;
+
+	VEC_INT(u32, 1, 3)
+
+	operator v3sx<1>()const;
+	operator v3fx<1>()const;
+};
+
+template<>
+union v4<u32, 1> { 
+	using v2 = v2<u32, 1>;
+	using v3 = v3<u32, 1>;
+	using Scalar = u32;
+
+	VEC_INT(u32, 1, 4)
+
+	operator v4sx<1>()const;
+	operator v4fx<1>()const;
+};
 
 v3fx<1>::operator v3sx<1>()const{return{(s32)x,(s32)y,(s32)z};}
 
@@ -2408,6 +2994,14 @@ union v4ux<8> {
 	forceinline v4ux8 operator<<(u32 b) const { return {x << b, y << b, z << b, w << b}; }
 	forceinline v4ux8 operator>>(u32 b) const { return {x >> b, y >> b, z >> b, w >> b}; }
 };
+
+#undef SWIZZLE
+
+#define SWIZZLE(type, scl, pack, fn, ...) forceinline constexpr type<scl,pack> v3<scl,pack>::fn() const { return {__VA_ARGS__}; }
+
+SWIZZLE_3(f32, 1)
+
+#undef SWIZZLE
 
 union m2 {
 	struct {
@@ -3787,15 +4381,18 @@ forceinline v2f ceil(v2f v) { return {ceil(v.x), ceil(v.y)}; }
 forceinline v3f ceil(v3f v) { return {ceil(v.x), ceil(v.y), ceil(v.z)}; }
 forceinline v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)}; }
 
-#define CEIL(t) forceinline t ceil(t v, t s) { return floor(v + s - 1, s); }
+#define CEIL(t) \
+	forceinline t ceil(t v, t s) { return floor(v + s - 1, s); }
 CEIL(v2s) CEIL(v3s) CEIL(v4s);
 #undef CEIL
 
 #define CEIL(s32, f32) forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
+
+CEIL(s32, f32)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
+CEIL(s64, f64)// CEIL(s32x4, f32x4) CEIL(s32x8, f32x8);
 CEIL(v2s, v2f)// CEIL(v2sx4, v2fx4) CEIL(v2sx4, v2fx4);
 CEIL(v3s, v3f)// CEIL(v3sx4, v3fx4) CEIL(v3sx4, v3fx4);
 CEIL(v4s, v4f)// CEIL(v4sx4, v4fx4) CEIL(v4sx4, v4fx4);
-#undef CEIL
 
 forceinline v2fx4 floor(v2fx4 v) { return V2fx4(floor(v.x), floor(v.y)); }
 forceinline v2fx8 floor(v2fx8 v) { return V2fx8(floor(v.x), floor(v.y)); }
@@ -4868,47 +5465,6 @@ forceinline aabb<T> aabbCenterRadius(T center, T radius) {
 	return {center - radius, center + radius};
 }
 
-template <class T>
-struct ForEacher {};
-
-template <class T>
-struct ForEacher<aabb<T>> {
-	aabb<T> const &box;
-	template <class Fn>
-	forceinline constexpr void operator+(Fn &&fn) {
-		T it;
-		if constexpr(dimension_of<T> == 2) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-		} else if constexpr(dimension_of<T> == 3) {
-			for (it.z = box.min.z; it.z <= box.max.z; ++it.z) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-			}
-		} else if constexpr(dimension_of<T> == 4) {
-			for (it.w = box.min.w; it.w <= box.max.w; ++it.w) {
-			for (it.z = box.min.z; it.z <= box.max.z; ++it.z) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-			}
-			}
-		}
-	}
-};
-
-template <class T>
-forceinline constexpr ForEacher<aabb<T>> for_each(aabb<T> const &box) {
-	return {box};
-}
 #define IN_BOUNDS2(bool, v2fA, v2fB) 			\
 	forceinline bool in_bounds(v2fA v, aabb<v2fB> b) { \
 		return 								    \
@@ -4962,14 +5518,6 @@ INTERSECTS3(bool, v3s) INTERSECTS3(b32x4, v3sx4) INTERSECTS3(b32x8, v3sx8);
 INTERSECTS3(bool, v3u) INTERSECTS3(b32x4, v3ux4) INTERSECTS3(b32x8, v3ux8);
 #undef INTERSECTS2
 #undef INTERSECTS3
-
-template <class T>
-aabb<T> operator&(aabb<T> const &a, aabb<T> const &b) {
-	aabb<T> result;
-	result.min = max(a.min, b.min);
-	result.max = min(a.max, b.max);
-	return result;
-}
 
 s32 volume(aabb<v2s> const &box) {
 	v2s diameter = box.max - box.min;
@@ -5452,9 +6000,21 @@ MAX_PACK_IMPL_(TL_MATH_MAX_PACK)
 template <class T>
 inline static constexpr u32 simdElementCount = simdWidth / sizeof(T);
 
-#define TO_STRING_V3(v3f)													  \
+#define TO_STRING_V2(v2)													  \
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> \
-CopyFnRet<CopyFn, Char> to_string(v3f v, CopyFn &&copyFn) {					  \
+CopyFnRet<CopyFn, Char> to_string(v2 v, CopyFn &&copyFn) {					  \
+	StaticList<Char, 256> buffer;											  \
+	buffer += '{';															  \
+	to_string<Char>(v.x, [&](Span<Char const> span) { buffer += span; });	  \
+	buffer += as_span(", ");												  \
+	to_string<Char>(v.y, [&](Span<Char const> span) { buffer += span; });	  \
+	buffer += '}';															  \
+	return copyFn(as_span(buffer));											  \
+}
+
+#define TO_STRING_V3(v3)													  \
+template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> \
+CopyFnRet<CopyFn, Char> to_string(v3 v, CopyFn &&copyFn) {					  \
 	StaticList<Char, 256> buffer;											  \
 	buffer += '{';															  \
 	to_string<Char>(v.x, [&](Span<Char const> span) { buffer += span; });	  \
@@ -5466,22 +6026,15 @@ CopyFnRet<CopyFn, Char> to_string(v3f v, CopyFn &&copyFn) {					  \
 	return copyFn(as_span(buffer));											  \
 }
 
+TO_STRING_V2(v2f)
+TO_STRING_V2(v2u)
+TO_STRING_V2(v2s)
+
 TO_STRING_V3(v3f)
 TO_STRING_V3(v3u)
 TO_STRING_V3(v3s)
 
 #undef TO_STRING_V3
-
-template <class Char, class T, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> 
-CopyFnRet<CopyFn, Char> to_string(aabb<T> v, CopyFn &&copyFn) {					  
-	StaticList<Char, 256> buffer;											  
-	buffer += as_span("{ min: ");															  
-	to_string<Char>(v.min, [&](Span<Char const> span) { buffer += span; });	  
-	buffer += as_span(", max: ");												  
-	to_string<Char>(v.max, [&](Span<Char const> span) { buffer += span; });	  
-	buffer += as_span(" }");															  
-	return copyFn(as_span(buffer));											  
-}
 
 template <class To, class From> To cvt(From v) { return (To)v; }
 template <> v2f cvt(f32 v) { return V2f(v); }

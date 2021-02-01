@@ -157,7 +157,7 @@ TcpServer *create_tcp_server(Socket listener) {
 	addresses.resize(50);
 	ULONG addressesCount;
 	while (1) {
-		addressesCount = countof(addresses);
+		addressesCount = count_of(addresses);
 		if (GetAdaptersAddresses(AF_INET, 0, 0, addresses.data(), &addressesCount) == NO_ERROR) {
 			break;
 		}

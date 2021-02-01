@@ -20,7 +20,7 @@ struct Array {
 };
 
 template <class T, umm size>
-inline constexpr umm countof(Array<T, size> const &arr) {
+inline constexpr umm count_of(Array<T, size> const &arr) {
 	return arr.size();
 }
 

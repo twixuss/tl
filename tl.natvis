@@ -52,7 +52,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::ForwardListBase&lt;*&gt;" Inheritable="true">
+  <Type Name="TL::List&lt;*&gt;" Inheritable="true">
     <Intrinsic Name="size" Expression="_end - _begin" />
     <Intrinsic Name="capacity" Expression="_allocEnd - _begin" />
     <DisplayString>{{ size={size()}, capacity={capacity()} }}</DisplayString>
@@ -75,6 +75,16 @@
     </Expand>
   </Type>
   <Type Name="TL::StaticList&lt;*&gt;">
+    <Intrinsic Name="size" Expression="_end - _begin" />
+    <DisplayString>{{ size={size()} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>_begin</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TL::UnorderedStaticList&lt;*&gt;">
     <Intrinsic Name="size" Expression="_end - _begin" />
     <DisplayString>{{ size={size()} }}</DisplayString>
     <Expand>

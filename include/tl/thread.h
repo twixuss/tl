@@ -33,6 +33,8 @@ forceinline T atomic_set(T volatile *dst, T src) {
 	else static_assert(false, "lockSet is not available for this size");
 	return *(T *)&result;
 }
+template <class T>
+forceinline T atomic_set(T volatile &dst, T src) { return atomic_set(&dst, src); }
 
 template <class T>
 forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
@@ -43,6 +45,10 @@ forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
 	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)dst, *(char     *)&newValue, *(char     *)&comparand);
 	else static_assert(false, "atomic_set_if_equals is not available for this size");
 	return *(T *)&result;
+}
+template <class T>
+forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
+	return atomic_set_if_equals(std::addressof(dst), newValue, comparand);
 }
 
 TL_DECLARE_HANDLE(Thread);
@@ -84,111 +90,6 @@ forceinline s64 atomic_add(s64 volatile &a, s64 b) { return atomic_add(&a, b); }
 forceinline u16 atomic_add(u16 volatile &a, u16 b) { return atomic_add(&a, b); }
 forceinline u32 atomic_add(u32 volatile &a, u32 b) { return atomic_add(&a, b); }
 forceinline u64 atomic_add(u64 volatile &a, u64 b) { return atomic_add(&a, b); }
-
-#if 0
-template <class T>
-struct AtomicBase {
-	T volatile value;
-
-	AtomicBase() = default;
-	AtomicBase(AtomicBase const &) = delete;
-	AtomicBase(AtomicBase &&) = delete;
-	AtomicBase(T that) : value(that) {}
-	AtomicBase &operator=(AtomicBase const &) = delete;
-	AtomicBase &operator=(AtomicBase &&) = delete;
-	T store(T that) { return lockSet(&value, that), that; }
-	T load() const { READ_WRITE_BARRIER; return value; }
-	T operator=(T that) { return store(that); }
-	operator T() const { return load(); }
-};
-
-template <class Int>
-struct AtomicIntBase : AtomicBase<Int> {
-	using Base = AtomicBase;
-	using Base::Base;
-	using Base::operator=;
-	AtomicIntBase &operator++() { return lockIncrement(&value), *this; }
-	AtomicIntBase &operator--() { return lockDecrement(&value), *this; }
-	AtomicIntBase operator++(int) { return lockIncrement(&value) - 1; }
-	AtomicIntBase operator--(int) { return lockDecrement(&value) + 1; }
-	Int operator+=(Int that) { return atomic_add(value, that) + that; }
-	Int operator-=(Int that) { return lockSubtract(value, that) - that; }
-};
-
-template <class T>
-using SelectAtomicBase = std::conditional_t<std::is_integral_v<T>, AtomicIntBase<T>, AtomicBase<T>>;
-
-template <class T>
-struct Atomic : SelectAtomicBase<T> {
-	using Base = SelectAtomicBase<T>;
-	using Base::Base;
-	using Base::operator=;
-};
-
-// single producer, single consumer
-namespace SPSC {
-template <class T, size_t capacity>
-struct CircularQueue {
-	CircularQueue()						 = default;
-	CircularQueue(CircularQueue const &) = delete;
-	template <class... Args>
-	void emplace(Args &&... args) {
-		getSpace();
-		new (std::addressof(end->val)) T(std::forward<Args>(args)...);
-		++poppableCount;
-		increment(end);
-	}
-	void push(T &&val) { emplace(std::move(val)); }
-	void push(T const &val) { emplace(val); }
-	T pop() {
-		assert (poppableCount);
-		--poppableCount;
-		T result = std::move(begin->val);
-		begin->val.~T();
-		++pushableCount;
-		increment(begin);
-		return result;
-	}
-	Optional<T> try_pop() {
-		Optional<T> result{};
-		if (poppableCount) {
-			--poppableCount;
-			result.emplace(std::move(begin->val));
-			begin->val.~T();
-			++pushableCount;
-			increment(begin);
-		}
-		return result;
-	}
-	umm size() const { return poppableCount; }
-
-private:
-	union Entry {
-		T val;
-		Entry() {}
-		~Entry() {}
-	};
-	Entry entries[capacity];
-	Entry *begin			  = entries;
-	Entry *end				  = begin;
-	Atomic<umm> poppableCount = 0;
-	Atomic<umm> pushableCount = capacity;
-	void increment(Entry *&e) {
-		if (++e == entries + capacity) {
-			e = entries;
-		}
-	}
-	void getSpace() {
-		while (pushableCount == 0) {
-#if !COMPILER_GCC
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
-#endif
-		}
-		--pushableCount;
-	}
-};
-} // namespace SPSC
-#endif
 
 #ifdef TL_IMPL
 
@@ -280,7 +181,7 @@ inline bool try_lock(RecursiveMutex &m) {
 		++m.counter;
 		return true;
 	} else {
-		return !atomic_set_if_equals(&m.thread_id, thread_id, (u32)0);
+		return !atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
 	}
 }
 inline void lock(RecursiveMutex &m) {
@@ -289,7 +190,7 @@ inline void lock(RecursiveMutex &m) {
 		++m.counter;
 	} else {
 		loop_until([&] {
-			return !atomic_set_if_equals(&m.thread_id, thread_id, (u32)0);
+			return !atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
 		});
 	}
 }
@@ -302,23 +203,17 @@ inline void unlock(RecursiveMutex &m) {
 }
 
 #define scoped_lock(mutex) lock(mutex); defer { unlock(mutex); }
-#define SCOPED_UNLOCK(mutex) unlock(mutex); defer { lock(mutex); }
+#define scoped_unlock(mutex) unlock(mutex); defer { lock(mutex); }
 
 template <class T, class Mutex = Mutex, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct MutexQueue {
 	Queue<T, Allocator> base;
 	Mutex mutex;
 	
-	void push_no_lock(T &&value) { base.push(std::move(value)); }
-	void push_no_lock(T const &value) { base.push(value); }
-	void push(T &&value) {
-		scoped_lock(mutex);
-		base.push(std::move(value));
-	}
-	void push(T const &value) {
-		scoped_lock(mutex);
-		base.push(value);
-	}
+	template <class ...Args> void push_front_unordered_no_lock(Args &&...args) { base.push_front_unordered(std::forward<Args>(args)...); }
+	template <class ...Args> void push_front_unordered(Args &&...args) { scoped_lock(mutex); base.push_front_unordered(std::forward<Args>(args)...); }
+	template <class ...Args> void push_no_lock(Args &&...args) { base.push(std::forward<Args>(args)...); }
+	template <class ...Args> void push(Args &&...args) { scoped_lock(mutex); base.push(std::forward<Args>(args)...); }
 	Optional<T> try_pop() {
 		Optional<T> result;
 		scoped_lock(mutex);
@@ -340,13 +235,35 @@ struct MutexQueue {
 		scoped_lock(mutex);
 		base.clear();
 	}
+	void erase_no_lock(T *ptr) {
+		base.erase(ptr);
+	}
+	template <class Fn>
+	void pop_all_nolock(Fn &&fn) {
+		for (auto &value : base) {
+			fn(value);
+		}
+		base.clear();
+	}
+	template <class Fn>
+	void pop_all(Fn &&fn) {
+		scoped_lock(mutex);
+		pop_all_nolock(std::forward<Fn>(fn));
+	}
+	umm size() {
+		scoped_lock(mutex);
+		return base.size();
+	}
+
+	MutexQueue &operator+=(T const &v)                 { base += v; return *this; }
+	MutexQueue &operator+=(T &&v)                      { base += v; return *this; }
+	MutexQueue &operator+=(Span<T const> v)            { base += v; return *this; }
+	MutexQueue &operator+=(std::initializer_list<T> v) { base += v; return *this; }
 };
 
 template <class T, class Mutex, class Allocator>
 Span<T> as_span(MutexQueue<T, Mutex, Allocator> &queue) { return { queue.base.begin(), queue.base.end() }; }
 
-
-// TODO: this is horrible
 template <class T, umm capacity, class Mutex = Mutex>
 struct StaticMutexCircularQueue {
 	void push(T &&value) {
@@ -409,15 +326,19 @@ bool try_do_work(ThreadPool<Allocator> *pool);
 
 template <class Allocator>
 struct WorkQueue {
-	u32 volatile work_to_do = 0;
 	ThreadPool<Allocator> *pool = 0;
+	u32 volatile work_to_do = 0;
+	bool important = false;
 	inline void push(void (*fn)(void *param), void *param) {
 		if (pool->thread_count) {
 			ThreadWork<Allocator> work;
 			work.fn = fn;
 			work.param = param;
 			work.queue = this;
-			pool->all_work.push(work);
+			if (important)
+				pool->all_work.push_front_unordered(work);
+			else
+				pool->all_work.push(work);
 		} else {
 			fn(param);
 		}
@@ -452,9 +373,10 @@ struct WorkQueue {
 };
 
 template <class Allocator>
-inline WorkQueue<Allocator> make_work_queue(ThreadPool<Allocator> &pool) {
+inline WorkQueue<Allocator> make_work_queue(ThreadPool<Allocator> &pool, bool important = false) {
 	WorkQueue<Allocator> result = {};
 	result.pool = &pool;
+	result.important = important;
 	return result;
 }
 

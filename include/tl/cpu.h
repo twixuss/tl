@@ -116,13 +116,13 @@ struct CpuInfo {
 
 	inline bool hasFeature(CpuFeature feature) const {
 		CpuFeatureIndex index = getCpuFeatureIndex(feature);
-		if (index.slot >= countof(features))
+		if (index.slot >= count_of(features))
 			return 0;
 		return features[index.slot] & (1 << index.bit);
 	}
 	u32 totalCacheSize(CpuCacheLevel level) const {
 		u32 index = (u32)level;
-		assert(index < countof(cache));
+		assert(index < count_of(cache));
 		u32 result = 0;
 		for (auto &c : cache[index]) {
 			result += c.size;
@@ -189,7 +189,7 @@ CpuInfo get_cpu_info() {
 
 	for (auto &info : Span{buffer, processorInfoLength / sizeof(buffer[0])}) {
 		switch (info.Relationship) {
-			case RelationProcessorCore: result.logicalProcessorCount += countBits(info.ProcessorMask); break;
+			case RelationProcessorCore: result.logicalProcessorCount += count_bits(info.ProcessorMask); break;
 			case RelationCache: {
 				auto &cache = result.cache[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
 				cache.size += info.Cache.Size;

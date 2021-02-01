@@ -6,6 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#include <Psapi.h>
 #pragma comment(lib, "user32.lib")
 
 namespace TL {
@@ -28,6 +29,7 @@ TL_API void set_cursor_position(s32 x, s32 y);
 inline void set_cursor_position(v2s position) {
 	set_cursor_position(position.x, position.y);
 }
+TL_API u64 get_memory_usage();
 
 #ifdef TL_IMPL
 bool init_rawinput(RawInputDevice deviceFlags) {
@@ -204,6 +206,14 @@ void show_cursor() {
 }
 void set_cursor_position(s32 x, s32 y) {
 	SetCursorPos(x, y);
+}
+u64 get_memory_usage() {
+	u64 result = 0;
+	PROCESS_MEMORY_COUNTERS memoryCounters;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &memoryCounters, sizeof(memoryCounters))) {
+		result = memoryCounters.PagefileUsage;
+	}
+	return result;
 }
 #endif
 
