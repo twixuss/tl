@@ -126,6 +126,8 @@ template <class T> inline constexpr bool isPointer<T *> = true;
 template <class T> inline constexpr bool isLValueReference = false;
 template <class T> inline constexpr bool isLValueReference<T&> = true;
 
+template <class ...Args> inline constexpr bool is_invocable = std::is_invocable_v<Args...>;
+
 template <class T> struct RemoveReferenceT       { using Type = T; };
 template <class T> struct RemoveReferenceT<T &>  { using Type = T; };
 template <class T> struct RemoveReferenceT<T &&> { using Type = T; };
@@ -164,35 +166,38 @@ constexpr T &construct(T &val, Args &&...args) {
 
 #pragma warning(push)
 #pragma warning(disable : 4309)
-template<class T> inline constexpr T min() = delete;
-template<class T> inline constexpr T max() = delete;
-template<> inline constexpr u8  min() { return 0; }
-template<> inline constexpr u16 min() { return 0; }
-template<> inline constexpr u32 min() { return 0; }
-template<> inline constexpr u64 min() { return 0; }
-template<> inline constexpr u8  max() { return 0xFF; }
-template<> inline constexpr u16 max() { return 0xFFFF; }
-template<> inline constexpr u32 max() { return 0xFFFFFFFF; }
-template<> inline constexpr u64 max() { return 0xFFFFFFFFFFFFFFFF; }
 
-template<> inline constexpr s8  min() { return 0x80; }
-template<> inline constexpr s16 min() { return 0x8000; }
-template<> inline constexpr s32 min() { return 0x80000000; }
-template<> inline constexpr s64 min() { return 0x8000000000000000; }
-template<> inline constexpr s8  max() { return 0x7F; }
-template<> inline constexpr s16 max() { return 0x7FFF; }
-template<> inline constexpr s32 max() { return 0x7FFFFFFF; }
-template<> inline constexpr s64 max() { return 0x7FFFFFFFFFFFFFFF; }
+template <class T> inline static constexpr T min_value;
+template <class T> inline static constexpr T max_value;
 
-template<> inline constexpr ulong min() { return (ulong)min<ulong_s>(); }
-template<> inline constexpr ulong max() { return (ulong)max<ulong_s>(); }
-template<> inline constexpr slong min() { return (slong)min<slong_s>(); }
-template<> inline constexpr slong max() { return (slong)max<slong_s>(); }
+template<> inline static constexpr u8  min_value<u8 > = 0;
+template<> inline static constexpr u16 min_value<u16> = 0;
+template<> inline static constexpr u32 min_value<u32> = 0;
+template<> inline static constexpr u64 min_value<u64> = 0;
+template<> inline static constexpr u8  max_value<u8 > = 0xFF;
+template<> inline static constexpr u16 max_value<u16> = 0xFFFF;
+template<> inline static constexpr u32 max_value<u32> = 0xFFFFFFFF;
+template<> inline static constexpr u64 max_value<u64> = 0xFFFFFFFFFFFFFFFF;
 
-template<> inline constexpr f32 min() { return 1.175494351e-38f; }
-template<> inline constexpr f32 max() { return 3.402823466e+38f; }
-template<> inline constexpr f64 min() { return 2.2250738585072014e-308; }
-template<> inline constexpr f64 max() { return 1.7976931348623158e+308; }
+template<> inline static constexpr s8  min_value<s8 > = 0x80;
+template<> inline static constexpr s16 min_value<s16> = 0x8000;
+template<> inline static constexpr s32 min_value<s32> = 0x80000000;
+template<> inline static constexpr s64 min_value<s64> = 0x8000000000000000;
+template<> inline static constexpr s8  max_value<s8 > = 0x7F;
+template<> inline static constexpr s16 max_value<s16> = 0x7FFF;
+template<> inline static constexpr s32 max_value<s32> = 0x7FFFFFFF;
+template<> inline static constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
+
+template<> inline static constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
+template<> inline static constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
+template<> inline static constexpr slong min_value<slong> = (slong)min_value<slong_s>;
+template<> inline static constexpr slong max_value<slong> = (slong)max_value<slong_s>;
+
+template<> inline static constexpr f32 min_value<f32> = 1.175494351e-38f;
+template<> inline static constexpr f32 max_value<f32> = 3.402823466e+38f;
+template<> inline static constexpr f64 min_value<f64> = 2.2250738585072014e-308;
+template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
+
 #pragma warning(pop)
 
 template <class T>
@@ -254,26 +259,37 @@ forceinline f32 log(f32 x, f32 base) {
 	return ::logf(x) / ::logf(base);
 }
 
+forceinline constexpr s32 pow(s32 base, u32 exp) {
+    s32 res = 1;
+    while (exp) {
+        if (exp & 1)
+            res *= base;
+        exp >>= 1;
+        base *= base;
+    }
+    return res;
+}
+
 namespace CE {
 
 // https://stackoverflow.com/a/24748637
 #define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
-constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
+forceinline constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
+forceinline constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
+forceinline constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
+forceinline constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
 #undef S
 
 }
 
 forceinline u32 count_leading_zeros(u16 val) { return _lzcnt_u32(val); }
 forceinline u32 count_leading_zeros(u32 val) { return _lzcnt_u32(val); }
-forceinline u32 count_leading_zeros(u64 val) { return _lzcnt_u64(val); }
+forceinline u32 count_leading_zeros(u64 val) { return (u32)_lzcnt_u64(val); }
 
-forceinline s32 log2(u64 n) { return 31 - count_leading_zeros(n); }
-forceinline s32 log2(u32 n) { return 31 - count_leading_zeros(n); }
-forceinline s32 log2(u16 n) { return 31 - count_leading_zeros((u32)n); }
-forceinline s32 log2(u8  n) { return 31 - count_leading_zeros((u32)n); }
+forceinline s32 log2(u64 n) { return 63 - (s32)count_leading_zeros(n); }
+forceinline s32 log2(u32 n) { return 31 - (s32)count_leading_zeros(n); }
+forceinline s32 log2(u16 n) { return 15 - (s32)count_leading_zeros((u32)n); }
+forceinline s32 log2(u8  n) { return  7 - (s32)count_leading_zeros((u32)n); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
@@ -294,7 +310,7 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 	for (; log_count < 5; ++log_count) {
 		Log &log = logs[log_count];
 		Log &previous_log = logs[log_count - 1];
-		if (max<u32>() / previous_log.value < previous_log.value)
+		if (max_value<u32> / previous_log.value < previous_log.value)
 			break;
 		log.value = previous_log.value * previous_log.value;
 		log.power = previous_log.power * 2;
@@ -407,6 +423,40 @@ inline bool memory_equals(T const *a, U const *b) {
 	return memcmp(a, b, sizeof(T)) == 0;
 }
 
+template <class T, class Iterator>
+constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
+	for (Iterator it = begin; it != end; ++it) {
+		if (*it == value) {
+			return it;
+		}
+	}
+	return 0;
+}
+template <class T, class Iterator, class Compare>
+constexpr Iterator find(Iterator begin, Iterator end, T const &value, Compare &&compare) {
+	for (Iterator it = begin; it != end; ++it) {
+		if (compare(*it, value)) {
+			return it;
+		}
+	}
+	return 0;
+}
+template <class Iterator, class CmpIterator>
+constexpr Iterator find(Iterator src_begin, Iterator src_end, CmpIterator cmp_begin, CmpIterator cmp_end) {
+	umm src_size = (umm)(src_end - src_begin);
+	umm cmp_size = (umm)(cmp_end - cmp_begin);
+	for (umm i = 0; i < src_size - cmp_size + 1; ++i) {
+		for (umm j = 0; j < cmp_size; ++j) {
+			if (cmp_begin[j] != src_begin[i + j]) {
+				goto continue_first;
+			}
+		}
+		return src_begin + i;
+	continue_first:;
+	}
+	return 0;
+}
+
 template <class Fn>
 struct Deferrer {
 	inline Deferrer(Fn &&fn) : fn(std::move(fn)) {}
@@ -439,32 +489,71 @@ auto reverse(T &x) {
 
 template <class T>
 struct Span {
+	using ValueType = T;
 	constexpr Span() = default;
-	constexpr Span(T &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
+	constexpr Span(ValueType &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
 	template <umm count>
-	constexpr Span(T (&value)[count]) : _begin(value), _end(_begin + count) {}
-	constexpr Span(T *begin, T *end) : _begin(begin), _end(end) {}
-	constexpr Span(T *begin, umm size) : Span(begin, begin + size) {}
-	constexpr T *data() const { return _begin; }
-	constexpr T *begin() const { return _begin; }
-	constexpr T *end() const { return _end; }
-	constexpr T &front() const { return *_begin; }
-	constexpr T &back() const { return _end[-1]; }
+	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {}
+	constexpr Span(ValueType *begin, ValueType *end) : _begin(begin), _end(end) {}
+	constexpr Span(ValueType *begin, umm size) : Span(begin, begin + size) {}
+	constexpr ValueType *data() const { return _begin; }
+	constexpr ValueType *begin() const { return _begin; }
+	constexpr ValueType *end() const { return _end; }
+	constexpr ValueType &front() const { return *_begin; }
+	constexpr ValueType &back() const { return _end[-1]; }
 	constexpr umm size() const { return umm(_end - _begin); }
-	constexpr T &operator[](umm i) { return _begin[i]; }
-	constexpr T const &operator[](umm i) const { return _begin[i]; }
-	constexpr T &at(umm i) { return _begin[i]; }
-	constexpr T const &at(umm i) const { return _begin[i]; }
+	constexpr ValueType &operator[](umm i) const { return _begin[i]; }
+	constexpr ValueType &at(umm i) const { return _begin[i]; }
 	constexpr bool empty() const { return _begin == _end; }
 
 	constexpr operator bool() const { return _begin; }
-	constexpr operator Span<T const>() const { return {_begin, _end}; }
+	constexpr operator Span<ValueType const>() const { return {_begin, _end}; }
 	
-	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(T)}; }
-	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(T)}; }
-	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(T)}; } // Yes, there are three one-byte types
+	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
+	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(ValueType)}; }
+	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(ValueType)}; } // Yes, there are three one-byte types
 
-	constexpr bool operator==(Span<T> that) const {
+	constexpr bool operator==(Span<ValueType const> that) const {
+		if (size() != that.size())
+			return false;
+		for (umm i = 0; i < size(); ++i) {
+			if ((*this)[i] != that[i])
+				return false;
+		}
+		return true;
+	}
+	constexpr bool operator==(Span<ValueType> that) const { return *this == (Span<ValueType const>)that; }
+
+	ValueType *_begin{};
+	ValueType *_end{};
+};
+
+template <class T>
+struct Span<T const> {
+	using ValueType = T const;
+	constexpr Span() = default;
+	constexpr Span(ValueType &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
+	template <umm count>
+	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {}
+	constexpr Span(ValueType *begin, ValueType *end) : _begin(begin), _end(end) {}
+	constexpr Span(ValueType *begin, umm size) : Span(begin, begin + size) {}
+	constexpr ValueType *data() const { return _begin; }
+	constexpr ValueType *begin() const { return _begin; }
+	constexpr ValueType *end() const { return _end; }
+	constexpr ValueType &front() const { return *_begin; }
+	constexpr ValueType &back() const { return _end[-1]; }
+	constexpr umm size() const { return umm(_end - _begin); }
+	constexpr ValueType &operator[](umm i) const { return _begin[i]; }
+	constexpr ValueType &at(umm i) const { return _begin[i]; }
+	constexpr bool empty() const { return _begin == _end; }
+
+	constexpr operator bool() const { return _begin; }
+	
+	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
+	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(ValueType)}; }
+	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(ValueType)}; } // Yes, there are three one-byte types
+
+	constexpr bool operator==(Span<ValueType> that) const {
 		if (size() != that.size())
 			return false;
 		for (umm i = 0; i < size(); ++i) {
@@ -474,8 +563,8 @@ struct Span {
 		return true;
 	}
 
-	T *_begin{};
-	T *_end{};
+	ValueType *_begin{};
+	ValueType *_end{};
 };
 
 //template <class T, umm size>
@@ -504,34 +593,12 @@ constexpr void replace(Span<T> destination, Span<T const> source, umm start_inde
 	}
 }
 
-template <class T, class Iterator>
-constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
-	for (Iterator it = begin; it != end; ++it) {
-		if (*it == value) {
-			return it;
-		}
-	}
-	return 0;
-}
-
-template <class T, class Iterator, class Compare>
-constexpr Iterator find(Iterator begin, Iterator end, T const &value, Compare &&compare) {
-	for (Iterator it = begin; it != end; ++it) {
-		if (compare(*it, value)) {
-			return it;
-		}
-	}
-	return 0;
-}
-
-template <class T>
-constexpr T *find(Span<T> span, T const &value) {
-	return find(span.begin(), span.end(), value);
-}
-template <class T>
-constexpr T const *find(Span<T const> span, T const &value) {
-	return find(span.begin(), span.end(), value);
-}
+template <class T> constexpr T       *find(Span<T>       span, T const &value) { return find(span.begin(), span.end(), value); }
+template <class T> constexpr T const *find(Span<T const> span, T const &value) { return find(span.begin(), span.end(), value); }
+template <class T> constexpr T const *find(Span<T const> span, Span<T const> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+template <class T> constexpr T       *find(Span<T>       span, Span<T const> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+template <class T> constexpr T const *find(Span<T const> span, Span<T>       cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+template <class T> constexpr T       *find(Span<T>       span, Span<T>       cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
 
 template <class T, class Predicate>
 constexpr T *find_if(Span<T> span, Predicate predicate) {
@@ -793,7 +860,7 @@ CopyFnRet<CopyFn, Char> to_string(FormatInt<Int> f, CopyFn &&copy_fn) {
 	if constexpr (isSigned<Int>) {
 		if (v < 0) {
 			negative = true;
-			if (v == min<Int>()) {
+			if (v == min_value<Int>) {
 				*lsc-- = charMap[-(v % (Int)radix)];
 				v /= (Int)radix;
 				++charsWritten;
@@ -818,7 +885,7 @@ CopyFnRet<CopyFn, Char> to_string(FormatInt<Int> f, CopyFn &&copy_fn) {
 		(void)negative;
 	}
 	if (f.leading_zeros) {
-		u32 total_digits = ceil_to_int(log((f32)max<Int>(), (f32)f.radix));
+		u32 total_digits = (u32)ceil_to_int(log((f32)max_value<Int>, (f32)f.radix));
 		for (u32 i = charsWritten; i < total_digits; ++i) {
 			*lsc-- = '0';
 		}
@@ -1099,10 +1166,12 @@ struct StaticList {
 	forceinline constexpr operator Span<T const>() const { return {begin(), end()}; }
 
 	template <class... Args>
-	forceinline constexpr T &push_back(Args &&... args) {
+	forceinline constexpr T &emplace_back(Args &&... args) {
 		TL_BOUNDS_CHECK(!full());
 		return *new (this->_end++) T(std::forward<Args>(args)...);
 	}
+	forceinline constexpr T &push_back(T const &value) { return emplace_back(value); }
+	forceinline constexpr T &push_back(T &&value) { return emplace_back(std::move(value)); }
 
 	constexpr void pop_back() {
 		TL_BOUNDS_CHECK(size());
@@ -1150,10 +1219,15 @@ struct StaticList {
 	Storage *_end = _begin;
 };
 
-template <class T, umm capacity>
-Span<T> as_span(StaticList<T, capacity> &list) {
-	return (Span<T>)list;
-}
+template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> &list) { return (Span<T>)list; }
+template <class T, umm capacity> Span<T const> as_span(StaticList<T, capacity> const &list) { return (Span<T const>)list; }
+
+template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, T const &value) { return find(as_span(list), value); }
+template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, Span<T const> cmp) { return find(as_span(list), cmp); }
+template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, Span<T>       cmp) { return find(as_span(list), cmp); }
+template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, T const &value) { return find(as_span(list), value); }
+template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T const> cmp) { return find(as_span(list), cmp); }
+template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T>       cmp) { return find(as_span(list), cmp); }
 
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
 CopyFnRet<CopyFn, Char> to_string(FormatFloat<f64> f, CopyFn &&copy_fn) {
@@ -1233,7 +1307,7 @@ void OsAllocator::deallocate(void *data) { free(data); }
 #endif
 
 Allocator default_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, void *state) -> void * {
+	[](AllocatorMode mode, umm size, umm align, void *data, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate:
 				return OsAllocator::allocate(size, align);

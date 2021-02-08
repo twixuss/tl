@@ -304,8 +304,9 @@ constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
+template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
+template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map_clamped(T v, SN sn, SX sx, DN dn, DX dx) { return (clamp(v, sn, sx) - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class A, class B, class T> forceinline constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
 template <class M, class T> forceinline T &maskAssign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
@@ -1118,6 +1119,7 @@ union f32x<1> {
 #define f32x4_sub(a, b) _mm_sub_ps(a, b)
 #define f32x4_mul(a, b) _mm_mul_ps(a, b)
 #define f32x4_div(a, b) _mm_div_ps(a, b)
+#define f32x4_neg(a) _mm_xor_ps(a, _mm_set1_ps(-0.0f))
 
 template<>
 union f32x<4> {
@@ -1128,7 +1130,7 @@ union f32x<4> {
 	Scalar s[4];
 	DECLARE_M16;
 	
-	forceinline f32x4 operator-()         const { RETURN_M(ps, m16_not(ps)); }
+	forceinline f32x4 operator-()         const { RETURN_M(ps, f32x4_neg(ps)); }
 	forceinline	f32x4 operator+ (f32x4 b) const { RETURN_M(ps, f32x4_add(ps, b.ps)); }
 	forceinline	f32x4 operator- (f32x4 b) const { RETURN_M(ps, f32x4_sub(ps, b.ps)); }
 	forceinline	f32x4 operator* (f32x4 b) const { RETURN_M(ps, f32x4_mul(ps, b.ps)); }
@@ -1214,6 +1216,7 @@ union f64x<1> {
 #define f64x2_sub(a, b) _mm_sub_pd(a, b)
 #define f64x2_mul(a, b) _mm_mul_pd(a, b)
 #define f64x2_div(a, b) _mm_div_pd(a, b)
+#define f64x2_neg(a) _mm_xor_pd(a, _mm_set1_pd(-0.0))
 
 template <>
 union f64x<2> {
@@ -1224,7 +1227,7 @@ union f64x<2> {
 	Scalar s[2];
 	DECLARE_M16;
 
-	forceinline f64x2 operator-()         const { RETURN_M(ps, m16_not(ps)); }
+	forceinline f64x2 operator-()         const { RETURN_M(pd, f64x2_neg(pd)); }
 	forceinline	f64x2 operator+ (f64x2 b) const { RETURN_M(pd, f64x2_add(pd, b.pd)); }
 	forceinline	f64x2 operator- (f64x2 b) const { RETURN_M(pd, f64x2_sub(pd, b.pd)); }
 	forceinline	f64x2 operator* (f64x2 b) const { RETURN_M(pd, f64x2_mul(pd, b.pd)); }
@@ -2317,16 +2320,16 @@ template<> union v3<f32, 1> {
 	fice v3f &operator*=(f32 b) { return x *= b, y *= b, z *= b, *this;}
 	fice v3f &operator/=(f32 b) { return x /= b, y /= b, z /= b, *this;}
 
-	explicit operator v3sx<1>()const;
+	forceinline explicit operator v3sx<1>() const;
 };
 template<> union v4fx<1> { VECIMPL(4, S, 1, f32); };
 
 template<> union v2sx<1> { VECIMPL(2, S, 1, s32); };
 template<> union v3sx<1> { 
 	VECIMPL(3, S, 1, s32); 
-	v2s xz() const { return {x, z}; } 
-	v3s zxy() const { return {z,x,y}; }
-	explicit operator v3s64() const;
+	fice v2s xz() const { return {x, z}; } 
+	fice v3s zxy() const { return {z,x,y}; }
+	forceinline explicit operator v3s64() const;
 };
 template<> union v4sx<1> { VECIMPL(4, S, 1, s32); };
 template<> union v2ux<1> { VECIMPL(2, S, 1, u32); };
@@ -2356,10 +2359,10 @@ union v3s64 {
 	struct {
 		s64 x, y, z;
 	};
-	v3s64 operator-(v3s64 b) const { return {x - b.x, y - b.y, z - b.z}; }
-	v3s64 operator*(v3s64 b) const { return {x * b.x, y * b.y, z * b.z}; }
-	v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
-	v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
+	fice v3s64 operator-(v3s64 b) const { return {x - b.x, y - b.y, z - b.z}; }
+	fice v3s64 operator*(v3s64 b) const { return {x * b.x, y * b.y, z * b.z}; }
+	fice v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
+	fice v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
 };
 forceinline v3sx<1>::operator v3s64() const {
 	return {x, y, z};
@@ -3831,8 +3834,8 @@ forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
 forceinline u32 absolute(u32 v) { return v; }
 forceinline s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
 
-#define f32x4_abs(v) and_pi_16(v, s32x4_broadcast(max<s32>()))
-#define f64x2_abs(v) and_pi_16(v, s64x2_broadcast(max<s64>()))
+#define f32x4_abs(v) and_pi_16(v, s32x4_broadcast(max_value<s32>))
+#define f64x2_abs(v) and_pi_16(v, s64x2_broadcast(max_value<s64>))
 
 #define f32x8_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s32x8_broadcast(max<s32>())))
 #define f64x4_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s64x4_broadcast(max<s64>())))
@@ -4844,6 +4847,8 @@ struct aabb {
 		sum *= 0.5f;
 		return sum;
 	}
+	template <class U>
+	aabb<T> operator*(U const &b) { return {min * b, max * b}; }
 	bool operator==(aabb const &that) const { return min == that.min && max == that.max; }
 	bool operator!=(aabb const &that) const { return min != that.min || max != that.max; }
 	template <class U>
@@ -4868,47 +4873,11 @@ forceinline aabb<T> aabbCenterRadius(T center, T radius) {
 	return {center - radius, center + radius};
 }
 
-template <class T>
-struct ForEacher {};
+#define for_aabb3(x, y, z, condition, box) \
+for (auto z = box.min.z; z condition box.max.z; ++z) \
+for (auto y = box.min.y; y condition box.max.y; ++y) \
+for (auto x = box.min.x; x condition box.max.x; ++x)
 
-template <class T>
-struct ForEacher<aabb<T>> {
-	aabb<T> const &box;
-	template <class Fn>
-	forceinline constexpr void operator+(Fn &&fn) {
-		T it;
-		if constexpr(dimension_of<T> == 2) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-		} else if constexpr(dimension_of<T> == 3) {
-			for (it.z = box.min.z; it.z <= box.max.z; ++it.z) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-			}
-		} else if constexpr(dimension_of<T> == 4) {
-			for (it.w = box.min.w; it.w <= box.max.w; ++it.w) {
-			for (it.z = box.min.z; it.z <= box.max.z; ++it.z) {
-			for (it.y = box.min.y; it.y <= box.max.y; ++it.y) {
-			for (it.x = box.min.x; it.x <= box.max.x; ++it.x) {
-				fn(it);
-			}
-			}
-			}
-			}
-		}
-	}
-};
-
-template <class T>
-forceinline constexpr ForEacher<aabb<T>> for_each(aabb<T> const &box) {
-	return {box};
-}
 #define IN_BOUNDS2(bool, v2fA, v2fB) 			\
 	forceinline bool in_bounds(v2fA v, aabb<v2fB> b) { \
 		return 								    \
@@ -4964,114 +4933,145 @@ INTERSECTS3(bool, v3u) INTERSECTS3(b32x4, v3ux4) INTERSECTS3(b32x8, v3ux8);
 #undef INTERSECTS3
 
 template <class T>
-aabb<T> operator&(aabb<T> const &a, aabb<T> const &b) {
+forceinline aabb<T> operator&(aabb<T> const &a, aabb<T> const &b) {
 	aabb<T> result;
 	result.min = max(a.min, b.min);
 	result.max = min(a.max, b.max);
 	return result;
 }
 
-s32 volume(aabb<v2s> const &box) {
+forceinline s32 volume(aabb<v2s> const &box) {
 	v2s diameter = box.max - box.min;
 	return diameter.x * diameter.y;
 }
-s32 volume(aabb<v3s> const &box) {
+forceinline s32 volume(aabb<v3s> const &box) {
 	v3s diameter = box.max - box.min;
 	return diameter.x * diameter.y * diameter.z;
 }
 
-#if 0
-v3s left_bottom_back  (aabb<v3s> box) { return {box.min.x, box.min.y, box.min.z}; }
-v3s left_bottom_front (aabb<v3s> box) { return {box.min.x, box.min.y, box.max.z}; }
-v3s left_top_back     (aabb<v3s> box) { return {box.min.x, box.max.y, box.min.z}; }
-v3s left_top_front    (aabb<v3s> box) { return {box.min.x, box.max.y, box.max.z}; }
-v3s right_bottom_back (aabb<v3s> box) { return {box.max.x, box.min.y, box.min.z}; }
-v3s right_bottom_front(aabb<v3s> box) { return {box.max.x, box.min.y, box.max.z}; }
-v3s right_top_back    (aabb<v3s> box) { return {box.max.x, box.max.y, box.min.z}; }
-v3s right_top_front   (aabb<v3s> box) { return {box.max.x, box.max.y, box.max.z}; }
-
-inline UnorderedStaticList<aabb<v2s>, 8> subtract(aabb<v2s> const &a, aabb<v2s> const &b) {
-	UnorderedStaticList<aabb<v2s>, 8> boxes;
-
-	boxes += aabb_min_max(a.min, b.min);
-	boxes += aabb_min_max(b.max, a.max);
-	boxes += aabb_min_max(v2s{a.min.x, b.max.y}, v2s{b.min.x, a.max.y});
-	boxes += aabb_min_max(v2s{b.max.x, a.min.y}, v2s{a.max.x, b.min.y});
-	boxes += aabb_min_max(v2s{b.min.x, a.min.y}, v2s{b.max.x, b.min.y});
-	boxes += aabb_min_max(v2s{b.min.x, b.max.y}, v2s{b.max.x, a.max.y});
-	boxes += aabb_min_max(v2s{a.min.x, b.min.y}, v2s{b.min.x, b.max.y});
-	boxes += aabb_min_max(v2s{b.max.x, b.min.y}, v2s{a.max.x, b.max.y});
-
-	for (u32 i = 0; i < boxes.size(); ++i) {
-		if (volume(boxes[i]) <= 0) {
-			boxes.erase_at(i--);
-		}
-	}
-
-	return boxes;
-}
-#endif
-
+// Axis aligned bounding box subrtacion routines
 // a - b
 // subtract b from a
-inline StaticList<aabb<v3s>, 26> subtract(aabb<v3s> a, aabb<v3s> b, bool exclusive) {
-	StaticList<aabb<v3s>, 26> boxes;
+//
+// subtract_volume treats a and b as volumes
+//
+// subtract_points treats a and b as sets of points; 
+// Every aabb in result contains unique set of points.
+//
+// In both cases result's max point is inclusive
+//
 
-	aabb<v3s> original_b = b;
-	
+inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 	b.min = clamp(b.min, a.min, a.max);
 	b.max = clamp(b.max, a.min, a.max);
-
-	// Corners
-	boxes += aabb_min_max(a.min, b.min);													 // left_bottom_back
-	boxes += aabb_min_max(b.max, a.max);													 // right_top_front
-	boxes += aabb_min_max(v3s{a.min.x, b.max.y, a.min.z}, v3s{b.min.x, a.max.y, b.min.z}); // left_top_back
-	boxes += aabb_min_max(v3s{b.max.x, b.max.y, a.min.z}, v3s{a.max.x, a.max.y, b.min.z}); // right_top_back
-	boxes += aabb_min_max(v3s{a.min.x, a.min.y, b.max.z}, v3s{b.min.x, b.min.y, a.max.z}); // left_bottom_front
-	boxes += aabb_min_max(v3s{b.max.x, a.min.y, b.max.z}, v3s{a.max.x, b.min.y, a.max.z}); // right_bottom_front
-	boxes += aabb_min_max(v3s{b.max.x, a.min.y, a.min.z}, v3s{a.max.x, b.min.y, b.min.z}); // right_bottom_back
-	boxes += aabb_min_max(v3s{a.min.x, b.max.y, b.max.z}, v3s{b.min.x, a.max.y, a.max.z}); // left_top_front
-
-	// Edges
-	boxes += aabb_min_max(v3s{b.min.x, a.min.y, a.min.z}, v3s{b.max.x, b.min.y, b.min.z}); // bottom_back
-	boxes += aabb_min_max(v3s{b.min.x, b.max.y, a.min.z}, v3s{b.max.x, a.max.y, b.min.z}); // top_back
-	boxes += aabb_min_max(v3s{b.min.x, a.min.y, b.max.z}, v3s{b.max.x, b.min.y, a.max.z}); // bottom_front
-	boxes += aabb_min_max(v3s{b.min.x, b.max.y, b.max.z}, v3s{b.max.x, a.max.y, a.max.z}); // top_front
-	boxes += aabb_min_max(v3s{a.min.x, b.min.y, a.min.z}, v3s{b.min.x, b.max.y, b.min.z}); // right_back
-	boxes += aabb_min_max(v3s{b.max.x, b.min.y, a.min.z}, v3s{a.max.x, b.max.y, b.min.z}); // left_back
-	boxes += aabb_min_max(v3s{a.min.x, b.min.y, b.max.z}, v3s{b.min.x, b.max.y, a.max.z}); // right_front
-	boxes += aabb_min_max(v3s{b.max.x, b.min.y, b.max.z}, v3s{a.max.x, b.max.y, a.max.z}); // left_front
-	boxes += aabb_min_max(v3s{a.min.x, b.max.y, b.min.z}, v3s{b.min.x, a.max.y, b.max.z}); // left_top
-	boxes += aabb_min_max(v3s{b.max.x, b.max.y, b.min.z}, v3s{a.max.x, a.max.y, b.max.z}); // right_top
-	boxes += aabb_min_max(v3s{a.min.x, a.min.y, b.min.z}, v3s{b.min.x, b.min.y, b.max.z}); // left_bottom
-	boxes += aabb_min_max(v3s{b.max.x, a.min.y, b.min.z}, v3s{a.max.x, b.min.y, b.max.z}); // right_bottom
-
-	// Faces
-	boxes += aabb_min_max(v3s{b.min.x, b.min.y, a.min.z}, v3s{b.max.x, b.max.y, b.min.z}); // back
-	boxes += aabb_min_max(v3s{b.min.x, b.min.y, b.max.z}, v3s{b.max.x, b.max.y, a.max.z}); // front
-	boxes += aabb_min_max(v3s{a.min.x, b.min.y, b.min.z}, v3s{b.min.x, b.max.y, b.max.z}); // left
-	boxes += aabb_min_max(v3s{b.max.x, b.min.y, b.min.z}, v3s{a.max.x, b.max.y, b.max.z}); // right
-	boxes += aabb_min_max(v3s{b.min.x, b.max.y, b.min.z}, v3s{b.max.x, a.max.y, b.max.z}); // top
-	boxes += aabb_min_max(v3s{b.min.x, a.min.y, b.min.z}, v3s{b.max.x, b.min.y, b.max.z}); // bottom
-
+	StaticList<aabb<v2s>, 8> boxes = {
+		aabb_min_max(a.min, b.min),
+		aabb_min_max(b.max, a.max),
+		aabb_min_max(v2s{a.min.x, b.max.y}, v2s{b.min.x, a.max.y}),
+		aabb_min_max(v2s{b.max.x, a.min.y}, v2s{a.max.x, b.min.y}),
+		aabb_min_max(v2s{b.min.x, a.min.y}, v2s{b.max.x, b.min.y}),
+		aabb_min_max(v2s{b.min.x, b.max.y}, v2s{b.max.x, a.max.y}),
+		aabb_min_max(v2s{a.min.x, b.min.y}, v2s{b.min.x, b.max.y}),
+		aabb_min_max(v2s{b.max.x, b.min.y}, v2s{a.max.x, b.max.y}),
+	};
 	for (u32 i = 0; i < boxes.size(); ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
 	}
+	return boxes;
+}
+inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
+	b.min = clamp(b.min, a.min, a.max);
+	b.max = clamp(b.max, a.min, a.max);
+	StaticList<aabb<v3s>, 26> boxes = {
+		// Corners
+		aabb_min_max(a.min, b.min),                                                   // left bottom back
+		aabb_min_max(b.max, a.max),                                                   // right top front
+		aabb_min_max(v3s{a.min.x, b.max.y, a.min.z}, v3s{b.min.x, a.max.y, b.min.z}), // left top back
+		aabb_min_max(v3s{b.max.x, b.max.y, a.min.z}, v3s{a.max.x, a.max.y, b.min.z}), // right top back
+		aabb_min_max(v3s{a.min.x, a.min.y, b.max.z}, v3s{b.min.x, b.min.y, a.max.z}), // left bottom front
+		aabb_min_max(v3s{b.max.x, a.min.y, b.max.z}, v3s{a.max.x, b.min.y, a.max.z}), // right bottom front
+		aabb_min_max(v3s{b.max.x, a.min.y, a.min.z}, v3s{a.max.x, b.min.y, b.min.z}), // right bottom back
+		aabb_min_max(v3s{a.min.x, b.max.y, b.max.z}, v3s{b.min.x, a.max.y, a.max.z}), // left top front
 
-	if (exclusive) {
-		for (auto &box : boxes) {
-			if (original_b.max.x == b.max.x && box.min.x == b.max.x) ++box.min.x;
-			if (original_b.max.y == b.max.y && box.min.y == b.max.y) ++box.min.y;
-			if (original_b.max.z == b.max.z && box.min.z == b.max.z) ++box.min.z;
-			if (original_b.min.x == b.min.x && box.max.x == b.min.x) --box.max.x;
-			if (original_b.min.y == b.min.y && box.max.y == b.min.y) --box.max.y;
-			if (original_b.min.z == b.min.z && box.max.z == b.min.z) --box.max.z;
+		// Edges
+		aabb_min_max(v3s{b.min.x, a.min.y, a.min.z}, v3s{b.max.x, b.min.y, b.min.z}), // bottom back
+		aabb_min_max(v3s{b.min.x, b.max.y, a.min.z}, v3s{b.max.x, a.max.y, b.min.z}), // top back
+		aabb_min_max(v3s{b.min.x, a.min.y, b.max.z}, v3s{b.max.x, b.min.y, a.max.z}), // bottom front
+		aabb_min_max(v3s{b.min.x, b.max.y, b.max.z}, v3s{b.max.x, a.max.y, a.max.z}), // top front
+		aabb_min_max(v3s{a.min.x, b.min.y, a.min.z}, v3s{b.min.x, b.max.y, b.min.z}), // right back
+		aabb_min_max(v3s{b.max.x, b.min.y, a.min.z}, v3s{a.max.x, b.max.y, b.min.z}), // left back
+		aabb_min_max(v3s{a.min.x, b.min.y, b.max.z}, v3s{b.min.x, b.max.y, a.max.z}), // right front
+		aabb_min_max(v3s{b.max.x, b.min.y, b.max.z}, v3s{a.max.x, b.max.y, a.max.z}), // left front
+		aabb_min_max(v3s{a.min.x, b.max.y, b.min.z}, v3s{b.min.x, a.max.y, b.max.z}), // left top
+		aabb_min_max(v3s{b.max.x, b.max.y, b.min.z}, v3s{a.max.x, a.max.y, b.max.z}), // right top
+		aabb_min_max(v3s{a.min.x, a.min.y, b.min.z}, v3s{b.min.x, b.min.y, b.max.z}), // left bottom
+		aabb_min_max(v3s{b.max.x, a.min.y, b.min.z}, v3s{a.max.x, b.min.y, b.max.z}), // right bottom
+
+		// Faces
+		aabb_min_max(v3s{b.min.x, b.min.y, a.min.z}, v3s{b.max.x, b.max.y, b.min.z}), // back
+		aabb_min_max(v3s{b.min.x, b.min.y, b.max.z}, v3s{b.max.x, b.max.y, a.max.z}), // front
+		aabb_min_max(v3s{a.min.x, b.min.y, b.min.z}, v3s{b.min.x, b.max.y, b.max.z}), // left
+		aabb_min_max(v3s{b.max.x, b.min.y, b.min.z}, v3s{a.max.x, b.max.y, b.max.z}), // right
+		aabb_min_max(v3s{b.min.x, b.max.y, b.min.z}, v3s{b.max.x, a.max.y, b.max.z}), // top
+		aabb_min_max(v3s{b.min.x, a.min.y, b.min.z}, v3s{b.max.x, b.min.y, b.max.z}), // bottom
+	};
+	for (u32 i = 0; i < boxes.size(); ++i) {
+		if (volume(boxes[i]) <= 0) {
+			boxes.erase_at_unordered(i--);
 		}
 	}
-
 	return boxes;
+}
+inline StaticList<aabb<v2s>, 8> subtract_points(aabb<v2s> a, aabb<v2s> b) {
+	aabb<v2s> original_b = b;
+	b.min = clamp(b.min, a.min, a.max);
+	b.max = clamp(b.max, a.min, a.max);
+	auto boxes = subtract_volumes(a, b);
+	for (auto &box : boxes) {
+		box.min.x += (original_b.max.x == b.max.x && box.min.x == b.max.x);
+		box.min.y += (original_b.max.y == b.max.y && box.min.y == b.max.y);
+		box.max.x -= (original_b.min.x == b.min.x && box.max.x == b.min.x);
+		box.max.y -= (original_b.min.y == b.min.y && box.max.y == b.min.y);
+	}
+	return boxes;
+}
+inline StaticList<aabb<v3s>, 26> subtract_points(aabb<v3s> a, aabb<v3s> b) {
+	aabb<v3s> original_b = b;
+	b.min = clamp(b.min, a.min, a.max);
+	b.max = clamp(b.max, a.min, a.max);
+	auto boxes = subtract_volumes(a, b);
+	for (auto &box : boxes) {
+		box.min.x += (original_b.max.x == b.max.x && box.min.x == b.max.x);
+		box.min.y += (original_b.max.y == b.max.y && box.min.y == b.max.y);
+		box.min.z += (original_b.max.z == b.max.z && box.min.z == b.max.z);
+		box.max.x -= (original_b.min.x == b.min.x && box.max.x == b.min.x);
+		box.max.y -= (original_b.min.y == b.min.y && box.max.y == b.min.y);
+		box.max.z -= (original_b.min.z == b.min.z && box.max.z == b.min.z);
+	}
+	return boxes;
+}
+
+inline StaticList<aabb<v2s>, 9> combine_volumes(aabb<v2s> const &a, aabb<v2s> const &b) {
+	StaticList<aabb<v2s>, 9> result = { a };
+	result += subtract_volumes(b, a);
+	return result;
+}
+inline StaticList<aabb<v3s>, 27> combine_volumes(aabb<v3s> const &a, aabb<v3s> const &b) {
+	StaticList<aabb<v3s>, 27> result = { a };
+	result += subtract_volumes(b, a);
+	return result;
+}
+inline StaticList<aabb<v2s>, 9> combine_points(aabb<v2s> const &a, aabb<v2s> const &b) {
+	StaticList<aabb<v2s>, 9> result = { a };
+	result += subtract_points(b, a);
+	return result;
+}
+inline StaticList<aabb<v3s>, 27> combine_points(aabb<v3s> const &a, aabb<v3s> const &b) {
+	StaticList<aabb<v3s>, 27> result = { a };
+	result += subtract_points(b, a);
+	return result;
 }
 
 forceinline bool intersects(line<v2f> line, aabb<v2f> aabb) {
@@ -5362,7 +5362,7 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 	}
 	return planes;
 }
-forceinline bool containsSphere(FrustumPlanes const &planes, v3f position, f32 radius) {
+forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 	for (auto p : planes) {
 		if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
 			return false;
@@ -5483,13 +5483,13 @@ CopyFnRet<CopyFn, Char> to_string(aabb<T> v, CopyFn &&copyFn) {
 	return copyFn(as_span(buffer));											  
 }
 
-template <class To, class From> To cvt(From v) { return (To)v; }
-template <> v2f cvt(f32 v) { return V2f(v); }
-template <> v3f cvt(f32 v) { return V3f(v); }
-template <> v2f cvt(s32 v) { return V2f(v); }
-template <> v3f cvt(s32 v) { return V3f(v); }
-template <> v2f cvt(u32 v) { return V2f(v); }
-template <> v3f cvt(u32 v) { return V3f(v); }
+template <class To, class From> forceinline To cvt(From v) { return (To)v; }
+template <> forceinline v2f cvt(f32 v) { return V2f(v); }
+template <> forceinline v3f cvt(f32 v) { return V3f(v); }
+template <> forceinline v2f cvt(s32 v) { return V2f(v); }
+template <> forceinline v3f cvt(s32 v) { return V3f(v); }
+template <> forceinline v2f cvt(u32 v) { return V2f(v); }
+template <> forceinline v3f cvt(u32 v) { return V3f(v); }
 
 } // namespace TL
 

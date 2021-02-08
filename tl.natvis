@@ -94,4 +94,21 @@
       </ArrayItems>
     </Expand>
   </Type>
+  <Type Name="TL::BlockList&lt;*&gt;::Block">
+    <Intrinsic Name="size" Expression="end - buffer" />
+    <DisplayString>{{ size={size()} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>size()</Size>
+        <ValuePointer>buffer</ValuePointer>
+      </ArrayItems>
+      <Item Name="next" Condition="next!=0">next</Item>
+    </Expand>
+  </Type>
+  <Type Name="TL::Storage_Trivial&lt;*&gt;">
+    <DisplayString>{value}</DisplayString>
+  </Type>
+  <Type Name="TL::Storage_NonTrivial&lt;*&gt;">
+    <DisplayString>{value}</DisplayString>
+  </Type>
 </AutoVisualizer>

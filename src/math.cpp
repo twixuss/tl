@@ -202,7 +202,26 @@ void test_bool() {
 template <class T>
 void test_float() {
 	static_assert(widthOf<T> != 0);
-	TEST_PREFIX;
+
+	printType<T>();
+	using Scalar		  = typename T::Scalar;
+	using Pack			  = typename T::Pack;
+	using Mask			  = typename T::Mask;
+	constexpr bool isMask = isSame<Mask, Pack>;
+	constexpr u32 width	  = widthOf<Pack>;
+	alignas(64) Scalar data[width * 2];
+	for (s32 i = 0; i < _countof(data); ++i) {
+		set<isMask>(data[i], (Scalar)((i == 2) ? (~0) : (i - 2)));
+	}
+	alignas(64) Scalar scalar;
+	set<isMask>(scalar, (Scalar)1);
+	alignas(64) Pack a = *(Pack *)(data + 0);
+	alignas(64) Pack b = *(Pack *)(data + width);
+	for (u32 i = 0; i < width; ++i) {
+		assertEqual(a[i], data[i], "a == data");
+		assertEqual(b[i], data[i + width], "b == data");
+	}
+
 	TEST_UNARY(-);
 	TEST_BINARY(+);
 	TEST_BINARY(-);
@@ -294,6 +313,27 @@ void math_test() {
 	assert(TL::log( 99u, 10u) == 1);
 	assert(TL::log(100u, 10u) == 2);
 	assert(TL::log(101u, 10u) == 2);
+	
+	static_assert(TL::pow(1, 0) == 1);
+	static_assert(TL::pow(2, 0) == 1);
+	static_assert(TL::pow(3, 0) == 1);
+	static_assert(TL::pow(4, 0) == 1);
+	static_assert(TL::pow(1, 1) == 1);
+	static_assert(TL::pow(2, 1) == 2);
+	static_assert(TL::pow(3, 1) == 3);
+	static_assert(TL::pow(4, 1) == 4);
+	static_assert(TL::pow(1, 2) == 1);
+	static_assert(TL::pow(2, 2) == 4);
+	static_assert(TL::pow(3, 2) == 9);
+	static_assert(TL::pow(4, 2) == 16);
+	static_assert(TL::pow(1, 3) == 1);
+	static_assert(TL::pow(2, 3) == 8);
+	static_assert(TL::pow(3, 3) == 27);
+	static_assert(TL::pow(4, 3) == 64);
+	static_assert(TL::pow(1, 4) == 1);
+	static_assert(TL::pow(2, 4) == 16);
+	static_assert(TL::pow(3, 4) == 81);
+	static_assert(TL::pow(4, 4) == 256);
 
 	static_assert(TL::midpoint(0, 0) == 0);
 	static_assert(TL::midpoint(0, 1) == 0);
@@ -414,14 +454,21 @@ void math_test() {
 	//test_int<u64x2>();
 	//test_int<u64x4>();
 
-	
-	assert((v2f{0,1}[0] == 0));
-	assert((v2f{0,1}[1] == 1));
-	assert((v3f{0,1,2}[0] == 0));
-	assert((v3f{0,1,2}[1] == 1));
-	assert((v3f{0,1,2}[2] == 2));
-	assert((v4f{0,1,2,3}[0] == 0));
-	assert((v4f{0,1,2,3}[1] == 1));
-	assert((v4f{0,1,2,3}[2] == 2));
-	assert((v4f{0,1,2,3}[3] == 3));
+	{
+		aabb<v2s> a, b;
+		a = {{0, 0}, {10, 10}};
+		b = {{5, 5}, {15, 15}};
+
+		auto c = subtract_volumes(a, b);
+		assert(c.size() == 3);
+		assert(find(c, aabb<v2s>{{0,0},{ 5, 5}}));
+		assert(find(c, aabb<v2s>{{0,5},{ 5,10}}));
+		assert(find(c, aabb<v2s>{{5,0},{10, 5}}));
+
+		c = subtract_points(a, b);
+		assert(c.size() == 3);
+		assert(find(c, aabb<v2s>{{0,0},{ 4, 4}}));
+		assert(find(c, aabb<v2s>{{0,5},{ 4,10}}));
+		assert(find(c, aabb<v2s>{{5,0},{10, 4}}));
+	}
 }

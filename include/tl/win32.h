@@ -5,8 +5,10 @@
 #include "common.h"
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#pragma warning(push, 0)
 #include <Windows.h>
 #include <Psapi.h>
+#pragma warning(pop, 0)
 #pragma comment(lib, "user32.lib")
 
 namespace TL {

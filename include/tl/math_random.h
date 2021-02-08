@@ -5,9 +5,20 @@
 #include "simd/bits.h"
 
 #pragma warning(push)
-#pragma warning(disable : 4244)
+//#pragma warning(disable : 4244)
 
 namespace TL {
+
+inline static constexpr u32 u32_random_primes[] = {
+	0x36DCD91D,
+	0x054A136F,
+	0x7DA1D8CD,
+	0x914907D1,
+	0xAF446B4D,
+	0xC9B813BD,
+	0x89617FB5,
+	0x19744049,
+};
 
 template <class State>
 inline v3f next_v3f(State &state) {
@@ -19,10 +30,11 @@ inline v3f next_v3f(State &state) {
 }
 
 forceinline u32 random_u32(u32 seed) { 
-    u32 r0 = seed;
-    u32 r1 = rotateLeft(seed, 16);
-    u32 r2 = ((seed << 8) & 0xFF00FF00) | ((seed >> 8) & 0x00FF00FF);
-    return r2 * r1 * r0 * 0xC79402CF;
+	seed ^= (u32)0x55555555;
+	seed *= u32_random_primes[0];
+	seed ^= (u32)0x33333333;
+	seed *= u32_random_primes[1];
+    return seed;
 }
 forceinline u64 random_u64(u64 seed) {
     u64 r0 = seed;
@@ -113,25 +125,35 @@ forceinline v3fx8 random_v3fx8(v3sx8 value) {
 	};
 }
 
-forceinline f32 random_f32(v2s seed) { 
-	return random_f64(((u64)random_u32(seed.x) + random_u32(seed.x + seed.y)) ^ 0x9BD5E3039BD5E303);
+forceinline f32 random_f32(v2u seed) {
+	u32 s = 0;
+	s ^= random_u32(seed.x);
+	s ^= random_u32(seed.y + 0x36DCD91D);
+	return normalize_range_f32<f32>(s);
 }
-forceinline f32 random_f32(v3u seed) { 
+forceinline f32 random_f32(v3u seed) {
 	u32 s = 0;
 	s ^= random_u32(seed.x);
 	s ^= random_u32(seed.y + 0x55555555);
 	s ^= random_u32(seed.z + 0xAAAAAAAA);
 	return normalize_range_f32<f32>(s);
 }
-forceinline f32x8 random_f32x8(v3ux8 seed) { 
+forceinline f32x8 random_f32x8(v3ux8 seed) {
 	u32x8 s = {};
 	s ^= random_u32x8(seed.x);
 	s ^= random_u32x8(seed.y + 0x55555555);
 	s ^= random_u32x8(seed.z + 0xAAAAAAAA);
 	return normalize_range_f32<f32x8>(s);
 }
+forceinline f32 random_f32(v2s seed) { return random_f32((v2u)seed); }
 forceinline f32 random_f32(v3s seed) { return random_f32((v3u)seed); }
 forceinline f32x8 random_f32x8(v3sx8 seed) { return random_f32x8((v3ux8)seed); }
+
+forceinline u32 random_u32(f32 seed) { return *(u32 *)&seed; }
+forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
+
+forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
+forceinline u32 random_u32(v3s seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
 
 static constexpr f32 voronoi_largest_distance_possible_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)
 static constexpr f32 voronoi_largest_distance_possible_3d = 1.6583123951776999245574663683353f; // sqrt(2.75)
@@ -208,7 +230,7 @@ forceinline f32 voronoi(v3f coordinate) {
 forceinline f32 voronoi(v2s coordinate, s32 step_size) {
 	v2s scaled_tile = floor(coordinate, step_size);
 	v2s tile_position = scaled_tile / step_size;
-	v2f local_position = (v2f)(coordinate - scaled_tile) / step_size;
+	v2f local_position = (v2f)(coordinate - scaled_tile) * (1.0f / (f32)step_size);
 	f32 min_distance_squared = 1000;
 
 	static constexpr v2s offsets[] = {
@@ -232,7 +254,7 @@ forceinline f32 voronoi(v2s coordinate, s32 step_size) {
 forceinline f32 voronoi(v3s coordinate, s32 step_size) {
 	v3s scaled_tile = floor(coordinate, step_size);
 	v3s tile_position = scaled_tile / step_size;
-	v3f local_position = (v3f)(coordinate - scaled_tile) / step_size;
+	v3f local_position = (v3f)(coordinate - scaled_tile) * (1.0f / (f32)step_size);
 	
 	v3sx8 tile_position_x8  = V3sx8(tile_position);
 	v3fx8 local_position_x8 = V3fx8(local_position);
@@ -332,7 +354,7 @@ forceinline f32 value_noise(v3f coordinate, f32(*interpolate)(f32) = [](f32 v){r
 forceinline f32 value_noise(v2s coordinate, s32 step, f32(*interpolate)(f32)) {
 	v2s floored = floor(coordinate, step);
     v2s tile = floored / step;
-    v2f local = (v2f)(coordinate - floored) * (1.0f / step);
+	v2f local = (v2f)(coordinate - floored) * (1.0f / (f32)step);
 
 	f32 top_left     = random_f32(tile + v2s{0,0});
 	f32 bottom_left  = random_f32(tile + v2s{0,1});
@@ -346,9 +368,33 @@ forceinline f32 value_noise(v2s coordinate, s32 step, f32(*interpolate)(f32)) {
 
 	return lerp(top, bottom, ty);
 }
-forceinline f32 value_noise(v2s coordinate, s32 step) {
-	return value_noise(coordinate, step, [](f32 v){return v;});
+forceinline f32 value_noise(v3s coordinate, s32 step, f32(*interpolate)(f32)) {
+	v3s floored = floor(coordinate, step);
+    v3s tile = floored / step;
+	v3f local = (v3f)(coordinate - floored) * (1.0f / (f32)step);
+	
+	f32 left_top_back      = random_f32(tile + v3s{0,0,0});
+	f32 right_top_back     = random_f32(tile + v3s{1,0,0});
+	f32 left_bottom_back   = random_f32(tile + v3s{0,1,0});
+	f32 right_bottom_back  = random_f32(tile + v3s{1,1,0});
+	f32 left_top_front     = random_f32(tile + v3s{0,0,1});
+	f32 right_top_front    = random_f32(tile + v3s{1,0,1});
+	f32 left_bottom_front  = random_f32(tile + v3s{0,1,1});
+	f32 right_bottom_front = random_f32(tile + v3s{1,1,1});
+
+	f32 tx = interpolate(local.x);
+	f32 ty = interpolate(local.y);
+	f32 tz = interpolate(local.z);
+	f32 top_back     = lerp(left_top_back,     right_top_back,     tx);
+	f32 bottom_back  = lerp(left_bottom_back,  right_bottom_back,  tx);
+	f32 top_front    = lerp(left_top_front,    right_top_front,    tx);
+	f32 bottom_front = lerp(left_bottom_front, right_bottom_front, tx);
+	f32 top    = lerp(top_back,    top_front,    tz);
+	f32 bottom = lerp(bottom_back, bottom_front, tz);
+	return lerp(top, bottom, ty);
 }
+forceinline f32 value_noise(v2s coordinate, s32 step) { return value_noise(coordinate, step, [](f32 v){ return v; }); }
+forceinline f32 value_noise(v3s coordinate, s32 step) { return value_noise(coordinate, step, [](f32 v){ return v; }); }
 
 template <class T>
 forceinline T saturate(T t) {
@@ -362,29 +408,28 @@ forceinline T smoothstep(T t) {
 }
 
 forceinline f32 gradient_noise(v2f coordinate) {
-	static constexpr auto sample_gradient = [](v2f tile, v2f offset) {
-		static const v2f gradients[8] = {
-			v2f{ 1., 0.},
-			v2f{-1., 0.},
-			v2f{ 0., 1.},
-			v2f{ 0.,-1.},
-			normalize(v2f{ 1., 1.}),
-			normalize(v2f{-1., 1.}),
-			normalize(v2f{ 1.,-1.}),
-			normalize(v2f{-1.,-1.})
-		};
-		return gradients[(u32)(random_f32(tile + offset) * count_of(gradients))];
-	};
     v2f tile = floor(coordinate);
     v2f local = frac(coordinate);
     
     v2f t0 = local;
     v2f t1 = t0 - 1.;
     
-    v2f g00 = sample_gradient(tile, v2f{0, 0});
-    v2f g10 = sample_gradient(tile, v2f{1, 0});
-    v2f g01 = sample_gradient(tile, v2f{0, 1});
-    v2f g11 = sample_gradient(tile, v2f{1, 1});
+	static const v2f directions[] = {
+		v2f{ 1., 0.},
+		v2f{-1., 0.},
+		v2f{ 0., 1.},
+		v2f{ 0.,-1.},
+		normalize(v2f{ 1., 1.}),
+		normalize(v2f{-1., 1.}),
+		normalize(v2f{ 1.,-1.}),
+		normalize(v2f{-1.,-1.})
+	};
+	static_assert(is_power_of_2(count_of(directions)));
+	auto get_direction = [&](v2f offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+    v2f g00 = get_direction(v2f{0, 0});
+    v2f g10 = get_direction(v2f{1, 0});
+    v2f g01 = get_direction(v2f{0, 1});
+    v2f g11 = get_direction(v2f{1, 1});
     
     f32 v00 = g00.x * t0.x + g00.y * t0.y;
     f32 v10 = g10.x * t1.x + g10.y * t0.y;
@@ -392,34 +437,33 @@ forceinline f32 gradient_noise(v2f coordinate) {
     f32 v11 = g11.x * t1.x + g11.y * t1.y;
     
     v2f t = smoothstep(local);
-    return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.) + 0.5;
+    return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
 
 forceinline f32 gradient_noise(v2s coordinate, s32 step) {
-	static constexpr auto sample_gradient = [](v2s tile, v2s offset) {
-		static const v2f gradients[8] = {
-			v2f{ 1., 0.},
-			v2f{-1., 0.},
-			v2f{ 0., 1.},
-			v2f{ 0.,-1.},
-			normalize(v2f{ 1., 1.}),
-			normalize(v2f{-1., 1.}),
-			normalize(v2f{ 1.,-1.}),
-			normalize(v2f{-1.,-1.})
-		};
-		return gradients[(u32)(random_f32(tile + offset) * count_of(gradients))];
-	};
 	v2s floored = floor(coordinate, step);
     v2s tile = floored / step;
-    v2f local = (v2f)(coordinate - floored) * (1.0f / step);
+    v2f local = (v2f)(coordinate - floored) * (1.0f / (f32)step);
     
     v2f t0 = local;
     v2f t1 = t0 - 1.;
     
-    v2f g00 = sample_gradient(tile, v2s{0, 0});
-    v2f g10 = sample_gradient(tile, v2s{1, 0});
-    v2f g01 = sample_gradient(tile, v2s{0, 1});
-    v2f g11 = sample_gradient(tile, v2s{1, 1});
+	static const v2f directions[] = {
+		v2f{ 1., 0.},
+		v2f{-1., 0.},
+		v2f{ 0., 1.},
+		v2f{ 0.,-1.},
+		normalize(v2f{ 1., 1.}),
+		normalize(v2f{-1., 1.}),
+		normalize(v2f{ 1.,-1.}),
+		normalize(v2f{-1.,-1.})
+	};
+	static_assert(is_power_of_2(count_of(directions)));
+	auto get_direction = [&](v2s offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+    v2f g00 = get_direction(v2s{0, 0});
+    v2f g10 = get_direction(v2s{1, 0});
+    v2f g01 = get_direction(v2s{0, 1});
+    v2f g11 = get_direction(v2s{1, 1});
     
     f32 v00 = g00.x * t0.x + g00.y * t0.y;
     f32 v10 = g10.x * t1.x + g10.y * t0.y;
@@ -427,24 +471,24 @@ forceinline f32 gradient_noise(v2s coordinate, s32 step) {
     f32 v11 = g11.x * t1.x + g11.y * t1.y;
     
     v2f t = smoothstep(local);
-    return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.) + 0.5;
+    return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
 
 forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 	v3s floored = floor(coordinate, step);
     v3s tile = floored / step;
-    v3f local = (v3f)(coordinate - floored) * (1.0f / step);
+    v3f local = (v3f)(coordinate - floored) * (1.0f / (f32)step);
     
     v3f t0 = local;
     v3f t1 = t0 - 1;
     
-	static constexpr v3f gradients[] = {
-		v3f{ 1, 0, 0},
-		v3f{-1, 0, 0},
-		v3f{ 0, 1, 0},
-		v3f{ 0,-1, 0},
-		v3f{ 0, 0, 1},
-		v3f{ 0, 0,-1},
+	static constexpr v3f directions[] = {
+		// v3f{ 1, 0, 0},
+		// v3f{-1, 0, 0},
+		// v3f{ 0, 1, 0},
+		// v3f{ 0,-1, 0},
+		// v3f{ 0, 0, 1},
+		// v3f{ 0, 0,-1},
 		CE::normalize(v3f{ 1, 1, 1}),
 		CE::normalize(v3f{-1, 1, 1}),
 		CE::normalize(v3f{ 1,-1, 1}),
@@ -454,6 +498,7 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 		CE::normalize(v3f{ 1,-1,-1}),
 		CE::normalize(v3f{-1,-1,-1})
 	};
+	static_assert(is_power_of_2(count_of(directions)));
 
     v3f t = smoothstep(local);
 
@@ -465,11 +510,11 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 																	  0, 0, 1,
 																	  1, 0, 1,
 																	  0, 1, 1,
-																	  1, 1, 1)) * count_of(gradients)) * sizeof(gradients[0]);
+																	  1, 1, 1)) * count_of(directions)) * sizeof(directions[0]);
 	v3fx8 g;
-	gather(g.x, &gradients->x, gradient_indices);
-	gather(g.y, &gradients->y, gradient_indices);
-	gather(g.z, &gradients->z, gradient_indices);
+	gather(g.x, &directions->x, gradient_indices);
+	gather(g.y, &directions->y, gradient_indices);
+	gather(g.z, &directions->z, gradient_indices);
 
 	f32x8 v = dot(g, V3fx8(
 		t0.x, t0.y, t0.z,
@@ -489,14 +534,15 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 			t.z
 		) / sqrt3 + 0.5f;
 #else
-    v3f g000 = gradients[(u32)(random_f32(tile + v3s{0, 0, 0}) * count_of(gradients) * 0.999999f)];
-    v3f g100 = gradients[(u32)(random_f32(tile + v3s{1, 0, 0}) * count_of(gradients) * 0.999999f)];
-    v3f g010 = gradients[(u32)(random_f32(tile + v3s{0, 1, 0}) * count_of(gradients) * 0.999999f)];
-    v3f g110 = gradients[(u32)(random_f32(tile + v3s{1, 1, 0}) * count_of(gradients) * 0.999999f)];
-    v3f g001 = gradients[(u32)(random_f32(tile + v3s{0, 0, 1}) * count_of(gradients) * 0.999999f)];
-    v3f g101 = gradients[(u32)(random_f32(tile + v3s{1, 0, 1}) * count_of(gradients) * 0.999999f)];
-    v3f g011 = gradients[(u32)(random_f32(tile + v3s{0, 1, 1}) * count_of(gradients) * 0.999999f)];
-    v3f g111 = gradients[(u32)(random_f32(tile + v3s{1, 1, 1}) * count_of(gradients) * 0.999999f)];
+	auto get_direction = [&](v3s offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+    v3f g000 = get_direction({0, 0, 0});
+    v3f g100 = get_direction({1, 0, 0});
+    v3f g010 = get_direction({0, 1, 0});
+    v3f g110 = get_direction({1, 1, 0});
+    v3f g001 = get_direction({0, 0, 1});
+    v3f g101 = get_direction({1, 0, 1});
+    v3f g011 = get_direction({0, 1, 1});
+    v3f g111 = get_direction({1, 1, 1});
 	f32 v000 = dot(g000, v3f{ t0.x, t0.y, t0.z});
     f32 v100 = dot(g100, v3f{ t1.x, t0.y, t0.z});
     f32 v010 = dot(g010, v3f{ t0.x, t1.y, t0.z});

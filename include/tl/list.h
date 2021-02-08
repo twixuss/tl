@@ -169,10 +169,12 @@ struct List {
 		return true;
 	}
 	template <class... Args>
-	T &push_back(Args &&...args) {
+	T &emplace_back(Args &&...args) {
 		_grow_if_needed(size() + 1);
 		return *new ((void *)_end++) T(std::forward<Args>(args)...);
 	}
+	T &push_back(T const &value) { return emplace_back(value); }
+	T &push_back(T &&value) { return emplace_back(std::move(value)); }
 
 	template <class... Args>
 	T &push_front(Args &&... args) {
@@ -978,19 +980,43 @@ private:
 
 template <class T, class Allocator, umm block_size, class Fn>
 void for_each(BlockList<T, block_size, Allocator> &list, Fn &&fn) {
-	auto block = &list.first;
-	do {
-		for (auto it = block->buffer; it != block->end; ++it) {
-			using Ret = decltype(fn(*it));
-			if constexpr (isSame<bool, Ret>) {
-				if (fn(*it))
-					return;
-			} else {
-				fn(*it);
+	constexpr bool using_index = std::is_invocable_v<Fn, T&, BlockListIndex>;
+
+	if constexpr (using_index) {
+		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
+		constexpr bool breakable = isSame<bool, ReturnType>;
+		BlockListIndex index = {};
+		auto block = &list.first;
+		do {
+			for (auto it = block->buffer; it != block->end; ++it) {
+				if constexpr (breakable) {
+					if (fn(it->value, index))
+						return;
+				} else {
+					fn(it->value, index);
+				}
+				++index.value_index;
 			}
-		}
-		block = block->next;
-	} while (block);
+			block = block->next;
+			++index.block_index;
+			index.value_index = 0;
+		} while (block);
+	} else {
+		using ReturnType = decltype(fn(*(T*)0));
+		constexpr bool breakable = isSame<bool, ReturnType>;
+		auto block = &list.first;
+		do {
+			for (auto it = block->buffer; it != block->end; ++it) {
+				if constexpr (breakable) {
+					if (fn(it->value))
+						return;
+				} else {
+					fn(it->value);
+				}
+			}
+			block = block->next;
+		} while (block);
+	}
 }
 
 template <class T, class Allocator, umm block_size>

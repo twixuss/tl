@@ -25,10 +25,11 @@ void string_test() {
 	assert(result.size() == strlen(str));
 	assert(memcmp(result.data(), str, result.size()) == 0);
 
-	auto copyFn = [&](Span<char const> span){return true;};
+	auto copyFn = [&] (Span<char const> span) {return true;};
 	static_assert(isCopyFn<decltype(copyFn), char>);
 	using TTT = CopyFnRet<decltype(copyFn), char>;
-	to_string<char>(v3f{}, copyFn);
+
+	to_string<char>(v3f{}, std::move(copyFn));
 
 	puts("ok");
 }
@@ -357,10 +358,17 @@ void buffer_test() {
 	}
 }
 
-f32 result__;
+u16 counts[0x10000];
 
 int main() {
-	result__ = voronoi(v2f{.1f, .2f});
+	for (u32 i = 0; i < count_of(counts); ++i) {
+		u32 index = random_u32(i) & (count_of(counts) - 1);
+		++counts[index];
+	}
+
+	std::sort(std::begin(counts), std::end(counts));
+
+	print("Median: %, Max: %, Min: %\n", counts[count_of(counts) / 2], *std::max_element(std::begin(counts), std::end(counts)), *std::min_element(std::begin(counts), std::end(counts)));
 
 	buffer_test();
 	sort_test();

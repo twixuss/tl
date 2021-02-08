@@ -17,13 +17,13 @@ enum ComponentType {
 
 }
 
-struct Vertex {
+struct GenericVertex {
 	v3f position;
 	v3f normal;
 };
 
 struct Mesh {
-	List<Vertex> vertices;
+	List<GenericVertex> vertices;
 	List<u32> indices;
 };
 

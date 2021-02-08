@@ -96,12 +96,14 @@ D(glLinkProgram, void (*)(GLuint program)) \
 D(glGetProgramiv, void (*)(GLuint program, GLenum pname, GLint *params)) \
 D(glGetProgramInfoLog, void (*)(GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog)) \
 D(glGenVertexArrays, void (*)(GLsizei n, GLuint *arrays)) \
+D(glDeleteVertexArrays, void (*)(GLsizei n, const GLuint *arrays))\
 D(glBindVertexArray, void (*)(GLuint array)) \
 D(glGenBuffers, void (*)(GLsizei n, GLuint * buffers)) \
 D(glBindBuffer, void (*)(GLenum target, GLuint buffer)) \
 D(glDeleteBuffers, void (*)(GLsizei n, const GLuint * buffers)) \
 D(glBufferData, void (*)(GLenum target, GLsizeiptr size, const void * data, GLenum usage)) \
 D(glVertexAttribPointer, void (*)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer)) \
+D(glVertexAttribIPointer, void (*)(GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer))\
 D(glEnableVertexAttribArray, void (*)(GLuint index)) \
 D(glUseProgram, void (*)(GLuint program)) \
 D(glUniform1f, void (*)(GLint location, GLfloat v0)) \
@@ -323,6 +325,8 @@ bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 	dp.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
 	dp.cColorBits = 32;
 	dp.cAlphaBits = 8;
+	dp.cDepthBits = 24;
+	dp.cStencilBits = 8;
 	dp.iPixelType = PFD_TYPE_RGBA;
 	dp.iLayerType = PFD_MAIN_PLANE;
 

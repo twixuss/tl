@@ -109,7 +109,7 @@ Thread create_thread(void (*fn)(void *), void *param) {
 	data.fn = fn;
 	data.param = param;
 	data.acquired = false;
-	HANDLE result = CreateThread(0, 0, [](void *param) -> DWORD {
+	HANDLE result = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
@@ -254,11 +254,15 @@ struct MutexQueue {
 		scoped_lock(mutex);
 		return base.size();
 	}
-
-	MutexQueue &operator+=(T const &v)                 { base += v; return *this; }
-	MutexQueue &operator+=(T &&v)                      { base += v; return *this; }
-	MutexQueue &operator+=(Span<T const> v)            { base += v; return *this; }
-	MutexQueue &operator+=(std::initializer_list<T> v) { base += v; return *this; }
+	
+	void append_no_lock(T const &v)                 { base += v; }
+	void append_no_lock(T &&v)                      { base += v; }
+	void append_no_lock(Span<T const> v)            { base += v; }
+	void append_no_lock(std::initializer_list<T> v) { base += v; }
+	void append(T const &v)                 { scoped_lock(mutex); base += v; }
+	void append(T &&v)                      { scoped_lock(mutex); base += v; }
+	void append(Span<T const> v)            { scoped_lock(mutex); base += v; }
+	void append(std::initializer_list<T> v) { scoped_lock(mutex); base += v; }
 };
 
 template <class T, class Mutex, class Allocator>
