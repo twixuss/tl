@@ -99,7 +99,7 @@ inline void writeString(File file, T const &value) {
 }
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(File file, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	auto oldCursor = getCursor(file);
 	defer { setCursor(file, oldCursor, File_begin); };
 
@@ -107,30 +107,44 @@ inline Buffer<Allocator> read_entire_file(File file, umm extraPreSpace = 0, umm 
 	auto size = (umm)getCursor(file);
 	setCursor(file, 0, File_begin);
 
-	u8 *data = ALLOCATE_T(Allocator, u8, size + extraPreSpace + extraPostSpace, 0);
-	read(file, data + extraPreSpace, size);
+	u8 *data = ALLOCATE_T(Allocator, u8, size + extra_space_before + extra_space_after, 0);
+	read(file, data + extra_space_before, size);
 
-	return {data, size + extraPreSpace + extraPostSpace};
+	return {data, size + extra_space_before + extra_space_after};
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(char const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(char const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		defer { close(file); };
-		return read_entire_file<Allocator>(file, extraPreSpace, extraPostSpace);
+		return read_entire_file<Allocator>(file, extra_space_before, extra_space_after);
 	} else {
 		return {};
 	}
 }
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(wchar const *path, umm extraPreSpace = 0, umm extraPostSpace = 0) {
+inline Buffer<Allocator> read_entire_file(wchar const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		defer { close(file); };
-		return read_entire_file<Allocator>(file, extraPreSpace, extraPostSpace);
+		return read_entire_file<Allocator>(file, extra_space_before, extra_space_after);
 	} else {
 		return {};
 	}
+}
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline Buffer<Allocator> read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+	if (path.back() == '\0')
+		return read_entire_file(path.data(), extra_space_before, extra_space_after);
+	else
+		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
+}
+template <class Allocator = TL_DEFAULT_ALLOCATOR>
+inline Buffer<Allocator> read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+	if (path.back() == '\0')
+		return read_entire_file(path.data(), extra_space_before, extra_space_after);
+	else
+		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
 }
 inline void truncate(File file, u64 size) {
 	setCursor(file, (s64)size, File_begin);
@@ -308,7 +322,7 @@ List<String<char>> get_files_in_directory(char const *directory) {
 	}
 	defer { free(allocator, directory_with_star); };
 
-	WIN32_FIND_DATA find_data;
+	WIN32_FIND_DATAA find_data;
 	HANDLE handle = FindFirstFileA(directory_with_star, &find_data);
     if (handle == INVALID_HANDLE_VALUE) {
 		return {};
@@ -319,6 +333,9 @@ List<String<char>> get_files_in_directory(char const *directory) {
     do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
+		}
+		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			continue;
 		}
         result += find_data.cFileName;
     } while (FindNextFileA(handle, &find_data));

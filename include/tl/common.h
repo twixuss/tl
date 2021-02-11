@@ -167,8 +167,8 @@ constexpr T &construct(T &val, Args &&...args) {
 #pragma warning(push)
 #pragma warning(disable : 4309)
 
-template <class T> inline static constexpr T min_value;
-template <class T> inline static constexpr T max_value;
+template <class T> inline static constexpr T min_value = {};
+template <class T> inline static constexpr T max_value = {};
 
 template<> inline static constexpr u8  min_value<u8 > = 0;
 template<> inline static constexpr u16 min_value<u16> = 0;
@@ -303,7 +303,7 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 		u32 value;
 		u32 power;
 	};
-	Log logs[5];
+	Log logs[5] = {};
 	logs[0].value = base;
 	logs[0].power = 1;
 	u32 log_count = 1;
@@ -471,7 +471,7 @@ private:
 };
 #endif
 
-#define defer ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]()
+#define defer ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]
 
 template <class T>
 auto reverse(T &x) {

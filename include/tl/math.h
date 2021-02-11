@@ -3917,7 +3917,7 @@ forceinline f32x8 reciprocal(f32x8 v) { RETURN_T2(f32x8, reciprocal(v.lo), recip
 #endif
 forceinline v4f sqrt(v4f v) { return V4f(sqrt(v.m)); }
 
-forceinline f32 reciprocal(f32 v) { return 1.0f / v; }
+forceinline f32 reciprocal(f32 v) { return _mm_cvtss_f32(_mm_rcp_ss(_mm_set_ss(v))); }
 
 forceinline f32 sin(f32 v) { return ::sinf(v); }
 forceinline f32 cos(f32 v) { return ::cosf(v); }

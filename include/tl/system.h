@@ -120,6 +120,12 @@
 	#define TL_API
 #endif
 
+#if OS_WINDOWS
+#define TL_OS_INCLUDE(x) STRINGIZE(windows/x)
+#else
+#define TL_OS_INCLUDE(x) STRINGIZE(?????/x)
+#endif
+
 namespace TL {
 
 template <bool v, class T, class F> struct ConditionalT { using Type = T; };

@@ -1,34 +1,36 @@
 #pragma once
 
-#include "system.h"
-
-namespace TL {
-
-TL_API void _print( char const *string, umm length);
-TL_API void _print(wchar const *string, umm length);
-TL_API void clear_console();
-
-template <class Char = char, class T>
-inline void print(T const &value);
-
-template <class Char = char, class ...Args>
-inline void print(Char const *fmt, Args const &...args);
-
-}
-
 #include "common.h"
 #include "string.h"
 
 namespace TL {
 
-template <class Char, class T>
+enum Encoding {
+    Encoding_ascii,
+    Encoding_utf16,
+};
+
+template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_ascii;
+template <> inline static constexpr Encoding encoding_from_type<wchar> = Encoding_utf16;
+
+using Printer = void (*)(void const *data, umm length, Encoding encoding);
+
+extern TL_API Printer console_printer;
+extern TL_API Printer current_printer;
+
+TL_API void clear_console();
+
+inline void print_to_console(char  const *string, umm length) { console_printer(string, length, Encoding_ascii); }
+inline void print_to_console(wchar const *string, umm length) { console_printer(string, length, Encoding_utf16); }
+
+template <class Char = char, class T>
 inline void print(T const &value) {
 	to_string<Char>(value, [](Span<Char const> span) {
-		_print(span.data(), span.size());
+		current_printer(span.data(), span.size(), encoding_from_type<Char>);
 	});
 }
 
-template <class Char, class ...Args>
+template <class Char = char, class ...Args>
 inline void print(Char const *fmt, Args const &...args) {
 	StringBuilder<Char> builder;
 	builder.appendFormat(fmt, args...);
@@ -37,65 +39,11 @@ inline void print(Char const *fmt, Args const &...args) {
 
 #ifdef TL_IMPL
 
-#if OS_WINDOWS
+#include TL_OS_INCLUDE(console.h)
 
-static HANDLE consoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-
-void _print(char const *string, umm length) {
-	DWORD charsWritten;
-	WriteConsoleA(consoleOutput, string, (DWORD)length, &charsWritten, 0);
-#ifdef TL_DEBUG
-	OutputDebugStringA(null_terminate(Span{string, length}).data());
-#endif
-}
-void _print(wchar const *string, umm length) {
-	DWORD charsWritten;
-	WriteConsoleW(consoleOutput, string, (DWORD)length, &charsWritten, 0);
-#ifdef TL_DEBUG
-	OutputDebugStringW(null_terminate(Span{string, length}).data());
-#endif
-}
-
-void clear_console() {
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    SMALL_RECT scrollRect;
-    COORD scrollTarget;
-    CHAR_INFO fill;
-
-    // Get the number of character cells in the current buffer.
-    if (!GetConsoleScreenBufferInfo(consoleOutput, &csbi))
-    {
-        return;
-    }
-
-    // Scroll the rectangle of the entire buffer.
-    scrollRect.Left = 0;
-    scrollRect.Top = 0;
-    scrollRect.Right = csbi.dwSize.X;
-    scrollRect.Bottom = csbi.dwSize.Y;
-
-    // Scroll it upwards off the top of the buffer with a magnitude of the entire height.
-    scrollTarget.X = 0;
-    scrollTarget.Y = (SHORT)(0 - csbi.dwSize.Y);
-
-    // Fill with empty spaces with the buffer's default text attribute.
-    fill.Char.UnicodeChar = TEXT(' ');
-    fill.Attributes = csbi.wAttributes;
-
-    // Do the scroll
-    ScrollConsoleScreenBufferA(consoleOutput, &scrollRect, NULL, scrollTarget, &fill);
-
-    // Move the cursor to the top left corner too.
-    csbi.dwCursorPosition.X = 0;
-    csbi.dwCursorPosition.Y = 0;
-
-    SetConsoleCursorPosition(consoleOutput, csbi.dwCursorPosition);
-}
-
-#else
+Printer current_printer = console_printer;
 
 #endif
 
-#endif
+} // namespace TL
 
-}
