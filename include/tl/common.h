@@ -952,11 +952,12 @@ T *allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
 }
 
 extern TL_API Allocator default_allocator;
-extern TL_API void init_allocator();
-extern TL_API Allocator get_allocator();
-extern TL_API void push_allocator(Allocator allocator);
-extern TL_API void pop_allocator();
+extern TL_API Allocator thread_local current_allocator;
 
+#define push_allocator(allocator) \
+Allocator CONCAT(previous_allocator, __LINE__) = current_allocator; \
+current_allocator = allocator; \
+defer { current_allocator = CONCAT(previous_allocator, __LINE__); }
 
 struct Buffer : Span<u8> {
 	using Span<u8>::Span;
@@ -965,7 +966,7 @@ struct Buffer : Span<u8> {
 
 inline Buffer create_buffer(umm size) {
 	Buffer result;
-	result.allocator = get_allocator();
+	result.allocator = current_allocator;
 	result._begin = allocate<u8>(result.allocator, size);
 	result._end = result._begin + size;
 	return result;
@@ -1019,7 +1020,7 @@ Function create_function(Fn &&fn, Args &&...args) {
 	if constexpr (std::is_convertible_v<Fn, void(*)()>) {
 		return create_function((void(*)())fn);
 	} else {
-		auto allocator = get_allocator();
+		auto allocator = current_allocator;
 
 		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
 		auto params = allocate<Tuple>(allocator);
@@ -1329,28 +1330,7 @@ Allocator default_allocator = {
 	},
 	0
 };
-
-}
-
-#include "list.h"
-
-namespace TL {
-
-thread_local List<Allocator> allocators;
-
-void init_allocator() {
-	allocators = {default_allocator};
-}
-
-Allocator get_allocator() {
-	return allocators.back();
-}
-void push_allocator(Allocator allocator) {
-	allocators += allocator;
-}
-void pop_allocator() {
-	allocators.pop_back();
-}
+thread_local Allocator current_allocator = default_allocator;
 
 #endif
 

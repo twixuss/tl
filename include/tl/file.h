@@ -62,7 +62,7 @@ inline FileTracker create_file_tracker(char const *path, void (*on_update)(FileT
 }
 template <class Fn>
 inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
-	auto allocator = get_allocator();
+	auto allocator = current_allocator;
 
 	auto params = allocate<Fn>(allocator);
 	new(params) Fn(std::forward<Fn>(on_update));
@@ -301,7 +301,7 @@ u64 get_file_write_time(char const *path) {
 }
 List<String<char>> get_files_in_directory(char const *directory) {
 	auto directory_len = length(directory);
-	auto allocator = get_allocator();
+	auto allocator = current_allocator;
 	char *directory_with_star;
 	if (directory[directory_len - 1] == '\\' || directory[directory_len - 1] == '/') {
 		directory_with_star = allocate<char>(allocator, directory_len + 2);

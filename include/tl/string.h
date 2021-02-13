@@ -160,111 +160,98 @@ inline ParseResult<f64> parseDecimalFloat(Span<char const> s) {
 	return result;
 }
 
-template <class Char = char, class Allocator = TL_DEFAULT_ALLOCATOR, umm blockSize_ = 4096>
+template <class Char, umm block_size_ = 4096>
 struct StringBuilder {
-	using String = String<Char, Allocator>;
-
-	static constexpr umm blockSize = blockSize_;
+	static constexpr umm block_size = block_size_;
 	struct Block {
-		Char buffer[blockSize];
+		Char buffer[block_size];
 		umm size = 0;
 		Block *next = 0;
 
 		Block() {}
 		Char *end() { return buffer + size; }
-		umm availableSpace() { return blockSize - size; }
+		umm available_space() { return block_size - size; }
 	};
+
+	Allocator allocator;
 	Block first = {};
 	Block *last = &first;
-	Block *allocLast = &first;
+	Block *alloc_last = &first;
 
 	StringBuilder() = default;
 	StringBuilder(StringBuilder const &that) = delete;
-	StringBuilder(StringBuilder&& that) {
-		first = that.first;
-		if (that.last == &that.first) last = &first;
-		else last = that.last;
-		
-		if (that.allocLast == &that.first) allocLast = &first;
-		else allocLast = that.allocLast;
-
-		that.first.size = 0;
-		that.first.next = 0;
-		that.last = &that.first;
-		that.allocLast = &that.first;
-	}
+	StringBuilder(StringBuilder&& that) = default;
 	StringBuilder &operator=(StringBuilder const &that) = delete;
-	StringBuilder &operator=(StringBuilder &&that) = delete;
+	StringBuilder &operator=(StringBuilder &&that) = default;
 	~StringBuilder() {
-		Block *next = 0;
-		for (Block *block = first.next; block != 0; block = next) {
-			next = block->next;
-			DEALLOCATE(Allocator, block);
+		for (Block *block = first.next; block != 0;) {
+			Block *next = block->next;
+			free(allocator, block);
+			block = next;
 		}
 	}
-	umm availableSpace() {
+	umm available_space() {
 		umm space = 0;
 		Block *block = last;
 		while (block) {
-			space += block->availableSpace();
+			space += block->available_space();
 			block = block->next;
 		}
 		return space;
 	}
 	void ensureSpace(umm amount) {
-		umm space = availableSpace();
+		umm space = available_space();
 		while (space < amount) {
-			Block *newBlock = allocateBlock();
-			allocLast->next = newBlock;
-			allocLast = newBlock;
-			space += blockSize;
+			Block *new_block = allocate_block();
+			alloc_last->next = new_block;
+			alloc_last = new_block;
+			space += block_size;
 		}
 	}
-	void ensureConsecutiveSpace(umm amount) {
-		assert(amount <= blockSize);
-		if (last->availableSpace() < amount) {
+	void ensure_consecutive_space(umm amount) {
+		assert(amount <= block_size);
+		if (last->available_space() < amount) {
 			if (last->next) {
 				last = last->next;
-				assert(last->availableSpace() == blockSize); // @DEBUG
 			} else {
-				last->next = allocateBlock();
-				last = allocLast = last->next;
+				last->next = allocate_block();
+				last = alloc_last = last->next;
 			}
 		}
 	}
-	umm append(Span<Char const> span) {
-		umm charsWritten = span.size();
-		umm charsToWrite = span.size();
-		while (last->availableSpace() < charsToWrite) {
-			umm spaceInBlock = last->availableSpace();
-			memcpy(last->end(), span.data(), spaceInBlock * sizeof(Char));
-			charsToWrite -= spaceInBlock;
-			last->size += spaceInBlock;
-			span = {span.begin() + spaceInBlock, span.end()};
+	umm append(Span<char const> span) {
+		umm chars_written = span.size();
+		umm chars_to_write = span.size();
+		while (last->available_space() < chars_to_write) {
+			umm space_in_block = last->available_space();
+			memcpy(last->end(), span.data(), space_in_block * sizeof(Char));
+			chars_to_write -= space_in_block;
+			last->size += space_in_block;
+			span = {span.begin() + space_in_block, span.end()};
 			if (!last->next) {
-				last->next = allocLast = allocateBlock();
+				last->next = alloc_last = allocate_block();
 				last = last->next;
 			}
 		}
-		memcpy(last->end(), span.data(), charsToWrite * sizeof(Char));
-		last->size += charsToWrite;
-		return charsWritten;
+		memcpy(last->end(), span.data(), chars_to_write * sizeof(Char));
+		last->size += chars_to_write;
+		return chars_written;
 	}
-	umm append(Char const *str) { return append(Span{str ? str : "(null)", str ? length(str) : 0}); }
-	umm append(Char ch, umm count = 1) {
-		umm charsToWrite = count;
-		while (last->availableSpace() < charsToWrite) {
-			umm spaceInBlock = last->availableSpace();
-			populate(last->end(), ch, spaceInBlock);
-			charsToWrite -= spaceInBlock;
-			last->size += spaceInBlock;
+	umm append(char const *str) { return append(as_span(str)); }
+	umm append(char ch, umm count = 1) {
+		umm chars_to_write = count;
+		while (last->available_space() < chars_to_write) {
+			umm space_in_block = last->available_space();
+			populate(last->end(), ch, space_in_block);
+			chars_to_write -= space_in_block;
+			last->size += space_in_block;
 			last = last->next;
 			if (!last) {
-				last = allocLast = allocateBlock();
+				last = alloc_last = allocate_block();
 			}
 		}
-		populate(last->end(), ch, charsToWrite);
-		last->size += charsToWrite;
+		populate(last->end(), ch, chars_to_write);
+		last->size += chars_to_write;
 		return count;
 	}
 	template <class T>
@@ -273,18 +260,18 @@ struct StringBuilder {
 			return append(span);
 		});
 	}
-	umm appendBytes(void const *address, umm size) {
+	umm append_bytes(void const *address, umm size) {
 		append(Span((Char *)address, (Char *)address + size));
 		return size;
 	}
 	template <class T>
-	umm appendBytes(T const &value) {
-		return appendBytes(std::addressof(value), sizeof(value));
+	umm append_bytes(T const &value) {
+		return append_bytes(std::addressof(value), sizeof(value));
 	}
-	umm appendFormat(Char const *fmt) {
+	umm append_format(char const *fmt) {
 		if (!*fmt)
 			return 0;
-		Char const *c = fmt;
+		char const *c = fmt;
 		while (*c) {
 			if (*c == '%') {
 				++c;
@@ -301,7 +288,7 @@ struct StringBuilder {
 		return append(Span{fmt, length(fmt)});
 	}
 	template <class Arg, class ...Args>
-	umm appendFormat(Char const *fmt, Arg const &arg, Args const &...args) {
+	umm append_format(Char const *fmt, Arg const &arg, Args const &...args) {
 		if (!*fmt)
 			return 0;
 		Char const *c = fmt;
@@ -332,14 +319,14 @@ struct StringBuilder {
 		}
 		//assert(fmtBegin && fmtEnd, "invalid format");
 		if (!(fmtBegin && fmtEnd)) {
-			return appendFormat(fmt);
+			return append_format(fmt);
 		}
 
 		umm charsAppended = append(Span{fmt, fmtBegin});
 
 		if (argAsFormat) {
 			if constexpr (isSame<RemoveReference<std::decay_t<Arg>>, Char const *> || isSame<RemoveReference<std::decay_t<Arg>>, Char *>)
-				charsAppended += appendFormat(arg, args...);
+				charsAppended += append_format(arg, args...);
 			else 
 				INVALID_CODE_PATH("'%fmt%' arg is not a string");
 		} else {
@@ -349,7 +336,7 @@ struct StringBuilder {
 			});
 		}
 
-		charsAppended += appendFormat(fmtEnd, args...);
+		charsAppended += append_format(fmtEnd, args...);
 		return charsAppended;
 	}
 	umm size() {
@@ -368,13 +355,15 @@ struct StringBuilder {
 		}
 		return Span<Char>(dstString.begin(), dstChar);
 	}
-	String get() {
+	template <class Char = char>
+	String<Char> get() {
 		String result(size());
 		fill(result);
 		return result;
 	}
-	String getNullTerminated() {
-		String result(size() + 1);
+	template <class Char = char>
+	String<Char> getNullTerminated() {
+		String<Char> result(size() + 1);
 		fill(result);
 		result.back() = '\0';
 		return result;
@@ -384,31 +373,53 @@ struct StringBuilder {
 	void stream(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto blockSize = block->size;
-			if (blockSize) {
-				fn(block->buffer, blockSize);
+			auto block_size = block->size;
+			if (block_size) {
+				fn(block->buffer, block_size);
 			}
 			block = block->next;
 		} while (block);
 	}
+	void clear() {
+		Block *block = &first;
+		do {
+			block->size = 0;
+			block = block->next;
+		} while (block);
+		last = &first;
+	}
 
 private:
-	Block *allocateBlock() { return construct(ALLOCATE_T(Allocator, Block, 1, 0)); }
+	Block *allocate_block() {
+		return new (allocate<Block>(allocator)) Block;
+	}
 };
+
+template <class Char = char, umm capacity = 4096>
+StringBuilder<Char, capacity> create_string_builder() {
+	StringBuilder<Char, capacity> result;
+	result.allocator = current_allocator;
+	return result;
+}
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> format(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
-	builder.appendFormat(fmt, args...);
+	builder.append_format(fmt, args...);
 	return builder.get();
 }
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
-	builder.appendFormat(fmt, args...);
+	builder.append_format(fmt, args...);
 	builder.append((Char)0);
 	return builder.get();
+}
+
+template <class Char, umm capacity, class T>
+void append_string(StaticList<Char, capacity> &list, T const &value) {
+	to_string<Char>(value, [&](Span<Char const> span) { list += span; });
 }
 
 }

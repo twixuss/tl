@@ -33,7 +33,7 @@ inline void print(T const &value) {
 template <class Char = char, class ...Args>
 inline void print(Char const *fmt, Args const &...args) {
 	StringBuilder<Char> builder;
-	builder.appendFormat(fmt, args...);
+	builder.append_format(fmt, args...);
 	print(builder.get());
 }
 
