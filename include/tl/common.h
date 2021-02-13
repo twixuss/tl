@@ -578,10 +578,10 @@ inline constexpr Span<wchar> as_span(wchar *str) { return Span(str, length(str))
 template <class T>
 inline constexpr Span<T> as_span(Span<T> span) { return span; }
 
-template <class T> constexpr Span<u8> toBytes(Span<T> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<u8 const> toBytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<char> to_chars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<char const> to_chars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<u8 const> as_bytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<char const> as_chars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
 
 template <class T> constexpr umm count_of(Span<T const> span) { return span.size(); }
 template <class T> constexpr umm length (Span<T const> span) { return span.size(); }
@@ -923,20 +923,6 @@ CopyFnRet<CopyFn, Char> to_string(f32 v, CopyFn &&copy_fn) {
 }
 
 
-template <class Allocator>
-struct Buffer : Span<u8> {
-	using Span<u8>::Span;
-	operator bool() const { return data() != 0; }
-};
-
-template <class Allocator>
-inline void free(Buffer<Allocator> buffer) {
-	if (buffer)
-		DEALLOCATE(Allocator, buffer.data());
-}
-
-
-
 enum AllocatorMode {
 	Allocator_allocate,
 	Allocator_reallocate,
@@ -966,9 +952,31 @@ T *allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
 }
 
 extern TL_API Allocator default_allocator;
+extern TL_API void init_allocator();
 extern TL_API Allocator get_allocator();
 extern TL_API void push_allocator(Allocator allocator);
 extern TL_API void pop_allocator();
+
+
+struct Buffer : Span<u8> {
+	using Span<u8>::Span;
+	Allocator allocator;
+};
+
+inline Buffer create_buffer(umm size) {
+	Buffer result;
+	result.allocator = get_allocator();
+	result._begin = allocate<u8>(result.allocator, size);
+	result._end = result._begin + size;
+	return result;
+}
+
+inline void free(Buffer buffer) {
+	if (buffer._begin) {
+		free(buffer.allocator, buffer._begin);
+	}
+}
+
 
 struct Function {
 	Allocator allocator;

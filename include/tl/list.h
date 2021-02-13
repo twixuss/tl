@@ -175,6 +175,8 @@ struct List {
 	}
 	T &push_back(T const &value) { return emplace_back(value); }
 	T &push_back(T &&value) { return emplace_back(std::move(value)); }
+	T &add(T const &value) { return emplace_back(value); }
+	T &add(T &&value) { return emplace_back(std::move(value)); }
 
 	template <class... Args>
 	T &push_front(Args &&... args) {

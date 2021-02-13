@@ -98,8 +98,7 @@ inline void writeString(File file, T const &value) {
 	});
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	auto oldCursor = getCursor(file);
 	defer { setCursor(file, oldCursor, File_begin); };
 
@@ -107,40 +106,36 @@ inline Buffer<Allocator> read_entire_file(File file, umm extra_space_before = 0,
 	auto size = (umm)getCursor(file);
 	setCursor(file, 0, File_begin);
 
-	u8 *data = ALLOCATE_T(Allocator, u8, size + extra_space_before + extra_space_after, 0);
-	read(file, data + extra_space_before, size);
+	auto result = create_buffer(size + extra_space_before + extra_space_after);
+	read(file, result._begin + extra_space_before, size);
 
-	return {data, size + extra_space_before + extra_space_after};
+	return result;
 }
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(char const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(char const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		defer { close(file); };
-		return read_entire_file<Allocator>(file, extra_space_before, extra_space_after);
+		return read_entire_file(file, extra_space_before, extra_space_after);
 	} else {
 		return {};
 	}
 }
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(wchar const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	File file = openFile(path, File_read);
 	if (file) {
 		defer { close(file); };
-		return read_entire_file<Allocator>(file, extra_space_before, extra_space_after);
+		return read_entire_file(file, extra_space_before, extra_space_after);
 	} else {
 		return {};
 	}
 }
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0')
 		return read_entire_file(path.data(), extra_space_before, extra_space_after);
 	else
 		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
 }
-template <class Allocator = TL_DEFAULT_ALLOCATOR>
-inline Buffer<Allocator> read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0')
 		return read_entire_file(path.data(), extra_space_before, extra_space_after);
 	else
