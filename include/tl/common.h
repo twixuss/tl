@@ -45,9 +45,9 @@
 	} while (0)
 #define assert(x, ...) assert_always(x, ...)  
 
-#define INVALID_CODE_PATH(...)                                   \
+#define invalid_code_path(...)                                   \
 	do {                                                         \
-		ASSERTION_FAILURE("INVALID_CODE_PATH", "", __VA_ARGS__); \
+		ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__); \
 	} while (0)
 
 #ifdef TL_DEBUG
@@ -282,14 +282,29 @@ forceinline constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S
 
 }
 
-forceinline u32 count_leading_zeros(u16 val) { return _lzcnt_u32(val); }
-forceinline u32 count_leading_zeros(u32 val) { return _lzcnt_u32(val); }
-forceinline u32 count_leading_zeros(u64 val) { return (u32)_lzcnt_u64(val); }
+#if COMPILER_MSVC
+#if ARCH_LZCNT
+forceinline u32 count_leading_zeros(u8  val) { return __lzcnt16(val) - 8; }
+forceinline u32 count_leading_zeros(u16 val) { return __lzcnt16(val); }
+forceinline u32 count_leading_zeros(u32 val) { return __lzcnt32(val); }
+forceinline u32 count_leading_zeros(u64 val) { return (u32)__lzcnt64(val); }
+#else
+forceinline u32 count_leading_zeros(u8  val) { ulong r; return _BitScanReverse  (&r, val) ?  7 - r :  8; }
+forceinline u32 count_leading_zeros(u16 val) { ulong r; return _BitScanReverse  (&r, val) ? 15 - r : 16; }
+forceinline u32 count_leading_zeros(u32 val) { ulong r; return _BitScanReverse  (&r, val) ? 31 - r : 32; }
+forceinline u32 count_leading_zeros(u64 val) { ulong r; return _BitScanReverse64(&r, val) ? 63 - r : 64; }
+#endif
+#endif
+
+forceinline u32 count_leading_ones(u8  val) { return count_leading_zeros((u8 )~val); }
+forceinline u32 count_leading_ones(u16 val) { return count_leading_zeros((u16)~val); }
+forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~val); }
+forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 
 forceinline s32 log2(u64 n) { return 63 - (s32)count_leading_zeros(n); }
 forceinline s32 log2(u32 n) { return 31 - (s32)count_leading_zeros(n); }
-forceinline s32 log2(u16 n) { return 15 - (s32)count_leading_zeros((u32)n); }
-forceinline s32 log2(u8  n) { return  7 - (s32)count_leading_zeros((u32)n); }
+forceinline s32 log2(u16 n) { return 15 - (s32)count_leading_zeros(n); }
+forceinline s32 log2(u8  n) { return  7 - (s32)count_leading_zeros(n); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
@@ -534,7 +549,11 @@ struct Span<T const> {
 	constexpr Span() = default;
 	constexpr Span(ValueType &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
 	template <umm count>
-	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {}
+	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {
+		if constexpr (isSame<T, char>) {
+			if (_end[-1] == 0) --_end;
+		}
+	}
 	constexpr Span(ValueType *begin, ValueType *end) : _begin(begin), _end(end) {}
 	constexpr Span(ValueType *begin, umm size) : Span(begin, begin + size) {}
 	constexpr ValueType *data() const { return _begin; }
@@ -563,8 +582,8 @@ struct Span<T const> {
 		return true;
 	}
 
-	ValueType *_begin{};
-	ValueType *_end{};
+	ValueType *_begin;
+	ValueType *_end;
 };
 
 //template <class T, umm size>
@@ -601,7 +620,7 @@ template <class T> constexpr T const *find(Span<T const> span, Span<T>       cmp
 template <class T> constexpr T       *find(Span<T>       span, Span<T>       cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
 
 template <class T, class Predicate>
-constexpr T *find_if(Span<T> span, Predicate predicate) {
+constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 	for (auto &v : span) {
 		if (predicate(v)) {
 			return std::addressof(v);
@@ -640,16 +659,25 @@ struct OsAllocator {
 #define TL_DEFAULT_ALLOCATOR ::TL::OsAllocator
 #endif
 
-inline constexpr bool isDigit(char c) {
+inline constexpr bool is_whitespace(u32 c) {
+	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
+}
+
+inline constexpr bool is_digit(char c) {
 	return c >= '0' && c <= '9';
 }
 
-inline constexpr char toLower(char c) {
+inline constexpr char to_lower_ascii(char c) {
 	if (c >= 'A' && c <= 'Z')
 		return (char)(c + ('a' - 'A'));
 	return c;
 }
-inline constexpr wchar toLower(wchar c) {
+inline constexpr u32 to_lower_utf8(u32 c) {
+	if (c >= 'A' && c <= 'Z')
+		return c + ('a' - 'A');
+	return c;
+}
+inline constexpr wchar to_lower_utf16(wchar c) {
 	if (c >= L'A' && c <= L'Z')
 		return (wchar)(c + (L'a' - L'A'));
 	return c;
@@ -736,7 +764,7 @@ inline constexpr bool endsWithCI(char const *str, char const *subStr) {
 		return false;
 	str += strLen - subStrLen;
 	while (*subStr)
-		if (toLower(*str++) != toLower(*subStr++))
+		if (to_lower_ascii(*str++) != to_lower_ascii(*subStr++))
 			return false;
 	return true;
 }
@@ -760,19 +788,19 @@ inline constexpr bool endsWithCI(wchar const *str, wchar const *subStr) {
 		return false;
 	str += strLen - subStrLen;
 	while (*subStr)
-		if (toLower(*str++) != toLower(*subStr++))
+		if (to_lower_utf16(*str++) != to_lower_utf16(*subStr++))
 			return false;
 	return true;
 }
 
 inline constexpr void setToLowerCase(Span<char> span) {
 	for (auto &c : span) {
-		c = toLower(c);
+		c = to_lower_ascii(c);
 	}
 }
 inline constexpr void setToLowerCase(Span<wchar> span) {
 	for (auto &c : span) {
-		c = toLower(c);
+		c = to_lower_utf16(c);
 	}
 }
 
@@ -951,6 +979,7 @@ T *allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
 	return (T *)allocate(allocator, sizeof(T) * count, align);
 }
 
+extern TL_API void init_allocator();
 extern TL_API Allocator default_allocator;
 extern TL_API Allocator thread_local current_allocator;
 
@@ -1330,7 +1359,11 @@ Allocator default_allocator = {
 	},
 	0
 };
-thread_local Allocator current_allocator = default_allocator;
+thread_local Allocator current_allocator;
+
+void init_allocator() {
+	current_allocator = default_allocator;
+}
 
 #endif
 

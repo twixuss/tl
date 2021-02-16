@@ -15,6 +15,7 @@
 
 #if COMPILER_MSVC
 #pragma warning(disable : 5045) // spectre
+#pragma warning(disable : 4146) // unary minus on unsigned
 #endif
 
 namespace TL {

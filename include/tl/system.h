@@ -100,6 +100,10 @@
 #endif
 // clang-format on
 
+#ifndef ARCH_LZCNT
+#define ARCH_LZCNT 0
+#endif
+
 #if !(ARCH_X86 | ARCH_X64)
 #error "Unresolved target architecture"
 #endif

@@ -95,37 +95,44 @@ String<Char, Allocator> null_terminate(Span<Char> span) {
 	return null_terminate<Allocator, Char>((Span<Char const>)span);
 }
 
-template <class T>
-struct ParseResult {
-	T value;
-	bool success;
-};
+inline u32 character_to_digit(char character, u32 base) {
+	u32 digit;
+	if (base > 10) {
+		digit = (u64)character - '0';
+		if (digit > 9) digit = (u64)to_lower_ascii(character) - ('a' - 10);
+	} else {
+		digit = (u64)character - '0';
+	}
+	return digit;
+}
 
-inline ParseResult<s64> parseDecimal(Span<char const> s) {
-	ParseResult<s64> result = {};
-	s64 oldResult = 0;
-	bool negative = false;
-	if (s.front() == '-') {
-		negative = true;
-		s._begin++;
+inline Optional<u64> parse_u64(Span<char const> string, u32 base) {
+	u64 result = 0;
+	u64 previous = 0;
+	for (auto character : string) {
+		u64 digit = character_to_digit(character, base);
+		if (digit >= base) return {};
+		previous = result;
+		result = result * base + digit;
+		if (result < previous) return {};
 	}
-	for (auto c : s) {
-		result.value *= 10;
-		s64 digit = (s64)c - '0';
-		if ((u64)digit > 9)
-			return {};
-		result.value += digit;
-		if (result.value < oldResult)
-			return {};
-		oldResult = result.value;
-	}
-	if (negative) {
-		result.value = -result.value;
-	}
-	result.success = true;
 	return result;
 }
 
+inline Optional<u64> parse_u64(Span<char const> string) {
+	if (string.size() > 1) {
+		if (string[1] == 'x') {
+			string._begin += 2;
+			return parse_u64(string, 16);
+		} else if (string[1] == 'b') {
+			string._begin += 2;
+			return parse_u64(string, 2);
+		}
+	}
+	return parse_u64(string, 10);
+
+}
+#if 0
 inline ParseResult<f64> parseDecimalFloat(Span<char const> s) {
 	ParseResult<f64> result = {};
 	bool negative = false;
@@ -159,8 +166,9 @@ inline ParseResult<f64> parseDecimalFloat(Span<char const> s) {
 	result.success = true;
 	return result;
 }
+#endif
 
-template <class Char, umm block_size_ = 4096>
+template <class Char = char, umm block_size_ = 4096>
 struct StringBuilder {
 	static constexpr umm block_size = block_size_;
 	struct Block {
@@ -173,12 +181,12 @@ struct StringBuilder {
 		umm available_space() { return block_size - size; }
 	};
 
-	Allocator allocator;
+	Allocator allocator = {};
 	Block first = {};
 	Block *last = &first;
 	Block *alloc_last = &first;
 
-	StringBuilder() = default;
+	StringBuilder() { allocator = current_allocator; }
 	StringBuilder(StringBuilder const &that) = delete;
 	StringBuilder(StringBuilder&& that) = default;
 	StringBuilder &operator=(StringBuilder const &that) = delete;
@@ -276,7 +284,7 @@ struct StringBuilder {
 			if (*c == '%') {
 				++c;
 				if (*c != '`') {
-					INVALID_CODE_PATH("bad format");
+					invalid_code_path("bad format");
 				}
 				append(Span{fmt, c});
 				++c;
@@ -328,7 +336,7 @@ struct StringBuilder {
 			if constexpr (isSame<RemoveReference<std::decay_t<Arg>>, Char const *> || isSame<RemoveReference<std::decay_t<Arg>>, Char *>)
 				charsAppended += append_format(arg, args...);
 			else 
-				INVALID_CODE_PATH("'%fmt%' arg is not a string");
+				invalid_code_path("'%fmt%' arg is not a string");
 		} else {
 			to_string<Char>(arg, [&] (Span<Char const> span) {
 				charsAppended += span.size();
@@ -395,13 +403,6 @@ private:
 	}
 };
 
-template <class Char = char, umm capacity = 4096>
-StringBuilder<Char, capacity> create_string_builder() {
-	StringBuilder<Char, capacity> result;
-	result.allocator = current_allocator;
-	return result;
-}
-
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> format(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
@@ -421,6 +422,19 @@ template <class Char, umm capacity, class T>
 void append_string(StaticList<Char, capacity> &list, T const &value) {
 	to_string<Char>(value, [&](Span<Char const> span) { list += span; });
 }
+
+inline u8 const *advance_utf8(u8 const *string) {
+	if ((*string & 0x80) == 0) {
+		++string;
+	} else {
+		u32 octets = count_leading_ones(*string);
+		if (octets > 4) return 0;
+		string += octets;
+	}
+	return string;
+}
+template <class Ptr>
+inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
 
 }
 

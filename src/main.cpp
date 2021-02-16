@@ -18,7 +18,7 @@ using namespace TL;
 
 void string_test() {
 	printf("%s ... ", "string_test");
-	StringBuilder<char, OsAllocator, 16> builder;
+	StringBuilder<char, 16> builder;
 	char const *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
 	builder.append(str);
 	auto result = builder.get();
@@ -217,7 +217,7 @@ void radixSort(Span<u32> span) {
 		std::swap(src, dst);
 	}
 }
-
+#if 0
 struct Timer {
 	char const *name;
 	List<u32> *origList;
@@ -294,7 +294,7 @@ void sort_perf() {
 	TIMER("quickSort") { quickSort(list); };
 	TIMER("mergeSort") { mergeSort(list); };
 }
-
+#endif
 #define memequ(a, b, s) (memcmp(a, b, s) == 0)
 
 void buffer_test() {
@@ -358,9 +358,9 @@ void buffer_test() {
 	}
 }
 
+#if 0
 u16 counts[0x10000];
-
-int main() {
+void rand_test() {
 	for (u32 i = 0; i < count_of(counts); ++i) {
 		u32 index = random_u32(i) & (count_of(counts) - 1);
 		++counts[index];
@@ -369,13 +369,30 @@ int main() {
 	std::sort(std::begin(counts), std::end(counts));
 
 	print("Median: %, Max: %, Min: %\n", counts[count_of(counts) / 2], *std::max_element(std::begin(counts), std::end(counts)), *std::min_element(std::begin(counts), std::end(counts)));
-
+}
+#endif
+int main() {
+	//rand_test();
 	buffer_test();
-	sort_test();
+	//sort_test();
 	//sort_perf();
 
 	string_test();
 
 	math_test();
+
+	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};
+	u16 test16[][2] = {{0, 16}, {0xFF,  8}, {0xFFFF,  0}};
+	u32 test32[][2] = {{0, 32}, {0xFF, 24}, {0xFFFF, 16}, {0xFFFFFFFF,  0}};
+	u64 test64[][2] = {{0, 64}, {0xFF, 56}, {0xFFFF, 48}, {0xFFFFFFFF, 32}, {0xFFFFFFFFFFFFFFFF, 0}};
+
+	for (auto &t : test8 ) assert(t[1] == count_leading_zeros(t[0]));
+	for (auto &t : test16) assert(t[1] == count_leading_zeros(t[0]));
+	for (auto &t : test32) assert(t[1] == count_leading_zeros(t[0]));
+	for (auto &t : test64) assert(t[1] == count_leading_zeros(t[0]));
+
+	//for (u32 i = 0; i < 32; ++i) {
+	//	assert(count_leading_zeros((u32)(1 << i)) == (31 - i));
+	//}
 }
 #pragma warning(pop)

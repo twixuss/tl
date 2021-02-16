@@ -7,6 +7,51 @@
 
 namespace TL {
 
+template <class T>
+struct MyList {
+	static_assert(std::is_trivial_v<T>, "o no");
+	
+	T &add() {
+		reserve(size() + 1);
+		memset(_end, 0, sizeof(T));
+		return *_end++;
+	}
+	T &add(T value) {
+		reserve(size() + 1);
+		memcpy(_end, &value, sizeof(T));
+		return *_end++;
+	}
+
+	umm capacity() { return _alloc_end - _begin; }
+	umm size() { return _end - _begin; }
+
+	void reserve(umm desired_capacity) {
+		if (capacity() >= desired_capacity) return;
+
+		umm new_capacity = max(1, capacity());
+		while (new_capacity < desired_capacity) new_capacity *= 2;
+
+		auto new_begin = allocate<T>(allocator, new_capacity);
+		auto size = this->size();
+		memcpy(new_begin, _begin, sizeof(T) * size);
+
+		if (_begin) free(allocator, _begin);
+		_begin = new_begin;
+		_end = _begin + size;
+		_alloc_end = _begin + new_capacity;
+	}
+
+	T &operator[](umm i) { return _begin[i]; }
+
+	T *begin() { return _begin; }
+	T *end() { return _end; }
+
+	T *_begin = 0;
+	T *_end = 0;
+	T *_alloc_end = 0;
+	Allocator allocator = current_allocator;
+};
+
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct List {
 	List() = default;
@@ -242,6 +287,16 @@ Span<T> as_span(List<T, Allocator> &list) {
 template <class T, class Allocator>
 Span<T const> as_span(List<T, Allocator> const &list) {
 	return (Span<T const>)list;
+}
+
+template <class T, class Predicate>
+constexpr T *find_if(List<T> &list, Predicate &&predicate) {
+	return find_if(as_span(list), std::forward<Predicate>(predicate));
+}
+
+template <class T, class Predicate>
+constexpr T const *find_if(List<T> const &list, Predicate &&predicate) {
+	return find_if(as_span(list), std::forward<Predicate>(predicate));
 }
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
@@ -885,7 +940,8 @@ struct BlockList {
 			}
 		}
 	}
-	void push_back(T const &value) {
+	template <class ...Args>
+	T &add_in_place(Args &&...args) {
 		auto dstBlock = last;
 		while (dstBlock && (dstBlock->availableSpace() == 0)) {
 			dstBlock = dstBlock->next;
@@ -896,8 +952,13 @@ struct BlockList {
 			allocLast->next = new_block;
 			dstBlock = last = allocLast = new_block;
 		}
-		new (dstBlock->end++) T(value);
+		return *new (dstBlock->end++) T(std::forward<Args>(args)...);
 	}
+
+	T &add(T const &value) { return add_in_place(value); }
+	T &add(T &&value) { return add_in_place(std::move(value)); }
+	T &add() { return add_in_place(); }
+
 	umm size() const {
 		umm totalSize = 0;
 		for (auto block = &first; block != 0; block = block->next) {

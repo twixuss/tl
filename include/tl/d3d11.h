@@ -660,7 +660,7 @@ void State::updateStructuredBuffer(StructuredBuffer& buffer, u32 count, u32 stri
 		useContext([&] { immediateContext->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0); });
 	}
 	else {
-		INVALID_CODE_PATH("bad buffer.usage");
+		invalid_code_path("bad buffer.usage");
 	}
 }
 void State::updateConstantBuffer(ConstantBuffer &buffer, u32 size, void const *data) {
@@ -672,7 +672,7 @@ void State::updateConstantBuffer(ConstantBuffer &buffer, u32 size, void const *d
 	} else if (buffer.usage == D3D11_USAGE_DEFAULT) {
 		useContext([&] { immediateContext->UpdateSubresource(buffer.buffer, 0, 0, data, 0, 0); });
 	} else {
-		INVALID_CODE_PATH("bad buffer.usage");
+		invalid_code_path("bad buffer.usage");
 	}
 }
 void State::clearRenderTarget(ID3D11RenderTargetView* renderTarget, f32 const rgba[4]) {
@@ -702,7 +702,7 @@ void State::setShaderResource(ShaderResource const &resource, char stage, u32 sl
 		switch (stage) {
 			case 'V': immediateContext->VSSetShaderResources(slot, 1, &resource.srv); break;
 			case 'P': immediateContext->PSSetShaderResources(slot, 1, &resource.srv); break;
-			default: INVALID_CODE_PATH("bad stage"); break;
+			default: invalid_code_path("bad stage"); break;
 		}
 	});
 }
@@ -711,7 +711,7 @@ void State::setSampler(Sampler const &sampler, char stage, u32 slot) {
 		switch (stage) {
 			case 'V': immediateContext->VSSetSamplers(slot, 1, &sampler.sampler); break;
 			case 'P': immediateContext->PSSetSamplers(slot, 1, &sampler.sampler); break;
-			default: INVALID_CODE_PATH("bad stage"); break;
+			default: invalid_code_path("bad stage"); break;
 		}
 	});
 }
@@ -720,7 +720,7 @@ void State::setConstantBuffer(ConstantBuffer const &buffer, char stage, u32 slot
 		switch (stage) {
 			case 'V': immediateContext->VSSetConstantBuffers(slot, 1, &buffer.buffer); break;
 			case 'P': immediateContext->PSSetConstantBuffers(slot, 1, &buffer.buffer); break;
-			default: INVALID_CODE_PATH("bad stage"); break;
+			default: invalid_code_path("bad stage"); break;
 		}
 	});
 }

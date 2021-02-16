@@ -170,7 +170,7 @@ CpuInfo get_cpu_info() {
 	defer { free(buffer); };
 
 	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
-		INVALID_CODE_PATH("GetLogicalProcessorInformation: %u", GetLastError());
+		invalid_code_path("GetLogicalProcessorInformation: %u", GetLastError());
 
 	assert(processorInfoLength % sizeof(buffer[0]) == 0);
 
@@ -182,7 +182,7 @@ CpuInfo get_cpu_info() {
 			case CacheData: return CpuCacheType::data;
 			case CacheTrace: return CpuCacheType::trace;
 		}
-		INVALID_CODE_PATH();
+		invalid_code_path();
 		return {};
 	};
 

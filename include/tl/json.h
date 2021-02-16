@@ -123,7 +123,7 @@ struct Object {
 			case Type_number: return (*this)[(umm)i.number.value];
 			case Type_string: return (*this)[i.string.view];
 		}
-		INVALID_CODE_PATH();
+		invalid_code_path();
 		return *this;
 	}
 };
@@ -205,7 +205,7 @@ List<Token> lex(Span<char const> json) {
 		if(*c == ' ')
 			break;
 
-		INVALID_CODE_PATH();
+		invalid_code_path();
 	}
 	return result;
 }
@@ -222,7 +222,7 @@ Object parse(Token *&t) {
 					assert(t++->type == ':');
 					result.object.members[memberName] = parse(t);
 				} else {
-					INVALID_CODE_PATH();
+					invalid_code_path();
 				}
 
 				if (t->type == '}') {
@@ -264,7 +264,7 @@ Object parse(Token *&t) {
 		}
 		return result;
 	} else {
-		INVALID_CODE_PATH();
+		invalid_code_path();
 		return {};
 	}
 }

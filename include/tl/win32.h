@@ -55,7 +55,7 @@ bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s 
 		if (UINT rawInputSize = sizeof(rawInput);
 			GetRawInputData((HRAWINPUT)msg.lParam, RID_INPUT, &rawInput, &rawInputSize,
 							sizeof(RAWINPUTHEADER)) == -1) {
-			INVALID_CODE_PATH("Error: GetRawInputData");
+			invalid_code_path("Error: GetRawInputData");
 		}
 		if (rawInput.header.dwType == RIM_TYPEMOUSE) {
 			auto &mouse = rawInput.data.mouse;
