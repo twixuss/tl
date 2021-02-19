@@ -40,11 +40,11 @@ struct String : List<Char, Allocator> {
 	}
 	s32 compare(String const &b) const {
 		s32 result = 0;
-        for (umm i = 0; i < min(this->size(), b.size()); ++i) {
-            if ((*this)[i] != b[i]) {
-                return (*this)[i] < b[i] ? -1 : +1;
-            }
-        }
+		for (umm i = 0; i < min(this->size(), b.size()); ++i) {
+			if ((*this)[i] != b[i]) {
+				return (*this)[i] < b[i] ? -1 : +1;
+			}
+		}
 
 		if (result)
 			return result;
@@ -424,17 +424,31 @@ void append_string(StaticList<Char, capacity> &list, T const &value) {
 }
 
 inline u8 const *advance_utf8(u8 const *string) {
-	if ((*string & 0x80) == 0) {
+	if (*string < 0x80) {
 		++string;
 	} else {
-		u32 octets = count_leading_ones(*string);
-		if (octets > 4) return 0;
-		string += octets;
+		u32 bytes = count_leading_ones(*string);
+		if (bytes > 4) return 0;
+		string += bytes;
 	}
 	return string;
 }
 template <class Ptr>
 inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
+
+inline u32 get_char_utf8(void const *_ptr) {
+	auto ptr = (u8 const *)_ptr;
+	if (*ptr < 0x80) {
+		return *ptr;
+	}
+
+	switch (count_leading_ones(*ptr)) {
+		case 2: return ((ptr[0] & 0x1F) <<  6) | ((ptr[1] & 0x3F));
+		case 3: return ((ptr[0] & 0x0F) << 12) | ((ptr[1] & 0x3F) <<  6) | ((ptr[2] & 0x3F));
+		case 4: return ((ptr[0] & 0x07) << 18) | ((ptr[1] & 0x3F) << 12) | ((ptr[2] & 0x3F) << 6) | ((ptr[3] & 0x3F));
+		default: return -1;
+	}
+}
 
 }
 

@@ -319,22 +319,22 @@ List<String<char>> get_files_in_directory(char const *directory) {
 
 	WIN32_FIND_DATAA find_data;
 	HANDLE handle = FindFirstFileA(directory_with_star, &find_data);
-    if (handle == INVALID_HANDLE_VALUE) {
+	if (handle == INVALID_HANDLE_VALUE) {
 		return {};
 	}
 
 	u32 file_index = 0;
 	List<String<char>> result;
-    do {
+	do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
 		}
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
-        result += find_data.cFileName;
-    } while (FindNextFileA(handle, &find_data));
-    FindClose(handle);
+		result += find_data.cFileName;
+	} while (FindNextFileA(handle, &find_data));
+	FindClose(handle);
 	return result;
 }
 

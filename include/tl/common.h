@@ -260,14 +260,14 @@ forceinline f32 log(f32 x, f32 base) {
 }
 
 forceinline constexpr s32 pow(s32 base, u32 exp) {
-    s32 res = 1;
-    while (exp) {
-        if (exp & 1)
-            res *= base;
-        exp >>= 1;
-        base *= base;
-    }
-    return res;
+	s32 res = 1;
+	while (exp) {
+		if (exp & 1)
+			res *= base;
+		exp >>= 1;
+		base *= base;
+	}
+	return res;
 }
 
 namespace CE {
@@ -521,7 +521,6 @@ struct Span {
 	constexpr ValueType &at(umm i) const { return _begin[i]; }
 	constexpr bool empty() const { return _begin == _end; }
 
-	constexpr operator bool() const { return _begin; }
 	constexpr operator Span<ValueType const>() const { return {_begin, _end}; }
 	
 	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
@@ -565,8 +564,6 @@ struct Span<T const> {
 	constexpr ValueType &operator[](umm i) const { return _begin[i]; }
 	constexpr ValueType &at(umm i) const { return _begin[i]; }
 	constexpr bool empty() const { return _begin == _end; }
-
-	constexpr operator bool() const { return _begin; }
 	
 	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
 	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(ValueType)}; }
@@ -601,6 +598,8 @@ template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)spa
 template <class T> constexpr Span<u8 const> as_bytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
 template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
 template <class T> constexpr Span<char const> as_chars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<u8> as_bytes(T &value) { return {(u8 *)&value, sizeof(T)}; }
+template <class T> constexpr Span<u8 const> as_bytes(T const &value) { return {(u8 *)&value, sizeof(T)}; }
 
 template <class T> constexpr umm count_of(Span<T const> span) { return span.size(); }
 template <class T> constexpr umm length (Span<T const> span) { return span.size(); }

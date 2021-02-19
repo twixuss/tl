@@ -46,11 +46,19 @@ struct MyList {
 	T *begin() { return _begin; }
 	T *end() { return _end; }
 
+	operator Span<T>() { return {begin(), end()}; }
+	operator Span<T const>() { return {begin(), end()}; }
+
 	T *_begin = 0;
 	T *_end = 0;
 	T *_alloc_end = 0;
 	Allocator allocator = current_allocator;
 };
+
+template <class T, class Predicate>
+decltype(auto) find_if(MyList<T> &list, Predicate &&predicate) {
+	return find_if((Span)list, predicate);
+}
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
 struct List {
@@ -270,6 +278,7 @@ struct List {
 	
 	List &operator+=(T const &v) { this->push_back(v); return *this; }
 	List &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
+	List &operator+=(Span<T> v) { this->insert(v, this->end()); return *this; }
 	List &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	List &operator+=(List<T> const &v) { this->insert(as_span(v), this->end()); return *this; }
 	List &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
@@ -297,6 +306,20 @@ constexpr T *find_if(List<T> &list, Predicate &&predicate) {
 template <class T, class Predicate>
 constexpr T const *find_if(List<T> const &list, Predicate &&predicate) {
 	return find_if(as_span(list), std::forward<Predicate>(predicate));
+}
+
+template <class T, class Allocator, class Fn>
+constexpr void for_each(List<T, Allocator> list, Fn &&fn) {
+	using ReturnType = decltype(fn(*(T*)0));
+	constexpr bool breakable = isSame<bool, ReturnType>;
+	for (auto &it : list) {
+		if constexpr (breakable) {
+			if (fn(it))
+				return;
+		} else {
+			fn(it);
+		}
+	}
 }
 
 template <class T, class Allocator = TL_DEFAULT_ALLOCATOR>
@@ -1015,10 +1038,19 @@ struct BlockList {
 		auto block = &first;
 		while (index.block_index--) {
 			block = block->next;
+			TL_BOUNDS_CHECK(block);
 		}
-		TL_BOUNDS_CHECK(block);
 		TL_BOUNDS_CHECK(index.value_index < block->size());
 		return block->buffer[index.value_index].value;
+	}
+	T &operator[](umm index) {
+		auto block = &first;
+		while (index >= block->size()) {
+			index -= block->size();
+			block = block->next;
+			TL_BOUNDS_CHECK(block);
+		}
+		return block->buffer[index].value;
 	}
 	
 	BlockList &operator+=(T const &v) { this->push_back(v); return *this; }
