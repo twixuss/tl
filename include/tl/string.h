@@ -79,9 +79,9 @@ template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
 String<Char, Allocator> asStringNT(T const &val) {
 	String<Char, Allocator> result;
 	to_string<Char>(val, [&](Span<Char const> span) {
-		result.resize(span.size() + 1);
-		memcpy(result.data(), span.data(), span.size() * sizeof(Char));
-		result[span.size()] = (Char)0;
+		result.resize(span.size + 1);
+		memcpy(result.data(), span.data, span.size * sizeof(Char));
+		result[span.size] = (Char)0;
 	}); 
 	return result;
 }
@@ -120,12 +120,12 @@ inline Optional<u64> parse_u64(Span<char const> string, u32 base) {
 }
 
 inline Optional<u64> parse_u64(Span<char const> string) {
-	if (string.size() > 1) {
+	if (string.size > 1) {
 		if (string[1] == 'x') {
-			string._begin += 2;
+			string.data += 2;
 			return parse_u64(string, 16);
 		} else if (string[1] == 'b') {
-			string._begin += 2;
+			string.data += 2;
 			return parse_u64(string, 2);
 		}
 	}
@@ -228,11 +228,11 @@ struct StringBuilder {
 		}
 	}
 	umm append(Span<char const> span) {
-		umm chars_written = span.size();
-		umm chars_to_write = span.size();
+		umm chars_written = span.size;
+		umm chars_to_write = span.size;
 		while (last->available_space() < chars_to_write) {
 			umm space_in_block = last->available_space();
-			memcpy(last->end(), span.data(), space_in_block * sizeof(Char));
+			memcpy(last->end(), span.data, space_in_block * sizeof(Char));
 			chars_to_write -= space_in_block;
 			last->size += space_in_block;
 			span = {span.begin() + space_in_block, span.end()};
@@ -241,7 +241,7 @@ struct StringBuilder {
 				last = last->next;
 			}
 		}
-		memcpy(last->end(), span.data(), chars_to_write * sizeof(Char));
+		memcpy(last->end(), span.data, chars_to_write * sizeof(Char));
 		last->size += chars_to_write;
 		return chars_written;
 	}
@@ -339,7 +339,7 @@ struct StringBuilder {
 				invalid_code_path("'%fmt%' arg is not a string");
 		} else {
 			to_string<Char>(arg, [&] (Span<Char const> span) {
-				charsAppended += span.size();
+				charsAppended += span.size;
 				append(span);
 			});
 		}
@@ -354,14 +354,14 @@ struct StringBuilder {
 		}
 		return totalSize;
 	}
-	Span<Char> fill(Span<Char> dstString) {
-		assert(dstString.size() >= this->size());
-		Char *dstChar = dstString.data();
+	Span<Char> fill(Span<Char> dst_string) {
+		assert(dst_string.size >= this->size());
+		Char *dst_char = dst_string.data;
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dstChar, block->buffer, block->size * sizeof(Char));
-			dstChar += block->size;
+			memcpy(dst_char, block->buffer, block->size * sizeof(Char));
+			dst_char += block->size;
 		}
-		return Span<Char>(dstString.begin(), dstChar);
+		return Span<Char>(dst_string.begin(), dst_char);
 	}
 	template <class Char = char>
 	String<Char> get() {
@@ -443,10 +443,10 @@ inline u32 get_char_utf8(void const *_ptr) {
 	}
 
 	switch (count_leading_ones(*ptr)) {
-		case 2: return ((ptr[0] & 0x1F) <<  6) | ((ptr[1] & 0x3F));
-		case 3: return ((ptr[0] & 0x0F) << 12) | ((ptr[1] & 0x3F) <<  6) | ((ptr[2] & 0x3F));
-		case 4: return ((ptr[0] & 0x07) << 18) | ((ptr[1] & 0x3F) << 12) | ((ptr[2] & 0x3F) << 6) | ((ptr[3] & 0x3F));
-		default: return -1;
+		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
+		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
+		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
+		default: return ~0u;
 	}
 }
 

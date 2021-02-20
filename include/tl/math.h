@@ -15,7 +15,6 @@
 
 #if COMPILER_MSVC
 #pragma warning(disable : 5045) // spectre
-#pragma warning(disable : 4146) // unary minus on unsigned
 #endif
 
 namespace TL {
@@ -171,6 +170,12 @@ namespace TL {
 #define f64x2_eq _mm_cmpeq_pd 
 #define f64x2_ne _mm_cmpneq_pd
 #endif
+
+#define f32x4_abs(v) and_pi_16(v, s32x4_broadcast(max_value<s32>))
+#define f64x2_abs(v) and_pi_16(v, s64x2_broadcast(max_value<s64>))
+
+#define f32x8_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s32x8_broadcast(max_value<s32>)))
+#define f64x4_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s64x4_broadcast(max_value<s64>)))
 
 #define i32x4_sli _mm_slli_epi32
 #define s32x4_sri _mm_srai_epi32
@@ -3834,12 +3839,6 @@ forceinline v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
 forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
 forceinline u32 absolute(u32 v) { return v; }
 forceinline s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
-
-#define f32x4_abs(v) and_pi_16(v, s32x4_broadcast(max_value<s32>))
-#define f64x2_abs(v) and_pi_16(v, s64x2_broadcast(max_value<s64>))
-
-#define f32x8_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s32x8_broadcast(max<s32>())))
-#define f64x4_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s64x4_broadcast(max<s64>())))
 
 forceinline f32x4 absolute(f32x4 v) { RETURN_MT(f32x4, pi, f32x4_abs(v.pi)); }
 forceinline f64x2 absolute(f64x2 v) { RETURN_MT(f64x2, pi, f64x2_abs(v.pi)); }

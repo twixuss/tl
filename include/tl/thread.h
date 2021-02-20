@@ -218,7 +218,7 @@ struct MutexQueue {
 		Optional<T> result;
 		scoped_lock(mutex);
 		if (base.size()) {
-			result.emplace(std::move(base.front()));
+			result = base.front();
 			base.pop();
 		}
 		return result;
@@ -393,7 +393,7 @@ inline void do_work(ThreadWork<Allocator> work) {
 template <class Allocator>
 inline bool try_do_work(ThreadPool<Allocator> *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
-		do_work(*popped);
+		do_work(popped.value);
 		return true;
 	}
 	return false;
@@ -406,7 +406,7 @@ inline bool do_work(ThreadPool<Allocator> *pool) {
 			return true;
 		}
 		if (auto popped = pool->all_work.try_pop()) {
-			work = *popped;
+			work = popped.value;
 			return true;
 		}
 		return false;

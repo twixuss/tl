@@ -88,8 +88,8 @@ inline s64 length(File file) {
 	setCursor(file, 0, File_end);
 	return getCursor(file);
 }
-inline void read(File file, Span<u8> span) { read(file, span.data(), span.size()); }
-inline void write(File file, Span<u8 const> span) { write(file, span.data(), span.size());}
+forceinline void read(File file, Span<u8> span) { read(file, span.data, span.size); }
+forceinline void write(File file, Span<u8 const> span) { write(file, span.data, span.size);}
 
 template <class Char = char, class T>
 inline void writeString(File file, T const &value) {
@@ -107,7 +107,7 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 	setCursor(file, 0, File_begin);
 
 	auto result = create_buffer(size + extra_space_before + extra_space_after);
-	read(file, result._begin + extra_space_before, size);
+	read(file, result.data + extra_space_before, size);
 
 	return result;
 }
@@ -131,13 +131,13 @@ inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, um
 }
 inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0')
-		return read_entire_file(path.data(), extra_space_before, extra_space_after);
+		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	else
 		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
 }
 inline Buffer read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0')
-		return read_entire_file(path.data(), extra_space_before, extra_space_after);
+		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	else
 		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
 }
@@ -164,8 +164,8 @@ inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
 	close(file);
 	return true;
 }
-inline bool writeEntireFile(char  const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
-inline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return writeEntireFile(path, span.data(), span.size()); }
+forceinline bool writeEntireFile(char  const *path, Span<u8 const> span) { return writeEntireFile(path, span.data, span.size); }
+forceinline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return writeEntireFile(path, span.data, span.size); }
 
 }
 

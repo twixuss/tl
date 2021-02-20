@@ -506,81 +506,77 @@ template <class T>
 struct Span {
 	using ValueType = T;
 	constexpr Span() = default;
-	constexpr Span(ValueType &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
+	constexpr Span(ValueType &value) : data(std::addressof(value)), size(1) {}
 	template <umm count>
-	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {}
-	constexpr Span(ValueType *begin, ValueType *end) : _begin(begin), _end(end) {}
-	constexpr Span(ValueType *begin, umm size) : Span(begin, begin + size) {}
-	constexpr ValueType *data() const { return _begin; }
-	constexpr ValueType *begin() const { return _begin; }
-	constexpr ValueType *end() const { return _end; }
-	constexpr ValueType &front() const { return *_begin; }
-	constexpr ValueType &back() const { return _end[-1]; }
-	constexpr umm size() const { return umm(_end - _begin); }
-	constexpr ValueType &operator[](umm i) const { return _begin[i]; }
-	constexpr ValueType &at(umm i) const { return _begin[i]; }
-	constexpr bool empty() const { return _begin == _end; }
+	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {}
+	constexpr Span(ValueType *begin, ValueType *end) : data(begin), size(end - begin) {}
+	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
+	constexpr ValueType *begin() const { return data; }
+	constexpr ValueType *end() const { return data + size; }
+	constexpr ValueType &front() const { return *data; }
+	constexpr ValueType &back() const { return data[size - 1]; }
+	constexpr ValueType &operator[](umm i) const { return data[i]; }
+	constexpr ValueType &at(umm i) const { return data[i]; }
+	constexpr bool empty() const { return size == 0; }
 
-	constexpr operator Span<ValueType const>() const { return {_begin, _end}; }
+	constexpr operator Span<ValueType const>() const { return {data, size}; }
 	
-	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
-	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(ValueType)}; }
-	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(ValueType)}; } // Yes, there are three one-byte types
+	constexpr explicit operator Span<s8>() { return {(s8 *)data, size * sizeof(ValueType)}; }
+	constexpr explicit operator Span<u8>() { return {(u8 *)data, size * sizeof(ValueType)}; }
+	constexpr explicit operator Span<char>() { return {(char *)data, size * sizeof(ValueType)}; } // Yes, there are three one-byte types
 
 	constexpr bool operator==(Span<ValueType const> that) const {
-		if (size() != that.size())
+		if (size != that.size)
 			return false;
-		for (umm i = 0; i < size(); ++i) {
-			if ((*this)[i] != that[i])
+		for (umm i = 0; i < size; ++i) {
+			if (data[i] != that.data[i])
 				return false;
 		}
 		return true;
 	}
-	constexpr bool operator==(Span<ValueType> that) const { return *this == (Span<ValueType const>)that; }
+	forceinline constexpr bool operator==(Span<ValueType> that) const { return *this == (Span<ValueType const>)that; }
 
-	ValueType *_begin{};
-	ValueType *_end{};
+	ValueType *data = 0;
+	umm size = 0;
 };
 
 template <class T>
 struct Span<T const> {
 	using ValueType = T const;
 	constexpr Span() = default;
-	constexpr Span(ValueType &value) : _begin(std::addressof(value)), _end(_begin + 1) {}
+	constexpr Span(ValueType &value) : data(std::addressof(value)), size(1) {}
 	template <umm count>
-	constexpr Span(ValueType (&value)[count]) : _begin(value), _end(_begin + count) {
+	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {
 		if constexpr (isSame<T, char>) {
-			if (_end[-1] == 0) --_end;
+			if (data[size - 1] == 0) --size;
 		}
 	}
-	constexpr Span(ValueType *begin, ValueType *end) : _begin(begin), _end(end) {}
-	constexpr Span(ValueType *begin, umm size) : Span(begin, begin + size) {}
-	constexpr ValueType *data() const { return _begin; }
-	constexpr ValueType *begin() const { return _begin; }
-	constexpr ValueType *end() const { return _end; }
-	constexpr ValueType &front() const { return *_begin; }
-	constexpr ValueType &back() const { return _end[-1]; }
-	constexpr umm size() const { return umm(_end - _begin); }
-	constexpr ValueType &operator[](umm i) const { return _begin[i]; }
-	constexpr ValueType &at(umm i) const { return _begin[i]; }
-	constexpr bool empty() const { return _begin == _end; }
+	constexpr Span(ValueType *begin, ValueType *end) : data(begin), size(end - begin) {}
+	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
+	constexpr ValueType *begin() const { return data; }
+	constexpr ValueType *end() const { return data + size; }
+	constexpr ValueType &front() const { return *data; }
+	constexpr ValueType &back() const { return data[size - 1]; }
+	constexpr ValueType &operator[](umm i) const { return data[i]; }
+	constexpr ValueType &at(umm i) const { return data[i]; }
+	constexpr bool empty() const { return size == 0; }
 	
-	constexpr explicit operator Span<s8>() { return {(s8 *)_begin, size() * sizeof(ValueType)}; }
-	constexpr explicit operator Span<u8>() { return {(u8 *)_begin, size() * sizeof(ValueType)}; }
-	constexpr explicit operator Span<char>() { return {(char *)_begin, size() * sizeof(ValueType)}; } // Yes, there are three one-byte types
+	constexpr explicit operator Span<s8>() { return {(s8 *)data, size * sizeof(ValueType)}; }
+	constexpr explicit operator Span<u8>() { return {(u8 *)data, size * sizeof(ValueType)}; }
+	constexpr explicit operator Span<char>() { return {(char *)data, size * sizeof(ValueType)}; } // Yes, there are three one-byte types
 
 	constexpr bool operator==(Span<ValueType> that) const {
-		if (size() != that.size())
+		if (size != that.size)
 			return false;
-		for (umm i = 0; i < size(); ++i) {
-			if ((*this)[i] != that[i])
+		for (umm i = 0; i < size; ++i) {
+			if (data[i] != that.data[i])
 				return false;
 		}
 		return true;
 	}
 
-	ValueType *_begin;
-	ValueType *_end;
+	ValueType *data = 0;
+	umm size = 0;
 };
 
 //template <class T, umm size>
@@ -594,19 +590,19 @@ inline constexpr Span<wchar> as_span(wchar *str) { return Span(str, length(str))
 template <class T>
 inline constexpr Span<T> as_span(Span<T> span) { return span; }
 
-template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<u8 const> as_bytes(Span<T const> span) { return {(u8 *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
-template <class T> constexpr Span<char const> as_chars(Span<T const> span) { return {(char *)span.begin(), span.size() * sizeof(T)}; }
+template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)span.begin(), span.size * sizeof(T)}; }
+template <class T> constexpr Span<u8 const> as_bytes(Span<T const> span) { return {(u8 *)span.begin(), span.size * sizeof(T)}; }
+template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size * sizeof(T)}; }
+template <class T> constexpr Span<char const> as_chars(Span<T const> span) { return {(char *)span.begin(), span.size * sizeof(T)}; }
 template <class T> constexpr Span<u8> as_bytes(T &value) { return {(u8 *)&value, sizeof(T)}; }
 template <class T> constexpr Span<u8 const> as_bytes(T const &value) { return {(u8 *)&value, sizeof(T)}; }
 
-template <class T> constexpr umm count_of(Span<T const> span) { return span.size(); }
-template <class T> constexpr umm length (Span<T const> span) { return span.size(); }
+template <class T> constexpr umm count_of(Span<T const> span) { return span.size; }
+template <class T> constexpr umm length (Span<T const> span) { return span.size; }
 
 template <class T>
 constexpr void replace(Span<T> destination, Span<T const> source, umm start_index = 0) {
-	for (umm i = 0; i < source.size(); ++i) {
+	for (umm i = 0; i < source.size; ++i) {
 		destination[start_index + i] = source[i];
 	}
 }
@@ -702,7 +698,7 @@ inline constexpr bool equals(typeA const *a, Span<typeB const> b) {             
 	return true;                                                                                           \
 }                                                                                                          \
 inline constexpr bool equals(Span<typeA const> a, Span<typeB const> b) {                                   \
-	if (a.size() != b.size())                                                                              \
+	if (a.size != b.size)                                                                              \
 		return false;                                                                                      \
 	auto ap = a.begin();                                                                                   \
 	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)                                                   \
@@ -819,7 +815,7 @@ inline constexpr bool isAnyOf(T &value, Span<T> span) {
 
 inline constexpr Span<char> skipChars(Span<char> span, Span<char> charsToSkip) {
 	while (isAnyOf(span.front(), charsToSkip))
-		++span._begin;
+		++span.data;
 	return span;
 }
 
@@ -995,14 +991,14 @@ struct Buffer : Span<u8> {
 inline Buffer create_buffer(umm size) {
 	Buffer result;
 	result.allocator = current_allocator;
-	result._begin = allocate<u8>(result.allocator, size);
-	result._end = result._begin + size;
+	result.data = allocate<u8>(result.allocator, size);
+	result.size = size;
 	return result;
 }
 
 inline void free(Buffer buffer) {
-	if (buffer._begin) {
-		free(buffer.allocator, buffer._begin);
+	if (buffer.data) {
+		free(buffer.allocator, buffer.data);
 	}
 }
 
@@ -1180,15 +1176,15 @@ struct StaticList {
 	constexpr T *insert(Span<T const> span, T *_where) {
 		auto where = (Storage *)_where;
 		TL_BOUNDS_CHECK(this->_begin <= where && where <= this->_end);
-		TL_BOUNDS_CHECK(size() + span.size() <= capacity());
+		TL_BOUNDS_CHECK(size() + span.size <= capacity());
 
 		for (auto src = where; src != this->_end; ++src) {
-			new (&src[span.size()].value) T(std::move(src->value));
+			new (&src[span.size].value) T(std::move(src->value));
 		}
-		for (umm i = 0; i < span.size(); ++i) {
+		for (umm i = 0; i < span.size; ++i) {
 			where[i].value = span[i];
 		}
-		this->_end += span.size();
+		this->_end += span.size;
 		return _where;
 	}
 

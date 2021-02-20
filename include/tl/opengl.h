@@ -8,6 +8,9 @@
 #include <gl/GL.h>
 #pragma warning(pop)
 
+#pragma warning(push)
+#pragma warning(disable: 4820)
+
 #pragma comment(lib, "opengl32")
 #pragma comment(lib, "gdi32")
 
@@ -248,12 +251,12 @@ CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<cha
 	char const *lines[3] {
 		version_string.data(),
 		stage_string.data(),
-		source.data()
+		source.data
 	};
 	int const lengths[3] {
 		(int)version_string.size(),
 		(int)stage_string.size(),
-		(int)source.size()
+		(int)source.size
 	};
 	
 	auto shader = glCreateShader(shaderType);
@@ -263,8 +266,8 @@ CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<cha
 CompiledShader create_shader(GLenum shaderType, Span<char const> source) {
 	auto shader = glCreateShader(shaderType);
 
-	GLint length = source.size();
-    glShaderSource(shader, 1, &source._begin, &length);
+	GLint length = (GLint)source.size;
+    glShaderSource(shader, 1, &source.data, &length);
 	
 	return compile_shader(shader);
 }
@@ -515,7 +518,7 @@ void immediate_draw() {
 	glBindBuffer(GL_ARRAY_BUFFER, immediate_vertex_buffer);
 	glBufferData(GL_ARRAY_BUFFER, immediate_vertices.size() * sizeof(immediate_vertices[0]), immediate_vertices.data(), GL_STATIC_DRAW);
 
-	glDrawArrays(immediate_type, 0, immediate_vertices.size());
+	glDrawArrays(immediate_type, 0, (GLsizei)immediate_vertices.size());
 	
 	glBindVertexArray(0);
 	glUseProgram(0);
@@ -533,3 +536,5 @@ void immediate_draw() {
 }
 }
 #endif
+
+#pragma warning(pop)

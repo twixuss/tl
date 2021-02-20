@@ -173,24 +173,24 @@ List<Token> lex(Span<char const> json) {
 				++c;
 				Token token;
 				token.type = '"';
-				token.view._begin = c;
+				token.view.data = c;
 				while (*c++ != '"') {}
-				token.view._end = c - 1;
+				token.view.size = c - token.view.data - 1;
 				result.push_back(token);
 				continue;
 			}
 		}
-		if (isDigit(*c) || *c == '-') {
+		if (is_digit(*c) || *c == '-') {
 			Token token;
 			token.type = Token_number;
-			token.view._begin = c;
+			token.view.data = c;
 			++c;
 			while (1) { 
-				if (isDigit(*c) || *c == '.') {
+				if (is_digit(*c) || *c == '.') {
 					++c; 
 				} else if (*c == 'e') {
 					c += 2;
-					while (isDigit(*c)) {
+					while (is_digit(*c)) {
 						++c;
 					}
 					break;
@@ -198,7 +198,7 @@ List<Token> lex(Span<char const> json) {
 					break;
 				}
 			}
-			token.view._end = c;
+			token.view.size = c - token.view.data;
 			result.push_back(token);
 			continue;
 		}
@@ -242,8 +242,8 @@ Object parse(Token *&t) {
 	} else if (t->type == Token_number) {
 		Object result = {Type_number};
 		char temp[256];
-		memcpy(temp, t->view.data(), t->view.size());
-		temp[t->view.size()] = 0;
+		memcpy(temp, t->view.data, t->view.size);
+		temp[t->view.size] = 0;
 		result.number.value = atof(temp);
 		++t;
 		return result;

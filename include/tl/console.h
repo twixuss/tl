@@ -28,7 +28,7 @@ inline void print_to_console(wchar const *string, umm length) { console_printer(
 template <class Char = char, class T>
 inline void print(T const &value) {
 	to_string<Char>(value, [](Span<Char const> span) {
-		current_printer(span.data(), span.size(), encoding_from_type<Char>);
+		current_printer(span.data, span.size, encoding_from_type<Char>);
 	});
 }
 

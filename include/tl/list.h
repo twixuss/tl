@@ -65,9 +65,9 @@ struct List {
 	List() = default;
 	explicit List(umm length) { resize(length); }
 	List(Span<T const> span) {
-		reserve(span.size());
+		reserve(span.size);
 		_copyConstruct(span.begin(), span.end());
-		_end = _begin + span.size();
+		_end = _begin + span.size;
 	}
 	List(T const *begin, umm length) : List(Span(begin, length)) {}
 	List(List &&that) {
@@ -174,17 +174,17 @@ struct List {
 		TL_BOUNDS_CHECK(_begin <= where && where <= _end);
 
 		umm where_index = where - _begin;
-		umm required_size = size() + span.size();
+		umm required_size = size() + span.size;
 		_grow_if_needed(required_size);
 		where = _begin + where_index; 
 		
 		for (auto src = where; src != _end; ++src) {
-			new (src + span.size()) T(std::move(*src));
+			new (src + span.size) T(std::move(*src));
 		}
-		for (umm i = 0; i < span.size(); ++i) {
+		for (umm i = 0; i < span.size; ++i) {
 			where[i] = span[i];
 		}
-		_end += span.size();
+		_end += span.size;
 		return where;
 	}
 
@@ -488,17 +488,17 @@ struct Queue {
 		TL_BOUNDS_CHECK(_begin <= where && where <= _end);
 
 		umm where_index = where - _begin;
-		umm required_size = size() + span.size();
+		umm required_size = size() + span.size;
 		_grow_if_needed(required_size);
 		where = _begin + where_index; 
 		
 		for (auto src = where; src != _end; ++src) {
-			new (src + span.size()) T(std::move(*src));
+			new (src + span.size) T(std::move(*src));
 		}
-		for (umm i = 0; i < span.size(); ++i) {
+		for (umm i = 0; i < span.size; ++i) {
 			where[i] = span[i];
 		}
-		_end += span.size();
+		_end += span.size;
 		return where;
 	}
 
@@ -1053,8 +1053,8 @@ struct BlockList {
 		return block->buffer[index].value;
 	}
 	
-	BlockList &operator+=(T const &v) { this->push_back(v); return *this; }
-	BlockList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
+	BlockList &operator+=(T const &v) { this->add(v); return *this; }
+	BlockList &operator+=(T &&v) { this->add(std::move(v)); return *this; }
 	BlockList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	BlockList &operator+=(BlockList const &v) { this->insert(as_span(v), this->end()); return *this; }
 	BlockList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }

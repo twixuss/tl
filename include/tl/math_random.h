@@ -65,42 +65,42 @@ forceinline f32x8 random_f32x8(u32x8 seed) { return normalize_range_f32<f32x8>(r
 forceinline f32x8 random_f32x8(s32x8 seed) { return normalize_range_f32<f32x8>(random_u32x8(seed)); }
 
 forceinline f32 random_f32(v2f value) {
-	v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45);
-	a += dot(a, a + 12.34);
+	v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
+	a += dot(a, a + 12.34f);
 	return frac(a.x * a.y * 136.51f);
 }
 forceinline f32 random_f32(v3f value) {
-	v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45);
-	a += dot(a, a + 12.34);
+	v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
+	a += dot(a, a + 12.34f);
 	a = frac(a * a.yzx() * 136.51f);
 	return frac(dot(a, a));
 }
 forceinline f32x4 random_f32x4(v3fx4 value) {
-	v3fx4 a = frac(value * V3fx4(sqrt2, sqrt3, sqrt5) * 123.45);
-	a += dot(a, a + 12.34);
+	v3fx4 a = frac(value * V3fx4(sqrt2, sqrt3, sqrt5) * 123.45f);
+	a += dot(a, a + 12.34f);
 	a = frac(a * a.yzx() * 136.51f);
 	return frac(dot(a, a));
 }
 forceinline f32x8 random_f32x8(v3fx8 value) {
-	v3fx8 a = frac(value * V3fx8(sqrt2, sqrt3, sqrt5) * 123.45);
-	a += dot(a, a + 12.34);
+	v3fx8 a = frac(value * V3fx8(sqrt2, sqrt3, sqrt5) * 123.45f);
+	a += dot(a, a + 12.34f);
 	a = frac(a * a.yzx() * 136.51f);
 	return frac(dot(a, a));
 }
 
 forceinline v2f random_v2f(v2f value) {
-	v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45);
-	return frac(a + dot(a, a + 12.34));
+	v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
+	return frac(a + dot(a, a + 12.34f));
 }
 forceinline v3f random_v3f(v3f value) {
-	v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45);
+	v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
 	a = frac(a);
-	return frac(a * a.yzx() + dot(a, a + 12.34));
+	return frac(a * a.yzx() + dot(a, a + 12.34f));
 }
 forceinline v3fx8 random_v3fx8(v3fx8 value) {
-	v3fx8 a = frac(value * V3fx8(sqrt2, sqrt3, sqrt5) * 123.45);
+	v3fx8 a = frac(value * V3fx8(sqrt2, sqrt3, sqrt5) * 123.45f);
 	a = frac(a);
-	return frac(a * a.yzx() + dot(a, a + 12.34));
+	return frac(a * a.yzx() + dot(a, a + 12.34f));
 }
 
 forceinline v2f random_v2f(v2s value) {
@@ -432,14 +432,14 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
     v2f t1 = t0 - 1.;
     
 	static const v2f directions[] = {
-		v2f{ 1., 0.},
-		v2f{-1., 0.},
-		v2f{ 0., 1.},
-		v2f{ 0.,-1.},
-		normalize(v2f{ 1., 1.}),
-		normalize(v2f{-1., 1.}),
-		normalize(v2f{ 1.,-1.}),
-		normalize(v2f{-1.,-1.})
+		v2f{ 1, 0},
+		v2f{-1, 0},
+		v2f{ 0, 1},
+		v2f{ 0,-1},
+		normalize(v2f{ 1, 1}),
+		normalize(v2f{-1, 1}),
+		normalize(v2f{ 1,-1}),
+		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 	auto get_direction = [&](v2f offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
@@ -466,14 +466,14 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
     v2f t1 = t0 - 1.;
     
 	static const v2f directions[] = {
-		v2f{ 1., 0.},
-		v2f{-1., 0.},
-		v2f{ 0., 1.},
-		v2f{ 0.,-1.},
-		normalize(v2f{ 1., 1.}),
-		normalize(v2f{-1., 1.}),
-		normalize(v2f{ 1.,-1.}),
-		normalize(v2f{-1.,-1.})
+		v2f{ 1, 0},
+		v2f{-1, 0},
+		v2f{ 0, 1},
+		v2f{ 0,-1},
+		normalize(v2f{ 1, 1}),
+		normalize(v2f{-1, 1}),
+		normalize(v2f{ 1,-1}),
+		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 	auto get_direction = [&](v2s offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
