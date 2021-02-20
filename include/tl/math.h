@@ -15,6 +15,7 @@
 
 #if COMPILER_MSVC
 #pragma warning(disable : 5045) // spectre
+#pragma warning(disable : 4146) // unsigned unary minus
 #endif
 
 namespace TL {
@@ -3837,6 +3838,7 @@ forceinline v4s roundToInt(v4f v) { return (v4s)round(v); }
 forceinline v2sx8 roundToInt(v2fx8 v) { return (v2sx8)round(v); }
 
 forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
+forceinline f64 absolute(f64 v) { return *(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v; }
 forceinline u32 absolute(u32 v) { return v; }
 forceinline s32 absolute(s32 v) { if (v < 0) v = -v; return v; }
 
@@ -4197,6 +4199,8 @@ template <class T>
 forceinline auto distance(T a, T b) {
 	return sqrt(distance_squared(a, b));
 }
+template <> forceinline auto distance(f32 a, f32 b) { return absolute(a - b); }
+template <> forceinline auto distance(f64 a, f64 b) { return absolute(a - b); }
 template <class T>
 forceinline auto manhattan(T a, T b) {
 	return sum(abs(a - b));
@@ -5490,6 +5494,17 @@ template <> forceinline v2f cvt(s32 v) { return V2f(v); }
 template <> forceinline v3f cvt(s32 v) { return V3f(v); }
 template <> forceinline v2f cvt(u32 v) { return V2f(v); }
 template <> forceinline v3f cvt(u32 v) { return V3f(v); }
+
+template <class T>
+forceinline T saturate(T t) {
+	return clamp(t, cvt<T>(0), cvt<T>(1));
+}
+
+template <class T>
+forceinline T smoothstep(T t) {
+	t = saturate(t);
+	return t * t * t * (t * (t * 6 - 15) + 10);
+}
 
 } // namespace TL
 

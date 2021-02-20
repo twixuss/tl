@@ -149,6 +149,23 @@ void loop_until(Predicate &&predicate) {
 	}
 }
 
+struct SyncPoint {
+	u32 volatile current_counter;
+	u32 target_counter;
+};
+
+SyncPoint create_sync_point(u32 target_counter) {
+	SyncPoint result;
+	result.current_counter = 0;
+	result.target_counter = target_counter;
+	return result;
+}
+
+void sync(SyncPoint &point) {
+	atomic_add(point.current_counter, 1);
+	loop_until([&] { return point.current_counter == point.target_counter; });
+}
+
 struct Mutex {
 	bool volatile in_use = false;
 };

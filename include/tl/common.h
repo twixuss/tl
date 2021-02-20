@@ -1262,6 +1262,9 @@ template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity>
 template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T const> cmp) { return find(as_span(list), cmp); }
 template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T>       cmp) { return find(as_span(list), cmp); }
 
+template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
+
+
 template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>>
 CopyFnRet<CopyFn, Char> to_string(FormatFloat<f64> f, CopyFn &&copy_fn) {
 	auto v = f.value;

@@ -16,10 +16,12 @@ namespace TL {
 enum RawInputDevice {
 	RawInput_mouse = 0x1,
 };
+
+TL_API extern s64 performance_frequency;
+
 TL_API bool init_rawinput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
-TL_API s64 getPerformanceFrequency();
 TL_API s64 get_performance_counter();
 TL_API bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
@@ -107,11 +109,11 @@ bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleR
 	}
 	return false;
 }
-s64 getPerformanceFrequency() {
+s64 performance_frequency = [] {
 	LARGE_INTEGER frequency;
 	QueryPerformanceFrequency(&frequency);
 	return frequency.QuadPart;
-}
+}();
 s64 get_performance_counter() {
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
