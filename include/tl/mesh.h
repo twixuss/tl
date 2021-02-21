@@ -98,6 +98,8 @@ Mesh parse_glb(char const *path) {
 			}
 			break;
 		}
+		default:
+			invalid_code_path();
 	}
 
 	return result;

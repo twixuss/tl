@@ -240,6 +240,17 @@ struct MutexQueue {
 		}
 		return result;
 	}
+	template <class Fn>
+	Optional<T> try_pop_and(Fn &&fn) {
+		Optional<T> result;
+		scoped_lock(mutex);
+		if (base.size()) {
+			result = base.front();
+			base.pop();
+			fn(result.value);
+		}
+		return result;
+	}
 	T pop() {
 		Optional<T> opt;
 		loop_until([&] {
@@ -268,7 +279,6 @@ struct MutexQueue {
 		pop_all_nolock(std::forward<Fn>(fn));
 	}
 	umm size() {
-		scoped_lock(mutex);
 		return base.size();
 	}
 	

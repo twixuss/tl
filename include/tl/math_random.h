@@ -29,13 +29,18 @@ inline v3f next_v3f(State &state) {
 	};
 }
 
-forceinline u32 random_u32(u32 seed) { 
-	seed ^= (u32)0x55555555;
-	seed *= u32_random_primes[0];
-	seed ^= (u32)0x33333333;
-	seed *= u32_random_primes[1];
-    return seed;
+#define RANDOM_U32(type) \
+forceinline type random_##type(type seed) {  \
+	seed ^= 0x55555555u; \
+	seed *= u32_random_primes[0]; \
+	seed ^= 0x33333333u; \
+	seed *= u32_random_primes[1]; \
+    return seed; \
 }
+RANDOM_U32(u32)
+RANDOM_U32(u32x8)
+#undef RANDOM_U32
+
 forceinline u64 random_u64(u64 seed) {
     u64 r0 = seed;
     u64 r1 = rotateLeft(seed, 32);
@@ -55,9 +60,6 @@ forceinline s64 random_s64(s64 seed) { return (s64)random_u64(seed); }
 forceinline f64 random_f64(u64 seed) { return normalize_range_f64<f64>(random_u64(seed)); }
 forceinline f64 random_f64(s64 seed) { return normalize_range_f64<f64>(random_u64(seed)); }
 
-forceinline u32x8 random_u32x8(u32x8 seed) {
-	return seed + reverse_bits(seed) + reverse_bytes(seed);
-}
 forceinline u32x8 random_u32x8(s32x8 seed) { return random_u32x8((u32x8)seed); }
 forceinline s32x8 random_s32x8(u32x8 seed) { return (s32x8)random_u32x8(seed); }
 forceinline s32x8 random_s32x8(s32x8 seed) { return (s32x8)random_u32x8(seed); }
@@ -385,44 +387,92 @@ forceinline f32 value_noise_v2s(v2s coordinate, s32 step, f32(*interpolate)(f32)
 
 	return lerp(top, bottom, ty);
 }
-forceinline f32 value_noise_v3s(v3s coordinate, s32 step, f32(*interpolate)(f32)) {
+template <class Interpolate>
+forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpolate) {
+	static_assert(isSame<decltype(interpolate(0.0f)), f32>);
 	v3s floored = floor(coordinate, step);
     v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
 	
-	f32 left_top_back      = random_f32(tile + v3s{0,0,0});
-	f32 right_top_back     = random_f32(tile + v3s{1,0,0});
-	f32 left_bottom_back   = random_f32(tile + v3s{0,1,0});
-	f32 right_bottom_back  = random_f32(tile + v3s{1,1,0});
-	f32 left_top_front     = random_f32(tile + v3s{0,0,1});
-	f32 right_top_front    = random_f32(tile + v3s{1,0,1});
-	f32 left_bottom_front  = random_f32(tile + v3s{0,1,1});
-	f32 right_bottom_front = random_f32(tile + v3s{1,1,1});
-
 	f32 tx = interpolate(local.x);
 	f32 ty = interpolate(local.y);
 	f32 tz = interpolate(local.z);
-	f32 top_back     = lerp(left_top_back,     right_top_back,     tx);
-	f32 bottom_back  = lerp(left_bottom_back,  right_bottom_back,  tx);
-	f32 top_front    = lerp(left_top_front,    right_top_front,    tx);
-	f32 bottom_front = lerp(left_bottom_front, right_bottom_front, tx);
-	f32 top    = lerp(top_back,    top_front,    tz);
-	f32 bottom = lerp(bottom_back, bottom_front, tz);
-	return lerp(top, bottom, ty);
+#if 1
+	__m256i px = _mm256_add_epi32(_mm256_set1_epi32(tile.x), _mm256_setr_epi32(0, 1, 0, 1, 0, 1, 0, 1));
+	__m256i py = _mm256_add_epi32(_mm256_set1_epi32(tile.y), _mm256_setr_epi32(0, 0, 1, 1, 0, 0, 1, 1));
+	__m256i pz = _mm256_add_epi32(_mm256_set1_epi32(tile.z), _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1));
+	
+	auto random_u32x8 = [] (__m256i s) {
+		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x55555555u));
+		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(u32_random_primes[0]));
+		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x33333333u));
+		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(u32_random_primes[1]));
+		return s;
+	};
+
+	__m256i s = {};
+	s = _mm256_xor_si256(s, random_u32x8(px));
+	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(py, s)));
+	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(pz, s)));
+
+	__m256 samples = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_srli_epi32(s, 8)), _mm256_set1_ps(1.0f / ((1 << 24) - 1)));
+
+	__m128 a = _mm256_extractf128_ps(samples, 0);
+	__m128 b = _mm256_extractf128_ps(samples, 1);
+
+	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(tz), a);
+
+	b = _mm_shuffle_ps(a, a, _MM_SHUFFLE(0, 0, 3, 2));
+	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(ty), a);
+
+	b = _mm_shuffle_ps(a, a, _MM_SHUFFLE(0, 0, 0, 1));
+	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(tx), a);
+	
+	return _mm_cvtss_f32(a);
+#elif 1
+	auto samples = random_f32x8(V3sx8(tile) + V3sx8(
+		0,0,0,
+		1,0,0,
+		0,1,0,
+		1,1,0,
+		0,0,1,
+		1,0,1,
+		0,1,1,
+		1,1,1
+	));
+
+	f32 left_bottom  = lerp(samples[0], samples[4], tz);
+	f32 right_bottom = lerp(samples[1], samples[5], tz);
+	f32 left_top     = lerp(samples[2], samples[6], tz);
+	f32 right_top    = lerp(samples[3], samples[7], tz);
+
+	f32 left  = lerp(left_bottom,  left_top,  ty);
+	f32 right = lerp(right_bottom, right_top, ty);
+
+	return lerp(left, right, tx);
+#else
+	f32 left_bottom_back   = random_f32(tile + v3s{0,0,0});
+	f32 right_bottom_back  = random_f32(tile + v3s{1,0,0});
+	f32 left_top_back      = random_f32(tile + v3s{0,1,0});
+	f32 right_top_back     = random_f32(tile + v3s{1,1,0});
+	f32 left_bottom_front  = random_f32(tile + v3s{0,0,1});
+	f32 right_bottom_front = random_f32(tile + v3s{1,0,1});
+	f32 left_top_front     = random_f32(tile + v3s{0,1,1});
+	f32 right_top_front    = random_f32(tile + v3s{1,1,1});
+
+	f32 left_bottom  = lerp(left_bottom_back,  left_bottom_front,  tz);
+	f32 right_bottom = lerp(right_bottom_back, right_bottom_front, tz);
+	f32 left_top     = lerp(left_top_back,     left_top_front,     tz);
+	f32 right_top    = lerp(right_top_back,    right_top_front,    tz);
+
+	f32 left  = lerp(left_bottom,  left_top,  ty);
+	f32 right = lerp(right_bottom, right_top, ty);
+
+	return lerp(left, right, tx);
+#endif
 }
 forceinline f32 value_noise_v2s_linear(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return v; }); }
 forceinline f32 value_noise_v3s_linear(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return v; }); }
-
-template <class T>
-forceinline T saturate(T t) {
-	return clamp(t, cvt<T>(0), cvt<T>(1));
-}
-
-template <class T>
-forceinline T smoothstep(T t) {
-	t = saturate(t);
-	return t * t * t * (t * (t * 6 - 15) + 10);
-}
 
 forceinline f32 gradient_noise_v2f(v2f coordinate) {
     v2f tile = floor(coordinate);
@@ -576,23 +626,6 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
 			t.z
 		) / sqrt3 + 0.5f;
 #endif
-}
-
-
-template <class T, class Fn, class ...Args>
-forceinline auto layer(u32 count, f32 power, f32 scale, Fn &&fn, T coordinate, Args &&...args) {
-	using ResultType = decltype(fn(coordinate, std::forward<Args>(args)...));
-	ResultType result = {};
-	f32 total_power = 0;
-	f32 current_scale = 1;
-	f32 current_power = 1;
-	for (u32 i = 0; i < count; ++i) {
-		result += fn(coordinate * current_scale, std::forward<Args>(args)...) * current_power;
-		total_power += current_power;
-		current_power *= power;
-		current_scale *= scale;
-	}
-	return result * reciprocal(total_power);
 }
 
 template <class T>
