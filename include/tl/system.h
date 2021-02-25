@@ -104,6 +104,10 @@
 #define ARCH_LZCNT 0
 #endif
 
+#ifndef ARCH_FMA
+#define ARCH_FMA ARCH_AVX2
+#endif
+
 #if !(ARCH_X86 | ARCH_X64)
 #error "Unresolved target architecture"
 #endif

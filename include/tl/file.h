@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "buffer.h"
 #include "string.h"
 
 namespace TL {
@@ -39,7 +39,7 @@ TL_API void close(File file);
 TL_API bool fileExists(char const *path);
 TL_API bool fileExists(wchar const *path);
 TL_API u64 get_file_write_time(char const *path);
-TL_API List<String<char>> get_files_in_directory(char const *directory);
+TL_API StringList<char> get_files_in_directory(char const *directory);
 
 inline void update_file_tracker(FileTracker &tracker) {
 	u64 last_write_time = get_file_write_time(tracker.path);
@@ -64,7 +64,7 @@ template <class Fn>
 inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
 	auto allocator = current_allocator;
 
-	auto params = allocate<Fn>(allocator);
+	auto params = ALLOCATE(Fn, allocator);
 	new(params) Fn(std::forward<Fn>(on_update));
 
 	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
@@ -77,7 +77,7 @@ inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
 
 inline void free_file_tracker(FileTracker &tracker) {
 	if (tracker.allocator) {
-		free(tracker.allocator, tracker.on_update_state);
+		FREE(tracker.allocator, tracker.on_update_state);
 	}
 	tracker = {};
 }
@@ -130,42 +130,48 @@ inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, um
 	}
 }
 inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
-	if (path.back() == '\0')
+	if (path.back() == '\0') {
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
-	else
-		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
+	} else {
+		auto null_terminated_path = null_terminate(path);
+		defer { null_terminated_path.free(); };
+		return read_entire_file(null_terminated_path.data, extra_space_before, extra_space_after);
+	}
 }
 inline Buffer read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
-	if (path.back() == '\0')
+	if (path.back() == '\0') {
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
-	else
-		return read_entire_file(null_terminate(path).data(), extra_space_before, extra_space_after);
+	} else {
+		auto null_terminated_path = null_terminate(path);
+		defer { null_terminated_path.free(); };
+		return read_entire_file(null_terminated_path.data, extra_space_before, extra_space_after);
+	}
 }
 inline void truncate(File file, u64 size) {
 	setCursor(file, (s64)size, File_begin);
 	truncateToCursor(file);
 }
-inline void writeEntireFile(File file, void const *data, u64 size) {
+inline void write_entire_file(File file, void const *data, u64 size) {
 	setCursor(file, 0, File_begin);
 	write(file, data, size);
 	truncateToCursor(file);
 }
-inline bool writeEntireFile(char const *path, void const *data, u64 size) {
+inline bool write_entire_file(char const *path, void const *data, u64 size) {
 	File file = openFile(path, File_write);
 	if (!file) return false;
-	writeEntireFile(file, data, size);
+	write_entire_file(file, data, size);
 	close(file);
 	return true;
 }
-inline bool writeEntireFile(wchar const *path, void const *data, u64 size) {
+inline bool write_entire_file(wchar const *path, void const *data, u64 size) {
 	File file = openFile(path, File_write);
 	if (!file) return false;
-	writeEntireFile(file, data, size);
+	write_entire_file(file, data, size);
 	close(file);
 	return true;
 }
-forceinline bool writeEntireFile(char  const *path, Span<u8 const> span) { return writeEntireFile(path, span.data, span.size); }
-forceinline bool writeEntireFile(wchar const *path, Span<u8 const> span) { return writeEntireFile(path, span.data, span.size); }
+forceinline bool write_entire_file(char  const *path, Span<u8 const> span) { return write_entire_file(path, span.data, span.size); }
+forceinline bool write_entire_file(wchar const *path, Span<u8 const> span) { return write_entire_file(path, span.data, span.size); }
 
 }
 
@@ -299,23 +305,23 @@ u64 get_file_write_time(char const *path) {
 
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
-List<String<char>> get_files_in_directory(char const *directory) {
+StringList<char> get_files_in_directory(char const *directory) {
 	auto directory_len = length(directory);
 	auto allocator = current_allocator;
 	char *directory_with_star;
 	if (directory[directory_len - 1] == '\\' || directory[directory_len - 1] == '/') {
-		directory_with_star = allocate<char>(allocator, directory_len + 2);
+		directory_with_star = ALLOCATE(char, allocator, directory_len + 2);
 		memcpy(directory_with_star, directory, directory_len);
 		directory_with_star[directory_len + 0] = '*';
 		directory_with_star[directory_len + 1] = 0;
 	} else {
-		directory_with_star = allocate<char>(allocator, directory_len + 3);
+		directory_with_star = ALLOCATE(char, allocator, directory_len + 3);
 		memcpy(directory_with_star, directory, directory_len);
 		directory_with_star[directory_len + 0] = '/';
 		directory_with_star[directory_len + 1] = '*';
 		directory_with_star[directory_len + 2] = 0;
 	}
-	defer { free(allocator, directory_with_star); };
+	defer { FREE(allocator, directory_with_star); };
 
 	WIN32_FIND_DATAA find_data;
 	HANDLE handle = FindFirstFileA(directory_with_star, &find_data);
@@ -324,7 +330,7 @@ List<String<char>> get_files_in_directory(char const *directory) {
 	}
 
 	u32 file_index = 0;
-	List<String<char>> result;
+	StringList<char> result;
 	do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
@@ -332,9 +338,11 @@ List<String<char>> get_files_in_directory(char const *directory) {
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
-		result += find_data.cFileName;
+		result.add(find_data.cFileName);
 	} while (FindNextFileA(handle, &find_data));
 	FindClose(handle);
+
+	result.make_absolute();
 	return result;
 }
 

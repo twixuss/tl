@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "system.h"
 #include "console.h"
+#include "math.h"
 
 #pragma warning(push, 0)
 #define NOMINMAX
@@ -442,6 +443,8 @@ void present() {
 }
 
 void immediate_init() {
+	immediate_vertices.allocator = current_allocator;
+
 	auto vertex_shader = create_shader(GL_VERTEX_SHADER, R"(
 #version 330 core
 
@@ -516,9 +519,9 @@ void immediate_draw() {
 	glUseProgram(immediate_shader);
 	glBindVertexArray(immediate_vertex_array);
 	glBindBuffer(GL_ARRAY_BUFFER, immediate_vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, immediate_vertices.size() * sizeof(immediate_vertices[0]), immediate_vertices.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, immediate_vertices.size * sizeof(immediate_vertices[0]), immediate_vertices.data, GL_STATIC_DRAW);
 
-	glDrawArrays(immediate_type, 0, (GLsizei)immediate_vertices.size());
+	glDrawArrays(immediate_type, 0, (GLsizei)immediate_vertices.size);
 	
 	glBindVertexArray(0);
 	glUseProgram(0);

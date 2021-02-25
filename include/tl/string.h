@@ -8,6 +8,68 @@
 
 namespace TL {
 
+//
+// Cache efficient list of strings
+//
+// Note: To start using 'strings' member ensure that list is in 'absolute mode',
+// so 'data' member of strings' elements represent a pointer to the beginning of a string
+// stored in 'buffer'
+//
+// Addition is allowed only In 'relative mode', where 'data' member of string's elements holds
+// an index to the 'buffer'
+//
+template <class Char>
+struct StringList {
+	List<Span<Char>> strings;
+	List<Char> buffer;
+#ifdef TL_DEBUG
+	bool is_absolute = false;
+#endif
+
+	void add(Span<Char const> string) {
+#ifdef TL_DEBUG
+		assert(is_absolute == false);
+#endif
+
+		Span<Char> dest;
+		dest.size = string.size;
+		dest.data = (Char *)buffer.size;
+		strings.add(dest);
+
+		buffer += string;
+	}
+	void add(Char const *string) {
+		add(Span(string, length(string)));
+	}
+	
+	void make_absolute() {
+#ifdef TL_DEBUG
+		is_absolute = true;
+#endif
+		for (auto &string : strings) {
+			string.data = buffer.data + (umm)string.data;
+		}
+	}
+	void make_relative() {
+#ifdef TL_DEBUG
+		is_absolute = false;
+#endif
+		for (auto &string : strings) {
+			string.data = (Char *)(string.data - buffer.data);
+		}
+	}
+
+	Span<Char> *begin() { return strings.begin(); }
+	Span<Char> *end() { return strings.end(); }
+};
+
+template <class Char, class Predicate>
+Span<Char> *find_if(StringList<Char> &list, Predicate &&predicate) {
+	return find_if(list.strings, std::forward<Predicate>(predicate));
+}
+
+#if 0
+
 template <class Allocator = TL_DEFAULT_ALLOCATOR>
 inline wchar *copyString(wchar const *str) {
 	umm size = (length(str) + 1) * sizeof(wchar);
@@ -59,13 +121,6 @@ struct String : List<Char, Allocator> {
 	}
 };
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class ...Args>
-constexpr String<char, Allocator> concatenate(Args &&...args) {
-	String<char, Allocator> result;
-	int x[] = {0, (result.append(as_span(std::forward<Args>(args))), 0)...};
-	return result;
-}
-
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char = char, class T>
 String<Char, Allocator> asString(T const &val) {
 	String<Char, Allocator> result;
@@ -86,13 +141,28 @@ String<Char, Allocator> asStringNT(T const &val) {
 	return result;
 }
 
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
-String<Char, Allocator> null_terminate(Span<Char const> span) {
-	return asStringNT<Allocator, Char>(span);
+#endif
+
+template <class T = char, class ...Args>
+constexpr List<T> concatenate(Args &&...args) {
+	List<T> result;
+	int x[] = {0, ((result += as_span(std::forward<Args>(args))), 0)...};
+	return result;
 }
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char>
-String<Char, Allocator> null_terminate(Span<Char> span) {
-	return null_terminate<Allocator, Char>((Span<Char const>)span);
+
+template <class Char>
+List<Char> null_terminate(Span<Char const> span) {
+	List<Char> result;
+	result.size = span.size + 1;
+	result.data = ALLOCATE(Char, current_allocator, result.size);
+	result.capacity = result.size;
+	memcpy(result.data, span.data, span.size * sizeof(Char));
+	result.data[result.size - 1] = 0;
+	return result;
+}
+template <class Char>
+List<Char> null_terminate(Span<Char> span) {
+	return null_terminate((Span<Char const>)span);
 }
 
 inline u32 character_to_digit(char character, u32 base) {
@@ -194,7 +264,7 @@ struct StringBuilder {
 	~StringBuilder() {
 		for (Block *block = first.next; block != 0;) {
 			Block *next = block->next;
-			free(allocator, block);
+			FREE(allocator, block);
 			block = next;
 		}
 	}
@@ -246,22 +316,22 @@ struct StringBuilder {
 		return chars_written;
 	}
 	umm append(char const *str) { return append(as_span(str)); }
-	umm append(char ch, umm count = 1) {
-		umm chars_to_write = count;
-		while (last->available_space() < chars_to_write) {
-			umm space_in_block = last->available_space();
-			populate(last->end(), ch, space_in_block);
-			chars_to_write -= space_in_block;
-			last->size += space_in_block;
-			last = last->next;
-			if (!last) {
-				last = alloc_last = allocate_block();
-			}
-		}
-		populate(last->end(), ch, chars_to_write);
-		last->size += chars_to_write;
-		return count;
-	}
+	//umm append(char ch, umm count = 1) {
+	//	umm chars_to_write = count;
+	//	while (last->available_space() < chars_to_write) {
+	//		umm space_in_block = last->available_space();
+	//		populate(last->end(), ch, space_in_block);
+	//		chars_to_write -= space_in_block;
+	//		last->size += space_in_block;
+	//		if (!last->next) {
+	//			last = alloc_last = allocate_block();
+	//			last = last->next;
+	//		}
+	//	}
+	//	populate(last->end(), ch, chars_to_write);
+	//	last->size += chars_to_write;
+	//	return count;
+	//}
 	template <class T>
 	umm append(T const &val) {
 		return to_string<Char>(val, [&](Span<Char const> span) {
@@ -355,7 +425,6 @@ struct StringBuilder {
 		return totalSize;
 	}
 	Span<Char> fill(Span<Char> dst_string) {
-		assert(dst_string.size >= this->size());
 		Char *dst_char = dst_string.data;
 		for (Block *block = &first; block != 0; block = block->next) {
 			memcpy(dst_char, block->buffer, block->size * sizeof(Char));
@@ -363,16 +432,18 @@ struct StringBuilder {
 		}
 		return Span<Char>(dst_string.begin(), dst_char);
 	}
-	template <class Char = char>
-	String<Char> get() {
-		String result(size());
+	List<Char> get() {
+		List<Char> result;
+		result.reserve(size());
 		fill(result);
+		result.size = result.capacity;
 		return result;
 	}
-	template <class Char = char>
-	String<Char> getNullTerminated() {
-		String<Char> result(size() + 1);
+	List<Char> getNullTerminated() {
+		List<Char> result;
+		result.reserve(size() + 1);
 		fill(result);
+		result.size = result.capacity;
 		result.back() = '\0';
 		return result;
 	}
@@ -399,10 +470,10 @@ struct StringBuilder {
 
 private:
 	Block *allocate_block() {
-		return new (allocate<Block>(allocator)) Block;
+		return new (ALLOCATE(Block, allocator)) Block;
 	}
 };
-
+#if 0
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> format(Char const *fmt, Args const &...args) {
 	StringBuilder<Char, Allocator> builder;
@@ -417,7 +488,7 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 	builder.append((Char)0);
 	return builder.get();
 }
-
+#endif
 template <class Char, umm capacity, class T>
 void append_string(StaticList<Char, capacity> &list, T const &value) {
 	to_string<Char>(value, [&](Span<Char const> span) { list += span; });

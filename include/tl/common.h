@@ -56,12 +56,6 @@
 #define TL_BOUNDS_CHECK(x)
 #endif
 
-#ifdef TL_ALLOCATION_TRACKER
-#ifndef TL_DEALLOCATION_TRACKER
-#error TL_DEALLOCATION_TRACKER must be defined with TL_ALLOCATION_TRACKER
-#endif
-#endif
-
 namespace TL {
 
 inline constexpr umm length(char const *str) {
@@ -83,6 +77,7 @@ inline constexpr umm length(wchar *str) { return length((wchar const *)str); }
 #define TL_DECLARE_HANDLE(name) typedef struct TL_HANDLE_NAME(name) *name;
 #define TL_DEFINE_HANDLE(name) struct TL_HANDLE_NAME(name)
 
+
 template <class T, class U> inline constexpr bool isSame = false;
 template <class T> inline constexpr bool isSame<T, T> = true;
 
@@ -102,12 +97,19 @@ template <class T> inline constexpr bool isChar = false;
 template <> inline constexpr bool isChar<u8> = true;
 template <> inline constexpr bool isChar<s8> = true;
 
-template <class T> inline constexpr bool isSigned = false;
-template <> inline constexpr bool isSigned<s8 > = true;
-template <> inline constexpr bool isSigned<s16> = true;
-template <> inline constexpr bool isSigned<s32> = true;
-template <> inline constexpr bool isSigned<s64> = true;
-template <> inline constexpr bool isSigned<slong> = true;
+template <class T> struct isSigned_ {};
+template <> struct isSigned_<s8   > { inline static constexpr bool value = true; };
+template <> struct isSigned_<s16  > { inline static constexpr bool value = true; };
+template <> struct isSigned_<s32  > { inline static constexpr bool value = true; };
+template <> struct isSigned_<s64  > { inline static constexpr bool value = true; };
+template <> struct isSigned_<slong> { inline static constexpr bool value = true; };
+template <> struct isSigned_<u8   > { inline static constexpr bool value = false; };
+template <> struct isSigned_<u16  > { inline static constexpr bool value = false; };
+template <> struct isSigned_<u32  > { inline static constexpr bool value = false; };
+template <> struct isSigned_<u64  > { inline static constexpr bool value = false; };
+template <> struct isSigned_<ulong> { inline static constexpr bool value = false; };
+
+template <class T> inline constexpr bool isSigned = isSigned_<T>::value;
 
 template <class T> inline constexpr bool isUnsigned = false;
 template <> inline constexpr bool isUnsigned<u8 > = true;
@@ -203,6 +205,7 @@ template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
 template <class T>
 forceinline constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
 
+template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
 template <class T, class U> forceinline constexpr auto max(T a, U b) { return a > b ? a : b; }
 template <class T, class U, class... Rest> forceinline constexpr auto min(T a, U b, Rest... rest) { return min(min(a, b), rest...); }
@@ -352,8 +355,6 @@ forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000
 
 forceinline constexpr bool is_positive(f32 v) { return !(*(u32 *)&v & 0x80000000); }
 forceinline constexpr bool is_positive(f64 v) { return !(*(u64 *)&v & 0x8000000000000000); }
-
-template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 
 #if COMPILER_GCC
 forceinline u8  rotateLeft (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
@@ -594,8 +595,8 @@ template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)spa
 template <class T> constexpr Span<u8 const> as_bytes(Span<T const> span) { return {(u8 *)span.begin(), span.size * sizeof(T)}; }
 template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size * sizeof(T)}; }
 template <class T> constexpr Span<char const> as_chars(Span<T const> span) { return {(char *)span.begin(), span.size * sizeof(T)}; }
-template <class T> constexpr Span<u8> as_bytes(T &value) { return {(u8 *)&value, sizeof(T)}; }
-template <class T> constexpr Span<u8 const> as_bytes(T const &value) { return {(u8 *)&value, sizeof(T)}; }
+template <class T> constexpr Span<u8> value_as_bytes(T &value) { return {(u8 *)&value, sizeof(T)}; }
+template <class T> constexpr Span<u8 const> value_as_bytes(T const &value) { return {(u8 *)&value, sizeof(T)}; }
 
 template <class T> constexpr umm count_of(Span<T const> span) { return span.size; }
 template <class T> constexpr umm length (Span<T const> span) { return span.size; }
@@ -623,36 +624,6 @@ constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 	}
 	return 0;
 }
-
-#ifdef TL_ALLOCATION_TRACKER
-
-#define ALLOCATE(al, size, align)                    (TL_ALLOCATION_TRACKER<al>((umm)(size), (umm)(align), __FILE__, __LINE__))
-#define ALLOCATE_MSG(al, size, align, message)       (TL_ALLOCATION_TRACKER<al>((umm)(size), (umm)(align), __FILE__, __LINE__, message))
-#define ALLOCATE_T(al, t, count, align)              ((t*)TL_ALLOCATION_TRACKER<al>(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)), __FILE__, __LINE__))
-#define ALLOCATE_T_MSG(al, t, count, align, message) ((t*)TL_ALLOCATION_TRACKER<al>(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)), __FILE__, __LINE__, message))
-
-#define DEALLOCATE(al, data) (TL_DEALLOCATION_TRACKER(data), al::deallocate(data))
-
-#else
-
-#define ALLOCATE(al, size, align)                    al::allocate((umm)(size), (umm)(align))
-#define ALLOCATE_MSG(al, size, align, message)       al::allocate((umm)(size), (umm)(align))
-#define ALLOCATE_T(al, t, count, align)              (t*)al::allocate(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)))
-#define ALLOCATE_T_MSG(al, t, count, align, message) (t*)al::allocate(sizeof(t) * (umm)(count), max((umm)(align), (umm)alignof(t)))
-
-#define DEALLOCATE(al, data) al::deallocate(data)
-
-#endif
-
-
-struct OsAllocator {
-	TL_API static void *allocate(umm size, umm align = 0);
-	TL_API static void deallocate(void *data);
-};
-
-#ifndef TL_DEFAULT_ALLOCATOR
-#define TL_DEFAULT_ALLOCATOR ::TL::OsAllocator
-#endif
 
 inline constexpr bool is_whitespace(u32 c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
@@ -946,123 +917,6 @@ CopyFnRet<CopyFn, Char> to_string(f32 v, CopyFn &&copy_fn) {
 }
 
 
-enum AllocatorMode {
-	Allocator_allocate,
-	Allocator_reallocate,
-	Allocator_free,
-};
-
-struct Allocator {
-	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state);
-	void *state;
-	operator bool() {
-		return func != 0;
-	}
-};
-
-inline void *allocate(Allocator allocator, umm size, umm align = 0) {
-	return allocator.func(Allocator_allocate, size, align, 0, allocator.state);
-}
-inline void *reallocate(Allocator allocator, void *data) {
-	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state);
-}
-inline void free(Allocator allocator, void *data) {
-	allocator.func(Allocator_free, 0, 0, data, allocator.state);
-}
-template <class T>
-T *allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
-	return (T *)allocate(allocator, sizeof(T) * count, align);
-}
-
-extern TL_API void init_allocator();
-extern TL_API Allocator default_allocator;
-extern TL_API Allocator thread_local current_allocator;
-
-#define push_allocator(allocator) \
-Allocator CONCAT(previous_allocator, __LINE__) = current_allocator; \
-current_allocator = allocator; \
-defer { current_allocator = CONCAT(previous_allocator, __LINE__); }
-
-struct Buffer : Span<u8> {
-	using Span<u8>::Span;
-	Allocator allocator;
-};
-
-inline Buffer create_buffer(umm size) {
-	Buffer result;
-	result.allocator = current_allocator;
-	result.data = allocate<u8>(result.allocator, size);
-	result.size = size;
-	return result;
-}
-
-inline void free(Buffer buffer) {
-	if (buffer.data) {
-		free(buffer.allocator, buffer.data);
-	}
-}
-
-
-struct Function {
-	Allocator allocator;
-
-	void (*function)(void *param);
-	void *param;
-
-	void operator()() {
-		return function(param);
-	}
-};
-
-namespace Detail {
-template <class Tuple, umm... indices>
-static void invoke(void *raw_vals) noexcept {
-	Tuple &tuple = *(Tuple *)raw_vals;
-	std::invoke(std::move(std::get<indices>(tuple))...);
-}
-
-template <class Tuple, umm... indices>
-static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
-	return &invoke<Tuple, indices...>;
-}
-
-} // namespace Detail
-
-inline Function create_function(void (*func)(void *param), void *param) {
-	Function result = {};
-	result.function = func;
-	result.param = param;
-	return result;
-}
-inline Function create_function(void (*func)()) {
-	Function result = {};
-	result.function = (void (*)(void *))func;
-	return result;
-}
-template <class Fn, class ...Args>
-Function create_function(Fn &&fn, Args &&...args) {
-	if constexpr (std::is_convertible_v<Fn, void(*)()>) {
-		return create_function((void(*)())fn);
-	} else {
-		auto allocator = current_allocator;
-
-		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-		auto params = allocate<Tuple>(allocator);
-		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
-
-		Function result = {};
-		result.allocator = allocator;
-		result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-		result.param = params;
-		return result;
-	}
-}
-inline void free_function(Function &function) {
-	if (function.allocator)
-		free(function.allocator, function.param);
-	function = {};
-}
-
 template <class T>
 struct Storage_Trivial {
 	union {
@@ -1315,43 +1169,108 @@ forceinline u32 count_bits(u64 v) { return (u32)_mm_popcnt_u64(v); }
 forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
 forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
 
-#ifdef TL_IMPL
 
-#if OS_WINDOWS
+enum AllocatorMode {
+	Allocator_allocate,
+	Allocator_reallocate,
+	Allocator_free,
+};
 
-#if COMPILER_MSVC
+struct Allocator {
+	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state);
+	void *state;
+	operator bool() {
+		return func != 0;
+	}
+};
 
-void *OsAllocator::allocate(umm size, umm align) { return _aligned_malloc(size, max(align, (umm)8)); }
-void OsAllocator::deallocate(void *data) { _aligned_free(data); }
+template <class T>
+T *_allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
+	return (T *)allocator.func(Allocator_allocate, sizeof(T) * count, align, 0, allocator.state);
+}
+inline void *_reallocate(Allocator allocator, void *data) {
+	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state);
+}
+inline void _free(Allocator allocator, void *data) {
+	allocator.func(Allocator_free, 0, 0, data, allocator.state);
+}
 
-#elif COMPILER_GCC
+#ifdef TL_TRACK_ALLOCATIONS
 
-void *OsAllocator::allocate(umm size, umm align) { return __mingw_aligned_malloc(size, max(align, (umm)8)); }
-void OsAllocator::deallocate(void *data) { __mingw_aligned_free(data); }
-
+#ifdef TL_ALLOCATION_TRACKER
+	#ifndef TL_DEALLOCATION_TRACKER
+		#error TL_ALLOCATION_TRACKER and TL_DEALLOCATION_TRACKER must be defined if allocation tracking is enabled
+	#endif
+#else
+	#ifdef TL_DEALLOCATION_TRACKER
+		#error TL_ALLOCATION_TRACKER and TL_DEALLOCATION_TRACKER must be defined if allocation tracking is enabled
+	#else
+		#define TL_ALLOCATION_TRACKER(t, allocator, ...) (track_allocations ? ::TL::allocation_tracker<t>(get_stack_trace(), allocator, __VA_ARGS__) : ::TL::_allocate<t>(allocator, __VA_ARGS__))
+		#define TL_DEALLOCATION_TRACKER(allocator, data) (track_allocations ? ::TL::deallocation_tracker(allocator, data) : ::TL::_free(allocator, data))
+	#endif
 #endif
+
+extern bool track_allocations;
+
+struct StackTrace;
+StackTrace get_stack_trace();
+
+template <class T>
+T *allocation_tracker(StackTrace const &trace, Allocator allocator, umm count = 1, umm align = alignof(T));
+void deallocation_tracker(Allocator allocator, void *data);
+
+#define ALLOCATE(t, allocator, ...) TL_ALLOCATION_TRACKER(t, allocator, __VA_ARGS__)
+#define FREE(allocator, data) TL_DEALLOCATION_TRACKER(allocator, data)
 
 #else
 
-void *OsAllocator::allocate(umm size, umm align) {
-	void *result = 0;
-	posix_memalign(&result, max(align, sizeof(void *)), size);
-	return result;
-}
-void OsAllocator::deallocate(void *data) { free(data); }
+#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, __VA_ARGS__)
+#define FREE(allocator, data) ::TL::_free(allocator, data)
 
 #endif
+
+extern TL_API void init_allocator();
+extern TL_API Allocator default_allocator;
+extern TL_API Allocator thread_local current_allocator;
+
+struct AllocatorPusher {
+	Allocator old_allocator;
+	AllocatorPusher(Allocator new_allocator) {
+		old_allocator = current_allocator;
+		current_allocator = new_allocator;
+	}
+	~AllocatorPusher() {
+		current_allocator = old_allocator;
+	}
+	operator bool() { return true; }
+};
+
+#define push_allocator(allocator) if(auto CONCAT(_,__LINE__) = AllocatorPusher(allocator))
+
+#ifdef TL_IMPL
 
 Allocator default_allocator = {
 	[](AllocatorMode mode, umm size, umm align, void *data, void *) -> void * {
 		switch (mode) {
-			case Allocator_allocate:
-				return OsAllocator::allocate(size, align);
-			case Allocator_reallocate:
-				return 0;
-			case Allocator_free:
-				OsAllocator::deallocate(data);
-				return 0;
+#if OS_WINDOWS
+#if COMPILER_MSVC
+			case Allocator_allocate:   return _aligned_malloc(size, align);
+			case Allocator_reallocate: return _aligned_realloc(data, size, align);
+			case Allocator_free:       _aligned_free(data); return 0;
+#elif COMPILER_GCC
+			case Allocator_allocate:   return __mingw_aligned_malloc(size, align);
+			case Allocator_reallocate: return __mingw_aligned_realloc(data, size, align);
+			case Allocator_free:       __mingw_aligned_free(data); return 0;
+#endif
+#else
+			case Allocator_allocate: {
+				void *result = 0;
+				posix_memalign(&result, max(align, sizeof(void *)), size);
+				return result;
+			}
+			case Allocator_reallocate: return realloc(data, size);
+			case Allocator_free:       free(data); return 0;
+#endif
 		}
 		return 0;
 	},
@@ -1369,4 +1288,42 @@ void init_allocator() {
 
 #if COMPILER_MSVC
 #pragma warning(pop)
+#endif
+
+#ifdef TL_TRACK_ALLOCATIONS
+
+#include "thread.h"
+#include "debug.h"
+
+namespace TL {
+
+struct AllocationInfo {
+	StackTrace trace;
+};
+
+std::unordered_map<void *, AllocationInfo> allocations;
+Mutex allocations_mutex;
+bool track_allocations = true;
+
+template <class T>
+T *allocation_tracker(StackTrace const &trace, Allocator allocator, umm count, umm align) {
+	auto result = _allocate<T>(allocator, count, align);
+
+	AllocationInfo info;
+	info.trace = trace;
+
+	scoped_lock(allocations_mutex);
+	allocations[result] = info;
+
+	return result;
+}
+void deallocation_tracker(Allocator allocator, void *data) {
+	_free(allocator, data);
+
+	scoped_lock(allocations_mutex);
+	allocations.erase(data);
+}
+
+}
+
 #endif

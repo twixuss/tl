@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "list.h"
 
 namespace TL { namespace Profiler {
 
@@ -36,15 +37,14 @@ TL_API void outputForChrome(char const *path);
 }}
 
 #ifdef TL_IMPL
+#if TL_ENABLE_PROFILER
 #if OS_WINDOWS
 #include "win32.h"
-#include "list.h"
 #include "string.h"
 #include "thread.h"
 #include <unordered_map>
 namespace TL { namespace Profiler {
 
-s64 performanceFrequency = getPerformanceFrequency();
 List<TimeSpan> recordedTimeSpans;
 Mutex recordedTimeSpansMutex;
 std::unordered_map<u32, List<TimeSpan>> currentTimeSpans;
@@ -107,13 +107,13 @@ void outputForChrome(char const *path) {
 				builder.append(",\n");
 			}
 			builder.append("{\"cat\":\"function\",\"dur\":");
-			builder.append((f64)(span.end - span.begin) / (f64)performanceFrequency * 1000000.0);
+			builder.append((f64)(span.end - span.begin) / (f64)performance_frequency * 1000000.0);
 			builder.append(",\"name\":\"");
 			builder.append(span.name);
 			builder.append("\",\"ph\":\"X\",\"pid\":0,\"tid\":");
 			builder.append(span.threadId);
 			builder.append(",\"ts\":");
-			builder.append((f64)span.begin / (f64)performanceFrequency * 1000000.0);
+			builder.append((f64)span.begin / (f64)performance_frequency * 1000000.0);
 			builder.append("}");
 			needComma = true;
 		}
@@ -125,5 +125,6 @@ void outputForChrome(char const *path) {
 }
 
 }}
+#endif
 #endif
 #endif

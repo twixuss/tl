@@ -47,5 +47,19 @@ Printer current_printer = console_printer;
 
 #endif
 
+struct PrinterPusher {
+	Printer old_printer;
+	PrinterPusher(Printer new_printer) {
+		old_printer = current_printer;
+		current_printer = new_printer;
+	}
+	~PrinterPusher() {
+		current_printer = old_printer;
+	}
+	operator bool() { return true; }
+};
+
+#define push_printer(printer) if(auto CONCAT(_,__LINE__) = PrinterPusher(printer))
+
 } // namespace TL
 

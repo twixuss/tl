@@ -42,7 +42,7 @@ TL_API void send(Socket s, sockaddr_in const &destination, void const *data, u32
 TL_API Span<u8> receive(Socket s, u32 maxSize);
 
 inline void send(Socket s, Span<u8 const> span) {
-	send(s, span.data(), (u32)span.size());
+	send(s, span.data, (u32)span.size);
 }
 template <class T>
 inline void send_bytes(Socket s, T const &val) {

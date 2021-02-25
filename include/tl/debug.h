@@ -8,15 +8,23 @@
 namespace TL {
 
 struct CallStackEntry {
-	String<> name;
-	String<> file;
+	Span<char> name;
+	Span<char> file;
 	u32 line = 0;
 };
 
-using StackTrace = List<CallStackEntry>;
+struct StackTrace {
+	List<CallStackEntry> call_stack;
+	List<char> string_buffer;
+};
 
-TL_API StackTrace getStackTrace();
-TL_API bool isDebuggerAttached();
+TL_API bool debug_init();
+TL_API void debug_deinit();
+
+TL_API StackTrace get_stack_trace();
+TL_API void free(StackTrace &stack_trace);
+
+TL_API bool is_debugger_attached();
 
 }
 
@@ -33,14 +41,32 @@ TL_API bool isDebuggerAttached();
 
 namespace TL {
 
-StackTrace getStackTrace() {
-	StackTrace result;
+HANDLE debug_process; 
 
-	auto process = GetCurrentProcess();
-	if (!SymInitialize(process, 0, true)) {
-		return {};
-	}
- 
+bool debug_init() {
+	debug_process = GetCurrentProcess();
+	if (!SymInitialize(debug_process, 0, true))
+		return false;
+	
+	DWORD options = SymGetOptions();
+	SymSetOptions(options & ~SYMOPT_UNDNAME | SYMOPT_PUBLICS_ONLY);
+
+	return true;
+}
+
+void debug_deinit() {
+	SymCleanup(debug_process);
+}
+
+
+StackTrace get_stack_trace() {
+#ifdef TL_TRACK_ALLOCATIONS
+	track_allocations = false;
+	defer { track_allocations = true; };
+#endif
+
+	StackTrace stack_trace;
+
 	STACKFRAME64 frame = {};
  
 	CONTEXT context = {};
@@ -56,11 +82,8 @@ StackTrace getStackTrace() {
  
 	auto thread = GetCurrentThread();
 
-	DWORD options = SymGetOptions();
-	SymSetOptions(options & ~SYMOPT_UNDNAME | SYMOPT_PUBLICS_ONLY);
-
 	u32 frameIndex = 0;
-	while (StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
+	while (StackWalk64(IMAGE_FILE_MACHINE_AMD64, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (!frameIndex++)
 			continue;
 		constexpr u32 maxNameLength = MAX_SYM_NAME;
@@ -71,39 +94,56 @@ StackTrace getStackTrace() {
 		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 		symbol->MaxNameLen = maxNameLength;
 		
-		if (!SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol)) {
+		if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
 			break;
 		}
 
 		CallStackEntry entry;
 
-		char demangledName[256];
-		auto demangledNameLength = UnDecorateSymbolName(symbol->Name, demangledName, (DWORD)count_of(demangledName), UNDNAME_NAME_ONLY);
-		if (demangledNameLength) {
-			entry.name = {demangledName, demangledNameLength};
+		char name[256];
+		auto name_length = UnDecorateSymbolName(symbol->Name, name, (DWORD)count_of(name), UNDNAME_NAME_ONLY);
+		if (name_length) {
+			entry.name.data = (char *)stack_trace.string_buffer.size;
+			entry.name.size = name_length;
+
+			stack_trace.string_buffer += Span(name, name_length);
 		}
 
 		IMAGEHLP_LINE64 line = {};
 		line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-		DWORD lineDisplacement;
-		if (SymGetLineFromAddr64(process, symbol->Address, &lineDisplacement, &line)) {
-			entry.file = line.FileName;
+		DWORD line_displacement;
+
+		char const *file;
+		if (SymGetLineFromAddr64(debug_process, symbol->Address, &line_displacement, &line)) {
 			entry.line = line.LineNumber;
+			file = line.FileName;
 		} else {
-			entry.file = "unknown";
+			file = "unknown";
 		}
+		auto file_length = length(file);
 
-		result.push_back(std::move(entry));
+		entry.file.data = (char *)stack_trace.string_buffer.size;
+		entry.file.size = file_length;
 
+		stack_trace.string_buffer += Span(file, file_length);
+
+		stack_trace.call_stack.add(entry);
+	}
+
+	for (auto &call : stack_trace.call_stack) {
+		call.name.data = stack_trace.string_buffer.data + (umm)call.name.data;
+		call.file.data = stack_trace.string_buffer.data + (umm)call.file.data;
 	}
  
-	SymSetOptions(options);
-	SymCleanup(process);
-
-	return result;
+	return stack_trace;
 }
 
-bool isDebuggerAttached() {
+void free(StackTrace &stack_trace) {
+	stack_trace.string_buffer.free();
+}
+
+
+bool is_debugger_attached() {
 	return IsDebuggerPresent();
 }
 

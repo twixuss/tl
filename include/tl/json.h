@@ -26,7 +26,7 @@ struct Object {
 		std::unordered_map<Span<char const>, Object> members;
 	};
 	struct v_Array {
-		List<Object> elements;
+		BadList<Object> elements;
 	};
 	struct v_Number {
 		f64 value;
@@ -165,7 +165,7 @@ List<Token> lex(Span<char const> json) {
 				Token token;
 				token.type = (TokenType)*c;
 				token.view = {c, 1};
-				result.push_back(token);
+				result.add(token);
 				++c;
 				continue;
 			}
@@ -176,7 +176,7 @@ List<Token> lex(Span<char const> json) {
 				token.view.data = c;
 				while (*c++ != '"') {}
 				token.view.size = c - token.view.data - 1;
-				result.push_back(token);
+				result.add(token);
 				continue;
 			}
 		}
@@ -199,7 +199,7 @@ List<Token> lex(Span<char const> json) {
 				}
 			}
 			token.view.size = c - token.view.data;
-			result.push_back(token);
+			result.add(token);
 			continue;
 		}
 		if(*c == ' ')

@@ -14,28 +14,24 @@
     </Expand>
   </Type>
   <Type Name="TL::Span&lt;char const&gt;">
-    <Intrinsic Name="size" Expression="_end-_begin" />
-    <Intrinsic Name="data" Expression="_begin" />
-    <DisplayString>{data(),[size()]s}</DisplayString>
-    <StringView>data(),[size()]s</StringView>
+    <DisplayString>{data,[size]s}</DisplayString>
+    <StringView>data,[size]s</StringView>
     <Expand>
-      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <Item Name="[size]" ExcludeView="simple">size</Item>
       <ArrayItems>
-        <Size>size()</Size>
-        <ValuePointer>data()</ValuePointer>
+        <Size>size</Size>
+        <ValuePointer>data</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>
   <Type Name="TL::Span&lt;*&gt;">
-    <Intrinsic Name="size" Expression="_end-_begin" />
-    <Intrinsic Name="data" Expression="_begin" />
-    <DisplayString>{data(),[size()]na}</DisplayString>
-    <StringView>data(),[size()]na</StringView>
+    <DisplayString>{data,[size]na}</DisplayString>
+    <StringView>data,[size]na</StringView>
     <Expand>
-      <Item Name="[size]" ExcludeView="simple">size()</Item>
+      <Item Name="[size]" ExcludeView="simple">size</Item>
       <ArrayItems>
-        <Size>size()</Size>
-        <ValuePointer>data()</ValuePointer>
+        <Size>size</Size>
+        <ValuePointer>data</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>

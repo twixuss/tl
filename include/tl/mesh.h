@@ -77,7 +77,7 @@ Mesh parse_glb(char const *path) {
 	
 	result.vertices.reserve(vertexCount);
 	for (u32 i = 0; i < vertexCount; ++i) {
-		result.vertices.push_back({positions[i], normals[i]});
+		result.vertices.add({positions[i], normals[i]});
 	}
 
 	result.indices.reserve(indexCount);
@@ -87,14 +87,14 @@ Mesh parse_glb(char const *path) {
 		case ComponentType_u32: {
 			u32 *indices = (u32 *)(indices_data); 
 			for (u32 i = 0; i < indexCount; ++i) {
-				result.indices.push_back(indices[i]);
+				result.indices.add(indices[i]);
 			}
 			break;
 		}
 		case ComponentType_u16: {
 			u16 *indices = (u16 *)(indices_data);
 			for (u32 i = 0; i < indexCount; ++i) {
-				result.indices.push_back(indices[i]);
+				result.indices.add(indices[i]);
 			}
 			break;
 		}
