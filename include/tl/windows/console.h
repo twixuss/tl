@@ -51,6 +51,8 @@ DWORD get_code_page(Encoding encoding) {
 		case Encoding_utf8: return 65001;
 		case Encoding_utf16: return 1200;
 	}
+	invalid_code_path();
+	return -1;
 }
 
 void set_console_mode(Encoding encoding) {

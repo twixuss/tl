@@ -122,10 +122,19 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 // Swizzle/Shuffle/ operations
 //
 
-#define select32x4(mask, a, b) _mm_blendv_ps(b, a, mask)
+#define select32x4(mask,a,b) _mm_blendv_ps(b,a,mask)
+#if ARCH_AVX
+#define shuffle32x4(a,n0,n1,n2,n3) _mm_permute_ps(a,_MM_SHUFFLE(n3,n2,n1,n0))
+#else
+#define shuffle32x4(a,n0,n1,n2,n3) ([](a32x8 _a){return _mm_shuffle_ps(_a,_a,_MM_SHUFFLE(n3,n2,n1,n0));}(a))
+#endif
 
 #if ARCH_AVX
-#define select32x8(mask, a, b) _mm256_blendv_ps(b, a, mask)
+#define select32x8(mask,a,b) _mm256_blendv_ps(b,a,mask)
+#if ARCH_AVX2
+#define permute32x8(a,n0,n1,n2,n3,n4,n5,n6,n7) _mm256_permutevar8x32_ps(a,_mm256_setr_epi32(n0,n1,n2,n3,n4,n5,n6,n7))
+#else
+#endif
 #endif
 
 
@@ -161,16 +170,17 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define f32x4_round(a) _mm_round_ps(a,_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)
 #define f32x4_floor(a) _mm_round_ps(a,_MM_FROUND_TO_NEG_INF|_MM_FROUND_NO_EXC)
 #define f32x4_ceil(a)  _mm_round_ps(a,_MM_FROUND_TO_POS_INF|_MM_FROUND_NO_EXC)
-#define f32x4_min(a, b) _mm_min_ps(a, b)
-#define f32x4_max(a, b) _mm_max_ps(a, b)
-#define f32x4_clamp(a, min, max) f32x4_min(f32x4_max(a, min), max)
+#define f32x4_min(a,b) _mm_min_ps(a,b)
+#define f32x4_max(a,b) _mm_max_ps(a,b)
+#define f32x4_clamp(a,min,max) f32x4_min(f32x4_max(a,min),max)
 #if ARCH_FMA
-#define f32x4_lerp(a, b, t) _mm_fmadd_ps(f32x4_sub(b, a), t, a)
+#define f32x4_muladd(a,b,c) _mm_fmadd_ps(a,b,c)
 #else
-#define f32x4_lerp(a, b, t) f32x4_add(f32x4_mul(f32x4_sub(b, a), t), a)
+#define f32x4_muladd(a,b,t) f32x4_add(f32x4_mul(a,b),c)
 #endif
-#define f32x4_to_s32x4(a) i2f16(_mm_cvtps_epi32(a))
-#define f32x4_to_u32x4(a) i2f16(_mm_cvtps_epi32(a))
+#define f32x4_lerp(a,b,t) f32x4_muladd(f32x4_sub(b,a),t,a)
+#define f32x4_to_s32x4(a) i2f16(_mm_cvttps_epi32(a))
+#define f32x4_to_u32x4(a) i2f16(_mm_cvttps_epi32(a))
 
 
 #define s32x4_set(a,b,c,d) i2f16(_mm_setr_epi32(a,b,c,d))
@@ -186,6 +196,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define s32x4_sub(a,b) i2f16(_mm_sub_epi32(f2i16(a),f2i16(b)))
 #define s32x4_mul(a,b) i2f16(_mm_mullo_epi32(f2i16(a),f2i16(b)))
 #define s32x4_div(a,b) i2f16(_mm_div_epi32(f2i16(a),f2i16(b)))
+#define s32x4_div_f32(a,b) i2f16(_mm_cvttps_epi32(_mm_div_ps(_mm_cvtepi32_ps(f2i16(a)),_mm_cvtepi32_ps(f2i16(b)))))
 #define s32x4_neg(a)   i2f16(_mm_sub_epi32(_mm_setzero_si128(),f2i16(a)))
 #define s32x4_to_f32x4(a) _mm_cvtepi32_ps(f2i16(a))
 #define s32x4_to_u32x4(a) (a)
@@ -314,14 +325,15 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define f32x8_round(a) _mm256_round_ps(a,_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)
 #define f32x8_floor(a) _mm256_round_ps(a,_MM_FROUND_TO_NEG_INF|_MM_FROUND_NO_EXC)
 #define f32x8_ceil(a)  _mm256_round_ps(a,_MM_FROUND_TO_POS_INF|_MM_FROUND_NO_EXC)
-#define f32x8_min(a, b) _mm256_min_ps(a, b)
-#define f32x8_max(a, b) _mm256_max_ps(a, b)
-#define f32x8_clamp(a, min, max) f32x8_min(f32x8_max(a, min), max)
+#define f32x8_min(a,b) _mm256_min_ps(a,b)
+#define f32x8_max(a,b) _mm256_max_ps(a,b)
+#define f32x8_clamp(a,min,max) f32x8_min(f32x8_max(a,min),max)
 #if ARCH_FMA
-#define f32x8_lerp(a, b, t) _mm256_fmadd_ps(f32x8_sub(b, a), t, a)
+#define f32x8_muladd(a,b,c) _mm256_fmadd_ps(a,b,c)
 #else
-#define f32x8_lerp(a, b, t) f32x8_add(f32x8_mul(f32x8_sub(b, a), t), a)
+#define f32x8_muladd(a,b,t) f32x8_add(f32x8_mul(a,b),c)
 #endif
+#define f32x8_lerp(a,b,t) f32x8_muladd(f32x8_sub(b,a),t,a)
 
 
 #define s32x8_set(a,b,c,d,e,f,g,h) i2f32(_mm256_setr_epi32(a,b,c,d,e,f,g,h))
@@ -333,12 +345,12 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define s32x8_lt(a,b) s32x8_gt(b,a)
 #define s32x8_le(a,b) vec32_not(s32x8_gt(a,b))
 #define s32x8_ge(a,b) vec32_not(s32x8_lt(a,b))
-#define s32x8_add(a, b) i2f32(_mm256_add_epi32(f2i32(a), f2i32(b)))
-#define s32x8_sub(a, b) i2f32(_mm256_sub_epi32(f2i32(a), f2i32(b)))
-#define s32x8_mul(a, b) i2f32(_mm256_mullo_epi32(f2i32(a), f2i32(b)))
-#define s32x8_div(a, b) i2f32(_mm256_div_epi32(f2i32(a), f2i32(b)))
-#define s32x8_div_floor(a, b) select32x8(s32x8_lt(a, s32x8_set1(0)), s32x8_add(s32x8_div(s32x8_add(a, s32x8_set1(1)), b), s32x8_set1(-1)), s32x8_div(a, b))
-#define s32x8_floor(a, b) s32x8_mul(s32x8_div_floor(a, b), b)
+#define s32x8_add(a,b) i2f32(_mm256_add_epi32(f2i32(a),f2i32(b)))
+#define s32x8_sub(a,b) i2f32(_mm256_sub_epi32(f2i32(a),f2i32(b)))
+#define s32x8_mul(a,b) i2f32(_mm256_mullo_epi32(f2i32(a),f2i32(b)))
+#define s32x8_div(a,b) i2f32(_mm256_div_epi32(f2i32(a),f2i32(b)))
+#define s32x8_div_floor(a,b) select32x8(s32x8_lt(a,s32x8_set1(0)),s32x8_add(s32x8_div(s32x8_add(a,s32x8_set1(1)),b),s32x8_set1(-1)),s32x8_div(a,b))
+#define s32x8_floor(a,b) s32x8_mul(s32x8_div_floor(a,b),b)
 #endif
 
 #define u32x8_set(a,b,c,d,e,f,g,h) i2f32(_mm256_setr_epi32(a,b,c,d,e,f,g,h))
@@ -350,11 +362,11 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define u32x8_lt(a,b) u32x8_gt(b,a)
 #define u32x8_le(a,b) vec32_not(u32x8_gt(a,b))
 #define u32x8_ge(a,b) vec32_not(u32x8_lt(a,b))
-#define u32x8_add(a, b) i2f32(_mm256_add_epi32(f2i32(a), f2i32(b)))
-#define u32x8_sub(a, b) i2f32(_mm256_sub_epi32(f2i32(a), f2i32(b)))
-#define u32x8_mul(a, b) i2f32(_mm256_mullo_epi32(f2i32(a), f2i32(b)))
-#define u32x8_div(a, b) i2f32(_mm256_div_epu32(f2i32(a), f2i32(b)))
-#define u32x8_shift_right(a, b) i2f32(_mm256_srli_epi32(f2i32(a), b))
+#define u32x8_add(a,b) i2f32(_mm256_add_epi32(f2i32(a),f2i32(b)))
+#define u32x8_sub(a,b) i2f32(_mm256_sub_epi32(f2i32(a),f2i32(b)))
+#define u32x8_mul(a,b) i2f32(_mm256_mullo_epi32(f2i32(a),f2i32(b)))
+#define u32x8_div(a,b) i2f32(_mm256_div_epu32(f2i32(a),f2i32(b)))
+#define u32x8_shift_right(a,b) i2f32(_mm256_srli_epi32(f2i32(a),b))
 #endif
 
 #define f64x4_lt(a,b) d2f32(_mm256_cmp_pd(f2d32(a),f2d32(b),_CMP_LT_OQ))

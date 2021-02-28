@@ -2,10 +2,19 @@
 #include "common.h"
 #include "array.h"
 
+#if COMPILER_MSVC
+#pragma warning(push, 0)
+#endif
+
 #include <float.h>
 #include <math.h>
 #include <memory.h>
 #include <utility>
+
+#if COMPILER_MSVC
+#pragma warning(pop)
+#endif
+
 
 #if COMPILER_MSVC
 #pragma warning(disable : 5045) // spectre
@@ -773,6 +782,8 @@ union v2u { VECIMPL(2, S, 1, u32); };
 union v3u { VECIMPL(3, S, 1, u32); };
 union v4u { VECIMPL(4, S, 1, u32); };
 
+#undef CVT
+
 v3f::operator v3s()const{return{(s32)x,(s32)y,(s32)z};}
 v3f::operator v3u()const{return{(u32)x,(u32)y,(u32)z};}
 
@@ -906,251 +917,6 @@ union m3 {
 	}
 };
 
-union m4 {
-	struct {
-		v4f i, j, k, l;
-	};
-	struct {
-		__m128 im, jm, km, lm;
-	};
-	__m128 m[4];
-	v4f vectors[4];
-	f32 s[16];
-	forceinline v4f operator*(v4f const &b) const {
-		v4f x = V4f(b.x) * i;
-		v4f y = V4f(b.y) * j;
-		v4f z = V4f(b.z) * k;
-		v4f w = V4f(b.w) * l;
-		return x + y + z + w;
-	}
-	forceinline v3f operator*(v3f const &b) const {
-		auto x = V4f(b.x) * i;
-		auto y = V4f(b.y) * j;
-		auto z = V4f(b.z) * k;
-		auto r = x + y + z;
-		v3f result;
-		memcpy(&result, &r, 12);
-		return result;
-	}
-	forceinline m4 operator*(m4 const &b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
-	forceinline m4& operator*=(m4 const &b) { return *this = *this * b; }
-	static forceinline m4 scale(f32 x, f32 y, f32 z) {
-		// clang-format off
-		return {
-			x, 0, 0, 0,
-			0, y, 0, 0,
-			0, 0, z, 0,
-			0, 0, 0, 1
-		};
-		// clang-format on
-	}
-	static forceinline m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
-	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
-	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
-	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
-	static forceinline m4 translation(f32 x, f32 y, f32 z) {
-		// clang-format off
-		return {
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			x, y, z, 1,
-		};
-		// clang-format on
-	}
-	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
-	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
-	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
-	static forceinline m4 perspectiveLH(f32 aspect, f32 fov, f32 nz, f32 fz) {
-		f32 h	   = 1.0f / tanf(fov * 0.5f);
-		f32 w	   = h / aspect;
-		f32 fzdfmn = fz / (fz - nz);
-		// clang-format off
-		return {
-			w, 0, 0, 0, 
-			0, h, 0, 0, 
-			0, 0, fzdfmn, 1, 
-			0, 0, -fzdfmn * nz, 0
-		};
-		// clang-format on
-	}
-	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
-		f32 xymax = nz * tan(fov * 0.5f);
-		f32 width = xymax * 2;
-		f32 height = xymax * 2;
-		f32 depth = fz - nz;
-		f32 q = -(fz + nz) / depth;
-		f32 qn = -2 * (fz * nz) / depth;
-		f32 h = nz / xymax;
-		f32 w = h / aspect;
-
-		return {
-			w, 0, 0, 0,
-			0, h, 0, 0,
-			0, 0, q, -1,
-			0, 0, qn, 0,
-		};
-	}
-	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
-		f32 h = 1.0f / (height * 0.5f);
-		f32 rz = fz - nz;
-		return {
-			h / aspect, 0, 0, 0,
-			0, h, 0, 0,
-			0, 0, 1.0f / rz, 0,
-			0, 0, -nz / rz, 1,
-		};
-	}
-	static forceinline m4 rotationX(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
-		return {
-			1, 0, 0, 0,
-			0, c, s, 0,
-			0,-s, c, 0,
-			0, 0, 0, 1
-		};
-		// clang-format on
-	}
-	static forceinline m4 rotationY(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
-		return {
-			c, 0, s, 0,
-			0, 1, 0, 0,
-		   -s, 0, c, 0,
-			0, 0, 0, 1
-		};
-		// clang-format on
-	}
-	static forceinline m4 rotationZ(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
-		return {
-			c, s, 0, 0,
-		   -s, c, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1
-		};
-		// clang-format on
-	}
-	// Roll, Pitch, Yaw (ZXY)
-	static forceinline m4 rotationZXY(v3f v) {
-		v3f sin;
-		v3f cos;
-		sincos(v, sin, cos);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
-		// clang-format off
-		return {
-			d * f - a * c * e,  b * e, c * f + a * d * e, 0,
-			-a * c * f - d * e, b * f, a * d * f - c * e, 0,
-			-b * c,             -a,    b * d,             0,
-			0,                  0,     0,                 1,
-		};
-		// clang-format on
-	}
-	static forceinline m4 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
-	// Yaw, Pitch, Roll (YXZ)
-	static forceinline m4 rotationYXZ(v3f v) {
-		v3f sin;
-		v3f cos;
-		sincos(v, sin, cos);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
-		// clang-format off
-		return {
-			d * f + a * c * e,  -a * c * f + d * e, b * c, 0, 
-			-b * e,             b * f,              a,     0,
-			-c * f + a * d * e, -a * d * f - c * e, b * d, 0, 
-			0,                  0,                  0,     1,
-		};
-		// clang-format on
-	}
-	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
-	v4f &operator[](umm i) { return vectors[i]; }
-	v4f const &operator[](umm i) const { return vectors[i]; }
-};
-
-#undef CVT
-
-forceinline constexpr m3 transpose(m3 const& m) {
-	return {
-		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
-	};
-}
-forceinline m4 transpose(m4 const& m) {
-	__m128 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
-	__m128 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
-	__m128 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
-	__m128 tmp3 = _mm_unpackhi_ps(m.km, m.lm);
-
-	m4 result;
-	result.im = _mm_movelh_ps(tmp0, tmp2);
-	result.jm = _mm_movehl_ps(tmp2, tmp0);
-	result.km = _mm_movelh_ps(tmp1, tmp3);
-	result.lm = _mm_movehl_ps(tmp3, tmp1);
-	return result;
-}
-
-inline m4 inverse(m4 const &m) {
-	f32 A2323 = m.k.z * m.l.w - m.k.w * m.l.z;
-	f32 A1323 = m.k.y * m.l.w - m.k.w * m.l.y;
-	f32 A1223 = m.k.y * m.l.z - m.k.z * m.l.y;
-	f32 A0323 = m.k.x * m.l.w - m.k.w * m.l.x;
-	f32 A0223 = m.k.x * m.l.z - m.k.z * m.l.x;
-	f32 A0123 = m.k.x * m.l.y - m.k.y * m.l.x;
-	f32 A2313 = m.j.z * m.l.w - m.j.w * m.l.z;
-	f32 A1313 = m.j.y * m.l.w - m.j.w * m.l.y;
-	f32 A1213 = m.j.y * m.l.z - m.j.z * m.l.y;
-	f32 A2312 = m.j.z * m.k.w - m.j.w * m.k.z;
-	f32 A1312 = m.j.y * m.k.w - m.j.w * m.k.y;
-	f32 A1212 = m.j.y * m.k.z - m.j.z * m.k.y;
-	f32 A0313 = m.j.x * m.l.w - m.j.w * m.l.x;
-	f32 A0213 = m.j.x * m.l.z - m.j.z * m.l.x;
-	f32 A0312 = m.j.x * m.k.w - m.j.w * m.k.x;
-	f32 A0212 = m.j.x * m.k.z - m.j.z * m.k.x;
-	f32 A0113 = m.j.x * m.l.y - m.j.y * m.l.x;
-	f32 A0112 = m.j.x * m.k.y - m.j.y * m.k.x;
-
-	f32 det = m.i.x * (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223) 
-		    - m.i.y * (m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223) 
-		    + m.i.z * (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123) 
-		    - m.i.w * (m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123);
-
-	if (det == 0)
-		return {};
-
-	det = 1 / det;
-
-	return m4 {
-	   det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
-	   det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
-	   det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
-	   det * -(m.i.y * A2312 - m.i.z * A1312 + m.i.w * A1212),
-	   det * -(m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223),
-	   det *  (m.i.x * A2323 - m.i.z * A0323 + m.i.w * A0223),
-	   det * -(m.i.x * A2313 - m.i.z * A0313 + m.i.w * A0213),
-	   det *  (m.i.x * A2312 - m.i.z * A0312 + m.i.w * A0212),
-	   det *  (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123),
-	   det * -(m.i.x * A1323 - m.i.y * A0323 + m.i.w * A0123),
-	   det *  (m.i.x * A1313 - m.i.y * A0313 + m.i.w * A0113),
-	   det * -(m.i.x * A1312 - m.i.y * A0312 + m.i.w * A0112),
-	   det * -(m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123),
-	   det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
-	   det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
-	   det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
-	};
-}
-
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
 	forceinline constexpr v2f V2f(f32 v) { return {v, v}; }
@@ -1212,30 +978,6 @@ CVT(v4s, v4f, V4f, f32, v4u, V4u, u32)
 CVT(v4u, v4f, V4f, f32, v4s, V4s, s32)
 #undef CVT
 // clang-format on
-
-forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
-forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
-forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
-	m4 r{};
-	r.m[0] = i;
-	r.m[1] = j;
-	r.m[2] = k;
-	r.m[3] = l;
-	return r;
-}
-forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
-				f32 ly, f32 lz, f32 lw) {
-	return {ix, iy, iz, iw, jx, jy, jz, jw, kx, ky, kz, kw, lx, ly, lz, lw};
-}
-
-forceinline m4 M4(m3 v) {
-	return {
-		V4f(v.i, 0),
-		V4f(v.j, 0),
-		V4f(v.k, 0),
-		V4f(0, 0, 0, 1),
-	};
-}
 
 namespace CE {
 
@@ -1687,9 +1429,9 @@ forceinline s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 
 forceinline f32 sign(f32 v) { return set_sign(1.0f, v); }
-forceinline v2f sign(v2f v) { return {set_sign(1.0f, v.x), set_sign(1.0f, v.y)}; }
-forceinline v3f sign(v3f v) { return {set_sign(1.0f, v.x), set_sign(1.0f, v.y), set_sign(1.0f, v.z)}; }
-forceinline v4f sign(v4f v) { return {set_sign(1.0f, v.x), set_sign(1.0f, v.y), set_sign(1.0f, v.z)}; }
+forceinline v2f sign(v2f v) { return {sign(v.x), sign(v.y)}; }
+forceinline v3f sign(v3f v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
+forceinline v4f sign(v4f v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
 
 forceinline f32 trunc(f32 v) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
 forceinline v2f trunc(v2f v) { return {trunc(v.x), trunc(v.y)}; }
@@ -1732,6 +1474,11 @@ forceinline f32 cos(f32 v) { return ::cosf(v); }
 forceinline v2f cos(v2f v) { return {cos(v.x), cos(v.y)}; }
 forceinline v3f cos(v3f v) { return {cos(v.x), cos(v.y), cos(v.z)}; }
 forceinline v4f cos(v4f v) { return {cos(v.x), cos(v.y), cos(v.z), cos(v.w)}; }
+
+forceinline f32 tan(f32 v) { return ::tanf(v); }
+forceinline v2f tan(v2f v) { return {tan(v.x), tan(v.y)}; }
+forceinline v3f tan(v3f v) { return {tan(v.x), tan(v.y), tan(v.z)}; }
+forceinline v4f tan(v4f v) { return {tan(v.x), tan(v.y), tan(v.z), tan(v.w)}; }
 
 forceinline void sincos(f32 v, f32 &_sin, f32 &_cos) { _sin = sin(v); _cos = cos(v); }
 forceinline void sincos(v2f v, v2f &_sin, v2f &_cos) { _sin = sin(v); _cos = cos(v); }
@@ -1908,9 +1655,9 @@ inline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
     } else {
         result.y = (delta / cMax);
     }
-         if (r >= cMax) result.x =       (g - b) / delta;
-    else if (g >= cMax) result.x = 2.0 + (b - r) / delta;
-    else                result.x = 4.0 + (r - g) / delta;
+         if (r >= cMax) result.x = (g - b) / delta;
+    else if (g >= cMax) result.x = (b - r) / delta + 2.0f;
+    else                result.x = (r - g) / delta + 4.0f;
 
     result.x = frac(result.x * 1.0f / 6.0f);
 
@@ -2330,6 +2077,276 @@ forceinline constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
 		b = 0;
 	return lerp(arr[a], arr[b], frac(f));
 }
+
+union m4 {
+	struct {
+		v4f i, j, k, l;
+	};
+	struct {
+		__m128 im, jm, km, lm;
+	};
+	__m128 m[4];
+	v4f vectors[4];
+	f32 s[16];
+	forceinline v4f operator*(v4f const &b) const {
+		v4f x = V4f(b.x) * i;
+		v4f y = V4f(b.y) * j;
+		v4f z = V4f(b.z) * k;
+		v4f w = V4f(b.w) * l;
+		return x + y + z + w;
+	}
+	forceinline v3f operator*(v3f const &b) const {
+		auto x = V4f(b.x) * i;
+		auto y = V4f(b.y) * j;
+		auto z = V4f(b.z) * k;
+		auto r = x + y + z;
+		v3f result;
+		memcpy(&result, &r, 12);
+		return result;
+	}
+	forceinline m4 operator*(m4 const &b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
+	forceinline m4& operator*=(m4 const &b) { return *this = *this * b; }
+	static forceinline m4 scale(f32 x, f32 y, f32 z) {
+		// clang-format off
+		return {
+			x, 0, 0, 0,
+			0, y, 0, 0,
+			0, 0, z, 0,
+			0, 0, 0, 1
+		};
+		// clang-format on
+	}
+	static forceinline m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
+	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
+	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
+	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
+	static forceinline m4 translation(f32 x, f32 y, f32 z) {
+		// clang-format off
+		return {
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			x, y, z, 1,
+		};
+		// clang-format on
+	}
+	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
+	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
+	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
+	static forceinline m4 perspectiveLH(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		f32 h	   = 1.0f / tanf(fov * 0.5f);
+		f32 w	   = h / aspect;
+		f32 fzdfmn = fz / (fz - nz);
+		// clang-format off
+		return {
+			w, 0, 0, 0, 
+			0, h, 0, 0, 
+			0, 0, fzdfmn, 1, 
+			0, 0, -fzdfmn * nz, 0
+		};
+		// clang-format on
+	}
+	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		f32 xymax = nz * tan(fov * 0.5f);
+		f32 width = xymax * 2;
+		f32 height = xymax * 2;
+		f32 depth = fz - nz;
+		f32 q = -(fz + nz) / depth;
+		f32 qn = -2 * (fz * nz) / depth;
+		f32 h = nz / xymax;
+		f32 w = h / aspect;
+
+		return {
+			w, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, q, -1,
+			0, 0, qn, 0,
+		};
+	}
+	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
+		f32 h = 1.0f / (height * 0.5f);
+		f32 rz = fz - nz;
+		return {
+			h / aspect, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, 1.0f / rz, 0,
+			0, 0, -nz / rz, 1,
+		};
+	}
+	static forceinline m4 rotationX(f32 a) {
+		f32 s = sinf(a), c = cosf(a);
+		// clang-format off
+		return {
+			1, 0, 0, 0,
+			0, c, s, 0,
+			0,-s, c, 0,
+			0, 0, 0, 1
+		};
+		// clang-format on
+	}
+	static forceinline m4 rotationY(f32 a) {
+		f32 s = sinf(a), c = cosf(a);
+		// clang-format off
+		return {
+			c, 0, s, 0,
+			0, 1, 0, 0,
+		   -s, 0, c, 0,
+			0, 0, 0, 1
+		};
+		// clang-format on
+	}
+	static forceinline m4 rotationZ(f32 a) {
+		f32 s = sinf(a), c = cosf(a);
+		// clang-format off
+		return {
+			c, s, 0, 0,
+		   -s, c, 0, 0,
+			0, 0, 1, 0,
+			0, 0, 0, 1
+		};
+		// clang-format on
+	}
+	// Roll, Pitch, Yaw (ZXY)
+	static forceinline m4 rotationZXY(v3f v) {
+		v3f sin;
+		v3f cos;
+		sincos(v, sin, cos);
+		f32 a = sin.x;
+		f32 c = sin.y;
+		f32 e = sin.z;
+		f32 b = cos.x;
+		f32 d = cos.y;
+		f32 f = cos.z;
+		// clang-format off
+		return {
+			d * f - a * c * e,  b * e, c * f + a * d * e, 0,
+			-a * c * f - d * e, b * f, a * d * f - c * e, 0,
+			-b * c,             -a,    b * d,             0,
+			0,                  0,     0,                 1,
+		};
+		// clang-format on
+	}
+	static forceinline m4 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
+	// Yaw, Pitch, Roll (YXZ)
+	static forceinline m4 rotationYXZ(v3f v) {
+		v3f sin;
+		v3f cos;
+		sincos(v, sin, cos);
+		f32 a = sin.x;
+		f32 c = sin.y;
+		f32 e = sin.z;
+		f32 b = cos.x;
+		f32 d = cos.y;
+		f32 f = cos.z;
+		// clang-format off
+		return {
+			d * f + a * c * e,  -a * c * f + d * e, b * c, 0, 
+			-b * e,             b * f,              a,     0,
+			-c * f + a * d * e, -a * d * f - c * e, b * d, 0, 
+			0,                  0,                  0,     1,
+		};
+		// clang-format on
+	}
+	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
+	v4f &operator[](umm i) { return vectors[i]; }
+	v4f const &operator[](umm i) const { return vectors[i]; }
+};
+
+#undef CVT
+
+forceinline constexpr m3 transpose(m3 const& m) {
+	return {
+		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
+	};
+}
+forceinline m4 transpose(m4 const& m) {
+	__m128 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
+	__m128 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
+	__m128 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
+	__m128 tmp3 = _mm_unpackhi_ps(m.km, m.lm);
+
+	m4 result;
+	result.im = _mm_movelh_ps(tmp0, tmp2);
+	result.jm = _mm_movehl_ps(tmp2, tmp0);
+	result.km = _mm_movelh_ps(tmp1, tmp3);
+	result.lm = _mm_movehl_ps(tmp3, tmp1);
+	return result;
+}
+
+inline m4 inverse(m4 const &m) {
+	f32 A2323 = m.k.z * m.l.w - m.k.w * m.l.z;
+	f32 A1323 = m.k.y * m.l.w - m.k.w * m.l.y;
+	f32 A1223 = m.k.y * m.l.z - m.k.z * m.l.y;
+	f32 A0323 = m.k.x * m.l.w - m.k.w * m.l.x;
+	f32 A0223 = m.k.x * m.l.z - m.k.z * m.l.x;
+	f32 A0123 = m.k.x * m.l.y - m.k.y * m.l.x;
+	f32 A2313 = m.j.z * m.l.w - m.j.w * m.l.z;
+	f32 A1313 = m.j.y * m.l.w - m.j.w * m.l.y;
+	f32 A1213 = m.j.y * m.l.z - m.j.z * m.l.y;
+	f32 A2312 = m.j.z * m.k.w - m.j.w * m.k.z;
+	f32 A1312 = m.j.y * m.k.w - m.j.w * m.k.y;
+	f32 A1212 = m.j.y * m.k.z - m.j.z * m.k.y;
+	f32 A0313 = m.j.x * m.l.w - m.j.w * m.l.x;
+	f32 A0213 = m.j.x * m.l.z - m.j.z * m.l.x;
+	f32 A0312 = m.j.x * m.k.w - m.j.w * m.k.x;
+	f32 A0212 = m.j.x * m.k.z - m.j.z * m.k.x;
+	f32 A0113 = m.j.x * m.l.y - m.j.y * m.l.x;
+	f32 A0112 = m.j.x * m.k.y - m.j.y * m.k.x;
+
+	f32 det = m.i.x * (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223) 
+		    - m.i.y * (m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223) 
+		    + m.i.z * (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123) 
+		    - m.i.w * (m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123);
+
+	if (det == 0)
+		return {};
+
+	det = 1 / det;
+
+	return m4 {
+	   det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
+	   det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
+	   det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
+	   det * -(m.i.y * A2312 - m.i.z * A1312 + m.i.w * A1212),
+	   det * -(m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223),
+	   det *  (m.i.x * A2323 - m.i.z * A0323 + m.i.w * A0223),
+	   det * -(m.i.x * A2313 - m.i.z * A0313 + m.i.w * A0213),
+	   det *  (m.i.x * A2312 - m.i.z * A0312 + m.i.w * A0212),
+	   det *  (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123),
+	   det * -(m.i.x * A1323 - m.i.y * A0323 + m.i.w * A0123),
+	   det *  (m.i.x * A1313 - m.i.y * A0313 + m.i.w * A0113),
+	   det * -(m.i.x * A1312 - m.i.y * A0312 + m.i.w * A0112),
+	   det * -(m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123),
+	   det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
+	   det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
+	   det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
+	};
+}
+
+forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
+forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
+forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
+	m4 r{};
+	r.m[0] = i;
+	r.m[1] = j;
+	r.m[2] = k;
+	r.m[3] = l;
+	return r;
+}
+forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
+				f32 ly, f32 lz, f32 lw) {
+	return {ix, iy, iz, iw, jx, jy, jz, jw, kx, ky, kz, kw, lx, ly, lz, lw};
+}
+
+forceinline m4 M4(m3 v) {
+	return {
+		V4f(v.i, 0),
+		V4f(v.j, 0),
+		V4f(v.k, 0),
+		V4f(0, 0, 0, 1),
+	};
+}
+
 using FrustumPlanes = Array<v4f, 6>;
 
 forceinline FrustumPlanes create_frustum_planes_d3d(m4 m) {
@@ -2465,10 +2482,10 @@ CopyFnRet<CopyFn, Char> to_string(aabb<T> v, CopyFn &&copyFn) {
 template <class To, class From> forceinline To cvt(From v) { return (To)v; }
 template <> forceinline v2f cvt(f32 v) { return V2f(v); }
 template <> forceinline v3f cvt(f32 v) { return V3f(v); }
-template <> forceinline v2f cvt(s32 v) { return V2f(v); }
-template <> forceinline v3f cvt(s32 v) { return V3f(v); }
-template <> forceinline v2f cvt(u32 v) { return V2f(v); }
-template <> forceinline v3f cvt(u32 v) { return V3f(v); }
+template <> forceinline v2f cvt(s32 v) { return V2f((f32)v); }
+template <> forceinline v3f cvt(s32 v) { return V3f((f32)v); }
+template <> forceinline v2f cvt(u32 v) { return V2f((f32)v); }
+template <> forceinline v3f cvt(u32 v) { return V3f((f32)v); }
 
 template <class T>
 forceinline T saturate(T t) {
@@ -2503,8 +2520,3 @@ forceinline T smoothstep(T t) {
 #undef f64x2_ge
 #undef f64x2_eq
 #undef f64x2_ne
-
-#if COMPILER_MSVC
-#pragma warning(pop)
-#endif
-

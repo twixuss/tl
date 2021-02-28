@@ -23,7 +23,7 @@ TL_API bool init_rawinput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
 TL_API s64 get_performance_counter();
-TL_API bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
+TL_API bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
 TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
 TL_API v2u getWindowSize(v2u clientSize, DWORD style, bool menu = false);
@@ -184,7 +184,7 @@ LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESUL
 	}
 	return centerHit;
 }
-bool registerWindowClass(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM)) {
+bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM)) {
 	WNDCLASSEXA c = {};
 	c.cbSize = sizeof(c);
 	c.hCursor = cursor;

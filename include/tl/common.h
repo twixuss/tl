@@ -509,7 +509,11 @@ struct Span {
 	constexpr Span() = default;
 	constexpr Span(ValueType &value) : data(std::addressof(value)), size(1) {}
 	template <umm count>
-	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {}
+	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {
+		if constexpr (isSame<T, char const>) {
+			if (data[size - 1] == 0) --size;
+		}
+	}
 	constexpr Span(ValueType *begin, ValueType *end) : data(begin), size(end - begin) {}
 	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
 	constexpr ValueType *begin() const { return data; }
@@ -526,7 +530,7 @@ struct Span {
 	constexpr explicit operator Span<u8>() { return {(u8 *)data, size * sizeof(ValueType)}; }
 	constexpr explicit operator Span<char>() { return {(char *)data, size * sizeof(ValueType)}; } // Yes, there are three one-byte types
 
-	constexpr bool operator==(Span<ValueType const> that) const {
+	constexpr bool operator==(Span<ValueType> that) const {
 		if (size != that.size)
 			return false;
 		for (umm i = 0; i < size; ++i) {
@@ -535,11 +539,21 @@ struct Span {
 		}
 		return true;
 	}
-	forceinline constexpr bool operator==(Span<ValueType> that) const { return *this == (Span<ValueType const>)that; }
 
 	ValueType *data = 0;
 	umm size = 0;
 };
+
+Span<char> operator""s(char const *string, umm size) {
+	return Span((char *)string, size);
+}
+
+#if 1
+
+//template <class T>
+//struct Span<T const> : Span<T> {};
+
+#else
 
 template <class T>
 struct Span<T const> {
@@ -579,6 +593,8 @@ struct Span<T const> {
 	ValueType *data = 0;
 	umm size = 0;
 };
+
+#endif
 
 //template <class T, umm size>
 //inline constexpr Span<T const> as_span(T const (&str)[size]) { return Span(str, size); }

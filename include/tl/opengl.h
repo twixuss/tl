@@ -505,7 +505,7 @@ void immediate_set_matrix(m4 const &matrix) {
 }
 
 void immediate_line(v3f position_a, v2f uv_a, v4f color_a, v3f position_b, v2f uv_b, v4f color_b) {
-	if (~immediate_type && immediate_type != GL_LINES) {
+	if (immediate_type != GL_LINES) {
 		immediate_draw();
 	}
 
@@ -515,7 +515,63 @@ void immediate_line(v3f position_a, v2f uv_a, v4f color_a, v3f position_b, v2f u
 		{ position_b, uv_b, color_b },
 	};
 }
+void immediate_quad(
+	v3f position_a, v2f uv_a, v4f color_a,
+	v3f position_b, v2f uv_b, v4f color_b,
+	v3f position_c, v2f uv_c, v4f color_c,
+	v3f position_d, v2f uv_d, v4f color_d
+) {
+	if (immediate_type != GL_QUADS) {
+		immediate_draw();
+	}
+
+	immediate_type = GL_QUADS;
+	immediate_vertices += {
+		{ position_a, uv_a, color_a }, 
+		{ position_b, uv_b, color_b },
+		{ position_c, uv_c, color_c },
+		{ position_d, uv_d, color_d },
+	};
+}
+void immediate_quad(
+	v3f position_a, v4f color_a,
+	v3f position_b, v4f color_b,
+	v3f position_c, v4f color_c,
+	v3f position_d, v4f color_d
+) {
+	if (immediate_type != GL_QUADS) {
+		immediate_draw();
+	}
+
+	immediate_type = GL_QUADS;
+	immediate_vertices += {
+		{ position_a, {0,0}, color_a }, 
+		{ position_b, {0,1}, color_b },
+		{ position_c, {1,1}, color_c },
+		{ position_d, {1,0}, color_d },
+	};
+}
+void immediate_quad(
+	v4f color_a,
+	v4f color_b,
+	v4f color_c,
+	v4f color_d
+) {
+	if (immediate_type != GL_QUADS) {
+		immediate_draw();
+	}
+
+	immediate_type = GL_QUADS;
+	immediate_vertices += {
+		{ {-1,-1}, {0,0}, color_a }, 
+		{ {-1, 1}, {0,1}, color_b },
+		{ { 1, 1}, {1,1}, color_c },
+		{ { 1,-1}, {1,0}, color_d },
+	};
+}
 void immediate_draw() {
+	if (immediate_vertices.size == 0) return;
+
 	glUseProgram(immediate_shader);
 	glBindVertexArray(immediate_vertex_array);
 	glBindBuffer(GL_ARRAY_BUFFER, immediate_vertex_buffer);
