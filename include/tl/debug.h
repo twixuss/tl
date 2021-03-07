@@ -139,7 +139,7 @@ StackTrace get_stack_trace() {
 }
 
 void free(StackTrace &stack_trace) {
-	stack_trace.string_buffer.free();
+	free(stack_trace.string_buffer);
 }
 
 

@@ -17,8 +17,11 @@
 
 
 #if COMPILER_MSVC
+#pragma warning(push)
 #pragma warning(disable : 5045) // spectre
 #pragma warning(disable : 4146) // unsigned unary minus
+#pragma warning(disable : 4201) // unnamed struct
+#pragma warning(disable : 4820) // padding
 #endif
 
 namespace TL {
@@ -2148,8 +2151,6 @@ union m4 {
 	}
 	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 xymax = nz * tan(fov * 0.5f);
-		f32 width = xymax * 2;
-		f32 height = xymax * 2;
 		f32 depth = fz - nz;
 		f32 q = -(fz + nz) / depth;
 		f32 qn = -2 * (fz * nz) / depth;
@@ -2188,10 +2189,10 @@ union m4 {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
-			c, 0, s, 0,
-			0, 1, 0, 0,
-		   -s, 0, c, 0,
-			0, 0, 0, 1
+			 c, 0, s, 0,
+			 0, 1, 0, 0,
+			-s, 0, c, 0,
+			 0, 0, 0, 1
 		};
 		// clang-format on
 	}
@@ -2199,10 +2200,10 @@ union m4 {
 		f32 s = sinf(a), c = cosf(a);
 		// clang-format off
 		return {
-			c, s, 0, 0,
-		   -s, c, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1
+			 c, s, 0, 0,
+			-s, c, 0, 0,
+			 0, 0, 1, 0,
+			 0, 0, 0, 1
 		};
 		// clang-format on
 	}
@@ -2219,10 +2220,10 @@ union m4 {
 		f32 f = cos.z;
 		// clang-format off
 		return {
-			d * f - a * c * e,  b * e, c * f + a * d * e, 0,
-			-a * c * f - d * e, b * f, a * d * f - c * e, 0,
-			-b * c,             -a,    b * d,             0,
-			0,                  0,     0,                 1,
+			 d * f - a * c * e,  b * e, c * f + a * d * e, 0,
+			-a * c * f - d * e,  b * f, a * d * f - c * e, 0,
+			            -b * c,     -a,             b * d, 0,
+			                 0,      0,                 0, 1,
 		};
 		// clang-format on
 	}
@@ -2240,19 +2241,15 @@ union m4 {
 		f32 f = cos.z;
 		// clang-format off
 		return {
-			d * f + a * c * e,  -a * c * f + d * e, b * c, 0, 
-			-b * e,             b * f,              a,     0,
-			-c * f + a * d * e, -a * d * f - c * e, b * d, 0, 
-			0,                  0,                  0,     1,
+			 d * f + a * c * e,  -a * c * f + d * e, b * c, 0,
+			            -b * e,               b * f,     a, 0,
+			-c * f + a * d * e,  -a * d * f - c * e, b * d, 0,
+			                 0,                   0,     0, 1,
 		};
 		// clang-format on
 	}
 	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
-	v4f &operator[](umm i) { return vectors[i]; }
-	v4f const &operator[](umm i) const { return vectors[i]; }
 };
-
-#undef CVT
 
 forceinline constexpr m3 transpose(m3 const& m) {
 	return {
@@ -2520,3 +2517,7 @@ forceinline T smoothstep(T t) {
 #undef f64x2_ge
 #undef f64x2_eq
 #undef f64x2_ne
+
+#if COMPILER_MSVC
+#pragma warning(pop)
+#endif

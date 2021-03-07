@@ -1,10 +1,43 @@
-#include "../include/tl/tl.h"
+#include "../include/tl/array.h"
+#include "../include/tl/bits.h"
+#include "../include/tl/buffer.h"
+#include "../include/tl/common.h"
+#include "../include/tl/console.h"
+#include "../include/tl/cpu.h"
+#include "../include/tl/debug.h"
+#include "../include/tl/file.h"
+#include "../include/tl/function.h"
+#include "../include/tl/hashtable.h"
+#include "../include/tl/json.h"
+#include "../include/tl/list.h"
+#include "../include/tl/math.h"
 #include "../include/tl/math_random.h"
+#include "../include/tl/mesh.h"
+#include "../include/tl/net.h"
+#include "../include/tl/opengl.h"
+#include "../include/tl/optional.h"
+#include "../include/tl/profiler.h"
+#include "../include/tl/random.h"
+#include "../include/tl/simd.h"
+#include "../include/tl/std_hash.h"
+#include "../include/tl/string.h"
+#include "../include/tl/system.h"
+#include "../include/tl/thread.h"
+#include "../include/tl/time.h"
+
+#if OS_WINDOWS
+#include "../include/tl/win32.h"
+#include "../include/tl/d3d11.h"
+#endif
+
 using namespace TL;
 
+#pragma warning(disable: 4100)
+
+#include "math.cpp"
+#include "string.cpp"
 
 #pragma warning(push, 0)
-#include "math.cpp"
 #include <stdio.h>
 #include <assert.h>
 #include <excpt.h>
@@ -15,24 +48,6 @@ using namespace TL;
 #include <chrono>
 #include <thread>
 #include <typeinfo>
-
-void string_test() {
-	printf("%s ... ", "string_test");
-	StringBuilder<char, 16> builder;
-	char const *str = "Surprise steepest recurred landlord mr wandered amounted of. Continuing devonshire but considered its. Rose past oh shew roof is song neat. Do depend better praise do friend garden an wonder to. Intention age nay otherwise but breakfast. Around garden beyond to extent by. ";
-	builder.append(str);
-	auto result = builder.get();
-	assert(result.size() == strlen(str));
-	assert(memcmp(result.data(), str, result.size()) == 0);
-
-	auto copyFn = [&] (Span<char const> span) {return true;};
-	static_assert(isCopyFn<decltype(copyFn), char>);
-	using TTT = CopyFnRet<decltype(copyFn), char>;
-
-	to_string<char>(v3f{}, std::move(copyFn));
-
-	puts("ok");
-}
 
 template <class T>
 void bubbleSort(Span<T> span) {
@@ -54,8 +69,11 @@ void bubbleSort(Span<T> span) {
 		}
 	}
 }
-// Fucking... nope, FUCKING FUCKING FUCKING FUCKING FUCKING c++!!!
-template <template <class T, class ...Args> class List, class T, class ...Args> void bubbleSort(List<T, Args...> &list) { bubbleSort((Span<T>)list); }
+
+template <template <class T> class List, class T>
+void bubbleSort(List<T> &list) {
+	bubbleSort((Span<T>)list);
+}
 
 template <class T, class Predicate>
 void quickSort(Span<T> span, Predicate &&predicate) {
@@ -297,6 +315,8 @@ void sort_perf() {
 #endif
 #define memequ(a, b, s) (memcmp(a, b, s) == 0)
 
+#if 0
+
 void buffer_test() {
 	{
 		CircularBuffer<char> buffer(8);
@@ -358,6 +378,8 @@ void buffer_test() {
 	}
 }
 
+#endif
+
 #if 0
 u16 counts[0x10000];
 void rand_test() {
@@ -375,7 +397,7 @@ int main() {
 	init_allocator();
 
 	//rand_test();
-	buffer_test();
+	//buffer_test();
 	//sort_test();
 	//sort_perf();
 
@@ -442,6 +464,9 @@ int main() {
 	assert(test.alloc_data[0] == 42);
 	assert(test.alloc_data[1] == 69);
 	assert(test.alloc_data[2] == 23);
+
+	free(test);
+
 
 }
 #pragma warning(pop)

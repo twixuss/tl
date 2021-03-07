@@ -161,8 +161,9 @@ ALL_FUNCS
 struct CompiledShader {
 	GLuint id;
 	char *message;
-	operator bool() const { return id; }
 };
+
+forceinline bool valid(CompiledShader shader) { return shader.id != 0; }
 
 TL_API void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 

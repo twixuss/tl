@@ -4,11 +4,12 @@
 #include "list.h"
 
 #pragma warning(push)
-#pragma warning(disable : 4582)
-#pragma warning(disable : 4583)
-#pragma warning(disable : 4625)
-#pragma warning(disable : 4820)
-#pragma warning(disable : 5220)
+#pragma warning(disable: TL_DISABLED_WARNINGS)
+#pragma warning(disable: 4582)
+#pragma warning(disable: 4583)
+#pragma warning(disable: 4625)
+#pragma warning(disable: 4820)
+#pragma warning(disable: 5220)
 
 namespace TL {
 

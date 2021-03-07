@@ -8,8 +8,9 @@ if not exist %bindir% mkdir %bindir%
 pushd %bindir%
 
 
-set cFlags=/Z7 /GF /FC /Oi /EHac /fp:fast /std:c++latest /Wall /MT /D"BUILD_DEBUG=1" /wd4464 /wd4514 /wd4505 /wd4710 /wd5045 /wd4711 /nologo /link /incremental:no
+set cFlags=/Z7 /GF /FC /Oi /EHac /fp:fast /std:c++latest /MT /D"BUILD_DEBUG=1" /wd4464 /wd4514 /wd4505 /wd4710 /wd5045 /wd4711 /nologo /link /incremental:no
 set cFlags=/Od %cFlags%
+::set cFlags=/Wall %cFlags%
 ::set cFlags=/O2 /Ob3 /GL %cFlags% /LTCG
 if "%1" == "dll" (
     echo definitions...

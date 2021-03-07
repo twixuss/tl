@@ -27,17 +27,17 @@ struct FileTracker {
 	void *on_update_state;
 };
 
-TL_API File openFile(char const *path, u32 openFlags);
-TL_API File openFile(wchar const *path, u32 openFlags);
-TL_API void setCursor(File file, s64 offset, FileCursor origin);
-TL_API s64 getCursor(File file);
+TL_API File open_file(char const *path, u32 openFlags);
+TL_API File open_file(wchar const *path, u32 openFlags);
+TL_API void set_cursor(File file, s64 offset, FileCursor origin);
+TL_API s64 get_cursor(File file);
 TL_API s64 length(File file);
 TL_API void read(File file, void *data, u64 size);
 TL_API void write(File file, void const *data, u64 size);
-TL_API void truncateToCursor(File file);
+TL_API void truncate_to_cursor(File file);
 TL_API void close(File file);
-TL_API bool fileExists(char const *path);
-TL_API bool fileExists(wchar const *path);
+TL_API bool file_exists(char const *path);
+TL_API bool file_exists(wchar const *path);
 TL_API u64 get_file_write_time(char const *path);
 TL_API StringList<char> get_files_in_directory(char const *directory);
 
@@ -83,10 +83,10 @@ inline void free_file_tracker(FileTracker &tracker) {
 }
 
 inline s64 length(File file) {
-	auto oldCursor = getCursor(file);
-	defer { setCursor(file, oldCursor, File_begin); };
-	setCursor(file, 0, File_end);
-	return getCursor(file);
+	auto oldCursor = get_cursor(file);
+	defer { set_cursor(file, oldCursor, File_begin); };
+	set_cursor(file, 0, File_end);
+	return get_cursor(file);
 }
 forceinline void read(File file, Span<u8> span) { read(file, span.data, span.size); }
 forceinline void write(File file, Span<u8 const> span) { write(file, span.data, span.size);}
@@ -99,12 +99,12 @@ inline void writeString(File file, T const &value) {
 }
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
-	auto oldCursor = getCursor(file);
-	defer { setCursor(file, oldCursor, File_begin); };
+	auto oldCursor = get_cursor(file);
+	defer { set_cursor(file, oldCursor, File_begin); };
 
-	setCursor(file, 0, File_end);
-	auto size = (umm)getCursor(file);
-	setCursor(file, 0, File_begin);
+	set_cursor(file, 0, File_end);
+	auto size = (umm)get_cursor(file);
+	set_cursor(file, 0, File_begin);
 
 	auto result = create_buffer(size + extra_space_before + extra_space_after);
 	read(file, result.data + extra_space_before, size);
@@ -112,7 +112,7 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 	return result;
 }
 inline Buffer read_entire_file(char const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
-	File file = openFile(path, File_read);
+	File file = open_file(path, File_read);
 	if (file) {
 		defer { close(file); };
 		return read_entire_file(file, extra_space_before, extra_space_after);
@@ -121,7 +121,7 @@ inline Buffer read_entire_file(char const *path, umm extra_space_before = 0, umm
 	}
 }
 inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, umm extra_space_after= 0) {
-	File file = openFile(path, File_read);
+	File file = open_file(path, File_read);
 	if (file) {
 		defer { close(file); };
 		return read_entire_file(file, extra_space_before, extra_space_after);
@@ -134,7 +134,7 @@ inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	} else {
 		auto null_terminated_path = null_terminate(path);
-		defer { null_terminated_path.free(); };
+		defer { free(null_terminated_path); };
 		return read_entire_file(null_terminated_path.data, extra_space_before, extra_space_after);
 	}
 }
@@ -143,28 +143,28 @@ inline Buffer read_entire_file(Span<wchar const> path, umm extra_space_before = 
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	} else {
 		auto null_terminated_path = null_terminate(path);
-		defer { null_terminated_path.free(); };
+		defer { free(null_terminated_path); };
 		return read_entire_file(null_terminated_path.data, extra_space_before, extra_space_after);
 	}
 }
 inline void truncate(File file, u64 size) {
-	setCursor(file, (s64)size, File_begin);
-	truncateToCursor(file);
+	set_cursor(file, (s64)size, File_begin);
+	truncate_to_cursor(file);
 }
 inline void write_entire_file(File file, void const *data, u64 size) {
-	setCursor(file, 0, File_begin);
+	set_cursor(file, 0, File_begin);
 	write(file, data, size);
-	truncateToCursor(file);
+	truncate_to_cursor(file);
 }
 inline bool write_entire_file(char const *path, void const *data, u64 size) {
-	File file = openFile(path, File_write);
+	File file = open_file(path, File_write);
 	if (!file) return false;
 	write_entire_file(file, data, size);
 	close(file);
 	return true;
 }
 inline bool write_entire_file(wchar const *path, void const *data, u64 size) {
-	File file = openFile(path, File_write);
+	File file = open_file(path, File_write);
 	if (!file) return false;
 	write_entire_file(file, data, size);
 	close(file);
@@ -214,7 +214,7 @@ OpenFileParams getOpenFileParams(u32 openFlags) {
 	}
 	return result;
 }
-File openFile(char const *path, u32 openFlags) {
+File open_file(char const *path, u32 openFlags) {
 	auto params = getOpenFileParams(openFlags);
 	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
@@ -225,7 +225,7 @@ File openFile(char const *path, u32 openFlags) {
 		handle = 0;
 	return (File)handle;
 }
-File openFile(wchar const *path, u32 openFlags) {
+File open_file(wchar const *path, u32 openFlags) {
 	auto params = getOpenFileParams(openFlags);
 	auto handle = CreateFileW(path, params.access, params.share, 0, params.creation, 0, 0);
 	if (!params.access) {
@@ -236,7 +236,7 @@ File openFile(wchar const *path, u32 openFlags) {
 		handle = 0;
 	return (File)handle;
 }
-void setCursor(File file, s64 offset, FileCursor origin) {
+void set_cursor(File file, s64 offset, FileCursor origin) {
 	LARGE_INTEGER newP;
 	newP.QuadPart = offset;
 	DWORD moveMethod;
@@ -248,7 +248,7 @@ void setCursor(File file, s64 offset, FileCursor origin) {
 	}
 	SetFilePointerEx((HANDLE)file, newP, 0, moveMethod);
 }
-s64 getCursor(File file) {
+s64 get_cursor(File file) {
 	LARGE_INTEGER curP;
 	SetFilePointerEx((HANDLE)file, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
@@ -279,17 +279,17 @@ void write(File file, void const *data_, u64 size) {
 		WriteFile((HANDLE)file, data, (DWORD)size, &bytesWritten, 0);
 	}
 }
-void truncateToCursor(File file) {
+void truncate_to_cursor(File file) {
 	SetEndOfFile((HANDLE)file);
 }
 void close(File file) {
 	CloseHandle((HANDLE)file);
 }
 
-bool fileExists(char const *path) {
+bool file_exists(char const *path) {
 	return PathFileExistsA(path);
 }
-bool fileExists(wchar const *path) {
+bool file_exists(wchar const *path) {
 	return PathFileExistsW(path);
 }
 u64 get_file_write_time(char const *path) {

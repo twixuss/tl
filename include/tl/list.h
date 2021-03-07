@@ -55,14 +55,6 @@ struct List {
 	void clear() {
 		size = 0;
 	}
-	void free() {
-		if (data == 0) return;
-
-		FREE(allocator, data);
-		data = 0;
-		size = 0;
-		capacity = 0;
-	}
 
 	T &operator[](umm i) { return data[i]; }
 
@@ -101,12 +93,41 @@ struct List {
 	T *insert(Span<T const> span, T *where) {
 		return insert(span, where - data);
 	}
+	
+	void erase_at(umm where) {
+		TL_BOUNDS_CHECK(where < size);
+		--size;
+		for (umm i = where; i < size; ++i) {
+			data[i] = data[i + 1];
+		}
+	}
+	void erase(T *value) { erase_at(value - data); }
+
+	bool find_and_erase(T value) {
+		auto found = find(as_span(*this), value);
+		if (found) {
+			erase(found);
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 	T *data = 0;
 	umm size = 0;
 	umm capacity = 0;
 	Allocator allocator = current_allocator;
 };
+
+template <class T>
+void free(List<T> &list) {
+	if (list.data == 0) return;
+
+	FREE(list.allocator, list.data);
+	list.data = 0;
+	list.size = 0;
+	list.capacity = 0;
+}
 
 template <class T>
 List<T> copy(List<T> const &that) {
@@ -512,22 +533,23 @@ struct Queue {
 	Queue &operator+=(Queue<T> const &v) { insert(as_span(v), end()); return *this; }
 	Queue &operator+=(std::initializer_list<T> v) { insert(Span(v.begin(), v.end()), this->end()); return *this; }
 	
-	void free() {
-		if (alloc_data == 0) return;
-
-		FREE(allocator, alloc_data);
-		data = 0;
-		size = 0;
-		alloc_data = 0;
-		alloc_size = 0;
-	}
-
 	Allocator allocator = current_allocator;
 	T *data = 0;
 	umm size = 0;
 	T *alloc_data = 0;
 	umm alloc_size = 0;
 };
+
+template <class T>
+void free(Queue<T> &queue) {
+	if (queue.alloc_data == 0) return;
+
+	FREE(queue.allocator, queue.alloc_data);
+	queue.data = 0;
+	queue.size = 0;
+	queue.alloc_data = 0;
+	queue.alloc_size = 0;
+}
 
 template <class T, umm _capacity>
 struct StaticCircularBuffer {

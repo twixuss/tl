@@ -29,8 +29,6 @@
 
 #if COMPILER_MSVC
 #pragma warning(pop)
-#pragma warning(push)
-#pragma warning(disable: 4820)
 #endif
 
 #ifndef ASSERTION_FAILURE
@@ -54,6 +52,16 @@
 #define TL_BOUNDS_CHECK(x) assert(x, "Bounds check failed")
 #else
 #define TL_BOUNDS_CHECK(x)
+#endif
+
+#define TL_DISABLED_WARNINGS \
+5026 /* implicitly deleted move constructor	*/ \
+5027 /* implicitly deleted move assigmnent  */
+
+#if COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable: TL_DISABLED_WARNINGS)
+#pragma warning(disable: 4820)
 #endif
 
 namespace TL {
@@ -544,7 +552,7 @@ struct Span {
 	umm size = 0;
 };
 
-Span<char> operator""s(char const *string, umm size) {
+forceinline Span<char> operator""s(char const *string, umm size) {
 	return Span((char *)string, size);
 }
 

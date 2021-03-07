@@ -98,10 +98,6 @@ void math_test() {
 	static_assert(TL::midpoint((s32)0xFFFFFFFD, (s32)0xFFFFFFFF) == (s32)0xFFFFFFFE);
 	static_assert(TL::midpoint((s32)0xFFFFFFFF, (s32)0xFFFFFFFD) == (s32)0xFFFFFFFE);
 
-	f32x8 a = f32x8_set(0,1,2,3,4,5,6,7);
-	f32x8 b = f32x8_set(8,9,10,11,12,13,14,15);
-
-
 	{
 		aabb<v2s> a, b;
 		a = {{0, 0}, {10, 10}};
