@@ -24,7 +24,7 @@ struct FileTracker {
 
 	Allocator allocator;
 	void (*on_update)(FileTracker &tracker, void *state);
-	void *on_update_state;
+	void *state;
 };
 
 TL_API File open_file(char const *path, u32 openFlags);
@@ -45,14 +45,14 @@ inline void update_file_tracker(FileTracker &tracker) {
 	u64 last_write_time = get_file_write_time(tracker.path);
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
-		tracker.on_update(tracker, tracker.on_update_state);
+		tracker.on_update(tracker, tracker.state);
 	}
 }
 
 inline FileTracker create_file_tracker(char const *path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
 	FileTracker result = {};
 	result.on_update = on_update;
-	result.on_update_state = state;
+	result.state = state;
 	result.path = path;
 	update_file_tracker(result);
 	return result;
@@ -77,7 +77,7 @@ inline FileTracker create_file_tracker(char const *path, Fn &&on_update) {
 
 inline void free_file_tracker(FileTracker &tracker) {
 	if (tracker.allocator) {
-		FREE(tracker.allocator, tracker.on_update_state);
+		FREE(tracker.allocator, tracker.state);
 	}
 	tracker = {};
 }
@@ -89,11 +89,11 @@ inline s64 length(File file) {
 	return get_cursor(file);
 }
 forceinline void read(File file, Span<u8> span) { read(file, span.data, span.size); }
-forceinline void write(File file, Span<u8 const> span) { write(file, span.data, span.size);}
+forceinline void write(File file, Span<u8> span) { write(file, span.data, span.size);}
 
 template <class Char = char, class T>
 inline void writeString(File file, T const &value) {
-	to_string<Char>(value, [&](Span<Char const> span) {
+	to_string<Char>(value, [&](Span<Char> span) {
 		write(file, span.data(), span.size() * sizeof(Char));
 	});
 }
@@ -129,7 +129,7 @@ inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, um
 		return {};
 	}
 }
-inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(Span<char> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0') {
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	} else {
@@ -138,7 +138,7 @@ inline Buffer read_entire_file(Span<char const> path, umm extra_space_before = 0
 		return read_entire_file(null_terminated_path.data, extra_space_before, extra_space_after);
 	}
 }
-inline Buffer read_entire_file(Span<wchar const> path, umm extra_space_before = 0, umm extra_space_after= 0) {
+inline Buffer read_entire_file(Span<wchar> path, umm extra_space_before = 0, umm extra_space_after= 0) {
 	if (path.back() == '\0') {
 		return read_entire_file(path.data, extra_space_before, extra_space_after);
 	} else {
@@ -170,8 +170,8 @@ inline bool write_entire_file(wchar const *path, void const *data, u64 size) {
 	close(file);
 	return true;
 }
-forceinline bool write_entire_file(char  const *path, Span<u8 const> span) { return write_entire_file(path, span.data, span.size); }
-forceinline bool write_entire_file(wchar const *path, Span<u8 const> span) { return write_entire_file(path, span.data, span.size); }
+forceinline bool write_entire_file(char  const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
+forceinline bool write_entire_file(wchar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
 
 }
 

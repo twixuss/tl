@@ -42,10 +42,10 @@ bool init_rawinput(RawInputDevice deviceFlags) {
 		RAWINPUTDEVICE mouse = {};
 		mouse.usUsagePage = 0x01;
 		mouse.usUsage = 0x02;
-		devices.push_back(mouse);
+		devices.add(mouse);
 	}
-	if (devices.size()) {
-		if (!RegisterRawInputDevices(devices.data(), (UINT)devices.size(), sizeof(devices[0]))) {
+	if (devices.size) {
+		if (!RegisterRawInputDevices(devices.data, (UINT)devices.size, sizeof(devices[0]))) {
 			return false;
 		}
 	}

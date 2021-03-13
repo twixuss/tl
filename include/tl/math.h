@@ -1841,7 +1841,7 @@ inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 		aabb_min_max(v2s{a.min.x, b.min.y}, v2s{b.min.x, b.max.y}),
 		aabb_min_max(v2s{b.max.x, b.min.y}, v2s{a.max.x, b.max.y}),
 	};
-	for (u32 i = 0; i < boxes.size(); ++i) {
+	for (u32 i = 0; i < boxes.size; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
@@ -1884,7 +1884,7 @@ inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
 		aabb_min_max(v3s{b.min.x, b.max.y, b.min.z}, v3s{b.max.x, a.max.y, b.max.z}), // top
 		aabb_min_max(v3s{b.min.x, a.min.y, b.min.z}, v3s{b.max.x, b.min.y, b.max.z}), // bottom
 	};
-	for (u32 i = 0; i < boxes.size(); ++i) {
+	for (u32 i = 0; i < boxes.size; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
@@ -2446,7 +2446,7 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 } // namespace CE
 
 #define TO_STRING_V3(v3f)													  \
-template <class Char, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> \
+template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> \
 CopyFnRet<CopyFn, Char> to_string(v3f v, CopyFn &&copyFn) {					  \
 	StaticList<Char, 256> buffer;											  \
 	buffer += '{';															  \
@@ -2465,7 +2465,7 @@ TO_STRING_V3(v3s)
 
 #undef TO_STRING_V3
 
-template <class Char, class T, class CopyFn, class = EnableIf<isCopyFn<CopyFn, Char>>> 
+template <class Char, class T, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> 
 CopyFnRet<CopyFn, Char> to_string(aabb<T> v, CopyFn &&copyFn) {					  
 	StaticList<Char, 256> buffer;											  
 	buffer += as_span("{ min: ");															  

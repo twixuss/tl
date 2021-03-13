@@ -7,8 +7,8 @@
 namespace std {
 
 template <>
-struct hash<TL::Span<char const>> {
-	TL::umm operator()(TL::Span<char const> const &v) const {
+struct hash<TL::Span<char>> {
+	TL::umm operator()(TL::Span<char> const &v) const {
 		using namespace TL;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		umm index = 0;

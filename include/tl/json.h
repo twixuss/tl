@@ -23,7 +23,7 @@ enum Type {
 
 struct Object {
 	struct v_Object {
-		std::unordered_map<Span<char const>, Object> members;
+		std::unordered_map<Span<char>, Object> members;
 	};
 	struct v_Array {
 		BadList<Object> elements;
@@ -32,7 +32,7 @@ struct Object {
 		f64 value;
 	};
 	struct v_String {
-		Span<char const> view;
+		Span<char> view;
 	};
 
 	Type type;
@@ -46,7 +46,7 @@ struct Object {
 		memset(this, 0, sizeof(*this));
 	}
 	Object(f64 number) : type(Type_number), number({number}) {}
-	Object(Span<char const> string) : type(Type_string), string({string}) {}
+	Object(Span<char> string) : type(Type_string), string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
@@ -89,7 +89,7 @@ struct Object {
 		number.value = value;
 		return *this;
 	}
-	Object &operator=(Span<char const> value) {
+	Object &operator=(Span<char> value) {
 		if (type != Type_null)
 			assert(type == Type_string);
 		string.view = value;
@@ -106,13 +106,9 @@ struct Object {
 		}
 		type = Type_null;
 	}
-	Object &operator[](Span<char const> name) {
+	Object &operator[](Span<char> name) {
 		assert(type == Type_object);
 		return object.members[name];
-	}
-	template <umm size>
-	Object &operator[](char const (&name)[size]) {
-		return (*this)[Span<char const>(name, length(name))];
 	}
 	Object &operator[](umm i) {
 		assert(type == Type_array);
@@ -135,13 +131,13 @@ enum : TokenType {
 
 struct Token {
 	TokenType type;
-	Span<char const> view;
+	Span<char> view;
 };
 
-TL_API List<Token> lex(Span<char const> json);
+TL_API List<Token> lex(Span<char> json);
 TL_API Object parse(Token *&t);
 TL_API Object parse(List<Token> tokens);
-TL_API Object parse(Span<char const> json);
+TL_API Object parse(Span<char> json);
 
 }
 }
@@ -151,7 +147,7 @@ TL_API Object parse(Span<char const> json);
 namespace TL {
 namespace Json {
 
-List<Token> lex(Span<char const> json) {
+List<Token> lex(Span<char> json) {
 	List<Token> result;
 	auto c = json.begin();
 	while (c != json.end()) {
@@ -217,7 +213,7 @@ Object parse(Token *&t) {
 		if (t->type != '}') {
 			while (1) {
 				if (t->type == '"') {
-					Span<char const> memberName = t->view;
+					Span<char> memberName = t->view;
 					++t;
 					assert(t++->type == ':');
 					result.object.members[memberName] = parse(t);
@@ -274,7 +270,7 @@ Object parse(List<Token> tokens) {
 	Token *t = tokens.begin();
 	return parse(t);
 }
-Object parse(Span<char const> json) {
+Object parse(Span<char> json) {
 	return parse(lex(json));
 }
 

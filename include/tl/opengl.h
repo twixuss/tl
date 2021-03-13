@@ -172,9 +172,9 @@ TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
 inline void glViewport(v2u size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
 TL_API CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char const> source);
-TL_API CompiledShader create_shader(GLenum shaderType, Span<char const> source);
+TL_API CompiledShader create_shader(GLenum shaderType, Span<char> source);
 inline CompiledShader create_shader(GLenum shaderType, char const *source) {
-	return create_shader(shaderType, Span(source, length(source)));
+	return create_shader(shaderType, as_span(source));
 }
 TL_API CompiledShader create_program(GLuint vertexShader, GLuint fragmentShader);
 TL_API void immediate_init();
@@ -230,34 +230,34 @@ CompiledShader compile_shader(GLuint shader) {
     return result;
 }
 
-CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char const> source) {
+CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
 	StaticList<char, 64> version_string;
-	version_string += as_span("#version ");
+	version_string += "#version "s;
 
-	to_string<char>(version, [&](Span<char const> span) {
+	to_string<char>(version, [&](Span<char> span) {
 		version_string += span;
 	});
 	if (core) {
-		version_string += as_span(" core");
+		version_string += " core"s;
 	}
 	version_string += '\n';
 
 	StaticList<char, 64> stage_string;
-	stage_string += as_span("#define ");
+	stage_string += "#define "s;
 	switch (shaderType) {
-		case GL_VERTEX_SHADER: stage_string += as_span("VERTEX_SHADER"); break;
-		case GL_FRAGMENT_SHADER: stage_string += as_span("FRAGMENT_SHADER"); break;
+		case GL_VERTEX_SHADER: stage_string += "VERTEX_SHADER"s; break;
+		case GL_FRAGMENT_SHADER: stage_string += "FRAGMENT_SHADER"s; break;
 	}
 	stage_string += '\n';
 
 	char const *lines[3] {
-		version_string.data(),
-		stage_string.data(),
+		version_string.data,
+		stage_string.data,
 		source.data
 	};
 	int const lengths[3] {
-		(int)version_string.size(),
-		(int)stage_string.size(),
+		(int)version_string.size,
+		(int)stage_string.size,
 		(int)source.size
 	};
 	
@@ -265,7 +265,7 @@ CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<cha
     glShaderSource(shader, 3, lines, lengths);
 	return compile_shader(shader);
 }
-CompiledShader create_shader(GLenum shaderType, Span<char const> source) {
+CompiledShader create_shader(GLenum shaderType, Span<char> source) {
 	auto shader = glCreateShader(shaderType);
 
 	GLint length = (GLint)source.size;
@@ -369,7 +369,7 @@ if (!name) { \
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0,
 		};
-		HGLRC new_context = wglCreateContextAttribsARB(client_dc, share, context_attribs.data());
+		HGLRC new_context = wglCreateContextAttribsARB(client_dc, share, context_attribs.data);
 		if (new_context) {
 			wglMakeCurrent(client_dc, new_context);
 			wglDeleteContext(context);
@@ -392,7 +392,7 @@ if (!name) { \
 
 bool init_opengl_thread() {
 
-	HGLRC thread_context = wglCreateContextAttribsARB(client_dc, context, context_attribs.data());
+	HGLRC thread_context = wglCreateContextAttribsARB(client_dc, context, context_attribs.data);
 	if (!thread_context)
 		return false;
 

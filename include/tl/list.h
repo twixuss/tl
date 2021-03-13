@@ -65,15 +65,13 @@ struct List {
 	T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
 
 	operator Span<T>() { return {data, size}; }
-	operator Span<T const>() const { return {data, size}; }
 	
 	List &operator+=(T const &v) { add(v); return *this; }
 	List &operator+=(Span<T> v) { insert(v, end()); return *this; }
-	List &operator+=(Span<T const> v) { insert(v, end()); return *this; }
 	List &operator+=(List<T> const &v) { insert(as_span(v), end()); return *this; }
-	List &operator+=(std::initializer_list<T> v) { insert(Span(v.begin(), v.end()), end()); return *this; }
+	List &operator+=(std::initializer_list<T> v) { insert(Span((T *)v.begin(), (T *)v.end()), end()); return *this; }
 	
-	T *insert(Span<T const> span, umm where) {
+	T &insert(Span<T> span, umm where) {
 		TL_BOUNDS_CHECK(where <= size);
 
 		umm required_size = size + span.size;
@@ -88,9 +86,9 @@ struct List {
 		}
 
 		size += span.size;
-		return data + where;
+		return data[where];
 	}
-	T *insert(Span<T const> span, T *where) {
+	T &insert(Span<T> span, T *where) {
 		return insert(span, where - data);
 	}
 	
@@ -139,11 +137,16 @@ List<T> copy(List<T> const &that) {
 	return result;
 }
 
+template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
+CopyFnRet<CopyFn, Char> to_string(List<char> const &list, CopyFn &&copy_fn) {
+	return copy_fn(Span<char>(list.data, list.size));
+}
+
 template <class T>
 struct BadList {
 	BadList() = default;
 	explicit BadList(umm length) { resize(length); }
-	BadList(Span<T const> span) {
+	BadList(Span<T> span) {
 		reserve(span.size);
 		_copyConstruct(span.begin(), span.end());
 		_end = _begin + span.size;
@@ -171,7 +174,7 @@ struct BadList {
 		_end = 0;
 		_allocEnd = 0;
 	}
-	BadList &set(Span<T const> span) {
+	BadList &set(Span<T> span) {
 		clear();
 		if (span.size > capacity()) {
 			_reallocate(span.size);
@@ -249,7 +252,7 @@ struct BadList {
 		_end = _begin;
 	}
 	
-	T *insert(Span<T const> span, T *where) {
+	T *insert(Span<T> span, T *where) {
 		TL_BOUNDS_CHECK(_begin <= where && where <= _end);
 
 		umm where_index = where - _begin;
@@ -268,7 +271,7 @@ struct BadList {
 	}
 
 	operator Span<T>() { return {begin(), end()}; }
-	operator Span<T const>() const { return {begin(), end()}; }
+	operator Span<T>() const { return {begin(), end()}; }
 
 	void _reallocate(umm newCapacity) {
 		assert(capacity() < newCapacity);
@@ -354,7 +357,6 @@ struct BadList {
 	BadList &operator+=(T const &v) { this->push_back(v); return *this; }
 	BadList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
 	BadList &operator+=(Span<T> v) { this->insert(v, this->end()); return *this; }
-	BadList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	BadList &operator+=(BadList<T> const &v) { this->insert(as_span(v), this->end()); return *this; }
 	BadList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
 
@@ -371,11 +373,6 @@ struct BadList {
 template <class T>
 Span<T> as_span(List<T> &list) {
 	return (Span<T>)list;
-}
-
-template <class T>
-Span<T const> as_span(List<T> const &list) {
-	return (Span<T const>)list;
 }
 
 template <class T, class Predicate>
