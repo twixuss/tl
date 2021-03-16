@@ -27,9 +27,15 @@ inline void print_to_console(wchar const *string, umm length) { console_printer(
 
 template <class Char = char, class T>
 inline void print(T const &value) {
-	to_string<Char>(value, [](Span<Char> span) {
-		current_printer(span.data, span.size, encoding_from_type<Char>);
-	});
+	StringBuilder builder;
+	defer { free(builder); };
+
+	append(builder, value);
+	
+	auto string = to_string(builder);
+	defer { free(string); };
+
+	current_printer(string.data, string.size, encoding_from_type<Char>);
 }
 
 template <class Char = char, class ...Args>
@@ -37,9 +43,9 @@ inline void print(Char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	defer { free(builder); };
 
-	builder.append_format(fmt, args...);
+	append_format(builder, fmt, args...);
 	
-	auto string = builder.get();
+	auto string = to_string(builder);
 	defer { free(string); };
 	
 	print<Char>(string);

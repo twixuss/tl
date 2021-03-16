@@ -86,55 +86,38 @@ inline constexpr umm length(wchar *str) { return length((wchar const *)str); }
 #define TL_DEFINE_HANDLE(name) struct TL_HANDLE_NAME(name)
 
 
-template <class T, class U> inline constexpr bool isSame = false;
-template <class T> inline constexpr bool isSame<T, T> = true;
+template <class T, class U> inline constexpr bool is_same = false;
+template <class T> inline constexpr bool is_same<T, T> = true;
 
-template <class T> inline constexpr bool isInteger = false;
-template <> inline constexpr bool isInteger<u8 > = true;
-template <> inline constexpr bool isInteger<u16> = true;
-template <> inline constexpr bool isInteger<u32> = true;
-template <> inline constexpr bool isInteger<u64> = true;
-template <> inline constexpr bool isInteger<s8 > = true;
-template <> inline constexpr bool isInteger<s16> = true;
-template <> inline constexpr bool isInteger<s32> = true;
-template <> inline constexpr bool isInteger<s64> = true;
-template <> inline constexpr bool isInteger<slong> = true;
-template <> inline constexpr bool isInteger<ulong> = true;
+template <class T> inline constexpr bool is_integer = false;
+template <> inline constexpr bool is_integer<u8 > = true;
+template <> inline constexpr bool is_integer<u16> = true;
+template <> inline constexpr bool is_integer<u32> = true;
+template <> inline constexpr bool is_integer<u64> = true;
+template <> inline constexpr bool is_integer<s8 > = true;
+template <> inline constexpr bool is_integer<s16> = true;
+template <> inline constexpr bool is_integer<s32> = true;
+template <> inline constexpr bool is_integer<s64> = true;
+template <> inline constexpr bool is_integer<slong> = true;
+template <> inline constexpr bool is_integer<ulong> = true;
 
-template <class T> inline constexpr bool isChar = false;
-template <> inline constexpr bool isChar<u8> = true;
-template <> inline constexpr bool isChar<s8> = true;
+template <class T> inline constexpr bool is_signed = false;
+template <> inline constexpr bool is_signed<s8   > = true;
+template <> inline constexpr bool is_signed<s16  > = true;
+template <> inline constexpr bool is_signed<s32  > = true;
+template <> inline constexpr bool is_signed<s64  > = true;
+template <> inline constexpr bool is_signed<slong> = true;
 
-template <class T> struct isSigned_ {};
-template <> struct isSigned_<s8   > { inline static constexpr bool value = true; };
-template <> struct isSigned_<s16  > { inline static constexpr bool value = true; };
-template <> struct isSigned_<s32  > { inline static constexpr bool value = true; };
-template <> struct isSigned_<s64  > { inline static constexpr bool value = true; };
-template <> struct isSigned_<slong> { inline static constexpr bool value = true; };
-template <> struct isSigned_<u8   > { inline static constexpr bool value = false; };
-template <> struct isSigned_<u16  > { inline static constexpr bool value = false; };
-template <> struct isSigned_<u32  > { inline static constexpr bool value = false; };
-template <> struct isSigned_<u64  > { inline static constexpr bool value = false; };
-template <> struct isSigned_<ulong> { inline static constexpr bool value = false; };
+template <class T> inline constexpr bool is_unsigned = false;
+template <> inline constexpr bool is_unsigned<u8   > = true;
+template <> inline constexpr bool is_unsigned<u16  > = true;
+template <> inline constexpr bool is_unsigned<u32  > = true;
+template <> inline constexpr bool is_unsigned<u64  > = true;
+template <> inline constexpr bool is_unsigned<ulong> = true;
 
-template <class T> inline constexpr bool isSigned = isSigned_<T>::value;
-
-template <class T> inline constexpr bool isUnsigned = false;
-template <> inline constexpr bool isUnsigned<u8 > = true;
-template <> inline constexpr bool isUnsigned<u16> = true;
-template <> inline constexpr bool isUnsigned<u32> = true;
-template <> inline constexpr bool isUnsigned<u64> = true;
-template <> inline constexpr bool isUnsigned<ulong> = true;
-
-template <class T> inline constexpr bool isFloat = false;
-template <> inline constexpr bool isFloat<f32> = true;
-template <> inline constexpr bool isFloat<f64> = true;
-
-template <class T> inline constexpr bool isPointer = false;
-template <class T> inline constexpr bool isPointer<T *> = true;
-
-template <class T> inline constexpr bool isLValueReference = false;
-template <class T> inline constexpr bool isLValueReference<T&> = true;
+template <class T> inline constexpr bool is_float = false;
+template <> inline constexpr bool is_float<f32> = true;
+template <> inline constexpr bool is_float<f64> = true;
 
 template <class ...Args> inline constexpr bool is_invocable = std::is_invocable_v<Args...>;
 
@@ -242,10 +225,12 @@ forceinline constexpr auto max(T (&array)[size]) {
 
 template <class T>
 forceinline constexpr T floor(T v, T s) {
-	if constexpr (isSigned<T>) {
+	if constexpr (is_signed<T>) {
 		return ((v < 0) ? ((v + 1) / s - 1) : (v / s)) * s;
-	} else {
+	} else if constexpr (is_unsigned<T>) {
 		return v / s * s;
+	} else {
+		static_assert(false, "floor(T, T) can be used with integers only");
 	}
 }
 
@@ -259,7 +244,7 @@ forceinline constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1,
 
 template <class T>
 forceinline constexpr T frac(T v, T s) {
-	if constexpr(isSigned<T>) {
+	if constexpr(is_signed<T>) {
 		return (v < 0) ? ((v + 1) % s + s - 1) : (v % s);
 	} else {
 		return v % s;
@@ -561,11 +546,29 @@ inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)st
 inline constexpr Span<char > as_span(char const *begin, char const *end) { return Span((char *)begin, (char *)end); }
 
 template <class T>
-inline constexpr Span<T> as_span(Span<T> span) { return span; }
+inline constexpr Span<T> as_span(Span<T> span) {
+	return span;
+}
 
-template <class T> constexpr Span<u8> as_bytes(Span<T> span) { return {(u8 *)span.begin(), span.size * sizeof(T)}; }
-template <class T> constexpr Span<char> as_chars(Span<T> span) { return {(char *)span.begin(), span.size * sizeof(T)}; }
-template <class T> constexpr Span<u8> value_as_bytes(T &value) { return {(u8 *)&value, sizeof(T)}; }
+template <class T>
+constexpr Span<u8> as_bytes(T span_like) {
+	return as_bytes(as_span(span_like));
+}
+
+template <class T>
+constexpr Span<u8> as_bytes(Span<T> span) {
+	return {(u8 *)span.begin(), span.size * sizeof(T)};
+}
+
+template <class T>
+constexpr Span<char> as_chars(Span<T> span) {
+	return {(char *)span.begin(), span.size * sizeof(T)};
+}
+
+template <class T>
+constexpr Span<u8> value_as_bytes(T &value) {
+	return {(u8 *)&value, sizeof(T)};
+}
 
 template <class T> constexpr umm count_of(Span<T> span) { return span.size; }
 template <class T> constexpr umm length (Span<T> span) { return span.size; }
@@ -742,7 +745,7 @@ template <class CopyFn, class Char>
 using CopyFnRet = decltype(((CopyFn *)0)->operator()(Span<Char>((Char*)0, (umm)0)));
 
 template <class Int>
-inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (isSigned<Int> ? 1 : 0);
+inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
 
 template <class Int>
 struct FormatInt {
@@ -769,88 +772,6 @@ template <>
 struct NullString<wchar> {
 	inline static constexpr wchar value[] = L"(null)";
 };
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(char  const &v, CopyFn &&copy_fn) { Char c = (Char)v; return copy_fn(Span(&c, 1)); }
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(wchar const &v, CopyFn &&copy_fn) { Char c = (Char)v; return copy_fn(Span(&c, 1)); }
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Char const *v, CopyFn &&copy_fn) { if (!v) v = NullString<Char>::value; return copy_fn(as_span(v)); }
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Char       *v, CopyFn &&copy_fn) { if (!v) v = (Char *)NullString<Char>::value; return copy_fn(as_span(v)); }
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> CopyFnRet<CopyFn, Char> to_string(Span<Char> v, CopyFn &&copy_fn) { return copy_fn(v); }
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(bool v, CopyFn &&copy_fn) {
-	if constexpr (isSame<Char, char>)
-		return copy_fn(as_span(v ? "true" : "false"));
-	else
-		return copy_fn(as_span(v ? L"true" : L"false"));
-}
-
-template <class Char, class CopyFn, class Int>
-CopyFnRet<CopyFn, Char> to_string(FormatInt<Int> f, CopyFn &&copy_fn) {
-	Int v = f.value;
-	u32 radix = f.radix;
-	constexpr u32 maxDigits = _intToStringSize<Int>;
-	Char buf[maxDigits];
-	constexpr char charMap[] = "0123456789ABCDEF";
-	Char *lsc = buf + maxDigits - 1;
-	u32 charsWritten = 0;
-
-	bool negative = false;
-	if constexpr (isSigned<Int>) {
-		if (v < 0) {
-			negative = true;
-			if (v == min_value<Int>) {
-				*lsc-- = charMap[-(v % (Int)radix)];
-				v /= (Int)radix;
-				++charsWritten;
-			} 
-			v = -v;
-		}
-	}
-
-	for (;;) {
-		*lsc-- = charMap[v % (Int)radix];
-		v /= (Int)radix;
-		++charsWritten;
-		if (v == 0)
-			break;
-	}
-	if constexpr (isSigned<Int>) {
-		if (negative) {
-			++charsWritten;
-			*lsc-- = '-';
-		}
-	} else {
-		(void)negative;
-	}
-	if (f.leading_zeros) {
-		u32 total_digits = (u32)ceil_to_int(log((f32)max_value<Int>, (f32)f.radix));
-		for (u32 i = charsWritten; i < total_digits; ++i) {
-			*lsc-- = '0';
-		}
-		charsWritten = total_digits;
-	}
-	return copy_fn(Span(lsc + 1, charsWritten));
-}
-
-template <class Char, class Int, class CopyFn, class = EnableIf<isInteger<Int> && is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(Int v, CopyFn &&copy_fn) {
-	return to_string<Char>(FormatInt(v), std::forward<CopyFn>(copy_fn));
-}
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(void const *p, CopyFn &&copy_fn) {
-	return to_string<Char>(FormatInt((umm)p, 16, true), std::forward<CopyFn>(copy_fn));
-}
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(f64 v, CopyFn &&copy_fn) {
-	return to_string<Char>(FormatFloat(v), std::forward<CopyFn>(copy_fn));
-}
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(f32 v, CopyFn &&copy_fn) {
-	return to_string<Char>((f64)v, std::forward<CopyFn>(copy_fn));
-}
-
 
 template <class T>
 struct Storage_Trivial {
@@ -911,10 +832,14 @@ struct StaticList {
 
 	forceinline constexpr bool empty() const { return size == 0; }
 	forceinline constexpr bool full() const { return size == capacity; }
-
+	
 	forceinline constexpr T &front() { TL_BOUNDS_CHECK(size); return data[0]; }
 	forceinline constexpr T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
 	forceinline constexpr T &operator[](umm i) { TL_BOUNDS_CHECK(size); return data[i]; }
+
+	forceinline constexpr T const &front() const { TL_BOUNDS_CHECK(size); return data[0]; }
+	forceinline constexpr T const &back() const { TL_BOUNDS_CHECK(size); return data[size - 1]; }
+	forceinline constexpr T const &operator[](umm i) const { TL_BOUNDS_CHECK(size); return data[i]; }
 
 	constexpr void resize(umm new_size) {
 		TL_BOUNDS_CHECK(new_size <= capacity);
@@ -1013,27 +938,6 @@ template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity>
 
 template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
 
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(FormatFloat<f64> f, CopyFn &&copy_fn) {
-	auto v = f.value;
-	auto precision = f.precision;
-	StaticList<Char, 64> buf;
-	if (is_negative(v)) {
-		buf += '-';
-		v = -v;
-	}
-	to_string<Char>((u64)v, [&](Span<Char> span){
-		buf += span;
-	});
-	buf += '.';
-	for (u32 i = 0; i < precision; ++i) {
-		v = v - (f64)(s64)v;
-		v = (v < 0 ? v + 1 : v) * 10;
-		buf += (Char)((u32)v + '0');
-	}
-	return copy_fn(as_span(buf));
-}
 
 #if COMPILER_GCC
 forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }

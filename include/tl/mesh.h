@@ -79,26 +79,26 @@ GenericMesh parse_glb_from_memory(Span<u8> memory) {
 	Chunk *binary_chunk = (Chunk *)((char *)json_chunk_data + json_chunk->length);
 	auto binary_chunk_data = chunk_data(binary_chunk);
 
-	auto &accessors    = json["accessors"];
-	auto &buffer_views = json["bufferViews"];
+	auto &accessors    = json["accessors"s];
+	auto &buffer_views = json["bufferViews"s];
 	// auto &buffers      = json["buffers"];
 
-	auto &primitives  = json["meshes"][0]["primitives"][0];
-	auto &attributes  = primitives["attributes"];
-	auto &position_accessor = accessors[attributes["POSITION"]];
-	auto &  normal_accessor = accessors[attributes["NORMAL"]];
-	auto &   index_accessor = accessors[primitives["indices"]];
+	auto &primitives  = json["meshes"s][0]["primitives"s][0];
+	auto &attributes  = primitives["attributes"s];
+	auto &position_accessor = accessors[attributes["POSITION"s]];
+	auto &  normal_accessor = accessors[attributes["NORMAL"s]];
+	auto &   index_accessor = accessors[primitives["indices"s]];
 
-	auto &position_buffer_view = buffer_views[position_accessor["bufferView"]];
-	auto &  normal_buffer_view = buffer_views[  normal_accessor["bufferView"]];
+	auto &position_buffer_view = buffer_views[position_accessor["bufferView"s]];
+	auto &  normal_buffer_view = buffer_views[  normal_accessor["bufferView"s]];
 
-	assert(equals(index_accessor["type"].string.view, "SCALAR"));
-	ComponentType indexType = (ComponentType)index_accessor["componentType"].number.value;
+	assert(equals(index_accessor["type"s].string.view, "SCALAR"s));
+	ComponentType indexType = (ComponentType)index_accessor["componentType"s].number.value;
 
-	u32 vertex_count = (u32)position_accessor["count"].number.value;
-	u32 index_count  = (u32)   index_accessor["count"].number.value;
-	v3f *positions = (v3f *)(binary_chunk_data + (u32)position_buffer_view["byteOffset"].number.value);
-	v3f *normals   = (v3f *)(binary_chunk_data + (u32)  normal_buffer_view["byteOffset"].number.value);
+	u32 vertex_count = (u32)position_accessor["count"s].number.value;
+	u32 index_count  = (u32)   index_accessor["count"s].number.value;
+	v3f *positions = (v3f *)(binary_chunk_data + (u32)position_buffer_view["byteOffset"s].number.value);
+	v3f *normals   = (v3f *)(binary_chunk_data + (u32)  normal_buffer_view["byteOffset"s].number.value);
 
 	GenericMesh mesh;
 	
@@ -109,7 +109,7 @@ GenericMesh parse_glb_from_memory(Span<u8> memory) {
 
 	mesh.indices.reserve(index_count);
 
-	void *indices_data = binary_chunk_data + (u32)buffer_views[index_accessor["bufferView"]]["byteOffset"].number.value;
+	void *indices_data = binary_chunk_data + (u32)buffer_views[index_accessor["bufferView"s]]["byteOffset"s].number.value;
 	switch (indexType) {
 		case ComponentType_u32: {
 			u32 *indices = (u32 *)(indices_data); 

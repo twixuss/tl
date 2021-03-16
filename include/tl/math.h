@@ -2445,18 +2445,15 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace CE
 
-#define TO_STRING_V3(v3f)													  \
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> \
-CopyFnRet<CopyFn, Char> to_string(v3f v, CopyFn &&copyFn) {					  \
-	StaticList<Char, 256> buffer;											  \
-	buffer += '{';															  \
-	to_string<Char>(v.x, [&](Span<Char const> span) { buffer += span; });	  \
-	buffer += as_span(", ");												  \
-	to_string<Char>(v.y, [&](Span<Char const> span) { buffer += span; });	  \
-	buffer += as_span(", ");												  \
-	to_string<Char>(v.z, [&](Span<Char const> span) { buffer += span; });	  \
-	buffer += '}';															  \
-	return copyFn(as_span(buffer));											  \
+#define TO_STRING_V3(v3f)                    \
+void append(StringBuilder &builder, v3f v) { \
+	append(builder, '{');                    \
+	append(builder, v.x);                    \
+	append(builder, ", "s);                  \
+	append(builder, v.y);                    \
+	append(builder, ", "s);                  \
+	append(builder, v.z);                    \
+	append(builder, '}');                    \
 }
 
 TO_STRING_V3(v3f)
@@ -2465,15 +2462,13 @@ TO_STRING_V3(v3s)
 
 #undef TO_STRING_V3
 
-template <class Char, class T, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>> 
-CopyFnRet<CopyFn, Char> to_string(aabb<T> v, CopyFn &&copyFn) {					  
-	StaticList<Char, 256> buffer;											  
-	buffer += as_span("{ min: ");															  
-	to_string<Char>(v.min, [&](Span<Char const> span) { buffer += span; });	  
-	buffer += as_span(", max: ");												  
-	to_string<Char>(v.max, [&](Span<Char const> span) { buffer += span; });	  
-	buffer += as_span(" }");															  
-	return copyFn(as_span(buffer));											  
+template <class T>
+void append(StringBuilder& builder, aabb<T> v) {
+	append(builder, "{ min: "s);
+	append(builder, v.min);
+	append(builder, ", max: "s);
+	append(builder, v.max);
+	append(builder, " }"s);
 }
 
 template <class To, class From> forceinline To cvt(From v) { return (To)v; }

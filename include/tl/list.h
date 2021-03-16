@@ -388,7 +388,7 @@ constexpr T const *find_if(List<T> const &list, Predicate &&predicate) {
 template <class T, class Fn>
 constexpr void for_each(List<T> list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
-	constexpr bool breakable = isSame<bool, ReturnType>;
+	constexpr bool breakable = is_same<bool, ReturnType>;
 	for (auto &it : list) {
 		if constexpr (breakable) {
 			if (fn(it))
@@ -1126,7 +1126,7 @@ void for_each(BlockList<T, block_size> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool breakable = isSame<bool, ReturnType>;
+		constexpr bool breakable = is_same<bool, ReturnType>;
 		BlockListIndex index = {};
 		auto block = &list.first;
 		do {
@@ -1145,7 +1145,7 @@ void for_each(BlockList<T, block_size> &list, Fn &&fn) {
 		} while (block);
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool breakable = isSame<bool, ReturnType>;
+		constexpr bool breakable = is_same<bool, ReturnType>;
 		auto block = &list.first;
 		do {
 			for (auto it = block->buffer; it != block->end; ++it) {

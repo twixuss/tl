@@ -211,45 +211,45 @@ CpuInfo get_cpu_info() {
 	s32 edx1ex = 0;
 
 	StaticList<CpuidRegisters, 64> data;
-	StaticList<CpuidRegisters, 64> dataEx;
+	StaticList<CpuidRegisters, 64> data_ex;
 
 	s32 highestId = cpuid(0).eax;
 	for (s32 i = 0; i <= highestId; ++i) {
-		data.push_back(cpuid(i, 0));
+		data.add(cpuid(i, 0));
 	}
-	if (data.size() > 0) {
+	if (data.size > 0) {
 		char vendorName[24];
 		((s32 *)vendorName)[0] = data[0].ebx;
 		((s32 *)vendorName)[1] = data[0].edx;
 		((s32 *)vendorName)[2] = data[0].ecx;
-		if (startsWith(vendorName, 24, "GenuineIntel")) {
+		if (starts_with(vendorName, 24, "GenuineIntel")) {
 			result.vendor = CpuVendor::intel;
-		} else if (startsWith(vendorName, 24, "AuthenticAMD")) {
+		} else if (starts_with(vendorName, 24, "AuthenticAMD")) {
 			result.vendor = CpuVendor::amd;
 		}
 	}
-	if (data.size() > 1) {
+	if (data.size > 1) {
 		ecx1 = data[1].ecx;
 		edx1 = data[1].edx;
 	}
-	if (data.size() > 7) {
+	if (data.size > 7) {
 		ebx7 = data[7].ebx;
 		ecx7 = data[7].ecx;
 	}
 
 	s32 highestExId = cpuid(0x80000000).eax;
 	for (s32 i = 0x80000000; i <= highestExId; ++i) {
-		dataEx.push_back(cpuid(i, 0));
+		data_ex.add(cpuid(i, 0));
 	}
-	if (dataEx.size() > 1) {
-		ecx1ex = dataEx[1].ecx;
-		edx1ex = dataEx[1].edx;
+	if (data_ex.size > 1) {
+		ecx1ex = data_ex[1].ecx;
+		edx1ex = data_ex[1].edx;
 	}
-	if (dataEx.size() > 4) {
+	if (data_ex.size > 4) {
 		result.brand[48] = 0;
-		memcpy(result.brand + sizeof(CpuidRegisters) * 0, &dataEx[2], sizeof(CpuidRegisters));
-		memcpy(result.brand + sizeof(CpuidRegisters) * 1, &dataEx[3], sizeof(CpuidRegisters));
-		memcpy(result.brand + sizeof(CpuidRegisters) * 2, &dataEx[4], sizeof(CpuidRegisters));
+		memcpy(result.brand + sizeof(CpuidRegisters) * 0, &data_ex[2], sizeof(CpuidRegisters));
+		memcpy(result.brand + sizeof(CpuidRegisters) * 1, &data_ex[3], sizeof(CpuidRegisters));
+		memcpy(result.brand + sizeof(CpuidRegisters) * 2, &data_ex[4], sizeof(CpuidRegisters));
 	} else {
 		result.brand[0] = 0;
 	}

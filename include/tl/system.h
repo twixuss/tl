@@ -1,66 +1,57 @@
 #pragma once
-#define OS_WINDOWS 0
-#define OS_LINUX   0
 
-#if defined _WIN32 || defined _WIN64
-	#undef OS_WINDOWS
-	#define OS_WINDOWS 1
-#else
-	#undef OS_LINUX
-	#define OS_LINUX 1
-#endif
+
+//
+// Compiler
+//
 
 #define COMPILER_MSVC 0
 #define COMPILER_GCC  0
 
 #if defined __GNUG__
-	#undef  COMPILER_GCC
 	#define COMPILER_GCC 1
 #elif defined _MSC_VER
-	#undef  COMPILER_MSVC
 	#define COMPILER_MSVC 1
 #else
 	#pragma message "TL: Unresolved compiler"
 #endif
 
-#if COMPILER_MSVC
 
-#define TL_DLL_IMPORT __declspec(dllimport)
-#define TL_DLL_EXPORT __declspec(dllexport)
+//
+// Operating system
+//
 
-#define forceinline        __forceinline
-#define no_inline           __declspec(noinline)
-#define debug_break()      ::__debugbreak()
-#define WRITE_BARRIER      ::_WriteBarrier()
-#define READ_BARRIER       ::_ReadBarrier()
-#define READ_WRITE_BARRIER ::_ReadWriteBarrier()
+#define OS_WINDOWS 0
+#define OS_LINUX   0
+
+#if defined _WIN32 || defined _WIN64
+	#define OS_WINDOWS 1
+#else
+	#define OS_LINUX 1
+#endif
+
+
+//
+// Architectural features
+//
 
 #define ARCH_X86 0
 #define ARCH_X64 0
 
-#if defined _M_IX86
-#undef ARCH_X86
-#define ARCH_X86 1
-#elif defined _M_X64
-#undef ARCH_X64
-#define ARCH_X64 1
-#endif
-
+#if COMPILER_MSVC
+	#if defined _M_IX86
+		#define ARCH_X86 1
+	#elif defined _M_X64
+		#define ARCH_X64 1
+	#endif
 #elif COMPILER_GCC
-
-#define forceinline //__attribute__((always_inline))
-#define debug_break() ::__builtin_trap()
-#if defined _X86_
-#undef ARCH_X86
-#define ARCH_X86 1
-#elif defined __x86_64__
-#undef ARCH_X64
-#define ARCH_X64 1
+	#if defined _X86_
+		#define ARCH_X86 1
+	#elif defined __x86_64__
+		#define ARCH_X64 1
+	#endif
 #endif
 
-#endif
-
-// clang-format off
 #if COMPILER_MSVC || COMPILER_GCC
 	#ifndef ARCH_AVX
 		#ifdef __AVX__
@@ -98,7 +89,6 @@
 		#endif
 	#endif
 #endif
-// clang-format on
 
 #ifndef ARCH_LZCNT
 #define ARCH_LZCNT 0
@@ -108,15 +98,16 @@
 #define ARCH_FMA ARCH_AVX2
 #endif
 
-#if !(ARCH_X86 | ARCH_X64)
-#error "Unresolved target architecture"
+
+//
+// Interface
+//
+
+#if COMPILER_MSVC
+	#define TL_DLL_IMPORT __declspec(dllimport)
+	#define TL_DLL_EXPORT __declspec(dllexport)
+#elif COMPILER_GCC
 #endif
-
-#define STRINGIZE_(x) #x
-#define STRINGIZE(x)  STRINGIZE_(x)
-
-#define CONCAT_(x, y) x##y
-#define CONCAT(x, y)  CONCAT_(x, y)
 
 #ifdef TL_API_DLL
 	#ifdef TL_IMPL
@@ -128,11 +119,26 @@
 	#define TL_API
 #endif
 
-#if OS_WINDOWS
-#define TL_OS_INCLUDE(x) STRINGIZE(windows/x)
-#else
-#define TL_OS_INCLUDE(x) STRINGIZE(?????/x)
+
+//
+// Things
+//
+
+#define STRINGIZE_(x) #x
+#define STRINGIZE(x)  STRINGIZE_(x)
+
+#define CONCAT_(x, y) x##y
+#define CONCAT(x, y)  CONCAT_(x, y)
+
+#if COMPILER_MSVC
+	#define forceinline   __forceinline
+	#define no_inline     __declspec(noinline)
+	#define debug_break() ::__debugbreak()
+#elif COMPILER_GCC
+	#define forceinline   __attribute__((always_inline))
+	#define debug_break() ::__builtin_trap()
 #endif
+
 
 namespace TL {
 
@@ -184,9 +190,15 @@ static_assert(sizeof(s8)  == 1);
 static_assert(sizeof(s16) == 2);
 static_assert(sizeof(s32) == 4);
 static_assert(sizeof(s64) == 8);
+static_assert(sizeof(smm) == sizeof(void *));
+
 static_assert(sizeof(u8)  == 1);
 static_assert(sizeof(u16) == 2);
 static_assert(sizeof(u32) == 4);
 static_assert(sizeof(u64) == 8);
+static_assert(sizeof(umm) == sizeof(void *));
+
+static_assert(sizeof(f32) == 4);
+static_assert(sizeof(f64) == 8);
 
 }

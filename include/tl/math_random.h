@@ -113,10 +113,10 @@ forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(se
 forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
 forceinline u32 random_u32(v3s seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
 
-static constexpr f32 voronoi_largest_distance_possible_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)
-static constexpr f32 voronoi_largest_distance_possible_3d = 1.6583123951776999245574663683353f; // sqrt(2.75)
-static constexpr f32 voronoi_inv_largest_distance_possible_2d = 1.0f / voronoi_largest_distance_possible_2d;
-static constexpr f32 voronoi_inv_largest_distance_possible_3d = 1.0f / voronoi_largest_distance_possible_3d;
+static constexpr f32 voronoi_largest_possible_distance_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)
+static constexpr f32 voronoi_largest_possible_distance_3d = 1.6583123951776999245574663683353f; // sqrt(2.75)
+static constexpr f32 voronoi_inv_largest_possible_distance_2d = 1.0f / voronoi_largest_possible_distance_2d;
+static constexpr f32 voronoi_inv_largest_possible_distance_3d = 1.0f / voronoi_largest_possible_distance_3d;
 
 forceinline f32 voronoi_v2f(v2f coordinate) {
 	v2f tile_position = floor(coordinate);
@@ -139,7 +139,7 @@ forceinline f32 voronoi_v2f(v2f coordinate) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v2f(tile_position + offset) + offset));
 	}
 	
-	return sqrt(min_distance_squared) * voronoi_inv_largest_distance_possible_2d;
+	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
 }
 forceinline f32 voronoi_v3f(v3f coordinate) {
 	v3f tile_position  = floor(coordinate);
@@ -164,7 +164,7 @@ forceinline f32 voronoi_v3f(v3f coordinate) {
 	}
 
 
-	return sqrt(min_distance_squared) * voronoi_largest_distance_possible_3d;
+	return sqrt(min_distance_squared) * voronoi_largest_possible_distance_3d;
 }
 forceinline f32 voronoi_v2s(v2s coordinate, s32 step_size) {
 	v2s scaled_tile = floor(coordinate, step_size);
@@ -182,7 +182,7 @@ forceinline f32 voronoi_v2s(v2s coordinate, s32 step_size) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v2f(tile_position + offset) + (v2f)offset));
 	}
 	
-	return sqrt(min_distance_squared) * voronoi_inv_largest_distance_possible_2d;
+	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
 }
 forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 	v3s scaled_tile = floor(coordinate, step_size);
@@ -206,7 +206,7 @@ forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v3f(tile_position + offset) + (v3f)offset));
 	}
 
-	return sqrt(min_distance_squared) * voronoi_inv_largest_distance_possible_3d;
+	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_3d;
 }
 
 forceinline f32 value_noise_v2f(v2f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
@@ -273,7 +273,7 @@ forceinline f32 value_noise_v2s(v2s coordinate, s32 step, f32(*interpolate)(f32)
 }
 template <class Interpolate>
 forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpolate) {
-	static_assert(isSame<decltype(interpolate(0.0f)), f32>);
+	static_assert(is_same<decltype(interpolate(0.0f)), f32>);
 	v3s floored = floor(coordinate, step);
     v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);

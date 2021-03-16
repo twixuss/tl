@@ -152,17 +152,16 @@ inline ParseResult<f64> parseDecimalFloat(Span<char> s) {
 }
 #endif
 
-template <umm block_size_ = 4096>
-struct StringBuilder {
-	static constexpr umm block_size = block_size_;
-	struct Block {
-		char buffer[block_size];
-		umm size = 0;
-		Block *next = 0;
+#ifndef TL_STRING_BUILDER_BLOCK_SIZE
+#define TL_STRING_BUILDER_BLOCK_SIZE 4096
+#endif
 
-		Block() {}
-		char *end() { return buffer + size; }
-		umm available_space() { return block_size - size; }
+struct StringBuilder {
+	static constexpr umm block_size = TL_STRING_BUILDER_BLOCK_SIZE;
+	struct Block {
+		StaticList<char, block_size> buffer;
+		Block *next = 0;
+		umm available_space() { return block_size - buffer.size; }
 	};
 
 	Allocator allocator = {};
@@ -204,147 +203,20 @@ struct StringBuilder {
 			}
 		}
 	}
-	umm append(Span<char> span) {
-		umm chars_written = span.size;
-		umm chars_to_write = span.size;
-		while (last->available_space() < chars_to_write) {
-			umm space_in_block = last->available_space();
-			memcpy(last->end(), span.data, space_in_block * sizeof(char));
-			chars_to_write -= space_in_block;
-			last->size += space_in_block;
-			span = {span.begin() + space_in_block, span.end()};
-			if (!last->next) {
-				last->next = alloc_last = allocate_block();
-				last = last->next;
-			}
-		}
-		memcpy(last->end(), span.data, chars_to_write * sizeof(char));
-		last->size += chars_to_write;
-		return chars_written;
-	}
-	umm append(char const *str) { return append(as_span(str)); }
-	//umm append(char ch, umm count = 1) {
-	//	umm chars_to_write = count;
-	//	while (last->available_space() < chars_to_write) {
-	//		umm space_in_block = last->available_space();
-	//		populate(last->end(), ch, space_in_block);
-	//		chars_to_write -= space_in_block;
-	//		last->size += space_in_block;
-	//		if (!last->next) {
-	//			last = alloc_last = allocate_block();
-	//			last = last->next;
-	//		}
-	//	}
-	//	populate(last->end(), ch, chars_to_write);
-	//	last->size += chars_to_write;
-	//	return count;
-	//}
-	template <class T>
-	umm append(T const &val) {
-		return to_string<char>(val, [&](Span<char> span) {
-			return append(span);
-		});
-	}
-	umm append_bytes(void const *address, umm size) {
-		append(Span((char *)address, (char *)address + size));
-		return size;
-	}
-	template <class T>
-	umm append_bytes(T const &value) {
-		return append_bytes(std::addressof(value), sizeof(value));
-	}
-	umm append_format(char const *fmt) {
-		if (!*fmt)
-			return 0;
-		char const *c = fmt;
-		while (*c) {
-			if (*c == '%') {
-				++c;
-				if (*c != '`') {
-					invalid_code_path("bad format");
-				}
-				append(as_span(fmt, c));
-				++c;
-				fmt = c;
-			} else {
-				++c;
-			}
-		}
-		return append(as_span(fmt));
-	}
-	template <class Arg, class ...Args>
-	umm append_format(char const *fmt, Arg const &arg, Args const &...args) {
-		if (!*fmt)
-			return 0;
-		char const *c = fmt;
-		char const *fmtBegin = 0;
-		char const *fmtEnd = 0;
-
-		bool argAsFormat = false;
-		
-		while (*c) {
-			if (*c == '%') {
-				fmtBegin = c;
-				++c;
-				if (*c == '`') {
-					append(as_span(fmt, c));
-					++c;
-					fmt = c;
-					fmtBegin = 0;
-					continue;
-				}
-				if (starts_with(c, "fmt%")) {
-					argAsFormat = true;
-					c += 4;
-				}
-				fmtEnd = c;
-				break;
-			}
-			++c;
-		}
-		//assert(fmtBegin && fmtEnd, "invalid format");
-		if (!(fmtBegin && fmtEnd)) {
-			return append_format(fmt);
-		}
-
-		umm charsAppended = append(as_span(fmt, fmtBegin));
-
-		if (argAsFormat) {
-			if constexpr (isSame<RemoveReference<std::decay_t<Arg>>, char const *> || isSame<RemoveReference<std::decay_t<Arg>>, char *>)
-				charsAppended += append_format(arg, args...);
-			else 
-				invalid_code_path("'%fmt%' arg is not a string");
-		} else {
-			to_string<char>(arg, [&] (Span<char> span) {
-				charsAppended += span.size;
-				append(span);
-			});
-		}
-
-		charsAppended += append_format(fmtEnd, args...);
-		return charsAppended;
-	}
 	umm size() {
-		umm totalSize = 0;
+		umm total_size = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
-			totalSize += block->size;
+			total_size += block->buffer.size;
 		}
-		return totalSize;
+		return total_size;
 	}
 	Span<char> fill(Span<char> dst_string) {
 		char *dst_char = dst_string.data;
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dst_char, block->buffer, block->size * sizeof(char));
-			dst_char += block->size;
+			memcpy(dst_char, block->buffer.data, block->buffer.size * sizeof(char));
+			dst_char += block->buffer.size;
 		}
 		return Span<char>(dst_string.begin(), dst_char);
-	}
-	List<char> get() {
-		List<char> result;
-		result.reserve(size());
-		fill(result);
-		result.size = result.capacity;
-		return result;
 	}
 	List<char> getNullTerminated() {
 		List<char> result;
@@ -356,12 +228,12 @@ struct StringBuilder {
 	}
 
 	template <class Fn>
-	void stream(Fn &&fn) {
+	void for_each_block(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto block_size = block->size;
+			auto block_size = block->buffer.size;
 			if (block_size) {
-				fn(block->buffer, block_size);
+				fn(block->buffer.data, block_size);
 			}
 			block = block->next;
 		} while (block);
@@ -369,20 +241,18 @@ struct StringBuilder {
 	void clear() {
 		Block *block = &first;
 		do {
-			block->size = 0;
+			block->buffer.size = 0;
 			block = block->next;
 		} while (block);
 		last = &first;
 	}
 
-private:
 	Block *allocate_block() {
 		return new (ALLOCATE(Block, allocator)) Block;
 	}
 };
 
-template <umm block_size>
-void free(StringBuilder<block_size> &builder) {
+void free(StringBuilder &builder) {
 	for (auto block = builder.first.next; block != 0;) {
 		auto next = block->next;
 		FREE(builder.allocator, block);
@@ -391,14 +261,223 @@ void free(StringBuilder<block_size> &builder) {
 	builder.allocator = {};
 }
 
+void append(StringBuilder &b, Span<char> span) {
+	umm chars_to_write = span.size;
+	while (b.last->available_space() < chars_to_write) {
+		umm space_in_block = b.last->available_space();
+		memcpy(b.last->buffer.end(), span.data, space_in_block * sizeof(char));
+		chars_to_write -= space_in_block;
+		b.last->buffer.size += space_in_block;
+		span = {span.begin() + space_in_block, span.end()};
+		if (!b.last->next) {
+			b.last->next = b.alloc_last = b.allocate_block();
+			b.last = b.last->next;
+		}
+	}
+	memcpy(b.last->buffer.end(), span.data, chars_to_write * sizeof(char));
+	b.last->buffer.size += chars_to_write;
+}
+forceinline void append(StringBuilder &b, List<char> list) {
+	append(b, as_span(list));
+}
+forceinline void append(StringBuilder &b, char const *str) {
+	append(b, as_span(str));
+}
+
+forceinline void append(StringBuilder &b, char ch) {
+	if (b.last->available_space() == 0) {
+		if (b.last->next) {
+			b.last = b.last->next;
+		} else {
+			auto new_block = b.allocate_block();
+			b.last->next = new_block;
+			b.last = b.alloc_last = new_block;
+		}
+	}
+	
+	b.last->buffer.data[b.last->buffer.size++] = ch;
+}
+
+forceinline void append_bytes(StringBuilder &b, void const *address, umm size) {
+	append(b, Span((char *)address, size));
+}
+
+template <class T>
+forceinline void append_bytes(StringBuilder &b, T const &value) {
+	append_bytes(b, &value, sizeof(value));
+}
+
+void append_format(StringBuilder &b, char const *fmt) {
+	if (!*fmt) {
+		return;
+	}
+
+	char const *c = fmt;
+	while (*c) {
+		if (*c == '%') {
+			++c;
+			if (*c != '`') {
+				invalid_code_path("bad format");
+			}
+			append(b, as_span(fmt, c));
+			++c;
+			fmt = c;
+		} else {
+			++c;
+		}
+	}
+	append(b, as_span(fmt));
+}
+template <class Arg, class ...Args>
+void append_format(StringBuilder &b, char const *fmt, Arg const &arg, Args const &...args) {
+	if (!*fmt) {
+		return;
+	}
+	char const *c = fmt;
+	char const *fmtBegin = 0;
+	char const *fmtEnd = 0;
+
+	bool argAsFormat = false;
+		
+	while (*c) {
+		if (*c == '%') {
+			fmtBegin = c;
+			++c;
+			if (*c == '`') {
+				append(b, as_span(fmt, c));
+				++c;
+				fmt = c;
+				fmtBegin = 0;
+				continue;
+			}
+			if (starts_with(c, "fmt%")) {
+				argAsFormat = true;
+				c += 4;
+			}
+			fmtEnd = c;
+			break;
+		}
+		++c;
+	}
+	//assert(fmtBegin && fmtEnd, "invalid format");
+	if (!(fmtBegin && fmtEnd)) {
+		append_format(b, fmt);
+	}
+	
+	append(b, as_span(fmt, fmtBegin));
+
+	if (argAsFormat) {
+		if constexpr (is_same<RemoveReference<std::decay_t<Arg>>, char const *> || is_same<RemoveReference<std::decay_t<Arg>>, char *>)
+			append_format(b, arg, args...);
+		else 
+			invalid_code_path("'%fmt%' arg is not a string");
+	} else {
+		append(b, arg);
+	}
+
+	append_format(b, fmtEnd, args...);
+}
+
+void append(StringBuilder &builder, bool value) {
+	append(builder, value ? "true"s : "false"s);
+}
+
+template <class Int>
+void append(StringBuilder &builder, FormatInt<Int> f) {
+	Int v = f.value;
+	u32 radix = f.radix;
+	constexpr u32 maxDigits = _intToStringSize<Int>;
+	char buf[maxDigits];
+	constexpr char charMap[] = "0123456789ABCDEF";
+	char *lsc = buf + maxDigits - 1;
+	u32 charsWritten = 0;
+
+	bool negative = false;
+	if constexpr (is_signed<Int>) {
+		if (v < 0) {
+			negative = true;
+			if (v == min_value<Int>) {
+				*lsc-- = charMap[-(v % (Int)radix)];
+				v /= (Int)radix;
+				++charsWritten;
+			} 
+			v = -v;
+		}
+	}
+
+	for (;;) {
+		*lsc-- = charMap[v % (Int)radix];
+		v /= (Int)radix;
+		++charsWritten;
+		if (v == 0)
+			break;
+	}
+	if constexpr (is_signed<Int>) {
+		if (negative) {
+			++charsWritten;
+			*lsc-- = '-';
+		}
+	} else {
+		(void)negative;
+	}
+	if (f.leading_zeros) {
+		u32 total_digits = (u32)ceil_to_int(log((f32)max_value<Int>, (f32)f.radix));
+		for (u32 i = charsWritten; i < total_digits; ++i) {
+			*lsc-- = '0';
+		}
+		charsWritten = total_digits;
+	}
+	append(builder, Span(lsc + 1, charsWritten));
+}
+
+template <class Int, class = EnableIf<is_integer<Int>>>
+void append(StringBuilder &builder, Int v) {
+	append(builder, FormatInt(v));
+}
+
+void append(StringBuilder &builder, void const *p) {
+	append(builder, FormatInt((umm)p, 16, true));
+}
+
+void append(StringBuilder &builder, FormatFloat<f64> f) {
+	auto v = f.value;
+	auto precision = f.precision;
+	if (is_negative(v)) {
+		append(builder, '-');
+		v = -v;
+	}
+	append(builder, (u64)v);
+	append(builder, '.');
+	for (u32 i = 0; i < precision; ++i) {
+		v = v - (f64)(s64)v;
+		v = (v < 0 ? v + 1 : v) * 10;
+		append(builder, (char)((u32)v + '0'));
+	}
+}
+
+void append(StringBuilder &builder, f64 v) {
+	append(builder, FormatFloat(v));
+}
+void append(StringBuilder &builder, f32 v) {
+	append(builder, (f64)v);
+}
+
+// Always allocates memory for the string
+List<char> to_string(StringBuilder &builder) {
+	List<char> result;
+	result.reserve(builder.size());
+	builder.fill(result);
+	result.size = result.capacity;
+	return result;
+}
+
 template <class ...Args>
 constexpr List<char> concatenate(Args &&...args) {
 	StringBuilder builder;
 	defer { free(builder); };
-	int ___[] = { ((builder.append(args), ...), 0) };
-	return builder.get();
+	int ___[] = { ((append(builder, args), ...), 0) };
+	return to_string(builder);
 }
-
 
 #if 0
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
@@ -416,10 +495,10 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 	return builder.get();
 }
 #endif
-template <class Char, umm capacity, class T>
-void append_string(StaticList<Char, capacity> &list, T const &value) {
-	to_string<Char>(value, [&](Span<Char> span) { list += span; });
-}
+//template <class Char, umm capacity, class T>
+//void append_string(StaticList<Char, capacity> &list, T const &value) {
+//	to_string<Char>(value, [&](Span<Char> span) { list += span; });
+//}
 
 inline u8 const *advance_utf8(u8 const *string) {
 	if (*string < 0x80) {

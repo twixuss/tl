@@ -231,16 +231,17 @@ CompiledShader compile_shader(GLuint shader) {
 }
 
 CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
-	StaticList<char, 64> version_string;
-	version_string += "#version "s;
+	StringBuilder version_builder;
+	defer { free(version_builder); };
+	append(version_builder, "#version "s);
+	append(version_builder, version);
 
-	to_string<char>(version, [&](Span<char> span) {
-		version_string += span;
-	});
 	if (core) {
-		version_string += " core"s;
+		append(version_builder, " core"s);
 	}
-	version_string += '\n';
+	append(version_builder, '\n');
+	auto version_string = to_string(version_builder);
+	defer { free(version_string); };
 
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;
