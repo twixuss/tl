@@ -5,8 +5,10 @@
 #include "time.h"
 
 #pragma warning(push, 0)
+#ifdef TL_IMPL
 #define NOMINMAX
 #include <Windows.h>
+#endif
 #include <gl/GL.h>
 #pragma warning(pop)
 
@@ -14,7 +16,9 @@
 #pragma warning(disable: 4820)
 
 #pragma comment(lib, "opengl32")
+#ifdef TL_IMPL
 #pragma comment(lib, "gdi32")
+#endif
 
 namespace TL {
 namespace OpenGL {
