@@ -2,6 +2,7 @@
 #include "system.h"
 #include "console.h"
 #include "math.h"
+#include "time.h"
 
 #pragma warning(push, 0)
 #define NOMINMAX
@@ -20,8 +21,10 @@ namespace OpenGL {
 
 using GLchar = char;
 using GLsizeiptr = umm;
+using GLintptr = smm;
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
+#define GL_TEXTURE_MAX_LEVEL              0x813D
 #define GL_DEPTH_COMPONENT16              0x81A5
 #define GL_DEPTH_COMPONENT32              0x81A7
 #define GL_DEPTH_STENCIL_ATTACHMENT       0x821A
@@ -48,6 +51,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_ARRAY_BUFFER                   0x8892
 #define GL_ELEMENT_ARRAY_BUFFER           0x8893
 #define GL_STATIC_DRAW                    0x88E4
+#define GL_STATIC_COPY                    0x88E6
 #define GL_DYNAMIC_DRAW                   0x88E8
 #define GL_DEPTH24_STENCIL8               0x88F0
 #define GL_VERTEX_SHADER                  0x8B31
@@ -61,11 +65,24 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_DEPTH_ATTACHMENT               0x8D00
 #define GL_FRAMEBUFFER                    0x8D40
 #define GL_RENDERBUFFER                   0x8D41
+#define GL_COPY_READ_BUFFER               0x8F36
+#define GL_COPY_WRITE_BUFFER              0x8F37
 #define GL_DEBUG_SEVERITY_HIGH            0x9146
 #define GL_DEBUG_SEVERITY_MEDIUM          0x9147
 #define GL_DEBUG_SEVERITY_LOW             0x9148
 #define GL_DEBUG_OUTPUT                   0x92E0
 #if OS_WINDOWS
+#define WGL_DRAW_TO_WINDOW_ARB                  0x2001
+#define WGL_ACCELERATION_ARB                    0x2003
+#define WGL_SUPPORT_OPENGL_ARB                  0x2010
+#define WGL_DOUBLE_BUFFER_ARB                   0x2011
+#define WGL_COLOR_BITS_ARB                      0x2014
+#define WGL_ALPHA_BITS_ARB                      0x201B
+#define WGL_DEPTH_BITS_ARB                      0x2022
+#define WGL_STENCIL_BITS_ARB                    0x2023
+#define WGL_FULL_ACCELERATION_ARB               0x2027
+#define WGL_SAMPLE_BUFFERS_ARB                  0x2041
+#define WGL_SAMPLES_ARB                         0x2042
 #define WGL_CONTEXT_MAJOR_VERSION_ARB           0x2091
 #define WGL_CONTEXT_MINOR_VERSION_ARB           0x2092
 #define WGL_CONTEXT_LAYER_PLANE_ARB             0x2093
@@ -75,17 +92,278 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB  0x0002
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB        0x00000001
 #define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+
+#define WGL_SAMPLE_BUFFERS_3DFX 0x2060
+#define WGL_SAMPLES_3DFX 0x2061
+#define WGL_STEREO_EMITTER_ENABLE_3DL 0x2055
+#define WGL_STEREO_EMITTER_DISABLE_3DL 0x2056
+#define WGL_STEREO_POLARITY_NORMAL_3DL 0x2057
+#define WGL_STEREO_POLARITY_INVERT_3DL 0x2058
+#define WGL_GPU_VENDOR_AMD 0x1F00
+#define WGL_GPU_RENDERER_STRING_AMD 0x1F01
+#define WGL_GPU_OPENGL_VERSION_STRING_AMD 0x1F02
+#define WGL_GPU_FASTEST_TARGET_GPUS_AMD 0x21A2
+#define WGL_GPU_RAM_AMD 0x21A3
+#define WGL_GPU_CLOCK_AMD 0x21A4
+#define WGL_GPU_NUM_PIPES_AMD 0x21A5
+#define WGL_GPU_NUM_SIMD_AMD 0x21A6
+#define WGL_GPU_NUM_RB_AMD 0x21A7
+#define WGL_GPU_NUM_SPI_AMD 0x21A8
+#define WGL_FRONT_COLOR_BUFFER_BIT_ARB 0x00000001
+#define WGL_BACK_COLOR_BUFFER_BIT_ARB 0x00000002
+#define WGL_DEPTH_BUFFER_BIT_ARB 0x00000004
+#define WGL_STENCIL_BUFFER_BIT_ARB 0x00000008
+#define WGL_CONTEXT_RELEASE_BEHAVIOR_ARB 0x2097
+#define WGL_CONTEXT_RELEASE_BEHAVIOR_NONE_ARB 0
+#define WGL_CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB 0x2098
+#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
+#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
+#define WGL_CONTEXT_FLAGS_ARB 0x2094
+#define ERROR_INVALID_VERSION_ARB 0x2095
+#define WGL_CONTEXT_OPENGL_NO_ERROR_ARB 0x31B3
+#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+#define ERROR_INVALID_PROFILE_ARB 0x2096
+#define WGL_CONTEXT_ROBUST_ACCESS_BIT_ARB 0x00000004
+#define WGL_LOSE_CONTEXT_ON_RESET_ARB 0x8252
+#define WGL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
+#define WGL_NO_RESET_NOTIFICATION_ARB 0x8261
+#define WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB 0x20A9
+#define ERROR_INVALID_PIXEL_TYPE_ARB 0x2043
+#define ERROR_INCOMPATIBLE_DEVICE_CONTEXTS_ARB 0x2054
+#define WGL_SAMPLE_BUFFERS_ARB 0x2041
+#define WGL_SAMPLES_ARB 0x2042
+#define WGL_DRAW_TO_PBUFFER_ARB 0x202D
+#define WGL_MAX_PBUFFER_PIXELS_ARB 0x202E
+#define WGL_MAX_PBUFFER_WIDTH_ARB 0x202F
+#define WGL_MAX_PBUFFER_HEIGHT_ARB 0x2030
+#define WGL_PBUFFER_LARGEST_ARB 0x2033
+#define WGL_PBUFFER_WIDTH_ARB 0x2034
+#define WGL_PBUFFER_HEIGHT_ARB 0x2035
+#define WGL_PBUFFER_LOST_ARB 0x2036
+#define WGL_NUMBER_PIXEL_FORMATS_ARB 0x2000
+#define WGL_DRAW_TO_WINDOW_ARB 0x2001
+#define WGL_DRAW_TO_BITMAP_ARB 0x2002
+#define WGL_ACCELERATION_ARB 0x2003
+#define WGL_NEED_PALETTE_ARB 0x2004
+#define WGL_NEED_SYSTEM_PALETTE_ARB 0x2005
+#define WGL_SWAP_LAYER_BUFFERS_ARB 0x2006
+#define WGL_SWAP_METHOD_ARB 0x2007
+#define WGL_NUMBER_OVERLAYS_ARB 0x2008
+#define WGL_NUMBER_UNDERLAYS_ARB 0x2009
+#define WGL_TRANSPARENT_ARB 0x200A
+#define WGL_TRANSPARENT_RED_VALUE_ARB 0x2037
+#define WGL_TRANSPARENT_GREEN_VALUE_ARB 0x2038
+#define WGL_TRANSPARENT_BLUE_VALUE_ARB 0x2039
+#define WGL_TRANSPARENT_ALPHA_VALUE_ARB 0x203A
+#define WGL_TRANSPARENT_INDEX_VALUE_ARB 0x203B
+#define WGL_SHARE_DEPTH_ARB 0x200C
+#define WGL_SHARE_STENCIL_ARB 0x200D
+#define WGL_SHARE_ACCUM_ARB 0x200E
+#define WGL_SUPPORT_GDI_ARB 0x200F
+#define WGL_SUPPORT_OPENGL_ARB 0x2010
+#define WGL_DOUBLE_BUFFER_ARB 0x2011
+#define WGL_STEREO_ARB 0x2012
+#define WGL_PIXEL_TYPE_ARB 0x2013
+#define WGL_COLOR_BITS_ARB 0x2014
+#define WGL_RED_BITS_ARB 0x2015
+#define WGL_RED_SHIFT_ARB 0x2016
+#define WGL_GREEN_BITS_ARB 0x2017
+#define WGL_GREEN_SHIFT_ARB 0x2018
+#define WGL_BLUE_BITS_ARB 0x2019
+#define WGL_BLUE_SHIFT_ARB 0x201A
+#define WGL_ALPHA_BITS_ARB 0x201B
+#define WGL_ALPHA_SHIFT_ARB 0x201C
+#define WGL_ACCUM_BITS_ARB 0x201D
+#define WGL_ACCUM_RED_BITS_ARB 0x201E
+#define WGL_ACCUM_GREEN_BITS_ARB 0x201F
+#define WGL_ACCUM_BLUE_BITS_ARB 0x2020
+#define WGL_ACCUM_ALPHA_BITS_ARB 0x2021
+#define WGL_DEPTH_BITS_ARB 0x2022
+#define WGL_STENCIL_BITS_ARB 0x2023
+#define WGL_AUX_BUFFERS_ARB 0x2024
+#define WGL_NO_ACCELERATION_ARB 0x2025
+#define WGL_GENERIC_ACCELERATION_ARB 0x2026
+#define WGL_FULL_ACCELERATION_ARB 0x2027
+#define WGL_SWAP_EXCHANGE_ARB 0x2028
+#define WGL_SWAP_COPY_ARB 0x2029
+#define WGL_SWAP_UNDEFINED_ARB 0x202A
+#define WGL_TYPE_RGBA_ARB 0x202B
+#define WGL_TYPE_COLORINDEX_ARB 0x202C
+#define WGL_TYPE_RGBA_FLOAT_ARB 0x21A0
+#define WGL_BIND_TO_TEXTURE_RGB_ARB 0x2070
+#define WGL_BIND_TO_TEXTURE_RGBA_ARB 0x2071
+#define WGL_TEXTURE_FORMAT_ARB 0x2072
+#define WGL_TEXTURE_TARGET_ARB 0x2073
+#define WGL_MIPMAP_TEXTURE_ARB 0x2074
+#define WGL_TEXTURE_RGB_ARB 0x2075
+#define WGL_TEXTURE_RGBA_ARB 0x2076
+#define WGL_NO_TEXTURE_ARB 0x2077
+#define WGL_TEXTURE_CUBE_MAP_ARB 0x2078
+#define WGL_TEXTURE_1D_ARB 0x2079
+#define WGL_TEXTURE_2D_ARB 0x207A
+#define WGL_MIPMAP_LEVEL_ARB 0x207B
+#define WGL_CUBE_MAP_FACE_ARB 0x207C
+#define WGL_TEXTURE_CUBE_MAP_POSITIVE_X_ARB 0x207D
+#define WGL_TEXTURE_CUBE_MAP_NEGATIVE_X_ARB 0x207E
+#define WGL_TEXTURE_CUBE_MAP_POSITIVE_Y_ARB 0x207F
+#define WGL_TEXTURE_CUBE_MAP_NEGATIVE_Y_ARB 0x2080
+#define WGL_TEXTURE_CUBE_MAP_POSITIVE_Z_ARB 0x2081
+#define WGL_TEXTURE_CUBE_MAP_NEGATIVE_Z_ARB 0x2082
+#define WGL_FRONT_LEFT_ARB 0x2083
+#define WGL_FRONT_RIGHT_ARB 0x2084
+#define WGL_BACK_LEFT_ARB 0x2085
+#define WGL_BACK_RIGHT_ARB 0x2086
+#define WGL_AUX0_ARB 0x2087
+#define WGL_AUX1_ARB 0x2088
+#define WGL_AUX2_ARB 0x2089
+#define WGL_AUX3_ARB 0x208A
+#define WGL_AUX4_ARB 0x208B
+#define WGL_AUX5_ARB 0x208C
+#define WGL_AUX6_ARB 0x208D
+#define WGL_AUX7_ARB 0x208E
+#define WGL_AUX8_ARB 0x208F
+#define WGL_AUX9_ARB 0x2090
+#define WGL_CONTEXT_RESET_ISOLATION_BIT_ARB 0x00000008
+#define WGL_TYPE_RGBA_FLOAT_ATI 0x21A0
+#define WGL_TEXTURE_RECTANGLE_ATI 0x21A5
+#define WGL_COLORSPACE_EXT 0x309D
+#define WGL_COLORSPACE_SRGB_EXT 0x3089
+#define WGL_COLORSPACE_LINEAR_EXT 0x308A
+#define WGL_CONTEXT_ES2_PROFILE_BIT_EXT 0x00000004
+#define WGL_CONTEXT_ES_PROFILE_BIT_EXT 0x00000004
+#define WGL_DEPTH_FLOAT_EXT 0x2040
+#define WGL_FRAMEBUFFER_SRGB_CAPABLE_EXT 0x20A9
+#define ERROR_INVALID_PIXEL_TYPE_EXT 0x2043
+#define WGL_SAMPLE_BUFFERS_EXT 0x2041
+#define WGL_SAMPLES_EXT 0x2042
+#define WGL_DRAW_TO_PBUFFER_EXT 0x202D
+#define WGL_MAX_PBUFFER_PIXELS_EXT 0x202E
+#define WGL_MAX_PBUFFER_WIDTH_EXT 0x202F
+#define WGL_MAX_PBUFFER_HEIGHT_EXT 0x2030
+#define WGL_OPTIMAL_PBUFFER_WIDTH_EXT 0x2031
+#define WGL_OPTIMAL_PBUFFER_HEIGHT_EXT 0x2032
+#define WGL_PBUFFER_LARGEST_EXT 0x2033
+#define WGL_PBUFFER_WIDTH_EXT 0x2034
+#define WGL_PBUFFER_HEIGHT_EXT 0x2035
+#define WGL_NUMBER_PIXEL_FORMATS_EXT 0x2000
+#define WGL_DRAW_TO_WINDOW_EXT 0x2001
+#define WGL_DRAW_TO_BITMAP_EXT 0x2002
+#define WGL_ACCELERATION_EXT 0x2003
+#define WGL_NEED_PALETTE_EXT 0x2004
+#define WGL_NEED_SYSTEM_PALETTE_EXT 0x2005
+#define WGL_SWAP_LAYER_BUFFERS_EXT 0x2006
+#define WGL_SWAP_METHOD_EXT 0x2007
+#define WGL_NUMBER_OVERLAYS_EXT 0x2008
+#define WGL_NUMBER_UNDERLAYS_EXT 0x2009
+#define WGL_TRANSPARENT_EXT 0x200A
+#define WGL_TRANSPARENT_VALUE_EXT 0x200B
+#define WGL_SHARE_DEPTH_EXT 0x200C
+#define WGL_SHARE_STENCIL_EXT 0x200D
+#define WGL_SHARE_ACCUM_EXT 0x200E
+#define WGL_SUPPORT_GDI_EXT 0x200F
+#define WGL_SUPPORT_OPENGL_EXT 0x2010
+#define WGL_DOUBLE_BUFFER_EXT 0x2011
+#define WGL_STEREO_EXT 0x2012
+#define WGL_PIXEL_TYPE_EXT 0x2013
+#define WGL_COLOR_BITS_EXT 0x2014
+#define WGL_RED_BITS_EXT 0x2015
+#define WGL_RED_SHIFT_EXT 0x2016
+#define WGL_GREEN_BITS_EXT 0x2017
+#define WGL_GREEN_SHIFT_EXT 0x2018
+#define WGL_BLUE_BITS_EXT 0x2019
+#define WGL_BLUE_SHIFT_EXT 0x201A
+#define WGL_ALPHA_BITS_EXT 0x201B
+#define WGL_ALPHA_SHIFT_EXT 0x201C
+#define WGL_ACCUM_BITS_EXT 0x201D
+#define WGL_ACCUM_RED_BITS_EXT 0x201E
+#define WGL_ACCUM_GREEN_BITS_EXT 0x201F
+#define WGL_ACCUM_BLUE_BITS_EXT 0x2020
+#define WGL_ACCUM_ALPHA_BITS_EXT 0x2021
+#define WGL_DEPTH_BITS_EXT 0x2022
+#define WGL_STENCIL_BITS_EXT 0x2023
+#define WGL_AUX_BUFFERS_EXT 0x2024
+#define WGL_NO_ACCELERATION_EXT 0x2025
+#define WGL_GENERIC_ACCELERATION_EXT 0x2026
+#define WGL_FULL_ACCELERATION_EXT 0x2027
+#define WGL_SWAP_EXCHANGE_EXT 0x2028
+#define WGL_SWAP_COPY_EXT 0x2029
+#define WGL_SWAP_UNDEFINED_EXT 0x202A
+#define WGL_TYPE_RGBA_EXT 0x202B
+#define WGL_TYPE_COLORINDEX_EXT 0x202C
+#define WGL_TYPE_RGBA_UNSIGNED_FLOAT_EXT 0x20A8
+#define WGL_DIGITAL_VIDEO_CURSOR_ALPHA_FRAMEBUFFER_I3D 0x2050
+#define WGL_DIGITAL_VIDEO_CURSOR_ALPHA_VALUE_I3D 0x2051
+#define WGL_DIGITAL_VIDEO_CURSOR_INCLUDED_I3D 0x2052
+#define WGL_DIGITAL_VIDEO_GAMMA_CORRECTED_I3D 0x2053
+#define WGL_GAMMA_TABLE_SIZE_I3D 0x204E
+#define WGL_GAMMA_EXCLUDE_DESKTOP_I3D 0x204F
+#define WGL_GENLOCK_SOURCE_MULTIVIEW_I3D 0x2044
+#define WGL_GENLOCK_SOURCE_EXTERNAL_SYNC_I3D 0x2045
+#define WGL_GENLOCK_SOURCE_EXTERNAL_FIELD_I3D 0x2046
+#define WGL_GENLOCK_SOURCE_EXTERNAL_TTL_I3D 0x2047
+#define WGL_GENLOCK_SOURCE_DIGITAL_SYNC_I3D 0x2048
+#define WGL_GENLOCK_SOURCE_DIGITAL_FIELD_I3D 0x2049
+#define WGL_GENLOCK_SOURCE_EDGE_FALLING_I3D 0x204A
+#define WGL_GENLOCK_SOURCE_EDGE_RISING_I3D 0x204B
+#define WGL_GENLOCK_SOURCE_EDGE_BOTH_I3D 0x204C
+#define WGL_IMAGE_BUFFER_MIN_ACCESS_I3D 0x00000001
+#define WGL_IMAGE_BUFFER_LOCK_I3D 0x00000002
+#define WGL_ACCESS_READ_ONLY_NV 0x00000000
+#define WGL_ACCESS_READ_WRITE_NV 0x00000001
+#define WGL_ACCESS_WRITE_DISCARD_NV 0x00000002
+#define WGL_FLOAT_COMPONENTS_NV 0x20B0
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_FLOAT_R_NV 0x20B1
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_FLOAT_RG_NV 0x20B2
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_FLOAT_RGB_NV 0x20B3
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_FLOAT_RGBA_NV 0x20B4
+#define WGL_TEXTURE_FLOAT_R_NV 0x20B5
+#define WGL_TEXTURE_FLOAT_RG_NV 0x20B6
+#define WGL_TEXTURE_FLOAT_RGB_NV 0x20B7
+#define WGL_TEXTURE_FLOAT_RGBA_NV 0x20B8
+#define ERROR_INCOMPATIBLE_AFFINITY_MASKS_NV 0x20D0
+#define ERROR_MISSING_AFFINITY_MASK_NV 0x20D1
+#define WGL_CONTEXT_MULTIGPU_ATTRIB_NV 0x20AA
+#define WGL_CONTEXT_MULTIGPU_ATTRIB_SINGLE_NV 0x20AB
+#define WGL_CONTEXT_MULTIGPU_ATTRIB_AFR_NV 0x20AC
+#define WGL_CONTEXT_MULTIGPU_ATTRIB_MULTICAST_NV 0x20AD
+#define WGL_CONTEXT_MULTIGPU_ATTRIB_MULTI_DISPLAY_MULTICAST_NV 0x20AE
+#define WGL_COVERAGE_SAMPLES_NV 0x2042
+#define WGL_COLOR_SAMPLES_NV 0x20B9
+#define WGL_NUM_VIDEO_SLOTS_NV 0x20F0
+#define WGL_BIND_TO_TEXTURE_DEPTH_NV 0x20A3
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_DEPTH_NV 0x20A4
+#define WGL_DEPTH_TEXTURE_FORMAT_NV 0x20A5
+#define WGL_TEXTURE_DEPTH_COMPONENT_NV 0x20A6
+#define WGL_DEPTH_COMPONENT_NV 0x20A7
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_RGB_NV 0x20A0
+#define WGL_BIND_TO_TEXTURE_RECTANGLE_RGBA_NV 0x20A1
+#define WGL_TEXTURE_RECTANGLE_NV 0x20A2
+#define WGL_UNIQUE_ID_NV 0x20CE
+#define WGL_NUM_VIDEO_CAPTURE_SLOTS_NV 0x20CF
+#define WGL_BIND_TO_VIDEO_RGB_NV 0x20C0
+#define WGL_BIND_TO_VIDEO_RGBA_NV 0x20C1
+#define WGL_BIND_TO_VIDEO_RGB_AND_DEPTH_NV 0x20C2
+#define WGL_VIDEO_OUT_COLOR_NV 0x20C3
+#define WGL_VIDEO_OUT_ALPHA_NV 0x20C4
+#define WGL_VIDEO_OUT_DEPTH_NV 0x20C5
+#define WGL_VIDEO_OUT_COLOR_AND_ALPHA_NV 0x20C6
+#define WGL_VIDEO_OUT_COLOR_AND_DEPTH_NV 0x20C7
+#define WGL_VIDEO_OUT_FRAME 0x20C8
+#define WGL_VIDEO_OUT_FIELD_1 0x20C9
+#define WGL_VIDEO_OUT_FIELD_2 0x20CA
+#define WGL_VIDEO_OUT_STACKED_FIELDS_1_2 0x20CB
+#define WGL_VIDEO_OUT_STACKED_FIELDS_2_1 0x20CC
+
 #define ERROR_INVALID_VERSION_ARB               0x2095
 #define ERROR_INVALID_PROFILE_ARB               0x2096
 #endif
 
-#if OS_WINDOWS
-#define IF_OS_WINDOWS(...) __VA_ARGS__
-#else
-#define IF_OS_WINDOWS(...)
-#endif
-
-#define ALL_FUNCS \
+#define BASE_FUNCS \
 D(glCreateShader, GLuint (*)(GLenum shaderType)) \
 D(glDeleteShader, void (*)(GLuint shader)) \
 D(glShaderSource, void (*)(GLuint id, GLsizei count, const GLchar * const *string, const GLint *length)) \
@@ -105,7 +383,9 @@ D(glBindVertexArray, void (*)(GLuint array)) \
 D(glGenBuffers, void (*)(GLsizei n, GLuint * buffers)) \
 D(glBindBuffer, void (*)(GLenum target, GLuint buffer)) \
 D(glDeleteBuffers, void (*)(GLsizei n, const GLuint * buffers)) \
-D(glBufferData, void (*)(GLenum target, GLsizeiptr size, const void * data, GLenum usage)) \
+D(glBufferData, void (*)(GLenum target, GLsizeiptr size, const void *data, GLenum usage)) \
+D(glBufferSubData, void (*)(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data)) \
+D(glCopyBufferSubData, void (*)(GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size)) \
 D(glVertexAttribPointer, void (*)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer)) \
 D(glVertexAttribIPointer, void (*)(GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer))\
 D(glEnableVertexAttribArray, void (*)(GLuint index)) \
@@ -151,12 +431,35 @@ D(glGenSamplers, void (*)(GLsizei n, GLuint *samplers))\
 D(glBindSampler, void (*)(GLuint unit, GLuint sampler))\
 D(glSamplerParameterf, void (*)(GLuint sampler, GLenum pname, GLfloat param))\
 D(glSamplerParameteri, void (*)(GLuint sampler, GLenum pname, GLint param))\
-IF_OS_WINDOWS(D(wglSwapIntervalEXT, BOOL (*)(int interval))) \
-IF_OS_WINDOWS(D(wglCreateContextAttribsARB, HGLRC (*)(HDC hDC, HGLRC hShareContext, const int *attribList))) \
+D(glGenerateMipmap, void (*)(GLenum target))\
+D(glTexStorage2D, void (*)(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height))\
+
+#if OS_WINDOWS
+
+#define ALL_FUNCS BASE_FUNCS \
+D(wglSwapIntervalEXT, BOOL (*)(int interval)) \
+D(wglCreateContextAttribsARB, HGLRC (*)(HDC hDC, HGLRC hShareContext, const int *attribList)) \
+D(wglChoosePixelFormatARB, BOOL (*)(HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats)) \
+D(wglGetPixelFormatAttribivARB, BOOL (*)(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues))
+
+#else
+
+#define ALL_FUNCS BASE_FUNCS
+
+#endif
 
 #define D(name, type) using name ## _t = type; extern TL_API name ## _t name;
 ALL_FUNCS
 #undef D
+
+enum TextureFormat {
+	Format_d24_s8,
+	Format_d32,
+};
+
+struct BackBufferParams {
+	TextureFormat depth_stencil_format;
+};
 
 struct CompiledShader {
 	GLuint id;
@@ -167,11 +470,17 @@ forceinline bool valid(CompiledShader shader) { return shader.id != 0; }
 
 TL_API void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
-TL_API bool init_opengl(HWND window, bool debug = false, DEBUGPROC debug_proc = default_debug_proc);
+TL_API BackBufferParams get_default_back_buffer_params();
+
+TL_API bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
+inline bool init_opengl(HWND window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(HWND window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(HWND window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
+
 TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
 inline void glViewport(v2u size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-TL_API CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char const> source);
+TL_API CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<char> source);
 TL_API CompiledShader create_shader(GLenum shaderType, Span<char> source);
 inline CompiledShader create_shader(GLenum shaderType, char const *source) {
 	return create_shader(shaderType, as_span(source));
@@ -195,10 +504,97 @@ inline void glClearColor(v4f color) {
 	::glClearColor(color.x, color.y, color.z, color.w);
 }
 
+template <class T, class Index = umm>
+struct GrowingBuffer {
+	void add(T value) {
+		reserve(size + 1);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), sizeof(T), &value);
+		++size;
+	}
+
+	void add(Span<T> span) {
+		reserve(size + span.size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), span.size * sizeof(T), span.data);
+		size += span.size;
+	}
+	void add(std::initializer_list<T> list) { add(as_span(list)); }
+	void set(Index index, T value) {
+		TL_BOUNDS_CHECK(index < size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
+	}
+	void set(Index start, Span<T> span) {
+		TL_BOUNDS_CHECK(start + span.size - 1 < size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
+	}
+	void init() {
+		if (!buffer) {
+			glGenBuffers(1, &buffer);
+		}
+	}
+	void clear() {
+		size = 0;
+	}
+	void reserve(Index amount) {
+		if (amount <= capacity)
+			return;
+
+		Index new_capacity = max(capacity, 1);
+		while (new_capacity < amount) new_capacity *= 2;
+
+		GLuint new_buffer;
+		glGenBuffers(1, &new_buffer);
+
+		glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
+		glBufferData(GL_COPY_WRITE_BUFFER, new_capacity * sizeof(T), 0, usage);
+
+		glBindBuffer(GL_COPY_READ_BUFFER, buffer);
+
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, capacity * sizeof(T));
+
+		glDeleteBuffers(1, &buffer);
+
+		buffer = new_buffer;
+		capacity = new_capacity;
+	}
+
+	GrowingBuffer &operator=(Span<T> span) {
+		reserve(span.size);
+		size = span.size;
+		set(0, span);
+		return *this;
+	}
+
+	Index size = 0;
+	Index capacity = 0;
+	GLuint buffer = 0;
+	GLenum usage = 0;
+};
+
+template <class T>
+void free(GrowingBuffer<T> &buffer) {
+	glDeleteBuffers(1, &buffer.buffer);
+	buffer.buffer = 0;
+	buffer.size = 0;
+	buffer.capacity = 0;
+}
+
 }
 }
 
 #ifdef TL_IMPL
+
+#ifndef TL_OPENGL_DEBUG_BREAK_LEVEL
+// 0 - don't break;
+// 1 - break only on high severerity messages
+// 2 - break high+medium severerity messages
+// 3 - break high+medium+low severerity messages
+// 4 - break high+medium+low+notification messages
+#define TL_OPENGL_DEBUG_BREAK_LEVEL 1
+#endif
 
 namespace TL {
 namespace OpenGL {
@@ -251,19 +647,23 @@ CompiledShader create_shader(GLenum shaderType, u32 version, bool core, Span<cha
 	}
 	stage_string += '\n';
 
-	char const *lines[3] {
+	auto line_string = "#line 1\n"s;
+
+	char const *lines[] {
 		version_string.data,
 		stage_string.data,
+		line_string.data,
 		source.data
 	};
-	int const lengths[3] {
+	int const lengths[] {
 		(int)version_string.size,
 		(int)stage_string.size,
+		(int)line_string.size,
 		(int)source.size
 	};
-	
+
 	auto shader = glCreateShader(shaderType);
-    glShaderSource(shader, 3, lines, lengths);
+    glShaderSource(shader, count_of(lines), lines, lengths);
 	return compile_shader(shader);
 }
 CompiledShader create_shader(GLenum shaderType, Span<char> source) {
@@ -271,7 +671,7 @@ CompiledShader create_shader(GLenum shaderType, Span<char> source) {
 
 	GLint length = (GLint)source.size;
     glShaderSource(shader, 1, &source.data, &length);
-	
+
 	return compile_shader(shader);
 }
 
@@ -284,7 +684,7 @@ CompiledShader create_program(GLuint vertexShader, GLuint fragmentShader) {
     glLinkProgram(result.id);
     glDetachShader(result.id, vertexShader);
     glDetachShader(result.id, fragmentShader);
-    
+
 	GLint status;
 	glGetProgramiv(result.id, GL_LINK_STATUS, &status);
 
@@ -294,13 +694,19 @@ CompiledShader create_program(GLuint vertexShader, GLuint fragmentShader) {
 
 		result.message = (char *)malloc(maxLength);
         glGetProgramInfoLog(result.id, maxLength, &maxLength, result.message);
-		
+
 		glDeleteProgram(result.id);
 		result.id = 0;
 
         print(result.message);
 	}
     return result;
+}
+
+BackBufferParams get_default_back_buffer_params() {
+	BackBufferParams p;
+	p.depth_stencil_format = Format_d24_s8;
+	return p;
 }
 
 #if OS_WINDOWS
@@ -322,8 +728,25 @@ static HGLRC context;
 
 static StaticList<int, 16> context_attribs;
 
-bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
+bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+	u32 depth_bits = 0;
+	u32 stencil_bits = 0;
+	switch (back_buffer_params.depth_stencil_format) {
+		case Format_d32:
+			depth_bits = 32;
+			stencil_bits = 8;
+			break;
+		case Format_d24_s8:
+			depth_bits = 24;
+			stencil_bits = 8;
+			break;
+	}
+
 	client_dc = GetDC(window);
+	if (!client_dc) {
+		print("GetDC failed\n");
+		return false;
+	}
 
 	PIXELFORMATDESCRIPTOR dp = {};
 	dp.nSize = sizeof(PIXELFORMATDESCRIPTOR);
@@ -331,12 +754,17 @@ bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 	dp.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
 	dp.cColorBits = 32;
 	dp.cAlphaBits = 8;
-	dp.cDepthBits = 24;
-	dp.cStencilBits = 8;
+	dp.cDepthBits = depth_bits;
+	dp.cStencilBits = stencil_bits;
 	dp.iPixelType = PFD_TYPE_RGBA;
 	dp.iLayerType = PFD_MAIN_PLANE;
 
 	int index = ChoosePixelFormat(client_dc, &dp);
+	if (!index) {
+		auto error = GetLastError();
+		print("ChoosePixelFormat failed with code 0x% (%)\n", FormatInt(error, 16), error);
+		return false;
+	}
 
 	PIXELFORMATDESCRIPTOR sp = {};
 	DescribePixelFormat(client_dc, index, sizeof(sp), &sp);
@@ -348,7 +776,7 @@ bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc) {
 		print("wglMakeCurrent failed");
 		return false;
 	}
-	
+
 	assert(wglGetCurrentContext());
 
 #define D(name, type) \
@@ -356,12 +784,149 @@ name = (name ## _t)wglGetProcAddress(# name); \
 if (!name) { \
 	print("Failed to query '" # name "'\n"); \
 }
-	
+
 	ALL_FUNCS
 
 #undef D
 
 	if (wglCreateContextAttribsARB) {
+#if 0
+		float required_attribs_f[] = {
+			0, 0
+		};
+
+#define REQUIRED_ATTRIBS \
+	/*A(WGL_ACCELERATION_ARB,   WGL_FULL_ACCELERATION_ARB)*/ \
+	A(WGL_COLOR_BITS_ARB,     32) \
+	A(WGL_ALPHA_BITS_ARB,     8) \
+	A(WGL_DEPTH_BITS_ARB,     depth_bits) \
+	A(WGL_STENCIL_BITS_ARB,   stencil_bits) \
+	A(WGL_DOUBLE_BUFFER_ARB,  GL_TRUE)
+
+#define A(attr, value) attr, value,
+		int required_attribs_i[] = {
+			REQUIRED_ATTRIBS
+			0, 0
+		};
+#undef A
+
+		int pixel_formats[32];
+		u32 num_formats;
+		bool success = wglChoosePixelFormatARB(client_dc, required_attribs_i, required_attribs_f, 1, pixel_formats, &num_formats);
+		if (success) {
+			if (num_formats != 0) {
+				int selected_format_index = pixel_formats[0];
+
+				PIXELFORMATDESCRIPTOR selected_format = {};
+				DescribePixelFormat(client_dc, selected_format_index, sizeof(selected_format), &selected_format);
+				SetPixelFormat(client_dc, selected_format_index, &selected_format);
+			} else {
+#define ATTRIBS \
+	/*A(WGL_NUMBER_PIXEL_FORMATS_ARB)*/ \
+	A(WGL_DRAW_TO_WINDOW_ARB) \
+	A(WGL_DRAW_TO_BITMAP_ARB) \
+	A(WGL_ACCELERATION_ARB) \
+	A(WGL_NEED_PALETTE_ARB) \
+	A(WGL_NEED_SYSTEM_PALETTE_ARB) \
+	A(WGL_SWAP_LAYER_BUFFERS_ARB) \
+	A(WGL_SWAP_METHOD_ARB) \
+	A(WGL_NUMBER_OVERLAYS_ARB) \
+	A(WGL_NUMBER_UNDERLAYS_ARB) \
+	A(WGL_TRANSPARENT_ARB) \
+	A(WGL_TRANSPARENT_RED_VALUE_ARB) \
+	A(WGL_TRANSPARENT_GREEN_VALUE_ARB) \
+	A(WGL_TRANSPARENT_BLUE_VALUE_ARB) \
+	A(WGL_TRANSPARENT_ALPHA_VALUE_ARB) \
+	A(WGL_TRANSPARENT_INDEX_VALUE_ARB) \
+	A(WGL_SHARE_DEPTH_ARB) \
+	A(WGL_SHARE_STENCIL_ARB) \
+	A(WGL_SHARE_ACCUM_ARB) \
+	A(WGL_SUPPORT_GDI_ARB) \
+	/*A(WGL_SUPPORT_OPENGL_ARB)*/ \
+	A(WGL_DOUBLE_BUFFER_ARB) \
+	A(WGL_STEREO_ARB) \
+	A(WGL_PIXEL_TYPE_ARB) \
+	A(WGL_COLOR_BITS_ARB) \
+	A(WGL_RED_BITS_ARB) \
+	A(WGL_RED_SHIFT_ARB) \
+	A(WGL_GREEN_BITS_ARB) \
+	A(WGL_GREEN_SHIFT_ARB) \
+	A(WGL_BLUE_BITS_ARB) \
+	A(WGL_BLUE_SHIFT_ARB) \
+	A(WGL_ALPHA_BITS_ARB) \
+	A(WGL_ALPHA_SHIFT_ARB) \
+	A(WGL_ACCUM_BITS_ARB) \
+	A(WGL_ACCUM_RED_BITS_ARB) \
+	A(WGL_ACCUM_GREEN_BITS_ARB) \
+	A(WGL_ACCUM_BLUE_BITS_ARB) \
+	A(WGL_ACCUM_ALPHA_BITS_ARB) \
+	A(WGL_DEPTH_BITS_ARB) \
+	A(WGL_STENCIL_BITS_ARB) \
+	A(WGL_AUX_BUFFERS_ARB)
+
+#define A(x) x,
+				int attribs[] = { ATTRIBS };
+#undef A
+				int attrib_values[count_of(attribs)];
+
+				bool satisfies = true;
+				for (umm format_index = 1;; ++format_index) {
+					if (!wglGetPixelFormatAttribivARB(client_dc, format_index, 0, count_of(attribs), attribs, attrib_values))
+						break;
+
+					satisfies = true;
+					for (u32 required_attrib_index = 0; required_attrib_index < count_of(required_attribs_i); required_attrib_index += 2) {
+						auto required_attrib       = required_attribs_i[required_attrib_index];
+						auto required_attrib_value = required_attribs_i[required_attrib_index + 1];
+
+						auto found_index = find(attribs, required_attrib);
+						assert(found_index);
+						auto index = found_index - attribs;
+						if (attrib_values[index] != required_attrib_value) {
+							satisfies = false;
+							break;
+						}
+					}
+					if (satisfies) {
+						PIXELFORMATDESCRIPTOR selected_format = {};
+						DescribePixelFormat(client_dc, format_index, sizeof(selected_format), &selected_format);
+						SetPixelFormat(client_dc, format_index, &selected_format);
+						break;
+					}
+				}
+				if (!satisfies) {
+					print("No mathing format found\n");
+				}
+
+#if 1
+				print("wglChoosePixelFormatARB no matching format found\nAvailable formats:\n");
+
+
+#define A(x) case x: return #x ## s;
+				auto to_string = [](int attr) {
+					switch (attr) {
+						ATTRIBS
+					}
+				};
+#undef A
+
+				for (u32 format_index = 1;;++format_index) {
+					if (!wglGetPixelFormatAttribivARB(client_dc, format_index, 0, count_of(attribs), attribs, attrib_values))
+						break;
+
+					print("Format #%:\n", format_index);
+					for (u32 attrib_index = 0; attrib_index < count_of(attribs); ++attrib_index) {
+						print("%: %\n", to_string(attribs[attrib_index]), attrib_values[attrib_index]);
+					}
+					print('\n');
+				}
+#endif
+			}
+		} else {
+			print("wglChoosePixelFormatARB failed\n");
+		}
+#endif
+
 		HGLRC share = {};
 		context_attribs = {
 			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
@@ -403,9 +968,11 @@ bool init_opengl_thread() {
 void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam) {
 	// ignore non-significant error/warning codes
     if(id == 131169 || id == 131185 || id == 131218 || id == 131204)
-		return; 
+		return;
 
-    print("---------------\nDebug message (%): %\nSource: ", id, message);
+	auto time = get_time_string();
+	defer { free(time); };
+    print("% ---------------\nDebug message (%): %\nSource: ", time, id, message);
 
     switch (source) {
         case GL_DEBUG_SOURCE_API:             print("API");             break;
@@ -414,12 +981,12 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
         case GL_DEBUG_SOURCE_THIRD_PARTY:     print("Third Party");     break;
         case GL_DEBUG_SOURCE_APPLICATION:     print("Application");     break;
         case GL_DEBUG_SOURCE_OTHER:           print("Other");           break;
-    } 
+    }
 	print("\nType: ");
     switch (type) {
         case GL_DEBUG_TYPE_ERROR:               print("Error");                break;
         case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: print("Deprecated Behaviour"); break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  print("Undefined Behaviour");  break; 
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  print("Undefined Behaviour");  break;
         case GL_DEBUG_TYPE_PORTABILITY:         print("Portability");          break;
         case GL_DEBUG_TYPE_PERFORMANCE:         print("Performance");          break;
         case GL_DEBUG_TYPE_MARKER:              print("Marker");               break;
@@ -430,13 +997,12 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 	print("\nSeverity: ");
 
     switch (severity) {
-        case GL_DEBUG_SEVERITY_HIGH:         print("Severity: high");         break;
-        case GL_DEBUG_SEVERITY_MEDIUM:       print("Severity: medium");       break;
-        case GL_DEBUG_SEVERITY_LOW:          print("Severity: low");          break;
-        case GL_DEBUG_SEVERITY_NOTIFICATION: print("Severity: notification"); break;
+        case GL_DEBUG_SEVERITY_HIGH:         print("Severity: high");         if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 0) debug_break(); break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       print("Severity: medium");       if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 1) debug_break(); break;
+        case GL_DEBUG_SEVERITY_LOW:          print("Severity: low");          if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 2) debug_break(); break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: print("Severity: notification"); if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 3) debug_break(); break;
     }
 	print('\n');
-	debug_break();
 }
 
 void present() {
@@ -513,7 +1079,7 @@ void immediate_line(v3f position_a, v2f uv_a, v4f color_a, v3f position_b, v2f u
 
 	immediate_type = GL_LINES;
 	immediate_vertices += {
-		{ position_a, uv_a, color_a }, 
+		{ position_a, uv_a, color_a },
 		{ position_b, uv_b, color_b },
 	};
 }
@@ -529,7 +1095,7 @@ void immediate_quad(
 
 	immediate_type = GL_QUADS;
 	immediate_vertices += {
-		{ position_a, uv_a, color_a }, 
+		{ position_a, uv_a, color_a },
 		{ position_b, uv_b, color_b },
 		{ position_c, uv_c, color_c },
 		{ position_d, uv_d, color_d },
@@ -547,7 +1113,7 @@ void immediate_quad(
 
 	immediate_type = GL_QUADS;
 	immediate_vertices += {
-		{ position_a, {0,0}, color_a }, 
+		{ position_a, {0,0}, color_a },
 		{ position_b, {0,1}, color_b },
 		{ position_c, {1,1}, color_c },
 		{ position_d, {1,0}, color_d },
@@ -565,7 +1131,7 @@ void immediate_quad(
 
 	immediate_type = GL_QUADS;
 	immediate_vertices += {
-		{ {-1,-1}, {0,0}, color_a }, 
+		{ {-1,-1}, {0,0}, color_a },
 		{ {-1, 1}, {0,1}, color_b },
 		{ { 1, 1}, {1,1}, color_c },
 		{ { 1,-1}, {1,0}, color_d },
@@ -580,7 +1146,7 @@ void immediate_draw() {
 	glBufferData(GL_ARRAY_BUFFER, immediate_vertices.size * sizeof(immediate_vertices[0]), immediate_vertices.data, GL_STATIC_DRAW);
 
 	glDrawArrays(immediate_type, 0, (GLsizei)immediate_vertices.size);
-	
+
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

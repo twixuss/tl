@@ -5,7 +5,7 @@ namespace TL {
 
 struct Buffer : Span<u8> {
 	using Span<u8>::Span;
-	Allocator allocator;
+	Allocator allocator = {};
 };
 
 inline Buffer create_buffer(umm size) {
@@ -17,7 +17,7 @@ inline Buffer create_buffer(umm size) {
 }
 
 inline void free(Buffer buffer) {
-	if (buffer.data) {
+	if (buffer.data && buffer.allocator.func) {
 		FREE(buffer.allocator, buffer.data);
 	}
 }

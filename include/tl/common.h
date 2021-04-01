@@ -41,7 +41,7 @@
 			ASSERTION_FAILURE("assert", #x, __VA_ARGS__);  \
 		}                                                  \
 	} while (0)
-#define assert(x, ...) assert_always(x, ...)  
+#define assert(x, ...) assert_always(x, ...)
 
 #define invalid_code_path(...)                                   \
 	do {                                                         \
@@ -81,9 +81,9 @@ inline constexpr umm length(wchar const *str) {
 inline constexpr umm length(char  *str) { return length((char  const *)str); }
 inline constexpr umm length(wchar *str) { return length((wchar const *)str); }
 
-#define TL_HANDLE_NAME(name) CONCAT(name, Impl)
-#define TL_DECLARE_HANDLE(name) typedef struct TL_HANDLE_NAME(name) *name;
-#define TL_DEFINE_HANDLE(name) struct TL_HANDLE_NAME(name)
+#define TL_HANDLE_IMPL_NAME(name) CONCAT(name, Impl)
+#define TL_DECLARE_HANDLE(name) typedef struct TL_HANDLE_IMPL_NAME(name) *name;
+#define TL_DEFINE_HANDLE(name) struct TL_HANDLE_IMPL_NAME(name)
 
 
 template <class T, class U> inline constexpr bool is_same = false;
@@ -193,8 +193,43 @@ template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
 
 #pragma warning(pop)
 
+#if COMPILER_GCC
+forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
+forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
+forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
+#else
+forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (ulong)val) ? (u32)result : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (ulong)val) ? (u32)result : ~0; }
+#if ARCH_X64
+forceinline u32 find_lowest_one_bit(u64 val) { unsigned long result; return _BitScanForward64(&result, val) ? (u32)result : ~0; }
+forceinline u32 find_highest_one_bit(u64 val) { unsigned long result; return _BitScanReverse64(&result, val) ? (u32)result : ~0; }
+#else
+#endif
+#endif
+
+forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
+
+#if ARCH_X64
+forceinline u32 count_bits(u64 v) { return (u32)_mm_popcnt_u64(v); }
+#else
+forceinline u32 count_bits(u64 v) { return count_bits((u32)v) + count_bits((u32)(v >> 32)); }
+#endif
+
+forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
+forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
+
 template <class T>
 forceinline constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
+
+forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
+
+// forceinline u8  floor_to_power_of_2(u8  v) { return 1 << find_highest_one_bit(v); }
+// forceinline u16 floor_to_power_of_2(u16 v) { return 1 << find_highest_one_bit(v); }
+forceinline u32 floor_to_power_of_2(u32 v) { return 1 << find_highest_one_bit(v); }
+forceinline u64 floor_to_power_of_2(u64 v) { return 1 << find_highest_one_bit(v); }
+
+forceinline u32 ceil_to_power_of_2(u32 v) { return is_power_of_2(v) ? v : (floor_to_power_of_2(v) + 1); }
 
 template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
@@ -528,17 +563,20 @@ struct Span {
 		}
 		return true;
 	}
+	constexpr bool operator!=(Span<ValueType> that) const { return !(*this == that); }
 
 	ValueType *data = 0;
 	umm size = 0;
 };
 
-forceinline Span<char> operator""s(char const *string, umm size) {
-	return Span((char *)string, size);
-}
+forceinline constexpr Span<char> operator""s(char const *string, umm size) { return Span((char *)string, size); }
+forceinline Span<u8> operator""b(char const *string, umm size) { return Span((u8 *)string, size); }
 
-//template <class T, umm size>
-//inline constexpr Span<T const> as_span(T const (&str)[size]) { return Span(str, size); }
+template <class T, umm size>
+inline constexpr Span<T> array_as_span(T const (&arr)[size]) { return Span((T *)arr, size); }
+
+template <class T>
+inline constexpr Span<T> as_span(std::initializer_list<T> list) { return Span((T *)list.begin(), list.size()); }
 
 inline constexpr Span<char > as_span(char  const *str) { return Span((char  *)str, length(str)); }
 inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)str, length(str)); }
@@ -580,6 +618,7 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 	}
 }
 
+template <class T, umm size> constexpr T *find(T (&arr)[size], T const &value) { return find(arr, arr + size, value); }
 template <class T> constexpr T *find(Span<T> span, T const &value) { return find(span.begin(), span.end(), value); }
 template <class T> constexpr T *find(Span<T> span, Span<T> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
 
@@ -595,6 +634,10 @@ constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 
 inline constexpr bool is_whitespace(u32 c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
+}
+
+inline constexpr bool is_alpha(char c) {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
 inline constexpr bool is_digit(char c) {
@@ -614,6 +657,22 @@ inline constexpr u32 to_lower_utf8(u32 c) {
 inline constexpr wchar to_lower_utf16(wchar c) {
 	if (c >= L'A' && c <= L'Z')
 		return (wchar)(c + (L'a' - L'A'));
+	return c;
+}
+
+inline constexpr char to_upper_ascii(char c) {
+	if (c >= 'a' && c <= 'z')
+		return (char)(c - ('a' - 'A'));
+	return c;
+}
+inline constexpr u32 to_upper_utf8(u32 c) {
+	if (c >= 'a' && c <= 'z')
+		return c - ('a' - 'A');
+	return c;
+}
+inline constexpr wchar to_upper_utf16(wchar c) {
+	if (c >= L'a' && c <= L'z')
+		return (wchar)(c - (L'a' - L'A'));
 	return c;
 }
 
@@ -738,41 +797,6 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 	return span;
 }
 
-template <class CopyFn, class Char>
-inline constexpr bool is_copy_fn = std::is_invocable_v<CopyFn, Span<Char>>;
-
-template <class CopyFn, class Char>
-using CopyFnRet = decltype(((CopyFn *)0)->operator()(Span<Char>((Char*)0, (umm)0)));
-
-template <class Int>
-inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
-
-template <class Int>
-struct FormatInt {
-	Int value;
-	u32 radix;
-	bool leading_zeros;
-	explicit FormatInt(Int value, u32 radix = 10, bool leading_zeros = false) : value(value), radix(radix), leading_zeros(leading_zeros) {}
-};
-
-template <class Float>
-struct FormatFloat {
-	Float value;
-	u32 precision;
-	explicit FormatFloat(Float value, u32 precision = 3) : value(value), precision(precision) {}
-};
-
-template <class Char>
-struct NullString{};
-template <>
-struct NullString<char> {
-	inline static constexpr char value[] = "(null)";
-};
-template <>
-struct NullString<wchar> {
-	inline static constexpr wchar value[] = L"(null)";
-};
-
 template <class T>
 struct Storage_Trivial {
 	union {
@@ -832,7 +856,7 @@ struct StaticList {
 
 	forceinline constexpr bool empty() const { return size == 0; }
 	forceinline constexpr bool full() const { return size == capacity; }
-	
+
 	forceinline constexpr T &front() { TL_BOUNDS_CHECK(size); return data[0]; }
 	forceinline constexpr T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
 	forceinline constexpr T &operator[](umm i) { TL_BOUNDS_CHECK(size); return data[i]; }
@@ -850,11 +874,21 @@ struct StaticList {
 		}
 		size = new_size;
 	}
+	constexpr T &insert_at(T value, umm where) {
+		TL_BOUNDS_CHECK(where <= size);
+		TL_BOUNDS_CHECK(size < capacity);
+
+		memmove(data + where + 1, data + where, (size - where) * sizeof(T));
+		memcpy(data + where, &value, sizeof(T));
+
+		++size;
+		return data[where];
+	}
 	constexpr Span<T> insert_at(Span<T> span, umm where) {
 		TL_BOUNDS_CHECK(where <= size);
 		TL_BOUNDS_CHECK(size + span.size <= capacity);
 
-		memcpy(data + where + span.size, data + where, span.size * sizeof(T));
+		memmove(data + where + span.size, data + where, (size - where) * sizeof(T));
 		memcpy(data + where, span.data, span.size * sizeof(T));
 
 		size += span.size;
@@ -869,22 +903,28 @@ struct StaticList {
 	forceinline constexpr StaticList &operator+=(Span<T> that) { add(that); return *this; }
 	template <umm capacity>
 	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { add(as_span(that)); return *this; }
-	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span(that.begin(), that.end())); return *this; }
+	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span((T *)that.begin(), (T *)that.end())); return *this; }
 
 	forceinline constexpr operator Span<T>() { return {data, size}; }
+
+	forceinline constexpr T &add() {
+		TL_BOUNDS_CHECK(!full());
+		return *new(data + size++) T();
+	}
 
 	forceinline constexpr T &add(T const &value) {
 		TL_BOUNDS_CHECK(!full());
 		memcpy(data + size, &value, sizeof(T));
 		return data[size++];
 	}
-	
+
 	forceinline constexpr Span<T> add(Span<T> span) {
 		TL_BOUNDS_CHECK(size + span.size <= capacity);
 		memcpy(data + size, span.data, span.size * sizeof(T));
 		defer { size += span.size; };
 		return {data + size, span.size};
 	}
+
 	constexpr T pop_back() {
 		TL_BOUNDS_CHECK(size);
 		return data[--size];
@@ -897,7 +937,7 @@ struct StaticList {
 	}
 	forceinline constexpr void pop_back_unordered() { erase_unordered(&back()); }
 	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
-	
+
 	T erase_at(umm where) {
 		TL_BOUNDS_CHECK(where < size);
 		T erased = data[where];
@@ -922,11 +962,11 @@ struct StaticList {
 	constexpr void clear() {
 		size = 0;
 	}
-	
+
+	umm size = 0;
 	union {
 		T data[capacity];
 	};
-	umm size = 0;
 };
 
 template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> const &list) { return {(T *)list.data, list.size}; }
@@ -938,44 +978,6 @@ template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity>
 
 template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
 
-
-#if COMPILER_GCC
-forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
-forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
-forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
-#else
-forceinline u32 find_lowest_one_bit(u32 val) {
-	unsigned long result;
-	return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0;
-}
-forceinline u32 find_highest_one_bit(u32 val) {
-	unsigned long result;
-	return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0;
-}
-#if ARCH_X64
-forceinline u32 find_lowest_one_bit(u64 val) {
-	unsigned long result;
-	return _BitScanForward64(&result, val) ? (u32)result : ~0;
-}
-forceinline u32 find_highest_one_bit(u64 val) {
-	unsigned long result;
-	return _BitScanReverse64(&result, val) ? (u32)result : ~0;
-}
-#else
-#endif
-#endif
-
-forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
-
-#if ARCH_X64
-forceinline u32 count_bits(u64 v) { return (u32)_mm_popcnt_u64(v); }
-#else
-#endif
-
-forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
-forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
-
 enum AllocatorMode {
 	Allocator_allocate,
 	Allocator_reallocate,
@@ -983,8 +985,8 @@ enum AllocatorMode {
 };
 
 struct Allocator {
-	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state);
-	void *state;
+	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state) = 0;
+	void *state = 0;
 	operator bool() {
 		return func != 0;
 	}

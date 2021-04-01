@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "array.h"
+#include "string.h"
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
@@ -248,12 +249,12 @@ template <class T>
 inline constexpr T smooth_min(T a, T b, f32 k) {
 	f32 h = max(0, min(1, (b - a) / k + .5f));
 	f32 m = h * (1 - h) * k;
-	return lerp(b, a, h) - m * .5f; 
+	return lerp(b, a, h) - m * .5f;
 }
 
 template <class T>
 inline constexpr T smooth_max(T a, T b, f32 k) {
-	return smooth_min(a, b, -k); 
+	return smooth_min(a, b, -k);
 }
 
 template <class T>
@@ -299,7 +300,7 @@ template<> inline static constexpr bool is_vector<v2u> = true;
 template<> inline static constexpr bool is_vector<v3u> = true;
 template<> inline static constexpr bool is_vector<v4u> = true;
 
-template <class T> 
+template <class T>
 inline static constexpr u32 _dimension_of = 0;
 template <class T>
 inline static constexpr u32 dimension_of = _dimension_of<RemoveCVRef<T>>;
@@ -607,7 +608,7 @@ forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	forceinline Pack operator~() const { RETURN_2(~lo, ~hi); }                     \
 	forceinline Pack operator^(Pack b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
 	forceinline Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
-	forceinline Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }                   
+	forceinline Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }
 
 #define TOMASK(expr) {(expr) ? -1 : 0}
 
@@ -732,7 +733,40 @@ uop(-, ty, con)
 
 union v3s64;
 
-union v2f { VECIMPL(2, S, 1, f32); v2f yx() const { return {y, x}; } };
+union v2f {
+	struct { f32 x, y; };
+	f32 s[2];
+
+	fice v2f yx() const { return {y, x}; }
+
+	fice v2f operator+() const { return *this; }
+	fice v2f operator-() const { return {-x, -y}; }
+	fice v2f operator+(v2f b) const { return {x + b.x, y + b.y}; }
+	fice v2f operator-(v2f b) const { return {x - b.x, y - b.y}; }
+	fice v2f operator*(v2f b) const { return {x * b.x, y * b.y}; }
+	fice v2f operator/(v2f b) const { return {x / b.x, y / b.y}; }
+	fice v2f operator+(f32 b) const { return {x + b, y + b}; }
+	fice v2f operator-(f32 b) const { return {x - b, y - b}; }
+	fice v2f operator*(f32 b) const { return {x * b, y * b}; }
+	fice v2f operator/(f32 b) const { return {x / b, y / b}; }
+	fice friend v2f operator+(f32 a, v2f b) { return {a + b.x, a + b.y};}
+	fice friend v2f operator-(f32 a, v2f b) { return {a - b.x, a - b.y};}
+	fice friend v2f operator*(f32 a, v2f b) { return {a * b.x, a * b.y};}
+	fice friend v2f operator/(f32 a, v2f b) { return {a / b.x, a / b.y};}
+	fice v2f &operator+=(v2f b) { return x += b.x, y += b.y, *this;}
+	fice v2f &operator-=(v2f b) { return x -= b.x, y -= b.y, *this;}
+	fice v2f &operator*=(v2f b) { return x *= b.x, y *= b.y, *this;}
+	fice v2f &operator/=(v2f b) { return x /= b.x, y /= b.y, *this;}
+	fice v2f &operator+=(f32 b) { return x += b, y += b, *this;}
+	fice v2f &operator-=(f32 b) { return x -= b, y -= b, *this;}
+	fice v2f &operator*=(f32 b) { return x *= b, y *= b, *this;}
+	fice v2f &operator/=(f32 b) { return x /= b, y /= b, *this;}
+	fice bool operator==(v2f b) { return x == b.x && y == b.y; }
+	fice bool operator!=(v2f b) { return x != b.x || y != b.y; }
+
+	forceinline explicit operator v2s() const;
+	forceinline explicit operator v2u() const;
+};
 template <>
 union v3<f32> {
 	using v2 = v2f;
@@ -773,10 +807,10 @@ union v3<f32> {
 };
 union v4f { VECIMPL(4, S, 1, f32); };
 
-union v2s { VECIMPL(2, S, 1, s32); };
-union v3s { 
-	VECIMPL(3, S, 1, s32); 
-	fice v2s xz() const { return {x, z}; } 
+union v2s { VECIMPL(2, S, 1, s32); fice bool operator!=(v2s b) { return x != b.x || y != b.y; } };
+union v3s {
+	VECIMPL(3, S, 1, s32);
+	fice v2s xz() const { return {x, z}; }
 	fice v3s zxy() const { return {z,x,y}; }
 	forceinline explicit operator v3s64() const;
 };
@@ -817,7 +851,7 @@ union m2 {
 	}
 	forceinline m2 operator*(m2 b) const { return {*this * b.i, *this * b.j}; }
 	forceinline m2& operator*=(m2 b) { return *this = *this * b; }
-	static forceinline m2 identity() { 
+	static forceinline m2 identity() {
 		return {
 			1, 0,
 			0, 1,
@@ -858,7 +892,7 @@ union m3 {
 	}
 	forceinline m3 operator*(m3 b) const { return {*this * b.i, *this * b.j, *this * b.k}; }
 	forceinline m3& operator*=(m3 b) { return *this = *this * b; }
-	static forceinline m3 identity() { 
+	static forceinline m3 identity() {
 		return {
 			1, 0, 0,
 			0, 1, 0,
@@ -1041,14 +1075,14 @@ forceinline v4f unpack(v4f v) { return v; }
 #if 0
 
 #if ARCH_AVX2
-forceinline void pack_32x4(any32x4 &x, any32x4 &y) { 
+forceinline void pack_32x4(any32x4 &x, any32x4 &y) {
 	any32x8 c = combine_m16(x, y);
     c = _mm256_permutevar8x32_ps(c, _mm256_setr_epi32(0,2,4,6,1,3,5,7));
 	x = m32_get_half(c, 0);
 	y = m32_get_half(c, 1);
 }
 #else
-forceinline void pack_32x4(any32x4 &x, any32x4 &y) { 
+forceinline void pack_32x4(any32x4 &x, any32x4 &y) {
 	v2fx4 r;
 	for (u32 i = 0; i < 2; ++i) {
 		for (u32 j = 0; j < 4; ++j) {
@@ -1058,7 +1092,7 @@ forceinline void pack_32x4(any32x4 &x, any32x4 &y) {
 }
 #endif
 
-forceinline void pack_32x4(any32x4 &_x, any32x4 &_y, any32x4 &_z) { 
+forceinline void pack_32x4(any32x4 &_x, any32x4 &_y, any32x4 &_z) {
 	s32 src[12];
 	s32 dst[12];
 
@@ -1072,7 +1106,7 @@ forceinline void pack_32x4(any32x4 &_x, any32x4 &_y, any32x4 &_z) {
 		}
 	}
 }
-forceinline v4fx4 pack(v4fx4 v) { 
+forceinline v4fx4 pack(v4fx4 v) {
 	v4fx4 r;
 #if ARCH_AVX2
 	__m256 &v0 = ((__m256 *)&v)[0];
@@ -1091,8 +1125,8 @@ forceinline v4fx4 pack(v4fx4 v) {
 #else
 	for (u32 i = 0; i < 4; ++i) {
 		for (u32 j = 0; j < 4; ++j) {
-			r.s[i * 4 + j]  = v.s[i + j * 4]; 
-			r.s[i * 4 + j]  = v.s[i + j * 4];	 
+			r.s[i * 4 + j]  = v.s[i + j * 4];
+			r.s[i * 4 + j]  = v.s[i + j * 4];
 			r.s[i * 4 + j]  = v.s[i + j * 4];
 			r.s[i * 4 + j]  = v.s[i + j * 4];
 		}
@@ -1109,7 +1143,7 @@ forceinline v2fx8 pack(v2fx8 v) {
 	}
 	return r;
 }
-forceinline v3fx8 pack(v3fx8 v) { 
+forceinline v3fx8 pack(v3fx8 v) {
 	v3fx8 r;
 	for (u32 i = 0; i < 3; ++i) {
 		for (u32 j = 0; j < 8; ++j) {
@@ -1118,7 +1152,7 @@ forceinline v3fx8 pack(v3fx8 v) {
 	}
 	return r;
 }
-forceinline v4fx8 pack(v4fx8 v) { 
+forceinline v4fx8 pack(v4fx8 v) {
 	v4fx8 r;
 	for (u32 i = 0; i < 4; ++i) {
 		for (u32 j = 0; j < 8; ++j) {
@@ -1127,13 +1161,13 @@ forceinline v4fx8 pack(v4fx8 v) {
 	}
 	return r;
 }
-forceinline v2fx4 unpack(v2fx4 v) { 
+forceinline v2fx4 unpack(v2fx4 v) {
 	v2fx4 r;
 	r.x.ps = _mm_unpacklo_ps(v.x.ps, v.y.ps);
 	r.y.ps = _mm_unpackhi_ps(v.x.ps, v.y.ps);
 	return r;
 }
-forceinline v3fx4 unpack(v3fx4 v) { 
+forceinline v3fx4 unpack(v3fx4 v) {
 	auto xy = SHUFFLE(v.x.ps, 0, 2, v.y.ps, 0, 2);
 	auto yz = SHUFFLE(v.y.ps, 1, 3, v.z.ps, 1, 3);
 	auto xz = SHUFFLE(v.x.ps, 1, 3, v.z.ps, 0, 2);
@@ -1145,7 +1179,7 @@ forceinline v3fx4 unpack(v3fx4 v) {
 forceinline v4fx4 unpack(v4fx4 v) {
 	return pack(v);
 }
-forceinline v2fx8 unpack(v2fx8 v) { 
+forceinline v2fx8 unpack(v2fx8 v) {
 	v2fx8 r;
 #if ARCH_AVX
 	__m256 m02 = _mm256_unpacklo_ps(v.x.ps, v.y.ps);
@@ -1520,8 +1554,8 @@ forceinline constexpr auto lerpWrap(A a, B b, T t, S s) {
 	a = positiveModulo(a, s);
 	b = positiveModulo(b, s);
 	auto d = a - b;
-	return select(absolute(d) > half(s), 
-				  positiveModulo(lerp(a, b+sign(d)*s, t), s), 
+	return select(absolute(d) > half(s),
+				  positiveModulo(lerp(a, b+sign(d)*s, t), s),
 				  lerp(a, b, t));
 }
 
@@ -1555,8 +1589,8 @@ forceinline v2f cross(v2f a) { return {a.y, -a.x}; }
 forceinline v2s cross(v2s a) { return {a.y, -a.x}; }
 forceinline v3f cross(v3f a, v3f b) {
 	return {
-		a.y * b.z - a.z * b.y, 
-		a.z * b.x - a.x * b.z, 
+		a.y * b.z - a.z * b.y,
+		a.z * b.x - a.x * b.z,
 		a.x * b.y - a.y * b.x
 	};
 }
@@ -1640,6 +1674,7 @@ forceinline v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
 	return m;
 }
 forceinline v3f hsv_to_rgb(v3f hsv) { return hsv_to_rgb(hsv.x, hsv.y, hsv.z); }
+forceinline v4f hsv_to_rgb(v4f hsv) { hsv.xyz = hsv_to_rgb(hsv.xyz); return hsv; }
 
 inline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
 	f32 cMax = max(max(r, g), b);
@@ -1667,6 +1702,7 @@ inline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
     return result;
 }
 forceinline v3f rgb_to_hsv(v3f rgb) { return rgb_to_hsv(rgb.x, rgb.y, rgb.z); }
+forceinline v4f rgb_to_hsv(v4f rgb) { rgb.xyz = rgb_to_hsv(rgb.xyz); return rgb; }
 
 template<class T>
 struct line {
@@ -1707,7 +1743,7 @@ template<class T>
 struct aabb {
 	T min, max;
 	T size() const { return max - min; }
-	T middle() const { 
+	T middle() const {
 		T sum = max + min;
 		sum *= 0.5f;
 		return sum;
@@ -1736,6 +1772,13 @@ forceinline aabb<T> aabbCenterDim(T center, T dim) {
 template <class T>
 forceinline aabb<T> aabbCenterRadius(T center, T radius) {
 	return {center - radius, center + radius};
+}
+
+template <class T>
+forceinline aabb<T> include(aabb<T> box, T point) {
+	box.min = min(box.min, point);
+	box.max = max(box.max, point);
+	return box;
 }
 
 #define for_aabb3(x, y, z, condition, box)           \
@@ -1822,7 +1865,7 @@ forceinline s32 volume(aabb<v3s> const &box) {
 //
 // subtract_volume treats a and b as volumes
 //
-// subtract_points treats a and b as sets of points; 
+// subtract_points treats a and b as sets of points;
 // Every aabb in result contains unique set of points.
 //
 // In both cases result's max point is inclusive
@@ -2056,7 +2099,7 @@ inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box) {
 	v3f dirfrac = 1.0f / ray.dir;
 	v3f t1 = (box.min - ray.begin)*dirfrac;
 	v3f t2 = (box.max - ray.begin)*dirfrac;
-	
+
 	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y), min(t1.z, t2.z));
 	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y), max(t1.z, t2.z));
 
@@ -2142,9 +2185,9 @@ union m4 {
 		f32 fzdfmn = fz / (fz - nz);
 		// clang-format off
 		return {
-			w, 0, 0, 0, 
-			0, h, 0, 0, 
-			0, 0, fzdfmn, 1, 
+			w, 0, 0, 0,
+			0, h, 0, 0,
+			0, 0, fzdfmn, 1,
 			0, 0, -fzdfmn * nz, 0
 		};
 		// clang-format on
@@ -2290,9 +2333,9 @@ inline m4 inverse(m4 const &m) {
 	f32 A0113 = m.j.x * m.l.y - m.j.y * m.l.x;
 	f32 A0112 = m.j.x * m.k.y - m.j.y * m.k.x;
 
-	f32 det = m.i.x * (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223) 
-		    - m.i.y * (m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223) 
-		    + m.i.z * (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123) 
+	f32 det = m.i.x * (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223)
+		    - m.i.y * (m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223)
+		    + m.i.z * (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123)
 		    - m.i.w * (m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123);
 
 	if (det == 0)
@@ -2348,7 +2391,7 @@ using FrustumPlanes = Array<v4f, 6>;
 
 forceinline FrustumPlanes create_frustum_planes_d3d(m4 m) {
 	FrustumPlanes planes;
-	
+
 	// http://www.cs.otago.ac.nz/postgrads/alexis/planeExtraction.pdf
 	planes[0].x = m.i.w + m.i.x;
 	planes[0].y = m.j.w + m.j.x;
@@ -2382,7 +2425,7 @@ forceinline FrustumPlanes create_frustum_planes_d3d(m4 m) {
 }
 forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 	FrustumPlanes planes;
-	
+
 	// http://www.cs.otago.ac.nz/postgrads/alexis/planeExtraction.pdf
 	planes[0].x = m.i.w + m.i.x;
 	planes[0].y = m.j.w + m.j.x;
@@ -2445,20 +2488,54 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace CE
 
-#define TO_STRING_V3(v3f)                    \
-void append(StringBuilder &builder, v3f v) { \
-	append(builder, '{');                    \
-	append(builder, v.x);                    \
-	append(builder, ", "s);                  \
-	append(builder, v.y);                    \
-	append(builder, ", "s);                  \
-	append(builder, v.z);                    \
-	append(builder, '}');                    \
+#define TO_STRING_V2(v2f)                           \
+inline void append(StringBuilder &builder, v2f v) { \
+	append(builder, '{');                           \
+	append(builder, v.x);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.y);                           \
+	append(builder, '}');                           \
+}
+
+TO_STRING_V2(v2f)
+TO_STRING_V2(v2u)
+TO_STRING_V2(v2s)
+
+#undef TO_STRING_V2
+
+#define TO_STRING_V3(v3f)                           \
+inline void append(StringBuilder &builder, v3f v) { \
+	append(builder, '{');                           \
+	append(builder, v.x);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.y);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.z);                           \
+	append(builder, '}');                           \
 }
 
 TO_STRING_V3(v3f)
 TO_STRING_V3(v3u)
 TO_STRING_V3(v3s)
+
+#undef TO_STRING_V3
+
+#define TO_STRING_V4(v4f)                           \
+inline void append(StringBuilder &builder, v4f v) { \
+	append(builder, '{');                           \
+	append(builder, v.x);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.y);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.z);                           \
+	append(builder, ", "s);                         \
+	append(builder, v.w);                           \
+	append(builder, '}');                           \
+}
+
+TO_STRING_V4(v4f)
+TO_STRING_V4(v4u)
+TO_STRING_V4(v4s)
 
 #undef TO_STRING_V3
 
@@ -2485,9 +2562,8 @@ forceinline T saturate(T t) {
 }
 
 template <class T>
-forceinline T smoothstep(T t) {
-	t = saturate(t);
-	return t * t * t * (t * (t * 6 - 15) + 10);
+forceinline auto smoothstep(T x) {
+	return x*x*x*(x*(6*x - 15) + 10);
 }
 
 } // namespace TL

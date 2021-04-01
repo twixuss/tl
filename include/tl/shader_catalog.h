@@ -7,8 +7,7 @@
 #include "console.h"
 #include <unordered_map>
 
-using namespace TL;
-using namespace TL::OpenGL;
+namespace TL {
 
 struct Shader {
 	GLuint program;
@@ -16,11 +15,12 @@ struct Shader {
 	FileTracker tracker;
 	std::unordered_map<Span<char>, GLuint> uniforms;
 	bool valid;
-	
+
 	u32 cull;
 	u32 src_blend, dst_blend;
 	u32 depth_func;
 	bool depth_write;
+	bool depth_test;
 	bool enable_blend;
 };
 struct ShaderCatalog {
@@ -29,6 +29,28 @@ struct ShaderCatalog {
 	StringList<char> shader_file_names;
 	Shader *fallback_shader;
 };
+
+TL_API Shader *find(ShaderCatalog &catalog, Span<char> name);
+TL_API bool parse_shader(Shader &shader, Span<char> source);
+TL_API Buffer load_shader_file(Span<char> full_path);
+TL_API Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_name);
+TL_API void init(ShaderCatalog &catalog, char const *directory, Span<char> fallback_shader_name);
+TL_API void update(ShaderCatalog &catalog);
+TL_API GLuint get_uniform_location(Shader &shader, Span<char> name);
+TL_API void set_uniform(Shader &shader, Span<char> name, f32 value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v2f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v3f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v4f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, m4  value);
+TL_API void use_shader(Shader &shader);
+
+inline void set_uniform(Shader &shader, char const *name, f32 value) { set_uniform(shader, as_span(name), value); }
+inline void set_uniform(Shader &shader, char const *name, v2f value) { set_uniform(shader, as_span(name), value); }
+inline void set_uniform(Shader &shader, char const *name, v3f value) { set_uniform(shader, as_span(name), value); }
+inline void set_uniform(Shader &shader, char const *name, v4f value) { set_uniform(shader, as_span(name), value); }
+inline void set_uniform(Shader &shader, char const *name, m4  value) { set_uniform(shader, as_span(name), value); }
+
+#ifdef TL_IMPL
 
 Shader *find(ShaderCatalog &catalog, Span<char> name) {
 	auto result = catalog.shaders.find(name);
@@ -44,22 +66,34 @@ Shader *find(ShaderCatalog &catalog, Span<char> name) {
 	return catalog.fallback_shader;
 }
 
-void parse_shader(Shader &shader, Span<char> source) {
+bool parse_shader(Shader &shader, Span<char> source) {
 	shader.cull = 0;
 	shader.depth_write = true;
 	shader.enable_blend = false;
 	shader.depth_func = GL_LEQUAL;
+	shader.depth_test = true;
 
-	auto get_blend = [](Span<char> str) {
+	bool success = true;
+
+	auto get_blend = [&](Span<char> str) {
 		if (str == "src_alpha"s) {
 			return GL_SRC_ALPHA;
 		} else if (str == "inv_src_alpha"s) {
 			return GL_ONE_MINUS_SRC_ALPHA;
+		} else if (str == "src_color"s) {
+			return GL_SRC_COLOR;
+		} else if (str == "inv_src_color"s) {
+			return GL_ONE_MINUS_SRC_COLOR;
+		} else if (str == "one"s) {
+			return GL_ONE;
+		} else if (str == "zero"s) {
+			return GL_ZERO;
 		}
+		success = false;
 		print("bad blend param\n");
 		return GL_ONE;
 	};
-	auto get_cull = [](Span<char> str) {
+	auto get_cull = [&](Span<char> str) {
 		if (str == "off"s) {
 			return 0;
 		} else if (str == "back"s) {
@@ -67,15 +101,17 @@ void parse_shader(Shader &shader, Span<char> source) {
 		} else if (str == "front"s) {
 			return GL_FRONT;
 		}
+		success = false;
 		print("bad cull param\n");
 		return 0;
 	};
-	auto get_bool = [](Span<char> str) {
+	auto get_bool = [&](Span<char> str) {
 		if (str == "off"s) {
 			return false;
 		} else if (str == "on"s) {
 			return true;
 		}
+		success = false;
 		print("bad bool param\n");
 		return false;
 	};
@@ -83,6 +119,7 @@ void parse_shader(Shader &shader, Span<char> source) {
 	auto params_start = find(source, "/*!\n"s);
 	auto params_end   = find(source, "\n!*/"s);
 	if ((bool)params_start != (bool)params_end) {
+		success = false;
 		print("Bad parameter scope\n");
 	} else if (params_start && params_end) {
 		StaticList<Span<char>, 16> tokens;
@@ -93,6 +130,13 @@ void parse_shader(Shader &shader, Span<char> source) {
 
 			if (*start == '!')
 				break;
+
+			if (*start == '#') {
+				while (*start != '\n') {
+					++start;
+				}
+				continue;
+			}
 
 			auto end = start;
 			while (!is_whitespace(*end))
@@ -110,10 +154,28 @@ void parse_shader(Shader &shader, Span<char> source) {
 				shader.cull = get_cull(*++token);
 			} else if (*token == "depth_write"s) {
 				shader.depth_write = get_bool(*++token);
+			} else if (*token == "depth_test"s) {
+				shader.depth_test = get_bool(*++token);
+			} else if (*token == "depth_func"s) {
+				auto func = *++token;
+				if (func == "less"s) shader.depth_func = GL_LESS;
+				else if (func == "less_equal"s) shader.depth_func = GL_LEQUAL;
+				else if (func == "greater"s) shader.depth_func = GL_GREATER;
+				else if (func == "greater_equal"s) shader.depth_func = GL_GEQUAL;
+				else if (func == "equal"s) shader.depth_func = GL_EQUAL;
+				else if (func == "not_equal"s) shader.depth_func = GL_NOTEQUAL;
+				else {
+					print("bad depth_func param\n");
+					success = false;
+				}
+			} else {
+				print("bad token: %\n", *token);
+				success = false;
 			}
 			++token;
 		}
 	}
+	return success;
 }
 
 Buffer load_shader_file(Span<char> full_path) {
@@ -125,7 +187,7 @@ Buffer load_shader_file(Span<char> full_path) {
 			c = '\n';
 		}
 	}
-		
+
 	auto directory = full_path;
 	while (directory.back() != '/') --directory.size;
 
@@ -171,6 +233,8 @@ Buffer load_shader_file(Span<char> full_path) {
 }
 
 Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_name) {
+	using namespace OpenGL;
+
 	auto file_name = full_name;
 	file_name.size = find(file_name, '.') - file_name.data;
 
@@ -194,26 +258,27 @@ Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_
 				glDeleteShader(vertex_shader);
 				glDeleteShader(fragment_shader);
 				if (shader.program) {
-					shader.uniforms.clear();
+					if (parse_shader(shader, as_chars(source))) {
+						shader.uniforms.clear();
 
-					GLint count;
-					glGetProgramiv(shader.program, GL_ACTIVE_UNIFORMS, &count);
-					
-					const GLsizei bufSize = 64; // maximum name length
-					GLchar name[bufSize]; // variable name in GLSL
-					GLsizei length; // name length
-					GLint size; // size of the variable
-					GLenum type; // type of the variable (float, vec3 or mat4, etc)
-					for (u32 i = 0; i < (u32)count; i++) {
-						glGetActiveUniform(shader.program, i, bufSize, &length, &size, &type, name);
-						Span<char> stored_name = {ALLOCATE(char, catalog.allocator, length), (umm)length};
-						memcpy(stored_name.data, name, length);
-						shader.uniforms[stored_name] = glGetUniformLocation(shader.program, name);
+						GLint count;
+						glGetProgramiv(shader.program, GL_ACTIVE_UNIFORMS, &count);
+
+						const GLsizei bufSize = 64; // maximum name length
+						GLchar name[bufSize]; // variable name in GLSL
+						GLsizei length; // name length
+						GLint size; // size of the variable
+						GLenum type; // type of the variable (float, vec3 or mat4, etc)
+						for (u32 i = 0; i < (u32)count; i++) {
+							glGetActiveUniform(shader.program, i, bufSize, &length, &size, &type, name);
+							Span<char> stored_name = {ALLOCATE(char, catalog.allocator, length), (umm)length};
+							memcpy(stored_name.data, name, length);
+							shader.uniforms[stored_name] = glGetUniformLocation(shader.program, name);
+						}
+
+						shader.valid = true;
+						return;
 					}
-					shader.valid = true;
-					
-					parse_shader(shader, as_chars(source));
-					return;
 				}
 			}
 		}
@@ -236,6 +301,10 @@ void init(ShaderCatalog &catalog, char const *directory, Span<char> fallback_sha
 	}
 }
 
+//
+// Updates file trackers in the catalog and reloads modified shaders.
+// Should be used only for development.
+//
 void update(ShaderCatalog &catalog) {
 	for (auto &[name, shader] : catalog.shaders) {
 		update_file_tracker(shader.tracker);
@@ -250,13 +319,14 @@ GLuint get_uniform_location(Shader &shader, Span<char> name) {
 	return it->second;
 }
 
-void set_uniform(Shader &shader, Span<char> name, f32 value) { glUniform1f(get_uniform_location(shader, name), value); }
-void set_uniform(Shader &shader, Span<char> name, v2f value) { glUniform2fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, v3f value) { glUniform3fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, v4f value) { glUniform4fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, m4  value) { glUniformMatrix4fv(get_uniform_location(shader, name), 1, false, value.s); }
+void set_uniform(Shader &shader, Span<char> name, f32 value) { OpenGL::glUniform1f(get_uniform_location(shader, name), value); }
+void set_uniform(Shader &shader, Span<char> name, v2f value) { OpenGL::glUniform2fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, v3f value) { OpenGL::glUniform3fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, v4f value) { OpenGL::glUniform4fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, m4  value) { OpenGL::glUniformMatrix4fv(get_uniform_location(shader, name), 1, false, value.s); }
 
 void use_shader(Shader &shader) {
+	using namespace OpenGL;
 	glUseProgram(shader.program);
 
 	if (shader.cull) {
@@ -266,8 +336,12 @@ void use_shader(Shader &shader) {
 		glDisable(GL_CULL_FACE);
 	}
 
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(shader.depth_func);
+	if (shader.depth_test) {
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(shader.depth_func);
+	} else {
+		glDisable(GL_DEPTH_TEST);
+	}
 
 	glDepthMask(shader.depth_write);
 
@@ -277,4 +351,8 @@ void use_shader(Shader &shader) {
 	} else {
 		glDisable(GL_BLEND);
 	}
+}
+
+#endif
+
 }

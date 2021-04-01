@@ -1,7 +1,6 @@
 #pragma once
 #include "system.h"
 #include "math.h"
-#if OS_WINDOWS
 #include "common.h"
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -26,13 +25,19 @@ TL_API s64 get_performance_counter();
 TL_API bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
 TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
-TL_API v2u getWindowSize(v2u clientSize, DWORD style, bool menu = false);
+TL_API v2u get_window_size(v2u clientSize, DWORD style, bool menu = false);
+TL_API v2s get_window_position(v2s client_position, DWORD style, bool menu = false);
 TL_API void hide_cursor();
 TL_API void show_cursor();
+inline void set_cursor_visibility(bool visible) {
+	if (visible) show_cursor();
+	else hide_cursor();
+}
 TL_API void set_cursor_position(s32 x, s32 y);
 inline void set_cursor_position(v2s position) {
 	set_cursor_position(position.x, position.y);
 }
+TL_API v2s get_cursor_position();
 TL_API u64 get_memory_usage();
 
 #ifdef TL_IMPL
@@ -133,12 +138,12 @@ void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor) {
 	auto monitorY = MonitorInfo.rcWork.top;
 	auto monitorWidth = MonitorInfo.rcWork.right - MonitorInfo.rcWork.left;
 	auto monitorHeight = MonitorInfo.rcWork.bottom - MonitorInfo.rcWork.top;
-	
+
     int X = Rect.left - MonitorInfo.rcWork.left;
     int Y = Rect.top - MonitorInfo.rcWork.top;
     int Width = Rect.right - Rect.left;
     int Height = Rect.bottom - Rect.top;
-	
+
     X = max(X, 0);
     Y = max(Y, 0);
 
@@ -194,12 +199,20 @@ bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCU
 	c.style = style;
 	return RegisterClassExA(&c) != 0;
 }
-v2u getWindowSize(v2u clientSize, DWORD style, bool menu) {
+v2u get_window_size(v2u clientSize, DWORD style, bool menu) {
 	RECT r = {0, 0, (LONG)clientSize.x, (LONG)clientSize.y};
 	AdjustWindowRect(&r, style, menu);
 	return {
 		(u32)(r.right - r.left),
 		(u32)(r.bottom - r.top)
+	};
+}
+v2s get_window_position(v2s client_position, DWORD style, bool menu) {
+	RECT r = {client_position.x, client_position.y, 0, 0};
+	AdjustWindowRect(&r, style, menu);
+	return {
+		(s32)(r.left),
+		(s32)(r.top)
 	};
 }
 void hide_cursor() {
@@ -210,6 +223,11 @@ void show_cursor() {
 }
 void set_cursor_position(s32 x, s32 y) {
 	SetCursorPos(x, y);
+}
+v2s get_cursor_position() {
+	POINT p;
+	GetCursorPos(&p);
+	return {p.x, p.y};
 }
 u64 get_memory_usage() {
 	u64 result = 0;
@@ -223,4 +241,11 @@ u64 get_memory_usage() {
 
 }
 
+#ifdef TL_WIN32_ENTRY
+extern TL::s32 tl_main(TL::Span<char> args);
+int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR command_line, int) {
+	TL::init_allocator();
+	TL::print("command_line: %\n", command_line);
+	return tl_main({});
+}
 #endif

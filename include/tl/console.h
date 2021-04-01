@@ -14,7 +14,14 @@ enum Encoding {
 template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_ascii;
 template <> inline static constexpr Encoding encoding_from_type<wchar> = Encoding_utf16;
 
-using Printer = void (*)(void const *data, umm length, Encoding encoding);
+struct Printer {
+	void (*func)(Span<u8> span, Encoding encoding, void *state);
+	void *state;
+
+	void operator()(Span<u8> span, Encoding encoding) {
+		func(span, encoding, state);
+	}
+};
 
 extern TL_API Printer console_printer;
 extern TL_API Printer current_printer;
@@ -22,8 +29,10 @@ extern TL_API Printer current_printer;
 TL_API void set_console_encoding(Encoding);
 TL_API void clear_console();
 
-inline void print_to_console(char  const *string, umm length) { console_printer(string, length, Encoding_ascii); }
-inline void print_to_console(wchar const *string, umm length) { console_printer(string, length, Encoding_utf16); }
+TL_API void print_to_console(Span<u8> string, Encoding encoding);
+
+inline void print_to_console(Span<char > string) { print_to_console(as_bytes(string), Encoding_ascii); }
+inline void print_to_console(Span<wchar> string) { print_to_console(as_bytes(string), Encoding_utf16); }
 
 template <class Char = char, class T>
 inline void print(T const &value) {
@@ -31,11 +40,11 @@ inline void print(T const &value) {
 	defer { free(builder); };
 
 	append(builder, value);
-	
+
 	auto string = to_string(builder);
 	defer { free(string); };
 
-	current_printer(string.data, string.size, encoding_from_type<Char>);
+	current_printer(as_bytes(string), encoding_from_type<Char>);
 }
 
 template <class Char = char, class ...Args>
@@ -44,27 +53,36 @@ inline void print(Char const *fmt, Args const &...args) {
 	defer { free(builder); };
 
 	append_format(builder, fmt, args...);
-	
+
 	auto string = to_string(builder);
 	defer { free(string); };
-	
+
 	print<Char>(string);
 }
 
+TL_API void hide_console_window();
+TL_API void show_console_window();
+
 #ifdef TL_IMPL
+
+Printer console_printer = {
+	[](Span<u8> span, Encoding encoding, void *) { print_to_console(span, encoding); },
+	0
+};
 
 #if OS_WINDOWS
 
 static HANDLE console_output = GetStdHandle(STD_OUTPUT_HANDLE);
+static HWND console_window = GetConsoleWindow();
 
-Printer console_printer = [](void const *string, umm length, Encoding encoding) {
+void print_to_console(Span<u8> span, Encoding encoding) {
 	DWORD charsWritten;
 	switch (encoding) {
-		case Encoding_ascii: WriteConsoleA(console_output, string, (DWORD)length, &charsWritten, 0); break;
-		case Encoding_utf8:  WriteConsoleA(console_output, string, (DWORD)length, &charsWritten, 0); break;
-		case Encoding_utf16: WriteConsoleW(console_output, string, (DWORD)length, &charsWritten, 0); break;
+		case Encoding_ascii: WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
+		case Encoding_utf8:  WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
+		case Encoding_utf16: WriteConsoleW(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
 	}
-};
+}
 
 void clear_console() {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -116,6 +134,18 @@ void set_console_encoding(Encoding encoding) {
 	auto cp = get_code_page(encoding);
 	SetConsoleOutputCP(cp);
 	SetConsoleCP(cp);
+}
+
+void hide_console_window() {
+	ShowWindow(console_window, SW_HIDE);
+}
+void show_console_window() {
+	if (!console_window) {
+		AllocConsole();
+		console_window = GetConsoleWindow();
+		console_output = GetStdHandle(STD_OUTPUT_HANDLE);
+	}
+	ShowWindow(console_window, SW_SHOW);
 }
 
 #endif

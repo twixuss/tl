@@ -5,24 +5,42 @@ namespace TL {
 
 template <class T, umm size_>
 struct Array {
-	constexpr umm size() const { return size_; }
+	inline static constexpr umm size = size_;
 
-	constexpr T *data() { return v; }
-	constexpr T *begin() { return v; }
-	constexpr T *end() { return v + size_; }
-	constexpr T& operator[](umm i) { return v[i]; }
+	inline operator Span<T>() const { return {(T *)data, size}; }
 
-	constexpr T const *data() const { return v; }
-	constexpr T const *begin() const { return v; }
-	constexpr T const *end() const { return v + size_; }
-	constexpr T const& operator[](umm i) const { return v[i]; }
-	T v[size_];
+	constexpr T *begin() { return data; }
+	constexpr T *end() { return data + size; }
+	constexpr T& operator[](umm i) { return data[i]; }
+
+	constexpr T const *begin() const { return data; }
+	constexpr T const *end() const { return data + size; }
+	constexpr T const& operator[](umm i) const { return data[i]; }
+	T data[size];
 };
 
 template <class T, umm size>
 inline constexpr umm count_of(Array<T, size> const &arr) {
-	return arr.size();
+	return size;
 }
+
+template <class T, class _IndexType, _IndexType _size_x, _IndexType _size_y>
+struct Array2 {
+	using IndexType = _IndexType;
+	inline static constexpr IndexType size_x = _size_x;
+	inline static constexpr IndexType size_y = _size_y;
+
+	constexpr T& at(IndexType x, IndexType y) {
+		TL_BOUNDS_CHECK(x < size_x);
+		TL_BOUNDS_CHECK(y < size_y);
+		return data[y][x];
+	}
+
+	constexpr T *begin() { return (T *)data; }
+	constexpr T *end() { return (T *)data + size_x * size_y; }
+
+	T data[size_y][size_x];
+};
 
 template <class T, class _IndexType, _IndexType _size_x, _IndexType _size_y, _IndexType _size_z>
 struct Array3 {
@@ -39,7 +57,7 @@ struct Array3 {
 	}
 
 	constexpr T *begin() { return (T *)data; }
-	constexpr T *end() { return (T *)data + size_z * size_y * size_x; }
+	constexpr T *end() { return (T *)data + size_x * size_y * size_z; }
 
 	T data[size_z][size_y][size_x];
 };

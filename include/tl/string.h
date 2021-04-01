@@ -41,7 +41,7 @@ struct StringList {
 	void add(Char const *string) {
 		add(Span((Char *)string, length(string)));
 	}
-	
+
 	void make_absolute() {
 #ifdef TL_DEBUG
 		is_absolute = true;
@@ -152,6 +152,34 @@ inline ParseResult<f64> parseDecimalFloat(Span<char> s) {
 }
 #endif
 
+template <class Int>
+inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
+
+template <class Int>
+struct FormatInt {
+	Int value;
+	u32 radix;
+	bool leading_zeros;
+	explicit FormatInt(Int value, u32 radix = 10, bool leading_zeros = false) : value(value), radix(radix), leading_zeros(leading_zeros) {}
+};
+
+enum FloatFormat {
+	FloatFormat_default,
+	FloatFormat_exponential,
+	FloatFormat_exponential_e,
+};
+
+template <class Float>
+struct FormatFloat {
+	Float value;
+	u32 precision = 3;
+	FloatFormat format = FloatFormat_default;
+	explicit FormatFloat(Float value, u32 precision, FloatFormat format) : value(value), precision(precision), format(format) {}
+	explicit FormatFloat(Float value, u32 precision) : value(value), precision(precision) {}
+	explicit FormatFloat(Float value, FloatFormat format) : value(value), format(format) {}
+	explicit FormatFloat(Float value) : value(value) {}
+};
+
 #ifndef TL_STRING_BUILDER_BLOCK_SIZE
 #define TL_STRING_BUILDER_BLOCK_SIZE 4096
 #endif
@@ -252,7 +280,7 @@ struct StringBuilder {
 	}
 };
 
-void free(StringBuilder &builder) {
+inline void free(StringBuilder &builder) {
 	for (auto block = builder.first.next; block != 0;) {
 		auto next = block->next;
 		FREE(builder.allocator, block);
@@ -261,7 +289,7 @@ void free(StringBuilder &builder) {
 	builder.allocator = {};
 }
 
-void append(StringBuilder &b, Span<char> span) {
+inline void append(StringBuilder &b, Span<char> span) {
 	umm chars_to_write = span.size;
 	while (b.last->available_space() < chars_to_write) {
 		umm space_in_block = b.last->available_space();
@@ -294,7 +322,7 @@ forceinline void append(StringBuilder &b, char ch) {
 			b.last = b.alloc_last = new_block;
 		}
 	}
-	
+
 	b.last->buffer.data[b.last->buffer.size++] = ch;
 }
 
@@ -307,7 +335,7 @@ forceinline void append_bytes(StringBuilder &b, T const &value) {
 	append_bytes(b, &value, sizeof(value));
 }
 
-void append_format(StringBuilder &b, char const *fmt) {
+inline void append_format(StringBuilder &b, char const *fmt) {
 	if (!*fmt) {
 		return;
 	}
@@ -338,7 +366,7 @@ void append_format(StringBuilder &b, char const *fmt, Arg const &arg, Args const
 	char const *fmtEnd = 0;
 
 	bool argAsFormat = false;
-		
+
 	while (*c) {
 		if (*c == '%') {
 			fmtBegin = c;
@@ -363,13 +391,13 @@ void append_format(StringBuilder &b, char const *fmt, Arg const &arg, Args const
 	if (!(fmtBegin && fmtEnd)) {
 		append_format(b, fmt);
 	}
-	
+
 	append(b, as_span(fmt, fmtBegin));
 
 	if (argAsFormat) {
 		if constexpr (is_same<RemoveReference<std::decay_t<Arg>>, char const *> || is_same<RemoveReference<std::decay_t<Arg>>, char *>)
 			append_format(b, arg, args...);
-		else 
+		else
 			invalid_code_path("'%fmt%' arg is not a string");
 	} else {
 		append(b, arg);
@@ -378,7 +406,7 @@ void append_format(StringBuilder &b, char const *fmt, Arg const &arg, Args const
 	append_format(b, fmtEnd, args...);
 }
 
-void append(StringBuilder &builder, bool value) {
+inline void append(StringBuilder &builder, bool value) {
 	append(builder, value ? "true"s : "false"s);
 }
 
@@ -400,7 +428,7 @@ void append(StringBuilder &builder, FormatInt<Int> f) {
 				*lsc-- = charMap[-(v % (Int)radix)];
 				v /= (Int)radix;
 				++charsWritten;
-			} 
+			}
 			v = -v;
 		}
 	}
@@ -435,35 +463,83 @@ void append(StringBuilder &builder, Int v) {
 	append(builder, FormatInt(v));
 }
 
-void append(StringBuilder &builder, void const *p) {
+forceinline void append(StringBuilder &builder, void const *p) {
 	append(builder, FormatInt((umm)p, 16, true));
 }
 
-void append(StringBuilder &builder, FormatFloat<f64> f) {
-	auto v = f.value;
+inline void append(StringBuilder &builder, FormatFloat<f64> f) {
+	auto value = f.value;
 	auto precision = f.precision;
-	if (is_negative(v)) {
+	if (is_negative(value)) {
 		append(builder, '-');
-		v = -v;
+		value = -value;
 	}
-	append(builder, (u64)v);
-	append(builder, '.');
-	for (u32 i = 0; i < precision; ++i) {
-		v = v - (f64)(s64)v;
-		v = (v < 0 ? v + 1 : v) * 10;
-		append(builder, (char)((u32)v + '0'));
+
+	auto append_float = [&](f64 f) {
+		append(builder, (u64)f);
+		append(builder, '.');
+		for (u32 i = 0; i < precision; ++i) {
+			f = f - (f64)(s64)f;
+			f = (f < 0 ? f + 1 : f) * 10;
+			append(builder, (char)((u32)f + '0'));
+		}
+	};
+
+	switch (f.format) {
+		case FloatFormat_default: {
+			append_float(value);
+			break;
+		}
+		case FloatFormat_exponential: {
+			f64 mantissa = value;
+			s32 exponent = 0;
+			while (mantissa >= 10) {
+				mantissa /= 10;
+				++exponent;
+			}
+			while (mantissa < 1) {
+				mantissa *= 10;
+				--exponent;
+			}
+			append_float(mantissa);
+
+			append(builder, "*10^"s);
+			append(builder, exponent);
+
+			break;
+		}
+		case FloatFormat_exponential_e: {
+			f64 mantissa = value;
+			s32 exponent = 0;
+			while (mantissa >= 10) {
+				mantissa /= 10;
+				++exponent;
+			}
+			while (mantissa < 1) {
+				mantissa *= 10;
+				--exponent;
+			}
+			append_float(mantissa);
+
+			append(builder, 'e');
+
+			if (exponent >= 0) append(builder, '+');
+
+			append(builder, exponent);
+
+			break;
+		}
 	}
+}
+inline void append(StringBuilder &builder, FormatFloat<f32> f) {
+	append(builder, FormatFloat((f64)f.value, f.precision, f.format));
 }
 
-void append(StringBuilder &builder, f64 v) {
-	append(builder, FormatFloat(v));
-}
-void append(StringBuilder &builder, f32 v) {
-	append(builder, (f64)v);
-}
+forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormatFloat(v)); }
+forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormatFloat(v)); }
 
 // Always allocates memory for the string
-List<char> to_string(StringBuilder &builder) {
+inline List<char> to_string(StringBuilder &builder) {
 	List<char> result;
 	result.reserve(builder.size());
 	builder.fill(result);
@@ -472,20 +548,22 @@ List<char> to_string(StringBuilder &builder) {
 }
 
 template <class ...Args>
-constexpr List<char> concatenate(Args &&...args) {
+inline List<char> concatenate(Args &&...args) {
 	StringBuilder builder;
 	defer { free(builder); };
 	int ___[] = { ((append(builder, args), ...), 0) };
 	return to_string(builder);
 }
 
-#if 0
-template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
-String<Char, Allocator> format(Char const *fmt, Args const &...args) {
-	StringBuilder<Char, Allocator> builder;
-	builder.append_format(fmt, args...);
-	return builder.get();
+template <class ...Args>
+List<char> format(char const *fmt, Args const &...args) {
+	StringBuilder builder;
+	defer { free(builder); };
+	append_format(builder, fmt, args...);
+	return to_string(builder);
 }
+
+#if 0
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
 String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args) {

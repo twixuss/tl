@@ -1,13 +1,12 @@
 #pragma once
 #include "common.h"
-#include <string.h>
 
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
 
 namespace TL {
 
-template <class T>
+template <class T, class Index = umm>
 struct List {
 	T &add() {
 		reserve_exponential(size + 1);
@@ -18,8 +17,23 @@ struct List {
 		memcpy(data + size, &value, sizeof(T));
 		return data[size++];
 	}
-	
-	void reallocate(umm desired_capacity) {
+	Span<T> add(Span<T> span) {
+		reserve_exponential(size + span.size);
+		memcpy(data + size, span.data, span.size * sizeof(T));
+		size += span.size;
+		return {data + size - span.size, span.size};
+	}
+
+	T &add_front(T value) {
+		reserve_exponential(size + 1);
+		for (Index i = size; i > 0; --i) {
+			data[i] = data[i - 1];
+		}
+		data[0] = value;
+		return data[0];
+	}
+
+	void reallocate(Index desired_capacity) {
 		auto new_data = ALLOCATE(T, allocator, desired_capacity);
 		memcpy(new_data, data, sizeof(T) * size);
 
@@ -28,24 +42,24 @@ struct List {
 		capacity = desired_capacity;
 	}
 
-	void reserve(umm desired_capacity) {
+	void reserve(Index desired_capacity) {
 		if (capacity >= desired_capacity) return;
 
 		reallocate(desired_capacity);
 	}
-	void reserve_exponential(umm desired_capacity) {
+	void reserve_exponential(Index desired_capacity) {
 		if (capacity >= desired_capacity) return;
 
-		umm new_capacity = max(1, capacity);
+		Index new_capacity = max(1, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
-		
+
 		reallocate(new_capacity);
 	}
-	void resize(umm new_size) {
+	void resize(Index new_size) {
 		reserve(new_size);
 
 		if (new_size > size) {
-			for (umm i = size; i < new_size; ++i) {
+			for (Index i = size; i < new_size; ++i) {
 				new (data + i) T();
 			}
 		}
@@ -56,46 +70,55 @@ struct List {
 		size = 0;
 	}
 
-	T &operator[](umm i) { return data[i]; }
+	T &operator[](Index i) {
+		TL_BOUNDS_CHECK(i < size);
+		return data[i];
+	}
 
 	T *begin() { return data; }
 	T *end() { return data + size; }
-	
+
 	T &front() { TL_BOUNDS_CHECK(size); return data[0]; }
 	T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
 
 	operator Span<T>() { return {data, size}; }
-	
+
 	List &operator+=(T const &v) { add(v); return *this; }
-	List &operator+=(Span<T> v) { insert(v, end()); return *this; }
-	List &operator+=(List<T> const &v) { insert(as_span(v), end()); return *this; }
-	List &operator+=(std::initializer_list<T> v) { insert(Span((T *)v.begin(), (T *)v.end()), end()); return *this; }
-	
-	T &insert(Span<T> span, umm where) {
+	List &operator+=(Span<T> v) { add(v); return *this; }
+	List &operator+=(List<T> const &v) { add(as_span(v)); return *this; }
+	List &operator+=(std::initializer_list<T> v) { add(Span((T *)v.begin(), (T *)v.end())); return *this; }
+
+	T &insert_at(T value, Index where) {
 		TL_BOUNDS_CHECK(where <= size);
+		TL_BOUNDS_CHECK(size < capacity);
 
-		umm required_size = size + span.size;
-		reserve(required_size);
-		
-		for (auto i = where; i != size; ++i) {
-			data[i + span.size] = data[i];
-		}
+		reserve_exponential(size + 1);
 
-		for (umm i = 0; i < span.size; ++i) {
-			data[where + i] = span.data[i];
-		}
+		memmove(data + where + 1, data + where, (size - where) * sizeof(T));
+		memcpy(data + where, &value, sizeof(T));
 
-		size += span.size;
+		++size;
 		return data[where];
 	}
-	T &insert(Span<T> span, T *where) {
-		return insert(span, where - data);
+	Span<T> insert_at(Span<T> span, Index where) {
+		TL_BOUNDS_CHECK(where <= size);
+		TL_BOUNDS_CHECK(size + span.size <= capacity);
+
+		reserve_exponential(size + span.size);
+
+		memmove(data + where + span.size, data + where, (size - where) * sizeof(T));
+		memcpy(data + where, span.data, span.size * sizeof(T));
+
+		size += span.size;
+		return {data + where, span.size};
 	}
-	
-	void erase_at(umm where) {
+	T &insert(T &value, T *where) { return insert(value, where - data); }
+	Span<T> insert(Span<T> span, T *where) { return insert(span, where - data); }
+
+	void erase_at(Index where) {
 		TL_BOUNDS_CHECK(where < size);
 		--size;
-		for (umm i = where; i < size; ++i) {
+		for (Index i = where; i < size; ++i) {
 			data[i] = data[i + 1];
 		}
 	}
@@ -112,8 +135,8 @@ struct List {
 	}
 
 	T *data = 0;
-	umm size = 0;
-	umm capacity = 0;
+	Index size = 0;
+	Index capacity = 0;
 	Allocator allocator = current_allocator;
 };
 
@@ -135,11 +158,6 @@ List<T> copy(List<T> const &that) {
 	result.data = ALLOCATE(T, result.allocator, result.size);
 	memcpy(result.data, that.data, result.size * sizeof(T));
 	return result;
-}
-
-template <class Char, class CopyFn, class = EnableIf<is_copy_fn<CopyFn, Char>>>
-CopyFnRet<CopyFn, Char> to_string(List<char> const &list, CopyFn &&copy_fn) {
-	return copy_fn(Span<char>(list.data, list.size));
 }
 
 template <class T>
@@ -194,9 +212,9 @@ struct BadList {
 		this->~BadList();
 		return *new(this) BadList(std::move(that));
 	}
-	BadList &operator=(std::initializer_list<T> v) { 
+	BadList &operator=(std::initializer_list<T> v) {
 		this->~BadList();
-		return *new(this) BadList(Span(v.begin(), v.end())); 
+		return *new(this) BadList(Span(v.begin(), v.end()));
 	}
 
 	void _copyConstruct(T const *srcBegin, T const *srcEnd) {
@@ -213,7 +231,7 @@ struct BadList {
 
 	umm remainingCapacity() const { return (umm)(_allocEnd - _end); }
 	umm capacity() const { return (umm)(_allocEnd - _begin); }
-	
+
 	umm size() const { return (umm)(_end - _begin); }
 	bool empty() const { return size() == 0; }
 
@@ -251,15 +269,15 @@ struct BadList {
 		}
 		_end = _begin;
 	}
-	
+
 	T *insert(Span<T> span, T *where) {
 		TL_BOUNDS_CHECK(_begin <= where && where <= _end);
 
 		umm where_index = where - _begin;
 		umm required_size = size() + span.size;
 		_grow_if_needed(required_size);
-		where = _begin + where_index; 
-		
+		where = _begin + where_index;
+
 		for (auto src = where; src != _end; ++src) {
 			new (src + span.size) T(std::move(*src));
 		}
@@ -353,7 +371,7 @@ struct BadList {
 		new (val) T(std::move(*(this->_end-- - 1)));
 	}
 	void erase_unordered(T &val) { erase_unordered(std::addressof(val)); }
-	
+
 	BadList &operator+=(T const &v) { this->push_back(v); return *this; }
 	BadList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
 	BadList &operator+=(Span<T> v) { this->insert(v, this->end()); return *this; }
@@ -433,7 +451,7 @@ struct Queue {
 		data[0] = value;
 	}
 
-	void pop() { 
+	void pop() {
 		TL_BOUNDS_CHECK(size);
 		++data;
 		--size;
@@ -485,7 +503,7 @@ struct Queue {
 	}
 	void erase(T *val) { erase_at(val - data); }
 	void erase(T &val) { erase(&val); }
-	
+
 	void _grow_if_needed(umm required_size) {
 		if (required_size <= space_back())
 			return;
@@ -495,7 +513,7 @@ struct Queue {
 		while (new_capacity < required_size) {
 			new_capacity *= 2;
 		}
-		
+
 		T *new_data = ALLOCATE(T, allocator, new_capacity);
 		for (umm i = 0; i < size; ++i) {
 			new_data[i] = data[i];
@@ -511,7 +529,7 @@ struct Queue {
 		TL_BOUNDS_CHECK(where <= size);
 
 		_grow_if_needed(size + span.size);
-		
+
 		for (umm i = where; i < size; ++i) {
 			data[span.size + i] = data[i];
 		}
@@ -529,7 +547,7 @@ struct Queue {
 	Queue &operator+=(Span<T const> v) { insert(v, end()); return *this; }
 	Queue &operator+=(Queue<T> const &v) { insert(as_span(v), end()); return *this; }
 	Queue &operator+=(std::initializer_list<T> v) { insert(Span(v.begin(), v.end()), this->end()); return *this; }
-	
+
 	Allocator allocator = current_allocator;
 	T *data = 0;
 	umm size = 0;
@@ -572,7 +590,7 @@ struct StaticCircularBuffer {
 		bool operator==(Iterator const &that) const { return index == that.index; }
 		bool operator!=(Iterator const &that) const { return index != that.index; }
 	};
-	
+
 	StaticCircularBuffer() = default;
 	StaticCircularBuffer(StaticCircularBuffer const &that) {
 		_size = that._size;
@@ -622,7 +640,7 @@ struct StaticCircularBuffer {
 
 	void pop_back() { _get(--_size).~T(); }
 	void pop_front() { _storage[_begin].value.~T(); _incBegin(); --_size; }
-	
+
 	Iterator begin() { return Iterator(this, 0); }
 	Iterator end() { return Iterator(this, _size); }
 
@@ -667,7 +685,7 @@ struct StaticCircularBuffer {
 	}
 	void _incBegin() {
 		++_begin;
-		if (_begin == _capacity) 
+		if (_begin == _capacity)
 			_begin = 0;
 	}
 
@@ -701,7 +719,7 @@ struct CircularBuffer {
 		bool operator==(Iterator const &that) const { return index == that.index; }
 		bool operator!=(Iterator const &that) const { return index != that.index; }
 	};
-	
+
 	CircularBuffer() = default;
 	explicit CircularBuffer(umm capacity) {
 		_allocBegin = ALLOCATE_T(Allocator, T, capacity, 0);
@@ -762,11 +780,11 @@ struct CircularBuffer {
 
 	void pop_back() { _get(--_size).~T(); }
 	void pop_front() { _allocBegin[_firstIndex].~T(); _incBegin(); --_size; }
-	
+
 	void reserve(umm count) {
 		if (count <= capacity())
 			return;
-		
+
 		T *newBegin = ALLOCATE_T(Allocator, T, count, 0);
 
 		for (umm i = 0; i < _size; ++i) {
@@ -898,7 +916,7 @@ struct BlockList {
 		for (u32 i = 0; i < that.first.size(); ++i) {
 			new (&first.buffer[i].value) T(that.first.buffer[i].value);
 		}
-		
+
 		auto previous = &first;
 		for (auto srcBlock = that.first.next; srcBlock != 0;) {
 			if (srcBlock->size()) {
@@ -925,12 +943,12 @@ struct BlockList {
 	}
 	BlockList &operator=(BlockList const &that) {
 		clear();
-		
+
 		first.end = first.buffer + that.first.size();
 		for (u32 i = 0; i < that.first.size(); ++i) {
 			new (&first.buffer[i].value) T(that.first.buffer[i].value);
 		}
-		
+
 		last = &first;
 		for (auto srcBlock = that.first.next; srcBlock != 0;) {
 			if (srcBlock->size()) {
@@ -1099,7 +1117,7 @@ struct BlockList {
 		}
 		return block->buffer[index].value;
 	}
-	
+
 	BlockList &operator+=(T const &v) { this->add(v); return *this; }
 	BlockList &operator+=(T &&v) { this->add(std::move(v)); return *this; }
 	BlockList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
@@ -1202,6 +1220,145 @@ T *find(BlockList<T, block_size> &list, T const &to_find, typename BlockList<T, 
 	} while (block);
 
 	return 0;
+}
+
+template <class T>
+struct LinearSet {
+	T &add(T value) {
+		auto found = find(value);
+		if (found) {
+			return *found;
+		} else {
+			reserve_exponential(size + 1);
+			memcpy(data + size, &value, sizeof(T));
+			return data[size++];
+		}
+	}
+
+	T *find(T value) {
+		for (umm i = 0; i < size; ++i) {
+			if (data[i] == value)
+				return data + i;
+		}
+		return 0;
+	}
+
+	//Span<T> add(Span<T> span) {
+	//	reserve_exponential(size + span.size);
+	//	memcpy(data + size, span.data, span.size * sizeof(T));
+	//	size += span.size;
+	//	return {data + size - span.size, span.size};
+	//}
+	//
+	void reallocate(umm desired_capacity) {
+		auto new_data = ALLOCATE(T, allocator, desired_capacity);
+		memcpy(new_data, data, sizeof(T) * size);
+
+		if (data) FREE(allocator, data);
+		data = new_data;
+		capacity = desired_capacity;
+	}
+
+	//void reserve(umm desired_capacity) {
+	//	if (capacity >= desired_capacity) return;
+
+	//	reallocate(desired_capacity);
+	//}
+	void reserve_exponential(umm desired_capacity) {
+		if (capacity >= desired_capacity) return;
+
+		umm new_capacity = max(1, capacity);
+		while (new_capacity < desired_capacity) new_capacity *= 2;
+
+		reallocate(new_capacity);
+	}
+	//void resize(umm new_size) {
+	//	reserve(new_size);
+
+	//	if (new_size > size) {
+	//		for (umm i = size; i < new_size; ++i) {
+	//			new (data + i) T();
+	//		}
+	//	}
+	//	size = new_size;
+	//}
+
+	//void clear() {
+	//	size = 0;
+	//}
+
+	//T &operator[](umm i) {
+	//	TL_BOUNDS_CHECK(i < size);
+	//	return data[i];
+	//}
+
+	//T *begin() { return data; }
+	//T *end() { return data + size; }
+	//
+	//T &front() { TL_BOUNDS_CHECK(size); return data[0]; }
+	//T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
+
+	//operator Span<T>() { return {data, size}; }
+	//
+	//List &operator+=(T const &v) { add(v); return *this; }
+	//List &operator+=(Span<T> v) { add(v); return *this; }
+	//List &operator+=(List<T> const &v) { add(as_span(v)); return *this; }
+	//List &operator+=(std::initializer_list<T> v) { add(Span((T *)v.begin(), (T *)v.end())); return *this; }
+	//
+	//T &insert(Span<T> span, umm where) {
+	//	TL_BOUNDS_CHECK(where <= size);
+
+	//	umm required_size = size + span.size;
+	//	reserve(required_size);
+	//
+	//	for (auto i = where; i != size; ++i) {
+	//		data[i + span.size] = data[i];
+	//	}
+
+	//	for (umm i = 0; i < span.size; ++i) {
+	//		data[where + i] = span.data[i];
+	//	}
+
+	//	size += span.size;
+	//	return data[where];
+	//}
+	//T &insert(Span<T> span, T *where) {
+	//	return insert(span, where - data);
+	//}
+	//
+	//void erase_at(umm where) {
+	//	TL_BOUNDS_CHECK(where < size);
+	//	--size;
+	//	for (umm i = where; i < size; ++i) {
+	//		data[i] = data[i + 1];
+	//	}
+	//}
+	//void erase(T *value) { erase_at(value - data); }
+
+	//bool find_and_erase(T value) {
+	//	auto found = find(as_span(*this), value);
+	//	if (found) {
+	//		erase(found);
+	//		return true;
+	//	} else {
+	//		return false;
+	//	}
+	//}
+
+	T *data = 0;
+	umm size = 0;
+	umm capacity = 0;
+	Allocator allocator = current_allocator;
+};
+
+template <class T>
+void free(LinearSet<T> &set) {
+	if (set.data == 0) return;
+
+	FREE(set.allocator, set.data);
+	set.data = 0;
+	set.size = 0;
+	set.capacity = 0;
 }
 
 #if 0

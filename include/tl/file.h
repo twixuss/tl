@@ -10,7 +10,7 @@ enum FileOpenFlags {
 	File_write  = 0x2,
 };
 
-enum FileCursor {
+enum FileCursorOrigin {
 	File_begin,
 	File_cursor,
 	File_end,
@@ -29,13 +29,25 @@ struct FileTracker {
 
 TL_API File open_file(char const *path, u32 openFlags);
 TL_API File open_file(wchar const *path, u32 openFlags);
-TL_API void set_cursor(File file, s64 offset, FileCursor origin);
+TL_API void close(File file);
+
+TL_API bool read(File file, void *data, u64 size);
+template <class T>
+inline bool read_bytes(File file, T &value) {
+	return read(file, &value, sizeof(value));
+}
+
+TL_API bool write(File file, void const *data, u64 size);
+template <class T>
+inline bool write_bytes(File file, T const &value) {
+	return write(file, &value, sizeof(value));
+}
+
+TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
 TL_API s64 get_cursor(File file);
 TL_API s64 length(File file);
-TL_API void read(File file, void *data, u64 size);
-TL_API void write(File file, void const *data, u64 size);
+
 TL_API void truncate_to_cursor(File file);
-TL_API void close(File file);
 TL_API bool file_exists(char const *path);
 TL_API bool file_exists(wchar const *path);
 TL_API u64 get_file_write_time(char const *path);
@@ -170,8 +182,18 @@ inline bool write_entire_file(wchar const *path, void const *data, u64 size) {
 	close(file);
 	return true;
 }
+inline bool write_entire_file(Span<char> path, void const *data, u64 size) {
+	if (path.back() == '\0') {
+		return write_entire_file(path.data, data, size);
+	} else {
+		auto null_terminated_path = null_terminate(path);
+		defer { free(null_terminated_path); };
+		return write_entire_file(null_terminated_path.data, data, size);
+	}
+}
 forceinline bool write_entire_file(char  const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
 forceinline bool write_entire_file(wchar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
+forceinline bool write_entire_file(Span<char> path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
 
 }
 
@@ -236,7 +258,7 @@ File open_file(wchar const *path, u32 openFlags) {
 		handle = 0;
 	return (File)handle;
 }
-void set_cursor(File file, s64 offset, FileCursor origin) {
+void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
 	LARGE_INTEGER newP;
 	newP.QuadPart = offset;
 	DWORD moveMethod;
@@ -253,31 +275,41 @@ s64 get_cursor(File file) {
 	SetFilePointerEx((HANDLE)file, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
 }
-void read(File file, void *data_, u64 size) {
-	DWORD const maxBytes = (DWORD)~0;
-	DWORD bytesRead;
+bool read(File file, void *data_, u64 size) {
+	DWORD const max_bytes = (DWORD)~0;
+	DWORD bytes_read = 0;
 	u8 *data = (u8 *)data_;
-	while (size > maxBytes) {
-		ReadFile((HANDLE)file, data, maxBytes, &bytesRead, 0);
-		data += maxBytes;
-		size -= maxBytes;
+	u64 total_bytes_read = 0;
+	u64 remaining = size;
+	while (remaining > max_bytes) {
+		ReadFile((HANDLE)file, data, max_bytes, &bytes_read, 0);
+		data += max_bytes;
+		remaining -= max_bytes;
+		total_bytes_read += bytes_read;
 	}
-	if (size) {
-		ReadFile((HANDLE)file, data, (DWORD)size, &bytesRead, 0);
+	if (remaining) {
+		ReadFile((HANDLE)file, data, (DWORD)remaining, &bytes_read, 0);
+		total_bytes_read += bytes_read;
 	}
+	return total_bytes_read == size;
 }
-void write(File file, void const *data_, u64 size) {
-	DWORD const maxBytes = (DWORD)~0;
-	DWORD bytesWritten;
+bool write(File file, void const *data_, u64 size) {
+	DWORD const max_bytes = (DWORD)~0;
+	DWORD bytes_written = 0;
 	u8 *data = (u8 *)data_;
-	while (size > maxBytes) {
-		WriteFile((HANDLE)file, data, maxBytes, &bytesWritten, 0);
-		data += maxBytes;
-		size -= maxBytes;
+	u64 total_bytes_written = 0;
+	u64 remaining = size;
+	while (remaining > max_bytes) {
+		WriteFile((HANDLE)file, data, max_bytes, &bytes_written, 0);
+		data += max_bytes;
+		remaining -= max_bytes;
+		total_bytes_written += bytes_written;
 	}
-	if (size) {
-		WriteFile((HANDLE)file, data, (DWORD)size, &bytesWritten, 0);
+	if (remaining) {
+		WriteFile((HANDLE)file, data, (DWORD)remaining, &bytes_written, 0);
+		total_bytes_written += bytes_written;
 	}
+	return total_bytes_written == size;
 }
 void truncate_to_cursor(File file) {
 	SetEndOfFile((HANDLE)file);
@@ -296,7 +328,7 @@ u64 get_file_write_time(char const *path) {
 	HANDLE file = CreateFileA(path, 0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
 	if (file == INVALID_HANDLE_VALUE)
 		return 0;
-	
+
 	defer { CloseHandle(file); };
 
 	FILETIME last_write_time;

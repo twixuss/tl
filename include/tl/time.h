@@ -13,6 +13,8 @@ TL_API f64 reset_timer(PreciseTimer &timer);
 
 TL_API u64 read_timestamp_counter();
 
+TL_API List<char> get_time_string();
+
 }
 
 #ifdef TL_IMPL
@@ -37,6 +39,18 @@ f64 reset_timer(PreciseTimer &timer) {
 
 u64 read_timestamp_counter() {
 	return __rdtsc();
+}
+
+List<char> get_time_string() {
+	StringBuilder builder;
+	defer { free(builder); };
+
+	SYSTEMTIME t;
+	GetSystemTime(&t);
+	
+	append_format(builder, "%:%:%:%", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+
+	return to_string(builder);
 }
 
 }
