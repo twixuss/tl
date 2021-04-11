@@ -5,21 +5,12 @@
 
 namespace TL {
 
-enum Encoding {
-	Encoding_ascii,
-	Encoding_utf8,
-	Encoding_utf16,
-};
-
-template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_ascii;
-template <> inline static constexpr Encoding encoding_from_type<wchar> = Encoding_utf16;
-
 struct Printer {
-	void (*func)(Span<u8> span, Encoding encoding, void *state);
+	void (*func)(Span<utf8> span, void *state);
 	void *state;
 
-	void operator()(Span<u8> span, Encoding encoding) {
-		func(span, encoding, state);
+	void operator()(Span<utf8> span) {
+		func(span, state);
 	}
 };
 
@@ -29,12 +20,17 @@ extern TL_API Printer current_printer;
 TL_API void set_console_encoding(Encoding);
 TL_API void clear_console();
 
-TL_API void print_to_console(Span<u8> string, Encoding encoding);
+// UTF-8
+TL_API void print_to_console(Span<utf8> string);
 
-inline void print_to_console(Span<char > string) { print_to_console(as_bytes(string), Encoding_ascii); }
-inline void print_to_console(Span<wchar> string) { print_to_console(as_bytes(string), Encoding_utf16); }
+inline void print_to_console(Span<ascii>  string) { print_to_console(ascii_to_utf8(string)); }
+inline void print_to_console(Span<utf16> string) {
+	auto temp = utf16_to_utf8(string);
+	defer { free(temp); };
+	print_to_console(temp);
+}
 
-template <class Char = char, class T>
+template <class T>
 inline void print(T const &value) {
 	StringBuilder builder;
 	defer { free(builder); };
@@ -44,11 +40,11 @@ inline void print(T const &value) {
 	auto string = to_string(builder);
 	defer { free(string); };
 
-	current_printer(as_bytes(string), encoding_from_type<Char>);
+	current_printer(ascii_to_utf8(string));
 }
 
-template <class Char = char, class ...Args>
-inline void print(Char const *fmt, Args const &...args) {
+template <class ...Args>
+inline void print(char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	defer { free(builder); };
 
@@ -57,7 +53,7 @@ inline void print(Char const *fmt, Args const &...args) {
 	auto string = to_string(builder);
 	defer { free(string); };
 
-	print<Char>(string);
+	print(string);
 }
 
 TL_API void hide_console_window();
@@ -66,7 +62,7 @@ TL_API void show_console_window();
 #ifdef TL_IMPL
 
 Printer console_printer = {
-	[](Span<u8> span, Encoding encoding, void *) { print_to_console(span, encoding); },
+	[](Span<utf8> span, void *) { print_to_console(span); },
 	0
 };
 
@@ -75,13 +71,9 @@ Printer console_printer = {
 static HANDLE console_output = GetStdHandle(STD_OUTPUT_HANDLE);
 static HWND console_window = GetConsoleWindow();
 
-void print_to_console(Span<u8> span, Encoding encoding) {
+void print_to_console(Span<utf8> span) {
 	DWORD charsWritten;
-	switch (encoding) {
-		case Encoding_ascii: WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
-		case Encoding_utf8:  WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
-		case Encoding_utf16: WriteConsoleW(console_output, span.data, (DWORD)span.size, &charsWritten, 0); break;
-	}
+	WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
 }
 
 void clear_console() {
@@ -166,7 +158,8 @@ struct PrinterPusher {
 	operator bool() { return true; }
 };
 
-#define push_printer(printer) if(auto CONCAT(_,__LINE__)=::TL::PrinterPusher(printer))
+#define push_printer(printer) tl_push(::TL::PrinterPusher, printer)
+#define scoped_printer(printer) tl_scoped(::TL::current_printer, printer)
 
 } // namespace TL
 

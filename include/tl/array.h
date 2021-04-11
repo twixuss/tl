@@ -11,11 +11,17 @@ struct Array {
 
 	constexpr T *begin() { return data; }
 	constexpr T *end() { return data + size; }
-	constexpr T& operator[](umm i) { return data[i]; }
+	constexpr T& operator[](umm i) {
+		bounds_check(i < size);
+		return data[i];
+	}
 
 	constexpr T const *begin() const { return data; }
 	constexpr T const *end() const { return data + size; }
-	constexpr T const& operator[](umm i) const { return data[i]; }
+	constexpr T const& operator[](umm i) const {
+		bounds_check(i < size);
+		return data[i];
+	}
 	T data[size];
 };
 
@@ -31,8 +37,8 @@ struct Array2 {
 	inline static constexpr IndexType size_y = _size_y;
 
 	constexpr T& at(IndexType x, IndexType y) {
-		TL_BOUNDS_CHECK(x < size_x);
-		TL_BOUNDS_CHECK(y < size_y);
+		bounds_check(x < size_x);
+		bounds_check(y < size_y);
 		return data[y][x];
 	}
 
@@ -50,9 +56,9 @@ struct Array3 {
 	inline static constexpr IndexType size_z = _size_z;
 
 	constexpr T& at(IndexType x, IndexType y, IndexType z) {
-		TL_BOUNDS_CHECK(x < size_x);
-		TL_BOUNDS_CHECK(y < size_y);
-		TL_BOUNDS_CHECK(z < size_z);
+		bounds_check(x < size_x);
+		bounds_check(y < size_y);
+		bounds_check(z < size_z);
 		return data[z][y][x];
 	}
 

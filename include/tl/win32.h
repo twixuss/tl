@@ -40,6 +40,8 @@ inline void set_cursor_position(v2s position) {
 TL_API v2s get_cursor_position();
 TL_API u64 get_memory_usage();
 
+TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
+
 #ifdef TL_IMPL
 bool init_rawinput(RawInputDevice deviceFlags) {
 	StaticList<RAWINPUTDEVICE, 1> devices;
@@ -237,6 +239,26 @@ u64 get_memory_usage() {
 	}
 	return result;
 }
+
+bool set_fullscreen(HWND window, bool fullscreen, DWORD window_style, WINDOWPLACEMENT &placement) {
+	if (fullscreen) {
+		HMONITOR hmon = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi = { sizeof(mi) };
+		if (!GetMonitorInfoA(hmon, &mi) || !GetWindowPlacement(window, &placement))
+			return false;
+
+		SetWindowLongA(window, GWL_STYLE, window_style & ~WS_OVERLAPPEDWINDOW);
+		SetWindowPos(window, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+		return true;
+	} else {
+        SetWindowLongA(window, GWL_STYLE, window_style | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(window, &placement);
+		SetWindowPos(window, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+		return false;
+	}
+
+}
+
 #endif
 
 }

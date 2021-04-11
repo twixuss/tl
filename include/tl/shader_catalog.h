@@ -11,7 +11,7 @@ namespace TL {
 
 struct Shader {
 	GLuint program;
-	List<char> path;
+	List<utf8> path;
 	FileTracker tracker;
 	std::unordered_map<Span<char>, GLuint> uniforms;
 	bool valid;
@@ -25,16 +25,17 @@ struct Shader {
 };
 struct ShaderCatalog {
 	Allocator allocator;
-	std::unordered_map<Span<char>, Shader> shaders;
-	StringList<char> shader_file_names;
+	std::unordered_map<Span<utf8>, Shader> shaders;
+	ListList<utf8> shader_file_names;
 	Shader *fallback_shader;
 };
 
-TL_API Shader *find(ShaderCatalog &catalog, Span<char> name);
+TL_API Shader *find(ShaderCatalog &catalog, Span<utf8> name);
+
 TL_API bool parse_shader(Shader &shader, Span<char> source);
-TL_API Buffer load_shader_file(Span<char> full_path);
-TL_API Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_name);
-TL_API void init(ShaderCatalog &catalog, char const *directory, Span<char> fallback_shader_name);
+TL_API Buffer load_shader_file(Span<utf8> full_path);
+TL_API Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_name);
+TL_API void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shader_name);
 TL_API void update(ShaderCatalog &catalog);
 TL_API GLuint get_uniform_location(Shader &shader, Span<char> name);
 TL_API void set_uniform(Shader &shader, Span<char> name, f32 value);
@@ -52,7 +53,7 @@ inline void set_uniform(Shader &shader, char const *name, m4  value) { set_unifo
 
 #ifdef TL_IMPL
 
-Shader *find(ShaderCatalog &catalog, Span<char> name) {
+Shader *find(ShaderCatalog &catalog, Span<utf8> name) {
 	auto result = catalog.shaders.find(name);
 	if (result != catalog.shaders.end()) {
 		if (result->second.valid) {
@@ -84,6 +85,10 @@ bool parse_shader(Shader &shader, Span<char> source) {
 			return GL_SRC_COLOR;
 		} else if (str == "inv_src_color"s) {
 			return GL_ONE_MINUS_SRC_COLOR;
+		} else if (str == "src_color2"s) {
+			return GL_SRC1_COLOR;
+		} else if (str == "inv_src_color2"s) {
+			return GL_ONE_MINUS_SRC1_COLOR;
 		} else if (str == "one"s) {
 			return GL_ONE;
 		} else if (str == "zero"s) {
@@ -178,7 +183,7 @@ bool parse_shader(Shader &shader, Span<char> source) {
 	return success;
 }
 
-Buffer load_shader_file(Span<char> full_path) {
+Buffer load_shader_file(Span<utf8> full_path) {
 	auto source = read_entire_file(full_path);
 	assert(source.data);
 
@@ -203,9 +208,9 @@ Buffer load_shader_file(Span<char> full_path) {
 			++file_name_end;
 		}
 
-		Span<char> file_name = {(char *)file_name_start, (char *)file_name_end};
+		Span<utf8> file_name = {(utf8 *)file_name_start, (utf8 *)file_name_end};
 
-		auto file_path = concatenate(directory, file_name);
+		auto file_path = (List<utf8>)concatenate(directory, file_name);
 		auto included_file = load_shader_file(file_path);
 		free(file_path);
 
@@ -232,29 +237,29 @@ Buffer load_shader_file(Span<char> full_path) {
 	return source;
 }
 
-Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_name) {
+Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_name) {
 	using namespace OpenGL;
 
 	auto file_name = full_name;
-	file_name.size = find(file_name, '.') - file_name.data;
+	file_name.size = find(file_name, u8'.') - file_name.data;
 
 	auto &shader = catalog.shaders[file_name];
 
-	shader.path = concatenate(directory, '/', full_name, '\0');
+	shader.path = (List<utf8>)concatenate(directory, "/", full_name, "\0"s);
 	shader.tracker = create_file_tracker(shader.path.data, [&](FileTracker &tracker) {
 		print("Compiling %\n", tracker.path);
 
 		auto source = load_shader_file(as_span(tracker.path));
 		defer { FREE(default_allocator, source.data); };
 
-		auto vertex_shader = create_shader(GL_VERTEX_SHADER, 330, true, as_chars(source)).id;
+		auto vertex_shader = create_shader(GL_VERTEX_SHADER, 330, true, as_chars(source));
 		if (vertex_shader) {
-			auto fragment_shader = create_shader(GL_FRAGMENT_SHADER, 330, true, as_chars(source)).id;
+			auto fragment_shader = create_shader(GL_FRAGMENT_SHADER, 330, true, as_chars(source));
 			if (fragment_shader) {
 				if (shader.program) {
 					glDeleteProgram(shader.program);
 				}
-				shader.program = create_program(vertex_shader, fragment_shader).id;
+				shader.program = create_program(vertex_shader, fragment_shader);
 				glDeleteShader(vertex_shader);
 				glDeleteShader(fragment_shader);
 				if (shader.program) {
@@ -287,10 +292,10 @@ Shader &add_file(ShaderCatalog &catalog, char const *directory, Span<char> full_
 	return shader;
 }
 
-void init(ShaderCatalog &catalog, char const *directory, Span<char> fallback_shader_name) {
+void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shader_name) {
 	catalog.allocator = current_allocator;
 	catalog.shader_file_names = get_files_in_directory(directory);
-	auto fallback_shader_path = concatenate(fallback_shader_name, ".glsl");
+	auto fallback_shader_path = (List<utf8>)concatenate(fallback_shader_name, ".glsl");
 	defer { free(fallback_shader_path); };
 	catalog.fallback_shader = &add_file(catalog, directory, fallback_shader_path);
 	assert(catalog.fallback_shader->program);

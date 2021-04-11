@@ -235,7 +235,10 @@ constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi, V ma) { return min(max(a, mi), ma); }
+template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi, V ma) {
+	minmax(mi, ma, mi, ma);
+	return min(max(a, mi), ma);
+}
 template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map_clamped(T v, SN sn, SX sx, DN dn, DX dx) { return (clamp(v, sn, sx) - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class A, class B, class T> forceinline constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
@@ -734,6 +737,7 @@ uop(-, ty, con)
 union v3s64;
 
 union v2f {
+	using Scalar = f32;
 	struct { f32 x, y; };
 	f32 s[2];
 
@@ -769,6 +773,7 @@ union v2f {
 };
 template <>
 union v3<f32> {
+	using Scalar = f32;
 	using v2 = v2f;
 
 	struct { f32 x, y, z; };
@@ -805,19 +810,20 @@ union v3<f32> {
 	forceinline explicit operator v3s() const;
 	forceinline explicit operator v3u() const;
 };
-union v4f { VECIMPL(4, S, 1, f32); };
+union v4f { using Scalar = f32; VECIMPL(4, S, 1, f32); };
 
-union v2s { VECIMPL(2, S, 1, s32); fice bool operator!=(v2s b) { return x != b.x || y != b.y; } };
+union v2s { using Scalar = s32; VECIMPL(2, S, 1, s32); fice bool operator!=(v2s b) { return x != b.x || y != b.y; } };
 union v3s {
+	using Scalar = s32;
 	VECIMPL(3, S, 1, s32);
 	fice v2s xz() const { return {x, z}; }
 	fice v3s zxy() const { return {z,x,y}; }
 	forceinline explicit operator v3s64() const;
 };
-union v4s { VECIMPL(4, S, 1, s32); };
-union v2u { VECIMPL(2, S, 1, u32); };
-union v3u { VECIMPL(3, S, 1, u32); };
-union v4u { VECIMPL(4, S, 1, u32); };
+union v4s { using Scalar = s32; VECIMPL(4, S, 1, s32); };
+union v2u { using Scalar = u32; VECIMPL(2, S, 1, u32); };
+union v3u { using Scalar = u32; VECIMPL(3, S, 1, u32); };
+union v4u { using Scalar = u32; VECIMPL(4, S, 1, u32); };
 
 #undef CVT
 
@@ -827,6 +833,7 @@ v3f::operator v3u()const{return{(u32)x,(u32)y,(u32)z};}
 // clang-format on
 
 union v3s64 {
+	using Scalar = s64;
 	struct {
 		s64 x, y, z;
 	};
@@ -840,6 +847,8 @@ forceinline v3s::operator v3s64() const {
 }
 
 union m2 {
+	using Scalar = f32;
+	using Vector = v2f;
 	struct {
 		v2f i, j;
 	};
@@ -879,7 +888,18 @@ union m2 {
 	}
 };
 
+template<> inline static constexpr v2f min_value<v2f> = {min_value<v2f::Scalar>, min_value<v2f::Scalar>};
+template<> inline static constexpr v2f max_value<v2f> = {max_value<v2f::Scalar>, max_value<v2f::Scalar>};
+
+template<> inline static constexpr v2s min_value<v2s> = {min_value<v2s::Scalar>, min_value<v2s::Scalar>};
+template<> inline static constexpr v2s max_value<v2s> = {max_value<v2s::Scalar>, max_value<v2s::Scalar>};
+
+template<> inline static constexpr v2u min_value<v2u> = {min_value<v2u::Scalar>, min_value<v2u::Scalar>};
+template<> inline static constexpr v2u max_value<v2u> = {max_value<v2u::Scalar>, max_value<v2u::Scalar>};
+
 union m3 {
+	using Scalar = f32;
+	using Vector = v3f;
 	struct {
 		v3f i, j, k;
 	};
@@ -1673,6 +1693,7 @@ forceinline v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
 
 	return m;
 }
+forceinline v4f hsv_to_rgb(f32 h, f32 s, f32 v, f32 a) { return V4f(hsv_to_rgb(h, s, v), a); }
 forceinline v3f hsv_to_rgb(v3f hsv) { return hsv_to_rgb(hsv.x, hsv.y, hsv.z); }
 forceinline v4f hsv_to_rgb(v4f hsv) { hsv.xyz = hsv_to_rgb(hsv.xyz); return hsv; }
 
@@ -1743,10 +1764,8 @@ template<class T>
 struct aabb {
 	T min, max;
 	T size() const { return max - min; }
-	T middle() const {
-		T sum = max + min;
-		sum *= 0.5f;
-		return sum;
+	T center() const {
+		return half(max + min);
 	}
 	template <class U>
 	aabb<T> operator*(U const &b) { return {min * b, max * b}; }
@@ -1754,6 +1773,9 @@ struct aabb {
 	bool operator!=(aabb const &that) const { return min != that.min || max != that.max; }
 	template <class U>
 	explicit operator aabb<U>() const { return { (U)min, (U)max }; }
+
+	aabb operator-(T b) { return {min - b, max - b}; }
+	aabb &operator+=(T b) { return min += b, max += b, *this; }
 };
 
 template <class T>
@@ -1761,8 +1783,8 @@ forceinline aabb<T> aabb_min_max(T min, T max) {
 	return {min, max};
 }
 template <class T>
-forceinline aabb<T> aabbMinDim(T min, T dim) {
-	return {min, min + dim};
+forceinline aabb<T> aabb_min_size(T min, T size) {
+	return {min, min + size};
 }
 template <class T>
 forceinline aabb<T> aabbCenterDim(T center, T dim) {
@@ -1778,6 +1800,27 @@ template <class T>
 forceinline aabb<T> include(aabb<T> box, T point) {
 	box.min = min(box.min, point);
 	box.max = max(box.max, point);
+	return box;
+}
+
+template <class T>
+forceinline aabb<T> extend(aabb<T> box, T radius) {
+	box.min -= radius;
+	box.max += radius;
+	return box;
+}
+
+template <class T>
+forceinline aabb<T> extend(aabb<T> box, T min_offset, T max_offset) {
+	box.min -= min_offset;
+	box.max += max_offset;
+	return box;
+}
+
+template <class T>
+forceinline aabb<T> to_zero(aabb<T> box) {
+	box.max -= box.min;
+	box.min = {};
 	return box;
 }
 
@@ -2125,6 +2168,8 @@ forceinline constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
 }
 
 union m4 {
+	using Scalar = f32;
+	using Vector = v4f;
 	struct {
 		v4f i, j, k, l;
 	};
@@ -2490,11 +2535,11 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 #define TO_STRING_V2(v2f)                           \
 inline void append(StringBuilder &builder, v2f v) { \
-	append(builder, '{');                           \
+	append(builder, "{"s);                          \
 	append(builder, v.x);                           \
 	append(builder, ", "s);                         \
 	append(builder, v.y);                           \
-	append(builder, '}');                           \
+	append(builder, "}"s);                          \
 }
 
 TO_STRING_V2(v2f)
@@ -2505,13 +2550,13 @@ TO_STRING_V2(v2s)
 
 #define TO_STRING_V3(v3f)                           \
 inline void append(StringBuilder &builder, v3f v) { \
-	append(builder, '{');                           \
+	append(builder, "{"s);                          \
 	append(builder, v.x);                           \
 	append(builder, ", "s);                         \
 	append(builder, v.y);                           \
 	append(builder, ", "s);                         \
 	append(builder, v.z);                           \
-	append(builder, '}');                           \
+	append(builder, "}"s);                          \
 }
 
 TO_STRING_V3(v3f)
@@ -2522,7 +2567,7 @@ TO_STRING_V3(v3s)
 
 #define TO_STRING_V4(v4f)                           \
 inline void append(StringBuilder &builder, v4f v) { \
-	append(builder, '{');                           \
+	append(builder, "{"s);                          \
 	append(builder, v.x);                           \
 	append(builder, ", "s);                         \
 	append(builder, v.y);                           \
@@ -2530,7 +2575,7 @@ inline void append(StringBuilder &builder, v4f v) { \
 	append(builder, v.z);                           \
 	append(builder, ", "s);                         \
 	append(builder, v.w);                           \
-	append(builder, '}');                           \
+	append(builder, "}"s);                          \
 }
 
 TO_STRING_V4(v4f)

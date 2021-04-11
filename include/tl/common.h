@@ -32,26 +32,18 @@
 #endif
 
 #ifndef ASSERTION_FAILURE
-#define ASSERTION_FAILURE(causeString, expression, ...) debug_break()
+#define ASSERTION_FAILURE(cause_string, expression, ...) debug_break()
 #endif
 
-#define assert_always(x, ...)                              \
-	do {                                                   \
-		if (!(x)) {                                        \
-			ASSERTION_FAILURE("assert", #x, __VA_ARGS__);  \
-		}                                                  \
-	} while (0)
-#define assert(x, ...) assert_always(x, ...)
+#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+#define assert(x, ...) assert_always(x, __VA_ARGS__)
 
-#define invalid_code_path(...)                                   \
-	do {                                                         \
-		ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__); \
-	} while (0)
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__))
 
 #ifdef TL_DEBUG
-#define TL_BOUNDS_CHECK(x) assert(x, "Bounds check failed")
+#define bounds_check(x, ...) (void)((x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
 #else
-#define TL_BOUNDS_CHECK(x)
+#define bounds_check(x)
 #endif
 
 #define TL_DISABLED_WARNINGS \
@@ -62,24 +54,35 @@
 #pragma warning(push)
 #pragma warning(disable: TL_DISABLED_WARNINGS)
 #pragma warning(disable: 4820)
+#pragma warning(disable: 4455)
 #endif
 
 namespace TL {
 
-inline constexpr umm length(char const *str) {
-	umm result = 0;
-	while (*str++)
-		++result;
-	return result;
-}
-inline constexpr umm length(wchar const *str) {
-	umm result = 0;
-	while (*str++)
-		++result;
-	return result;
-}
-inline constexpr umm length(char  *str) { return length((char  const *)str); }
-inline constexpr umm length(wchar *str) { return length((wchar const *)str); }
+inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
+inline constexpr umm string_char_count(ascii *str) { return string_char_count((ascii const *)str); }
+
+inline constexpr umm string_unit_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
+inline constexpr umm string_unit_count(utf8  const *str) { umm result = 0; while (*str++) ++result; return result; }
+inline constexpr umm string_unit_count(utf16 const *str) { umm result = 0; while (*str++) ++result; return result;}
+inline constexpr umm string_unit_count(utf32 const *str) { umm result = 0; while (*str++) ++result; return result;}
+inline constexpr umm string_unit_count(wchar const *str) { umm result = 0; while (*str++) ++result; return result;}
+inline constexpr umm string_unit_count(ascii *str) { return string_unit_count((ascii const *)str); }
+inline constexpr umm string_unit_count(utf8  *str) { return string_unit_count((utf8  const *)str); }
+inline constexpr umm string_unit_count(utf16 *str) { return string_unit_count((utf16 const *)str); }
+inline constexpr umm string_unit_count(utf32 *str) { return string_unit_count((utf32 const *)str); }
+inline constexpr umm string_unit_count(wchar *str) { return string_unit_count((wchar const *)str); }
+
+inline constexpr umm string_byte_count(ascii const *str) { return string_unit_count(str) * sizeof(ascii); }
+inline constexpr umm string_byte_count(utf8  const *str) { return string_unit_count(str) * sizeof(utf8 ); }
+inline constexpr umm string_byte_count(utf16 const *str) { return string_unit_count(str) * sizeof(utf16);}
+inline constexpr umm string_byte_count(utf32 const *str) { return string_unit_count(str) * sizeof(utf32);}
+inline constexpr umm string_byte_count(wchar const *str) { return string_unit_count(str) * sizeof(wchar);}
+inline constexpr umm string_byte_count(ascii *str) { return string_byte_count((ascii const *)str); }
+inline constexpr umm string_byte_count(utf8  *str) { return string_byte_count((utf8  const *)str); }
+inline constexpr umm string_byte_count(utf16 *str) { return string_byte_count((utf16 const *)str); }
+inline constexpr umm string_byte_count(utf32 *str) { return string_byte_count((utf32 const *)str); }
+inline constexpr umm string_byte_count(wchar *str) { return string_byte_count((wchar const *)str); }
 
 #define TL_HANDLE_IMPL_NAME(name) CONCAT(name, Impl)
 #define TL_DECLARE_HANDLE(name) typedef struct TL_HANDLE_IMPL_NAME(name) *name;
@@ -163,35 +166,60 @@ constexpr T &construct(T &val, Args &&...args) {
 template <class T> inline static constexpr T min_value = {};
 template <class T> inline static constexpr T max_value = {};
 
+template <class T> inline static constexpr T min_value<T &> = min_value<T>;
+template <class T> inline static constexpr T max_value<T &> = max_value<T>;
+
 template<> inline static constexpr u8  min_value<u8 > = 0;
-template<> inline static constexpr u16 min_value<u16> = 0;
-template<> inline static constexpr u32 min_value<u32> = 0;
-template<> inline static constexpr u64 min_value<u64> = 0;
 template<> inline static constexpr u8  max_value<u8 > = 0xFF;
+
+template<> inline static constexpr u16 min_value<u16> = 0;
 template<> inline static constexpr u16 max_value<u16> = 0xFFFF;
+
+template<> inline static constexpr u32 min_value<u32> = 0;
 template<> inline static constexpr u32 max_value<u32> = 0xFFFFFFFF;
+
+template<> inline static constexpr u64 min_value<u64> = 0;
 template<> inline static constexpr u64 max_value<u64> = 0xFFFFFFFFFFFFFFFF;
 
 template<> inline static constexpr s8  min_value<s8 > = 0x80;
-template<> inline static constexpr s16 min_value<s16> = 0x8000;
-template<> inline static constexpr s32 min_value<s32> = 0x80000000;
-template<> inline static constexpr s64 min_value<s64> = 0x8000000000000000;
 template<> inline static constexpr s8  max_value<s8 > = 0x7F;
+
+template<> inline static constexpr s16 min_value<s16> = 0x8000;
 template<> inline static constexpr s16 max_value<s16> = 0x7FFF;
+
+template<> inline static constexpr s32 min_value<s32> = 0x80000000;
 template<> inline static constexpr s32 max_value<s32> = 0x7FFFFFFF;
+
+template<> inline static constexpr s64 min_value<s64> = 0x8000000000000000;
 template<> inline static constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
 
 template<> inline static constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
 template<> inline static constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
+
 template<> inline static constexpr slong min_value<slong> = (slong)min_value<slong_s>;
 template<> inline static constexpr slong max_value<slong> = (slong)max_value<slong_s>;
 
 template<> inline static constexpr f32 min_value<f32> = 1.175494351e-38f;
 template<> inline static constexpr f32 max_value<f32> = 3.402823466e+38f;
+
 template<> inline static constexpr f64 min_value<f64> = 2.2250738585072014e-308;
 template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
 
 #pragma warning(pop)
+
+forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry) { *carry = _addcarry_u8 (0, a, b, result); }
+forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry) { *carry = _addcarry_u16(0, a, b, result); }
+forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry) { *carry = _addcarry_u32(0, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry) { *carry = _addcarry_u64(0, a, b, result); }
+
+forceinline constexpr bool is_nan(f32 v) {
+	union {
+		u32 u;
+		f32 f;
+	};
+	f = v;
+	return ((u & 0x7f800000) == 0x7f800000) && (u & 0x007fffff);
+}
 
 #if COMPILER_GCC
 forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
@@ -226,8 +254,8 @@ forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
 
 // forceinline u8  floor_to_power_of_2(u8  v) { return 1 << find_highest_one_bit(v); }
 // forceinline u16 floor_to_power_of_2(u16 v) { return 1 << find_highest_one_bit(v); }
-forceinline u32 floor_to_power_of_2(u32 v) { return 1 << find_highest_one_bit(v); }
-forceinline u64 floor_to_power_of_2(u64 v) { return 1 << find_highest_one_bit(v); }
+forceinline u32 floor_to_power_of_2(u32 v) { return (u32)1 << find_highest_one_bit(v); }
+forceinline u64 floor_to_power_of_2(u64 v) { return (u64)1 << find_highest_one_bit(v); }
 
 forceinline u32 ceil_to_power_of_2(u32 v) { return is_power_of_2(v) ? v : (floor_to_power_of_2(v) + 1); }
 
@@ -329,15 +357,25 @@ forceinline u32 count_leading_zeros(u64 val) { ulong r; return _BitScanReverse64
 #endif
 #endif
 
+forceinline u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
+forceinline u32 count_leading_zeros(s16 val) { return count_leading_zeros((u16)val); }
+forceinline u32 count_leading_zeros(s32 val) { return count_leading_zeros((u32)val); }
+forceinline u32 count_leading_zeros(s64 val) { return count_leading_zeros((u64)val); }
+
 forceinline u32 count_leading_ones(u8  val) { return count_leading_zeros((u8 )~val); }
 forceinline u32 count_leading_ones(u16 val) { return count_leading_zeros((u16)~val); }
 forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~val); }
 forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 
-forceinline s32 log2(u64 n) { return 63 - (s32)count_leading_zeros(n); }
-forceinline s32 log2(u32 n) { return 31 - (s32)count_leading_zeros(n); }
-forceinline s32 log2(u16 n) { return 15 - (s32)count_leading_zeros(n); }
-forceinline s32 log2(u8  n) { return  7 - (s32)count_leading_zeros(n); }
+forceinline u32 log2(u64 n) { return 63u - count_leading_zeros(n); }
+forceinline u32 log2(u32 n) { return 31u - count_leading_zeros(n); }
+forceinline u32 log2(u16 n) { return 15u - count_leading_zeros(n); }
+forceinline u32 log2(u8  n) { return  7u - count_leading_zeros(n); }
+
+forceinline u32 log2(s64 n) { return 63u - count_leading_zeros(n); }
+forceinline u32 log2(s32 n) { return 31u - count_leading_zeros(n); }
+forceinline u32 log2(s16 n) { return 15u - count_leading_zeros(n); }
+forceinline u32 log2(s8  n) { return  7u - count_leading_zeros(n); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
@@ -387,23 +425,23 @@ forceinline constexpr bool is_positive(f32 v) { return !(*(u32 *)&v & 0x80000000
 forceinline constexpr bool is_positive(f64 v) { return !(*(u64 *)&v & 0x8000000000000000); }
 
 #if COMPILER_GCC
-forceinline u8  rotateLeft (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
-forceinline u16 rotateLeft (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
-forceinline u32 rotateLeft (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
-forceinline u64 rotateLeft (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
-forceinline u8  rotateRight(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
-forceinline u16 rotateRight(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
-forceinline u32 rotateRight(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
-forceinline u64 rotateRight(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
+forceinline u8  rotate_left (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
+forceinline u16 rotate_left (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
+forceinline u32 rotate_left (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
+forceinline u64 rotate_left (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
+forceinline u8  rotate_right(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
+forceinline u16 rotate_right(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
+forceinline u32 rotate_right(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
+forceinline u64 rotate_right(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
 #else
-forceinline u8  rotateLeft (u8  v, s32 shift = 1) { return _rotl8(v, (u8)shift); }
-forceinline u16 rotateLeft (u16 v, s32 shift = 1) { return _rotl16(v, (u8)shift); }
-forceinline u32 rotateLeft (u32 v, s32 shift = 1) { return _rotl(v, shift); }
-forceinline u64 rotateLeft (u64 v, s32 shift = 1) { return _rotl64(v, shift); }
-forceinline u8  rotateRight(u8  v, s32 shift = 1) { return _rotr8(v, (u8)shift); }
-forceinline u16 rotateRight(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift); }
-forceinline u32 rotateRight(u32 v, s32 shift = 1) { return _rotr(v, shift); }
-forceinline u64 rotateRight(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
+forceinline u8  rotate_left (u8  v, s32 shift = 1) { return _rotl8(v, (u8)shift); }
+forceinline u16 rotate_left (u16 v, s32 shift = 1) { return _rotl16(v, (u8)shift); }
+forceinline u32 rotate_left (u32 v, s32 shift = 1) { return _rotl(v, shift); }
+forceinline u64 rotate_left (u64 v, s32 shift = 1) { return _rotl64(v, shift); }
+forceinline u8  rotate_right(u8  v, s32 shift = 1) { return _rotr8(v, (u8)shift); }
+forceinline u16 rotate_right(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift); }
+forceinline u32 rotate_right(u32 v, s32 shift = 1) { return _rotr(v, shift); }
+forceinline u64 rotate_right(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
 #endif
 
 template <class T>
@@ -469,6 +507,15 @@ inline bool memory_equals(T const *a, U const *b) {
 	return memcmp(a, b, sizeof(T)) == 0;
 }
 
+template <class Predicate, class Iterator>
+constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) {
+	for (Iterator it = begin; it != end; ++it) {
+		if (predicate(*it)) {
+			return it;
+		}
+	}
+	return 0;
+}
 template <class T, class Iterator>
 constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
 	for (Iterator it = begin; it != end; ++it) {
@@ -541,6 +588,7 @@ struct Span {
 	template <umm count>
 	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {}
 	constexpr Span(ValueType *begin, ValueType *end) : data(begin), size(end - begin) {}
+	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), size(end - begin) {}
 	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
 	constexpr ValueType *begin() const { return data; }
 	constexpr ValueType *end() const { return data + size; }
@@ -550,9 +598,16 @@ struct Span {
 	constexpr ValueType &at(umm i) const { return data[i]; }
 	constexpr bool empty() const { return size == 0; }
 
-	constexpr explicit operator Span<s8>() const { return {(s8 *)data, size * sizeof(ValueType)}; }
-	constexpr explicit operator Span<u8>() const { return {(u8 *)data, size * sizeof(ValueType)}; }
-	constexpr explicit operator Span<char>() const { return {(char *)data, size * sizeof(ValueType)}; } // Yes, there are three one-byte types
+	template <class U>
+	constexpr explicit operator Span<U>() const {
+		static_assert(sizeof(U) == sizeof(T));
+		return {(U *)data, size};
+	}
+
+	constexpr operator Span<utf8>() const { // Really this cast should be defined only in Span<char>, but this is impossible to do in this language without copypasta
+		static_assert(is_same<T, ascii>);
+		return {(utf8 *)data, size * sizeof(ValueType)};
+	}
 
 	constexpr bool operator==(Span<ValueType> that) const {
 		if (size != that.size)
@@ -569,7 +624,9 @@ struct Span {
 	umm size = 0;
 };
 
-forceinline constexpr Span<char> operator""s(char const *string, umm size) { return Span((char *)string, size); }
+forceinline constexpr Span<char > operator""s(char  const *string, umm size) { return Span((char  *)string, size); }
+forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm size) { return Span((utf8  *)string, size); }
+forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm size) { return Span((utf16 *)string, size); }
 forceinline Span<u8> operator""b(char const *string, umm size) { return Span((u8 *)string, size); }
 
 template <class T, umm size>
@@ -578,8 +635,11 @@ inline constexpr Span<T> array_as_span(T const (&arr)[size]) { return Span((T *)
 template <class T>
 inline constexpr Span<T> as_span(std::initializer_list<T> list) { return Span((T *)list.begin(), list.size()); }
 
-inline constexpr Span<char > as_span(char  const *str) { return Span((char  *)str, length(str)); }
-inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)str, length(str)); }
+inline constexpr Span<char > as_span(char  const *str) { return Span((char  *)str, string_unit_count(str)); }
+inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)str, string_unit_count(str)); }
+inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)str, string_unit_count(str)); }
+inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
+inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
 
 inline constexpr Span<char > as_span(char const *begin, char const *end) { return Span((char *)begin, (char *)end); }
 
@@ -609,7 +669,6 @@ constexpr Span<u8> value_as_bytes(T &value) {
 }
 
 template <class T> constexpr umm count_of(Span<T> span) { return span.size; }
-template <class T> constexpr umm length (Span<T> span) { return span.size; }
 
 template <class T>
 constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0) {
@@ -621,6 +680,15 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 template <class T, umm size> constexpr T *find(T (&arr)[size], T const &value) { return find(arr, arr + size, value); }
 template <class T> constexpr T *find(Span<T> span, T const &value) { return find(span.begin(), span.end(), value); }
 template <class T> constexpr T *find(Span<T> span, Span<T> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+
+template <class T>
+constexpr T *find_last(Span<T> span, T const &value) {
+	for (auto it = span.end() - 1; it >= span.begin(); --it) {
+		if (*it == value)
+			return it;
+	}
+	return 0;
+}
 
 template <class T, class Predicate>
 constexpr T *find_if(Span<T> span, Predicate &&predicate) {
@@ -660,6 +728,14 @@ inline constexpr wchar to_lower_utf16(wchar c) {
 	return c;
 }
 
+forceinline constexpr char to_lower(char c) { return to_lower_ascii(c); }
+forceinline constexpr utf8 to_lower(utf8 c) { return to_lower_utf8(c); }
+#if OS_WINDOWS
+forceinline constexpr wchar to_lower(wchar c) { return to_lower_utf16(c); }
+#else
+forceinline constexpr wchar to_lower(wchar c) { return to_lower_utf32(c); }
+#endif
+
 inline constexpr char to_upper_ascii(char c) {
 	if (c >= 'a' && c <= 'z')
 		return (char)(c - ('a' - 'A'));
@@ -676,26 +752,8 @@ inline constexpr wchar to_upper_utf16(wchar c) {
 	return c;
 }
 
-#define COMP_FUNCS(typeA, typeB)                               \
-inline constexpr bool equals(typeA const *a, typeB const *b) { \
-	for (;;)                                                   \
-		if (*a++ != *b++)                                      \
-			return false;                                      \
-	return true;                                               \
-}                                                              \
-inline constexpr bool equals(Span<typeA> a, typeB const *b) { \
-	for (auto ap = a.begin(); ap != a.end(); ++ap, ++b)       \
-		if (*ap != *b)                                        \
-			return false;                                     \
-	return true;                                              \
-}                                                             \
-inline constexpr bool equals(typeA const *a, Span<typeB> b) { \
-	for (auto bp = b.begin(); bp != b.end(); ++a, ++bp)       \
-		if (*a != *bp)                                        \
-			return false;                                     \
-	return true;                                              \
-}                                                             \
-inline constexpr bool equals(Span<typeA> a, Span<typeB> b) { \
+template <class T, class U>
+inline constexpr bool equals(Span<T> a, Span<U> b) { \
 	if (a.size != b.size)                                    \
 		return false;                                        \
 	auto ap = a.begin();                                     \
@@ -703,56 +761,44 @@ inline constexpr bool equals(Span<typeA> a, Span<typeB> b) { \
 		if (*ap != *bp)                                      \
 			return false;                                    \
 	return true;                                             \
-}                                                            \
-inline constexpr bool starts_with(typeA const *str, typeB const *subStr) { \
-	while (*subStr)                                                        \
-		if (*str++ != *subStr++)                                           \
-			return false;                                                  \
-	return true;                                                           \
-}                                                                          \
-inline constexpr bool starts_with(typeA const *str, typeB const *subStr, umm substrLength) { \
-	while (substrLength--)                                                                   \
-		if (*str++ != *subStr++)                                                             \
-			return false;                                                                    \
-	return true;                                                                             \
-}                                                                                            \
-inline constexpr bool starts_with(typeA const *str, umm strLength, typeB const *subStr) { \
-	while (*subStr && strLength--)                                                        \
-		if (*str++ != *subStr++)                                                          \
-			return false;                                                                 \
-	return !*subStr;                                                                      \
-}                                                                                         \
-inline constexpr bool starts_with(typeA const *str, umm strLength, typeB const *subStr, umm substrLength) { \
-	if (strLength < substrLength)                                                                           \
-		return false;                                                                                       \
-	while (strLength-- && substrLength--)                                                                   \
-		if (*str++ != *subStr++)                                                                            \
-			return false;                                                                                   \
-	return true;                                                                                            \
 }
 
-COMP_FUNCS(char, char)
-COMP_FUNCS(char, wchar)
-COMP_FUNCS(wchar, char)
-COMP_FUNCS(wchar, wchar)
+template <class T, class U>
+inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
+	if (sub_str.size > str.size)
+		return false;
+	for (umm i = 0; i < sub_str.size; ++i) {
+		if (str.data[i] != sub_str.data[i]) {
+			return false;
+		}
+	}
+	return true;
+}
 
-#undef COMP_FUNCS
-
-inline constexpr bool ends_with(Span<char> str, Span<char> sub_str, bool case_sensitive = true) {
+template <class T, class U>
+inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
 	if (sub_str.size > str.size)
 		return false;
 	umm base_offset = str.size - sub_str.size;
-	if (case_sensitive) {
-		for (umm i = 0; i < sub_str.size; ++i) {
-			if (str.data[i + base_offset] != sub_str.data[i]) {
-				return false;
-			}
+	for (umm i = 0; i < sub_str.size; ++i) {
+		if (str.data[i + base_offset] != sub_str.data[i]) {
+			return false;
 		}
-	} else {
-		for (umm i = 0; i < sub_str.size; ++i) {
-			if (to_lower_ascii(str.data[i + base_offset]) != to_lower_ascii(sub_str.data[i])) {
-				return false;
-			}
+	}
+	return true;
+}
+
+bool equals_case_insensitive(char a, char b) { return to_lower(a) == to_lower(b); }
+bool equals_case_insensitive(utf8 a, utf8 b) { return to_lower(a) == to_lower(b); }
+
+template <class T, class Predicate, class = EnableIf<is_invocable<Predicate, T, T>>>
+inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {
+	if (sub_str.size > str.size)
+		return false;
+	umm base_offset = str.size - sub_str.size;
+	for (umm i = 0; i < sub_str.size; ++i) {
+		if (!predicate(str.data[i + base_offset], sub_str.data[i])) {
+			return false;
 		}
 	}
 	return true;
@@ -857,16 +903,16 @@ struct StaticList {
 	forceinline constexpr bool empty() const { return size == 0; }
 	forceinline constexpr bool full() const { return size == capacity; }
 
-	forceinline constexpr T &front() { TL_BOUNDS_CHECK(size); return data[0]; }
-	forceinline constexpr T &back() { TL_BOUNDS_CHECK(size); return data[size - 1]; }
-	forceinline constexpr T &operator[](umm i) { TL_BOUNDS_CHECK(size); return data[i]; }
+	forceinline constexpr T &front() { bounds_check(size); return data[0]; }
+	forceinline constexpr T &back() { bounds_check(size); return data[size - 1]; }
+	forceinline constexpr T &operator[](umm i) { bounds_check(size); return data[i]; }
 
-	forceinline constexpr T const &front() const { TL_BOUNDS_CHECK(size); return data[0]; }
-	forceinline constexpr T const &back() const { TL_BOUNDS_CHECK(size); return data[size - 1]; }
-	forceinline constexpr T const &operator[](umm i) const { TL_BOUNDS_CHECK(size); return data[i]; }
+	forceinline constexpr T const &front() const { bounds_check(size); return data[0]; }
+	forceinline constexpr T const &back() const { bounds_check(size); return data[size - 1]; }
+	forceinline constexpr T const &operator[](umm i) const { bounds_check(size); return data[i]; }
 
 	constexpr void resize(umm new_size) {
-		TL_BOUNDS_CHECK(new_size <= capacity);
+		bounds_check(new_size <= capacity);
 		if (new_size > size) {
 			for (umm i = size; i < new_size; ++i) {
 				new (data + i) T();
@@ -875,8 +921,8 @@ struct StaticList {
 		size = new_size;
 	}
 	constexpr T &insert_at(T value, umm where) {
-		TL_BOUNDS_CHECK(where <= size);
-		TL_BOUNDS_CHECK(size < capacity);
+		bounds_check(where <= size);
+		bounds_check(size < capacity);
 
 		memmove(data + where + 1, data + where, (size - where) * sizeof(T));
 		memcpy(data + where, &value, sizeof(T));
@@ -885,8 +931,8 @@ struct StaticList {
 		return data[where];
 	}
 	constexpr Span<T> insert_at(Span<T> span, umm where) {
-		TL_BOUNDS_CHECK(where <= size);
-		TL_BOUNDS_CHECK(size + span.size <= capacity);
+		bounds_check(where <= size);
+		bounds_check(size + span.size <= capacity);
 
 		memmove(data + where + span.size, data + where, (size - where) * sizeof(T));
 		memcpy(data + where, span.data, span.size * sizeof(T));
@@ -908,29 +954,29 @@ struct StaticList {
 	forceinline constexpr operator Span<T>() { return {data, size}; }
 
 	forceinline constexpr T &add() {
-		TL_BOUNDS_CHECK(!full());
+		bounds_check(!full());
 		return *new(data + size++) T();
 	}
 
 	forceinline constexpr T &add(T const &value) {
-		TL_BOUNDS_CHECK(!full());
+		bounds_check(!full());
 		memcpy(data + size, &value, sizeof(T));
 		return data[size++];
 	}
 
 	forceinline constexpr Span<T> add(Span<T> span) {
-		TL_BOUNDS_CHECK(size + span.size <= capacity);
+		bounds_check(size + span.size <= capacity);
 		memcpy(data + size, span.data, span.size * sizeof(T));
 		defer { size += span.size; };
 		return {data + size, span.size};
 	}
 
 	constexpr T pop_back() {
-		TL_BOUNDS_CHECK(size);
+		bounds_check(size);
 		return data[--size];
 	}
 	constexpr T pop_front() {
-		TL_BOUNDS_CHECK(size);
+		bounds_check(size);
 		T popped = *data;
 		memmove(data, data + 1, --size * sizeof(T));
 		return popped;
@@ -939,7 +985,7 @@ struct StaticList {
 	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
 
 	T erase_at(umm where) {
-		TL_BOUNDS_CHECK(where < size);
+		bounds_check(where < size);
 		T erased = data[where];
 		memmove(data + where, data + where + 1, --size - where);
 		return erased;
@@ -948,7 +994,7 @@ struct StaticList {
 	forceinline T erase(T &value) { return erase(&value); }
 
 	T erase_at_unordered(umm where) {
-		TL_BOUNDS_CHECK(where < size);
+		bounds_check(where < size);
 		T erased = data[where];
 		--size;
 		if (size != where) {
@@ -969,6 +1015,11 @@ struct StaticList {
 	};
 };
 
+template <class T, umm capacity>
+umm index_of(StaticList<T, capacity> const &list, T const *value) {
+	return value - list.data;
+}
+
 template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> const &list) { return {(T *)list.data, list.size}; }
 
 template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, T const &value) { return find(as_span(list), value); }
@@ -977,6 +1028,30 @@ template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity>
 template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T> cmp) { return find(as_span(list), cmp); }
 
 template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
+
+template <class Collection, class T>
+T *find_previous(Collection collection, T value) {
+	auto found = find(collection, value);
+	if (found) return previous(collection, found);
+	return 0;
+}
+
+template <class Collection, class T>
+T *find_next(Collection collection, T value) {
+	auto found = find(collection, value);
+	if (found) return next(collection, found);
+	return 0;
+}
+
+template <class Collection, class T>
+bool find_and_erase(Collection &collection, T value) {
+	auto found = find(collection, value);
+	if (found) {
+		erase(collection, found);
+		return true;
+	}
+	return false;
+}
 
 enum AllocatorMode {
 	Allocator_allocate,
@@ -1037,6 +1112,9 @@ void deallocation_tracker(Allocator allocator, void *data);
 
 #endif
 
+#define tl_push(pusher, ...) if(auto CONCAT(_, __LINE__)=pusher(__VA_ARGS__))
+#define tl_scoped(current, new) auto CONCAT(_,__LINE__)=current;current=(new);defer{current=CONCAT(_,__LINE__);}
+
 extern TL_API void init_allocator();
 extern TL_API Allocator default_allocator;
 extern TL_API Allocator thread_local current_allocator;
@@ -1053,7 +1131,8 @@ struct AllocatorPusher {
 	operator bool() { return true; }
 };
 
-#define push_allocator(allocator) if(auto CONCAT(_,__LINE__) = AllocatorPusher(allocator))
+#define push_allocator(allocator) tl_push(::TL::AllocatorPusher, allocator)
+#define scoped_allocator(allocator) tl_scoped(::TL::current_allocator, allocator)
 
 #ifdef TL_IMPL
 

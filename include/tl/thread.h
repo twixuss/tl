@@ -27,7 +27,7 @@ forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchange
 template <class T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
-	     if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src); 
+	     if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src);
 	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
 	else if constexpr (sizeof(T) == 2) result = _InterlockedExchange16((short    *)dst, *(short    *)&src);
 	else if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
@@ -114,6 +114,7 @@ Thread create_thread(void (*fn)(void *), void *param) {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
+		init_allocator();
 		data.fn(data.param);
 		return 0;
 	}, &data, 0, 0);
@@ -151,14 +152,14 @@ void loop_until(Predicate &&predicate) {
 }
 
 struct SyncPoint {
-	u32 volatile current_counter;
 	u32 target_counter;
+	u32 volatile current_counter;
 };
 
 inline SyncPoint create_sync_point(u32 target_counter) {
 	SyncPoint result;
-	result.current_counter = 0;
 	result.target_counter = target_counter;
+	result.current_counter = 0;
 	return result;
 }
 
@@ -227,7 +228,7 @@ template <class T, class Mutex = Mutex>
 struct MutexQueue {
 	Queue<T> base;
 	Mutex mutex;
-	
+
 	void push_front_unordered_no_lock(T const &value) { base.push_front_unordered(value); }
 	void push_front_unordered(T const &value) { scoped_lock(mutex); base.push_front_unordered(value); }
 	void push_no_lock(T const &value) { base.push(value); }
@@ -281,7 +282,7 @@ struct MutexQueue {
 		pop_all_nolock(std::forward<Fn>(fn));
 	}
 	umm size() { return base.size; }
-	
+
 	void append_no_lock(T const &v)                 { base += v; }
 	void append_no_lock(T &&v)                      { base += v; }
 	void append_no_lock(Span<T const> v)            { base += v; }
@@ -457,7 +458,7 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 	pool.thread_count = thread_count;
 	if (thread_count) {
 		pool.threads.reserve(thread_count);
-		
+
 		struct StartParams {
 			ThreadPool *pool;
 			ThreadProc *proc;
@@ -465,7 +466,7 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 		StartParams params;
 		params.pool = &pool;
 		params.proc = std::addressof(thread_proc);
-		
+
 		auto start_proc = [](void *param) {
 			StartParams *info = (StartParams *)param;
 			(*info->proc)(info->pool);

@@ -8,66 +8,6 @@
 
 namespace TL {
 
-//
-// List of strings pointing into one shared buffer
-//
-// Note: To start using 'strings' member ensure that list is in 'absolute mode',
-// so 'data' member of strings' elements represent a pointer to the beginning of a string
-// stored in 'buffer'
-//
-// Addition is allowed only In 'relative mode', where 'data' member of string's elements holds
-// an index to the 'buffer'
-//
-template <class Char>
-struct StringList {
-	List<Span<Char>> strings;
-	List<Char> buffer;
-#ifdef TL_DEBUG
-	bool is_absolute = false;
-#endif
-
-	void add(Span<Char> string) {
-#ifdef TL_DEBUG
-		assert(is_absolute == false);
-#endif
-
-		Span<Char> dest;
-		dest.size = string.size;
-		dest.data = (Char *)buffer.size;
-		strings.add(dest);
-
-		buffer += string;
-	}
-	void add(Char const *string) {
-		add(Span((Char *)string, length(string)));
-	}
-
-	void make_absolute() {
-#ifdef TL_DEBUG
-		is_absolute = true;
-#endif
-		for (auto &string : strings) {
-			string.data = buffer.data + (umm)string.data;
-		}
-	}
-	void make_relative() {
-#ifdef TL_DEBUG
-		is_absolute = false;
-#endif
-		for (auto &string : strings) {
-			string.data = (Char *)(string.data - buffer.data);
-		}
-	}
-
-	Span<Char> *begin() { return strings.begin(); }
-	Span<Char> *end() { return strings.end(); }
-};
-
-template <class Char, class Predicate>
-Span<Char> *find_if(StringList<Char> &list, Predicate &&predicate) {
-	return find_if(list.strings, std::forward<Predicate>(predicate));
-}
-
 template <class Char>
 List<Char> null_terminate(Span<Char> span) {
 	List<Char> result;
@@ -159,8 +99,8 @@ template <class Int>
 struct FormatInt {
 	Int value;
 	u32 radix;
-	bool leading_zeros;
-	explicit FormatInt(Int value, u32 radix = 10, bool leading_zeros = false) : value(value), radix(radix), leading_zeros(leading_zeros) {}
+	u32 pad_to_length;
+	explicit FormatInt(Int value, u32 radix = 10, u32 pad_to_length = 0) : value(value), radix(radix), pad_to_length(pad_to_length) {}
 };
 
 enum FloatFormat {
@@ -180,8 +120,111 @@ struct FormatFloat {
 	explicit FormatFloat(Float value) : value(value) {}
 };
 
+enum Encoding {
+	Encoding_unknown,
+	Encoding_ascii,
+	Encoding_utf8,
+	Encoding_utf16,
+	Encoding_utf32,
+};
+
+template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_unknown;
+template <> inline static constexpr Encoding encoding_from_type<char > = Encoding_ascii;
+template <> inline static constexpr Encoding encoding_from_type<utf8 > = Encoding_utf8;
+template <> inline static constexpr Encoding encoding_from_type<utf16> = Encoding_utf16;
+template <> inline static constexpr Encoding encoding_from_type<utf32> = Encoding_utf32;
+template <> inline static constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding_utf16 : Encoding_utf32;
+
+inline u32 char_byte_count(utf8 const *ch) {
+	auto byte_count = count_leading_ones((u8)*ch);
+	if (byte_count == 1 || byte_count > 4)
+		return ~0u;
+	return byte_count;
+}
+
+inline u8 const *advance_utf8(u8 const *string) {
+	if (*string < 0x80) {
+		++string;
+	} else {
+		u32 bytes = count_leading_ones(*string);
+		if (bytes > 4) return 0;
+		string += bytes;
+	}
+	return string;
+}
+template <class Ptr>
+inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
+
+inline u32 get_char_utf8(void const *_ptr) {
+	auto ptr = (u8 const *)_ptr;
+	if (*ptr < 0x80) {
+		return *ptr;
+	}
+
+	switch (count_leading_ones(*ptr)) {
+		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
+		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
+		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
+		default: return ~0u;
+	}
+}
+
+inline u32 get_char_and_advance_utf8(utf8 const *&ptr) {
+	if (*ptr < 0x80) {
+		defer { ++ptr; };
+		return *ptr;
+	}
+
+	u32 byte_count = count_leading_ones((u8)*ptr);
+	if (byte_count == 1 || byte_count > 4)
+		return ~0u;
+
+	defer { ptr += byte_count; };
+
+	switch (byte_count) {
+		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
+		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
+		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
+	}
+}
+inline u32 get_char_and_advance_utf8(utf8 *&ptr) {
+	return get_char_and_advance_utf8((utf8 const *&)ptr);
+}
+
+// NOTE: TODO: surrogate pairs ate not supported
+inline List<ascii> utf16_to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
+	List<ascii> result;
+	result.reserve(span.size);
+	for (auto u16 : span) {
+		result.add(u16 > 0xFF ? unfound : (ascii)u16);
+	}
+	if (terminate) {
+		result.add(0);
+	}
+	return result;
+}
+
+inline Span<utf8> ascii_to_utf8(Span<ascii> span) {
+	return Span((utf8 *)span.data, span.size);
+}
+
+inline List<utf16> ascii_to_utf16(Span<ascii> span, bool terminate = false) {
+	List<utf16> result;
+	result.reserve(span.size);
+	for (auto ch : span) {
+		result.add((utf16)ch);
+	}
+	if (terminate) {
+		result.add(0);
+	}
+	return result;
+}
+
+TL_API List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate = false);
+TL_API List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate = false);
+
 #ifndef TL_STRING_BUILDER_BLOCK_SIZE
-#define TL_STRING_BUILDER_BLOCK_SIZE 4096
+#define TL_STRING_BUILDER_BLOCK_SIZE 0x4000
 #endif
 
 struct StringBuilder {
@@ -196,6 +239,8 @@ struct StringBuilder {
 	Block first = {};
 	Block *last = &first;
 	Block *alloc_last = &first;
+	Encoding encoding = Encoding_utf8;
+	ascii unfound_ascii = '?';
 
 	StringBuilder() { allocator = current_allocator; }
 	StringBuilder(StringBuilder const &that) = delete;
@@ -289,45 +334,22 @@ inline void free(StringBuilder &builder) {
 	builder.allocator = {};
 }
 
-inline void append(StringBuilder &b, Span<char> span) {
-	umm chars_to_write = span.size;
+forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
+	umm chars_to_write = size;
+	u8 *data = (u8 *)_data;
 	while (b.last->available_space() < chars_to_write) {
 		umm space_in_block = b.last->available_space();
-		memcpy(b.last->buffer.end(), span.data, space_in_block * sizeof(char));
+		memcpy(b.last->buffer.end(), data, space_in_block);
 		chars_to_write -= space_in_block;
 		b.last->buffer.size += space_in_block;
-		span = {span.begin() + space_in_block, span.end()};
+		data += space_in_block;
 		if (!b.last->next) {
 			b.last->next = b.alloc_last = b.allocate_block();
 			b.last = b.last->next;
 		}
 	}
-	memcpy(b.last->buffer.end(), span.data, chars_to_write * sizeof(char));
+	memcpy(b.last->buffer.end(), data, chars_to_write);
 	b.last->buffer.size += chars_to_write;
-}
-forceinline void append(StringBuilder &b, List<char> list) {
-	append(b, as_span(list));
-}
-forceinline void append(StringBuilder &b, char const *str) {
-	append(b, as_span(str));
-}
-
-forceinline void append(StringBuilder &b, char ch) {
-	if (b.last->available_space() == 0) {
-		if (b.last->next) {
-			b.last = b.last->next;
-		} else {
-			auto new_block = b.allocate_block();
-			b.last->next = new_block;
-			b.last = b.alloc_last = new_block;
-		}
-	}
-
-	b.last->buffer.data[b.last->buffer.size++] = ch;
-}
-
-forceinline void append_bytes(StringBuilder &b, void const *address, umm size) {
-	append(b, Span((char *)address, size));
 }
 
 template <class T>
@@ -335,75 +357,202 @@ forceinline void append_bytes(StringBuilder &b, T const &value) {
 	append_bytes(b, &value, sizeof(value));
 }
 
-inline void append_format(StringBuilder &b, char const *fmt) {
-	if (!*fmt) {
+template <class T>
+forceinline void append_bytes(StringBuilder &b, Span<T> span) {
+	append_bytes(b, span.data, span.size * sizeof(T));
+}
+
+template <class T>
+forceinline void append_bytes(StringBuilder &b, List<T> list) {
+	append_bytes(b, list.data, list.size * sizeof(T));
+}
+
+inline void append(StringBuilder &b, Span<ascii> string) {
+	switch (b.encoding) {
+		case Encoding_ascii:
+		case Encoding_utf8:
+			append_bytes(b, string);
+			break;
+		case Encoding_utf16:
+			while (*string.data) {
+				append_bytes(b, (utf16)*string.data);
+				++string.data;
+			}
+			break;
+		case Encoding_utf32:
+			while (*string.data) {
+				append_bytes(b, (utf32)*string.data);
+				++string.data;
+			}
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
+
+inline void append(StringBuilder &b, Span<utf8> string) {
+	switch (b.encoding) {
+		case Encoding_utf8:
+			append_bytes(b, string);
+			break;
+		case Encoding_ascii:
+			while (*string.data) {
+				if (*string.data < 0x80) {
+					append_bytes(b, (ascii)*string.data);
+					++string.data;
+				} else {
+					append_bytes(b, b.unfound_ascii);
+					u32 byte_count = char_byte_count(string.data);
+					if (byte_count == ~0u) {
+						invalid_code_path("string was invalid");
+						return;
+					}
+					string.data += byte_count;
+				}
+			}
+			break;
+		case Encoding_utf16: {
+			auto utf16 = utf8_to_utf16(string);
+			defer { free(utf16); };
+			append_bytes(b, utf16);
+			break;
+		}
+		case Encoding_utf32:
+			invalid_code_path("case Encoding_utf32 is not implemented");
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
+
+inline void append(StringBuilder &b, Span<utf16> string) {
+	switch (b.encoding) {
+		case Encoding_utf8: {
+			auto utf8 = utf16_to_utf8(string);
+			defer { free(utf8); };
+			append_bytes(b, utf8);
+			break;
+		}
+		case Encoding_ascii:
+			while (*string.data) {
+				if (*string.data < 0x80) {
+					append_bytes(b, (ascii)*string.data);
+					++string.data;
+				} else {
+					append_bytes(b, b.unfound_ascii);
+					++string.data; // NOTE: TODO: surrogate pairs
+				}
+			}
+			break;
+		case Encoding_utf16:
+			append_bytes(b, string);
+			break;
+		case Encoding_utf32:
+			invalid_code_path("case Encoding_utf32 is not implemented");
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
+inline void append(StringBuilder &b, Span<utf32> string) {
+	invalid_code_path("not implemented");
+}
+
+forceinline void append(StringBuilder &b, ascii const *string) { append(b, as_span(string)); }
+forceinline void append(StringBuilder &b, utf8  const *string) { append(b, as_span(string)); }
+forceinline void append(StringBuilder &b, utf16 const *string) { append(b, as_span(string)); }
+forceinline void append(StringBuilder &b, utf32 const *string) { append(b, as_span(string)); }
+forceinline void append(StringBuilder &b, wchar const *string) {
+	if constexpr (sizeof(wchar) == sizeof(utf16)) {
+		append(b, as_span((utf16 *)string));
+	} else {
+		append(b, as_span((utf32 *)string));
+	}
+}
+
+forceinline void append(StringBuilder &b, List<ascii> list) { append(b, as_span(list)); }
+forceinline void append(StringBuilder &b, List<utf8 > list) { append(b, as_span(list)); }
+forceinline void append(StringBuilder &b, List<utf16> list) { append(b, as_span(list)); }
+forceinline void append(StringBuilder &b, List<utf32> list) { append(b, as_span(list)); }
+forceinline void append(StringBuilder &b, List<wchar> list) { append(b, (Span<utf16>)as_span(list)); }
+
+template <class T>
+inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
+
+template <class Char, class = EnableIf<is_char<Char>>>
+inline void append_format(StringBuilder &b, Char const *format_string) {
+	if (!*format_string) {
 		return;
 	}
 
-	char const *c = fmt;
+	Char const *c = format_string;
 	while (*c) {
 		if (*c == '%') {
 			++c;
 			if (*c != '`') {
 				invalid_code_path("bad format");
 			}
-			append(b, as_span(fmt, c));
+			append(b, Span(format_string, c));
 			++c;
-			fmt = c;
+			format_string = c;
 		} else {
 			++c;
 		}
 	}
-	append(b, as_span(fmt));
+	append(b, as_span(format_string));
 }
-template <class Arg, class ...Args>
-void append_format(StringBuilder &b, char const *fmt, Arg const &arg, Args const &...args) {
-	if (!*fmt) {
+template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
+void append_format(StringBuilder &b, Char const *format_string, Arg const &arg, Args const &...args) {
+	if (!*format_string) {
 		return;
 	}
-	char const *c = fmt;
-	char const *fmtBegin = 0;
-	char const *fmtEnd = 0;
+	Char const *c = format_string;
+	Char const *percent = 0;
+	Char const *after_percent = 0;
+	auto format_string_end = format_string + string_unit_count(format_string);
 
 	bool argAsFormat = false;
 
 	while (*c) {
 		if (*c == '%') {
-			fmtBegin = c;
+			percent = c;
 			++c;
 			if (*c == '`') {
-				append(b, as_span(fmt, c));
+				append(b, Span(format_string, c));
 				++c;
-				fmt = c;
-				fmtBegin = 0;
+				format_string = c;
+				percent = 0;
 				continue;
 			}
-			if (starts_with(c, "fmt%")) {
+			if (starts_with(Span(c, format_string_end), "fmt%"s)) {
 				argAsFormat = true;
 				c += 4;
 			}
-			fmtEnd = c;
+			after_percent = c;
 			break;
 		}
 		++c;
 	}
-	//assert(fmtBegin && fmtEnd, "invalid format");
-	if (!(fmtBegin && fmtEnd)) {
-		append_format(b, fmt);
-	}
+	//assert(percent && after_percent, "invalid format");
+	if (percent && after_percent) {
+		append(b, Span(format_string, percent));
 
-	append(b, as_span(fmt, fmtBegin));
+		if (argAsFormat) {
+			if constexpr (is_same<RemoveReference<std::decay_t<Arg>>, Char const *> || is_same<RemoveReference<std::decay_t<Arg>>, Char *>)
+				append_format(b, arg, args...);
+			else
+				invalid_code_path("'%fmt%' arg is not a string");
+		} else {
+			append(b, arg);
+		}
 
-	if (argAsFormat) {
-		if constexpr (is_same<RemoveReference<std::decay_t<Arg>>, char const *> || is_same<RemoveReference<std::decay_t<Arg>>, char *>)
-			append_format(b, arg, args...);
-		else
-			invalid_code_path("'%fmt%' arg is not a string");
+		append_format(b, after_percent, args...);
 	} else {
-		append(b, arg);
+		invalid_code_path("missing argument in append_format");
 	}
-
-	append_format(b, fmtEnd, args...);
 }
 
 inline void append(StringBuilder &builder, bool value) {
@@ -448,12 +597,12 @@ void append(StringBuilder &builder, FormatInt<Int> f) {
 	} else {
 		(void)negative;
 	}
-	if (f.leading_zeros) {
-		u32 total_digits = (u32)ceil_to_int(log((f32)max_value<Int>, (f32)f.radix));
-		for (u32 i = charsWritten; i < total_digits; ++i) {
+	if (f.pad_to_length) {
+		for (u32 i = charsWritten; i < f.pad_to_length; ++i) {
 			*lsc-- = '0';
 		}
-		charsWritten = total_digits;
+		if (f.pad_to_length > charsWritten)
+			charsWritten = f.pad_to_length;
 	}
 	append(builder, Span(lsc + 1, charsWritten));
 }
@@ -471,17 +620,18 @@ inline void append(StringBuilder &builder, FormatFloat<f64> f) {
 	auto value = f.value;
 	auto precision = f.precision;
 	if (is_negative(value)) {
-		append(builder, '-');
+		append(builder, "-");
 		value = -value;
 	}
 
 	auto append_float = [&](f64 f) {
 		append(builder, (u64)f);
-		append(builder, '.');
+		append(builder, ".");
 		for (u32 i = 0; i < precision; ++i) {
 			f = f - (f64)(s64)f;
 			f = (f < 0 ? f + 1 : f) * 10;
-			append(builder, (char)((u32)f + '0'));
+			ascii ch = (ascii)((u32)f + '0');
+			append(builder, Span(&ch, 1));
 		}
 	};
 
@@ -521,9 +671,9 @@ inline void append(StringBuilder &builder, FormatFloat<f64> f) {
 			}
 			append_float(mantissa);
 
-			append(builder, 'e');
+			append(builder, "e");
 
-			if (exponent >= 0) append(builder, '+');
+			if (exponent >= 0) append(builder, "+");
 
 			append(builder, exponent);
 
@@ -556,11 +706,31 @@ inline List<char> concatenate(Args &&...args) {
 }
 
 template <class ...Args>
-List<char> format(char const *fmt, Args const &...args) {
+List<ascii> format(ascii const *fmt, Args const &...args) {
+	StringBuilder builder;
+	defer { free(builder); };
+	builder.encoding = Encoding_ascii;
+	append_format(builder, fmt, args...);
+	return to_string(builder);
+}
+
+template <class ...Args>
+List<utf8> format(utf8 const *fmt, Args const &...args) {
 	StringBuilder builder;
 	defer { free(builder); };
 	append_format(builder, fmt, args...);
-	return to_string(builder);
+	return (List<utf8>)to_string(builder);
+}
+
+template <class ...Args>
+List<utf16> format(utf16 const *fmt, Args const &...args) {
+	StringBuilder builder;
+	defer { free(builder); };
+
+	builder.encoding = Encoding_utf16;
+
+	append_format(builder, fmt, args...);
+	return (List<utf16>)to_string(builder);
 }
 
 #if 0
@@ -578,32 +748,55 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 //	to_string<Char>(value, [&](Span<Char> span) { list += span; });
 //}
 
-inline u8 const *advance_utf8(u8 const *string) {
-	if (*string < 0x80) {
-		++string;
-	} else {
-		u32 bytes = count_leading_ones(*string);
-		if (bytes > 4) return 0;
-		string += bytes;
-	}
-	return string;
-}
-template <class Ptr>
-inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
+#ifdef TL_IMPL
 
-inline u32 get_char_utf8(void const *_ptr) {
-	auto ptr = (u8 const *)_ptr;
-	if (*ptr < 0x80) {
-		return *ptr;
+List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate) {
+	List<utf8> result;
+
+	if (utf16.size > max_value<int>)
+		return {};
+
+	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, 0, 0, 0, 0);
+	if (!bytes_required)
+		return {};
+
+	result.reserve(bytes_required + terminate);
+	result.size = bytes_required + terminate;
+
+	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
+		return {};
+	}
+	
+	if (terminate)
+		result.back() = 0;
+
+	return result;
+}
+
+List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate) {
+	List<utf16> result;
+	
+	if (utf8.size > max_value<int>)
+		return {};
+
+	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, 0, 0);
+	if (!chars_required)
+		return {};
+
+	result.reserve(chars_required + terminate);
+	result.size = chars_required + terminate;
+
+	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, (wchar *)result.data, chars_required) != chars_required) {
+		return {};
 	}
 
-	switch (count_leading_ones(*ptr)) {
-		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
-		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
-		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
-		default: return ~0u;
-	}
+	if (terminate)
+		result.back() = 0;
+
+	return result;
 }
+
+#endif
 
 }
 

@@ -113,14 +113,14 @@ struct xoshiro256ss {
 };
 inline u64 next(xoshiro256ss &state) {
 	u64 *s = state.s;
-	u64 result = rotateLeft(s[1] * 5, 7) * 9;
+	u64 result = rotate_left(s[1] * 5, 7) * 9;
 	u64 t = s[1] << 17;
 	s[2] ^= s[0];
 	s[3] ^= s[1];
 	s[1] ^= s[2];
 	s[0] ^= s[3];
 	s[2] ^= t;
-	s[3] = rotateLeft(s[3], 45);
+	s[3] = rotate_left(s[3], 45);
 	return result;
 }
 
@@ -136,7 +136,7 @@ inline u64 next(xoshiro256p &state) {
 	s[1] ^= s[2];
 	s[0] ^= s[3];
 	s[2] ^= t;
-	s[3] = rotateLeft(s[3], 45);
+	s[3] = rotate_left(s[3], 45);
 	return result;
 }
 

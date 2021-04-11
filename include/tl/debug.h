@@ -41,7 +41,16 @@ TL_API bool is_debugger_attached();
 
 namespace TL {
 
-HANDLE debug_process; 
+static HANDLE debug_process; 
+
+struct ModuleInfo {
+    List<char> image_name;
+    List<char> module_name;
+    void *base_address;
+    DWORD load_size;
+};
+
+List<ModuleInfo> loaded_modules;
 
 bool debug_init() {
 	debug_process = GetCurrentProcess();
@@ -49,7 +58,7 @@ bool debug_init() {
 		return false;
 	
 	DWORD options = SymGetOptions();
-	SymSetOptions(options & ~SYMOPT_UNDNAME | SYMOPT_PUBLICS_ONLY);
+	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES);
 
 	return true;
 }
@@ -58,14 +67,53 @@ void debug_deinit() {
 	SymCleanup(debug_process);
 }
 
+ModuleInfo get_module_info(HMODULE module, HANDLE process) {
+	ModuleInfo result;
+	char temp[4096];
+    MODULEINFO mi;
+
+    GetModuleInformation(process, module, &mi, sizeof(mi));
+    result.base_address = mi.lpBaseOfDll;
+    result.load_size = mi.SizeOfImage;
+
+    GetModuleFileNameEx(process, module, temp, sizeof(temp));
+    result.image_name = as_list(as_span(temp));
+
+    GetModuleBaseName(process, module, temp, sizeof(temp));
+    result.module_name = as_list(as_span(temp));
+    
+    SymLoadModule64(process, 0, result.image_name.data, result.module_name.data, (DWORD64)result.base_address, result.load_size);
+ 
+	return result;
+}
+
+static void *load_modules_symbols(HANDLE process, DWORD pid) {
+    List<ModuleInfo> modules;
+	defer { free(modules); };
+
+    DWORD cbNeeded;
+
+    List<HMODULE> module_handles;
+	defer { free(module_handles); };
+
+	module_handles.resize(1);
+
+    EnumProcessModules(process, &module_handles[0], module_handles.size * sizeof(HMODULE), &cbNeeded);
+    module_handles.resize(cbNeeded/sizeof(HMODULE));
+    EnumProcessModules(process, &module_handles[0], module_handles.size * sizeof(HMODULE), &cbNeeded);
+
+	for (auto module : module_handles) {
+		modules.add(get_module_info(module, process));
+	}
+
+    return modules[0].base_address;
+}
 
 StackTrace get_stack_trace() {
 #ifdef TL_TRACK_ALLOCATIONS
 	track_allocations = false;
 	defer { track_allocations = true; };
 #endif
-
-	StackTrace stack_trace;
 
 	STACKFRAME64 frame = {};
  
@@ -80,53 +128,67 @@ StackTrace get_stack_trace() {
 	frame.AddrStack.Mode   = AddrModeFlat;
 	frame.AddrFrame.Mode   = AddrModeFlat;
  
-	auto thread = GetCurrentThread();
+	//List<>
+	//DWORD required_size_for_modules;
+	//EnumProcessModules(debug_process, modules, sizeof(HMODULE), &required_size_for_modules);
+
+	void *base = load_modules_symbols(debug_process, GetCurrentProcessId());
+    IMAGE_NT_HEADERS *h = ImageNtHeader(base);
+    DWORD image_type = h->FileHeader.Machine;
+
+	HANDLE thread;
+	DuplicateHandle(debug_process, GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
+	defer { CloseHandle(thread); };
+
+	StackTrace stack_trace;
 
 	u32 frameIndex = 0;
-	while (StackWalk64(IMAGE_FILE_MACHINE_AMD64, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
+	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (!frameIndex++)
 			continue;
 		constexpr u32 maxNameLength = MAX_SYM_NAME;
 		DWORD64 displacement;
 
-		static u8 buffer[sizeof(SYMBOL_INFO) + maxNameLength * sizeof(char)] = {};
-		PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
-		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-		symbol->MaxNameLen = maxNameLength;
+		static u8 buffer[sizeof(IMAGEHLP_SYMBOL64) + maxNameLength] = {};
+		auto symbol = (IMAGEHLP_SYMBOL64*)buffer;
+		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+		symbol->MaxNameLength = maxNameLength;
 		
-		if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
+		if (!SymGetSymFromAddr64(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
 			break;
 		}
+		
+		char name_buffer[256];
 
 		CallStackEntry entry;
+		
+		Span<char> file = "unknown"s;
+		Span<char> name = "unknown"s;
+		
+        if (frame.AddrPC.Offset != 0) {
+			auto name_length = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NAME_ONLY);
+			if (name_length) {
+				name = Span(name_buffer, name_length);
+			}
 
-		char name[256];
-		auto name_length = UnDecorateSymbolName(symbol->Name, name, (DWORD)count_of(name), UNDNAME_NAME_ONLY);
-		if (name_length) {
-			entry.name.data = (char *)stack_trace.string_buffer.size;
-			entry.name.size = name_length;
+			IMAGEHLP_LINE64 line = {};
+			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+			DWORD line_displacement;
 
-			stack_trace.string_buffer += Span(name, name_length);
+			if (SymGetLineFromAddr64(debug_process, symbol->Address, &line_displacement, &line)) {
+				entry.line = line.LineNumber;
+				file = as_span(line.FileName);
+			}
+
 		}
-
-		IMAGEHLP_LINE64 line = {};
-		line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-		DWORD line_displacement;
-
-		char const *file;
-		if (SymGetLineFromAddr64(debug_process, symbol->Address, &line_displacement, &line)) {
-			entry.line = line.LineNumber;
-			file = line.FileName;
-		} else {
-			file = "unknown";
-		}
-		auto file_length = length(file);
+		entry.name.data = (char *)stack_trace.string_buffer.size;
+		entry.name.size = name.size;
+		stack_trace.string_buffer += name;
 
 		entry.file.data = (char *)stack_trace.string_buffer.size;
-		entry.file.size = file_length;
-
-		stack_trace.string_buffer += Span(file, file_length);
-
+		entry.file.size = file.size;
+		stack_trace.string_buffer += file;
+		
 		stack_trace.call_stack.add(entry);
 	}
 

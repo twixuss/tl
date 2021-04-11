@@ -9,8 +9,10 @@
 #define COMPILER_GCC  0
 
 #if defined __GNUG__
+	#undef COMPILER_GCC
 	#define COMPILER_GCC 1
 #elif defined _MSC_VER
+	#undef COMPILER_MSVC
 	#define COMPILER_MSVC 1
 #else
 	#pragma message "TL: Unresolved compiler"
@@ -25,8 +27,10 @@
 #define OS_LINUX   0
 
 #if defined _WIN32 || defined _WIN64
+	#undef OS_WINDOWS
 	#define OS_WINDOWS 1
 #else
+	#undef OS_LINUX
 	#define OS_LINUX 1
 #endif
 
@@ -40,14 +44,18 @@
 
 #if COMPILER_MSVC
 	#if defined _M_IX86
+		#undef ARCH_X86
 		#define ARCH_X86 1
 	#elif defined _M_X64
+		#undef ARCH_X64
 		#define ARCH_X64 1
 	#endif
 #elif COMPILER_GCC
 	#if defined _X86_
+		#undef ARCH_X86
 		#define ARCH_X86 1
 	#elif defined __x86_64__
+		#undef ARCH_X64
 		#define ARCH_X64 1
 	#endif
 #endif
@@ -55,36 +63,46 @@
 #if COMPILER_MSVC || COMPILER_GCC
 	#ifndef ARCH_AVX
 		#ifdef __AVX__
+			#undef ARCH_AVX
 			#define ARCH_AVX 1
 		#else
+			#undef ARCH_AVX
 			#define ARCH_AVX 0
 		#endif
 	#endif
-	#ifndef ARCH_AVX2 
+	#ifndef ARCH_AVX2
 		#ifdef __AVX2__
+			#undef ARCH_AVX2
 			#define ARCH_AVX2 1
 		#else
+			#undef ARCH_AVX2
 			#define ARCH_AVX2 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512F
 		#ifdef __AVX512F__
+			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 1
 		#else
+			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512VL
 		#ifdef __AVX512VL__
+			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 1
 		#else
+			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512DQ
 		#ifdef __AVX512DQ__
+			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 1
 		#else
+			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 0
 		#endif
 	#endif
@@ -200,5 +218,14 @@ static_assert(sizeof(umm) == sizeof(void *));
 
 static_assert(sizeof(f32) == 4);
 static_assert(sizeof(f64) == 8);
+
+using ascii = char;
+using utf8  = char8_t;
+using utf16 = char16_t;
+using utf32 = char32_t;
+
+#if OS_WINDOWS
+static_assert(sizeof(utf16) == sizeof(wchar));
+#endif
 
 }

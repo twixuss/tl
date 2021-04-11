@@ -38,7 +38,7 @@ forceinline u32 random_u32(u32 seed) {
 
 forceinline u64 random_u64(u64 seed) {
     u64 r0 = seed;
-    u64 r1 = rotateLeft(seed, 32);
+    u64 r1 = rotate_left(seed, 32);
     u64 r2 = ((seed << 8) & 0xFF00FF00FF00FF00) | ((seed >> 8) & 0x00FF00FF00FF00FF);
     return r2 * r1 * r0 * 0x8F2A63394D;
 }
@@ -78,7 +78,7 @@ forceinline v3f random_v3f(v3f value) {
 
 forceinline v2f random_v2f(v2s value) {
 	return {
-		random_f32((value.x + reverse_bits(value.y)) ^ 0xABCDEF01), 
+		random_f32((value.x + reverse_bits(value.y)) ^ 0xABCDEF01),
 		random_f32((value.y - reverse_bits(value.x)) ^ 0x12435687)
 	};
 }
@@ -107,7 +107,7 @@ forceinline f32 random_f32(v3u seed) {
 forceinline f32 random_f32(v2s seed) { return random_f32((v2u)seed); }
 forceinline f32 random_f32(v3s seed) { return random_f32((v3u)seed); }
 
-forceinline u32 random_u32(f32 seed) { return *(u32 *)&seed; }
+forceinline u32 random_u32(f32 seed) { return random_u32(*(u32 *)&seed); }
 forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
 
 forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
@@ -138,7 +138,7 @@ forceinline f32 voronoi_v2f(v2f coordinate) {
 	for (auto offset : offsets) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v2f(tile_position + offset) + offset));
 	}
-	
+
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
 }
 forceinline f32 voronoi_v3f(v3f coordinate) {
@@ -158,7 +158,7 @@ forceinline f32 voronoi_v3f(v3f coordinate) {
 		{ 1, 0,-1}, { 1, 0, 0}, { 1, 0, 1},
 		{ 1, 1,-1}, { 1, 1, 0}, { 1, 1, 1},
 	};
-	
+
 	for (auto offset : offsets) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v3f(tile_position + offset) + offset));
 	}
@@ -181,14 +181,14 @@ forceinline f32 voronoi_v2s(v2s coordinate, s32 step_size) {
 	for (auto offset : offsets) {
 		min_distance_squared = min(min_distance_squared, distance_squared(local_position, random_v2f(tile_position + offset) + (v2f)offset));
 	}
-	
+
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
 }
 forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 	v3s scaled_tile = floor(coordinate, step_size);
 	v3s tile_position = scaled_tile / step_size;
 	v3f local_position = (v3f)(coordinate - scaled_tile) * reciprocal((f32)step_size);
-	
+
 	f32 min_distance_squared = 1000;
 
 	static constexpr v3s offsets[] = {
@@ -229,7 +229,7 @@ forceinline f32 value_noise_v2f(v2f coordinate, f32(*interpolate)(f32) = [](f32 
 forceinline f32 value_noise_v3f(v3f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
 	v3f tile_position = floor(coordinate);
 	v3f local_position = coordinate - tile_position;
-	
+
 	f32 left_bottom_front  = random_f32(tile_position + v3f{0,0,0});
 	f32 left_bottom_back   = random_f32(tile_position + v3f{0,0,1});
 	f32 left_top_front     = random_f32(tile_position + v3f{0,1,0});
@@ -238,7 +238,7 @@ forceinline f32 value_noise_v3f(v3f coordinate, f32(*interpolate)(f32) = [](f32 
 	f32 right_bottom_back  = random_f32(tile_position + v3f{1,0,1});
 	f32 right_top_front    = random_f32(tile_position + v3f{1,1,0});
 	f32 right_top_back     = random_f32(tile_position + v3f{1,1,1});
-	
+
 	f32 tx = interpolate(local_position.x);
 	f32 ty = interpolate(local_position.y);
 	f32 tz = interpolate(local_position.z);
@@ -277,7 +277,7 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 	v3s floored = floor(coordinate, step);
     v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
-	
+
 	f32 tx = interpolate(local.x);
 	f32 ty = interpolate(local.y);
 	f32 tz = interpolate(local.z);
@@ -285,7 +285,7 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 	__m256i px = _mm256_add_epi32(_mm256_set1_epi32(tile.x), _mm256_setr_epi32(0, 1, 0, 1, 0, 1, 0, 1));
 	__m256i py = _mm256_add_epi32(_mm256_set1_epi32(tile.y), _mm256_setr_epi32(0, 0, 1, 1, 0, 0, 1, 1));
 	__m256i pz = _mm256_add_epi32(_mm256_set1_epi32(tile.z), _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1));
-	
+
 	auto random_u32x8 = [] (__m256i s) {
 		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x55555555u));
 		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(u32_random_primes[0]));
@@ -310,7 +310,7 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 
 	b = _mm_shuffle_ps(a, a, _MM_SHUFFLE(0, 0, 0, 1));
 	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(tx), a);
-	
+
 	return _mm_cvtss_f32(a);
 #else
 	f32 left_bottom_back   = random_f32(tile + v3s{0,0,0});
@@ -336,13 +336,33 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 forceinline f32 value_noise_v2s_linear(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return v; }); }
 forceinline f32 value_noise_v3s_linear(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return v; }); }
 
+forceinline f32 gradient_noise_f32(f32 coordinate) {
+    f32 tile = floor(coordinate);
+    f32 local = frac(coordinate);
+
+    f32 t0 = local;
+    f32 t1 = t0 - 1.f;
+
+	static constexpr f32 directions[] = {-1, -.75, -.5, -.25, .25, .5, .75, 1};
+	static_assert(is_power_of_2(count_of(directions)));
+	auto get_direction = [&](f32 offset) { return directions[(random_u32(tile + offset) >> 26) & (count_of(directions) - 1)]; };
+    f32 d0 = get_direction(0);
+    f32 d1 = get_direction(1);
+
+    f32 v0 = d0 * t0;
+    f32 v1 = d1 * t1;
+
+    f32 t = smoothstep(local);
+    return lerp(v0, v1, t) + 0.5f;
+}
+
 forceinline f32 gradient_noise_v2f(v2f coordinate) {
     v2f tile = floor(coordinate);
     v2f local = frac(coordinate);
-    
+
     v2f t0 = local;
-    v2f t1 = t0 - 1.;
-    
+    v2f t1 = t0 - 1.f;
+
 	static const v2f directions[] = {
 		v2f{ 1, 0},
 		v2f{-1, 0},
@@ -359,12 +379,12 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
     v2f g10 = get_direction(v2f{1, 0});
     v2f g01 = get_direction(v2f{0, 1});
     v2f g11 = get_direction(v2f{1, 1});
-    
+
     f32 v00 = g00.x * t0.x + g00.y * t0.y;
     f32 v10 = g10.x * t1.x + g10.y * t0.y;
     f32 v01 = g01.x * t0.x + g01.y * t1.y;
     f32 v11 = g11.x * t1.x + g11.y * t1.y;
-    
+
     v2f t = smoothstep(local);
     return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
@@ -373,10 +393,10 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
 	v2s floored = floor(coordinate, step);
     v2s tile = floored / step;
     v2f local = (v2f)(coordinate - floored) * reciprocal((f32)step);
-    
+
     v2f t0 = local;
-    v2f t1 = t0 - 1.;
-    
+    v2f t1 = t0 - 1.f;
+
 	static const v2f directions[] = {
 		v2f{ 1, 0},
 		v2f{-1, 0},
@@ -393,12 +413,12 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
     v2f g10 = get_direction(v2s{1, 0});
     v2f g01 = get_direction(v2s{0, 1});
     v2f g11 = get_direction(v2s{1, 1});
-    
-    f32 v00 = g00.x * t0.x + g00.y * t0.y;
-    f32 v10 = g10.x * t1.x + g10.y * t0.y;
-    f32 v01 = g01.x * t0.x + g01.y * t1.y;
-    f32 v11 = g11.x * t1.x + g11.y * t1.y;
-    
+
+    f32 v00 = dot(g00, v2f{t0.x, t0.y});
+    f32 v10 = dot(g10, v2f{t1.x, t0.y});
+    f32 v01 = dot(g01, v2f{t0.x, t1.y});
+    f32 v11 = dot(g11, v2f{t1.x, t1.y});
+
     v2f t = smoothstep(local);
     return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
@@ -407,10 +427,10 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
 	v3s floored = floor(coordinate, step);
     v3s tile = floored / step;
     v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
-    
+
     v3f t0 = local;
     v3f t1 = t0 - 1;
-    
+
 	static constexpr v3f directions[] = {
 		// v3f{ 1, 0, 0},
 		// v3f{-1, 0, 0},
@@ -448,8 +468,8 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
     f32 v101 = dot(g101, v3f{ t1.x, t0.y, t1.z});
     f32 v011 = dot(g011, v3f{ t0.x, t1.y, t1.z});
     f32 v111 = dot(g111, v3f{ t1.x, t1.y, t1.z});
-    
-    return 
+
+    return
 		lerp(
 			lerp(lerp(v000, v100, t.x), lerp(v010, v110, t.x), t.y),
 			lerp(lerp(v001, v101, t.x), lerp(v011, v111, t.x), t.y),
