@@ -36,7 +36,7 @@ TL_API bool parse_shader(Shader &shader, Span<char> source);
 TL_API Buffer load_shader_file(Span<utf8> full_path);
 TL_API Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_name);
 TL_API void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shader_name);
-TL_API void update(ShaderCatalog &catalog);
+TL_API bool update(ShaderCatalog &catalog);
 TL_API GLuint get_uniform_location(Shader &shader, Span<char> name);
 TL_API void set_uniform(Shader &shader, Span<char> name, f32 value);
 TL_API void set_uniform(Shader &shader, Span<char> name, v2f value);
@@ -310,10 +310,12 @@ void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shad
 // Updates file trackers in the catalog and reloads modified shaders.
 // Should be used only for development.
 //
-void update(ShaderCatalog &catalog) {
+bool update(ShaderCatalog &catalog) {
+	bool any_updated = false;
 	for (auto &[name, shader] : catalog.shaders) {
-		update_file_tracker(shader.tracker);
+		any_updated |= update_file_tracker(shader.tracker);
 	}
+	return any_updated;
 }
 
 GLuint get_uniform_location(Shader &shader, Span<char> name) {

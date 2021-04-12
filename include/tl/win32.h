@@ -2,7 +2,6 @@
 #include "system.h"
 #include "math.h"
 #include "common.h"
-#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #pragma warning(push, 0)
 #include <Windows.h>

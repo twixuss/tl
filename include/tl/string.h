@@ -367,6 +367,24 @@ forceinline void append_bytes(StringBuilder &b, List<T> list) {
 	append_bytes(b, list.data, list.size * sizeof(T));
 }
 
+inline void append(StringBuilder &b, ascii ch) {
+	switch (b.encoding) {
+		case Encoding_ascii:
+		case Encoding_utf8:
+			append_bytes(b, ch);
+			break;
+		case Encoding_utf16:
+			append_bytes(b, (utf16)ch);
+			break;
+		case Encoding_utf32:
+			append_bytes(b, (utf32)ch);
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
+
 inline void append(StringBuilder &b, Span<ascii> string) {
 	switch (b.encoding) {
 		case Encoding_ascii:

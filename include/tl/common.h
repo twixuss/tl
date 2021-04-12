@@ -7,7 +7,6 @@
 
 #ifdef TL_IMPL
 #if OS_WINDOWS
-#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
 #else
@@ -592,10 +591,22 @@ struct Span {
 	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
 	constexpr ValueType *begin() const { return data; }
 	constexpr ValueType *end() const { return data + size; }
-	constexpr ValueType &front() const { return *data; }
-	constexpr ValueType &back() const { return data[size - 1]; }
-	constexpr ValueType &operator[](umm i) const { return data[i]; }
-	constexpr ValueType &at(umm i) const { return data[i]; }
+	constexpr ValueType &front() const {
+		bounds_check(size);
+		return *data;
+	}
+	constexpr ValueType &back() const {
+		bounds_check(size);
+		return data[size - 1];
+	}
+	constexpr ValueType &operator[](umm i) const {
+		bounds_check(i < size);
+		return data[i];
+	}
+	constexpr ValueType &at(umm i) const {
+		bounds_check(i < size);
+		return data[i];
+	}
 	constexpr bool empty() const { return size == 0; }
 
 	template <class U>
@@ -788,8 +799,8 @@ inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
 	return true;
 }
 
-bool equals_case_insensitive(char a, char b) { return to_lower(a) == to_lower(b); }
-bool equals_case_insensitive(utf8 a, utf8 b) { return to_lower(a) == to_lower(b); }
+inline bool equals_case_insensitive(char a, char b) { return to_lower(a) == to_lower(b); }
+inline bool equals_case_insensitive(utf8 a, utf8 b) { return to_lower(a) == to_lower(b); }
 
 template <class T, class Predicate, class = EnableIf<is_invocable<Predicate, T, T>>>
 inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {

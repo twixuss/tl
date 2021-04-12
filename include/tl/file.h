@@ -86,7 +86,7 @@ TL_API bool file_exists(utf8  const *path);
 TL_API bool file_exists(utf16 const *path);
 TL_API bool file_exists(utf32 const *path);
 
-TL_API bool file_exists(wchar const *path) {
+inline bool file_exists(wchar const *path) {
 	if constexpr(sizeof(wchar) == sizeof(utf16)) {
 		return file_exists((utf16 *)path);
 	} else {
@@ -151,12 +151,14 @@ inline void delete_file(Span<char> path) {
 	}
 }
 
-inline void update_file_tracker(FileTracker &tracker) {
+inline bool update_file_tracker(FileTracker &tracker) {
 	u64 last_write_time = get_file_write_time(tracker.path);
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
 		tracker.on_update(tracker, tracker.state);
+		return true;
 	}
+	return false;
 }
 
 inline FileTracker create_file_tracker(utf8 const *path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
@@ -386,12 +388,8 @@ void close(File file) {
 	CloseHandle((HANDLE)file);
 }
 
-bool file_exists(ascii const *path) {
-	return PathFileExistsA(path);
-}
-bool file_exists(utf16 const *path) {
-	return PathFileExistsW((wchar *)path);
-}
+bool file_exists(ascii const *path) { return PathFileExistsA(path); }
+bool file_exists(utf16 const *path) { return PathFileExistsW((wchar *)path); }
 
 static u64 get_file_write_time(HANDLE file) {
 	FILETIME last_write_time;

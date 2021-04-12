@@ -27,15 +27,31 @@ enum : KeyState {
 #if OS_WINDOWS
 
 enum Key {
-	Key_page_up   = VK_PRIOR,
-	Key_page_down = VK_NEXT,
-	Key_end       = VK_END,
-	Key_home      = VK_HOME,
+	Key_tab       = 0x09,
+	Key_shift     = 0x10,
+	Key_control   = 0x11,
+	Key_alt       = 0x12,
+	Key_page_up   = 0x21,
+	Key_page_down = 0x22,
+	Key_end       = 0x23,
+	Key_home      = 0x24,
+	Key_f1        = 0x70,
+	Key_f2        = 0x71,
+	Key_f3        = 0x72,
+	Key_f4        = 0x73,
+	Key_f5        = 0x74,
+	Key_f6        = 0x75,
+	Key_f7        = 0x76,
+	Key_f8        = 0x77,
+	Key_f9        = 0x78,
+	Key_f10       = 0x79,
+	Key_f11       = 0x7A,
+	Key_f12       = 0x7B,
 };
 
 #endif
 
-void update_key_state(Span<KeyState> key_state) {
+inline void update_key_state(Span<KeyState> key_state) {
 	for (KeyState &key : key_state) {
 		if (key & KeyState_down) {
 			key &= ~KeyState_down;
@@ -48,14 +64,19 @@ void update_key_state(Span<KeyState> key_state) {
 	}
 }
 
+#ifdef TL_IMPL
 #if OS_WINDOWS
-bool process_mouse_message(MSG message, KeyState *mouse_state, v2s *mouse_delta = 0) {
+bool process_mouse_message(MSG message, Span<KeyState> mouse_state, v2s *mouse_delta = 0, s32 *wheel = 0) {
 	switch (message.message) {
 		case WM_LBUTTONDOWN: { mouse_state[0] = KeyState_down | KeyState_held; return true; }
 		case WM_RBUTTONDOWN: { mouse_state[1] = KeyState_down | KeyState_held; return true; }
 		case WM_MBUTTONDOWN: { mouse_state[2] = KeyState_down | KeyState_held; return true; }
 		case WM_LBUTTONUP: { mouse_state[0] = KeyState_up; return true; }
 		case WM_RBUTTONUP: { mouse_state[1] = KeyState_up; return true; }
+
+		if (wheel) {
+			case WM_MOUSEWHEEL: *wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; return true;
+		}
 
 		case WM_INPUT: {
 			RAWINPUT rawInput;
@@ -81,7 +102,7 @@ bool process_mouse_message(MSG message, KeyState *mouse_state, v2s *mouse_delta 
 	}
 	return false;
 }
-bool process_keyboard_message(MSG message, KeyState *key_state) {
+bool process_keyboard_message(MSG message, Span<KeyState> key_state) {
 	switch (message.message) {
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN: {
@@ -107,6 +128,7 @@ bool process_keyboard_message(MSG message, KeyState *key_state) {
 	return false;
 }
 
+#endif
 #endif
 
 }

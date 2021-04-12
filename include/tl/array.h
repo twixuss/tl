@@ -22,6 +22,12 @@ struct Array {
 		bounds_check(i < size);
 		return data[i];
 	}
+
+	constexpr Span<T> operator+(umm i) {
+		bounds_check(i <= size);
+		return {data + i, size - i};
+	}
+
 	T data[size];
 };
 

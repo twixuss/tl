@@ -6,10 +6,25 @@
 
 #pragma warning(push, 0)
 #ifdef TL_IMPL
+
 #define NOMINMAX
 #include <Windows.h>
-#endif
 #include <gl/GL.h>
+
+#else
+
+#define WINGDIAPI __declspec(dllimport)
+#define APIENTRY __stdcall
+using BOOL = int;
+using HDC = struct{}*;
+using HGLRC = struct{}*;
+using UINT = TL::u32;
+using INT = TL::s32;
+using FLOAT = TL::f32;
+
+#include <gl/GL.h>
+
+#endif
 #pragma warning(pop)
 
 #pragma warning(push)
@@ -451,10 +466,10 @@ TL_API void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, G
 
 TL_API BackBufferParams get_default_back_buffer_params();
 
-TL_API bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
-inline bool init_opengl(HWND window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(HWND window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(HWND window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
+TL_API bool init_opengl(void *window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
+inline bool init_opengl(void *window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(void *window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(void *window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
 
 TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
@@ -724,7 +739,8 @@ static HGLRC context;
 
 static StaticList<int, 16> context_attribs;
 
-bool init_opengl(HWND window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+bool init_opengl(void *_window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+	auto window = (HWND)_window;
 	u32 depth_bits = 0;
 	u32 stencil_bits = 0;
 	switch (back_buffer_params.depth_stencil_format) {

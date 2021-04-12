@@ -20,8 +20,8 @@ struct hash<TL::Span<char>> {
 };
 
 template <>
-struct hash<TL::Span<utf8>> {
-	TL::umm operator()(TL::Span<utf8> const &v) const {
+struct hash<TL::Span<TL::utf8>> {
+	TL::umm operator()(TL::Span<TL::utf8> const &v) const {
 		using namespace TL;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		umm index = 0;
