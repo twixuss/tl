@@ -14,6 +14,7 @@ s32 fixed_addition_overflow(f32 a, f32 b, f32 *result) {
 	if (sum > 1) {
 	
 	}
+	return 0;
 }
 
 template <class Int, class Fract>

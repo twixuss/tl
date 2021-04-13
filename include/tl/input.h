@@ -73,11 +73,12 @@ bool process_mouse_message(MSG message, Span<KeyState> mouse_state, v2s *mouse_d
 		case WM_MBUTTONDOWN: { mouse_state[2] = KeyState_down | KeyState_held; return true; }
 		case WM_LBUTTONUP: { mouse_state[0] = KeyState_up; return true; }
 		case WM_RBUTTONUP: { mouse_state[1] = KeyState_up; return true; }
-
-		if (wheel) {
-			case WM_MOUSEWHEEL: *wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; return true;
-		}
-
+		case WM_MOUSEWHEEL:
+			if (wheel) {
+				*wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA;
+				return true;
+			}
+			break;
 		case WM_INPUT: {
 			RAWINPUT rawInput;
 			if (UINT rawInputSize = sizeof(rawInput);

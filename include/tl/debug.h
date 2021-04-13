@@ -58,7 +58,8 @@ bool debug_init() {
 		return false;
 	
 	DWORD options = SymGetOptions();
-	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES);
+	//SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
+	SymSetOptions(options | SYMOPT_PUBLICS_ONLY | SYMOPT_DEBUG | SYMOPT_EXACT_SYMBOLS);
 
 	return true;
 }
@@ -109,7 +110,7 @@ static void *load_modules_symbols(HANDLE process, DWORD pid) {
     return modules[0].base_address;
 }
 
-StackTrace get_stack_trace() {
+StackTrace get_stack_trace(CONTEXT context) {
 #ifdef TL_TRACK_ALLOCATIONS
 	track_allocations = false;
 	defer { track_allocations = true; };
@@ -117,10 +118,6 @@ StackTrace get_stack_trace() {
 
 	STACKFRAME64 frame = {};
  
-	CONTEXT context = {};
-	context.ContextFlags = CONTEXT_ALL;
-	RtlCaptureContext(&context);
-
 	frame.AddrPC.Offset    = context.Rip;
 	frame.AddrStack.Offset = context.Rsp;
 	frame.AddrFrame.Offset = context.Rbp;
@@ -146,18 +143,23 @@ StackTrace get_stack_trace() {
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (!frameIndex++)
 			continue;
+
 		constexpr u32 maxNameLength = MAX_SYM_NAME;
 		DWORD64 displacement;
 
-		static u8 buffer[sizeof(IMAGEHLP_SYMBOL64) + maxNameLength] = {};
-		auto symbol = (IMAGEHLP_SYMBOL64*)buffer;
-		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
-		symbol->MaxNameLength = maxNameLength;
+		static u8 buffer[sizeof(SYMBOL_INFO) + maxNameLength] = {};
+		auto symbol = (SYMBOL_INFO*)buffer;
+		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+		symbol->MaxNameLen = maxNameLength;
 		
-		if (!SymGetSymFromAddr64(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
+		if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
+			auto error = GetLastError();
+			print("SymFromAddr failed with code: 0x% (%)\m", FormatInt(error, 16), error);
 			break;
 		}
 		
+		print("% % % %\n", symbol->Address, symbol->Flags, symbol->Size, displacement);
+
 		char name_buffer[256];
 
 		CallStackEntry entry;
@@ -198,6 +200,13 @@ StackTrace get_stack_trace() {
 	}
  
 	return stack_trace;
+}
+StackTrace get_stack_trace() {
+	CONTEXT context = {};
+	context.ContextFlags = CONTEXT_ALL;
+	RtlCaptureContext(&context);
+
+	return get_stack_trace(context);
 }
 
 void free(StackTrace &stack_trace) {
