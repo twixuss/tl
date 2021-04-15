@@ -109,6 +109,14 @@ forceinline f32 random_f32(v3s seed) { return random_f32((v3u)seed); }
 
 forceinline u32 random_u32(f32 seed) { return random_u32(*(u32 *)&seed); }
 forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
+forceinline u32 random_u32(v3f seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
+//forceinline u32 random_u32(v3f seed) { 
+//	u32 result = 0xbabeface;
+//	result ^= random_u32(seed.x);
+//	result ^= random_u32(result ^ *(u32 *)&seed.y);
+//	result ^= random_u32(result ^ *(u32 *)&seed.z);
+//	return result;
+//}
 
 forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
 forceinline u32 random_u32(v3s seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
@@ -387,6 +395,53 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
 
     v2f t = smoothstep(local);
     return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
+}
+
+forceinline f32 gradient_noise_v3f(v3f coordinate) {
+    v3f tile = floor(coordinate);
+    v3f local = frac(coordinate);
+
+    v3f t0 = local;
+    v3f t1 = t0 - 1;
+
+	static constexpr v3f directions[] = {
+		CE::normalize(v3f{ 1, 1, 1}),
+		CE::normalize(v3f{-1, 1, 1}),
+		CE::normalize(v3f{ 1,-1, 1}),
+		CE::normalize(v3f{-1,-1, 1}),
+		CE::normalize(v3f{ 1, 1,-1}),
+		CE::normalize(v3f{-1, 1,-1}),
+		CE::normalize(v3f{ 1,-1,-1}),
+		CE::normalize(v3f{-1,-1,-1})
+	};
+	static_assert(is_power_of_2(count_of(directions)));
+
+    v3f t = smoothstep(local);
+
+	auto get_direction = [&](v3f offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+    v3f g000 = get_direction({0, 0, 0});
+    v3f g100 = get_direction({1, 0, 0});
+    v3f g010 = get_direction({0, 1, 0});
+    v3f g110 = get_direction({1, 1, 0});
+    v3f g001 = get_direction({0, 0, 1});
+    v3f g101 = get_direction({1, 0, 1});
+    v3f g011 = get_direction({0, 1, 1});
+    v3f g111 = get_direction({1, 1, 1});
+	f32 v000 = dot(g000, v3f{ t0.x, t0.y, t0.z});
+    f32 v100 = dot(g100, v3f{ t1.x, t0.y, t0.z});
+    f32 v010 = dot(g010, v3f{ t0.x, t1.y, t0.z});
+    f32 v110 = dot(g110, v3f{ t1.x, t1.y, t0.z});
+	f32 v001 = dot(g001, v3f{ t0.x, t0.y, t1.z});
+    f32 v101 = dot(g101, v3f{ t1.x, t0.y, t1.z});
+    f32 v011 = dot(g011, v3f{ t0.x, t1.y, t1.z});
+    f32 v111 = dot(g111, v3f{ t1.x, t1.y, t1.z});
+
+    return
+		lerp(
+			lerp(lerp(v000, v100, t.x), lerp(v010, v110, t.x), t.y),
+			lerp(lerp(v001, v101, t.x), lerp(v011, v111, t.x), t.y),
+			t.z
+		) / sqrt3 + 0.5f;
 }
 
 forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {

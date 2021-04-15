@@ -168,6 +168,13 @@ template <class T>
 void erase(List<T> &list, T *value) { list.erase_at(value - list.data); }
 
 template <class T>
+void erase_unordered_at(List<T> &list, umm index) {
+	bounds_check(index < list.size);
+	memcpy(list.data + index, &list.back(), sizeof(T));
+	--list.size;
+}
+
+template <class T>
 void free(List<T> &list) {
 	if (list.data == 0) return;
 

@@ -1824,6 +1824,13 @@ forceinline aabb<T> to_zero(aabb<T> box) {
 	return box;
 }
 
+template <class T>
+forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
+	box.min = clamp(box.min, bounds.min, bounds.max);
+	box.max = clamp(box.max, bounds.min, bounds.max);
+	return box;
+}
+
 #define for_aabb3(x, y, z, condition, box)           \
 for (auto z = box.min.z; z condition box.max.z; ++z) \
 for (auto y = box.min.y; y condition box.max.y; ++y) \

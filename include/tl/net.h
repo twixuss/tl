@@ -41,7 +41,7 @@ TL_API void send(Socket s, void const *data, u32 size);
 TL_API void send(Socket s, sockaddr_in const &destination, void const *data, u32 size);
 TL_API Span<u8> receive_into(Socket socket, void *data, u32 size);
 
-inline void send(Socket s, Span<u8 const> span) {
+inline void send(Socket s, Span<u8> span) {
 	send(s, span.data, (u32)span.size);
 }
 template <class T>
@@ -189,7 +189,7 @@ void run(TcpServer &server, void *context) {
 				int bytesReceived = recv(socket, (char *)buf, sizeof(buf), 0);
 				if (bytesReceived <= 0) {
 					server.on_client_disconnected(server, context, (Socket)socket);
-					server.clients.find_and_erase((Socket)socket);
+					find_and_erase(server.clients, (Socket)socket);
 					continue;
 				}
 				server.on_client_message_received(server, context, (Socket)socket, buf, (u32)bytesReceived);

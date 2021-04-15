@@ -306,7 +306,7 @@ struct StringBuilder {
 		do {
 			auto block_size = block->buffer.size;
 			if (block_size) {
-				fn(block->buffer.data, block_size);
+				fn(block->buffer);
 			}
 			block = block->next;
 		} while (block);

@@ -475,6 +475,12 @@ TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
 inline void glViewport(v2u size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
 inline void glViewport(v2u position, v2u size) { ::glViewport((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2f size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2s size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2u size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2f position, v2f size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2s position, v2s size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+inline void glScissor(v2u position, v2u size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 TL_API GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source);
 TL_API GLuint create_shader(GLenum shaderType, Span<char> source);
 inline GLuint create_shader(GLenum shaderType, char const *source) {

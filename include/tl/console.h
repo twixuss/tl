@@ -43,6 +43,9 @@ inline void print(T const &value) {
 	current_printer(ascii_to_utf8(string));
 }
 
+template <> inline void print(Span<char> const &span) { current_printer(span); }
+template <> inline void print(Span<utf8> const &span) { current_printer(span); }
+
 template <class ...Args>
 inline void print(char const *fmt, Args const &...args) {
 	StringBuilder builder;

@@ -59,7 +59,7 @@ bool debug_init() {
 	
 	DWORD options = SymGetOptions();
 	//SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
-	SymSetOptions(options | SYMOPT_PUBLICS_ONLY | SYMOPT_DEBUG | SYMOPT_EXACT_SYMBOLS);
+	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_DEBUG | SYMOPT_EXACT_SYMBOLS);
 
 	return true;
 }
@@ -110,7 +110,7 @@ static void *load_modules_symbols(HANDLE process, DWORD pid) {
     return modules[0].base_address;
 }
 
-StackTrace get_stack_trace(CONTEXT context) {
+StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 #ifdef TL_TRACK_ALLOCATIONS
 	track_allocations = false;
 	defer { track_allocations = true; };
@@ -139,36 +139,37 @@ StackTrace get_stack_trace(CONTEXT context) {
 
 	StackTrace stack_trace;
 
-	u32 frameIndex = 0;
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
-		if (!frameIndex++)
+		if (frames_to_skip) {
+			--frames_to_skip;
 			continue;
-
-		constexpr u32 maxNameLength = MAX_SYM_NAME;
-		DWORD64 displacement;
-
-		static u8 buffer[sizeof(SYMBOL_INFO) + maxNameLength] = {};
-		auto symbol = (SYMBOL_INFO*)buffer;
-		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-		symbol->MaxNameLen = maxNameLength;
-		
-		if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
-			auto error = GetLastError();
-			print("SymFromAddr failed with code: 0x% (%)\m", FormatInt(error, 16), error);
-			break;
 		}
-		
-		print("% % % %\n", symbol->Address, symbol->Flags, symbol->Size, displacement);
-
-		char name_buffer[256];
 
 		CallStackEntry entry;
-		
 		Span<char> file = "unknown"s;
 		Span<char> name = "unknown"s;
 		
-        if (frame.AddrPC.Offset != 0) {
-			auto name_length = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NAME_ONLY);
+        if (frame.AddrPC.Offset == 0) {
+			file = "NULL"s;
+			name = "ATTEMP TO EXECUTE AT ADDRESS 0"s;
+		} else {
+			constexpr u32 maxNameLength = MAX_SYM_NAME;
+			DWORD64 displacement;
+
+			static u8 buffer[sizeof(SYMBOL_INFO) + maxNameLength] = {};
+			auto symbol = (SYMBOL_INFO*)buffer;
+			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+			symbol->MaxNameLen = maxNameLength;
+		
+			if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
+				auto error = GetLastError();
+				print("SymFromAddr failed with code: 0x% (%)\n", FormatInt(error, 16), error);
+				break;
+			}
+
+			char name_buffer[256];
+		
+			auto name_length = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_COMPLETE);
 			if (name_length) {
 				name = Span(name_buffer, name_length);
 			}
@@ -181,15 +182,15 @@ StackTrace get_stack_trace(CONTEXT context) {
 				entry.line = line.LineNumber;
 				file = as_span(line.FileName);
 			}
-
 		}
+
 		entry.name.data = (char *)stack_trace.string_buffer.size;
 		entry.name.size = name.size;
-		stack_trace.string_buffer += name;
+		stack_trace.string_buffer.add(name);
 
 		entry.file.data = (char *)stack_trace.string_buffer.size;
 		entry.file.size = file.size;
-		stack_trace.string_buffer += file;
+		stack_trace.string_buffer.add(file);
 		
 		stack_trace.call_stack.add(entry);
 	}
@@ -203,14 +204,15 @@ StackTrace get_stack_trace(CONTEXT context) {
 }
 StackTrace get_stack_trace() {
 	CONTEXT context = {};
-	context.ContextFlags = CONTEXT_ALL;
+	context.ContextFlags = CONTEXT_CONTROL;
 	RtlCaptureContext(&context);
 
-	return get_stack_trace(context);
+	return get_stack_trace(context, 1);
 }
 
 void free(StackTrace &stack_trace) {
 	free(stack_trace.string_buffer);
+	free(stack_trace.call_stack);
 }
 
 
