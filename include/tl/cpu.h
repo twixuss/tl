@@ -259,7 +259,6 @@ CpuInfo get_cpu_info() {
 		result.features[index.slot] |= (u32)value << index.bit;
 	};
 
-	// clang-format off
 	set(CpuFeature::sse3,		(ecx1	& (1 <<  0)));
     set(CpuFeature::pclmulqdq,	(ecx1	& (1 <<  1)));
     set(CpuFeature::monitor,	(ecx1	& (1 <<  3)));
@@ -312,7 +311,6 @@ CpuInfo get_cpu_info() {
     set(CpuFeature::rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor::intel);
     set(CpuFeature::_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor::amd);
     set(CpuFeature::_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor::amd);
-	// clang-format on
 	
 	return result;
 }

@@ -31,6 +31,7 @@ enum Key {
 	Key_shift     = 0x10,
 	Key_control   = 0x11,
 	Key_alt       = 0x12,
+	Key_space     = ' ',
 	Key_page_up   = 0x21,
 	Key_page_down = 0x22,
 	Key_end       = 0x23,

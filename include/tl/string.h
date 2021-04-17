@@ -12,7 +12,7 @@ template <class Char>
 List<Char> null_terminate(Span<Char> span) {
 	List<Char> result;
 	result.size = span.size + 1;
-	result.data = ALLOCATE(Char, current_allocator, result.size);
+	result.data = ALLOCATE(Char, result.allocator, result.size);
 	result.capacity = result.size;
 	memcpy(result.data, span.data, span.size * sizeof(Char));
 	result.data[result.size - 1] = 0;
@@ -185,6 +185,7 @@ inline u32 get_char_and_advance_utf8(utf8 const *&ptr) {
 		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
 		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
 		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
+		default: return ~0u;
 	}
 }
 inline u32 get_char_and_advance_utf8(utf8 *&ptr) {
@@ -784,7 +785,7 @@ List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate) {
 	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
 		return {};
 	}
-	
+
 	if (terminate)
 		result.back() = 0;
 
@@ -793,7 +794,7 @@ List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate) {
 
 List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate) {
 	List<utf16> result;
-	
+
 	if (utf8.size > max_value<int>)
 		return {};
 

@@ -38,18 +38,14 @@ template <class T>
 forceinline T atomic_set(T volatile &dst, T src) { return atomic_set(&dst, src); }
 
 template <class T>
-forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
+forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 	s64 result;
-	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&newValue, *(long long*)&comparand);
-	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)dst, *(long     *)&newValue, *(long     *)&comparand);
-	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)dst, *(short    *)&newValue, *(short    *)&comparand);
-	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)dst, *(char     *)&newValue, *(char     *)&comparand);
+	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)&dst, *(long long*)&newValue, *(long long*)&comparand);
+	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)&dst, *(long     *)&newValue, *(long     *)&comparand);
+	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)&dst, *(short    *)&newValue, *(short    *)&comparand);
+	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)&dst, *(char     *)&newValue, *(char     *)&comparand);
 	else static_assert(false, "atomic_set_if_equals is not available for this size");
 	return *(T *)&result;
-}
-template <class T>
-forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
-	return atomic_set_if_equals(std::addressof(dst), newValue, comparand);
 }
 
 TL_DECLARE_HANDLE(Thread);
@@ -173,7 +169,7 @@ struct Mutex {
 };
 
 inline bool try_lock(Mutex &m) {
-	return !atomic_set_if_equals(&m.in_use, true, false);
+	return !atomic_set_if_equals(m.in_use, true, false);
 }
 inline void lock(Mutex &m) {
 	loop_until([&] {

@@ -354,7 +354,7 @@ void use_shader(Shader &shader) {
 
 	if (shader.enable_blend) {
 		glEnable(GL_BLEND);
-		glBlendFunc(shader.src_blend, shader.dst_blend);
+		glBlendFuncSeparate(shader.src_blend, shader.dst_blend, GL_ZERO, GL_ONE);
 	} else {
 		glDisable(GL_BLEND);
 	}

@@ -590,7 +590,7 @@ void free(GrowingBuffer<T> &buffer) {
 #ifdef TL_IMPL
 
 #ifndef TL_OPENGL_DEBUG_BREAK_LEVEL
-// 0 - don't break;
+// 0 - don't break
 // 1 - break only on high severerity messages
 // 2 - break high+medium severerity messages
 // 3 - break high+medium+low severerity messages
@@ -598,10 +598,19 @@ void free(GrowingBuffer<T> &buffer) {
 #define TL_OPENGL_DEBUG_BREAK_LEVEL 1
 #endif
 
+#ifndef TL_OPENGL_LOG_LEVEL
+// 0 - don't log
+// 1 - log only high severerity messages
+// 2 - log high+medium severerity messages
+// 3 - log high+medium+low severerity messages
+// 4 - log high+medium+low+notification messages
+#define TL_OPENGL_LOG_LEVEL 3
+#endif
+
 namespace TL {
 namespace OpenGL {
 
-union {
+static union {
 	struct {
 #define D(name, ret, args, params) name##_t name;
 		ALL_FUNCS
@@ -610,7 +619,7 @@ union {
 	void *data[1];
 } procedures;
 
-char const *procedure_names[] {
+static char const *procedure_names[] {
 #define D(name, ret, args, params) #name,
 ALL_FUNCS
 #undef D
@@ -620,7 +629,7 @@ ALL_FUNCS
 ALL_FUNCS
 #undef D
 
-GLuint compile_shader(GLuint shader) {
+static GLuint compile_shader(GLuint shader) {
 	glCompileShader(shader);
 
 	GLint status;
@@ -990,39 +999,55 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 	if(id == 131169 || id == 131185 || id == 131218 || id == 131204)
 		return;
 
-	auto time = get_time_string();
-	defer { free(time); };
-	print("% ---------------\nDebug message (%): %\nSource: ", time, id, message);
+	bool do_print = false;
+	switch (severity) {
+		case GL_DEBUG_SEVERITY_HIGH:         if constexpr (TL_OPENGL_LOG_LEVEL > 0) do_print = true; break;
+		case GL_DEBUG_SEVERITY_MEDIUM:       if constexpr (TL_OPENGL_LOG_LEVEL > 1) do_print = true; break;
+		case GL_DEBUG_SEVERITY_LOW:          if constexpr (TL_OPENGL_LOG_LEVEL > 2) do_print = true; break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION: if constexpr (TL_OPENGL_LOG_LEVEL > 3) do_print = true; break;
+	}
 
-	switch (source) {
-		case GL_DEBUG_SOURCE_API:             print("API");             break;
-		case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   print("Window System");   break;
-		case GL_DEBUG_SOURCE_SHADER_COMPILER: print("Shader Compiler"); break;
-		case GL_DEBUG_SOURCE_THIRD_PARTY:     print("Third Party");     break;
-		case GL_DEBUG_SOURCE_APPLICATION:     print("Application");     break;
-		case GL_DEBUG_SOURCE_OTHER:           print("Other");           break;
+	if (do_print) {
+		auto time = get_time_string();
+		defer { free(time); };
+		print("% ---------------\nDebug message (%): %\nSource: ", time, id, message);
+		switch (source) {
+			case GL_DEBUG_SOURCE_API:             print("API");             break;
+			case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   print("Window System");   break;
+			case GL_DEBUG_SOURCE_SHADER_COMPILER: print("Shader Compiler"); break;
+			case GL_DEBUG_SOURCE_THIRD_PARTY:     print("Third Party");     break;
+			case GL_DEBUG_SOURCE_APPLICATION:     print("Application");     break;
+			case GL_DEBUG_SOURCE_OTHER:           print("Other");           break;
+		}
+		print("\nType: ");
+		switch (type) {
+			case GL_DEBUG_TYPE_ERROR:               print("Error");                break;
+			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: print("Deprecated Behaviour"); break;
+			case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  print("Undefined Behaviour");  break;
+			case GL_DEBUG_TYPE_PORTABILITY:         print("Portability");          break;
+			case GL_DEBUG_TYPE_PERFORMANCE:         print("Performance");          break;
+			case GL_DEBUG_TYPE_MARKER:              print("Marker");               break;
+			case GL_DEBUG_TYPE_PUSH_GROUP:          print("Push Group");           break;
+			case GL_DEBUG_TYPE_POP_GROUP:           print("Pop Group");            break;
+			case GL_DEBUG_TYPE_OTHER:               print("Other");                break;
+		}
+		print("\nSeverity: ");
+
+		switch (severity) {
+			case GL_DEBUG_SEVERITY_HIGH:         print("Severity: high");         break;
+			case GL_DEBUG_SEVERITY_MEDIUM:       print("Severity: medium");       break;
+			case GL_DEBUG_SEVERITY_LOW:          print("Severity: low");          break;
+			case GL_DEBUG_SEVERITY_NOTIFICATION: print("Severity: notification"); break;
+		}
+		print("\n");
 	}
-	print("\nType: ");
-	switch (type) {
-		case GL_DEBUG_TYPE_ERROR:               print("Error");                break;
-		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: print("Deprecated Behaviour"); break;
-		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  print("Undefined Behaviour");  break;
-		case GL_DEBUG_TYPE_PORTABILITY:         print("Portability");          break;
-		case GL_DEBUG_TYPE_PERFORMANCE:         print("Performance");          break;
-		case GL_DEBUG_TYPE_MARKER:              print("Marker");               break;
-		case GL_DEBUG_TYPE_PUSH_GROUP:          print("Push Group");           break;
-		case GL_DEBUG_TYPE_POP_GROUP:           print("Pop Group");            break;
-		case GL_DEBUG_TYPE_OTHER:               print("Other");                break;
-	}
-	print("\nSeverity: ");
 
 	switch (severity) {
-		case GL_DEBUG_SEVERITY_HIGH:         print("Severity: high");         if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 0) debug_break(); break;
-		case GL_DEBUG_SEVERITY_MEDIUM:       print("Severity: medium");       if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 1) debug_break(); break;
-		case GL_DEBUG_SEVERITY_LOW:          print("Severity: low");          if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 2) debug_break(); break;
-		case GL_DEBUG_SEVERITY_NOTIFICATION: print("Severity: notification"); if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 3) debug_break(); break;
+		case GL_DEBUG_SEVERITY_HIGH:         if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 0) debug_break(); break;
+		case GL_DEBUG_SEVERITY_MEDIUM:       if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 1) debug_break(); break;
+		case GL_DEBUG_SEVERITY_LOW:          if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 2) debug_break(); break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION: if constexpr (TL_OPENGL_DEBUG_BREAK_LEVEL > 3) debug_break(); break;
 	}
-	print("\n");
 }
 
 void present() {

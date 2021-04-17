@@ -8,6 +8,12 @@ namespace TL {
 
 template <class T>
 struct List {
+	List &operator=(Span<T> span) {
+		reserve(span.size);
+		size = span.size;
+		memcpy(data, span.data, span.size);
+		return *this;
+	}
 	T &add() {
 		reserve_exponential(size + 1);
 		return *new (data + size++) T();
@@ -77,6 +83,20 @@ struct List {
 
 	T *begin() { return data; }
 	T *end() { return data + size; }
+
+	struct ReverseIterator {
+		T *pointer;
+		ReverseIterator(T *pointer) : pointer(pointer) {}
+		ReverseIterator &operator++() { return --pointer, *this; }
+		ReverseIterator operator++(int) { auto temp = *this; return --pointer, temp; }
+		bool operator==(ReverseIterator that) const { return pointer == that.pointer; }
+		bool operator!=(ReverseIterator that) const { return pointer != that.pointer; }
+		T &operator*() { return *pointer; }
+		T *operator->() { return pointer; }
+	};
+
+	ReverseIterator rbegin() { return data + size - 1; }
+	ReverseIterator rend() { return data - 1; }
 
 	T &front() { bounds_check(size); return data[0]; }
 	T &back() { bounds_check(size); return data[size - 1]; }
@@ -194,14 +214,14 @@ List<T> copy(List<T> const &that) {
 	return result;
 }
 
-template <class T>
-List<T> as_list(Span<T> span) {
-	List<T> result;
-	result.reserve(span.size);
-	result.size = span.size;
-	memcpy(result.data, span.data, result.size * sizeof(T));
-	return result;
-}
+//template <class T>
+//List<T> as_list(Span<T> span) {
+//	List<T> result;
+//	result.reserve(span.size);
+//	result.size = span.size;
+//	memcpy(result.data, span.data, result.size * sizeof(T));
+//	return result;
+//}
 
 template <class T>
 T *next(List<T> list, T *value) {

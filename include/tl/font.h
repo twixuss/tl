@@ -43,11 +43,14 @@ struct FontCollection {
 
 inline FontChar get_char_info(u32 ch, SizedFont &font) {
 	auto found = font.char_buckets.find(ch >> 8);
-	assert(found != font.char_buckets.end(), "get_char_info: character is not present. Call ensure_all_chars_present before");
+	assert(found != font.char_buckets.end(), "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
 	return found->second.chars[ch & 0xff];
 }
 
-inline void ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
+//
+// Returns true if new characters were added
+//
+inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 	auto current_char = text.data;
 
 	List<CharBucket *> new_buckets;
@@ -158,7 +161,10 @@ inline void ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 		}
 		
 		font.collection->update_atlas(font.texture, font.atlas_data, font.atlas_size);
+
+		return true;
 	}
+	return false;
 }
 
 inline SizedFont &get_font_at_size(FontCollection &fonts, u32 size) {

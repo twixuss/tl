@@ -61,6 +61,7 @@ inline void print(char const *fmt, Args const &...args) {
 
 TL_API void hide_console_window();
 TL_API void show_console_window();
+TL_API void toggle_console_window();
 
 #ifdef TL_IMPL
 
@@ -141,6 +142,13 @@ void show_console_window() {
 		console_output = GetStdHandle(STD_OUTPUT_HANDLE);
 	}
 	ShowWindow(console_window, SW_SHOW);
+}
+void toggle_console_window() {
+	if (console_window && IsWindowVisible(console_window)) {
+		hide_console_window();
+	} else {
+		show_console_window();
+	}
 }
 
 #endif

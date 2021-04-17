@@ -573,9 +573,10 @@ auto reverse(T &x) {
 		Iter end() { return {_end}; }
 		Iter _begin, _end;
 	};
-	Range r;
-	r._begin = x.rbegin();
-	r._end = x.rend();
+	Range r = {
+		x.rbegin(),
+		x.rend(),
+	};
 	return r;
 }
 

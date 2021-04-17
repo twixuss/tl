@@ -24,7 +24,7 @@ TL_API void debug_deinit();
 TL_API StackTrace get_stack_trace();
 TL_API void free(StackTrace &stack_trace);
 
-TL_API bool is_debugger_attached();
+TL_API bool debugger_attached();
 
 }
 
@@ -41,7 +41,7 @@ TL_API bool is_debugger_attached();
 
 namespace TL {
 
-static HANDLE debug_process; 
+static HANDLE debug_process;
 
 struct ModuleInfo {
     List<char> image_name;
@@ -56,7 +56,7 @@ bool debug_init() {
 	debug_process = GetCurrentProcess();
 	if (!SymInitialize(debug_process, 0, true))
 		return false;
-	
+
 	DWORD options = SymGetOptions();
 	//SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
 	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_DEBUG | SYMOPT_EXACT_SYMBOLS);
@@ -78,13 +78,13 @@ ModuleInfo get_module_info(HMODULE module, HANDLE process) {
     result.load_size = mi.SizeOfImage;
 
     GetModuleFileNameEx(process, module, temp, sizeof(temp));
-    result.image_name = as_list(as_span(temp));
+    result.image_name = as_span(temp);
 
     GetModuleBaseName(process, module, temp, sizeof(temp));
-    result.module_name = as_list(as_span(temp));
-    
+    result.module_name = as_span(temp);
+
     SymLoadModule64(process, 0, result.image_name.data, result.module_name.data, (DWORD64)result.base_address, result.load_size);
- 
+
 	return result;
 }
 
@@ -117,14 +117,14 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 #endif
 
 	STACKFRAME64 frame = {};
- 
+
 	frame.AddrPC.Offset    = context.Rip;
 	frame.AddrStack.Offset = context.Rsp;
 	frame.AddrFrame.Offset = context.Rbp;
 	frame.AddrPC.Mode      = AddrModeFlat;
 	frame.AddrStack.Mode   = AddrModeFlat;
 	frame.AddrFrame.Mode   = AddrModeFlat;
- 
+
 	//List<>
 	//DWORD required_size_for_modules;
 	//EnumProcessModules(debug_process, modules, sizeof(HMODULE), &required_size_for_modules);
@@ -148,7 +148,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 		CallStackEntry entry;
 		Span<char> file = "unknown"s;
 		Span<char> name = "unknown"s;
-		
+
         if (frame.AddrPC.Offset == 0) {
 			file = "NULL"s;
 			name = "ATTEMP TO EXECUTE AT ADDRESS 0"s;
@@ -160,7 +160,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 			auto symbol = (SYMBOL_INFO*)buffer;
 			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 			symbol->MaxNameLen = maxNameLength;
-		
+
 			if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
 				auto error = GetLastError();
 				print("SymFromAddr failed with code: 0x% (%)\n", FormatInt(error, 16), error);
@@ -168,7 +168,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 			}
 
 			char name_buffer[256];
-		
+
 			auto name_length = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_COMPLETE);
 			if (name_length) {
 				name = Span(name_buffer, name_length);
@@ -191,7 +191,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 		entry.file.data = (char *)stack_trace.string_buffer.size;
 		entry.file.size = file.size;
 		stack_trace.string_buffer.add(file);
-		
+
 		stack_trace.call_stack.add(entry);
 	}
 
@@ -199,7 +199,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 		call.name.data = stack_trace.string_buffer.data + (umm)call.name.data;
 		call.file.data = stack_trace.string_buffer.data + (umm)call.file.data;
 	}
- 
+
 	return stack_trace;
 }
 StackTrace get_stack_trace() {
@@ -216,7 +216,7 @@ void free(StackTrace &stack_trace) {
 }
 
 
-bool is_debugger_attached() {
+bool debugger_attached() {
 	return IsDebuggerPresent();
 }
 

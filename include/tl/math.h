@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "array.h"
+#include "simd.h"
 #include "string.h"
 
 #if COMPILER_MSVC
@@ -19,219 +20,20 @@
 
 #if COMPILER_MSVC
 #pragma warning(push)
-#pragma warning(disable : 5045) // spectre
-#pragma warning(disable : 4146) // unsigned unary minus
-#pragma warning(disable : 4201) // unnamed struct
-#pragma warning(disable : 4820) // padding
+//#pragma warning(disable : 5045) // spectre
+//#pragma warning(disable : 4146) // unsigned unary minus
+//#pragma warning(disable : 4201) // unnamed struct
+//#pragma warning(disable : 4820) // padding
 #endif
 
 namespace TL {
-/*
-#define s32x8_eq(a, b) _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_castps_si256(a), _mm256_castps_si256(b)))
-#define s32x8_gt(a, b) _mm256_castsi256_ps(_mm256_cmpgt_epi32(_mm256_castps_si256(a), _mm256_castps_si256(b)))
-#define s32x8_lt(a, b) s32x8_gt(b, a)
-#define s32x8_le(a, b) m32_not(s32x8_gt(a, b))
-#define s32x8_ge(a, b) m32_not(s32x8_lt(a, b))
-#define s32x8_ne(a, b) m32_not(_mm256_cmpeq_epi32(b, a))
 
-#define u32x8_eq s32x8_eq
-#define u32x8_ne s32x8_ne
-#define u32x8_gt(a, b) s32x8_gt(_mm256_xor_pi(a, _mm256_set1_epi32(0x80000000)), _mm256_xor_pi(b, _mm256_set1_epi32(0x80000000)))
-#define u32x8_lt(a, b) u32x8_gt(b, a)
-#define u32x8_le(a, b) m32_not(u32x8_gt(a, b))
-#define u32x8_ge(a, b) m32_not(u32x8_lt(a, b))
-
-#define _mm256_slliv_epi32(a, b) _mm256_setr_epi32(a << _mm256_extract_epi32(b, 0), a << _mm256_extract_epi32(b, 1), a << _mm256_extract_epi32(b, 2), a << _mm256_extract_epi32(b, 3), a << _mm256_extract_epi32(b, 4), a << _mm256_extract_epi32(b, 5), a << _mm256_extract_epi32(b, 6), a << _mm256_extract_epi32(b, 7))
-#define _mm256_sraiv_epi32(a, b) _mm256_setr_epi32(a >> _mm256_extract_epi32(b, 0), a >> _mm256_extract_epi32(b, 1), a >> _mm256_extract_epi32(b, 2), a >> _mm256_extract_epi32(b, 3), a >> _mm256_extract_epi32(b, 4), a >> _mm256_extract_epi32(b, 5), a >> _mm256_extract_epi32(b, 6), a >> _mm256_extract_epi32(b, 7))
-#define _mm256_srliv_epi32(a, b) _mm256_setr_epi32((u32)a >> (u32)_mm256_extract_epi32(b, 0), (u32)a >> (u32)_mm256_extract_epi32(b, 1), (u32)a >> (u32)_mm256_extract_epi32(b, 2), (u32)a >> (u32)_mm256_extract_epi32(b, 3), (u32)a >> (u32)_mm256_extract_epi32(b, 4), (u32)a >> (u32)_mm256_extract_epi32(b, 5), (u32)a >> (u32)_mm256_extract_epi32(b, 6), (u32)a >> (u32)_mm256_extract_epi32(b, 7))
-
-#if ARCH_AVX
-
-#define m32_xor _mm256_xor_ps
-#define m32_and _mm256_and_ps
-#define m32_or  _mm256_or_ps
-
-#define combine_m16(a, b) _mm256_setr_m128(a, b)
-#define m32_get_half(a, n) _mm256_extractf128_ps(a, n)
-#define m32_get_lower(a) _mm256_extractf128_ps(a, 0)
-#define m32_get_upper(a) _mm256_extractf128_ps(a, 1)
-
-#define f32x8_set _mm256_setr_ps
-#define s32x8_set(a,b,c,d,e,f,g,h) _mm256_castsi256_ps(_mm256_setr_epi32(a,b,c,d,e,f,g,h))
-#define u32x8_set _mm256_setr_epi32
-
-#define f32x8_set1(a) _mm256_set1_ps(a)
-#define s32x8_set1(a) _mm256_castsi256_ps(_mm256_set1_epi32(a))
-#define u32x8_set1(v) _mm256_castsi256_ps(_mm256_set1_epi32((s32)v))
-
-#define f64x4_set1 _mm256_set1_pd
-#define s64x4_set1 _mm256_set1_epi64x
-#define u64x4_set1(v) _mm256_set1_epi64x((s32)v)
-
-#define s32x8_get _mm256_extract_epi32
-#define u32x8_get(v, i) ((u32)_mm256_extract_epi32(v, i))
-
-#define f32x8_add(a, b) _mm256_add_ps(a, b)
-#define f32x8_sub(a, b) _mm256_sub_ps(a, b)
-#define f32x8_mul(a, b) _mm256_mul_ps(a, b)
-#define f32x8_div(a, b) _mm256_div_ps(a, b)
-
-#define f32x8_reciprocal(a) _mm256_rcp_ps(a)
-
-#define f32x8_and_not(a, b) _mm256_andnot_ps(b, a)
-
-#define b32x8_get_mask(a)  _mm256_movemask_ps(a.ps)
-#define b64x4_get_mask(a)  _mm256_movemask_pd(a.pd)
-
-#define b64x4_all_true(v) (b64x4_get_mask(v) == 0xF)
-#define b32x8_all_true(v) (b32x8_get_mask(v) == 0xFF)
-#define b64x4_all_false(v) (b64x4_get_mask(v) == 0)
-#define b32x8_all_false(v) (b32x8_get_mask(v) == 0)
-
-#define b64x4_any_false(v) (b64x4_get_mask(v) != 0xF)
-#define b32x8_any_false(v) (b32x8_get_mask(v) != 0xFF)
-#define b64x4_any_true(v) (b64x4_get_mask(v) != 0)
-#define b32x8_any_true(v) (b32x8_get_mask(v) != 0)
-
-#define select_32x8(mask, a, b) _mm256_blendv_ps(b, a, mask)
-
-#else
-#define b32x8_get_mask(a)  ((_mm_movemask_ps(a.lo.ps) << 4) | _mm_movemask_ps(a.hi.ps))
-#define b64x4_get_mask(a)  ((_mm_movemask_pd(a.lo.pd) << 2) | _mm_movemask_pd(a.hi.pd))
-
-#endif
-
-#if ARCH_AVX2
-#define s32x8_to_f32x8(a) _mm256_cvtepi32_ps(_mm256_castps_si256(a))
-#define u32x8_to_f32x8(a) _mm256_cvtepi32_ps(_mm256_castps_si256(a))
-
-#endif
-
-#define f32x4_abs(v) and_pi_16(v, s32x4_set1(max_value<s32>))
-#define f64x2_abs(v) and_pi_16(v, s64x2_set1(max_value<s64>))
-
-#define f32x8_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s32x8_set1(max_value<s32>)))
-#define f64x4_abs(v) _mm256_and_ps(v, _mm256_castsi256_ps(s64x4_set1(max_value<s64>)))
-
-#define i32x4_sli _mm_slli_epi32
-#define s32x4_sri _mm_srai_epi32
-#define u32x4_sri _mm_srli_epi32
-#define i32x4_sil(a, b) i32x4_sl(s32x4_set1(a), b)
-#define s32x4_sir(a, b) s32x4_sr(s32x4_set1(a), b)
-#define u32x4_sir(a, b) u32x4_sr(u32x4_set1(a), b)
-
-#if ARCH_AVX2
-#define i32x8_sli _mm256_slli_epi32
-#define s32x8_sri _mm256_srai_epi32
-#define u32x8_sri _mm256_srli_epi32
-
-#define b256_cmpeq(a, b) _mm256_castsi256_ps(_mm256_cmpeq_epi8(_mm256_castps_pi(a), _mm256_castps_pi(b)))
-#define i32x4_sl _mm_sllv_epi32
-#define s32x4_sr _mm_srav_epi32
-#define u32x4_sr _mm_srlv_epi32
-#define i64x2_sl _mm_sllv_epi64
-#define u64x2_sr _mm_srlv_epi64
-#define i32x8_sl _mm256_sllv_epi32
-#define s32x8_sr _mm256_srav_epi32
-#define u32x8_sr _mm256_srlv_epi32
-#define i32x8_sli _mm256_slli_epi32
-#define s32x8_sri _mm256_srai_epi32
-#define u32x8_sri _mm256_srli_epi32
-#define i32x8_sil(a, b) i32x8_sl(s32x8_set1(a), b)
-#define s32x8_sir(a, b) s32x8_sr(s32x8_set1(a), b)
-#define u32x8_sir(a, b) u32x8_sr(u32x8_set1(a), b)
-#else
-#define b256_cmpeq(a, b) (m32_not_ps(_mm256_xor_ps(a, b)))
-#define i32x4_sl(a, b) s32x4_set(s32x4_get(a, 0) << s32x4_get(b, 0), s32x4_get(a, 1) << s32x4_get(b, 1), s32x4_get(a, 2) << s32x4_get(b, 2), s32x4_get(a, 3) << s32x4_get(b, 3))
-#define s32x4_sr(a, b) s32x4_set(s32x4_get(a, 0) >> s32x4_get(b, 0), s32x4_get(a, 1) >> s32x4_get(b, 1), s32x4_get(a, 2) >> s32x4_get(b, 2), s32x4_get(a, 3) >> s32x4_get(b, 3))
-#define u32x4_sr(a, b) s32x4_set(u32x4_get(a, 0) >> u32x4_get(b, 0), u32x4_get(a, 1) >> u32x4_get(b, 1), u32x4_get(a, 2) >> u32x4_get(b, 2), u32x4_get(a, 3) >> u32x4_get(b, 3))
-#define i64x2_sl(a, b) s64x2_set(s64x2_get(a, 0) << s64x2_get(b, 0), s64x2_get(a, 1) << s64x2_get(b, 1))
-#define u64x2_sr(a, b) s64x2_set(u64x2_get(a, 0) >> u64x2_get(b, 0), u64x2_get(a, 1) >> u64x2_get(b, 1))
-#define i32x8_sl(a, b) _mm256_setr_epi32(s32x8_get(a, 0) << s32x8_get(b, 0), s32x8_get(a, 1) << s32x8_get(b, 1), s32x8_get(a, 2) << s32x8_get(b, 2), s32x8_get(a, 3) << s32x8_get(b, 3), s32x8_get(a, 4) << s32x8_get(b, 4), s32x8_get(a, 5) << s32x8_get(b, 5), s32x8_get(a, 6) << s32x8_get(b, 6), s32x8_get(a, 7) << s32x8_get(b, 7))
-#define s32x8_sr(a, b) _mm256_setr_epi32(s32x8_get(a, 0) >> s32x8_get(b, 0), s32x8_get(a, 1) >> s32x8_get(b, 1), s32x8_get(a, 2) >> s32x8_get(b, 2), s32x8_get(a, 3) >> s32x8_get(b, 3), s32x8_get(a, 4) >> s32x8_get(b, 4), s32x8_get(a, 5) >> s32x8_get(b, 5), s32x8_get(a, 6) >> s32x8_get(b, 6), s32x8_get(a, 7) >> s32x8_get(b, 7))
-#define u32x8_sr(a, b) _mm256_setr_epi32(u32x8_get(a, 0) >> u32x8_get(b, 0), u32x8_get(a, 1) >> u32x8_get(b, 1), u32x8_get(a, 2) >> u32x8_get(b, 2), u32x8_get(a, 3) >> u32x8_get(b, 3), u32x8_get(a, 4) >> u32x8_get(b, 4), u32x8_get(a, 5) >> u32x8_get(b, 5), u32x8_get(a, 6) >> u32x8_get(b, 6), u32x8_get(a, 7) >> u32x8_get(b, 7))
-#endif
-
-#if ARCH_AVX512DQ && ARCH_AVX512VL
-#define s64x2_mul _mm_mullo_epi64
-#else
-#define s64x2_mul(a, b) s64x2_set(s64x2_get(a, 0) * s64x2_get(b, 0), s64x2_get(a, 1) * s64x2_get(b, 1))
-#endif
-
-#if ARCH_AVX512F && ARCH_AVX512VL
-#define s64x2_sr _mm_srav_epi64
-#define i64x2_sli _mm_slli_epi64
-#define s64x2_sri _mm_srai_epi64
-#define u64x2_sri _mm_srli_epi64
-#define i64x2_sil(a, b) i64x2_sl(s64x2_set1(a), b)
-#define s64x2_sir(a, b) s64x2_sr(s64x2_set1(a), b)
-#define u64x2_sir(a, b) u64x2_sr(u64x2_set1(a), b)
-#else
-#define s64x2_sr(a, b) s64x2_set(s64x2_get(a, 0) >> s64x2_get(b, 0), s64x2_get(a, 1) >> s64x2_get(b, 1))
-#define i64x2_sli(a, b) u64x2_set(u64x2_get(a, 0) << ((u64)b), u64x2_get(a, 1) << ((u64)b))
-#define s64x2_sri(a, b) s64x2_set(s64x2_get(a, 0) >> ((s64)b), s64x2_get(a, 1) >> ((s64)b))
-#define u64x2_sri(a, b) u64x2_set(u64x2_get(a, 0) >> ((u64)b), u64x2_get(a, 1) >> ((u64)b))
-#define i64x2_sil(a, b) u64x2_set(((u64)a) << u64x2_get(b, 0), ((u64)a) << u64x2_get(b, 1))
-#define s64x2_sir(a, b) s64x2_set(((s64)a) >> s64x2_get(b, 0), ((s64)a) >> s64x2_get(b, 1))
-#define u64x2_sir(a, b) u64x2_set(((u64)a) >> u64x2_get(b, 0), ((u64)a) >> u64x2_get(b, 1))
-#endif
-
-#if COMPILER_GCC
-#define s32x4_div(a,b)                             \
-_mm_setr_epi32(                                        \
-	_mm_extract_epi32(a, 0) / _mm_extract_epi32(b, 0), \
-	_mm_extract_epi32(a, 1) / _mm_extract_epi32(b, 1), \
-	_mm_extract_epi32(a, 2) / _mm_extract_epi32(b, 2), \
-	_mm_extract_epi32(a, 3) / _mm_extract_epi32(b, 3)  \
-)
-#define s32x4_rem(a,b)                             \
-_mm_setr_epi32(                                        \
-	_mm_extract_epi32(a, 0) % _mm_extract_epi32(b, 0), \
-	_mm_extract_epi32(a, 1) % _mm_extract_epi32(b, 1), \
-	_mm_extract_epi32(a, 2) % _mm_extract_epi32(b, 2), \
-	_mm_extract_epi32(a, 3) % _mm_extract_epi32(b, 3)  \
-)
-#define u32x4_div(a,b)                                       \
-_mm_setr_epi32(                                                  \
-	(u32)_mm_extract_epi32(a, 0) / (u32)_mm_extract_epi32(b, 0), \
-	(u32)_mm_extract_epi32(a, 1) / (u32)_mm_extract_epi32(b, 1), \
-	(u32)_mm_extract_epi32(a, 2) / (u32)_mm_extract_epi32(b, 2), \
-	(u32)_mm_extract_epi32(a, 3) / (u32)_mm_extract_epi32(b, 3)  \
-)
-#define u32x4_rem(a,b)                                       \
-_mm_setr_epi32(                                                  \
-	(u32)_mm_extract_epi32(a, 0) % (u32)_mm_extract_epi32(b, 0), \
-	(u32)_mm_extract_epi32(a, 1) % (u32)_mm_extract_epi32(b, 1), \
-	(u32)_mm_extract_epi32(a, 2) % (u32)_mm_extract_epi32(b, 2), \
-	(u32)_mm_extract_epi32(a, 3) % (u32)_mm_extract_epi32(b, 3)  \
-)
-#else
-#define s32x4_div _mm_div_epi32
-#define s32x4_rem _mm_rem_epi32
-#define u32x4_div _mm_div_epu32
-#define u32x4_rem _mm_rem_epu32
-#define s64x2_div _mm_div_epi64
-#define s64x2_rem _mm_rem_epi64
-#define u64x2_div _mm_div_epu64
-#define u64x2_rem _mm_rem_epu64
-#endif
-
-
-#define MM256_PERM128(a, b) ((a) | ((b) << 4))
-#define MM_SHUFFLE(a,b,c,d) _MM_SHUFFLE(d,c,b,a)
-
-#define DECLARE_M16 __m128 ps; __m128i pi; __m128d pd
-#define DECLARE_M32 __m256 ps; __m256i pi; __m256d pd
-*/
-
-// clang-format off
-
-constexpr f32 pi    = f32(3.1415926535897932384626433832795L);
-constexpr f32 tau   = f32(6.283185307179586476925286766559L);
-constexpr f32 invPi = f32(0.31830988618379067153776752674503L);
-constexpr f32 sqrt2 = f32(1.4142135623730950488016887242097L);
-constexpr f32 sqrt3 = f32(1.7320508075688772935274463415059L);
-constexpr f32 sqrt5 = f32(2.2360679774997896964091736687313L);
+constexpr f32 pi     = f32(3.1415926535897932384626433832795L);
+constexpr f32 tau    = f32(6.283185307179586476925286766559L);
+constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
+constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
+constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
+constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
@@ -242,11 +44,10 @@ template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi,
 template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map_clamped(T v, SN sn, SX sx, DN dn, DX dx) { return (clamp(v, sn, sx) - sn) / (sx - sn) * (dx - dn) + dn; }
 template <class A, class B, class T> forceinline constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
-template <class M, class T> forceinline T &maskAssign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
+template <class M, class T> forceinline T &mask_assign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
 template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
 template <class T> forceinline constexpr auto pow4(T v) { return pow2(v * v); }
-// clang-format on
 
 template <class T>
 inline constexpr T smooth_min(T a, T b, f32 k) {
@@ -260,13 +61,6 @@ inline constexpr T smooth_max(T a, T b, f32 k) {
 	return smooth_min(a, b, -k);
 }
 
-template <class T>
-forceinline constexpr T easeInOut2(T t) {
-	if (t < 0.5f) return 0.5f * pow2(2 * t);
-	else          return 1 - 0.5f * pow2(2 - 2 * t);
-	//return lerp(pow2(t), 1 - pow2(1 - t), t);
-}
-
 namespace CE {
 
 template <class To, class From>
@@ -276,21 +70,23 @@ forceinline constexpr To cvt(From v) {
 
 } // namespace CE
 
-union v2f;
-union v2s;
-union v2u;
+template <class T> union v2;
 template <class T> union v3;
-union v4f;
-union v4s;
-union v4u;
+template <class T> union v4;
 union m3;
 union m4;
 
+using v2f = v2<f32>;
+using v2s = v2<s32>;
+using v2u = v2<u32>;
+
 using v3f = v3<f32>;
-//using v3s = v3<s32>;
-//using v3u = v3<u32>;
-union v3s;
-union v3u;
+using v3s = v3<s32>;
+using v3u = v3<u32>;
+
+using v4f = v4<f32>;
+using v4s = v4<s32>;
+using v4u = v4<u32>;
 
 template<class T> inline static constexpr bool is_vector = false;
 template<> inline static constexpr bool is_vector<v2f> = true;
@@ -361,476 +157,138 @@ forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 
 #define fice forceinline constexpr
 
-#define MOP(op, vec)			fice vec& operator op##=(vec b) { return *this = *this op b; }
-#define MOPS(op, vec, scl, con)	fice vec& operator op##=(scl b) { return *this op##= con(b); }
-#define OPS(op, vec, scl, con)	fice vec operator op(scl b) const { return *this op con(b); }
-#define SOP(op, vec, scl, con)	fice friend vec operator op(scl a, vec b) { return con(a) op b; }
+#define DEFN_2 \
+	struct { Scalar x, y; }; \
+	Scalar s[2];\
+	template <class U>\
+	forceinline explicit operator v2<U>() const { return {(U)x, (U)y}; } \
+	fice v2 operator+() const { return *this; } \
+	fice v2 yx() const { return {y, x}; }
 
-#define MEMFUNS_BASIC_SCL(vec, scl, con) \
-	SOP(+, vec, scl, con)                \
-	SOP(-, vec, scl, con)                \
-	SOP(*, vec, scl, con)                \
-	SOP(/, vec, scl, con)                \
-	OPS(+, vec, scl, con)                \
-	OPS(-, vec, scl, con)                \
-	OPS(*, vec, scl, con)                \
-	OPS(/, vec, scl, con)                \
-	MOPS(+, vec, scl, con)               \
-	MOPS(-, vec, scl, con)               \
-	MOPS(*, vec, scl, con)               \
-	MOPS(/, vec, scl, con)
-
-#define MEMFUNS_BASIC(vec, scl, con) \
-	MOP(+, vec)                      \
-	MOP(-, vec)                      \
-	MOP(*, vec)                      \
-	MOP(/, vec)                      \
-	MEMFUNS_BASIC_SCL(vec, scl, con)
-
-#define NEQ(vec) \
-	fice bool operator!=(vec b) const { return !(*this == b); }
-
-#define MEMFUNS_DATA(scl)               \
-	fice scl* data() { return s; } \
-	fice scl const* data() const { return s; }
-
-#define INDEX_S(scl)                                          \
-	fice scl operator[](umm i) const { return s[i]; } \
-	fice scl& operator[](umm i) { return s[i]; }
-
-#define MEMFUNS_INT(vec, scl, con)                              \
-	fice vec& operator%=(vec b) { return *this = *this % b; }        \
-	fice vec& operator^=(vec b) { return *this = *this ^ b; }        \
-	fice vec& operator|=(vec b) { return *this = *this | b; }        \
-	fice vec& operator&=(vec b) { return *this = *this & b; }        \
-	fice vec& operator<<=(vec b) { return *this = *this << b; }      \
-	fice vec& operator>>=(vec b) { return *this = *this >> b; }      \
-	fice vec operator%(scl b) const { return *this % con(b); }       \
-	fice vec operator^(scl b) const { return *this ^ con(b); }       \
-	fice vec operator|(scl b) const { return *this | con(b); }       \
-	fice vec operator&(scl b) const { return *this & con(b); }       \
-	fice vec& operator%=(scl b) { return *this %= con(b); }          \
-	fice vec& operator^=(scl b) { return *this ^= con(b); }          \
-	fice vec& operator|=(scl b) { return *this |= con(b); }          \
-	fice vec& operator&=(scl b) { return *this &= con(b); }          \
-	fice vec& operator<<=(scl b) { return *this = *this << b; }      \
-	fice vec& operator>>=(scl b) { return *this = *this >> b; }      \
-	fice friend vec operator%(scl a, vec b) { return con(a) % b; }   \
-	fice friend vec operator^(scl a, vec b) { return con(a) ^ b; }   \
-	fice friend vec operator|(scl a, vec b) { return con(a) | b; }   \
-	fice friend vec operator&(scl a, vec b) { return con(a) & b; }   \
-	fice friend vec operator<<(scl a, vec b) { return con(a) << b; } \
-	fice friend vec operator>>(scl a, vec b) { return con(a) >> b; }
-
-#define MEMFUNS_SHIFT_SCL(vec, scl, con)                    \
-	fice vec operator<<(scl b) const { return *this << con(b); } \
-	fice vec operator>>(scl b) const { return *this >> con(b); }
-
-#define MEMFUNS_SHIFT_SCL_M(vec, scl, con)              \
-	fice vec operator<<(scl b) const { return con(m << b); } \
-	fice vec operator>>(scl b) const { return con(m >> b); }
-
-#define MEMFUNS_SHIFT_SCL_2(vec, scl)                        \
-	fice vec operator<<(scl b) const { return {x << b, y << b}; } \
-	fice vec operator>>(scl b) const { return {x >> b, y >> b}; }
-
-#define MEMFUNS_SHIFT_SCL_3(vec, scl)                                \
-	fice vec operator<<(scl b) const { return {x << b, y << b, z << b}; } \
-	fice vec operator>>(scl b) const { return {x >> b, y >> b, z >> b}; }
-
-#define MEMFUNS_SHIFT_SCL_4(vec, scl)                                        \
-	fice vec operator<<(scl b) const { return {x << b, y << b, z << b, w << b}; } \
-	fice vec operator>>(scl b) const { return {x >> b, y >> b, z >> b, w >> b}; }
+#define DEFN_3 \
+	using v2 = v2<Scalar>; \
+	struct { Scalar x, y, z; }; \
+	v2 xy; \
+	struct { Scalar _pad; v2 yz; }; \
+	Scalar s[3];\
+	template <class U>\
+	forceinline explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
+	fice v3 operator+() const { return *this; } \
+	fice v3 yzx() const { return {y, z, x}; } \
+	fice v3 zxy() const { return {z, x, y}; }
 
 
-#define RETURN_T(t,x)    t _result{}; _result = x; return _result
-#define RETURN_T2(t,x,y) t _result{}; _result.lo = x; _result.hi = y; return _result
-#define RETURN(x)        RETURN_T(Pack,x)
-#define RETURN_2(x,y)    RETURN_T2(Pack,x,y)
+#define DEFN_4 \
+	using v2 = v2<Scalar>; \
+	using v3 = v3<Scalar>; \
+	struct { Scalar x, y, z, w; }; \
+	struct { v2 xy; v2 zw; }; \
+	v3 xyz; \
+	struct { Scalar _pad; v2 yz; v3 yzw; }; \
+	Scalar s[4];\
+	template <class U>\
+	forceinline explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
+	fice v4 operator+() const { return *this; }
 
-#define RETURN_MT(t,m,x)    t _result{}; _result.m = x; return _result
-#define RETURN_MT2(t,m,x,y) t _result{}; _result.lo.m = x; _result.hi.m = y; return _result
-#define RETURN_M(m,x)       RETURN_MT(Pack,m,x)
-#define RETURN_M2(m,x,y)    RETURN_MT2(Pack,m,x,y)
+#define UNOP_2(o) \
+	fice v2 operator o() const { return {o x, o y}; }
 
-#define RETURN_MASK(m,x)       RETURN_MT(Mask,m,x)
+#define UNOP_3(o) \
+	fice v3 operator o() const { return {o x, o y, o z}; }
 
+#define UNOP_4(o) \
+	fice v4 operator o() const { return {o x, o y, o z, o w}; }
 
-#define OPERATOR_SCALAR(op, extend) \
-	forceinline Pack operator op(Scalar b) const { return *this op extend(b); } \
-	forceinline friend Pack operator op(Scalar a, Pack b) { return extend(a) op b; }
+#define BINOP_2(o) \
+	fice v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
+	fice v2 operator o(Scalar b) const { return {x o b, y o b}; } \
+	fice friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
+	fice v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
+	fice v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
 
-// is first is not friend, s32x4's operator!= refuses to compile
-#define OPERATOR_COMPARE(op, extend) \
-	forceinline friend Mask operator op(Pack a, Scalar b) { return a op extend(b); } \
-	forceinline friend Mask operator op(Scalar a, Pack b) { return extend(a) op b; }
+#define BINOP_3(o) \
+	fice v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
+	fice v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
+	fice friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
+	fice v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
+	fice v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
 
-#define OPERATOR_MODIFY(op, extend) \
-	forceinline Pack &operator op##=(Pack b) { return *this = *this op b; } \
-	forceinline Pack &operator op##=(Scalar b) { return *this = *this op extend(b); }
+#define BINOP_4(o) \
+	fice v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
+	fice v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
+	fice friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
+	fice v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
+	fice v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
 
+#define EQ_2 \
+	fice bool operator==(v2 b) { return x == b.x && y == b.y; } \
+	fice bool operator!=(v2 b) { return x != b.x || y != b.y; }
 
-#define OPERATOR_ALL_VER(op, extend) \
-	OPERATOR_MODIFY(op, extend) \
-	OPERATOR_SCALAR(op, extend)
+#define EQ_3 \
+	fice bool operator==(v3 b) { return x == b.x && y == b.y && z == b.z; } \
+	fice bool operator!=(v3 b) { return x != b.x || y != b.y || z != b.z; }
 
-#define OPERATOR_XCREMENT(extend) \
-	forceinline Pack &operator++()   { return *this = *this + extend(1); } \
-	forceinline Pack &operator--()   { return *this = *this - extend(1); } \
-	forceinline Pack  operator++(int){ auto result = *this; *this = *this + extend(1); return result; }\
-	forceinline Pack  operator--(int){ auto result = *this; *this = *this - extend(1); return result; }
-
-#define OPERATORS_BOOL(extend)                                           \
-	forceinline Pack operator!() const { return ~*this; }               \
-	forceinline Pack operator&&(Pack b) const { return *this & b; }     \
-	forceinline Pack operator||(Pack b) const { return *this | b; }     \
-	forceinline Scalar operator[](umm index) const { return s[index]; } \
-	forceinline Scalar &operator[](umm index) { return s[index]; } \
-	OPERATOR_COMPARE(==, extend) \
-	OPERATOR_COMPARE(!=, extend) \
-	OPERATOR_ALL_VER(^, extend) \
-	OPERATOR_ALL_VER(&, extend) \
-	OPERATOR_ALL_VER(|, extend)\
-	OPERATOR_SCALAR(&&, extend) \
-	OPERATOR_SCALAR(||, extend)
-
-#define FALLBACK_BOOL                                                                  \
-	forceinline Pack operator~() const { RETURN_2(~lo, ~hi); }                        \
-	forceinline Pack operator==(Pack b) const { RETURN_2(lo == b.lo, hi == b.hi); } \
-	forceinline Pack operator!=(Pack b) const { RETURN_2(lo != b.lo, hi != b.hi); } \
-	forceinline Pack operator^ (Pack b) const { RETURN_2(lo ^  b.lo, hi ^  b.hi); } \
-	forceinline Pack operator& (Pack b) const { RETURN_2(lo &  b.lo, hi &  b.hi); } \
-	forceinline Pack operator| (Pack b) const { RETURN_2(lo |  b.lo, hi |  b.hi); }
-
-#define B1_IMPL(extend) \
-	Scalar s[1];\
-	Scalar m;\
-	forceinline Pack operator~() const { return {~m}; }\
-	forceinline Pack operator==(Pack b) const { return {~(m ^ b.m)}; }\
-	forceinline Pack operator!=(Pack b) const { return {m ^ b.m}; }\
-	forceinline Pack operator^ (Pack b) const { return {m ^ b.m}; }\
-	forceinline Pack operator& (Pack b) const { return {m & b.m}; }\
-	forceinline Pack operator| (Pack b) const { return {m | b.m}; }\
-	OPERATORS_BOOL(extend)
-
-#define B128_IMPL(extend) \
-	DECLARE_M16;\
-	forceinline Pack operator~() const { RETURN_M(ps, _mm_xor_ps(ps, _mm_setone_ps())); }\
-	forceinline Pack operator==(Pack b) const { RETURN_M(pi, s32x4_eq(pi, b.pi)); }\
-	forceinline Pack operator!=(Pack b) const { RETURN_M(pi, s32x4_ne(pi, b.pi)); }\
-	forceinline Pack operator^ (Pack b) const { RETURN_M(ps, _mm_xor_ps(ps, b.ps)); }\
-	forceinline Pack operator& (Pack b) const { RETURN_M(ps, _mm_and_ps(ps, b.ps)); }\
-	forceinline Pack operator| (Pack b) const { RETURN_M(ps, _mm_or_ps (ps, b.ps)); }\
-	OPERATORS_BOOL(extend)
-
-#if ARCH_AVX
-#define B256_IMPL(extend) \
-	DECLARE_M32;\
-	forceinline Pack operator~() const { RETURN_M(ps, _mm256_xor_ps(ps, _mm256_setone_ps())); }\
-	forceinline Pack operator==(Pack b) const { RETURN_M(ps, b256_cmpeq(ps, b.ps)); }\
-	forceinline Pack operator!=(Pack b) const { RETURN_M(ps, _mm256_xor_ps(ps, b.ps)); }\
-	forceinline Pack operator^ (Pack b) const { RETURN_M(ps, _mm256_xor_ps(ps, b.ps)); }\
-	forceinline Pack operator& (Pack b) const { RETURN_M(ps, _mm256_and_ps(ps, b.ps)); }\
-	forceinline Pack operator| (Pack b) const { RETURN_M(ps, _mm256_or_ps (ps, b.ps)); }\
-	OPERATORS_BOOL(extend)
-#else
-#define B256_IMPL(extend) \
-	FALLBACK_BOOL; \
-	OPERATORS_BOOL(extend)
-#endif
-
-#define OPERATORS_FLOAT(extend) \
-	OPERATOR_COMPARE(>, extend) \
-	OPERATOR_COMPARE(<, extend) \
-	OPERATOR_COMPARE(>=, extend) \
-	OPERATOR_COMPARE(<=, extend) \
-	OPERATOR_COMPARE(==, extend) \
-	OPERATOR_COMPARE(!=, extend) \
-	OPERATOR_ALL_VER(+, extend) \
-	OPERATOR_ALL_VER(-, extend) \
-	OPERATOR_ALL_VER(*, extend) \
-	OPERATOR_ALL_VER(/, extend) \
-	OPERATOR_XCREMENT(extend)
-
-#define OPERATORS_INT(extend) \
-	OPERATOR_COMPARE(>, extend) \
-	OPERATOR_COMPARE(<, extend) \
-	OPERATOR_COMPARE(>=, extend) \
-	OPERATOR_COMPARE(<=, extend) \
-	OPERATOR_COMPARE(==, extend) \
-	OPERATOR_COMPARE(!=, extend) \
-	OPERATOR_ALL_VER(+, extend) \
-	OPERATOR_ALL_VER(-, extend) \
-	OPERATOR_ALL_VER(*, extend) \
-	OPERATOR_ALL_VER(/, extend) \
-	OPERATOR_ALL_VER(%, extend) \
-	OPERATOR_ALL_VER(^, extend) \
-	OPERATOR_ALL_VER(&, extend) \
-	OPERATOR_ALL_VER(|, extend) \
-	OPERATOR_MODIFY(>>, extend) \
-	OPERATOR_MODIFY(<<, extend) \
-	forceinline Mask operator!() const { return *this == 0; } \
-	OPERATOR_XCREMENT(extend)
+#define EQ_4 \
+	fice bool operator==(v4 b) { return x == b.x && y == b.y && z == b.z && w == b.w; } \
+	fice bool operator!=(v4 b) { return x != b.x || y != b.y || z != b.z || w != b.w; }
 
 
-#define FALLBACK_FLOAT                                                                  \
-	forceinline Pack operator-() const { RETURN_2(-lo, -hi); }                        \
-	forceinline Pack operator+ (Pack b) const { RETURN_2(lo +  b.lo, hi +  b.hi); } \
-	forceinline Pack operator- (Pack b) const { RETURN_2(lo -  b.lo, hi -  b.hi); } \
-	forceinline Pack operator* (Pack b) const { RETURN_2(lo *  b.lo, hi *  b.hi); } \
-	forceinline Pack operator/ (Pack b) const { RETURN_2(lo /  b.lo, hi /  b.hi); } \
-	forceinline Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); } \
-	forceinline Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); } \
-	forceinline Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); } \
-	forceinline Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); } \
-	forceinline Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); } \
-	forceinline Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
-
-#define FALLBACK_INT_NO_BITWISE                                                                  \
-	forceinline Pack operator-() const { RETURN_2(-lo, -hi); }                                 \
-	forceinline Pack operator+(Pack b) const { RETURN_2(lo + b.lo, hi + b.hi); }             \
-	forceinline Pack operator-(Pack b) const { RETURN_2(lo - b.lo, hi - b.hi); }             \
-	forceinline Pack operator*(Pack b) const { RETURN_2(lo * b.lo, hi * b.hi); }             \
-	forceinline Pack operator/(Pack b) const { RETURN_2(lo / b.lo, hi / b.hi); }             \
-	forceinline Pack operator%(Pack b) const { RETURN_2(lo % b.lo, hi % b.hi); }             \
-	forceinline Pack operator<<(Pack b) const { RETURN_2(lo << b.lo, hi << b.hi); }          \
-	forceinline Pack operator>>(Pack b) const { RETURN_2(lo >> b.lo, hi >> b.hi); }          \
-	forceinline Pack operator<<(Scalar b) const { RETURN_2(lo << b, hi << b); }                \
-	forceinline Pack operator>>(Scalar b) const { RETURN_2(lo >> b, hi >> b); }                \
-	forceinline friend Pack operator<<(Scalar a, Pack b) { RETURN_T2(decltype(b), a << b.lo, a << b.hi); } \
-	forceinline friend Pack operator>>(Scalar a, Pack b) { RETURN_T2(decltype(b), a >> b.lo, a >> b.hi); } \
-	forceinline Mask operator> (Pack b) const { RETURN_T2(Mask, lo >  b.lo, hi >  b.hi); }     \
-	forceinline Mask operator< (Pack b) const { RETURN_T2(Mask, lo <  b.lo, hi <  b.hi); }     \
-	forceinline Mask operator>=(Pack b) const { RETURN_T2(Mask, lo >= b.lo, hi >= b.hi); }     \
-	forceinline Mask operator<=(Pack b) const { RETURN_T2(Mask, lo <= b.lo, hi <= b.hi); }     \
-	forceinline Mask operator==(Pack b) const { RETURN_T2(Mask, lo == b.lo, hi == b.hi); }     \
-	forceinline Mask operator!=(Pack b) const { RETURN_T2(Mask, lo != b.lo, hi != b.hi); }
-
-#define FALLBACK_INT                                                                 \
-	FALLBACK_INT_NO_BITWISE                                                          \
-	forceinline Pack operator~() const { RETURN_2(~lo, ~hi); }                     \
-	forceinline Pack operator^(Pack b) const { RETURN_2(lo ^ b.lo, hi ^ b.hi); } \
-	forceinline Pack operator&(Pack b) const { RETURN_2(lo & b.lo, hi & b.hi); } \
-	forceinline Pack operator|(Pack b) const { RETURN_2(lo | b.lo, hi | b.hi); }
-
-#define TOMASK(expr) {(expr) ? -1 : 0}
-
-#define CVT(other) explicit forceinline operator other() const
-
-// clang-format on
-
-#define UOP2(op, ty, con) fice ty operator op() const { return {op x, op y}; }
-#define UOP3(op, ty, con) fice ty operator op() const { return {op x, op y, op z}; }
-#define UOP4(op, ty, con) fice ty operator op() const { return {op x, op y, op z, op w}; }
-
-#define BOP2(op, ty, con) fice ty operator op(ty b) const { return {x op b.x, y op b.y}; }
-#define BOP3(op, ty, con) fice ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z}; }
-#define BOP4(op, ty, con) fice ty operator op(ty b) const { return {x op b.x, y op b.y, z op b.z, w op b.w}; }
-
-#define BOP2CMP(op, ty, con) fice ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y)}; }
-#define BOP3CMP(op, ty, con) fice ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y), _mask<ty>(z op b.z)}; }
-#define BOP4CMP(op, ty, con) fice ty operator op(ty b) const { return {_mask<ty>(x op b.x), _mask<ty>(y op b.y), _mask<ty>(z op b.z), _mask<ty>(w op b.w)}; }
-
-#define BOPSF32_(bop, uop, cmp, ty, con) \
-uop(-, ty, con) \
-bop(+, ty, con) \
-bop(-, ty, con) \
-bop(*, ty, con) \
-bop(/, ty, con)
-
-#define BOPSU32_(bop, uop, ty, con) \
-bop(+, ty, con) \
-bop(-, ty, con) \
-bop(*, ty, con) \
-bop(/, ty, con) \
-bop(%, ty, con) \
-bop(^, ty, con) \
-bop(|, ty, con) \
-bop(&, ty, con) \
-bop(<<, ty, con) \
-bop(>>, ty, con) \
-uop(~, ty, con)
-
-#define BOPSS32_(bop, uop, ty, con) \
-BOPSU32_(bop, uop, ty, con) \
-uop(-, ty, con)
-
-#define BOPSF32(op, ty, con) BOPSF32_(CONCAT(B, op), CONCAT(U, op), CONCAT(CONCAT(B, op), CMP), ty, con)
-#define BOPSS32(op, ty, con) BOPSS32_(CONCAT(B, op), CONCAT(U, op), ty, con)
-#define BOPSU32(op, ty, con) BOPSU32_(CONCAT(B, op), CONCAT(U, op), ty, con)
-
-#define VECCMP2(bool, v2) fice bool operator==(v2 b) const { return x == b.x && y == b.y; }
-#define VECCMP3(bool, v3) fice bool operator==(v3 b) const { return x == b.x && y == b.y && z == b.z; }
-#define VECCMP4(bool, v4) fice bool operator==(v4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; }
-
-#define MEMBERS2(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...) \
-	struct {                                                                          \
-		f32 x, y;                                                                     \
-	};                                                                                \
-	fn(__VA_ARGS__) VECCMP2(bool, v2) CVT(v2s);                                       \
-	CVT(v2u);                                                                         \
-	f32 s[(width)*2]
-
-#define MEMBERS3(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...) \
-	struct {                                                                          \
-		f32 x, y, z;                                                                  \
-	};                                                                                \
-	v2 xy;                                                                            \
-	struct {                                                                          \
-		f32 _pad0;                                                                    \
-		v2 yz;                                                                        \
-	};                                                                                \
-	fn(__VA_ARGS__) VECCMP3(bool, v3) CVT(v3s);                                       \
-	CVT(v3u);                                                                         \
-	f32 s[(width)*3]
-
-#define MEMBERS4(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...) \
-	struct {                                                                          \
-		f32 x, y, z, w;                                                               \
-	};                                                                                \
-	struct {                                                                          \
-		v2 xy;                                                                        \
-		v2 zw;                                                                        \
-	};                                                                                \
-	v3 xyz;                                                                           \
-	struct {                                                                          \
-		f32 _pad0;                                                                    \
-		union {                                                                       \
-			v2 yz;                                                                    \
-			v3 yzw;                                                                   \
-		};                                                                            \
-	};                                                                                \
-	fn(__VA_ARGS__) VECCMP4(bool, v4) CVT(v4s);                                       \
-	CVT(v4u);                                                                         \
-	f32 s[(width)*4]
-
-#define MEMBERS2S(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
-	MEMBERS2(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	fice f32 operator[](umm i) const { return s[i]; }                               \
-	fice f32 &operator[](umm i) { return s[i]; }
-#define MEMBERS3S(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
-	MEMBERS3(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	fice f32 operator[](umm i) const { return s[i]; }                               \
-	fice f32 &operator[](umm i) { return s[i]; }
-#define MEMBERS4S(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, ...)     \
-	MEMBERS4(width, bool, f32, v2, v3, v4, v2s, v3s, v4s, v2u, v3u, v4u, fn, __VA_ARGS__); \
-	fice f32 operator[](umm i) const { return s[i]; }                               \
-	fice f32 &operator[](umm i) { return s[i]; }
-
-// clang-format off
-#define IMPL_v2f32x1() MEMFUNS_DATA(f32) MEMFUNS_BASIC(v2f, f32, V2f) BOPSF32(OP2, v2f, V2f)
-#define IMPL_v3f32x1() MEMFUNS_DATA(f32) MEMFUNS_BASIC(v3f, f32, V3f) BOPSF32(OP3, v3f, V3f)
-#define IMPL_v4f32x1() MEMFUNS_DATA(f32) MEMFUNS_BASIC(v4f, f32, V4f) BOPSF32(OP4, v4f, V4f)
-#define IMPL_v2s32x1() MEMFUNS_DATA(s32) MEMFUNS_BASIC(v2s, s32, V2s) MEMFUNS_INT(v2s, s32, V2s) MEMFUNS_SHIFT_SCL(v2s, s32, V2s) BOPSS32(OP2, v2s, V2s)
-#define IMPL_v3s32x1() MEMFUNS_DATA(s32) MEMFUNS_BASIC(v3s, s32, V3s) MEMFUNS_INT(v3s, s32, V3s) MEMFUNS_SHIFT_SCL(v3s, s32, V3s) BOPSS32(OP3, v3s, V3s)
-#define IMPL_v4s32x1() MEMFUNS_DATA(s32) MEMFUNS_BASIC(v4s, s32, V4s) MEMFUNS_INT(v4s, s32, V4s) MEMFUNS_SHIFT_SCL(v4s, s32, V4s) BOPSS32(OP4, v4s, V4s)
-#define IMPL_v2u32x1() MEMFUNS_DATA(u32) MEMFUNS_BASIC(v2u, u32, V2u) MEMFUNS_INT(v2u, u32, V2u) MEMFUNS_SHIFT_SCL(v2u, u32, V2u) BOPSU32(OP2, v2u, V2u)
-#define IMPL_v3u32x1() MEMFUNS_DATA(u32) MEMFUNS_BASIC(v3u, u32, V3u) MEMFUNS_INT(v3u, u32, V3u) MEMFUNS_SHIFT_SCL(v3u, u32, V3u) BOPSU32(OP3, v3u, V3u)
-#define IMPL_v4u32x1() MEMFUNS_DATA(u32) MEMFUNS_BASIC(v4u, u32, V4u) MEMFUNS_INT(v4u, u32, V4u) MEMFUNS_SHIFT_SCL(v4u, u32, V4u) BOPSU32(OP4, v4u, V4u)
-
-#define TYPES_f32x1(fn, packSize, dim) fn(packSize, bool, f32, v2f, v3f, v4f, v2s, v3s, v4s, v2u, v3u, v4u, IMPL_v##dim##f32x1)
-#define TYPES_s32x1(fn, packSize, dim) fn(packSize, bool, s32, v2s, v3s, v4s, v2f, v3f, v4f, v2u, v3u, v4u, IMPL_v##dim##s32x1)
-#define TYPES_u32x1(fn, packSize, dim) fn(packSize, bool, u32, v2u, v3u, v4u, v2f, v3f, v4f, v2s, v3s, v4s, IMPL_v##dim##u32x1)
-
-#define VECIMPL(dim, SorP, packSize, type) TYPES_##type##x##packSize(MEMBERS##dim##SorP, packSize, dim)
-
-union v3s64;
-
-union v2f {
-	using Scalar = f32;
-	struct { f32 x, y; };
-	f32 s[2];
-
-	fice v2f yx() const { return {y, x}; }
-
-	fice v2f operator+() const { return *this; }
-	fice v2f operator-() const { return {-x, -y}; }
-	fice v2f operator+(v2f b) const { return {x + b.x, y + b.y}; }
-	fice v2f operator-(v2f b) const { return {x - b.x, y - b.y}; }
-	fice v2f operator*(v2f b) const { return {x * b.x, y * b.y}; }
-	fice v2f operator/(v2f b) const { return {x / b.x, y / b.y}; }
-	fice v2f operator+(f32 b) const { return {x + b, y + b}; }
-	fice v2f operator-(f32 b) const { return {x - b, y - b}; }
-	fice v2f operator*(f32 b) const { return {x * b, y * b}; }
-	fice v2f operator/(f32 b) const { return {x / b, y / b}; }
-	fice friend v2f operator+(f32 a, v2f b) { return {a + b.x, a + b.y};}
-	fice friend v2f operator-(f32 a, v2f b) { return {a - b.x, a - b.y};}
-	fice friend v2f operator*(f32 a, v2f b) { return {a * b.x, a * b.y};}
-	fice friend v2f operator/(f32 a, v2f b) { return {a / b.x, a / b.y};}
-	fice v2f &operator+=(v2f b) { return x += b.x, y += b.y, *this;}
-	fice v2f &operator-=(v2f b) { return x -= b.x, y -= b.y, *this;}
-	fice v2f &operator*=(v2f b) { return x *= b.x, y *= b.y, *this;}
-	fice v2f &operator/=(v2f b) { return x /= b.x, y /= b.y, *this;}
-	fice v2f &operator+=(f32 b) { return x += b, y += b, *this;}
-	fice v2f &operator-=(f32 b) { return x -= b, y -= b, *this;}
-	fice v2f &operator*=(f32 b) { return x *= b, y *= b, *this;}
-	fice v2f &operator/=(f32 b) { return x /= b, y /= b, *this;}
-	fice bool operator==(v2f b) { return x == b.x && y == b.y; }
-	fice bool operator!=(v2f b) { return x != b.x || y != b.y; }
-
-	forceinline explicit operator v2s() const;
-	forceinline explicit operator v2u() const;
+template <class _Scalar>
+union v2 {
+	using Scalar = _Scalar;
+	DEFN_2
+	UNOP_2(-)
+	BINOP_2(+)
+	BINOP_2(-)
+	BINOP_2(*)
+	BINOP_2(/)
+	BINOP_2(%)
+	BINOP_2(^)
+	BINOP_2(&)
+	BINOP_2(|)
+	BINOP_2(<<)
+	BINOP_2(>>)
+	EQ_2
 };
-template <>
-union v3<f32> {
-	using Scalar = f32;
-	using v2 = v2f;
 
-	struct { f32 x, y, z; };
-	v2 xy;
-	struct { f32 _pad; v2 yz; };
-	f32 s[3];
-
-	fice v3f yzx() const { return {y, z, x}; }
-	fice v3f zxy() const { return {z, x, y}; }
-
-	fice v3f operator+() const { return *this; }
-	fice v3f operator-() const { return {-x, -y, -z}; }
-	fice v3f operator+(v3f b) const { return {x + b.x, y + b.y, z + b.z}; }
-	fice v3f operator-(v3f b) const { return {x - b.x, y - b.y, z - b.z}; }
-	fice v3f operator*(v3f b) const { return {x * b.x, y * b.y, z * b.z}; }
-	fice v3f operator/(v3f b) const { return {x / b.x, y / b.y, z / b.z}; }
-	fice v3f operator+(f32 b) const { return {x + b, y + b, z + b}; }
-	fice v3f operator-(f32 b) const { return {x - b, y - b, z - b}; }
-	fice v3f operator*(f32 b) const { return {x * b, y * b, z * b}; }
-	fice v3f operator/(f32 b) const { return {x / b, y / b, z / b}; }
-	fice friend v3f operator+(f32 a, v3f b) { return {a + b.x, a + b.y, a + b.z};}
-	fice friend v3f operator-(f32 a, v3f b) { return {a - b.x, a - b.y, a - b.z};}
-	fice friend v3f operator*(f32 a, v3f b) { return {a * b.x, a * b.y, a * b.z};}
-	fice friend v3f operator/(f32 a, v3f b) { return {a / b.x, a / b.y, a / b.z};}
-	fice v3f &operator+=(v3f b) { return x += b.x, y += b.y, z += b.z, *this;}
-	fice v3f &operator-=(v3f b) { return x -= b.x, y -= b.y, z -= b.z, *this;}
-	fice v3f &operator*=(v3f b) { return x *= b.x, y *= b.y, z *= b.z, *this;}
-	fice v3f &operator/=(v3f b) { return x /= b.x, y /= b.y, z /= b.z, *this;}
-	fice v3f &operator+=(f32 b) { return x += b, y += b, z += b, *this;}
-	fice v3f &operator-=(f32 b) { return x -= b, y -= b, z -= b, *this;}
-	fice v3f &operator*=(f32 b) { return x *= b, y *= b, z *= b, *this;}
-	fice v3f &operator/=(f32 b) { return x /= b, y /= b, z /= b, *this;}
-
-	forceinline explicit operator v3s() const;
-	forceinline explicit operator v3u() const;
+template <class _Scalar>
+union v3 {
+	using Scalar = _Scalar;
+	DEFN_3
+	UNOP_3(-)
+	BINOP_3(+)
+	BINOP_3(-)
+	BINOP_3(*)
+	BINOP_3(/)
+	BINOP_3(%)
+	BINOP_3(^)
+	BINOP_3(&)
+	BINOP_3(|)
+	BINOP_3(<<)
+	BINOP_3(>>)
+	EQ_3
 };
-union v4f { using Scalar = f32; VECIMPL(4, S, 1, f32); };
 
-union v2s { using Scalar = s32; VECIMPL(2, S, 1, s32); fice bool operator!=(v2s b) { return x != b.x || y != b.y; } };
-union v3s {
-	using Scalar = s32;
-	VECIMPL(3, S, 1, s32);
-	fice v2s xz() const { return {x, z}; }
-	fice v3s zxy() const { return {z,x,y}; }
-	forceinline explicit operator v3s64() const;
+template <class _Scalar>
+union v4 {
+	using Scalar = _Scalar;
+	DEFN_4
+	UNOP_4(-)
+	BINOP_4(+)
+	BINOP_4(-)
+	BINOP_4(*)
+	BINOP_4(/)
+	BINOP_4(%)
+	BINOP_4(^)
+	BINOP_4(&)
+	BINOP_4(|)
+	BINOP_4(<<)
+	BINOP_4(>>)
+	EQ_4
 };
-union v4s { using Scalar = s32; VECIMPL(4, S, 1, s32); };
-union v2u { using Scalar = u32; VECIMPL(2, S, 1, u32); };
-union v3u { using Scalar = u32; VECIMPL(3, S, 1, u32); };
-union v4u { using Scalar = u32; VECIMPL(4, S, 1, u32); };
+
 
 #undef CVT
-
-v3f::operator v3s()const{return{(s32)x,(s32)y,(s32)z};}
-v3f::operator v3u()const{return{(u32)x,(u32)y,(u32)z};}
-
-// clang-format on
 
 union v3s64 {
 	using Scalar = s64;
@@ -842,9 +300,6 @@ union v3s64 {
 	fice v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
 	fice v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
 };
-forceinline v3s::operator v3s64() const {
-	return {x, y, z};
-}
 
 union m2 {
 	using Scalar = f32;
@@ -867,24 +322,20 @@ union m2 {
 		};
 	}
 	static forceinline m2 scale(f32 x, f32 y) {
-		// clang-format off
 		return {
 			x, 0,
 			0, y,
 		};
-		// clang-format on
 	}
 	static forceinline m2 scale(v2f v) { return scale(v.x, v.y); }
 	static forceinline m2 scale(f32 v) { return scale(v, v); }
 	static forceinline m2 rotation(f32 a) {
 		f32 s, c;
 		sincos(a, s, c);
-		// clang-format off
 		return {
 			c, s,
 		   -s, c,
 		};
-		// clang-format on
 	}
 };
 
@@ -920,57 +371,47 @@ union m3 {
 		};
 	}
 	static forceinline m3 scale(f32 x, f32 y, f32 z) {
-		// clang-format off
 		return {
 			x, 0, 0,
 			0, y, 0,
 			0, 0, z,
 		};
-		// clang-format on
 	}
 	static forceinline m3 scale(v3f v) { return scale(v.x, v.y, v.z); }
 	static forceinline m3 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
 	static forceinline m3 scale(f32 v) { return scale(v, v, v); }
 	static forceinline m3 translation(f32 x, f32 y) {
-		// clang-format off
 		return {
 			1, 0, 0,
 			0, 1, 0,
 			x, y, 1,
 		};
-		// clang-format on
 	}
 	static forceinline m3 translation(v2f v) { return translation(v.x, v.y); }
 	static forceinline m3 translation(f32 v) { return translation(v, v); }
 	static forceinline m3 rotationX(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
 		return {
 			1, 0, 0,
 			0, c, s,
 			0,-s, c,
 		};
-		// clang-format on
 	}
 	static forceinline m3 rotationY(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
 		return {
 			c, 0, s,
 			0, 1, 0,
 		   -s, 0, c,
 		};
-		// clang-format on
 	}
 	static forceinline m3 rotationZ(f32 a) {
 		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
 		return {
 			c, s, 0,
 		   -s, c, 0,
 			0, 0, 1,
 		};
-		// clang-format on
 	}
 };
 
@@ -1010,31 +451,6 @@ C(v2f, V2f) C(v2s, V2s) C(v2u, V2u);
 C(v3f, V3f) C(v3s, V3s) C(v3u, V3u);
 C(v4f, V4f) C(v4s, V4s) C(v4u, V4u);
 #undef C
-
-// clang-format off
-#define CVT(v2f, v2s, V2s, s32, v2u, V2u, u32)                \
-	forceinline v2f::operator v2s() const { return V2s((s32)x, (s32)y); } \
-	forceinline v2f::operator v2u() const { return V2u((u32)x, (u32)y); }
-CVT(v2f, v2s, V2s, s32, v2u, V2u, u32)
-CVT(v2s, v2f, V2f, f32, v2u, V2u, u32)
-CVT(v2u, v2f, V2f, f32, v2s, V2s, s32)
-#undef CVT
-
-#define CVT(v3f, v3s, V3s, s32, v3u, V3u, u32)                        \
-	forceinline v3f::operator v3s() const { return V3s((s32)x, (s32)y, (s32)z); } \
-	forceinline v3f::operator v3u() const { return V3u((u32)x, (u32)y, (u32)z); }
-CVT(v3s, v3f, V3f, f32, v3u, V3u, u32)
-CVT(v3u, v3f, V3f, f32, v3s, V3s, s32)
-#undef CVT
-
-#define CVT(v4f, v4s, V4s, s32, v4u, V4u, u32)                                \
-	forceinline v4f::operator v4s() const { return V4s((s32)x, (s32)y, (s32)z, (s32)w); } \
-	forceinline v4f::operator v4u() const { return V4u((u32)x, (u32)y, (u32)z, (u32)w); }
-CVT(v4f, v4s, V4s, s32, v4u, V4u, u32)
-CVT(v4s, v4f, V4f, f32, v4u, V4u, u32)
-CVT(v4u, v4f, V4f, f32, v4s, V4s, s32)
-#undef CVT
-// clang-format on
 
 namespace CE {
 
@@ -1080,11 +496,8 @@ CVT(v4u, v4f, f32) CVT(v4u, v4s, s32)
 #undef CVT
 } // namespace CE
 
-// clang-format on
-
 #define SHUFFLE(a, s0, s1, b, s2, s3) _mm_shuffle_ps(a, b, _MM_SHUFFLE(s3, s2, s1, s0))
 
-// clang-format off
 forceinline v2f pack(v2f v) { return v; }
 forceinline v3f pack(v3f v) { return v; }
 forceinline v4f pack(v4f v) { return v; }
@@ -1252,11 +665,9 @@ forceinline v4fx8 unpack(v4fx8 v) {
 	}
 	return r;
 }
-// clang-format on
 
 #endif
 
-// clang-format off
 #define MINMAX(v2f, V2f)						  \
 	forceinline auto min(v2f a) { return min(a.x, a.y); }\
 	forceinline auto max(v2f a) { return max(a.x, a.y); }\
@@ -1301,7 +712,6 @@ MINMAX(v4f, V4f)
 MINMAX(v4s, V4s)
 MINMAX(v4u, V4u)
 #undef MINMAX
-// clang-format on
 
 #define HALF(f32) forceinline f32 half(f32 v) { return v * 0.5f; }
 HALF(f32)
@@ -1775,6 +1185,8 @@ struct aabb {
 	explicit operator aabb<U>() const { return { (U)min, (U)max }; }
 
 	aabb operator-(T b) { return {min - b, max - b}; }
+	aabb operator+(T b) { return {min + b, max + b}; }
+	aabb &operator-=(T b) { return min -= b, max -= b, *this; }
 	aabb &operator+=(T b) { return min += b, max += b, *this; }
 };
 
@@ -1825,9 +1237,22 @@ forceinline aabb<T> to_zero(aabb<T> box) {
 }
 
 template <class T>
-forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
+forceinline aabb<T> mask(aabb<T> box, aabb<T> bounds) {
 	box.min = clamp(box.min, bounds.min, bounds.max);
 	box.max = clamp(box.max, bounds.min, bounds.max);
+	return box;
+}
+
+template <class T>
+forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
+	auto diff = max(bounds.min - box.min, T{});
+	box.min += diff;
+	box.max += diff;
+
+	diff = min(bounds.max - box.max, T{});
+	box.min += diff;
+	box.max += diff;
+
 	return box;
 }
 
@@ -2181,9 +1606,9 @@ union m4 {
 		v4f i, j, k, l;
 	};
 	struct {
-		__m128 im, jm, km, lm;
+		f32x4 im, jm, km, lm;
 	};
-	__m128 m[4];
+	f32x4 m[4];
 	v4f vectors[4];
 	f32 s[16];
 	forceinline v4f operator*(v4f const &b) const {
@@ -2205,28 +1630,24 @@ union m4 {
 	forceinline m4 operator*(m4 const &b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
 	forceinline m4& operator*=(m4 const &b) { return *this = *this * b; }
 	static forceinline m4 scale(f32 x, f32 y, f32 z) {
-		// clang-format off
 		return {
 			x, 0, 0, 0,
 			0, y, 0, 0,
 			0, 0, z, 0,
 			0, 0, 0, 1
 		};
-		// clang-format on
 	}
 	static forceinline m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
 	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
 	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
 	static forceinline m4 translation(f32 x, f32 y, f32 z) {
-		// clang-format off
 		return {
 			1, 0, 0, 0,
 			0, 1, 0, 0,
 			0, 0, 1, 0,
 			x, y, z, 1,
 		};
-		// clang-format on
 	}
 	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
 	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
@@ -2235,14 +1656,12 @@ union m4 {
 		f32 h	   = 1.0f / tanf(fov * 0.5f);
 		f32 w	   = h / aspect;
 		f32 fzdfmn = fz / (fz - nz);
-		// clang-format off
 		return {
 			w, 0, 0, 0,
 			0, h, 0, 0,
 			0, 0, fzdfmn, 1,
 			0, 0, -fzdfmn * nz, 0
 		};
-		// clang-format on
 	}
 	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 xymax = nz * tan(fov * 0.5f);
@@ -2270,39 +1689,35 @@ union m4 {
 		};
 	}
 	static forceinline m4 rotationX(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
+		f32 s, c;
+		sincos(a, s, c);
 		return {
 			1, 0, 0, 0,
 			0, c, s, 0,
 			0,-s, c, 0,
 			0, 0, 0, 1
 		};
-		// clang-format on
 	}
 	static forceinline m4 rotationY(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
+		f32 s, c;
+		sincos(a, s, c);
 		return {
 			 c, 0, s, 0,
 			 0, 1, 0, 0,
 			-s, 0, c, 0,
 			 0, 0, 0, 1
 		};
-		// clang-format on
 	}
 	static forceinline m4 rotationZ(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
-		// clang-format off
+		f32 s, c;
+		sincos(a, s, c);
 		return {
 			 c, s, 0, 0,
 			-s, c, 0, 0,
 			 0, 0, 1, 0,
 			 0, 0, 0, 1
 		};
-		// clang-format on
 	}
-	// Roll, Pitch, Yaw (ZXY)
 	static forceinline m4 rotationZXY(v3f v) {
 		v3f sin;
 		v3f cos;
@@ -2313,17 +1728,14 @@ union m4 {
 		f32 b = cos.x;
 		f32 d = cos.y;
 		f32 f = cos.z;
-		// clang-format off
 		return {
-			 d * f - a * c * e,  b * e, c * f + a * d * e, 0,
-			-a * c * f - d * e,  b * f, a * d * f - c * e, 0,
-			            -b * c,     -a,             b * d, 0,
-			                 0,      0,                 0, 1,
+			 d * f - a * c * e, b * e, a * d * e + c * f, 0,
+			-a * c * f - d * e, b * f, a * d * f - c * e, 0,
+			            -b * c,    -a,             b * d, 0,
+			                 0,     0,                 0, 1,
 		};
-		// clang-format on
 	}
 	static forceinline m4 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
-	// Yaw, Pitch, Roll (YXZ)
 	static forceinline m4 rotationYXZ(v3f v) {
 		v3f sin;
 		v3f cos;
@@ -2334,28 +1746,28 @@ union m4 {
 		f32 b = cos.x;
 		f32 d = cos.y;
 		f32 f = cos.z;
-		// clang-format off
 		return {
-			 d * f + a * c * e,  -a * c * f + d * e, b * c, 0,
-			            -b * e,               b * f,     a, 0,
-			-c * f + a * d * e,  -a * d * f - c * e, b * d, 0,
-			                 0,                   0,     0, 1,
+			d * f + a * c * e,  d * e - a * c * f, b * c, 0,
+			           -b * e,              b * f,     a, 0,
+			a * d * e - c * f, -a * d * f - c * e, b * d, 0,
+			                0,                  0,     0, 1,
 		};
-		// clang-format on
 	}
 	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
 };
 
 forceinline constexpr m3 transpose(m3 const& m) {
 	return {
-		m.i.x, m.j.x, m.k.x, m.i.y, m.j.y, m.k.y, m.i.z, m.j.z, m.k.z,
+		m.i.x, m.j.x, m.k.x,
+		m.i.y, m.j.y, m.k.y,
+		m.i.z, m.j.z, m.k.z,
 	};
 }
 forceinline m4 transpose(m4 const& m) {
-	__m128 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
-	__m128 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
-	__m128 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
-	__m128 tmp3 = _mm_unpackhi_ps(m.km, m.lm);
+	f32x4 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
+	f32x4 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
+	f32x4 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
+	f32x4 tmp3 = _mm_unpackhi_ps(m.km, m.lm);
 
 	m4 result;
 	result.im = _mm_movelh_ps(tmp0, tmp2);
@@ -2396,22 +1808,22 @@ inline m4 inverse(m4 const &m) {
 	det = 1 / det;
 
 	return m4 {
-	   det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
-	   det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
-	   det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
-	   det * -(m.i.y * A2312 - m.i.z * A1312 + m.i.w * A1212),
-	   det * -(m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223),
-	   det *  (m.i.x * A2323 - m.i.z * A0323 + m.i.w * A0223),
-	   det * -(m.i.x * A2313 - m.i.z * A0313 + m.i.w * A0213),
-	   det *  (m.i.x * A2312 - m.i.z * A0312 + m.i.w * A0212),
-	   det *  (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123),
-	   det * -(m.i.x * A1323 - m.i.y * A0323 + m.i.w * A0123),
-	   det *  (m.i.x * A1313 - m.i.y * A0313 + m.i.w * A0113),
-	   det * -(m.i.x * A1312 - m.i.y * A0312 + m.i.w * A0112),
-	   det * -(m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123),
-	   det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
-	   det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
-	   det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
+		det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
+		det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
+		det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
+		det * -(m.i.y * A2312 - m.i.z * A1312 + m.i.w * A1212),
+		det * -(m.j.x * A2323 - m.j.z * A0323 + m.j.w * A0223),
+		det *  (m.i.x * A2323 - m.i.z * A0323 + m.i.w * A0223),
+		det * -(m.i.x * A2313 - m.i.z * A0313 + m.i.w * A0213),
+		det *  (m.i.x * A2312 - m.i.z * A0312 + m.i.w * A0212),
+		det *  (m.j.x * A1323 - m.j.y * A0323 + m.j.w * A0123),
+		det * -(m.i.x * A1323 - m.i.y * A0323 + m.i.w * A0123),
+		det *  (m.i.x * A1313 - m.i.y * A0313 + m.i.w * A0113),
+		det * -(m.i.x * A1312 - m.i.y * A0312 + m.i.w * A0112),
+		det * -(m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123),
+		det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
+		det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
+		det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
 	};
 }
 
@@ -2419,10 +1831,10 @@ forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v,
 forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
 forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
 	m4 r{};
-	r.m[0] = i;
-	r.m[1] = j;
-	r.m[2] = k;
-	r.m[3] = l;
+	r.im = i;
+	r.jm = j;
+	r.km = k;
+	r.lm = l;
 	return r;
 }
 forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
