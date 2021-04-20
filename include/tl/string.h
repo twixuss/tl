@@ -432,8 +432,7 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 			}
 			break;
 		case Encoding_utf16: {
-			auto utf16 = utf8_to_utf16(string);
-			defer { free(utf16); };
+			auto utf16 = with(temporary_allocator, utf8_to_utf16(string));
 			append_bytes(b, utf16);
 			break;
 		}
@@ -449,8 +448,7 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 inline void append(StringBuilder &b, Span<utf16> string) {
 	switch (b.encoding) {
 		case Encoding_utf8: {
-			auto utf8 = utf16_to_utf8(string);
-			defer { free(utf8); };
+			auto utf8 = with(temporary_allocator, utf16_to_utf8(string));
 			append_bytes(b, utf8);
 			break;
 		}
@@ -708,50 +706,57 @@ forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormatF
 forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormatFloat(v)); }
 
 // Always allocates memory for the string
-inline List<char> to_string(StringBuilder &builder) {
+inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
 	List<char> result;
+	result.allocator = allocator;
 	result.reserve(builder.size());
 	builder.fill(result);
 	result.size = result.capacity;
 	return result;
 }
+inline List<char> to_string(StringBuilder &builder) {
+	return to_string(builder, builder.allocator);
+}
 
 template <class ...Args>
 inline List<char> concatenate(Args &&...args) {
 	StringBuilder builder;
-	defer { free(builder); };
+	builder.allocator = temporary_allocator;
 	int ___[] = { ((append(builder, args), ...), 0) };
-	return to_string(builder);
+	return to_string(builder, current_allocator);
 }
 
 template <class ...Args>
 List<ascii> format(ascii const *fmt, Args const &...args) {
 	StringBuilder builder;
-	defer { free(builder); };
+	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_ascii;
 	append_format(builder, fmt, args...);
-	return to_string(builder);
+	return to_string(builder, current_allocator);
 }
 
 template <class ...Args>
 List<utf8> format(utf8 const *fmt, Args const &...args) {
 	StringBuilder builder;
-	defer { free(builder); };
+	builder.allocator = temporary_allocator;
+	builder.encoding = Encoding_utf8;
 	append_format(builder, fmt, args...);
-	return (List<utf8>)to_string(builder);
+	return (List<utf8>)to_string(builder, current_allocator);
 }
 
 template <class ...Args>
 List<utf16> format(utf16 const *fmt, Args const &...args) {
 	StringBuilder builder;
-	defer { free(builder); };
-
+	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_utf16;
-
 	append_format(builder, fmt, args...);
-	return (List<utf16>)to_string(builder);
+	return (List<utf16>)to_string(builder, current_allocator);
 }
 
+template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 #if 0
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>

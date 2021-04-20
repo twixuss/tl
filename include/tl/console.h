@@ -20,26 +20,17 @@ extern TL_API Printer current_printer;
 TL_API void set_console_encoding(Encoding);
 TL_API void clear_console();
 
-// UTF-8
-TL_API void print_to_console(Span<utf8> string);
-
-inline void print_to_console(Span<ascii>  string) { print_to_console(ascii_to_utf8(string)); }
-inline void print_to_console(Span<utf16> string) {
-	auto temp = utf16_to_utf8(string);
-	defer { free(temp); };
-	print_to_console(temp);
-}
+TL_API void print_to_console(Span<ascii> string);
+TL_API void print_to_console(Span<utf8 > string);
+TL_API void print_to_console(Span<utf16> string);
+TL_API void print_to_console(Span<utf32> string);
 
 template <class T>
 inline void print(T const &value) {
 	StringBuilder builder;
-	defer { free(builder); };
-
+	builder.allocator = temporary_allocator;
 	append(builder, value);
-
 	auto string = to_string(builder);
-	defer { free(string); };
-
 	current_printer(ascii_to_utf8(string));
 }
 
@@ -49,14 +40,14 @@ template <> inline void print(Span<utf8> const &span) { current_printer(span); }
 template <class ...Args>
 inline void print(char const *fmt, Args const &...args) {
 	StringBuilder builder;
-	defer { free(builder); };
-
+	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
-
 	auto string = to_string(builder);
-	defer { free(string); };
-
 	print(string);
+}
+
+inline void print(char const *string) {
+	print(as_span(string));
 }
 
 TL_API void hide_console_window();
@@ -75,9 +66,17 @@ Printer console_printer = {
 static HANDLE console_output = GetStdHandle(STD_OUTPUT_HANDLE);
 static HWND console_window = GetConsoleWindow();
 
+void print_to_console(Span<ascii> span) {
+	DWORD charsWritten;
+	WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
+}
 void print_to_console(Span<utf8> span) {
 	DWORD charsWritten;
 	WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
+}
+void print_to_console(Span<utf16> span) {
+	DWORD charsWritten;
+	WriteConsoleW(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
 }
 
 void clear_console() {

@@ -2,24 +2,23 @@
 #include "system.h"
 
 #if COMPILER_MSVC
-#pragma warning(push, 0)
+	#pragma warning(push, 0)
 #endif
 
 #ifdef TL_IMPL
-#if OS_WINDOWS
-#define NOMINMAX
-#include <Windows.h>
-#else
-#include <pthread.h>
-#endif
-
+	#if OS_WINDOWS
+		#define NOMINMAX
+		#include <Windows.h>
+	#else
+		#include <pthread.h>
+	#endif
 #endif // TL_IMPL
 
 #if COMPILER_MSVC
-#include <intrin.h>
-#include <vcruntime_new.h>
+	#include <intrin.h>
+	#include <vcruntime_new.h>
 #elif COMPILER_GCC
-#include <malloc.h>
+	#include <malloc.h>
 #endif
 
 #include <utility>
@@ -27,7 +26,7 @@
 #include <tuple>
 
 #if COMPILER_MSVC
-#pragma warning(pop)
+	#pragma warning(pop)
 #endif
 
 #ifndef ASSERTION_FAILURE
@@ -39,10 +38,8 @@
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__))
 
-#ifdef TL_DEBUG
+#ifndef bounds_check
 #define bounds_check(x, ...) (void)((x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
-#else
-#define bounds_check(x)
 #endif
 
 #define TL_DISABLED_WARNINGS \
@@ -51,9 +48,7 @@
 
 #if COMPILER_MSVC
 #pragma warning(push)
-#pragma warning(disable: TL_DISABLED_WARNINGS)
-#pragma warning(disable: 4820)
-#pragma warning(disable: 4455)
+#pragma warning(disable: TL_DISABLED_WARNINGS 4820 4455)
 #endif
 
 namespace TL {
@@ -653,8 +648,6 @@ inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)st
 inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
 inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
 
-inline constexpr Span<char > as_span(char const *begin, char const *end) { return Span((char *)begin, (char *)end); }
-
 template <class T>
 inline constexpr Span<T> as_span(Span<T> span) {
 	return span;
@@ -1065,14 +1058,28 @@ bool find_and_erase(Collection &collection, T value) {
 	return false;
 }
 
+struct SourceLocation {
+	char const *file;
+	char const *function;
+	umm line;
+};
+
+#define get_source_location() SourceLocation{__FILE__, __FUNCTION__, __LINE__}
+
 enum AllocatorMode {
 	Allocator_allocate,
 	Allocator_reallocate,
 	Allocator_free,
 };
 
+#if TL_TRACK_ALLOCATIONS
+using AllocatorSourceLocation = SourceLocation;
+#else
+struct AllocatorSourceLocation {};
+#endif
+
 struct Allocator {
-	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state) = 0;
+	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state, AllocatorSourceLocation location) = 0;
 	void *state = 0;
 	operator bool() {
 		return func != 0;
@@ -1080,105 +1087,177 @@ struct Allocator {
 };
 
 template <class T>
-T *_allocate(Allocator allocator, umm count = 1, umm align = alignof(T)) {
-	return (T *)allocator.func(Allocator_allocate, sizeof(T) * count, align, 0, allocator.state);
+T *_allocate(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
+	return (T *)allocator.func(Allocator_allocate, sizeof(T) * count, align, 0, allocator.state, location);
 }
 inline void *_reallocate(Allocator allocator, void *data) {
-	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state);
+	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state, {});
 }
 inline void _free(Allocator allocator, void *data) {
-	allocator.func(Allocator_free, 0, 0, data, allocator.state);
+	allocator.func(Allocator_free, 0, 0, data, allocator.state, {});
 }
 
-#ifdef TL_TRACK_ALLOCATIONS
-
-#ifdef TL_ALLOCATION_TRACKER
-	#ifndef TL_DEALLOCATION_TRACKER
-		#error TL_ALLOCATION_TRACKER and TL_DEALLOCATION_TRACKER must be defined if allocation tracking is enabled
-	#endif
+#if TL_TRACK_ALLOCATIONS
+#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, get_source_location(), __VA_ARGS__)
 #else
-	#ifdef TL_DEALLOCATION_TRACKER
-		#error TL_ALLOCATION_TRACKER and TL_DEALLOCATION_TRACKER must be defined if allocation tracking is enabled
-	#else
-		#define TL_ALLOCATION_TRACKER(t, allocator, ...) (track_allocations ? ::TL::allocation_tracker<t>(get_stack_trace(), allocator, __VA_ARGS__) : ::TL::_allocate<t>(allocator, __VA_ARGS__))
-		#define TL_DEALLOCATION_TRACKER(allocator, data) (track_allocations ? ::TL::deallocation_tracker(allocator, data) : ::TL::_free(allocator, data))
-	#endif
+#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, AllocatorSourceLocation {}, __VA_ARGS__)
 #endif
 
-extern bool track_allocations;
-
-struct StackTrace;
-StackTrace get_stack_trace();
-
-template <class T>
-T *allocation_tracker(StackTrace const &trace, Allocator allocator, umm count = 1, umm align = alignof(T));
-void deallocation_tracker(Allocator allocator, void *data);
-
-#define ALLOCATE(t, allocator, ...) TL_ALLOCATION_TRACKER(t, allocator, __VA_ARGS__)
-#define FREE(allocator, data) TL_DEALLOCATION_TRACKER(allocator, data)
-
-#else
-
-#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, __VA_ARGS__)
 #define FREE(allocator, data) ::TL::_free(allocator, data)
 
-#endif
+
 
 #define tl_push(pusher, ...) if(auto CONCAT(_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_,__LINE__)=current;current=(new);defer{current=CONCAT(_,__LINE__);}
 
 extern TL_API void init_allocator();
+extern TL_API void deinit_allocator();
+extern TL_API void clear_temporary_storage();
 extern TL_API Allocator default_allocator;
+extern TL_API thread_local Allocator temporary_allocator;
+#if TL_TRACK_ALLOCATIONS
+extern TL_API Allocator tracking_allocator;
+#endif
 extern TL_API Allocator thread_local current_allocator;
 
 struct AllocatorPusher {
 	Allocator old_allocator;
-	AllocatorPusher(Allocator new_allocator) {
+	forceinline AllocatorPusher(Allocator new_allocator) {
 		old_allocator = current_allocator;
 		current_allocator = new_allocator;
 	}
-	~AllocatorPusher() {
+	forceinline ~AllocatorPusher() {
 		current_allocator = old_allocator;
 	}
-	operator bool() { return true; }
+	forceinline operator bool() { return true; }
 };
 
 #define push_allocator(allocator) tl_push(::TL::AllocatorPusher, allocator)
 #define scoped_allocator(allocator) tl_scoped(::TL::current_allocator, allocator)
 
+#define with(allocator, ...) ([&]{scoped_allocator(allocator);return __VA_ARGS__;}())
+
 #ifdef TL_IMPL
 
-Allocator default_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, void *) -> void * {
-		switch (mode) {
 #if OS_WINDOWS
 #if COMPILER_MSVC
-			case Allocator_allocate:   return _aligned_malloc(size, align);
-			case Allocator_reallocate: return _aligned_realloc(data, size, align);
-			case Allocator_free:       _aligned_free(data); return 0;
+#define tl_allocate(size, align)         ::_aligned_malloc(size, align)
+#define tl_reallocate(data, size, align) ::_aligned_realloc(data, size, align)
+#define tl_free(data)                    ::_aligned_free(data)
 #elif COMPILER_GCC
-			case Allocator_allocate:   return __mingw_aligned_malloc(size, align);
-			case Allocator_reallocate: return __mingw_aligned_realloc(data, size, align);
-			case Allocator_free:       __mingw_aligned_free(data); return 0;
+#define tl_allocate(size, align)         ::__mingw_aligned_malloc(size, align)
+#define tl_reallocate(data, size, align) ::__mingw_aligned_realloc(data, size, align)
+#define tl_free(data)                    ::__mingw_aligned_free(data)
 #endif
-#else
-			case Allocator_allocate: {
-				void *result = 0;
-				posix_memalign(&result, max(align, sizeof(void *)), size);
-				return result;
-			}
-			case Allocator_reallocate: return realloc(data, size);
-			case Allocator_free:       free(data); return 0;
 #endif
+
+Allocator default_allocator = {
+	[](AllocatorMode mode, umm size, umm align, void *data, void *, AllocatorSourceLocation location) -> void * {
+		switch (mode) {
+			case Allocator_allocate:   return tl_allocate(size, align);
+			case Allocator_reallocate: return tl_reallocate(data, size, align);
+			case Allocator_free:       tl_free(data); return 0;
 		}
 		return 0;
 	},
 	0
 };
+
+struct TemporaryAllocatorState {
+	struct Block {
+		Block *next;
+		umm size;
+		umm capacity;
+		forceinline u8 *data() { return (u8 *)(this + 1); }
+	};
+	Block *first = 0;
+	Block *last = 0;
+	umm last_block_size = 0x10000;
+};
+
+void free(TemporaryAllocatorState &state) {
+	auto block = state.first;
+	while (block) {
+		auto next = block->next;
+		FREE(default_allocator, block);
+		block = next;
+	}
+	state = {};
+}
+
+#if TL_TRACK_ALLOCATIONS
+extern TL_API thread_local bool track_allocations;
+#endif
+
+thread_local TemporaryAllocatorState temporary_allocator_state;
+thread_local Allocator temporary_allocator = {
+	[](AllocatorMode mode, umm size, umm align, void *data, void *_state, AllocatorSourceLocation location) -> void * {
+		auto &state = *(TemporaryAllocatorState *)_state;
+		switch (mode) {
+			case TL::Allocator_allocate: {
+				auto block = state.first;
+				while (block) {
+					auto candidate = (u8 *)ceil(block->data() + block->size, align);
+					if (candidate + size <= block->data() + block->capacity) {
+						block->size = (candidate - block->data()) + size;
+						assert(block->size <= block->capacity);
+						return candidate;
+					}
+					block = block->next;
+				}
+
+				// Block with enough space was not found. Create a new bigger one
+				while (state.last_block_size < size) {
+					state.last_block_size *= 2;
+				}
+
+				block = (TemporaryAllocatorState::Block *)ALLOCATE(u8, default_allocator, sizeof(TemporaryAllocatorState::Block) + state.last_block_size);
+				block->size = size;
+				block->capacity = state.last_block_size;
+				block->next = 0;
+
+				if (state.first) {
+					state.last->next = block;
+				} else {
+					state.first = block;
+				}
+				state.last = block;
+
+				return block->data();
+			}
+			case TL::Allocator_reallocate:
+				invalid_code_path();
+				break;
+			case TL::Allocator_free:
+				break;
+		}
+		return 0;
+	},
+	&temporary_allocator_state
+};
+
+void clear_temporary_storage() {
+	umm total_size = 0;
+	auto block = temporary_allocator_state.first;
+	while (block) {
+		total_size += block->size;
+		block->size = 0;
+		block = block->next;
+	}
+}
+
 thread_local Allocator current_allocator;
 
 void init_allocator() {
+#if TL_TRACK_ALLOCATIONS
+	current_allocator = tracking_allocator;
+#else
 	current_allocator = default_allocator;
+#endif
+}
+
+void deinit_allocator() {
+	free(temporary_allocator_state);
 }
 
 #endif
@@ -1189,40 +1268,95 @@ void init_allocator() {
 #pragma warning(pop)
 #endif
 
-#ifdef TL_TRACK_ALLOCATIONS
+#ifdef TL_IMPL
 
+#if TL_TRACK_ALLOCATIONS
 #include "thread.h"
 #include "debug.h"
+#include <unordered_map>
+#endif
 
 namespace TL {
 
+#if TL_TRACK_ALLOCATIONS
 struct AllocationInfo {
-	StackTrace trace;
+	umm size;
+	AllocatorSourceLocation location;
+	CallStack call_stack;
 };
-
 std::unordered_map<void *, AllocationInfo> allocations;
 Mutex allocations_mutex;
-bool track_allocations = true;
+bool thread_local track_allocations = true;
+forceinline void track_allocation(void *pointer, umm size, AllocatorSourceLocation location) {
+	if (!track_allocations) return;
+	track_allocations = false;
+	defer { track_allocations = true; };
 
-template <class T>
-T *allocation_tracker(StackTrace const &trace, Allocator allocator, umm count, umm align) {
-	auto result = _allocate<T>(allocator, count, align);
-
-	AllocationInfo info;
-	info.trace = trace;
-
-	scoped_lock(allocations_mutex);
-	allocations[result] = info;
-
-	return result;
-}
-void deallocation_tracker(Allocator allocator, void *data) {
-	_free(allocator, data);
+	scoped_allocator(default_allocator);
 
 	scoped_lock(allocations_mutex);
-	allocations.erase(data);
+	AllocationInfo a;
+	a.size = size;
+	a.location = location;
+	a.call_stack = get_call_stack();
+	allocations[pointer] = a;
 }
+forceinline void untrack_allocation(void *pointer) {
+	if (!track_allocations) return;
+
+	scoped_lock(allocations_mutex);
+	allocations.erase(pointer);
+}
+forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm size, AllocatorSourceLocation location) {
+	if (!track_allocations) return;
+	track_allocations = false;
+	defer { track_allocations = true; };
+
+	scoped_allocator(default_allocator);
+
+	scoped_lock(allocations_mutex);
+	AllocationInfo a;
+	a.size = size;
+	a.location = location;
+	a.call_stack = get_call_stack();
+	allocations[new_pointer] = a;
+	allocations.erase(old_pointer);
+}
+#else
+#define track_allocation(...)
+#define untrack_allocation(...)
+#define retrack_allocation(...)
+#endif
+
+Allocator tracking_allocator = {
+	[](AllocatorMode mode, umm size, umm align, void *data, void *, AllocatorSourceLocation location) -> void * {
+		switch (mode) {
+			case Allocator_allocate: {
+				auto result = tl_allocate(size, align);
+				track_allocation(result, size, location);
+				return result;
+			}
+			case Allocator_reallocate: {
+				auto result = tl_reallocate(data, size, align);
+				retrack_allocation(data, result, size, location);
+				return result;
+			}
+			case Allocator_free: {
+				tl_free(data);
+				untrack_allocation(data);
+				break;
+			}
+		}
+		return 0;
+	},
+	0
+};
+
+#undef tl_allocate
+#undef tl_reallocate
+#undef tl_free
 
 }
+
 
 #endif

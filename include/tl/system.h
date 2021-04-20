@@ -184,17 +184,10 @@ using u32 = unsigned int;
 using u64 = unsigned long long;
 #endif
 
-using slong = signed long;
-using ulong = unsigned long;
-
-using slong_s = Conditional<sizeof(slong) == 4, s32, s64>;
-using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
-
 using f32   = float;
 using f64   = double;
 using b32   = s32;
 using b64   = s64;
-using wchar = wchar_t;
 
 #if ARCH_X64
 using umm = u64;
@@ -223,6 +216,21 @@ using ascii = char;
 using utf8  = char8_t;
 using utf16 = char16_t;
 using utf32 = char32_t;
+
+
+
+//
+// Really?
+//
+using slong = signed long;
+using ulong = unsigned long;
+using wchar = wchar_t;
+
+using slong_s = Conditional<sizeof(slong) == 4, s32, s64>;
+using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
+using wchar_s = Conditional<sizeof(wchar) == 2, utf16, utf32>;
+
+
 
 #if OS_WINDOWS
 static_assert(sizeof(utf16) == sizeof(wchar));

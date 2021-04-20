@@ -42,15 +42,10 @@ u64 read_timestamp_counter() {
 }
 
 List<char> get_time_string() {
-	StringBuilder builder;
-	defer { free(builder); };
-
 	SYSTEMTIME t;
 	GetSystemTime(&t);
-	
-	append_format(builder, "%:%:%:%", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
-	return to_string(builder);
+	return format("%:%:%.%", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 }
 
 }

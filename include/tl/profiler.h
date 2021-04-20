@@ -1,37 +1,44 @@
 #pragma once
 #include "common.h"
 #include "list.h"
+#include "file.h"
 
 namespace TL { namespace Profiler {
 
 struct TimeSpan {
 	s64 begin;
 	s64 end;
-	char const *name;
+	Span<char> name;
 	char const *file;
 	u32 line;
 	u32 threadId;
 };
 
-TL_API void begin(char const *name, char const *file, u32 line);
+TL_API void init();
+TL_API void deinit();
+TL_API void begin(Span<char> name, char const *file, u32 line);
 TL_API void end();
 TL_API void reset();
 
-TL_API void waitForCompletion();
-TL_API List<TimeSpan> const &getRecordedTimeSpans();
+TL_API void wait_for_completion();
+TL_API Span<TimeSpan> get_recorded_time_spans();
 
-TL_API void outputForChrome(char const *path);
+TL_API void output_for_chrome(char const *path);
 
 #ifndef TL_ENABLE_PROFILER
-#define TL_ENABLE_PROFILER 0
+#define TL_ENABLE_PROFILER 1
 #endif
 
 #if TL_ENABLE_PROFILER
-#define TL_TIMED_BLOCK(name) ::TL::Profiler::begin(name, __FILE__, __LINE__); defer{ ::TL::Profiler::end(); }
-#define TL_TIMED_FUNCTION TL_TIMED_BLOCK(__FUNCTION__)
+#define timed_begin(name) ::TL::Profiler::begin(name, __FILE__, __LINE__)
+#define timed_end() ::TL::Profiler::end()
+#define timed_block(name) timed_begin(name); defer{ timed_end(); }
+#define timed_function() timed_block(as_span(__FUNCTION__))
 #else
-#define TL_TIMED_BLOCK(name)
-#define TL_TIMED_FUNCTION
+#define timed_begin(name)
+#define timed_end()
+#define timed_block(name)
+#define timed_function()
 #endif
 
 }}
@@ -45,14 +52,23 @@ TL_API void outputForChrome(char const *path);
 #include <unordered_map>
 namespace TL { namespace Profiler {
 
-List<TimeSpan> recordedTimeSpans;
-Mutex recordedTimeSpansMutex;
-std::unordered_map<u32, List<TimeSpan>> currentTimeSpans;
-Mutex currentTimeSpansMutex;
-//f64 startTime;
-u32 undoneSpanCount;
+List<TimeSpan> recorded_time_spans;
+Mutex recorded_time_spans_mutex;
 
-void begin(char const *name, char const *file, u32 line) {
+std::unordered_map<u32, List<TimeSpan>> current_time_spans;
+Mutex current_time_spans_mutex;
+//f64 startTime;
+u32 remaining_span_count;
+s64 start_time;
+
+void init() {
+	recorded_time_spans.allocator = default_allocator;
+	start_time = get_performance_counter();
+}
+void deinit() {
+	free(recorded_time_spans);
+}
+void begin(Span<char> name, char const *file, u32 line) {
 	u32 threadId = get_current_thread_id();
 	TimeSpan span;
 	span.begin = get_performance_counter();
@@ -61,67 +77,67 @@ void begin(char const *name, char const *file, u32 line) {
 	span.line = line;
 	span.threadId = threadId;
 
-	//if (currentTimeSpans.empty()) {
+	//if (current_time_spans.empty()) {
 	//	startTime = (f64)span.begin * 1000.0 / performanceFrequency;
 	//}
 
-	atomic_add(undoneSpanCount, 1);
-	scoped_lock(currentTimeSpansMutex);
-	currentTimeSpans[threadId].push_back(span);
+	atomic_add(remaining_span_count, 1);
+	scoped_lock(current_time_spans_mutex);
+	current_time_spans[threadId].add(span);
 }
 void end() {
 	u32 threadId = get_current_thread_id();
 
-	lock(currentTimeSpansMutex);
-	auto &list = currentTimeSpans[threadId];
-	unlock(currentTimeSpansMutex);
+	lock(current_time_spans_mutex);
+	auto &list = current_time_spans[threadId];
+	unlock(current_time_spans_mutex);
 
 	TimeSpan span = list.back();
-	list.pop_back();
+	list.pop();
 
 	span.end = get_performance_counter();
 
-	atomic_add(undoneSpanCount, (u32)-1);
-	scoped_lock(recordedTimeSpansMutex);
-	recordedTimeSpans.push_back(span);
+	atomic_add(remaining_span_count, (u32)-1);
+	scoped_lock(recorded_time_spans_mutex);
+	recorded_time_spans.add(span);
 }
 void reset() {
-	recordedTimeSpans.clear();
-	currentTimeSpans.clear();
+	recorded_time_spans.clear();
+	current_time_spans.clear();
 }
 
-void waitForCompletion() {
-	loop_until([]{ return undoneSpanCount == 0; });
+void wait_for_completion() {
+	loop_until([]{ return remaining_span_count == 0; });
 }
-List<TimeSpan> const &getRecordedTimeSpans() {
-	return recordedTimeSpans;
+Span<TimeSpan> get_recorded_time_spans() {
+	return recorded_time_spans;
 }
 
-void outputForChrome(char const *path) {
-	StringBuilder<> builder;
-	builder.append("{\"otherData\":{},\"traceEvents\":[\n");
-	if (!recordedTimeSpans.empty()) {
+void output_for_chrome(char const *path) {
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	append(builder, R"({"otherData":{},"traceEvents":[
+)"s);
+
+
+	if (!recorded_time_spans.empty()) {
 		bool needComma = false;
-		for (auto span : recordedTimeSpans) {
+		for (auto span : recorded_time_spans) {
 			if (needComma) {
-				builder.append(",\n");
+				append(builder, ",\n"s);
 			}
-			builder.append("{\"cat\":\"function\",\"dur\":");
-			builder.append((f64)(span.end - span.begin) / (f64)performance_frequency * 1000000.0);
-			builder.append(",\"name\":\"");
-			builder.append(span.name);
-			builder.append("\",\"ph\":\"X\",\"pid\":0,\"tid\":");
-			builder.append(span.threadId);
-			builder.append(",\"ts\":");
-			builder.append((f64)span.begin / (f64)performance_frequency * 1000000.0);
-			builder.append("}");
+			append_format(builder, R"({"cat":"function","dur":%,"name":"%","ph":"X","pid":0,"tid":%,"ts":%})",
+				(span.end - span.begin) * 1000000. / performance_frequency,
+				span.name,
+				span.threadId,
+				(span.begin - start_time) * 1000000. / performance_frequency
+			);
 			needComma = true;
 		}
 	}
-	builder.append("\n]}");
-
-	auto str = builder.get();
-	writeEntireFile(path, str.data(), str.size());
+	append(builder, "\n]}"s);
+	auto s = to_string(builder);
+	write_entire_file(path, s.data, s.size);
 }
 
 }}

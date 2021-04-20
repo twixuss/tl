@@ -20,11 +20,8 @@ void free(Process &process);
 #if OS_WINDOWS
 
 Process execute(Span<utf8> path_, Span<utf8> arguments_, bool visible) {
-	auto path = utf8_to_utf16(path_, true);
-	defer { free(path); };
-	
-	auto arguments = utf8_to_utf16(arguments_, true);
-	defer { free(arguments); };
+	auto path = with(temporary_allocator, utf8_to_utf16(path_, true));
+	auto arguments = with(temporary_allocator, utf8_to_utf16(arguments_, true));
 
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);

@@ -1,28 +1,37 @@
 #pragma once
 #include "list.h"
 #include "string.h"
+#include "console.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
 namespace TL {
 
-struct CallStackEntry {
-	Span<char> name;
-	Span<char> file;
-	u32 line = 0;
-};
+using CallStack = List<void *>;
 
-struct StackTrace {
-	List<CallStackEntry> call_stack;
+struct StringizedCallStack {
+	struct Entry {
+		Span<char> name;
+		Span<char> file;
+		u32 line = 0;
+	};
+	List<Entry> call_stack;
 	List<char> string_buffer;
 };
 
 TL_API bool debug_init();
 TL_API void debug_deinit();
 
-TL_API StackTrace get_stack_trace();
-TL_API void free(StackTrace &stack_trace);
+TL_API CallStack get_call_stack();
+
+TL_API StringizedCallStack to_string(CallStack &call_stack);
+TL_API void free(StringizedCallStack &call_stack);
+
+inline StringizedCallStack get_stack_trace() {
+	auto call_stack = with(temporary_allocator, get_call_stack());
+	return to_string(call_stack);
+}
 
 TL_API bool debugger_attached();
 
@@ -43,23 +52,13 @@ namespace TL {
 
 static HANDLE debug_process;
 
-struct ModuleInfo {
-    List<char> image_name;
-    List<char> module_name;
-    void *base_address;
-    DWORD load_size;
-};
-
-List<ModuleInfo> loaded_modules;
-
 bool debug_init() {
 	debug_process = GetCurrentProcess();
 	if (!SymInitialize(debug_process, 0, true))
 		return false;
 
 	DWORD options = SymGetOptions();
-	//SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
-	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_DEBUG | SYMOPT_EXACT_SYMBOLS);
+	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
 
 	return true;
 }
@@ -68,54 +67,7 @@ void debug_deinit() {
 	SymCleanup(debug_process);
 }
 
-ModuleInfo get_module_info(HMODULE module, HANDLE process) {
-	ModuleInfo result;
-	char temp[4096];
-    MODULEINFO mi;
-
-    GetModuleInformation(process, module, &mi, sizeof(mi));
-    result.base_address = mi.lpBaseOfDll;
-    result.load_size = mi.SizeOfImage;
-
-    GetModuleFileNameEx(process, module, temp, sizeof(temp));
-    result.image_name = as_span(temp);
-
-    GetModuleBaseName(process, module, temp, sizeof(temp));
-    result.module_name = as_span(temp);
-
-    SymLoadModule64(process, 0, result.image_name.data, result.module_name.data, (DWORD64)result.base_address, result.load_size);
-
-	return result;
-}
-
-static void *load_modules_symbols(HANDLE process, DWORD pid) {
-    List<ModuleInfo> modules;
-	defer { free(modules); };
-
-    DWORD cbNeeded;
-
-    List<HMODULE> module_handles;
-	defer { free(module_handles); };
-
-	module_handles.resize(1);
-
-    EnumProcessModules(process, &module_handles[0], module_handles.size * sizeof(HMODULE), &cbNeeded);
-    module_handles.resize(cbNeeded/sizeof(HMODULE));
-    EnumProcessModules(process, &module_handles[0], module_handles.size * sizeof(HMODULE), &cbNeeded);
-
-	for (auto module : module_handles) {
-		modules.add(get_module_info(module, process));
-	}
-
-    return modules[0].base_address;
-}
-
-StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
-#ifdef TL_TRACK_ALLOCATIONS
-	track_allocations = false;
-	defer { track_allocations = true; };
-#endif
-
+static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	STACKFRAME64 frame = {};
 
 	frame.AddrPC.Offset    = context.Rip;
@@ -125,19 +77,17 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 	frame.AddrStack.Mode   = AddrModeFlat;
 	frame.AddrFrame.Mode   = AddrModeFlat;
 
-	//List<>
-	//DWORD required_size_for_modules;
-	//EnumProcessModules(debug_process, modules, sizeof(HMODULE), &required_size_for_modules);
-
-	void *base = load_modules_symbols(debug_process, GetCurrentProcessId());
-    IMAGE_NT_HEADERS *h = ImageNtHeader(base);
-    DWORD image_type = h->FileHeader.Machine;
+#if ARCH_X64
+    DWORD image_type = IMAGE_FILE_MACHINE_AMD64;
+#else
+    DWORD image_type = IMAGE_FILE_MACHINE_I386;
+#endif
 
 	HANDLE thread;
 	DuplicateHandle(debug_process, GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
 	defer { CloseHandle(thread); };
 
-	StackTrace stack_trace;
+	CallStack call_stack;
 
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (frames_to_skip) {
@@ -145,11 +95,28 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 			continue;
 		}
 
-		CallStackEntry entry;
+		call_stack.add((void *)frame.AddrPC.Offset);
+	}
+
+	return call_stack;
+}
+CallStack get_call_stack() {
+	CONTEXT context = {};
+	context.ContextFlags = CONTEXT_CONTROL;
+	RtlCaptureContext(&context);
+
+	return get_call_stack(context, 1);
+}
+
+StringizedCallStack to_string(CallStack &call_stack) {
+	StringizedCallStack result;
+	for (auto &call : call_stack) {
+
+		StringizedCallStack::Entry entry;
 		Span<char> file = "unknown"s;
 		Span<char> name = "unknown"s;
 
-        if (frame.AddrPC.Offset == 0) {
+        if (call == 0) {
 			file = "NULL"s;
 			name = "ATTEMP TO EXECUTE AT ADDRESS 0"s;
 		} else {
@@ -161,7 +128,7 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 			symbol->MaxNameLen = maxNameLength;
 
-			if (!SymFromAddr(debug_process, frame.AddrPC.Offset, &displacement, symbol)) {
+			if (!SymFromAddr(debug_process, (DWORD64)call, &displacement, symbol)) {
 				auto error = GetLastError();
 				print("SymFromAddr failed with code: 0x% (%)\n", FormatInt(error, 16), error);
 				break;
@@ -184,35 +151,31 @@ StackTrace get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 			}
 		}
 
-		entry.name.data = (char *)stack_trace.string_buffer.size;
+		entry.name.data = (char *)result.string_buffer.size;
 		entry.name.size = name.size;
-		stack_trace.string_buffer.add(name);
+		result.string_buffer.add(name);
 
-		entry.file.data = (char *)stack_trace.string_buffer.size;
+		entry.file.data = (char *)result.string_buffer.size;
 		entry.file.size = file.size;
-		stack_trace.string_buffer.add(file);
+		result.string_buffer.add(file);
 
-		stack_trace.call_stack.add(entry);
+		result.call_stack.add(entry);
 	}
-
-	for (auto &call : stack_trace.call_stack) {
-		call.name.data = stack_trace.string_buffer.data + (umm)call.name.data;
-		call.file.data = stack_trace.string_buffer.data + (umm)call.file.data;
+	for (auto &call : result.call_stack) {
+		call.name.data = result.string_buffer.data + (umm)call.name.data;
+		call.file.data = result.string_buffer.data + (umm)call.file.data;
 	}
-
-	return stack_trace;
-}
-StackTrace get_stack_trace() {
-	CONTEXT context = {};
-	context.ContextFlags = CONTEXT_CONTROL;
-	RtlCaptureContext(&context);
-
-	return get_stack_trace(context, 1);
+	return result;
 }
 
-void free(StackTrace &stack_trace) {
-	free(stack_trace.string_buffer);
-	free(stack_trace.call_stack);
+static StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
+	auto call_stack = with(temporary_allocator, get_call_stack(context, frames_to_skip));
+	return to_string(call_stack);
+}
+
+void free(StringizedCallStack &call_stack) {
+	free(call_stack.string_buffer);
+	free(call_stack.call_stack);
 }
 
 

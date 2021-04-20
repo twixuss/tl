@@ -639,8 +639,7 @@ static GLuint compile_shader(GLuint shader) {
 		GLint maxLength;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = ALLOCATE(char, current_allocator, maxLength);
-		defer { FREE(current_allocator, message); };
+		auto message = ALLOCATE(char, temporary_allocator, maxLength);
 		glGetShaderInfoLog(shader, maxLength, &maxLength, message);
 
 		glDeleteShader(shader);
@@ -653,7 +652,7 @@ static GLuint compile_shader(GLuint shader) {
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
 	StringBuilder version_builder;
-	defer { free(version_builder); };
+	version_builder.allocator = temporary_allocator;
 	append(version_builder, "#version "s);
 	append(version_builder, version);
 
@@ -662,7 +661,6 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 	}
 	append(version_builder, "\n"s);
 	auto version_string = to_string(version_builder);
-	defer { free(version_string); };
 
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;
@@ -715,8 +713,7 @@ GLuint create_program(GLuint vertexShader, GLuint fragmentShader) {
 		GLint maxLength;
 		glGetProgramiv(result, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = ALLOCATE(char, current_allocator, maxLength);
-		defer { FREE(current_allocator, message); };
+		auto message = ALLOCATE(char, temporary_allocator, maxLength);
 		glGetProgramInfoLog(result, maxLength, &maxLength, message);
 
 		glDeleteProgram(result);
@@ -1008,8 +1005,7 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 	}
 
 	if (do_print) {
-		auto time = get_time_string();
-		defer { free(time); };
+		auto time = with(temporary_allocator, get_time_string());
 		print("% ---------------\nDebug message (%): %\nSource: ", time, id, message);
 		switch (source) {
 			case GL_DEBUG_SOURCE_API:             print("API");             break;

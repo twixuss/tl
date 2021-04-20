@@ -76,13 +76,17 @@ struct List {
 		size = 0;
 	}
 
+	void pop() {
+		--size;
+	}
+
 	T &operator[](umm i) {
 		bounds_check(i < size);
 		return data[i];
 	}
 
-	T *begin() { return data; }
-	T *end() { return data + size; }
+	T *begin() const { return data; }
+	T *end() const { return data + size; }
 
 	struct ReverseIterator {
 		T *pointer;
@@ -177,6 +181,19 @@ struct List {
 		return true;
 	}
 	bool operator!=(List that) const { return !(*this == that); }
+
+	bool operator==(Span<T> that) const {
+		if (size != that.size)
+			return false;
+
+		for (umm i = 0; i < size; ++i) {
+			if (data[i] != that.data[i])
+				return false;
+		}
+
+		return true;
+	}
+	bool operator!=(Span<T> that) const { return !(*this == that); }
 
 	T *data = 0;
 	umm size = 0;

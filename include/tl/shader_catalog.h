@@ -30,6 +30,17 @@ struct ShaderCatalog {
 	Shader *fallback_shader;
 };
 
+void free(ShaderCatalog &catalog) {
+	for (auto &[name, shader] : catalog.shaders) {
+		free(shader.path);
+		free(shader.tracker);
+		for (auto &[name, index] : shader.uniforms) {
+			FREE(catalog.allocator, name.data);
+		}
+	}
+	free(catalog.shader_file_names);
+}
+
 TL_API Shader *find(ShaderCatalog &catalog, Span<utf8> name);
 
 TL_API bool parse_shader(Shader &shader, Span<char> source);
@@ -184,6 +195,8 @@ bool parse_shader(Shader &shader, Span<char> source) {
 }
 
 Buffer load_shader_file(Span<utf8> full_path) {
+	scoped_allocator(temporary_allocator);
+
 	auto source = read_entire_file(full_path);
 	assert(source.data);
 
@@ -212,7 +225,6 @@ Buffer load_shader_file(Span<utf8> full_path) {
 
 		auto file_path = (List<utf8>)concatenate(directory, file_name);
 		auto included_file = load_shader_file(file_path);
-		free(file_path);
 
 		auto full_directive_size = directive.size + file_name.size;
 		auto new_source_size = source.size - full_directive_size + included_file.size;
@@ -229,9 +241,6 @@ Buffer load_shader_file(Span<utf8> full_path) {
 		append_copy(included_file.data, included_file.size);
 		append_copy(file_name_end, source.end() - file_name_end);
 
-		free(source);
-		free(included_file);
-
 		source = new_source;
 	}
 	return source;
@@ -245,12 +254,11 @@ Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_n
 
 	auto &shader = catalog.shaders[file_name];
 
-	shader.path = (List<utf8>)concatenate(directory, "/", full_name, "\0"s);
-	shader.tracker = create_file_tracker(shader.path.data, [&](FileTracker &tracker) {
+	shader.path = (List<utf8>)concatenate(directory, '/', full_name, '\0');
+	shader.tracker = create_file_tracker(shader.path, [&](FileTracker &tracker) {
 		print("Compiling %\n", tracker.path);
 
 		auto source = load_shader_file(as_span(tracker.path));
-		defer { FREE(default_allocator, source.data); };
 
 		auto vertex_shader = create_shader(GL_VERTEX_SHADER, 330, true, as_chars(source));
 		if (vertex_shader) {
@@ -269,15 +277,19 @@ Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_n
 						GLint count;
 						glGetProgramiv(shader.program, GL_ACTIVE_UNIFORMS, &count);
 
-						const GLsizei bufSize = 64; // maximum name length
-						GLchar name[bufSize]; // variable name in GLSL
-						GLsizei length; // name length
-						GLint size; // size of the variable
-						GLenum type; // type of the variable (float, vec3 or mat4, etc)
+						const GLsizei bufSize = 64;
+						GLchar name[bufSize];
+						GLsizei length;
+						GLint size;
+						GLenum type;
 						for (u32 i = 0; i < (u32)count; i++) {
 							glGetActiveUniform(shader.program, i, bufSize, &length, &size, &type, name);
 							Span<char> stored_name = {ALLOCATE(char, catalog.allocator, length), (umm)length};
 							memcpy(stored_name.data, name, length);
+							auto found = shader.uniforms.find(stored_name);
+							if (found != shader.uniforms.end()) {
+								FREE(catalog.allocator, found->first.data);
+							}
 							shader.uniforms[stored_name] = glGetUniformLocation(shader.program, name);
 						}
 
@@ -289,14 +301,14 @@ Shader &add_file(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> full_n
 		}
 		shader.valid = false;
 	});
+	update_file_tracker(shader.tracker);
 	return shader;
 }
 
 void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shader_name) {
 	catalog.allocator = current_allocator;
 	catalog.shader_file_names = get_files_in_directory(directory);
-	auto fallback_shader_path = (List<utf8>)concatenate(fallback_shader_name, ".glsl");
-	defer { free(fallback_shader_path); };
+	auto fallback_shader_path = (List<utf8>)with(temporary_allocator, concatenate(fallback_shader_name, ".glsl"));
 	catalog.fallback_shader = &add_file(catalog, directory, fallback_shader_path);
 	assert(catalog.fallback_shader->program);
 	for (auto &full_name : catalog.shader_file_names) {
@@ -304,6 +316,7 @@ void init(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_shad
 			continue;
 		add_file(catalog, directory, full_name);
 	}
+	update(catalog);
 }
 
 //

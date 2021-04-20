@@ -84,9 +84,8 @@ Sound load_wav_from_memory(Span<u8> data) {
 }
 
 Sound load_wav_from_file(Span<char> path) {
-	auto file = read_entire_file(path);
+	auto file = with(temporary_allocator, read_entire_file(path));
 	if (!file.data) return {};
-	defer { free(file); };
 
 	return load_wav_from_memory(file);
 }

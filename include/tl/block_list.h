@@ -4,18 +4,14 @@
 
 namespace TL {
 
-template <class T, umm blockCapacity_>
+template <class T, umm block_capacity_>
 struct BlockList {
-	static constexpr umm blockCapacity = blockCapacity_;
-	using Storage = Storage<T>;
-	struct Block {
-		Storage buffer[blockCapacity];
-		Storage *end;
-		Block *next;
-		Block *previous;
+	static constexpr umm block_capacity = block_capacity_;
+	struct Block : StaticList<T, block_capacity> {
+		Block *next = 0;
+		Block *previous = 0;
 
-		umm size() const { return (umm)(end - buffer); }
-		umm availableSpace() const { return blockCapacity - size(); }
+		umm available_space() const { return block_capacity - this->size; }
 	};
 	struct Index {
 		Block *block;
@@ -25,144 +21,32 @@ struct BlockList {
 	Allocator allocator = current_allocator;
 	Block first;
 	Block *last = &first;
-	Block *allocLast = &first;
+	Block *alloc_last = &first;
 
-	BlockList() {
-		init_block(&first);
-	}
+	BlockList() = default;
 	BlockList(BlockList const &that) = default;
 	BlockList(BlockList &&that) = delete;
 	BlockList &operator=(BlockList const &that) = default;
 	BlockList &operator=(BlockList &&that) = delete;
-#if 0
-	BlockList(BlockList const &that) {
-		first.end = first.buffer + that.first.size();
-		for (u32 i = 0; i < that.first.size(); ++i) {
-			new (&first.buffer[i].value) T(that.first.buffer[i].value);
-		}
-
-		auto previous = &first;
-		for (auto srcBlock = that.first.next; srcBlock != 0;) {
-			if (srcBlock->size()) {
-				last = allocLast = allocateBlock(previous);
-				for (u32 i = 0; i < srcBlock->size(); ++i) {
-					new (&last->buffer[i].value) T(srcBlock->buffer[i].value);
-				}
-				previous = last;
-			}
-		}
-	}
-	BlockList(BlockList &&that) {
-		first.end = first.buffer + that.first.size();
-		for (u32 i = 0; i < that.first.size(); ++i) {
-			new (&first.buffer[i].value) T(std::move(that.first.buffer[i].value));
-		}
-
-		first.next = that.first.next;
-		last = that.last;
-		allocLast = that.allocLast;
-
-		that.first.end = that.first.buffer;
-		that.last = that.allocLast = &that.first;
-	}
-	BlockList &operator=(BlockList const &that) {
-		clear();
-
-		first.end = first.buffer + that.first.size();
-		for (u32 i = 0; i < that.first.size(); ++i) {
-			new (&first.buffer[i].value) T(that.first.buffer[i].value);
-		}
-
-		last = &first;
-		for (auto srcBlock = that.first.next; srcBlock != 0;) {
-			if (srcBlock->size()) {
-				if (!last->next)
-					last->next = allocLast = allocateBlock(last);
-				last = last->next;
-				for (u32 i = 0; i < srcBlock->size(); ++i) {
-					new (&last->buffer[i].value) T(srcBlock->buffer[i].value);
-				}
-			}
-		}
-
-		return *this;
-	}
-	BlockList &operator=(BlockList &&that) {
-		clear();
-		return *new (this) BlockList(std::move(that));
-	}
-	~BlockList() {
-		for (u32 i = 0; i < first.size(); ++i) {
-			first.buffer[i].value.~T();
-		}
-		first.end = first.buffer;
-
-		for (auto block = first.next; block != 0;) {
-			for (u32 i = 0; i < block->size(); ++i) {
-				block->buffer[i].value.~T();
-			}
-			auto next = block->next;
-			FREE(allocator, block);
-			block = next;
-		}
-
-		last = &first;
-		allocLast = &first;
-	}
-#endif
 
 	void clear() {
-		for (u32 i = 0; i < first.size(); ++i) {
-			first.buffer[i].value.~T();
-		}
-		first.end = first.buffer;
-
-		for (auto block = first.next; block != 0; block = block->next) {
-			for (u32 i = 0; i < block->size(); ++i) {
-				block->buffer[i].value.~T();
-			}
-			block->end = block->buffer;
+		for (auto block = &first; block != 0; block = block->next) {
+			block->clear();
 		}
 		last = &first;
 	}
-	umm availableSpace() {
-		umm space = 0;
-		auto block = last;
-		while (block) {
-			space += block->availableSpace();
-			block = block->next;
-		}
-		return space;
-	}
-	void ensureSpace(umm amount) {
-		umm space = availableSpace();
-		while (space < amount) {
-			allocLast = allocLast->next = allocateBlock(allocLast);
-			space += blockCapacity;
-		}
-	}
-	void ensureConsecutiveSpace(umm amount) {
-		assert(amount <= blockCapacity, "reserving this amount of consecutive space is impossible");
-		if (last->availableSpace() < amount) {
-			if (last->next) {
-				last = last->next;
-			} else {
-				last->next = allocateBlock(last);
-				last = allocLast = last->next;
-			}
-		}
-	}
+
 	template <class ...Args>
 	T &add_in_place(Args &&...args) {
 		auto dstBlock = last;
-		while (dstBlock && (dstBlock->availableSpace() == 0)) {
+		while (dstBlock && (dstBlock->available_space() == 0)) {
 			dstBlock = dstBlock->next;
 		}
 
 		if (!dstBlock) {
-			auto new_block = allocateBlock(allocLast);
-			allocLast->next = new_block;
-			dstBlock = last = allocLast = new_block;
+			auto new_block = allocate_block();
+			alloc_last->next = new_block;
+			dstBlock = last = alloc_last = new_block;
 		}
 		return *new (dstBlock->end++) T(std::forward<Args>(args)...);
 	}
@@ -197,9 +81,9 @@ struct BlockList {
 	void for_each_block(Fn &&fn) const {
 		auto block = &first;
 		do {
-			auto blockCapacity = block->size();
-			if (blockCapacity) {
-				fn(block->buffer, blockCapacity);
+			auto block_capacity = block->size();
+			if (block_capacity) {
+				fn(block->buffer, block_capacity);
 			}
 			block = block->next;
 		} while (block);
@@ -249,16 +133,13 @@ struct BlockList {
 	BlockList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
 
 private:
-	void init_block(Block *block) {
-		block->end = block->buffer;
-		block->next = 0;
-		block->previous = 0;
-	}
-	Block *allocateBlock(Block *previous) {
-		Block *result = ALLOCATE(Block, allocator);
-		init_block(result);
-		result->previous = previous;
-		return result;
+	void allocate_block(umm align = alignof(Block)) {
+		Block *result = ALLOCATE(Block, allocator, 1, align);
+		result->size = 0;
+		result->next = 0;
+		result->previous = alloc_last;
+		alloc_last->next = result;
+		alloc_last = result;
 	}
 };
 
@@ -379,7 +260,7 @@ T *find(BlockList<T, block_size> &list, T const &to_find, typename BlockList<T, 
 	do {
 		index.block = block;
 		index.value_index = 0;
-		auto blockCapacity = block->size();
+		auto block_capacity = block->size();
 		for (auto it = block->buffer; it != block->end; ++it) {
 			if (it == to_find) {
 				if (result_index)

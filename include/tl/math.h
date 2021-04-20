@@ -155,15 +155,13 @@ forceinline void sincos(v2f v, v2f& sinOut, v2f& cosOut);
 forceinline void sincos(v3f v, v3f& sinOut, v3f& cosOut);
 forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 
-#define fice forceinline constexpr
-
 #define DEFN_2 \
 	struct { Scalar x, y; }; \
 	Scalar s[2];\
 	template <class U>\
-	forceinline explicit operator v2<U>() const { return {(U)x, (U)y}; } \
-	fice v2 operator+() const { return *this; } \
-	fice v2 yx() const { return {y, x}; }
+	forceinline constexpr explicit operator v2<U>() const { return {(U)x, (U)y}; } \
+	forceinline constexpr v2 operator+() const { return *this; } \
+	forceinline constexpr v2 yx() const { return {y, x}; }
 
 #define DEFN_3 \
 	using v2 = v2<Scalar>; \
@@ -172,10 +170,10 @@ forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	struct { Scalar _pad; v2 yz; }; \
 	Scalar s[3];\
 	template <class U>\
-	forceinline explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
-	fice v3 operator+() const { return *this; } \
-	fice v3 yzx() const { return {y, z, x}; } \
-	fice v3 zxy() const { return {z, x, y}; }
+	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
+	forceinline constexpr v3 operator+() const { return *this; } \
+	forceinline constexpr v3 yzx() const { return {y, z, x}; } \
+	forceinline constexpr v3 zxy() const { return {z, x, y}; }
 
 
 #define DEFN_4 \
@@ -187,50 +185,50 @@ forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
 	struct { Scalar _pad; v2 yz; v3 yzw; }; \
 	Scalar s[4];\
 	template <class U>\
-	forceinline explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
-	fice v4 operator+() const { return *this; }
+	forceinline constexpr explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
+	forceinline constexpr v4 operator+() const { return *this; }
 
 #define UNOP_2(o) \
-	fice v2 operator o() const { return {o x, o y}; }
+	forceinline constexpr v2 operator o() const { return {o x, o y}; }
 
 #define UNOP_3(o) \
-	fice v3 operator o() const { return {o x, o y, o z}; }
+	forceinline constexpr v3 operator o() const { return {o x, o y, o z}; }
 
 #define UNOP_4(o) \
-	fice v4 operator o() const { return {o x, o y, o z, o w}; }
+	forceinline constexpr v4 operator o() const { return {o x, o y, o z, o w}; }
 
 #define BINOP_2(o) \
-	fice v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
-	fice v2 operator o(Scalar b) const { return {x o b, y o b}; } \
-	fice friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
-	fice v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
-	fice v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
+	forceinline constexpr v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
+	forceinline constexpr v2 operator o(Scalar b) const { return {x o b, y o b}; } \
+	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
+	forceinline constexpr v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
+	forceinline constexpr v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
 
 #define BINOP_3(o) \
-	fice v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
-	fice v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
-	fice friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
-	fice v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
-	fice v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
+	forceinline constexpr v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
+	forceinline constexpr v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
+	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
+	forceinline constexpr v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
+	forceinline constexpr v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
 
 #define BINOP_4(o) \
-	fice v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
-	fice v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
-	fice friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
-	fice v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
-	fice v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
+	forceinline constexpr v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
+	forceinline constexpr v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
+	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
+	forceinline constexpr v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
+	forceinline constexpr v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
 
 #define EQ_2 \
-	fice bool operator==(v2 b) { return x == b.x && y == b.y; } \
-	fice bool operator!=(v2 b) { return x != b.x || y != b.y; }
+	forceinline constexpr bool operator==(v2 b) { return x == b.x && y == b.y; } \
+	forceinline constexpr bool operator!=(v2 b) { return x != b.x || y != b.y; }
 
 #define EQ_3 \
-	fice bool operator==(v3 b) { return x == b.x && y == b.y && z == b.z; } \
-	fice bool operator!=(v3 b) { return x != b.x || y != b.y || z != b.z; }
+	forceinline constexpr bool operator==(v3 b) { return x == b.x && y == b.y && z == b.z; } \
+	forceinline constexpr bool operator!=(v3 b) { return x != b.x || y != b.y || z != b.z; }
 
 #define EQ_4 \
-	fice bool operator==(v4 b) { return x == b.x && y == b.y && z == b.z && w == b.w; } \
-	fice bool operator!=(v4 b) { return x != b.x || y != b.y || z != b.z || w != b.w; }
+	forceinline constexpr bool operator==(v4 b) { return x == b.x && y == b.y && z == b.z && w == b.w; } \
+	forceinline constexpr bool operator!=(v4 b) { return x != b.x || y != b.y || z != b.z || w != b.w; }
 
 
 template <class _Scalar>
@@ -295,10 +293,10 @@ union v3s64 {
 	struct {
 		s64 x, y, z;
 	};
-	fice v3s64 operator-(v3s64 b) const { return {x - b.x, y - b.y, z - b.z}; }
-	fice v3s64 operator*(v3s64 b) const { return {x * b.x, y * b.y, z * b.z}; }
-	fice v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
-	fice v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
+	forceinline constexpr v3s64 operator-(v3s64 b) const { return {x - b.x, y - b.y, z - b.z}; }
+	forceinline constexpr v3s64 operator*(v3s64 b) const { return {x * b.x, y * b.y, z * b.z}; }
+	forceinline constexpr v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
+	forceinline constexpr v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
 };
 
 union m2 {

@@ -50,7 +50,7 @@ forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 
 TL_DECLARE_HANDLE(Thread);
 TL_API Thread create_thread(void (*fn)(void *), void *param);
-TL_API void destroy_thread(Thread thread);
+TL_API void free(Thread thread);
 TL_API u32 get_current_thread_id();
 TL_API u32 get_thread_id(Thread thread);
 TL_API void join(Thread thread);
@@ -59,9 +59,36 @@ inline Thread create_thread(Function function) {
 	return create_thread(function.function, function.param);
 }
 
+struct ThreadWithAllocatedFunction {
+	Thread thread;
+	Function function;
+};
+
 template <class Fn, class ...Args>
-Thread create_thread(Fn &&fn, Args &&...args) {
-	return create_thread(create_function(std::forward<Fn>(fn), std::forward<Args>(args)...));
+ThreadWithAllocatedFunction create_thread(Fn &&fn, Args &&...args) {
+	ThreadWithAllocatedFunction result;
+	result.function = create_function(std::forward<Fn>(fn), std::forward<Args>(args)...);
+	result.thread = create_thread(result.function);
+	return result;
+}
+
+inline void join(ThreadWithAllocatedFunction thread) {
+	join(thread.thread);
+}
+
+inline void free(ThreadWithAllocatedFunction &thread) {
+	free(thread.function);
+	free(thread.thread);
+}
+
+inline void join_and_free(Thread thread) {
+	join(thread);
+	free(thread);
+}
+
+inline void join_and_free(ThreadWithAllocatedFunction &thread) {
+	join(thread);
+	free(thread);
 }
 
 #else
@@ -112,12 +139,13 @@ Thread create_thread(void (*fn)(void *), void *param) {
 		pData->acquired = true;
 		init_allocator();
 		data.fn(data.param);
+		deinit_allocator();
 		return 0;
 	}, &data, 0, 0);
 	while (!data.acquired);
 	return (Thread)result;
 }
-void destroy_thread(Thread thread) {
+void free(Thread thread) {
 	CloseHandle((HANDLE)thread);
 }
 u32 get_current_thread_id() {
@@ -473,7 +501,7 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 			if (!thread) {
 				pool.stopping = true;
 				for (auto t : pool.threads) {
-					destroy_thread(t);
+					free(t);
 				}
 				pool.threads.clear();
 				return false;

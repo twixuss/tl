@@ -52,8 +52,7 @@ TL_API GenericMesh parse_glb_from_memory(Span<u8> memory);
 inline GenericMesh parse_glb_from_file(char const *path) {
 	using namespace Glb;
 
-	auto data = read_entire_file(path);
-	defer { free(data); };
+	auto data = with(temporary_allocator, read_entire_file(path));
 
 	return parse_glb_from_memory(data);
 }
@@ -101,7 +100,7 @@ GenericMesh parse_glb_from_memory(Span<u8> memory) {
 	v3f *normals   = (v3f *)(binary_chunk_data + (u32)  normal_buffer_view["byteOffset"s].number.value);
 
 	GenericMesh mesh;
-	
+
 	mesh.vertices.reserve(vertex_count);
 	for (u32 i = 0; i < vertex_count; ++i) {
 		mesh.vertices.add({positions[i], normals[i]});
@@ -112,7 +111,7 @@ GenericMesh parse_glb_from_memory(Span<u8> memory) {
 	void *indices_data = binary_chunk_data + (u32)buffer_views[index_accessor["bufferView"s]]["byteOffset"s].number.value;
 	switch (indexType) {
 		case ComponentType_u32: {
-			u32 *indices = (u32 *)(indices_data); 
+			u32 *indices = (u32 *)(indices_data);
 			for (u32 i = 0; i < index_count; ++i) {
 				mesh.indices.add(indices[i]);
 			}

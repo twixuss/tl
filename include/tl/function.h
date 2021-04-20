@@ -58,7 +58,7 @@ Function create_function(Fn &&fn, Args &&...args) {
 		return result;
 	}
 }
-inline void free_function(Function &function) {
+inline void free(Function &function) {
 	if (function.allocator)
 		FREE(function.allocator, function.param);
 	function = {};

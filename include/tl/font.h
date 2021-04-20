@@ -25,15 +25,16 @@ struct SizedFont {
 	std::unordered_map<u32, CharBucket> char_buckets;
 	void *texture;
 	u32 size;
-	
+
 	u8 *atlas_data = 0;
 	v2u atlas_size = {};
-	
+
 	v2u next_char_position = {};
 	u32 current_row_height = 0;
 };
 
 struct FontCollection {
+	Allocator allocator = current_allocator;
 	List<FT_Face> faces;
 	std::unordered_map<u32, SizedFont> size_to_font;
 	List<Buffer> files;
@@ -51,10 +52,12 @@ inline FontChar get_char_info(u32 ch, SizedFont &font) {
 // Returns true if new characters were added
 //
 inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
+	scoped_allocator(font.collection->allocator);
+
 	auto current_char = text.data;
 
 	List<CharBucket *> new_buckets;
-	defer { free(new_buckets); };
+	new_buckets.allocator = temporary_allocator;
 
 	while (current_char < text.end()) {
 		u32 code_point = get_char_and_advance_utf8(current_char);
@@ -114,7 +117,7 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 					font.next_char_position.y += font.current_row_height;
 					font.current_row_height = 0;
 				}
-					
+
 				if ((font.next_char_position.y + char_size.y > font.atlas_size.y) || !font.atlas_data) {
 					if (font.atlas_data) {
 						font.atlas_size *= 2;
@@ -159,7 +162,7 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 				font.current_row_height = max(font.current_row_height, char_size.y);
 			}
 		}
-		
+
 		font.collection->update_atlas(font.texture, font.atlas_data, font.atlas_size);
 
 		return true;
@@ -204,7 +207,23 @@ inline FontCollection init_font(FT_Library library, Span<Span<utf8>> font_paths)
 	return result;
 }
 
+inline void free(SizedFont &font) {
+	FREE(font.collection->allocator, font.atlas_data);
+}
+inline void free(FontCollection &collection) {
+	free(collection.faces);
+	for (auto &file : collection.files) {
+		free(file);
+	}
+	free(collection.files);
+	for (auto &[size, font] : collection.size_to_font) {
+		free(font);
+	}
+}
+
 inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont &font, bool min_at_zero = false) {
+	scoped_allocator(font.collection->allocator);
+
 	ensure_all_chars_present(text, font);
 
 	v2s pos = {};
@@ -250,12 +269,12 @@ struct PlacedChar {
 
 inline List<PlacedChar> place_text(Span<utf8> text, SizedFont &font) {
 	List<PlacedChar> result;
-	
+
 	ensure_all_chars_present(text, font);
 
 	f32 posX = 0;
 	f32 posY = 0;
-	
+
 	auto current_char = text.data;
 	while (current_char < text.end()) {
 		auto ch = get_char_and_advance_utf8(current_char);

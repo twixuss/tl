@@ -51,7 +51,7 @@ struct ListList : List<Span<T>> {
 		}
 	}
 
-	List<Span<T>> &base() { return *this; }
+	Base &base() { return *this; }
 };
 
 template <class T>

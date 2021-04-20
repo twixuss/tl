@@ -94,6 +94,18 @@ struct LinkedList {
 };
 
 template <class T>
+void free(LinkedList<T> &list) {
+	auto node = list.head;
+	while (node) {
+		auto next = node->next;
+		FREE(list.allocator, node);
+		node = next;
+	}
+	list.head = 0;
+	list.tail = 0;
+}
+
+template <class T>
 void erase(LinkedList<T> &list, T *value) {
 	using Node = typename LinkedList<T>::Node;
 	Node *node = list.head;
