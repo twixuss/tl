@@ -98,6 +98,8 @@ template <> inline constexpr bool is_integer<s64> = true;
 template <> inline constexpr bool is_integer<slong> = true;
 template <> inline constexpr bool is_integer<ulong> = true;
 
+template <class T> inline constexpr bool is_integer_like = is_integer<T>;
+
 template <class T> inline constexpr bool is_signed = false;
 template <> inline constexpr bool is_signed<s8   > = true;
 template <> inline constexpr bool is_signed<s16  > = true;

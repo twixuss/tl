@@ -13,8 +13,8 @@ enum FileItemKind {
 };
 
 struct FileItem {
-	Span<utf8> name;
 	FileItemKind kind;
+	Span<utf8> name;
 };
 struct FileItemList : List<FileItem> {
 	using Base = List<FileItem>;
@@ -30,8 +30,8 @@ void free(FileItemList &list) {
 }
 
 enum FileOpenFlags {
-	File_read   = 0x1,
-	File_write  = 0x2,
+	File_read  = 0x1,
+	File_write = 0x2,
 };
 
 enum FileCursorOrigin {
@@ -42,48 +42,27 @@ enum FileCursorOrigin {
 
 TL_DECLARE_HANDLE(File);
 
-TL_API File open_file(ascii const *path, u32 open_flags);
-TL_API File open_file(utf8 const *path, u32 open_flags);
-TL_API File open_file(utf16 const *path, u32 open_flags);
-TL_API File open_file(utf32 const *path, u32 open_flags);
-
-inline File open_file(wchar const *path, u32 open_flags) { return open_file((wchar_s *)path, open_flags); }
-
-
+TL_API File open_file(Span<utf8> path, u32 open_flags);
 TL_API void close(File file);
 
-
 TL_API bool read(File file, void *data, u64 size);
-
 template <class T>
 inline bool read_bytes(File file, T &value) {
 	return read(file, &value, sizeof(value));
 }
-
-
 TL_API bool write(File file, void const *data, u64 size);
-
 template <class T>
 inline bool write_bytes(File file, T const &value) {
 	return write(file, &value, sizeof(value));
 }
 
-
 TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
-
 TL_API s64 get_cursor(File file);
-
 TL_API s64 length(File file);
-
 TL_API void truncate_to_cursor(File file);
 
 
-TL_API bool file_exists(ascii const *path);
-TL_API bool file_exists(utf8  const *path);
-TL_API bool file_exists(utf16 const *path);
-TL_API bool file_exists(utf32 const *path);
-inline bool file_exists(wchar const *path) { return file_exists((wchar_s *)path); }
-
+TL_API bool file_exists(Span<utf8> path);
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	auto oldCursor = get_cursor(file);
@@ -98,17 +77,12 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 
 	return result;
 }
-inline Buffer read_entire_file(ascii const *path, umm extra_space_before = 0, umm extra_space_after = 0) { File file = open_file(path, File_read); if (!file) return {}; defer { close(file); }; return read_entire_file(file, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(utf8  const *path, umm extra_space_before = 0, umm extra_space_after = 0) { File file = open_file(path, File_read); if (!file) return {}; defer { close(file); }; return read_entire_file(file, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(utf16 const *path, umm extra_space_before = 0, umm extra_space_after = 0) { File file = open_file(path, File_read); if (!file) return {}; defer { close(file); }; return read_entire_file(file, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(utf32 const *path, umm extra_space_before = 0, umm extra_space_after = 0) { File file = open_file(path, File_read); if (!file) return {}; defer { close(file); }; return read_entire_file(file, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(wchar const *path, umm extra_space_before = 0, umm extra_space_after = 0) { return read_entire_file((wchar_s *)path, extra_space_before, extra_space_after); }
-
-inline Buffer read_entire_file(Span<ascii> path, umm extra_space_before = 0, umm extra_space_after = 0) { if (path.back() == 0) return read_entire_file(path.data, extra_space_before, extra_space_after); return read_entire_file(with(temporary_allocator, null_terminate(path)).data, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(Span<utf8 > path, umm extra_space_before = 0, umm extra_space_after = 0) { if (path.back() == 0) return read_entire_file(path.data, extra_space_before, extra_space_after); return read_entire_file(with(temporary_allocator, null_terminate(path)).data, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(Span<utf16> path, umm extra_space_before = 0, umm extra_space_after = 0) { if (path.back() == 0) return read_entire_file(path.data, extra_space_before, extra_space_after); return read_entire_file(with(temporary_allocator, null_terminate(path)).data, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(Span<utf32> path, umm extra_space_before = 0, umm extra_space_after = 0) { if (path.back() == 0) return read_entire_file(path.data, extra_space_before, extra_space_after); return read_entire_file(with(temporary_allocator, null_terminate(path)).data, extra_space_before, extra_space_after); }
-inline Buffer read_entire_file(Span<wchar> path, umm extra_space_before = 0, umm extra_space_after = 0) { return read_entire_file((Span<wchar_s>)path, extra_space_before, extra_space_after); }
+inline Buffer read_entire_file(Span<utf8> path, umm extra_space_before = 0, umm extra_space_after = 0) {
+	File file = open_file(path, File_read);
+	if (!file) return {};
+	defer { close(file); };
+	return read_entire_file(file, extra_space_before, extra_space_after);
+}
 
 inline bool write_entire_file(File file, void const *data, u64 size) {
 	set_cursor(file, 0, File_begin);
@@ -117,46 +91,20 @@ inline bool write_entire_file(File file, void const *data, u64 size) {
 	truncate_to_cursor(file);
 	return true;
 }
-inline bool write_entire_file(ascii const *path, void const *data, u64 size) { File file = open_file(path, File_write); if (!file) return false; defer { close(file); }; return write_entire_file(file, data, size); }
-inline bool write_entire_file(utf8  const *path, void const *data, u64 size) { File file = open_file(path, File_write); if (!file) return false; defer { close(file); }; return write_entire_file(file, data, size); }
-inline bool write_entire_file(utf16 const *path, void const *data, u64 size) { File file = open_file(path, File_write); if (!file) return false; defer { close(file); }; return write_entire_file(file, data, size); }
-inline bool write_entire_file(utf32 const *path, void const *data, u64 size) { File file = open_file(path, File_write); if (!file) return false; defer { close(file); }; return write_entire_file(file, data, size); }
-inline bool write_entire_file(wchar const *path, void const *data, u64 size) { return write_entire_file((wchar_s *)path, data, size); }
+inline bool write_entire_file(Span<utf8> path, void const *data, u64 size) {
+	File file = open_file(path, File_write);
+	if (!file) return false;
+	defer { close(file); };
+	return write_entire_file(file, data, size);
+}
 
-inline bool write_entire_file(Span<ascii> path, void const *data, u64 size) { if (path.back() == '\0') return write_entire_file(path.data, data, size); return write_entire_file(with(temporary_allocator, null_terminate(path)).data, data, size); }
-inline bool write_entire_file(Span<utf8 > path, void const *data, u64 size) { if (path.back() == '\0') return write_entire_file(path.data, data, size); return write_entire_file(with(temporary_allocator, null_terminate(path)).data, data, size); }
-inline bool write_entire_file(Span<utf16> path, void const *data, u64 size) { if (path.back() == '\0') return write_entire_file(path.data, data, size); return write_entire_file(with(temporary_allocator, null_terminate(path)).data, data, size); }
-inline bool write_entire_file(Span<utf32> path, void const *data, u64 size) { if (path.back() == '\0') return write_entire_file(path.data, data, size); return write_entire_file(with(temporary_allocator, null_terminate(path)).data, data, size); }
-inline bool write_entire_file(Span<wchar> path, void const *data, u64 size) { return write_entire_file((Span<wchar_s>)path, data, size); }
+TL_API u64 get_file_write_time(Span<utf8> path);
 
-TL_API u64 get_file_write_time(ascii const *path);
-TL_API u64 get_file_write_time(utf8  const *path);
-TL_API u64 get_file_write_time(utf16 const *path);
-TL_API u64 get_file_write_time(utf32 const *path);
+TL_API ListList<utf8> get_files_in_directory(Span<utf8> directory);
 
-inline u64 get_file_write_time(Span<ascii> path) { if (path.back() == 0) return get_file_write_time(path.data); return get_file_write_time(with(temporary_allocator, null_terminate(path)).data); }
-inline u64 get_file_write_time(Span<utf8 > path) { if (path.back() == 0) return get_file_write_time(path.data); return get_file_write_time(with(temporary_allocator, null_terminate(path)).data); }
-inline u64 get_file_write_time(Span<utf16> path) { if (path.back() == 0) return get_file_write_time(path.data); return get_file_write_time(with(temporary_allocator, null_terminate(path)).data); }
-inline u64 get_file_write_time(Span<utf32> path) { if (path.back() == 0) return get_file_write_time(path.data); return get_file_write_time(with(temporary_allocator, null_terminate(path)).data); }
+TL_API FileItemList get_items_in_directory(Span<utf8> directory);
 
-TL_API ListList<utf8> get_files_in_directory(Span<ascii> directory);
-TL_API ListList<utf8> get_files_in_directory(Span<utf8 > directory);
-TL_API ListList<utf8> get_files_in_directory(Span<utf16> directory);
-
-TL_API FileItemList get_items_in_directory(Span<ascii> directory);
-TL_API FileItemList get_items_in_directory(Span<utf8 > directory);
-TL_API FileItemList get_items_in_directory(Span<utf16> directory);
-
-TL_API void delete_file(ascii const *path);
-TL_API void delete_file(utf8  const *path);
-TL_API void delete_file(utf16 const *path);
-TL_API void delete_file(utf32 const *path);
-inline void delete_file(wchar const *path) { delete_file((wchar_s *)path); }
-
-inline void delete_file(Span<ascii> path) { if (path.back() == '\0') delete_file(path.data); else delete_file(with(temporary_allocator, null_terminate(path)).data); }
-inline void delete_file(Span<utf8 > path) { if (path.back() == '\0') delete_file(path.data); else delete_file(with(temporary_allocator, null_terminate(path)).data); }
-inline void delete_file(Span<utf16> path) { if (path.back() == '\0') delete_file(path.data); else delete_file(with(temporary_allocator, null_terminate(path)).data); }
-inline void delete_file(Span<utf32> path) { if (path.back() == '\0') delete_file(path.data); else delete_file(with(temporary_allocator, null_terminate(path)).data); }
+TL_API void delete_file(Span<utf8> path);
 
 struct FileTracker {
 	List<utf8> path;
@@ -219,13 +167,6 @@ inline s64 length(File file) {
 forceinline void read(File file, Span<u8> span) { read(file, span.data, span.size); }
 forceinline void write(File file, Span<u8> span) { write(file, span.data, span.size);}
 
-template <class Char = char, class T>
-inline void writeString(File file, T const &value) {
-	to_string<Char>(value, [&](Span<Char> span) {
-		write(file, span.data(), span.size() * sizeof(Char));
-	});
-}
-
 inline void truncate(File file, u64 size) {
 	set_cursor(file, (s64)size, File_begin);
 	truncate_to_cursor(file);
@@ -264,7 +205,7 @@ struct OpenFileParams {
 	DWORD share;
 	DWORD creation;
 };
-OpenFileParams getOpenFileParams(u32 open_flags) {
+OpenFileParams get_open_file_params(u32 open_flags) {
 	OpenFileParams result;
 	if ((open_flags & File_read) && (open_flags & File_write)) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
@@ -285,9 +226,12 @@ OpenFileParams getOpenFileParams(u32 open_flags) {
 	}
 	return result;
 }
-File open_file(ascii const *path, u32 open_flags) {
-	auto params = getOpenFileParams(open_flags);
-	auto handle = CreateFileA(path, params.access, params.share, 0, params.creation, 0, 0);
+File open_file(Span<utf8> path, u32 open_flags) {
+	auto params = get_open_file_params(open_flags);
+	auto handle = CreateFileW(
+		(wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data,
+		params.access, params.share, 0, params.creation, 0, 0
+	);
 	if (!params.access) {
 		CloseHandle(handle);
 		handle = 0;
@@ -295,20 +239,6 @@ File open_file(ascii const *path, u32 open_flags) {
 	if (handle == INVALID_HANDLE_VALUE)
 		handle = 0;
 	return (File)handle;
-}
-File open_file(utf16 const *path, u32 open_flags) {
-	auto params = getOpenFileParams(open_flags);
-	auto handle = CreateFileW((wchar *)path, params.access, params.share, 0, params.creation, 0, 0);
-	if (!params.access) {
-		CloseHandle(handle);
-		handle = 0;
-	}
-	if (handle == INVALID_HANDLE_VALUE)
-		handle = 0;
-	return (File)handle;
-}
-File open_file(utf8 const *path, u32 open_flags) {
-	return open_file(with(temporary_allocator, utf8_to_utf16(as_span(path), true)).data, open_flags);
 }
 
 void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
@@ -371,8 +301,9 @@ void close(File file) {
 	CloseHandle((HANDLE)file);
 }
 
-bool file_exists(ascii const *path) { return PathFileExistsA(path); }
-bool file_exists(utf16 const *path) { return PathFileExistsW((wchar *)path); }
+bool file_exists(Span<utf8> path) {
+	return PathFileExistsW((wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data);
+}
 
 static u64 get_file_write_time(HANDLE file) {
 	FILETIME last_write_time;
@@ -381,26 +312,17 @@ static u64 get_file_write_time(HANDLE file) {
 
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
-u64 get_file_write_time(ascii const *path) {
-	HANDLE file = CreateFileA(path, 0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+u64 get_file_write_time(Span<utf8> path) {
+	HANDLE file = CreateFileW(
+		(wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data,
+		0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0
+	);
 	if (file == INVALID_HANDLE_VALUE)
 		return 0;
 
 	defer { CloseHandle(file); };
 
 	return get_file_write_time(file);
-}
-u64 get_file_write_time(utf16 const *path) {
-	HANDLE file = CreateFileW((wchar *)path, 0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-	if (file == INVALID_HANDLE_VALUE)
-		return 0;
-
-	defer { CloseHandle(file); };
-
-	return get_file_write_time(file);
-}
-u64 get_file_write_time(utf8 const *path) {
-	return get_file_write_time(with(temporary_allocator, utf8_to_utf16(as_span(path), true)).data);
 }
 
 utf16 *append_star(Span<utf16> directory) {
@@ -425,8 +347,8 @@ utf16 *append_star(Span<utf16> directory) {
 	return directory_with_star;
 }
 
-ListList<utf8> get_files_in_directory(Span<utf16> directory) {
-	auto directory_with_star = append_star(directory);
+ListList<utf8> get_files_in_directory(Span<utf8> directory) {
+	auto directory_with_star = append_star(with(temporary_allocator, utf8_to_utf16(directory)));
 
 	WIN32_FIND_DATAW find_data;
 	HANDLE handle = FindFirstFileW((wchar *)directory_with_star, &find_data);
@@ -450,15 +372,9 @@ ListList<utf8> get_files_in_directory(Span<utf16> directory) {
 	result.make_absolute();
 	return result;
 }
-ListList<utf8> get_files_in_directory(Span<ascii> directory) {
-	return get_files_in_directory(with(temporary_allocator, ascii_to_utf16(directory, true)));
-}
-ListList<utf8> get_files_in_directory(Span<utf8> directory) {
-	return get_files_in_directory(with(temporary_allocator, utf8_to_utf16(directory, true)));
-}
 
-FileItemList get_items_in_directory(Span<utf16> directory) {
-	auto directory_with_star = append_star(directory);
+FileItemList get_items_in_directory(Span<utf8> directory) {
+	auto directory_with_star = append_star(with(temporary_allocator, utf8_to_utf16(directory)));
 
 	WIN32_FIND_DATAW find_data;
 	HANDLE handle = FindFirstFileW((wchar *)directory_with_star, &find_data);
@@ -511,17 +427,8 @@ FileItemList get_items_in_directory(Span<utf16> directory) {
 	}
 	return result;
 }
-FileItemList get_items_in_directory(Span<ascii> directory) {
-	return get_items_in_directory(with(temporary_allocator, ascii_to_utf16(directory)));
-}
-FileItemList get_items_in_directory(Span<utf8> directory) {
-	return get_items_in_directory(with(temporary_allocator, utf8_to_utf16(directory)));
-}
 
-void delete_file(ascii const *path) { DeleteFileA(path); }
-void delete_file(utf16 const *path) { DeleteFileW((wchar *)path); }
-void delete_file(utf8 const *path)  { DeleteFileW((wchar *)with(temporary_allocator, utf8_to_utf16(as_span(path), true)).data); }
-//void delete_file(utf32 const *path) { DeleteFileW((wchar *)with(temporary_allocator, utf32_to_utf16(as_span(path), true)).data); }
+void delete_file(Span<utf8> path)  { DeleteFileW((wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data); }
 
 class CDialogEventHandler : public IFileDialogEvents, public IFileDialogControlEvents {
 public:

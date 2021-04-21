@@ -37,13 +37,23 @@ constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-template <class T, class U, class V> forceinline constexpr auto clamp(T a, U mi, V ma) {
-	minmax(mi, ma, mi, ma);
-	return min(max(a, mi), ma);
+template <class T> forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
+	minmax(min_bound, max_bound, min_bound, max_bound);
+	return min(max(value, min_bound), max_bound);
 }
-template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map(T v, SN sn, SX sx, DN dn, DX dx) { return (v - sn) / (sx - sn) * (dx - dn) + dn; }
-template <class T, class SN, class SX, class DN, class DX> forceinline constexpr auto map_clamped(T v, SN sn, SX sx, DN dn, DX dx) { return (clamp(v, sn, sx) - sn) / (sx - sn) * (dx - dn) + dn; }
-template <class A, class B, class T> forceinline constexpr auto lerp(A a, B b, T t) { return a + (b - a) * t; }
+template <class T>
+forceinline constexpr auto map(T value, T source_min, T source_max, T dest_min, T dest_max) {
+	if constexpr (is_integer_like<T>) { // Do multiplication first
+		return (value - source_min) * (dest_max - dest_min) / (source_max - source_min) + dest_min;
+	} else {
+		return (value - source_min) / (source_max - source_min) * (dest_max - dest_min) + dest_min;
+	}
+}
+template <class T>
+forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T dest_min, T dest_max) {
+	return map(clamp(value, source_min, source_max), source_min, source_max, dest_min, dest_max);
+}
+template <class A, class T> forceinline constexpr auto lerp(A a, A b, T t) { return a + (b - a) * t; }
 template <class M, class T> forceinline T &mask_assign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
 template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
@@ -98,6 +108,13 @@ template<> inline static constexpr bool is_vector<v4s> = true;
 template<> inline static constexpr bool is_vector<v2u> = true;
 template<> inline static constexpr bool is_vector<v3u> = true;
 template<> inline static constexpr bool is_vector<v4u> = true;
+
+template<> inline static constexpr bool is_integer_like<v2<s32>> = true;
+template<> inline static constexpr bool is_integer_like<v3<s32>> = true;
+template<> inline static constexpr bool is_integer_like<v4<s32>> = true;
+template<> inline static constexpr bool is_integer_like<v2<u32>> = true;
+template<> inline static constexpr bool is_integer_like<v3<u32>> = true;
+template<> inline static constexpr bool is_integer_like<v4<u32>> = true;
 
 template <class T>
 inline static constexpr u32 _dimension_of = 0;

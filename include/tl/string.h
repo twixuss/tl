@@ -8,14 +8,14 @@
 
 namespace TL {
 
-template <class Char>
-List<Char> null_terminate(Span<Char> span) {
-	List<Char> result;
+template <class T>
+List<T> null_terminate(Span<T> span) {
+	List<T> result;
 	result.size = span.size + 1;
-	result.data = ALLOCATE(Char, result.allocator, result.size);
+	result.data = ALLOCATE(T, result.allocator, result.size);
 	result.capacity = result.size;
-	memcpy(result.data, span.data, span.size * sizeof(Char));
-	result.data[result.size - 1] = 0;
+	memcpy(result.data, span.data, span.size * sizeof(T));
+	result.data[result.size - 1] = {};
 	return result;
 }
 
