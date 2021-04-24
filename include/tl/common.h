@@ -139,6 +139,8 @@ template <bool v, class T = void> struct EnableIfT {};
 template <class T> struct EnableIfT<true, T> { using Type = T; };
 template <bool v, class T = void> using EnableIf = typename EnableIfT<v, T>::Type;
 
+struct EmptyStruct {};
+
 template <class T, class ...Args>
 constexpr T *construct(T *val, Args &&...args) {
 	return new(val) T(std::forward<Args>(args)...);
@@ -636,6 +638,7 @@ struct Span {
 forceinline constexpr Span<char > operator""s(char  const *string, umm size) { return Span((char  *)string, size); }
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm size) { return Span((utf8  *)string, size); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm size) { return Span((utf16 *)string, size); }
+forceinline constexpr Span<wchar> operator""s(wchar const *string, umm size) { return Span((wchar *)string, size); }
 forceinline Span<u8> operator""b(char const *string, umm size) { return Span((u8 *)string, size); }
 
 template <class T, umm size>
@@ -994,7 +997,7 @@ struct StaticList {
 	T erase_at(umm where) {
 		bounds_check(where < size);
 		T erased = data[where];
-		memmove(data + where, data + where + 1, --size - where);
+		memmove(data + where, data + where + 1, (--size - where) * sizeof(T));
 		return erased;
 	}
 	forceinline T erase(T *where) { return erase_at(where - data); }
@@ -1081,22 +1084,25 @@ struct AllocatorSourceLocation {};
 #endif
 
 struct Allocator {
-	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, void *state, AllocatorSourceLocation location) = 0;
+	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *state) = 0;
 	void *state = 0;
-	operator bool() {
+	forceinline operator bool() {
 		return func != 0;
+	}
+	forceinline void *operator()(AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location) {
+		return func(mode, size, align, data, location, state);
 	}
 };
 
 template <class T>
 T *_allocate(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
-	return (T *)allocator.func(Allocator_allocate, sizeof(T) * count, align, 0, allocator.state, location);
+	return (T *)allocator(Allocator_allocate, sizeof(T) * count, align, 0, location);
 }
 inline void *_reallocate(Allocator allocator, void *data) {
-	return allocator.func(Allocator_reallocate, 0, 0, data, allocator.state, {});
+	return allocator(Allocator_reallocate, 0, 0, data, {});
 }
 inline void _free(Allocator allocator, void *data) {
-	allocator.func(Allocator_free, 0, 0, data, allocator.state, {});
+	allocator(Allocator_free, 0, 0, data, {});
 }
 
 #if TL_TRACK_ALLOCATIONS
@@ -1117,10 +1123,10 @@ extern TL_API void deinit_allocator();
 extern TL_API void clear_temporary_storage();
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
+extern TL_API thread_local Allocator current_allocator;
 #if TL_TRACK_ALLOCATIONS
 extern TL_API Allocator tracking_allocator;
 #endif
-extern TL_API Allocator thread_local current_allocator;
 
 struct AllocatorPusher {
 	Allocator old_allocator;
@@ -1154,7 +1160,7 @@ struct AllocatorPusher {
 #endif
 
 Allocator default_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, void *, AllocatorSourceLocation location) -> void * {
+	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate:   return tl_allocate(size, align);
 			case Allocator_reallocate: return tl_reallocate(data, size, align);
@@ -1187,13 +1193,9 @@ void free(TemporaryAllocatorState &state) {
 	state = {};
 }
 
-#if TL_TRACK_ALLOCATIONS
-extern TL_API thread_local bool track_allocations;
-#endif
-
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, void *_state, AllocatorSourceLocation location) -> void * {
+	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *_state) -> void * {
 		auto &state = *(TemporaryAllocatorState *)_state;
 		switch (mode) {
 			case TL::Allocator_allocate: {
@@ -1276,11 +1278,9 @@ void deinit_allocator() {
 #include "thread.h"
 #include "debug.h"
 #include <unordered_map>
-#endif
 
 namespace TL {
 
-#if TL_TRACK_ALLOCATIONS
 struct AllocationInfo {
 	umm size;
 	AllocatorSourceLocation location;
@@ -1288,12 +1288,7 @@ struct AllocationInfo {
 };
 std::unordered_map<void *, AllocationInfo> allocations;
 Mutex allocations_mutex;
-bool thread_local track_allocations = true;
 forceinline void track_allocation(void *pointer, umm size, AllocatorSourceLocation location) {
-	if (!track_allocations) return;
-	track_allocations = false;
-	defer { track_allocations = true; };
-
 	scoped_allocator(default_allocator);
 
 	scoped_lock(allocations_mutex);
@@ -1304,16 +1299,10 @@ forceinline void track_allocation(void *pointer, umm size, AllocatorSourceLocati
 	allocations[pointer] = a;
 }
 forceinline void untrack_allocation(void *pointer) {
-	if (!track_allocations) return;
-
 	scoped_lock(allocations_mutex);
 	allocations.erase(pointer);
 }
 forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm size, AllocatorSourceLocation location) {
-	if (!track_allocations) return;
-	track_allocations = false;
-	defer { track_allocations = true; };
-
 	scoped_allocator(default_allocator);
 
 	scoped_lock(allocations_mutex);
@@ -1324,14 +1313,8 @@ forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm si
 	allocations[new_pointer] = a;
 	allocations.erase(old_pointer);
 }
-#else
-#define track_allocation(...)
-#define untrack_allocation(...)
-#define retrack_allocation(...)
-#endif
-
 Allocator tracking_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, void *, AllocatorSourceLocation location) -> void * {
+	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate: {
 				auto result = tl_allocate(size, align);
@@ -1354,11 +1337,11 @@ Allocator tracking_allocator = {
 	0
 };
 
+}
+#endif
+
 #undef tl_allocate
 #undef tl_reallocate
 #undef tl_free
-
-}
-
 
 #endif

@@ -23,7 +23,7 @@ enum Type {
 
 struct Object {
 	struct v_Object {
-		std::unordered_map<Span<char>, Object> members;
+		std::unordered_map<Span<utf8>, Object> members;
 	};
 	struct v_Array {
 		BadList<Object> elements;
@@ -32,7 +32,7 @@ struct Object {
 		f64 value;
 	};
 	struct v_String {
-		Span<char> view;
+		Span<utf8> view;
 	};
 
 	Type type;
@@ -46,7 +46,7 @@ struct Object {
 		memset(this, 0, sizeof(*this));
 	}
 	Object(f64 number) : type(Type_number), number({number}) {}
-	Object(Span<char> string) : type(Type_string), string({string}) {}
+	Object(Span<utf8> string) : type(Type_string), string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
@@ -89,7 +89,7 @@ struct Object {
 		number.value = value;
 		return *this;
 	}
-	Object &operator=(Span<char> value) {
+	Object &operator=(Span<utf8> value) {
 		if (type != Type_null)
 			assert(type == Type_string);
 		string.view = value;
@@ -106,7 +106,7 @@ struct Object {
 		}
 		type = Type_null;
 	}
-	Object &operator[](Span<char> name) {
+	Object &operator[](Span<utf8> name) {
 		assert(type == Type_object);
 		return object.members[name];
 	}
@@ -131,15 +131,59 @@ enum : TokenType {
 
 struct Token {
 	TokenType type;
-	Span<char> view;
+	Span<utf8> view;
 };
 
-TL_API List<Token> lex(Span<char> json);
+TL_API List<Token> lex(Span<utf8> json);
 TL_API Object parse(Token *&t);
 TL_API Object parse(List<Token> tokens);
-TL_API Object parse(Span<char> json);
+TL_API Object parse(Span<utf8> json);
 
 }
+
+void append(StringBuilder &b, Json::Object const &obj) {
+	switch (obj.type) {
+		case Json::Type_number: {
+			append(b, obj.number.value);
+			break;
+		}
+		case Json::Type_string: {
+			append(b, '"');
+			append(b, obj.string.view);
+			append(b, '"');
+			break;
+		}
+		case Json::Type_array: {
+			append(b, '[');
+			bool comma = false;
+			for (auto &e : obj.array.elements) {
+				if (comma) {
+					append(b, ',');
+				}
+				append(b, e);
+				comma = true;
+			}
+			append(b, ']');
+			break;
+		}
+		case Json::Type_object: {
+			append(b, '{');
+			bool comma = false;
+			for (auto &[name, value] : obj.object.members) {
+				if (comma) {
+					append(b, ',');
+				}
+				append(b, name);
+				append(b, ':');
+				append(b, value);
+				comma = true;
+			}
+			append(b, '}');
+			break;
+		}
+	}
+}
+
 }
 
 #ifdef TL_IMPL
@@ -147,7 +191,7 @@ TL_API Object parse(Span<char> json);
 namespace TL {
 namespace Json {
 
-List<Token> lex(Span<char> json) {
+List<Token> lex(Span<utf8> json) {
 	List<Token> result;
 	auto c = json.begin();
 	while (c != json.end()) {
@@ -181,9 +225,9 @@ List<Token> lex(Span<char> json) {
 			token.type = Token_number;
 			token.view.data = c;
 			++c;
-			while (1) { 
+			while (1) {
 				if (is_digit(*c) || *c == '.') {
-					++c; 
+					++c;
 				} else if (*c == 'e') {
 					c += 2;
 					while (is_digit(*c)) {
@@ -213,7 +257,7 @@ Object parse(Token *&t) {
 		if (t->type != '}') {
 			while (1) {
 				if (t->type == '"') {
-					Span<char> memberName = t->view;
+					Span<utf8> memberName = t->view;
 					++t;
 					assert(t++->type == ':');
 					result.object.members[memberName] = parse(t);
@@ -237,10 +281,10 @@ Object parse(Token *&t) {
 		return result;
 	} else if (t->type == Token_number) {
 		Object result = {Type_number};
-		char temp[256];
+		utf8 temp[256];
 		memcpy(temp, t->view.data, t->view.size);
 		temp[t->view.size] = 0;
-		result.number.value = atof(temp);
+		result.number.value = atof((char *)temp);
 		++t;
 		return result;
 	} else if (t->type == '[') {
@@ -270,7 +314,7 @@ Object parse(List<Token> tokens) {
 	Token *t = tokens.begin();
 	return parse(t);
 }
-Object parse(Span<char> json) {
+Object parse(Span<utf8> json) {
 	return parse(lex(json));
 }
 

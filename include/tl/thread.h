@@ -48,45 +48,28 @@ forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 	return *(T *)&result;
 }
 
-TL_DECLARE_HANDLE(Thread);
-TL_API Thread create_thread(void (*fn)(void *), void *param);
-TL_API void free(Thread thread);
-TL_API u32 get_current_thread_id();
-TL_API u32 get_thread_id(Thread thread);
-TL_API void join(Thread thread);
-
-inline Thread create_thread(Function function) {
-	return create_thread(function.function, function.param);
-}
-
-struct ThreadWithAllocatedFunction {
-	Thread thread;
+struct Thread {
+	void *handle = 0;
 	Function function;
 };
 
+
+TL_API Thread create_thread(Function function);
 template <class Fn, class ...Args>
-ThreadWithAllocatedFunction create_thread(Fn &&fn, Args &&...args) {
-	ThreadWithAllocatedFunction result;
-	result.function = create_function(std::forward<Fn>(fn), std::forward<Args>(args)...);
-	result.thread = create_thread(result.function);
-	return result;
+Thread create_thread(Fn &&fn, Args &&...args) {
+	return create_thread(create_function(fn, args...));
 }
 
-inline void join(ThreadWithAllocatedFunction thread) {
-	join(thread.thread);
-}
+TL_API void join(Thread thread);
+TL_API bool finished(Thread thread);
+TL_API void free(Thread &thread);
 
-inline void free(ThreadWithAllocatedFunction &thread) {
-	free(thread.function);
-	free(thread.thread);
-}
+inline bool valid(Thread thread) { return thread.handle != 0; }
 
-inline void join_and_free(Thread thread) {
-	join(thread);
-	free(thread);
-}
+TL_API u32 get_current_thread_id();
+TL_API u32 get_thread_id(Thread thread);
 
-inline void join_and_free(ThreadWithAllocatedFunction &thread) {
+inline void join_and_free(Thread &thread) {
 	join(thread);
 	free(thread);
 }
@@ -123,39 +106,45 @@ void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
 
-Thread create_thread(void (*fn)(void *), void *param) {
+Thread create_thread(Function function) {
 	struct Data {
-		void (*fn)(void *);
-		void *param;
+		Function *function;
 		bool volatile acquired;
 	};
+	Thread result;
+	result.function = function;
+
 	Data data = {};
-	data.fn = fn;
-	data.param = param;
+	data.function = &result.function;
 	data.acquired = false;
-	HANDLE result = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
+
+	result.handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
-		init_allocator();
-		data.fn(data.param);
-		deinit_allocator();
+		(*data.function)();
 		return 0;
 	}, &data, 0, 0);
 	while (!data.acquired);
 	return (Thread)result;
 }
-void free(Thread thread) {
-	CloseHandle((HANDLE)thread);
+void join(Thread thread) {
+	WaitForSingleObjectEx((HANDLE)thread.handle, INFINITE, false);
 }
+bool finished(Thread thread) {
+	return WaitForSingleObjectEx((HANDLE)thread.handle, 0, false) == WAIT_OBJECT_0;
+}
+void free(Thread &thread) {
+	CloseHandle((HANDLE)thread.handle);
+	thread.handle = 0;
+	free(thread.function);
+}
+
 u32 get_current_thread_id() {
 	return GetCurrentThreadId();
 }
 u32 get_thread_id(Thread thread) {
-	return GetThreadId((HANDLE)thread);
-}
-void join(Thread thread) {
-	WaitForSingleObjectEx((HANDLE)thread, INFINITE, false);
+	return GetThreadId((HANDLE)thread.handle);
 }
 
 #else // ^^^ OS_WINDOWS ^^^ vvvvvv

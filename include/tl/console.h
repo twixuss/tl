@@ -15,7 +15,7 @@ struct Printer {
 };
 
 extern TL_API Printer console_printer;
-extern TL_API Printer current_printer;
+extern TL_API thread_local Printer current_printer;
 
 TL_API void set_console_encoding(Encoding);
 TL_API void clear_console();
@@ -152,7 +152,7 @@ void toggle_console_window() {
 
 #endif
 
-Printer current_printer = console_printer;
+thread_local Printer current_printer = console_printer;
 
 #endif
 

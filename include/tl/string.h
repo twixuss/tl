@@ -231,7 +231,7 @@ TL_API List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate = false);
 struct StringBuilder {
 	static constexpr umm block_size = TL_STRING_BUILDER_BLOCK_SIZE;
 	struct Block {
-		StaticList<char, block_size> buffer;
+		StaticList<utf8, block_size> buffer;
 		Block *next = 0;
 		umm available_space() { return block_size - buffer.size; }
 	};
@@ -476,6 +476,9 @@ inline void append(StringBuilder &b, Span<utf16> string) {
 }
 inline void append(StringBuilder &b, Span<utf32> string) {
 	invalid_code_path("not implemented");
+}
+inline void append(StringBuilder &b, Span<wchar> string) {
+	append(b, (Span<wchar_s>)string);
 }
 
 forceinline void append(StringBuilder &b, ascii const *string) { append(b, as_span(string)); }
