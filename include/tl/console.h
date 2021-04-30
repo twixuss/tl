@@ -17,6 +17,9 @@ struct Printer {
 extern TL_API Printer console_printer;
 extern TL_API thread_local Printer current_printer;
 
+TL_API void init_printer();
+TL_API void deinit_printer();
+
 TL_API void set_console_encoding(Encoding);
 TL_API void clear_console();
 
@@ -60,6 +63,15 @@ Printer console_printer = {
 	[](Span<utf8> span, void *) { print_to_console(span); },
 	0
 };
+
+thread_local Printer current_printer;
+
+void init_printer() {
+	current_printer = console_printer;
+}
+void deinit_printer() {
+
+}
 
 #if OS_WINDOWS
 
@@ -151,8 +163,6 @@ void toggle_console_window() {
 }
 
 #endif
-
-thread_local Printer current_printer = console_printer;
 
 #endif
 

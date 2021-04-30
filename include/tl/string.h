@@ -415,8 +415,9 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 		case Encoding_utf8:
 			append_bytes(b, string);
 			break;
-		case Encoding_ascii:
-			while (*string.data) {
+		case Encoding_ascii: {
+			auto string_end = string.end();
+			while (string.data != string_end) {
 				if (*string.data < 0x80) {
 					append_bytes(b, (ascii)*string.data);
 					++string.data;
@@ -431,6 +432,7 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 				}
 			}
 			break;
+		}
 		case Encoding_utf16: {
 			auto utf16 = with(temporary_allocator, utf8_to_utf16(string));
 			append_bytes(b, utf16);
@@ -816,9 +818,6 @@ List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate) {
 	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, (wchar *)result.data, chars_required) != chars_required) {
 		return {};
 	}
-
-	if (terminate)
-		result.back() = 0;
 
 	return result;
 }

@@ -1048,7 +1048,7 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 
 void present() {
 	if (!SwapBuffers(client_dc))
-		print("SwapBuffers failed");
+		print("SwapBuffers failed\n");
 }
 
 #if 0

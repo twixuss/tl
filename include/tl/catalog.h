@@ -11,6 +11,7 @@ template <class EntryAddition>
 struct Catalog {
 	struct Entry : EntryAddition {
 		List<utf8> path;
+		List<utf8> name;
 		FileTracker tracker;
 		bool initialized;
 	};
@@ -62,6 +63,7 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<utf8> directory, Span<utf8
 
 	auto &entry = catalog.entries[file_name];
 
+	entry.name = file_name;
 	entry.path = (List<utf8>)concatenate(directory, '/', full_name, '\0');
 	entry.tracker = create_file_tracker(entry.path, [&](FileTracker &tracker) {
 		if (entry.initialized) {
@@ -72,15 +74,11 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<utf8> directory, Span<utf8
 }
 
 template <class T>
-void init_catalog(Catalog<T> &catalog, Span<utf8> directory, Span<utf8> fallback_name) {
+void init_catalog(Catalog<T> &catalog, Span<utf8> directory) {
 	catalog.allocator = current_allocator;
 	catalog.file_names = get_files_in_directory(directory);
-	auto fallback_path = (List<utf8>)with(temporary_allocator, concatenate(fallback_name, ".glsl"));
-	catalog.fallback = &add_file(catalog, directory, fallback_path);
 	for (auto &full_name : catalog.file_names) {
-		if (full_name == as_span(fallback_path))
-			continue;
-		add_file(catalog, directory, full_name);
+		auto &entry = add_file(catalog, directory, full_name);
 	}
 	update(catalog);
 }

@@ -129,7 +129,7 @@ template <class Fn>
 inline FileTracker create_file_tracker(Span<utf8> path, Fn &&on_update) {
 	auto allocator = current_allocator;
 
-	auto params = ALLOCATE(Fn, allocator);
+	auto params = ALLOCATE_NOINIT(Fn, allocator);
 	new(params) Fn(std::forward<Fn>(on_update));
 
 	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
@@ -180,6 +180,8 @@ enum : FileDialogFlags {
 };
 
 TL_API ListList<utf8> open_file_dialog(FileDialogFlags flags);
+
+TL_API List<utf8> get_current_directory();
 
 }
 
@@ -563,6 +565,15 @@ ListList<utf8> open_file_dialog(FileDialogFlags flags) {
 
 	result.make_absolute();
 	return result;
+}
+
+List<utf8> get_current_directory() {
+	List<wchar> temp;
+	temp.allocator = temporary_allocator;
+	temp.resize(GetCurrentDirectoryW(0, 0));
+	GetCurrentDirectoryW(temp.size, temp.data);
+
+	return utf16_to_utf8((List<utf16>)temp);
 }
 
 #else

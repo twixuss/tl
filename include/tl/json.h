@@ -19,114 +19,79 @@ enum Type {
 	Type_array,
 	Type_number,
 	Type_string,
+	Type_boolean,
 };
 
 struct Object {
-	struct v_Object {
-		std::unordered_map<Span<utf8>, Object> members;
+	struct MemberMap {
+		List<Span<utf8>> names;
+		List<Object> values;
 	};
-	struct v_Array {
-		BadList<Object> elements;
-	};
-	struct v_Number {
-		f64 value;
-	};
-	struct v_String {
-		Span<utf8> view;
-	};
+	using Array = List<Object>;
+	using String = Span<utf8>;
 
 	Type type;
 	union {
-		v_Object object;
-		v_Array array;
-		v_Number number;
-		v_String string;
+		MemberMap members;
+		Array array;
+		f64 number;
+		String string;
+		bool boolean;
 	};
 	Object() {
 		memset(this, 0, sizeof(*this));
 	}
-	Object(f64 number) : type(Type_number), number({number}) {}
+	Object(f64 number) : type(Type_number), number(number) {}
 	Object(Span<utf8> string) : type(Type_string), string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
-			case Type_object: new (&object) v_Object(); break;
-			case Type_array:  new (&array)  v_Array (); break;
-			case Type_number: new (&number) v_Number(); break;
-			case Type_string: new (&string) v_String(); break;
+			case Type_object:  new (&members) MemberMap(); break;
+			case Type_array:   new (&array)   Array    (); break;
+			case Type_number:  new (&number)  f64      (); break;
+			case Type_string:  new (&string)  String   (); break;
+			case Type_boolean: new (&boolean) bool     (); break;
 			default:
 				break;
 		}
 	}
-	Object(Object const &that) {
-		type = that.type;
-		switch (type) {
-			case Type_object: new (&object) v_Object(that.object); break;
-			case Type_array:  new (&array)  v_Array (that.array ); break;
-			case Type_number: new (&number) v_Number(that.number); break;
-			case Type_string: new (&string) v_String(that.string); break;
-			default:
-				break;
-		}
-	}
-	Object(Object &&that) {
-		type = that.type;
-		switch (type) {
-			case Type_object: new (&object) v_Object(std::move(that.object)); break;
-			case Type_array:  new (&array)  v_Array (std::move(that.array )); break;
-			case Type_number: new (&number) v_Number(std::move(that.number)); break;
-			case Type_string: new (&string) v_String(std::move(that.string)); break;
-			default:
-				break;
-		}
-		that.type = Type_null;
-	}
-	Object &operator=(Object const &that) { this->~Object(); return *new (this) Object(that); }
-	Object &operator=(Object &&that) { this->~Object(); return *new (this) Object(std::move(that)); }
+	~Object() = default;
 	Object &operator=(f64 value) {
 		if (type != Type_null)
 			assert(type == Type_number);
-		number.value = value;
+		number = value;
 		return *this;
 	}
 	Object &operator=(Span<utf8> value) {
 		if (type != Type_null)
 			assert(type == Type_string);
-		string.view = value;
+		string = value;
 		return *this;
 	}
-	~Object() {
-		switch (type) {
-			case Type_object: object.~v_Object(); break;
-			case Type_array:  array .~v_Array (); break;
-			case Type_number: number.~v_Number(); break;
-			case Type_string: string.~v_String(); break;
-			default:
-				break;
-		}
-		type = Type_null;
+	Object &operator=(bool value) {
+		if (type != Type_null)
+			assert(type == Type_boolean);
+		boolean = value;
+		return *this;
 	}
-	Object &operator[](Span<utf8> name) {
+	Object *member(Span<utf8> name) {
 		assert(type == Type_object);
-		return object.members[name];
+		auto found = find(members.names, name);
+		if (found)
+			return &members.values[index_of(members.names, found)];
+		return 0;
 	}
-	Object &operator[](umm i) {
+	Object *index(umm i) {
 		assert(type == Type_array);
-		return array.elements[i];
-	}
-	Object &operator[](Object const &i) {
-		switch (i.type) {
-			case Type_number: return (*this)[(umm)i.number.value];
-			case Type_string: return (*this)[i.string.view];
-		}
-		invalid_code_path();
-		return *this;
+		return &array[i];
 	}
 };
 
 using TokenType = u32;
 enum : TokenType {
 	Token_number = 0x100,
+	Token_true,
+	Token_false,
 };
 
 struct Token {
@@ -141,22 +106,44 @@ TL_API Object parse(Span<utf8> json);
 
 }
 
-void append(StringBuilder &b, Json::Object const &obj) {
+inline void free(Json::Object &obj) {
+	switch (obj.type) {
+		case Json::Type_object: {
+			for (auto &member : obj.members.values) {
+				free(member);
+			}
+			free(obj.members.values);
+			free(obj.members.names);
+			break;
+		}
+		case Json::Type_array: {
+			for (auto &element : obj.array) {
+				free(element);
+			}
+			free(obj.array);
+			break;
+		}
+		default: break;
+	}
+	obj.type = Json::Type_null;
+}
+
+void append(StringBuilder &b, Json::Object obj) {
 	switch (obj.type) {
 		case Json::Type_number: {
-			append(b, obj.number.value);
+			append(b, obj.number);
 			break;
 		}
 		case Json::Type_string: {
 			append(b, '"');
-			append(b, obj.string.view);
+			append(b, obj.string);
 			append(b, '"');
 			break;
 		}
 		case Json::Type_array: {
 			append(b, '[');
 			bool comma = false;
-			for (auto &e : obj.array.elements) {
+			for (auto &e : obj.array) {
 				if (comma) {
 					append(b, ',');
 				}
@@ -169,7 +156,9 @@ void append(StringBuilder &b, Json::Object const &obj) {
 		case Json::Type_object: {
 			append(b, '{');
 			bool comma = false;
-			for (auto &[name, value] : obj.object.members) {
+			for (u32 i = 0; i < obj.members.names.size; ++i) {
+				auto name = obj.members.names[i];
+				auto value = obj.members.values[i];
 				if (comma) {
 					append(b, ',');
 				}
@@ -220,6 +209,22 @@ List<Token> lex(Span<utf8> json) {
 				continue;
 			}
 		}
+
+		auto check_keyword = [&] (Span<utf8> keyword, TokenType token_type) {
+			if (Span(c, min(c + keyword.size, json.end())) == keyword) {
+				Token token;
+				token.type = token_type;
+				token.view = {c, keyword.size};
+				c += keyword.size;
+				result.add(token);
+				return true;
+			}
+			return false;
+		};
+
+		if (check_keyword("true"s,  Token_true)) continue;
+		if (check_keyword("false"s, Token_false)) continue;
+
 		if (is_digit(*c) || *c == '-') {
 			Token token;
 			token.type = Token_number;
@@ -257,10 +262,11 @@ Object parse(Token *&t) {
 		if (t->type != '}') {
 			while (1) {
 				if (t->type == '"') {
-					Span<utf8> memberName = t->view;
+					Span<utf8> member_name = t->view;
 					++t;
 					assert(t++->type == ':');
-					result.object.members[memberName] = parse(t);
+					result.members.names.add(member_name);
+					result.members.values.add(parse(t));
 				} else {
 					invalid_code_path();
 				}
@@ -276,7 +282,7 @@ Object parse(Token *&t) {
 		return result;
 	} else if (t->type == '"') {
 		Object result = {Type_string};
-		result.string.view = t->view;
+		result.string = t->view;
 		++t;
 		return result;
 	} else if (t->type == Token_number) {
@@ -284,7 +290,12 @@ Object parse(Token *&t) {
 		utf8 temp[256];
 		memcpy(temp, t->view.data, t->view.size);
 		temp[t->view.size] = 0;
-		result.number.value = atof((char *)temp);
+		result.number = atof((char *)temp);
+		++t;
+		return result;
+	} else if (t->type == Token_true || t->type == Token_false) {
+		Object result = {Type_boolean};
+		result.boolean = t->type == Token_true;
 		++t;
 		return result;
 	} else if (t->type == '[') {
@@ -292,7 +303,7 @@ Object parse(Token *&t) {
 		++t;
 		if (t->type != ']') {
 			while (1) {
-				result.array.elements.push_back(parse(t));
+				result.array.add(parse(t));
 
 				if (t->type == ']') {
 					++t;

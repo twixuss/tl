@@ -149,8 +149,17 @@ bool parse_shader(Shader &shader, Span<char> source) {
 Buffer load_shader_file(Span<utf8> full_path) {
 	scoped_allocator(temporary_allocator);
 
-	auto source = read_entire_file(full_path);
-	assert(source.data);
+	auto pre_include_line_directive = format("#line 0 \"%\"\n", full_path);
+
+	auto buffer = read_entire_file(full_path, pre_include_line_directive.size, 1);
+	if (!buffer.data) {
+		print("#included file '%' does not exist\n", full_path);
+	}
+
+	memcpy(buffer.data, pre_include_line_directive.data, pre_include_line_directive.size);
+	buffer.back() = '\n';
+
+	auto source = as_chars(buffer);
 
 	for (auto &c : source) {
 		if (c == '\r') {
@@ -162,40 +171,55 @@ Buffer load_shader_file(Span<utf8> full_path) {
 	while (directory.back() != '/') --directory.size;
 
 	while (1) {
-		auto directive = "//include "s;
-		auto include_start = find(source, as_bytes(directive));
-		if (!include_start) {
+		auto directive = "#include "s;
+		auto include_line_begin = find(source, directive);
+		if (!include_line_begin) {
 			break;
 		}
-		auto file_name_start = include_start + directive.size;
-		auto file_name_end = file_name_start;
-		while (*file_name_end != '\n') {
-			++file_name_end;
+		auto include_line_end = find(Span(include_line_begin, source.end()), '\n');
+		if (!include_line_end) include_line_end = source.end();
+
+		auto quote_first = find(Span(include_line_begin, include_line_end), '"');
+		auto quote_last  = find_last(Span(include_line_begin, include_line_end), '"');
+
+		if (quote_first && quote_last && quote_first != quote_last) {
+			Span<utf8> file_name = {(utf8 *)quote_first + 1, (utf8 *)quote_last};
+
+			auto file_path = (List<utf8>)concatenate(directory, file_name);
+			auto included_file_buffer = load_shader_file(file_path);
+			auto included_file_source = as_chars(included_file_buffer);
+
+			auto post_include_line_directive = format("#line 1 \"%\"\n", full_path);
+
+			auto new_source_size =
+				  source.size
+				- (include_line_end - include_line_begin)
+				+ included_file_source.size
+				+ post_include_line_directive.size;
+
+			auto new_buffer = create_buffer(new_source_size);
+			auto new_source = as_chars(new_buffer);
+
+			auto cursor = new_source.data;
+			auto append_copy = [&](Span<char> span) {
+				memcpy(cursor, span.data, span.size);
+				cursor += span.size;
+				assert(cursor <= (new_source.data + new_source_size));
+			};
+
+			append_copy(Span(source.begin(), include_line_begin));
+			append_copy(included_file_source);
+			append_copy(post_include_line_directive);
+			append_copy(Span(include_line_end, source.end()));
+
+			source = new_source;
+			buffer = new_buffer;
+		} else {
+			print("Bad #include directive in file '%'\n", full_path);
+			return {};
 		}
-
-		Span<utf8> file_name = {(utf8 *)file_name_start, (utf8 *)file_name_end};
-
-		auto file_path = (List<utf8>)concatenate(directory, file_name);
-		auto included_file = load_shader_file(file_path);
-
-		auto full_directive_size = directive.size + file_name.size;
-		auto new_source_size = source.size - full_directive_size + included_file.size;
-
-		auto new_source = create_buffer(new_source_size);
-
-		auto cursor = new_source.data;
-		auto append_copy = [&](u8 const *from, umm size) {
-			memcpy(cursor, from, size);
-			cursor += size;
-			assert(cursor <= (new_source.data + new_source_size));
-		};
-		append_copy(source.begin(), include_start - source.begin());
-		append_copy(included_file.data, included_file.size);
-		append_copy(file_name_end, source.end() - file_name_end);
-
-		source = new_source;
 	}
-	return source;
+	return buffer;
 }
 
 GLuint get_uniform_location(Shader &shader, Span<char> name) {
@@ -240,7 +264,7 @@ void use_shader(Shader &shader) {
 	}
 }
 
-void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_name) {
+void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<utf8> directory) {
 	using namespace OpenGL;
 
 	catalog.update_entry = [](ShaderCatalog::Entry &entry) {
@@ -248,7 +272,7 @@ void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<utf8> directory, Sp
 
 		print("Compiling %\n", entry.tracker.path);
 
-		auto source = load_shader_file(as_span(entry.tracker.path));
+		auto source = load_shader_file(Span(entry.tracker.path.data, entry.tracker.path.size - 1));
 
 		auto vertex_shader = create_shader(GL_VERTEX_SHADER, 330, true, as_chars(source));
 		if (vertex_shader) {
@@ -297,7 +321,7 @@ void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<utf8> directory, Sp
 	catalog.entry_valid = [](ShaderCatalog::Entry &entry) {
 		return entry.program != 0;
 	};
-	init(catalog, directory, fallback_name);
+	init(catalog, directory);
 }
 
 }

@@ -3,6 +3,7 @@
 #include "array.h"
 #include "simd.h"
 #include "string.h"
+#include "vector.h"
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
@@ -37,10 +38,19 @@ constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-template <class T> forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
+
+template <class T>
+forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
 	minmax(min_bound, max_bound, min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
+
+// Does not check if min_bound is greater than max_bound
+template <class T>
+forceinline constexpr auto clamp_unchecked(T value, T min_bound, T max_bound) {
+	return min(max(value, min_bound), max_bound);
+}
+
 template <class T>
 forceinline constexpr auto map(T value, T source_min, T source_max, T dest_min, T dest_max) {
 	if constexpr (is_integer_like<T>) { // Do multiplication first
@@ -53,7 +63,7 @@ template <class T>
 forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T dest_min, T dest_max) {
 	return map(clamp(value, source_min, source_max), source_min, source_max, dest_min, dest_max);
 }
-template <class A, class T> forceinline constexpr auto lerp(A a, A b, T t) { return a + (b - a) * t; }
+template <class T> forceinline constexpr auto lerp(T a, T b, T t) { return a + (b - a) * t; }
 template <class M, class T> forceinline T &mask_assign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
 template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
@@ -80,241 +90,18 @@ forceinline constexpr To cvt(From v) {
 
 } // namespace CE
 
-template <class T> union v2;
-template <class T> union v3;
-template <class T> union v4;
 union m3;
 union m4;
-
-using v2f = v2<f32>;
-using v2s = v2<s32>;
-using v2u = v2<u32>;
-
-using v3f = v3<f32>;
-using v3s = v3<s32>;
-using v3u = v3<u32>;
-
-using v4f = v4<f32>;
-using v4s = v4<s32>;
-using v4u = v4<u32>;
-
-template<class T> inline static constexpr bool is_vector = false;
-template<> inline static constexpr bool is_vector<v2f> = true;
-template<> inline static constexpr bool is_vector<v3f> = true;
-template<> inline static constexpr bool is_vector<v4f> = true;
-template<> inline static constexpr bool is_vector<v2s> = true;
-template<> inline static constexpr bool is_vector<v3s> = true;
-template<> inline static constexpr bool is_vector<v4s> = true;
-template<> inline static constexpr bool is_vector<v2u> = true;
-template<> inline static constexpr bool is_vector<v3u> = true;
-template<> inline static constexpr bool is_vector<v4u> = true;
-
-template<> inline static constexpr bool is_integer_like<v2<s32>> = true;
-template<> inline static constexpr bool is_integer_like<v3<s32>> = true;
-template<> inline static constexpr bool is_integer_like<v4<s32>> = true;
-template<> inline static constexpr bool is_integer_like<v2<u32>> = true;
-template<> inline static constexpr bool is_integer_like<v3<u32>> = true;
-template<> inline static constexpr bool is_integer_like<v4<u32>> = true;
-
-template <class T>
-inline static constexpr u32 _dimension_of = 0;
-template <class T>
-inline static constexpr u32 dimension_of = _dimension_of<RemoveCVRef<T>>;
-
-template <> inline static constexpr u32 _dimension_of<v2f> = 2;
-template <> inline static constexpr u32 _dimension_of<v2s> = 2;
-template <> inline static constexpr u32 _dimension_of<v2u> = 2;
-template <> inline static constexpr u32 _dimension_of<v3f> = 3;
-template <> inline static constexpr u32 _dimension_of<v3s> = 3;
-template <> inline static constexpr u32 _dimension_of<v3u> = 3;
-template <> inline static constexpr u32 _dimension_of<v4f> = 4;
-template <> inline static constexpr u32 _dimension_of<v4s> = 4;
-template <> inline static constexpr u32 _dimension_of<v4u> = 4;
-
-#define ConV2\
-	forceinline constexpr v2f V2f(f32 = 0);\
-	forceinline constexpr v2f V2f(f32 x, f32 y);\
-	forceinline v2fx4 V2fx4(f32 = 0); forceinline constexpr v2fx4 V2fx4(f32x4);\
-	forceinline v2fx8 V2fx8(f32 = 0); forceinline constexpr v2fx8 V2fx8(f32x8 v);\
-	template<umm ps> forceinline v2fx<ps> V2fx(f32 = 0);\
-	template<umm ps> forceinline v2fx<ps> V2fx(f32, f32);\
-	template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>);\
-	template<umm ps> forceinline v2fx<ps> V2fx(f32x<ps>, f32x<ps>);\
-	template<umm ps> forceinline v2fx<ps> V2fx(v2f);
-
-forceinline constexpr v2f V2f(f32 = 0);
-forceinline constexpr v2s V2s(s32 = 0);
-forceinline constexpr v2u V2u(u32 = 0);
-
-forceinline constexpr v3f V3f(f32 = 0);
-forceinline constexpr v3s V3s(s32 = 0);
-forceinline constexpr v3u V3u(u32 = 0);
-
-forceinline constexpr v4f V4f(f32 = 0);
-forceinline constexpr v4s V4s(s32 = 0);
-forceinline constexpr v4u V4u(u32 = 0);
-
-forceinline constexpr v2f V2f(f32 x, f32 y);
-forceinline constexpr v2s V2s(s32 x, s32 y);
-forceinline constexpr v2u V2u(u32 x, u32 y);
-
-forceinline constexpr v3f V3f(f32 x, f32 y, f32 z);
-forceinline constexpr v3s V3s(s32 x, s32 y, s32 z);
-forceinline constexpr v3u V3u(u32 x, u32 y, u32 z);
 
 forceinline constexpr m4 M4();
 forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l);
 forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
 				f32 ly, f32 lz, f32 lw);
 
-forceinline void sincos(f32 v, f32& sinOut, f32& cosOut);
-forceinline void sincos(v2f v, v2f& sinOut, v2f& cosOut);
-forceinline void sincos(v3f v, v3f& sinOut, v3f& cosOut);
-forceinline void sincos(v4f v, v4f& sinOut, v4f& cosOut);
-
-#define DEFN_2 \
-	struct { Scalar x, y; }; \
-	Scalar s[2];\
-	template <class U>\
-	forceinline constexpr explicit operator v2<U>() const { return {(U)x, (U)y}; } \
-	forceinline constexpr v2 operator+() const { return *this; } \
-	forceinline constexpr v2 yx() const { return {y, x}; }
-
-#define DEFN_3 \
-	using v2 = v2<Scalar>; \
-	struct { Scalar x, y, z; }; \
-	v2 xy; \
-	struct { Scalar _pad; v2 yz; }; \
-	Scalar s[3];\
-	template <class U>\
-	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
-	forceinline constexpr v3 operator+() const { return *this; } \
-	forceinline constexpr v3 yzx() const { return {y, z, x}; } \
-	forceinline constexpr v3 zxy() const { return {z, x, y}; }
-
-
-#define DEFN_4 \
-	using v2 = v2<Scalar>; \
-	using v3 = v3<Scalar>; \
-	struct { Scalar x, y, z, w; }; \
-	struct { v2 xy; v2 zw; }; \
-	v3 xyz; \
-	struct { Scalar _pad; v2 yz; v3 yzw; }; \
-	Scalar s[4];\
-	template <class U>\
-	forceinline constexpr explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
-	forceinline constexpr v4 operator+() const { return *this; }
-
-#define UNOP_2(o) \
-	forceinline constexpr v2 operator o() const { return {o x, o y}; }
-
-#define UNOP_3(o) \
-	forceinline constexpr v3 operator o() const { return {o x, o y, o z}; }
-
-#define UNOP_4(o) \
-	forceinline constexpr v4 operator o() const { return {o x, o y, o z, o w}; }
-
-#define BINOP_2(o) \
-	forceinline constexpr v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
-	forceinline constexpr v2 operator o(Scalar b) const { return {x o b, y o b}; } \
-	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
-	forceinline constexpr v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
-	forceinline constexpr v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
-
-#define BINOP_3(o) \
-	forceinline constexpr v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
-	forceinline constexpr v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
-	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
-	forceinline constexpr v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
-	forceinline constexpr v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
-
-#define BINOP_4(o) \
-	forceinline constexpr v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
-	forceinline constexpr v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
-	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
-	forceinline constexpr v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
-	forceinline constexpr v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
-
-#define EQ_2 \
-	forceinline constexpr bool operator==(v2 b) { return x == b.x && y == b.y; } \
-	forceinline constexpr bool operator!=(v2 b) { return x != b.x || y != b.y; }
-
-#define EQ_3 \
-	forceinline constexpr bool operator==(v3 b) { return x == b.x && y == b.y && z == b.z; } \
-	forceinline constexpr bool operator!=(v3 b) { return x != b.x || y != b.y || z != b.z; }
-
-#define EQ_4 \
-	forceinline constexpr bool operator==(v4 b) { return x == b.x && y == b.y && z == b.z && w == b.w; } \
-	forceinline constexpr bool operator!=(v4 b) { return x != b.x || y != b.y || z != b.z || w != b.w; }
-
-
-template <class _Scalar>
-union v2 {
-	using Scalar = _Scalar;
-	DEFN_2
-	UNOP_2(-)
-	BINOP_2(+)
-	BINOP_2(-)
-	BINOP_2(*)
-	BINOP_2(/)
-	BINOP_2(%)
-	BINOP_2(^)
-	BINOP_2(&)
-	BINOP_2(|)
-	BINOP_2(<<)
-	BINOP_2(>>)
-	EQ_2
-};
-
-template <class _Scalar>
-union v3 {
-	using Scalar = _Scalar;
-	DEFN_3
-	UNOP_3(-)
-	BINOP_3(+)
-	BINOP_3(-)
-	BINOP_3(*)
-	BINOP_3(/)
-	BINOP_3(%)
-	BINOP_3(^)
-	BINOP_3(&)
-	BINOP_3(|)
-	BINOP_3(<<)
-	BINOP_3(>>)
-	EQ_3
-};
-
-template <class _Scalar>
-union v4 {
-	using Scalar = _Scalar;
-	DEFN_4
-	UNOP_4(-)
-	BINOP_4(+)
-	BINOP_4(-)
-	BINOP_4(*)
-	BINOP_4(/)
-	BINOP_4(%)
-	BINOP_4(^)
-	BINOP_4(&)
-	BINOP_4(|)
-	BINOP_4(<<)
-	BINOP_4(>>)
-	EQ_4
-};
-
-
-#undef CVT
-
-union v3s64 {
-	using Scalar = s64;
-	struct {
-		s64 x, y, z;
-	};
-	forceinline constexpr v3s64 operator-(v3s64 b) const { return {x - b.x, y - b.y, z - b.z}; }
-	forceinline constexpr v3s64 operator*(v3s64 b) const { return {x * b.x, y * b.y, z * b.z}; }
-	forceinline constexpr v3s64 operator*(s64   b) const { return {x * b, y * b, z * b}; }
-	forceinline constexpr v3s64 &operator*=(v3s64 b) { return x *= b.x, y *= b.y, z *= b.z, *this; }
-};
+forceinline void cos_sin(f32 v, f32& cos_out, f32& sin_out);
+forceinline void cos_sin(v2f v, v2f& cos_out, v2f& sin_out);
+forceinline void cos_sin(v3f v, v3f& cos_out, v3f& sin_out);
+forceinline void cos_sin(v4f v, v4f& cos_out, v4f& sin_out);
 
 union m2 {
 	using Scalar = f32;
@@ -346,7 +133,7 @@ union m2 {
 	static forceinline m2 scale(f32 v) { return scale(v, v); }
 	static forceinline m2 rotation(f32 a) {
 		f32 s, c;
-		sincos(a, s, c);
+		cos_sin(a, s, c);
 		return {
 			c, s,
 		   -s, c,
@@ -428,6 +215,40 @@ union m3 {
 			0, 0, 1,
 		};
 	}
+	static forceinline m3 rotationZXY(v3f v) {
+		v3f sin;
+		v3f cos;
+		cos_sin(v, cos, sin);
+		f32 a = sin.x;
+		f32 c = sin.y;
+		f32 e = sin.z;
+		f32 b = cos.x;
+		f32 d = cos.y;
+		f32 f = cos.z;
+		return {
+			 d * f - a * c * e, b * e, a * d * e + c * f,
+			-a * c * f - d * e, b * f, a * d * f - c * e,
+			            -b * c,    -a,             b * d,
+		};
+	}
+	static forceinline m3 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
+	static forceinline m3 rotationYXZ(v3f v) {
+		v3f sin;
+		v3f cos;
+		cos_sin(v, cos, sin);
+		f32 a = sin.x;
+		f32 c = sin.y;
+		f32 e = sin.z;
+		f32 b = cos.x;
+		f32 d = cos.y;
+		f32 f = cos.z;
+		return {
+			d * f + a * c * e,  d * e - a * c * f, b * c,
+			           -b * e,              b * f,     a,
+			a * d * e - c * f, -a * d * f - c * e, b * d,
+		};
+	}
+	static forceinline m3 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
 };
 
 #define V2(f32, v2f, V2f)                                     \
@@ -962,14 +783,14 @@ forceinline v2f tan(v2f v) { return {tan(v.x), tan(v.y)}; }
 forceinline v3f tan(v3f v) { return {tan(v.x), tan(v.y), tan(v.z)}; }
 forceinline v4f tan(v4f v) { return {tan(v.x), tan(v.y), tan(v.z), tan(v.w)}; }
 
-forceinline void sincos(f32 v, f32 &_sin, f32 &_cos) { _sin = sin(v); _cos = cos(v); }
-forceinline void sincos(v2f v, v2f &_sin, v2f &_cos) { _sin = sin(v); _cos = cos(v); }
-forceinline void sincos(v3f v, v3f &_sin, v3f &_cos) { _sin = sin(v); _cos = cos(v); }
-forceinline void sincos(v4f v, v4f &_sin, v4f &_cos) { _sin = sin(v); _cos = cos(v); }
+forceinline void cos_sin(f32 v, f32 &_cos, f32 &_sin) { _cos = cos(v); _sin = sin(v); }
+forceinline void cos_sin(v2f v, v2f &_cos, v2f &_sin) { _cos = cos(v); _sin = sin(v); }
+forceinline void cos_sin(v3f v, v3f &_cos, v3f &_sin) { _cos = cos(v); _sin = sin(v); }
+forceinline void cos_sin(v4f v, v4f &_cos, v4f &_sin) { _cos = cos(v); _sin = sin(v); }
 
-forceinline void sincos(f32 v, v2f &result) { result.y = sin(v); result.x = cos(v); }
+forceinline void cos_sin(f32 v, v2f &result) { result.x = cos(v); result.y = sin(v); }
 
-forceinline v2f sincos(f32 v) { return {cos(v), sin(v)}; }
+forceinline v2f cos_sin(f32 v) { return {cos(v), sin(v)}; }
 
 forceinline f32 sin_bhaskara(f32 v) {
 	v = positive_modulo(v, pi * 2);
@@ -1054,7 +875,7 @@ forceinline auto length(T a) {
 }
 template <class T>
 forceinline auto normalize(T a) {
-	return a * rsqrt(dot(a, a));
+	return a / sqrt(dot(a, a));
 }
 template <class T>
 forceinline auto normalize(T a, T fallback) {
@@ -1165,9 +986,54 @@ forceinline line<T> line_begin_dir(T begin, T dir) {
 	return {begin, begin + dir};
 }
 
+template <class T>
+forceinline auto length_squared(line<T> line) {
+	return distance_squared(line.a, line.b);
+}
+
+template <class T>
+forceinline auto length(line<T> line) {
+	return distance(line.a, line.b);
+}
+
+template <class T>
+forceinline auto closest_point(T point, line<T> line) {
+	auto l2 = length_squared(line);
+	if (l2 == 0) return line.a;
+
+	using Scalar = decltype(l2);
+
+	auto t = clamp(dot(point - line.a, line.b - line.a) / l2, (Scalar)0, (Scalar)1);
+	return line.a + t * (line.b - line.a);
+}
+
+template <class T>
+forceinline auto closest_point(line<T> a, line<T> b) {
+	auto d1 = normalize(a.b - a.a);
+	auto d2 = normalize(b.b - b.a);
+    auto n1 = cross(d1, d2);
+    auto n2 = cross(d2, n1);
+    return a.a + dot(b.a - a.a, n2) / dot(d1, n2) * d1;
+}
+
+template <class T>
+forceinline auto distance(T point, line<T> line) {
+	auto l2 = length_squared(line);
+	if (l2 == 0) return distance(point, line.a);
+
+	using Scalar = decltype(l2);
+
+	auto t = clamp(dot(point - line.a, line.b - line.a) / l2, (Scalar)0, (Scalar)1);
+	auto projection = line.a + t * (line.b - line.a);
+	return distance(point, projection);
+}
+
 template<class T>
 struct ray {
 	T begin, dir;
+	explicit operator line<T>() {
+		return {begin, begin + dir};
+	}
 };
 
 template <class T>
@@ -1652,7 +1518,29 @@ union m4 {
 			0, 0, 0, 1
 		};
 	}
-	static forceinline m4 identity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
+	static forceinline m4 identity() {
+		m4 m;
+		m.s[0] = 1;
+		m.s[1] = 0;
+		m.s[2] = 0;
+		m.s[3] = 0;
+
+		m.s[4] = 0;
+		m.s[5] = 1;
+		m.s[6] = 0;
+		m.s[7] = 0;
+
+		m.s[8] = 0;
+		m.s[9] = 0;
+		m.s[10] = 1;
+		m.s[11] = 0;
+
+		m.s[12] = 0;
+		m.s[13] = 0;
+		m.s[14] = 0;
+		m.s[15] = 1;
+		return m;
+	}
 	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
 	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
 	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
@@ -1678,7 +1566,7 @@ union m4 {
 			0, 0, -fzdfmn * nz, 0
 		};
 	}
-	static forceinline m4 perspectiveRH(f32 aspect, f32 fov, f32 nz, f32 fz) {
+	static forceinline m4 perspective_rh(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 xymax = nz * tan(fov * 0.5f);
 		f32 depth = fz - nz;
 		f32 q = -(fz + nz) / depth;
@@ -1705,7 +1593,7 @@ union m4 {
 	}
 	static forceinline m4 rotationX(f32 a) {
 		f32 s, c;
-		sincos(a, s, c);
+		cos_sin(a, c, s);
 		return {
 			1, 0, 0, 0,
 			0, c, s, 0,
@@ -1715,7 +1603,7 @@ union m4 {
 	}
 	static forceinline m4 rotationY(f32 a) {
 		f32 s, c;
-		sincos(a, s, c);
+		cos_sin(a, c, s);
 		return {
 			 c, 0, s, 0,
 			 0, 1, 0, 0,
@@ -1725,7 +1613,7 @@ union m4 {
 	}
 	static forceinline m4 rotationZ(f32 a) {
 		f32 s, c;
-		sincos(a, s, c);
+		cos_sin(a, c, s);
 		return {
 			 c, s, 0, 0,
 			-s, c, 0, 0,
@@ -1736,7 +1624,7 @@ union m4 {
 	static forceinline m4 rotationZXY(v3f v) {
 		v3f sin;
 		v3f cos;
-		sincos(v, sin, cos);
+		cos_sin(v, cos, sin);
 		f32 a = sin.x;
 		f32 c = sin.y;
 		f32 e = sin.z;
@@ -1754,7 +1642,7 @@ union m4 {
 	static forceinline m4 rotationYXZ(v3f v) {
 		v3f sin;
 		v3f cos;
-		sincos(v, sin, cos);
+		cos_sin(v, cos, sin);
 		f32 a = sin.x;
 		f32 c = sin.y;
 		f32 e = sin.z;

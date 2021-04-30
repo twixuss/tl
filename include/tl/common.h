@@ -234,6 +234,11 @@ forceinline u32 find_highest_one_bit(u64 val) { unsigned long result; return _Bi
 #endif
 #endif
 
+forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
+forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
+forceinline u32 find_lowest_zero_bit (u64 val) { return find_lowest_one_bit (~val); }
+forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~val); }
+
 forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
 
 #if ARCH_X64
@@ -710,6 +715,18 @@ constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 	return 0;
 }
 
+template <class T>
+constexpr T *find_any(Span<T> where, Span<T> what) {
+	for (auto &a : where) {
+		for (auto &b : what) {
+			if (a == b) {
+				return &a;
+			}
+		}
+	}
+	return 0;
+}
+
 inline constexpr bool is_whitespace(u32 c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
 }
@@ -1096,6 +1113,14 @@ struct Allocator {
 
 template <class T>
 T *_allocate(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
+	auto data = (T *)allocator(Allocator_allocate, sizeof(T) * count, align, 0, location);
+	for (umm i = 0; i < count; ++i) {
+		new (data + i) T();
+	}
+	return data;
+}
+template <class T>
+T *_allocate_noinit(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
 	return (T *)allocator(Allocator_allocate, sizeof(T) * count, align, 0, location);
 }
 inline void *_reallocate(Allocator allocator, void *data) {
@@ -1107,8 +1132,10 @@ inline void _free(Allocator allocator, void *data) {
 
 #if TL_TRACK_ALLOCATIONS
 #define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, get_source_location(), __VA_ARGS__)
+#define ALLOCATE_NOINIT(t, allocator, ...) ::TL::_allocate_noinit<t>(allocator, get_source_location(), __VA_ARGS__)
 #else
 #define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, AllocatorSourceLocation {}, __VA_ARGS__)
+#define ALLOCATE_NOINIT(t, allocator, ...) ::TL::_allocate_noinit<t>(allocator, AllocatorSourceLocation {}, __VA_ARGS__)
 #endif
 
 #define FREE(allocator, data) ::TL::_free(allocator, data)

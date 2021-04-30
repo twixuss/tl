@@ -8,10 +8,16 @@ namespace TL {
 
 template <class T>
 struct List {
+	List() = default;
+	List(std::initializer_list<T> list) {
+		reserve(list.size());
+		size = list.size();
+		memcpy(data, list.begin(), list.size() * sizeof(T));
+	}
 	List &operator=(Span<T> span) {
 		reserve(span.size);
 		size = span.size;
-		memcpy(data, span.data, span.size);
+		memcpy(data, span.data, span.size * sizeof(T));
 		return *this;
 	}
 	T &add() {
@@ -28,6 +34,12 @@ struct List {
 		memcpy(data + size, span.data, span.size * sizeof(T));
 		size += span.size;
 		return {data + size - span.size, span.size};
+	}
+	Span<T> add(std::initializer_list<T> list) {
+		reserve_exponential(size + list.size());
+		memcpy(data + size, list.begin(), list.size() * sizeof(T));
+		size += list.size();
+		return {data + size - list.size(), list.size()};
 	}
 
 	T &add_front(T value) {
