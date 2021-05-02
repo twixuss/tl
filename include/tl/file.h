@@ -6,6 +6,14 @@
 
 namespace TL {
 
+#if OS_WINDOWS
+using filechar = utf16;
+inline List<utf8> path_to_utf8(Span<filechar> span) {
+	return utf16_to_utf8(span);
+}
+#define TL_FILE_STRING(x) u ## x
+#endif
+
 enum FileItemKind {
 	FileItem_unknown,
 	FileItem_file,
@@ -14,12 +22,12 @@ enum FileItemKind {
 
 struct FileItem {
 	FileItemKind kind;
-	Span<utf8> name;
+	Span<filechar> name;
 };
 struct FileItemList : List<FileItem> {
 	using Base = List<FileItem>;
 
-	List<utf8> buffer;
+	List<filechar> buffer;
 
 	Base &base() { return *this; }
 };
@@ -42,7 +50,11 @@ enum FileCursorOrigin {
 
 TL_DECLARE_HANDLE(File);
 
-TL_API File open_file(Span<utf8> path, u32 open_flags);
+TL_API File open_file(filechar const *path, u32 open_flags);
+inline File open_file(Span<filechar> path, u32 open_flags) {
+	assert(path.back() == 0);
+	return open_file(path.data, open_flags);
+}
 TL_API void close(File file);
 
 TL_API bool read(File file, void *data, u64 size);
@@ -62,7 +74,7 @@ TL_API s64 length(File file);
 TL_API void truncate_to_cursor(File file);
 
 
-TL_API bool file_exists(Span<utf8> path);
+TL_API bool file_exists(Span<filechar> path);
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	auto oldCursor = get_cursor(file);
@@ -77,7 +89,7 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 
 	return result;
 }
-inline Buffer read_entire_file(Span<utf8> path, umm extra_space_before = 0, umm extra_space_after = 0) {
+inline Buffer read_entire_file(Span<filechar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
 	File file = open_file(path, File_read);
 	if (!file) return {};
 	defer { close(file); };
@@ -91,23 +103,34 @@ inline bool write_entire_file(File file, void const *data, u64 size) {
 	truncate_to_cursor(file);
 	return true;
 }
-inline bool write_entire_file(Span<utf8> path, void const *data, u64 size) {
+inline bool write_entire_file(filechar const *path, void const *data, u64 size) {
 	File file = open_file(path, File_write);
 	if (!file) return false;
 	defer { close(file); };
 	return write_entire_file(file, data, size);
 }
+inline bool write_entire_file(Span<filechar> path, void const *data, u64 size) {
+	assert(path.back() == 0);
+	return write_entire_file(path.data, data, size);
+}
+inline bool write_entire_file(File file, Span<u8> span) { return write_entire_file(file, span.data, span.size); }
+inline bool write_entire_file(filechar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
+inline bool write_entire_file(Span<filechar> path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
 
-TL_API u64 get_file_write_time(Span<utf8> path);
+TL_API u64 get_file_write_time(Span<filechar> path);
 
-TL_API ListList<utf8> get_files_in_directory(Span<utf8> directory);
+TL_API ListList<filechar> get_files_in_directory(Span<filechar> directory);
 
-TL_API FileItemList get_items_in_directory(Span<utf8> directory);
+TL_API FileItemList get_items_in_directory(Span<filechar> directory);
 
-TL_API void delete_file(Span<utf8> path);
+TL_API void delete_file(filechar const *path);
+inline void delete_file(Span<filechar> path) {
+	assert(path.back() == 0);
+	delete_file(path.data);
+}
 
 struct FileTracker {
-	List<utf8> path;
+	List<filechar> path;
 	u64 last_write_time; // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
 
 	Allocator allocator;
@@ -115,29 +138,40 @@ struct FileTracker {
 	void *state;
 };
 
-inline FileTracker create_file_tracker(Span<utf8> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+inline FileTracker create_file_tracker_steal_path(List<filechar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+	assert(path.back() == 0);
 	FileTracker result = {};
 	result.on_update = on_update;
 	result.state = state;
 	result.path = path;
 	return result;
 }
-inline FileTracker create_file_tracker(Span<utf8> path, void (*on_update)(FileTracker &tracker)) {
-	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
+inline FileTracker create_file_tracker_steal_path(List<filechar> path, void (*on_update)(FileTracker &tracker)) {
+	return create_file_tracker_steal_path(path, (void(*)(FileTracker &, void *))on_update, 0);
 }
 template <class Fn>
-inline FileTracker create_file_tracker(Span<utf8> path, Fn &&on_update) {
+inline FileTracker create_file_tracker_steal_path(List<filechar> path, Fn &&on_update) {
 	auto allocator = current_allocator;
 
 	auto params = ALLOCATE_NOINIT(Fn, allocator);
 	new(params) Fn(std::forward<Fn>(on_update));
 
-	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
+	FileTracker result = create_file_tracker_steal_path(path, [](FileTracker &tracker, void *state) {
 		Fn &fn = *(Fn *)state;
 		fn(tracker);
 	}, params);
 	result.allocator = allocator;
 	return result;
+}
+inline FileTracker create_file_tracker(Span<filechar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), on_update, state);
+}
+inline FileTracker create_file_tracker(Span<filechar> path, void (*on_update)(FileTracker &tracker)) {
+	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
+}
+template <class Fn>
+inline FileTracker create_file_tracker(Span<filechar> path, Fn &&on_update) {
+	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), std::forward<Fn>(on_update));
 }
 
 inline bool update_file_tracker(FileTracker &tracker) {
@@ -179,9 +213,9 @@ enum : FileDialogFlags {
 	FileDialog_multiple  = 0x2,
 };
 
-TL_API ListList<utf8> open_file_dialog(FileDialogFlags flags);
+TL_API ListList<filechar> open_file_dialog(FileDialogFlags flags);
 
-TL_API List<utf8> get_current_directory();
+TL_API List<filechar> get_current_directory();
 
 }
 
@@ -228,10 +262,10 @@ OpenFileParams get_open_file_params(u32 open_flags) {
 	}
 	return result;
 }
-File open_file(Span<utf8> path, u32 open_flags) {
+File open_file(filechar const *path, u32 open_flags) {
 	auto params = get_open_file_params(open_flags);
 	auto handle = CreateFileW(
-		(wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data,
+		(wchar *)path,
 		params.access, params.share, 0, params.creation, 0, 0
 	);
 	if (!params.access) {
@@ -303,8 +337,9 @@ void close(File file) {
 	CloseHandle((HANDLE)file);
 }
 
-bool file_exists(Span<utf8> path) {
-	return PathFileExistsW((wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data);
+bool file_exists(Span<filechar> path) {
+	assert(path.back() == 0);
+	return PathFileExistsW((wchar *)path.data);
 }
 
 static u64 get_file_write_time(HANDLE file) {
@@ -314,9 +349,10 @@ static u64 get_file_write_time(HANDLE file) {
 
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
-u64 get_file_write_time(Span<utf8> path) {
+u64 get_file_write_time(Span<filechar> path) {
+	assert(path.back() == 0);
 	HANDLE file = CreateFileW(
-		(wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data,
+		(wchar *)path.data,
 		0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0
 	);
 	if (file == INVALID_HANDLE_VALUE)
@@ -327,20 +363,20 @@ u64 get_file_write_time(Span<utf8> path) {
 	return get_file_write_time(file);
 }
 
-utf16 *append_star(Span<utf16> directory) {
+wchar *append_star(Span<utf16> directory) {
 	auto allocator = temporary_allocator;
-	utf16 *directory_with_star;
+	wchar *directory_with_star;
 
 	if (directory.back() == u'\0')
 		directory.size--;
 
 	if (directory.back() == u'\\' || directory.back() == u'/') {
-		directory_with_star = ALLOCATE(utf16, allocator, directory.size + 2);
+		directory_with_star = ALLOCATE(wchar, allocator, directory.size + 2);
 		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
 		directory_with_star[directory.size + 0] = '*';
 		directory_with_star[directory.size + 1] = 0;
 	} else {
-		directory_with_star = ALLOCATE(utf16, allocator, directory.size + 3);
+		directory_with_star = ALLOCATE(wchar, allocator, directory.size + 3);
 		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
 		directory_with_star[directory.size + 0] = '/';
 		directory_with_star[directory.size + 1] = '*';
@@ -349,17 +385,17 @@ utf16 *append_star(Span<utf16> directory) {
 	return directory_with_star;
 }
 
-ListList<utf8> get_files_in_directory(Span<utf8> directory) {
-	auto directory_with_star = append_star(with(temporary_allocator, utf8_to_utf16(directory)));
+ListList<filechar> get_files_in_directory(Span<filechar> directory) {
+	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
-	HANDLE handle = FindFirstFileW((wchar *)directory_with_star, &find_data);
+	HANDLE handle = FindFirstFileW(directory_with_star, &find_data);
 	if (handle == INVALID_HANDLE_VALUE) {
 		return {};
 	}
 
 	u32 file_index = 0;
-	ListList<utf8> result;
+	ListList<filechar> result;
 	do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
@@ -367,7 +403,7 @@ ListList<utf8> get_files_in_directory(Span<utf8> directory) {
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
-		result.add(with(temporary_allocator, utf16_to_utf8(as_span((utf16 *)find_data.cFileName))));
+		result.add(as_span((filechar *)find_data.cFileName));
 	} while (FindNextFileW(handle, &find_data));
 	FindClose(handle);
 
@@ -375,11 +411,11 @@ ListList<utf8> get_files_in_directory(Span<utf8> directory) {
 	return result;
 }
 
-FileItemList get_items_in_directory(Span<utf8> directory) {
-	auto directory_with_star = append_star(with(temporary_allocator, utf8_to_utf16(directory)));
+FileItemList get_items_in_directory(Span<filechar> directory) {
+	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
-	HANDLE handle = FindFirstFileW((wchar *)directory_with_star, &find_data);
+	HANDLE handle = FindFirstFileW(directory_with_star, &find_data);
 	if (handle == INVALID_HANDLE_VALUE) {
 		return {};
 	}
@@ -395,14 +431,14 @@ FileItemList get_items_in_directory(Span<utf8> directory) {
 		}
 
 
-		auto name = utf16_to_utf8(as_span((utf16 *)find_data.cFileName));
+		auto name = as_span((utf16 *)find_data.cFileName);
 
 		if (name.size > 200)
 			debug_break();
 
 		FileItem item;
 		item.name.size = name.size;
-		item.name.data = (utf8 *)result.buffer.size;
+		item.name.data = (filechar *)result.buffer.size;
 
 		if (item.name.size > 200)
 			debug_break();
@@ -430,7 +466,9 @@ FileItemList get_items_in_directory(Span<utf8> directory) {
 	return result;
 }
 
-void delete_file(Span<utf8> path)  { DeleteFileW((wchar *)with(temporary_allocator, utf8_to_utf16(path, true)).data); }
+void delete_file(filechar const *path) {
+	DeleteFileW((wchar *)path);
+}
 
 class CDialogEventHandler : public IFileDialogEvents, public IFileDialogControlEvents {
 public:
@@ -488,7 +526,7 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 	return hr;
 }
 
-ListList<utf8> open_file_dialog(FileDialogFlags flags) {
+ListList<filechar> open_file_dialog(FileDialogFlags flags) {
 	IFileOpenDialog *dialog = NULL;
 	if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return {};
 	defer { dialog->Release(); };
@@ -528,14 +566,14 @@ ListList<utf8> open_file_dialog(FileDialogFlags flags) {
 	if (FAILED(dialog->Show(NULL))) return {};
 
 
-	ListList<utf8> result;
+	ListList<filechar> result;
 
 	auto add_item = [&](IShellItem *item) {
 		PWSTR path = NULL;
 		if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) return;
 		defer { CoTaskMemFree(path); };
 
-		result.add(with(temporary_allocator, utf16_to_utf8(as_span((utf16 *)path))));
+		result.add(as_span((utf16 *)path));
 	};
 
 	IShellItem *item;
@@ -567,13 +605,11 @@ ListList<utf8> open_file_dialog(FileDialogFlags flags) {
 	return result;
 }
 
-List<utf8> get_current_directory() {
-	List<wchar> temp;
-	temp.allocator = temporary_allocator;
+List<filechar> get_current_directory() {
+	List<filechar> temp;
 	temp.resize(GetCurrentDirectoryW(0, 0));
-	GetCurrentDirectoryW(temp.size, temp.data);
-
-	return utf16_to_utf8((List<utf16>)temp);
+	GetCurrentDirectoryW(temp.size, (wchar *)temp.data);
+	return temp;
 }
 
 #else

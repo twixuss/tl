@@ -51,6 +51,11 @@
 #pragma warning(disable: TL_DISABLED_WARNINGS 4820 4455)
 #endif
 
+#if !TL_ENABLE_PROFILER
+#define timed_block(...)
+#define timed_function(...)
+#endif
+
 namespace TL {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -620,10 +625,10 @@ struct Span {
 		return {(U *)data, size};
 	}
 
-	constexpr operator Span<utf8>() const { // Really this cast should be defined only in Span<char>, but this is impossible to do in this language without copypasta
-		static_assert(is_same<T, ascii>);
-		return {(utf8 *)data, size * sizeof(ValueType)};
-	}
+	//constexpr operator Span<utf8>() const { // Really this cast should be defined only in Span<char>, but this is impossible to do in this language without copypasta
+	//	static_assert(is_same<T, ascii>);
+	//	return {(utf8 *)data, size * sizeof(ValueType)};
+	//}
 
 	constexpr bool operator==(Span<ValueType> that) const {
 		if (size != that.size)
@@ -755,13 +760,10 @@ inline constexpr wchar to_lower_utf16(wchar c) {
 	return c;
 }
 
-forceinline constexpr char to_lower(char c) { return to_lower_ascii(c); }
-forceinline constexpr utf8 to_lower(utf8 c) { return to_lower_utf8(c); }
-#if OS_WINDOWS
-forceinline constexpr wchar to_lower(wchar c) { return to_lower_utf16(c); }
-#else
-forceinline constexpr wchar to_lower(wchar c) { return to_lower_utf32(c); }
-#endif
+forceinline constexpr ascii to_lower(ascii c) { return to_lower_ascii(c); }
+forceinline constexpr utf8  to_lower(utf8  c) { return to_lower_utf8(c); }
+forceinline constexpr utf16 to_lower(utf16 c) { return to_lower_utf16(c); }
+forceinline constexpr wchar to_lower(wchar c) { return to_lower((wchar_s)c); }
 
 inline constexpr char to_upper_ascii(char c) {
 	if (c >= 'a' && c <= 'z')
@@ -1079,6 +1081,8 @@ bool find_and_erase(Collection &collection, T value) {
 	}
 	return false;
 }
+
+using NativeWindowHandle = struct{} *;
 
 struct SourceLocation {
 	char const *file;

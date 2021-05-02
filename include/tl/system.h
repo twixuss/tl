@@ -231,7 +231,6 @@ using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
 using wchar_s = Conditional<sizeof(wchar) == 2, utf16, utf32>;
 
 
-
 #if OS_WINDOWS
 static_assert(sizeof(utf16) == sizeof(wchar));
 #endif

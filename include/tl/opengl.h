@@ -466,10 +466,10 @@ TL_API void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, G
 
 TL_API BackBufferParams get_default_back_buffer_params();
 
-TL_API bool init_opengl(void *window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
-inline bool init_opengl(void *window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(void *window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(void *window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
+TL_API bool init_opengl(NativeWindowHandle window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
+inline bool init_opengl(NativeWindowHandle window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(NativeWindowHandle window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(NativeWindowHandle window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
 
 TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
@@ -630,6 +630,7 @@ ALL_FUNCS
 #undef D
 
 static GLuint compile_shader(GLuint shader) {
+	timed_function();
 	glCompileShader(shader);
 
 	GLint status;
@@ -651,6 +652,7 @@ static GLuint compile_shader(GLuint shader) {
 }
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
+	timed_function();
 	StringBuilder version_builder;
 	version_builder.allocator = temporary_allocator;
 	append(version_builder, "#version "s);
@@ -699,6 +701,7 @@ GLuint create_shader(GLenum shaderType, Span<char> source) {
 }
 
 GLuint create_program(GLuint vertexShader, GLuint fragmentShader) {
+	timed_function();
 	GLuint result = glCreateProgram();
 	glAttachShader(result, vertexShader);
 	glAttachShader(result, fragmentShader);
@@ -751,7 +754,7 @@ static HGLRC context;
 
 static StaticList<int, 16> context_attribs;
 
-bool init_opengl(void *_window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+bool init_opengl(NativeWindowHandle _window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
 	auto window = (HWND)_window;
 	u32 depth_bits = 0;
 	u32 stencil_bits = 0;

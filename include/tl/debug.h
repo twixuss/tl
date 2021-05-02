@@ -41,12 +41,7 @@ TL_API bool debugger_attached();
 
 #if OS_WINDOWS
 
-#pragma warning(push, 0)
-#include <DbgHelp.h>
-#include <debugapi.h>
-#pragma warning(pop)
-
-#pragma comment(lib, "dbghelp")
+#include "compiler.h"
 
 namespace TL {
 
@@ -134,12 +129,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 				break;
 			}
 
-			char name_buffer[256];
-
-			auto name_length = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_COMPLETE);
-			if (name_length) {
-				name = Span(name_buffer, name_length);
-			}
+			name = with(temporary_allocator, demangle(symbol->Name));
 
 			IMAGEHLP_LINE64 line = {};
 			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);

@@ -258,6 +258,18 @@ bool set_fullscreen(HWND window, bool fullscreen, DWORD window_style, WINDOWPLAC
 
 }
 
+struct FormattedLastError {
+	DWORD value;
+};
+
+FormattedLastError last_error() {
+	return {GetLastError()};
+}
+
+inline void append(StringBuilder &b, FormattedLastError e) {
+	append_format(b, "0x% (%)", FormatInt(e.value, 16), e.value);
+}
+
 #endif
 
 }

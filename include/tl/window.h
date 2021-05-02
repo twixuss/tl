@@ -20,6 +20,13 @@ struct Window;
 
 using WindowOnSize = void (*)(Window &);
 using WindowOnDraw = void (*)(Window &);
+using WindowHitTest = u32 (*)(Window &);
+
+enum WindowState {
+	Window_normal,
+	Window_minimized,
+	Window_maximized,
+};
 
 #ifdef TL_WINDOW_EXTRA_STATE
 struct Window : TL_WINDOW_EXTRA_STATE {
@@ -27,28 +34,35 @@ struct Window : TL_WINDOW_EXTRA_STATE {
 struct Window {
 #endif
 	Allocator allocator;
-	void *handle = 0;
+	NativeWindowHandle handle = 0;
 	v2u client_size = {};
 	v2u min_client_size = {240, 180};
 	v2s client_position = {};
+	v2s window_position = {};
 	v2s mouse_position = {};
 	v2s mouse_delta = {};
+	s32 mouse_wheel = 0;
 	bool has_focus = false;
+	bool active = false;
 	WindowFlags flags = 0;
 	WindowStyleFlags style_flags = 0;
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
+	WindowHitTest hit_test = 0;
+	WindowState state;
 };
 
 struct CreateWindowInfo {
 	Span<utf8> title;
 	v2u client_size = {};
+	v2u min_client_size = {};
 	WindowStyleFlags style_flags = 0;
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
+	WindowHitTest hit_test = 0;
 };
 
-TL_API Window *create_window(CreateWindowInfo info);
+TL_API bool create_window(Window **_window, CreateWindowInfo info);
 TL_API void free(Window *window);
 
 TL_API void close(Window *window);
@@ -71,6 +85,9 @@ TL_DEFINE_MOUSE_INPUT   (Span(::TL::key_state + 256,   3))
 #ifdef TL_IMPL
 
 #include "string.h"
+#include "win32.h"
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi")
 
 namespace TL {
 
@@ -84,6 +101,11 @@ static void draw(Window &window) {
 	window.on_draw(window);
 	update_key_state(key_state);
 	window.mouse_delta = {};
+	window.mouse_wheel = 0;
+}
+
+static DWORD get_window_style(WindowStyleFlags flags) {
+	return WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 }
 
 static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -97,7 +119,22 @@ static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam
 	}
 
 	auto &window = *window_pointer;
+
+	static bool changing_state = false;
+
 	switch (message) {
+		case WM_ACTIVATE: {
+			//if (window.style_flags & WindowStyle_no_frame) {
+			//	BOOL is_composition_enabled;
+			//	DwmIsCompositionEnabled(&is_composition_enabled);
+			//	if (is_composition_enabled) {
+			//		MARGINS margins = {1,1,1,1};
+			//		DwmExtendFrameIntoClientArea((HWND)window.handle, &margins);
+			//	}
+			//}
+			window.active = wparam != WA_INACTIVE;
+			return 0;
+		}
 		case WM_SETFOCUS: {
 			window.has_focus = true;
 			return 0;
@@ -107,22 +144,26 @@ static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam
 			return 0;
 		}
 		case WM_MOVE: {
-			window.client_position =  {
+			window.client_position = {
 				(s16)LOWORD(lparam),
 				(s16)HIWORD(lparam)
 			};
+			window.window_position = get_window_position(window.client_position, get_window_style(window.style_flags));
 			return 0;
 		}
 		case WM_TIMER: {
 			draw(window);
-			return 0;
+			break;
 		}
 		case WM_ENTERSIZEMOVE: {
-			SetTimer(hwnd, 0, 1, 0);
-			return 0;
+			SetTimer(hwnd, 0, 10, 0);
+			break;
 		}
 		case WM_EXITSIZEMOVE: {
 			KillTimer(hwnd, 0);
+			break;
+		}
+		case WM_WINDOWPOSCHANGING: {
 			return 0;
 		}
 		case WM_DESTROY: {
@@ -134,10 +175,56 @@ static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam
 				LOWORD(lparam),
 				HIWORD(lparam),
 			};
-			if (new_size.x && new_size.y) {
-				window.client_size = new_size;
-				if (window.on_size)
-					window.on_size(window);
+
+			if (wparam == SIZE_MAXIMIZED) {
+				window.state = Window_maximized;
+			} else {
+				window.state = Window_normal;
+			}
+
+			if (!new_size.x || !new_size.y || (wparam == SIZE_MINIMIZED))
+				return 0;
+
+			window.client_size = new_size;
+			if (window.on_size)
+				window.on_size(window);
+			return 0;
+		}
+		case WM_NCCALCSIZE: {
+			if (window.style_flags & WindowStyle_no_frame) {
+				if (wparam) {
+					auto &params = *(NCCALCSIZE_PARAMS *)lparam;
+
+					auto proposed_window_rect = params.rgrc[0];
+					auto previous_window_rect = params.rgrc[1];
+					auto previous_client_rect = params.rgrc[2];
+
+					auto &new_client_rect = params.rgrc[0];
+
+					HMONITOR monitor = MonitorFromWindow((HWND)window.handle, MONITOR_DEFAULTTONEAREST);
+					MONITORINFO info;
+					info.cbSize = sizeof(info);
+					GetMonitorInfoA(monitor, &info);
+
+					auto mr = info.rcWork;
+
+					auto cmp = proposed_window_rect;
+
+					// for some reason, when maximized, window's client area is extened in all directions by 8 pixels
+					// idk how to do this properly, but that's how i check it
+					if ((cmp.left   == mr.left   - 8) &&
+						(cmp.top    == mr.top    - 8) &&
+						(cmp.right  == mr.right  + 8) &&
+						(cmp.bottom == mr.bottom + 8))
+					{
+						new_client_rect = info.rcWork;
+					}
+
+				} else {
+					auto &rect = *(RECT *)lparam;
+				}
+			} else {
+				break;
 			}
 			return 0;
 		}
@@ -148,11 +235,20 @@ static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam
 			i.ptMinTrackSize.y = window.min_client_size.y;
 			return 0;
 		}
+		case WM_NCPAINT: {
+			break;
+		}
+		case WM_NCHITTEST: {
+			if (window.hit_test)
+				return window.hit_test(window);
+			break;
+		}
 	}
 	return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-Window *create_window(CreateWindowInfo info) {
+bool create_window(Window **_window, CreateWindowInfo info) {
+	*_window = 0;
 
 	auto instance = GetModuleHandleA(0);
 
@@ -160,36 +256,48 @@ Window *create_window(CreateWindowInfo info) {
 		window_class_created = true;
 		WNDCLASSEXW c = {};
 		c.cbSize = sizeof(c);
-		c.hCursor = LoadCursorA(0, IDC_ARROW);
+		c.hCursor = LoadCursor(0, IDC_ARROW);
 		c.hInstance = instance;
 		c.lpfnWndProc = window_proc;
 		c.lpszClassName = class_name;
 		c.hbrBackground = CreateSolidBrush(RGB(10,20,30));
 		c.style = 0;
-		RegisterClassExW(&c);
+		if (!RegisterClassExW(&c)) {
+			print("RegisterClassExW failed with error code: %\n", last_error());
+			return false;
+		}
 	}
 
-	DWORD window_style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+	DWORD window_style = get_window_style(info.style_flags);
 
 	auto allocator = current_allocator;
 	Window *window = ALLOCATE(Window, allocator);
+	*_window = window;
+
 	window->allocator = allocator;
 	window->style_flags = info.style_flags;
 	window->flags = Window_open;
 	window->on_size = info.on_size;
 	window->on_draw = info.on_draw;
+	window->hit_test = info.hit_test;
+	window->min_client_size = info.min_client_size;
 
 	auto window_size = get_window_size(info.client_size, window_style);
 
 	currently_creating_window = window;
-	window->handle = CreateWindowExW(
+	window->handle = (NativeWindowHandle)CreateWindowExW(
 		0, class_name, with(temporary_allocator, (wchar *)utf8_to_utf16(info.title, true).data),
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleA(0), 0
 	);
+	if (!window->handle) {
+		*_window = 0;
+		print("CreateWindowExW failed with error code: %\n", last_error());
+		return false;
+	}
 
 	init_rawinput(RawInput_mouse);
 
-	return window;
+	return true;
 }
 void close(Window *window) {
 	window->flags &= ~Window_open;
@@ -201,10 +309,16 @@ void free(Window *window) {
 }
 
 bool update(Window *window) {
+	if (!(window->flags & Window_open)) {
+		return false;
+	}
 	MSG m;
 	while (PeekMessageA(&m, 0, 0, 0, PM_REMOVE)) {
 		if (process_keyboard_message(m, Span(key_state, 256))) continue;
 		if (process_mouse_message(m, Span(key_state + 256, 3), &window->mouse_delta)) continue;
+		switch (m.message) {
+			case WM_MOUSEWHEEL: window->mouse_wheel += GET_WHEEL_DELTA_WPARAM(m.wParam) / WHEEL_DELTA; continue;
+		}
 		TranslateMessage(&m);
 		DispatchMessageA(&m);
 		if (!(window->flags & Window_open)) {

@@ -187,7 +187,7 @@ inline SizedFont &get_font_at_size(FontCollection &fonts, u32 size) {
 	return font;
 }
 
-inline FontCollection init_font(FT_Library library, Span<Span<utf8>> font_paths) {
+inline FontCollection init_font(FT_Library library, Span<Span<filechar>> font_paths) {
 	FontCollection result = {};
 
 	for (auto &path : font_paths) {

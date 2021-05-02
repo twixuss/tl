@@ -222,8 +222,8 @@ List<Token> lex(Span<utf8> json) {
 			return false;
 		};
 
-		if (check_keyword("true"s,  Token_true)) continue;
-		if (check_keyword("false"s, Token_false)) continue;
+		if (check_keyword(u8"true"s,  Token_true)) continue;
+		if (check_keyword(u8"false"s, Token_false)) continue;
 
 		if (is_digit(*c) || *c == '-') {
 			Token token;

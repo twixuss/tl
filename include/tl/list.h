@@ -234,7 +234,17 @@ void free(List<T> &list) {
 }
 
 template <class T>
-List<T> copy(List<T> const &that) {
+List<T> copy(List<T> that) {
+	List<T> result;
+	result.size = that.size;
+	result.capacity = result.size;
+	result.data = ALLOCATE(T, result.allocator, result.size);
+	memcpy(result.data, that.data, result.size * sizeof(T));
+	return result;
+}
+
+template <class T>
+List<T> as_list(Span<T> that) {
 	List<T> result;
 	result.size = that.size;
 	result.capacity = result.size;
@@ -264,6 +274,7 @@ T *previous(List<T> list, T *value) {
 
 template <class T> constexpr T *find(List<T> list, T const &value) { return find(as_span(list), value); }
 template <class T> constexpr T *find(List<T> list, Span<T> cmp) { return find(as_span(list), cmp); }
+template <class T> constexpr T *find_last(List<T> list, T const &value) { return find_last(as_span(list), value); }
 
 template <class T>
 struct BadList {

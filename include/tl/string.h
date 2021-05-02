@@ -385,6 +385,46 @@ inline void append(StringBuilder &b, ascii ch) {
 			break;
 	}
 }
+inline void append(StringBuilder &b, utf8 ch) {
+	switch (b.encoding) {
+		case Encoding_ascii:
+		case Encoding_utf8:
+			append_bytes(b, ch);
+			break;
+		case Encoding_utf16:
+			append_bytes(b, (utf16)ch);
+			break;
+		case Encoding_utf32:
+			invalid_code_path("not implemented");
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
+inline void append(StringBuilder &b, utf16 ch) {
+	switch (b.encoding) {
+		case Encoding_ascii:
+			if (ch >= 256) {
+				append_bytes(b, b.unfound_ascii);
+			} else {
+				append_bytes(b, (ascii)ch);
+			}
+			break;
+		case Encoding_utf8:
+			append_bytes(b, with(temporary_allocator, utf16_to_utf8(Span(&ch, 1))));
+			break;
+		case Encoding_utf16:
+			append_bytes(b, ch);
+			break;
+		case Encoding_utf32:
+			invalid_code_path("not implemented");
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+}
 
 inline void append(StringBuilder &b, Span<ascii> string) {
 	switch (b.encoding) {
@@ -505,76 +545,60 @@ template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
 
 template <class Char, class = EnableIf<is_char<Char>>>
-inline void append_format(StringBuilder &b, Char const *format_string) {
-	if (!*format_string) {
-		return;
-	}
-
-	Char const *c = format_string;
-	while (*c) {
+inline void append_format(StringBuilder &b, Span<Char> format_string) {
+	bool previous_is_percent = false;
+	auto c = format_string.data;
+	auto end = format_string.end();
+	for (;c != end; ++c) {
 		if (*c == '%') {
-			++c;
-			if (*c != '`') {
-				invalid_code_path("bad format");
-			}
-			append(b, Span(format_string, c));
-			++c;
-			format_string = c;
-		} else {
-			++c;
+			previous_is_percent = true;
+			continue;
 		}
-	}
-	append(b, as_span(format_string));
-}
-template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
-void append_format(StringBuilder &b, Char const *format_string, Arg const &arg, Args const &...args) {
-	if (!*format_string) {
-		return;
-	}
-	Char const *c = format_string;
-	Char const *percent = 0;
-	Char const *after_percent = 0;
-	auto format_string_end = format_string + string_unit_count(format_string);
-
-	bool argAsFormat = false;
-
-	while (*c) {
-		if (*c == '%') {
-			percent = c;
-			++c;
+		if (previous_is_percent) {
 			if (*c == '`') {
-				append(b, Span(format_string, c));
-				++c;
-				format_string = c;
-				percent = 0;
-				continue;
+				append(b, '%');
+			} else {
+				invalid_code_path("not enough arguments were provided for 'append_format'");
+				return;
 			}
-			if (starts_with(Span(c, format_string_end), "fmt%"s)) {
-				argAsFormat = true;
-				c += 4;
-			}
-			after_percent = c;
-			break;
 		}
-		++c;
+		append(b, *c);
+		previous_is_percent = false;
 	}
-	//assert(percent && after_percent, "invalid format");
-	if (percent && after_percent) {
-		append(b, Span(format_string, percent));
+}
 
-		if (argAsFormat) {
-			if constexpr (is_same<RemoveReference<std::decay_t<Arg>>, Char const *> || is_same<RemoveReference<std::decay_t<Arg>>, Char *>)
-				append_format(b, arg, args...);
-			else
-				invalid_code_path("'%fmt%' arg is not a string");
-		} else {
-			append(b, arg);
+template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
+void append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
+	bool previous_is_percent = false;
+	auto c = format_string.data;
+	auto end = format_string.end();
+	for (;c != end; ++c) {
+		if (previous_is_percent) {
+			if (*c == '`') {
+				append(b, '%');
+			} else {
+				append(b, arg);
+				append_format(b, Span(c, end), args...);
+				return;
+			}
 		}
-
-		append_format(b, after_percent, args...);
+		if (*c == '%') {
+			previous_is_percent = true;
+			continue;
+		}
+		append(b, *c);
+		previous_is_percent = false;
+	}
+	if (previous_is_percent) {
+		append(b, arg);
+		append_format(b, Span(c, end), args...);
 	} else {
-		invalid_code_path("missing argument in append_format");
+		invalid_code_path("too many arguments were provided for 'append_format'");
 	}
+}
+template <class ...Args, class Char, class = EnableIf<is_char<Char>>>
+void append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
+	append_format(b, as_span(format_string), args...);
 }
 
 inline void append(StringBuilder &builder, bool value) {
@@ -732,7 +756,7 @@ inline List<char> concatenate(Args &&...args) {
 }
 
 template <class ...Args>
-List<ascii> format(ascii const *fmt, Args const &...args) {
+List<ascii> format(Span<ascii> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_ascii;
@@ -741,7 +765,7 @@ List<ascii> format(ascii const *fmt, Args const &...args) {
 }
 
 template <class ...Args>
-List<utf8> format(utf8 const *fmt, Args const &...args) {
+List<utf8> format(Span<utf8> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_utf8;
@@ -750,7 +774,7 @@ List<utf8> format(utf8 const *fmt, Args const &...args) {
 }
 
 template <class ...Args>
-List<utf16> format(utf16 const *fmt, Args const &...args) {
+List<utf16> format(Span<utf16> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_utf16;
@@ -758,10 +782,20 @@ List<utf16> format(utf16 const *fmt, Args const &...args) {
 	return (List<utf16>)to_string(builder, current_allocator);
 }
 
+template <class ...Args> List<ascii> format(ascii const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
+template <class ...Args> List<utf8 > format(utf8  const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
+template <class ...Args> List<utf16> format(utf16 const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
+
 template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+
+template <class ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+
 #if 0
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>

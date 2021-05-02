@@ -1,14 +1,19 @@
 #pragma once
-#include "common.h"
+#include "file.h"
 
 namespace TL {
 
 TL_DECLARE_HANDLE(Process);
 
-TL_IMPL Process execute(Span<utf8> path_, Span<utf8> arguments_, bool visible);
-TL_IMPL bool wait(Process process, u32 timeout = -1);
-TL_IMPL u32 get_exit_code(Process process);
-TL_IMPL void terminate(Process process);
+TL_API Process execute(filechar const *path, filechar const *arguments, bool visible);
+inline Process execute(Span<filechar> path, Span<filechar> arguments, bool visible) {
+	assert(path.back() == 0);
+	assert(arguments.back() == 0);
+	return execute(path.data, arguments.data, visible);
+}
+TL_API bool wait(Process process, u32 timeout = -1);
+TL_API u32 get_exit_code(Process process);
+TL_API void terminate(Process process);
 //
 // Ends the lifetime of the handle
 // Does not terminate the process!
@@ -19,17 +24,14 @@ void free(Process &process);
 
 #if OS_WINDOWS
 
-Process execute(Span<utf8> path_, Span<utf8> arguments_, bool visible) {
-	auto path = with(temporary_allocator, utf8_to_utf16(path_, true));
-	auto arguments = with(temporary_allocator, utf8_to_utf16(arguments_, true));
-
+Process execute(filechar const *path, filechar const *arguments, bool visible) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
 	ShExecInfo.hwnd = NULL;
 	ShExecInfo.lpVerb = NULL;
-	ShExecInfo.lpFile = (wchar *)path.data;
-	ShExecInfo.lpParameters = (wchar *)arguments.data;
+	ShExecInfo.lpFile = (wchar *)path;
+	ShExecInfo.lpParameters = (wchar *)arguments;
 	ShExecInfo.lpDirectory = NULL;
 	ShExecInfo.nShow = visible ? SW_SHOW : SW_HIDE;
 	ShExecInfo.hInstApp = NULL;

@@ -24,13 +24,10 @@ struct Shader {
 #include "console.h"
 #include "opengl.h"
 
-#ifndef timed_block
-#define timed_block(...)
-#endif
-
 namespace TL {
 
 bool parse_shader(Shader &shader, Span<char> source) {
+	timed_function();
 	shader.cull = 0;
 	shader.depth_write = true;
 	shader.enable_blend = false;
@@ -146,12 +143,17 @@ bool parse_shader(Shader &shader, Span<char> source) {
 	return success;
 }
 
-Buffer load_shader_file(Span<utf8> full_path) {
+Buffer load_shader_file(Span<filechar> terminated_full_path) {
+	timed_function();
+
 	scoped_allocator(temporary_allocator);
+
+	auto full_path = terminated_full_path;
+	full_path.size -= 1;
 
 	auto pre_include_line_directive = format("#line 0 \"%\"\n", full_path);
 
-	auto buffer = read_entire_file(full_path, pre_include_line_directive.size, 1);
+	auto buffer = read_entire_file(terminated_full_path, pre_include_line_directive.size, 1);
 	if (!buffer.data) {
 		print("#included file '%' does not exist\n", full_path);
 	}
@@ -179,13 +181,15 @@ Buffer load_shader_file(Span<utf8> full_path) {
 		auto include_line_end = find(Span(include_line_begin, source.end()), '\n');
 		if (!include_line_end) include_line_end = source.end();
 
-		auto quote_first = find(Span(include_line_begin, include_line_end), '"');
-		auto quote_last  = find_last(Span(include_line_begin, include_line_end), '"');
+		auto include_line = Span(include_line_begin, include_line_end);
+
+		auto quote_first = find     (include_line, '"');
+		auto quote_last  = find_last(include_line, '"');
 
 		if (quote_first && quote_last && quote_first != quote_last) {
 			Span<utf8> file_name = {(utf8 *)quote_first + 1, (utf8 *)quote_last};
 
-			auto file_path = (List<utf8>)concatenate(directory, file_name);
+			auto file_path = format(TL_FILE_STRING("%%\0"s), directory, file_name);
 			auto included_file_buffer = load_shader_file(file_path);
 			auto included_file_source = as_chars(included_file_buffer);
 
@@ -193,7 +197,7 @@ Buffer load_shader_file(Span<utf8> full_path) {
 
 			auto new_source_size =
 				  source.size
-				- (include_line_end - include_line_begin)
+				- include_line.size
 				+ included_file_source.size
 				+ post_include_line_directive.size;
 
@@ -207,10 +211,10 @@ Buffer load_shader_file(Span<utf8> full_path) {
 				assert(cursor <= (new_source.data + new_source_size));
 			};
 
-			append_copy(Span(source.begin(), include_line_begin));
+			append_copy(Span(source.begin(), include_line.begin()));
 			append_copy(included_file_source);
 			append_copy(post_include_line_directive);
-			append_copy(Span(include_line_end, source.end()));
+			append_copy(Span(include_line.end(), source.end()));
 
 			source = new_source;
 			buffer = new_buffer;
@@ -264,15 +268,15 @@ void use_shader(Shader &shader) {
 	}
 }
 
-void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<utf8> directory) {
+void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<filechar> directory) {
 	using namespace OpenGL;
 
 	catalog.update_entry = [](ShaderCatalog::Entry &entry) {
 		timed_block("ShaderCatalog::update_entry"s);
 
-		print("Compiling %\n", entry.tracker.path);
+		print("Compiling %\n", Span(entry.tracker.path.data, entry.tracker.path.size - 1));
 
-		auto source = load_shader_file(Span(entry.tracker.path.data, entry.tracker.path.size - 1));
+		auto source = load_shader_file(entry.tracker.path);
 
 		auto vertex_shader = create_shader(GL_VERTEX_SHADER, 330, true, as_chars(source));
 		if (vertex_shader) {

@@ -9,9 +9,9 @@ namespace TL {
 
 using TextureCatalog = Catalog<TL_TEXTURE_CATALOG_ENTRY>;
 
-void init(TextureCatalog &catalog, Span<utf8> directory, Span<utf8> fallback_path) {
+void init(TextureCatalog &catalog, Span<filechar> directory) {
 	catalog.entry_string = "Texture"s;
-	init_catalog(catalog, directory, fallback_path);
+	init_catalog(catalog, directory);
 }
 
 }
