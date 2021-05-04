@@ -15,6 +15,8 @@ struct TimeSpan {
 	u32 thread_id;
 };
 
+extern TL_API bool enabled;
+
 TL_API void init();
 TL_API void deinit();
 TL_API void begin(Span<char> name, char const *file, u32 line);
@@ -59,6 +61,7 @@ std::unordered_map<u32, List<TimeSpan>> current_time_spans;
 Mutex current_time_spans_mutex;
 //f64 startTime;
 s64 start_time;
+bool enabled = TL_ENABLE_PROFILER;
 
 void init() {
 	recorded_time_spans.allocator = default_allocator;
@@ -67,6 +70,8 @@ void deinit() {
 	free(recorded_time_spans);
 }
 void begin(Span<char> name, char const *file, u32 line) {
+	if (!enabled)
+		return;
 	u32 thread_id = get_current_thread_id();
 	scoped_lock(current_time_spans_mutex);
 	auto &span = current_time_spans[thread_id].add();
@@ -81,6 +86,8 @@ void begin(Span<char> name, char const *file, u32 line) {
 		start_time = span.begin;
 }
 void end() {
+	if (!enabled)
+		return;
 	auto counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
@@ -129,6 +136,31 @@ List<ascii> output_for_chrome() {
 	}
 	append(builder, "\n]}"s);
 	return to_string(builder);
+}
+
+List<u8> output_for_timed() {
+	/*
+	struct Event {
+		s64 start;
+		s64 end;
+		u32 thread_id;
+		u16 name_size;
+		utf8 name[];
+	};
+	*/
+
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	if (!recorded_time_spans.empty()) {
+		for (auto span : recorded_time_spans) {
+			append_bytes(builder, (s64)((span.begin - start_time) * 1000000 / performance_frequency));
+			append_bytes(builder, (s64)((span.end   - start_time) * 1000000 / performance_frequency));
+			append_bytes(builder, (u32)span.thread_id);
+			append_bytes(builder, (u16)span.name.size);
+			append_bytes(builder, span.name);
+		}
+	}
+	return (List<u8>)to_string(builder);
 }
 
 }}
