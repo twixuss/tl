@@ -5,26 +5,9 @@
 #include "time.h"
 
 #pragma warning(push, 0)
-#ifdef TL_IMPL
-
 #define NOMINMAX
 #include <Windows.h>
 #include <gl/GL.h>
-
-#else
-
-#define WINGDIAPI __declspec(dllimport)
-#define APIENTRY __stdcall
-using BOOL = int;
-using HDC = struct{}*;
-using HGLRC = struct{}*;
-using UINT = TL::u32;
-using INT = TL::s32;
-using FLOAT = TL::f32;
-
-#include <gl/GL.h>
-
-#endif
 #pragma warning(pop)
 
 #pragma warning(push)
@@ -449,7 +432,7 @@ D(wglGetPixelFormatAttribivARB, BOOL,  (HDC hdc, int iPixelFormat, int iLayerPla
 
 #endif
 
-#define D(name, ret, args, params) using name ## _t = ret(*)args; TL_API ret name args;
+#define D(name, ret, args, params) using name ## _t = ret(__stdcall*)args; TL_API ret name args;
 ALL_FUNCS
 #undef D
 
@@ -506,6 +489,14 @@ inline void glClearColor(v4f color) {
 	::glClearColor(color.x, color.y, color.z, color.w);
 }
 
+inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, v4f value) { glUniform4fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, m4  value) { glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, false, value.s); }
+
+inline void use_shader(GLuint shader) { glUseProgram(shader); }
+
 template <class T, class Index = umm>
 struct GrowingBuffer {
 	void add(T value) {
@@ -531,6 +522,12 @@ struct GrowingBuffer {
 		bounds_check(start + span.size - 1 < size);
 		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
 		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
+	}
+	void reset(Span<T> span) {
+		reserve(span.size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, 0, span.size * sizeof(T), span.data);
+		size = span.size;
 	}
 	void init() {
 		if (!buffer) {

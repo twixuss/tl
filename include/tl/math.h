@@ -1117,6 +1117,7 @@ forceinline aabb<T> to_zero(aabb<T> box) {
 	return box;
 }
 
+
 template <class T>
 forceinline aabb<T> mask(aabb<T> box, aabb<T> bounds) {
 	box.min = clamp(box.min, bounds.min, bounds.max);
@@ -1169,6 +1170,15 @@ IN_BOUNDS3(bool, v3f, v3f)
 IN_BOUNDS3(bool, v3s, v3s)
 IN_BOUNDS3(bool, v3u, v3u)
 #undef IN_BOUNDS3
+
+#define INTERSECTS1(bool, scl)						        \
+	forceinline bool intersects(aabb<scl> a, aabb<scl> b) { \
+		return 										        \
+			(a.min < b.max) && 					            \
+			(a.max > b.min); 					            \
+	}
+INTERSECTS1(bool, s64)
+#undef INTERSECTS1
 
 #define INTERSECTS2(bool, v2f)						        \
 	forceinline bool intersects(aabb<v2f> a, aabb<v2f> b) { \

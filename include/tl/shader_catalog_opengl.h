@@ -240,6 +240,12 @@ void set_uniform(Shader &shader, Span<char> name, v3f value) { OpenGL::glUniform
 void set_uniform(Shader &shader, Span<char> name, v4f value) { OpenGL::glUniform4fv(get_uniform_location(shader, name), 1, value.s); }
 void set_uniform(Shader &shader, Span<char> name, m4  value) { OpenGL::glUniformMatrix4fv(get_uniform_location(shader, name), 1, false, value.s); }
 
+void set_uniform(Shader &shader, char const *name, f32 value) { set_uniform(shader, as_span(name), value); }
+void set_uniform(Shader &shader, char const *name, v2f value) { set_uniform(shader, as_span(name), value); }
+void set_uniform(Shader &shader, char const *name, v3f value) { set_uniform(shader, as_span(name), value); }
+void set_uniform(Shader &shader, char const *name, v4f value) { set_uniform(shader, as_span(name), value); }
+void set_uniform(Shader &shader, char const *name, m4  value) { set_uniform(shader, as_span(name), value); }
+
 void use_shader(Shader &shader) {
 	using namespace OpenGL;
 	glUseProgram(shader.program);

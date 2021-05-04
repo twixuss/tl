@@ -32,7 +32,7 @@ struct FileItemList : List<FileItem> {
 	Base &base() { return *this; }
 };
 
-void free(FileItemList &list) {
+inline void free(FileItemList &list) {
 	free(list.buffer);
 	free(list.base());
 }
@@ -213,7 +213,7 @@ enum : FileDialogFlags {
 	FileDialog_multiple  = 0x2,
 };
 
-TL_API ListList<filechar> open_file_dialog(FileDialogFlags flags);
+TL_API ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
 TL_API List<filechar> get_current_directory();
 
@@ -363,7 +363,7 @@ u64 get_file_write_time(Span<filechar> path) {
 	return get_file_write_time(file);
 }
 
-wchar *append_star(Span<utf16> directory) {
+static wchar *append_star(Span<utf16> directory) {
 	auto allocator = temporary_allocator;
 	wchar *directory_with_star;
 
@@ -526,7 +526,7 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 	return hr;
 }
 
-ListList<filechar> open_file_dialog(FileDialogFlags flags) {
+ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
 	IFileOpenDialog *dialog = NULL;
 	if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return {};
 	defer { dialog->Release(); };
@@ -556,10 +556,24 @@ ListList<filechar> open_file_dialog(FileDialogFlags flags) {
 
 
 	if (kind != FileDialog_directory) {
-		const COMDLG_FILTERSPEC file_types[] = {
-			{L"Audio file", L"*.mp3;*.wav;*.ogg"},
-		};
-		if (FAILED(dialog->SetFileTypes(ARRAYSIZE(file_types), file_types))) return {};
+		COMDLG_FILTERSPEC file_type;
+		if (allowed_extensions.size) {
+			scoped_allocator(temporary_allocator);
+			StringBuilder builder;
+			builder.encoding = Encoding_utf16;
+			for (auto &ext : allowed_extensions) {
+				if (&ext == &allowed_extensions.back()) {
+					append_format(builder, u"*.%", ext);
+				} else {
+					append_format(builder, u"*.%;", ext);
+				}
+			}
+			append(builder, u'\0');
+			file_type = {L"Files", (wchar *)to_string(builder).data};
+		} else {
+			file_type = {L"Files", L"*.*"};
+		}
+		if (FAILED(dialog->SetFileTypes(1, &file_type))) return {};
 	}
 
 
@@ -573,7 +587,9 @@ ListList<filechar> open_file_dialog(FileDialogFlags flags) {
 		if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) return;
 		defer { CoTaskMemFree(path); };
 
-		result.add(as_span((utf16 *)path));
+		auto span = as_span((utf16 *)path);
+		++span.size;
+		result.add(span);
 	};
 
 	IShellItem *item;

@@ -64,7 +64,7 @@ Printer console_printer = {
 	0
 };
 
-thread_local Printer current_printer;
+thread_local Printer current_printer = {[](Span<utf8> span, void *) {}};
 
 void init_printer() {
 	current_printer = console_printer;

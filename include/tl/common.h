@@ -213,7 +213,9 @@ template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
 forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry) { *carry = _addcarry_u8 (0, a, b, result); }
 forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry) { *carry = _addcarry_u16(0, a, b, result); }
 forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry) { *carry = _addcarry_u32(0, a, b, result); }
+#if ARCH_X64
 forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry) { *carry = _addcarry_u64(0, a, b, result); }
+#endif
 
 forceinline constexpr bool is_nan(f32 v) {
 	union {
@@ -229,20 +231,19 @@ forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
 forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
 forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
 forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
-#else
+#elif COMPILER_MSVC
 forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (ulong)val) ? (u32)result : ~0; }
 forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (ulong)val) ? (u32)result : ~0; }
+forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
+forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
 #if ARCH_X64
 forceinline u32 find_lowest_one_bit(u64 val) { unsigned long result; return _BitScanForward64(&result, val) ? (u32)result : ~0; }
 forceinline u32 find_highest_one_bit(u64 val) { unsigned long result; return _BitScanReverse64(&result, val) ? (u32)result : ~0; }
+forceinline u32 find_lowest_zero_bit (u64 val) { return find_lowest_one_bit (~val); }
+forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~val); }
 #else
 #endif
 #endif
-
-forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
-forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
-forceinline u32 find_lowest_zero_bit (u64 val) { return find_lowest_one_bit (~val); }
-forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~val); }
 
 forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
 
@@ -255,15 +256,21 @@ forceinline u32 count_bits(u64 v) { return count_bits((u32)v) + count_bits((u32)
 forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
 forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
 
-template <class T>
-forceinline constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
-
+forceinline bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
+forceinline bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
+forceinline bool is_power_of_2(u64 v) { return count_bits(v) == 1; }
+namespace CE {
+template <class T>
+constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
+}
 
 // forceinline u8  floor_to_power_of_2(u8  v) { return 1 << find_highest_one_bit(v); }
 // forceinline u16 floor_to_power_of_2(u16 v) { return 1 << find_highest_one_bit(v); }
 forceinline u32 floor_to_power_of_2(u32 v) { return (u32)1 << find_highest_one_bit(v); }
+#if ARCH_X64
 forceinline u64 floor_to_power_of_2(u64 v) { return (u64)1 << find_highest_one_bit(v); }
+#endif
 
 forceinline u32 ceil_to_power_of_2(u32 v) { return is_power_of_2(v) ? v : (floor_to_power_of_2(v) + 1); }
 
@@ -368,28 +375,38 @@ forceinline u32 count_leading_zeros(u64 val) { ulong r; return _BitScanReverse64
 forceinline u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
 forceinline u32 count_leading_zeros(s16 val) { return count_leading_zeros((u16)val); }
 forceinline u32 count_leading_zeros(s32 val) { return count_leading_zeros((u32)val); }
+#if ARCH_X64
 forceinline u32 count_leading_zeros(s64 val) { return count_leading_zeros((u64)val); }
+#endif
 
 forceinline u32 count_leading_ones(u8  val) { return count_leading_zeros((u8 )~val); }
 forceinline u32 count_leading_ones(u16 val) { return count_leading_zeros((u16)~val); }
 forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~val); }
+#if ARCH_X64
 forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
+#endif
 
-forceinline u32 log2(u64 n) { return 63u - count_leading_zeros(n); }
-forceinline u32 log2(u32 n) { return 31u - count_leading_zeros(n); }
-forceinline u32 log2(u16 n) { return 15u - count_leading_zeros(n); }
 forceinline u32 log2(u8  n) { return  7u - count_leading_zeros(n); }
+forceinline u32 log2(u16 n) { return 15u - count_leading_zeros(n); }
+forceinline u32 log2(u32 n) { return 31u - count_leading_zeros(n); }
+#if ARCH_X64
+forceinline u32 log2(u64 n) { return 63u - count_leading_zeros(n); }
+#endif
 
-forceinline u32 log2(s64 n) { return 63u - count_leading_zeros(n); }
-forceinline u32 log2(s32 n) { return 31u - count_leading_zeros(n); }
-forceinline u32 log2(s16 n) { return 15u - count_leading_zeros(n); }
 forceinline u32 log2(s8  n) { return  7u - count_leading_zeros(n); }
+forceinline u32 log2(s16 n) { return 15u - count_leading_zeros(n); }
+forceinline u32 log2(s32 n) { return 31u - count_leading_zeros(n); }
+#if ARCH_X64
+forceinline u32 log2(s64 n) { return 63u - count_leading_zeros(n); }
+#endif
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
-forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
-forceinline constexpr s32 log10(u32 n) { s32 i = -(n == 0); S(8,100000000); S(4,10000); S(2,100); S(1,10); return i; }
-forceinline constexpr s32 log10(u16 n) { s32 i = -(n == 0); S(4,10000); S(2,100); S(1,10); return i; }
-forceinline constexpr s32 log10(u8  n) { s32 i = -(n == 0); S(2,100); S(1,10); return i; }
+forceinline constexpr s32 log10(u8  n) { s32 i = -(n == 0); S(2,100)S(1,10)return i; }
+forceinline constexpr s32 log10(u16 n) { s32 i = -(n == 0); S(4,10000)S(2,100)S(1,10)return i; }
+forceinline constexpr s32 log10(u32 n) { s32 i = -(n == 0); S(8,100000000)S(4,10000)S(2,100)S(1,10)return i; }
+#if ARCH_X64
+forceinline constexpr s32 log10(u64 n) { s32 i = -(n == 0); S(16,10000000000000000)S(8,100000000)S(4,10000)S(2,100)S(1,10)return i; }
+#endif
 #undef S
 
 forceinline constexpr s32 log(u32 n, u32 base) {
@@ -592,6 +609,7 @@ auto reverse(T &x) {
 template <class T>
 struct Span {
 	using ValueType = T;
+	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), size(list.size()) {}
 	constexpr Span() = default;
 	constexpr Span(ValueType &value) : data(std::addressof(value)), size(1) {}
 	template <umm count>
@@ -1082,7 +1100,7 @@ bool find_and_erase(Collection &collection, T value) {
 	return false;
 }
 
-using NativeWindowHandle = struct{} *;
+using NativeWindowHandle = struct NativeWindow {} *;
 
 struct SourceLocation {
 	char const *file;
@@ -1375,4 +1393,48 @@ Allocator tracking_allocator = {
 #undef tl_reallocate
 #undef tl_free
 
+#endif
+
+#ifdef TL_MAIN
+#include "string.h"
+extern TL::s32 tl_main(TL::Span<TL::Span<TL::utf8>> args);
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR command_line_16, int) {
+	using namespace TL;
+	init_allocator();
+	defer { deinit_allocator(); };
+
+	auto command_line = utf16_to_utf8(as_span((utf16 *)command_line_16));
+	List<Span<utf8>> arguments;
+
+	utf8 *c = command_line.data;
+	while (c != command_line.end()) {
+		while (is_whitespace(*c)) {
+			++c;
+			if (c == command_line.end())
+				goto main;
+		}
+
+		if (*c == '"') {
+			++c;
+			auto begin = c;
+			while (c != command_line.end()) {
+				++c;
+				if (*c == '"')
+					break;
+			}
+			arguments.add(Span(begin, c));
+			continue;
+		}
+
+		auto begin = c;
+		while (c != command_line.end()) {
+			++c;
+			if (is_whitespace(*c))
+				break;
+		}
+		arguments.add(Span(begin, c));
+	}
+main:
+	return tl_main(arguments);
+}
 #endif

@@ -1,8 +1,10 @@
 #pragma once
-#ifdef FREETYPE_H_
 
 #include "common.h"
 #include "list.h"
+#include "buffer.h"
+#include "file.h"
+#include <unordered_map>
 
 namespace TL {
 
@@ -23,7 +25,7 @@ struct SizedFont {
 	FontCollection *collection;
 
 	std::unordered_map<u32, CharBucket> char_buckets;
-	void *texture;
+	umm texture_id;
 	u32 size;
 
 	u8 *atlas_data = 0;
@@ -35,24 +37,50 @@ struct SizedFont {
 
 struct FontCollection {
 	Allocator allocator = current_allocator;
-	List<FT_Face> faces;
 	std::unordered_map<u32, SizedFont> size_to_font;
-	List<Buffer> files;
-	void *(*create_atlas)();
-	void (*update_atlas)(void *texture, void *data, v2u size);
+	umm (*update_atlas)(umm texture_id, void *data, v2u size);
 };
 
-inline FontChar get_char_info(u32 ch, SizedFont &font) {
-	auto found = font.char_buckets.find(ch >> 8);
-	assert(found != font.char_buckets.end(), "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
+struct PlacedChar {
+	aabb<v2f> position;
+	aabb<v2f> uv;
+};
+
+TL_API FontChar get_char_info(u32 ch, SizedFont *font);
+TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
+TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
+TL_API FontCollection *create_font_collection(Span<Span<filechar>> font_paths);
+TL_API void free(FontCollection *collection);
+TL_API aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero = false);
+TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink = false);
+
+}
+
+#ifdef TL_IMPL
+
+#ifdef FREETYPE_H_
+
+namespace TL {
+
+struct FontCollectionFT : FontCollection {
+	List<FT_Face> faces;
+	List<Buffer> files;
+};
+
+FontChar get_char_info(u32 ch, SizedFont *font) {
+	auto found = font->char_buckets.find(ch >> 8);
+	assert(found != font->char_buckets.end(), "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
 	return found->second.chars[ch & 0xff];
 }
 
 //
 // Returns true if new characters were added
 //
-inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
-	scoped_allocator(font.collection->allocator);
+bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
+	auto collection = (FontCollectionFT *)font->collection;
+
+	scoped_allocator(collection->allocator);
+
 
 	auto current_char = text.data;
 
@@ -62,22 +90,22 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 	while (current_char < text.end()) {
 		u32 code_point = get_char_and_advance_utf8(current_char);
 		u32 bucket_index = code_point >> 8;
-		auto found = font.char_buckets.find(bucket_index);
-		if (found == font.char_buckets.end()) {
-			auto &bucket = font.char_buckets.insert({bucket_index, CharBucket{}}).first->second;
+		auto found = font->char_buckets.find(bucket_index);
+		if (found == font->char_buckets.end()) {
+			auto &bucket = font->char_buckets.insert({bucket_index, CharBucket{}}).first->second;
 			bucket.index = bucket_index;
 			new_buckets.add(&bucket);
 		}
 	}
 
 	if (new_buckets.size) {
-		for (auto &face : font.collection->faces) {
-			auto error = FT_Set_Pixel_Sizes(face, font.size, font.size);
+		for (auto &face : collection->faces) {
+			auto error = FT_Set_Pixel_Sizes(face, font->size, font->size);
 			assert(!error);
 		}
 
 	retry_buckets:
-		auto current_face = font.collection->faces.data;
+		auto current_face = collection->faces.data;
 		for (auto bucket_pointer : new_buckets) {
 			auto &bucket = *bucket_pointer;
 
@@ -93,8 +121,8 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 				);
 
 				if (error || glyph_index == 0) {
-					if (current_face == &font.collection->faces.back()) {
-						current_face = font.collection->faces.data;
+					if (current_face == &collection->faces.back()) {
+						current_face = collection->faces.data;
 						FT_Load_Glyph(*current_face, 0, 0);
 					} else {
 						++current_face;
@@ -112,27 +140,27 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 
 				v2u char_size = {bitmap.width/3, bitmap.rows};
 
-				if (font.next_char_position.x + char_size.x >= font.atlas_size.x) {
-					font.next_char_position.x = 0;
-					font.next_char_position.y += font.current_row_height;
-					font.current_row_height = 0;
+				if (font->next_char_position.x + char_size.x >= font->atlas_size.x) {
+					font->next_char_position.x = 0;
+					font->next_char_position.y += font->current_row_height;
+					font->current_row_height = 0;
 				}
 
-				if ((font.next_char_position.y + char_size.y > font.atlas_size.y) || !font.atlas_data) {
-					if (font.atlas_data) {
-						font.atlas_size *= 2;
-						FREE(current_allocator, font.atlas_data);
+				if ((font->next_char_position.y + char_size.y > font->atlas_size.y) || !font->atlas_data) {
+					if (font->atlas_data) {
+						font->atlas_size *= 2;
+						FREE(current_allocator, font->atlas_data);
 					} else {
-						font.atlas_size = V2u(font.size * 16);
+						font->atlas_size = V2u(font->size * 16);
 					}
-					font.atlas_data = ALLOCATE(u8, current_allocator, font.atlas_size.x * font.atlas_size.y * 3);
-					memset(font.atlas_data, 0, font.atlas_size.x * font.atlas_size.y * 3);
+					font->atlas_data = ALLOCATE(u8, current_allocator, font->atlas_size.x * font->atlas_size.y * 3);
+					memset(font->atlas_data, 0, font->atlas_size.x * font->atlas_size.y * 3);
 
-					font.next_char_position = {};
-					font.current_row_height = 0;
+					font->next_char_position = {};
+					font->current_row_height = 0;
 
 					new_buckets.clear();
-					for (auto &[bucket_index, bucket] : font.char_buckets) {
+					for (auto &[bucket_index, bucket] : font->char_buckets) {
 						new_buckets.add(&bucket);
 					}
 
@@ -142,7 +170,7 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 				//
 				// NOTE bitmap.width is in bytes not pixels
 				//
-				bucket.chars[char_index].position = font.next_char_position;
+				bucket.chars[char_index].position = font->next_char_position;
 				bucket.chars[char_index].size = char_size;
 				bucket.chars[char_index].offset = {slot->bitmap_left, slot->bitmap_top};
 				bucket.chars[char_index].advance = {slot->advance.x >> 6, slot->advance.y >> 6};
@@ -153,76 +181,84 @@ inline bool ensure_all_chars_present(Span<utf8> text, SizedFont &font) {
 
 				for (u32 y = 0; y < bitmap.rows; ++y) {
 					memcpy(
-						font.atlas_data + ((font.next_char_position.y + y)*font.atlas_size.x + font.next_char_position.x) * 3,
+						font->atlas_data + ((font->next_char_position.y + y)*font->atlas_size.x + font->next_char_position.x) * 3,
 						bitmap.buffer + y*bitmap.pitch,
 						bitmap.width
 					);
 				}
-				font.next_char_position.x += char_size.x;
-				font.current_row_height = max(font.current_row_height, char_size.y);
+				font->next_char_position.x += char_size.x;
+				font->current_row_height = max(font->current_row_height, char_size.y);
 			}
 		}
 
-		font.collection->update_atlas(font.texture, font.atlas_data, font.atlas_size);
+		font->texture_id = collection->update_atlas(font->texture_id, font->atlas_data, font->atlas_size);
 
 		return true;
 	}
 	return false;
 }
 
-inline SizedFont &get_font_at_size(FontCollection &fonts, u32 size) {
-	auto found = fonts.size_to_font.find(size);
-	if (found != fonts.size_to_font.end()) {
-		return found->second;
+SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
+	auto found = collection->size_to_font.find(size);
+	if (found != collection->size_to_font.end()) {
+		return &found->second;
 	}
 
-	SizedFont &font = fonts.size_to_font[size];
+	SizedFont &font = collection->size_to_font[size];
 
-	font.collection = &fonts;
+	font.collection = collection;
 
 	font.size = size;
 
-	font.texture = font.collection->create_atlas();
-
-	return font;
+	return &font;
 }
 
-inline FontCollection init_font(FT_Library library, Span<Span<filechar>> font_paths) {
-	FontCollection result = {};
+static FT_Library ft_library;
+
+FontCollection *create_font_collection(Span<Span<filechar>> font_paths) {
+	if (!ft_library) {
+		auto error = FT_Init_FreeType(&ft_library);
+		assert(!error, "FT_Init_FreeType Error %", FT_Error_String(error));
+	}
+
+	auto allocator = current_allocator;
+	auto result = ALLOCATE(FontCollectionFT, allocator);
 
 	for (auto &path : font_paths) {
 		auto file = read_entire_file(path);
-		result.files.add(file);
+		result->files.add(file);
 
 		FT_Face face;
-		auto error = FT_New_Memory_Face(library, file.data, file.size, 0, &face);
+		auto error = FT_New_Memory_Face(ft_library, file.data, file.size, 0, &face);
 		if (error) {
 			invalid_code_path("FT_New_Face failed: %", FT_Error_String(error));
 		}
 
 		face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
-		result.faces.add(face);
+		result->faces.add(face);
 	}
 
 	return result;
 }
 
-inline void free(SizedFont &font) {
-	FREE(font.collection->allocator, font.atlas_data);
-}
-inline void free(FontCollection &collection) {
-	free(collection.faces);
-	for (auto &file : collection.files) {
+void free(FontCollection *_collection) {
+	auto collection = (FontCollectionFT *)_collection;
+
+	free(collection->faces);
+	for (auto &file : collection->files) {
 		free(file);
 	}
-	free(collection.files);
-	for (auto &[size, font] : collection.size_to_font) {
-		free(font);
+	free(collection->files);
+	for (auto &[size, font] : collection->size_to_font) {
+		FREE(collection->allocator, font.atlas_data);
 	}
+	FREE(collection->allocator, collection);
 }
 
-inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont &font, bool min_at_zero = false) {
-	scoped_allocator(font.collection->allocator);
+aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
+	auto collection = (FontCollectionFT *)font->collection;
+
+	scoped_allocator(collection->allocator);
 
 	ensure_all_chars_present(text, font);
 
@@ -246,12 +282,12 @@ inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont &font, bool min_at_z
 
 		if (ch == '\n') {
 			pos.x = 0;
-			pos.x += font.size;
+			pos.x += font->size;
 			continue;
 		}
 
 
-		v2s position_min = {pos.x + d.offset.x, pos.y + font.size - d.offset.y};
+		v2s position_min = {pos.x + d.offset.x, pos.y + font->size - d.offset.y};
 		v2s position_max = position_min + (v2s)d.size;
 		result.max = max(result.max, position_max);
 		result.min = min(result.min, position_min);
@@ -262,12 +298,7 @@ inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont &font, bool min_at_z
 	return result;
 }
 
-struct PlacedChar {
-	aabb<v2f> position;
-	aabb<v2f> uv;
-};
-
-inline List<PlacedChar> place_text(Span<utf8> text, SizedFont &font) {
+List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink) {
 	List<PlacedChar> result;
 
 	ensure_all_chars_present(text, font);
@@ -283,17 +314,17 @@ inline List<PlacedChar> place_text(Span<utf8> text, SizedFont &font) {
 
 		if (ch == '\n') {
 			posX = 0;
-			posY += font.size;
+			posY += font->size;
 			continue;
 		}
 
 		PlacedChar c;
 
-		c.position.min = {posX + d.offset.x, posY + font.size - d.offset.y};
+		c.position.min = {posX + d.offset.x, posY + font->size - d.offset.y};
 		c.position.max = c.position.min + (v2f)d.size;
 
-		c.uv.min = (v2f)d.position / (v2f)font.atlas_size;
-		c.uv.max = c.uv.min + (v2f)d.size / (v2f)font.atlas_size;
+		c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
+		c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
 
 		result.add(c);
 
@@ -304,5 +335,7 @@ inline List<PlacedChar> place_text(Span<utf8> text, SizedFont &font) {
 }
 
 }
+
+#endif
 
 #endif

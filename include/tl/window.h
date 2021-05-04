@@ -36,7 +36,8 @@ struct Window {
 	Allocator allocator;
 	NativeWindowHandle handle = 0;
 	v2u client_size = {};
-	v2u min_client_size = {240, 180};
+	v2u min_client_size = {};
+	v2u min_window_size = {};
 	v2s client_position = {};
 	v2s window_position = {};
 	v2s mouse_position = {};
@@ -55,7 +56,7 @@ struct Window {
 struct CreateWindowInfo {
 	Span<utf8> title;
 	v2u client_size = {};
-	v2u min_client_size = {};
+	v2u min_client_size = {512, 512};
 	WindowStyleFlags style_flags = 0;
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
@@ -86,6 +87,7 @@ TL_DEFINE_MOUSE_INPUT   (Span(::TL::key_state + 256,   3))
 
 #include "string.h"
 #include "win32.h"
+#include "console.h"
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi")
 
@@ -108,7 +110,7 @@ static DWORD get_window_style(WindowStyleFlags flags) {
 	return WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 }
 
-static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
 	Window *window_pointer;
 	if (currently_creating_window) {
 		window_pointer = currently_creating_window;
@@ -231,8 +233,8 @@ static LRESULT window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam
 		case WM_GETMINMAXINFO: {
 			auto &i = *(MINMAXINFO *)lparam;
 
-			i.ptMinTrackSize.x = window.min_client_size.x;
-			i.ptMinTrackSize.y = window.min_client_size.y;
+			i.ptMinTrackSize.x = window.min_window_size.x;
+			i.ptMinTrackSize.y = window.min_window_size.y;
 			return 0;
 		}
 		case WM_NCPAINT: {
@@ -281,6 +283,7 @@ bool create_window(Window **_window, CreateWindowInfo info) {
 	window->on_draw = info.on_draw;
 	window->hit_test = info.hit_test;
 	window->min_client_size = info.min_client_size;
+	window->min_window_size = get_window_size(info.min_client_size, window_style);
 
 	auto window_size = get_window_size(info.client_size, window_style);
 

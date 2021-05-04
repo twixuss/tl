@@ -13,6 +13,7 @@ struct Catalog {
 		List<utf8> name;
 		FileTracker tracker;
 		bool initialized;
+		void (*on_update)(Entry &entry);
 	};
 	Allocator allocator;
 	std::unordered_map<Span<utf8>, Entry> entries;
@@ -35,12 +36,19 @@ inline void free(Catalog<T> &catalog) {
 }
 
 template <class T>
+void update_entry(Catalog<T> &catalog, typename Catalog<T>::Entry &entry) {
+	catalog.update_entry(entry);
+	if (entry.on_update)
+		entry.on_update(entry);
+}
+
+template <class T>
 Catalog<T>::Entry *find(Catalog<T> &catalog, Span<utf8> name) {
 	auto result = catalog.entries.find(name);
 	if (result != catalog.entries.end()) {
 		if (!result->second.initialized) {
 			result->second.initialized = true;
-			catalog.update_entry(result->second);
+			update_entry(catalog, result->second);
 		}
 		if (catalog.entry_valid(result->second)) {
 			return &result->second;
@@ -55,8 +63,6 @@ Catalog<T>::Entry *find(Catalog<T> &catalog, Span<utf8> name) {
 
 template <class T>
 Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<filechar> directory, Span<filechar> full_name) {
-	using namespace OpenGL;
-
 	auto file_name = full_name;
 	file_name.size = find(file_name, TL_FILE_STRING('.')) - file_name.data;
 
@@ -66,12 +72,12 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<filechar> directory, Span<
 	entry.name = name;
 	entry.tracker = create_file_tracker_steal_path(format(TL_FILE_STRING("%/%\0"s), directory, full_name), [&](FileTracker &tracker) {
 		if (entry.initialized) {
-			catalog.update_entry(entry);
+			update_entry(catalog, entry);
 		}
 	});
 	if (catalog.load_all_at_start) {
 		entry.initialized = true;
-		catalog.update_entry(entry);
+		update_entry(catalog, entry);
 	}
 	return entry;
 }

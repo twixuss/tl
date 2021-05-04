@@ -110,7 +110,7 @@ forceinline f32 random_f32(v3s seed) { return random_f32((v3u)seed); }
 forceinline u32 random_u32(f32 seed) { return random_u32(*(u32 *)&seed); }
 forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
 forceinline u32 random_u32(v3f seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
-//forceinline u32 random_u32(v3f seed) { 
+//forceinline u32 random_u32(v3f seed) {
 //	u32 result = 0xbabeface;
 //	result ^= random_u32(seed.x);
 //	result ^= random_u32(result ^ *(u32 *)&seed.y);
@@ -352,7 +352,7 @@ forceinline f32 gradient_noise_f32(f32 coordinate) {
     f32 t1 = t0 - 1.f;
 
 	static constexpr f32 directions[] = {-1, -.75, -.5, -.25, .25, .5, .75, 1};
-	static_assert(is_power_of_2(count_of(directions)));
+	static_assert(CE::is_power_of_2(count_of(directions)));
 	auto get_direction = [&](f32 offset) { return directions[(random_u32(tile + offset) >> 26) & (count_of(directions) - 1)]; };
     f32 d0 = get_direction(0);
     f32 d1 = get_direction(1);
@@ -381,7 +381,7 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
 		normalize(v2f{ 1,-1}),
 		normalize(v2f{-1,-1})
 	};
-	static_assert(is_power_of_2(count_of(directions)));
+	static_assert(CE::is_power_of_2(count_of(directions)));
 	auto get_direction = [&](v2f offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
     v2f g00 = get_direction(v2f{0, 0});
     v2f g10 = get_direction(v2f{1, 0});
@@ -414,7 +414,7 @@ forceinline f32 gradient_noise_v3f(v3f coordinate) {
 		CE::normalize(v3f{ 1,-1,-1}),
 		CE::normalize(v3f{-1,-1,-1})
 	};
-	static_assert(is_power_of_2(count_of(directions)));
+	static_assert(CE::is_power_of_2(count_of(directions)));
 
     v3f t = smoothstep(local);
 
@@ -462,7 +462,7 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
 		normalize(v2f{ 1,-1}),
 		normalize(v2f{-1,-1})
 	};
-	static_assert(is_power_of_2(count_of(directions)));
+	static_assert(CE::is_power_of_2(count_of(directions)));
 	auto get_direction = [&](v2s offset) { return directions[(random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
     v2f g00 = get_direction(v2s{0, 0});
     v2f g10 = get_direction(v2s{1, 0});
@@ -502,7 +502,7 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
 		CE::normalize(v3f{ 1,-1,-1}),
 		CE::normalize(v3f{-1,-1,-1})
 	};
-	static_assert(is_power_of_2(count_of(directions)));
+	static_assert(CE::is_power_of_2(count_of(directions)));
 
     v3f t = smoothstep(local);
 

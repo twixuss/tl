@@ -190,7 +190,7 @@ LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESUL
 	}
 	return centerHit;
 }
-bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM)) {
+bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, WNDPROC wndProc) {
 	WNDCLASSEXA c = {};
 	c.cbSize = sizeof(c);
 	c.hCursor = cursor;
@@ -273,12 +273,3 @@ inline void append(StringBuilder &b, FormattedLastError e) {
 #endif
 
 }
-
-#ifdef TL_WIN32_ENTRY
-extern TL::s32 tl_main(TL::Span<char> args);
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR command_line, int) {
-	TL::init_allocator();
-	TL::print("command_line: %\n", command_line);
-	return tl_main({});
-}
-#endif

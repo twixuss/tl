@@ -68,7 +68,7 @@ struct List {
 	void reserve_exponential(umm desired_capacity) {
 		if (capacity >= desired_capacity) return;
 
-		umm new_capacity = max(1, capacity);
+		umm new_capacity = max(1u, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity);
