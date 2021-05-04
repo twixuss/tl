@@ -72,10 +72,10 @@ enum class CpuVendor : u8 {
 };
 
 enum class CpuCacheType : u8 {
-	unified, 
-	instruction, 
-	data, 
-	trace, 
+	unified,
+	instruction,
+	data,
+	trace,
 
 	count,
 };
@@ -146,14 +146,14 @@ struct CpuidRegisters {
 	s32 edx;
 };
 
-CpuidRegisters cpuid(s32 func) { 
+CpuidRegisters cpuid(s32 func) {
 	CpuidRegisters result;
 	__cpuid(&result.eax, func);
 	return result;
 }
 CpuidRegisters cpuid(s32 func, s32 subfunc) {
 	CpuidRegisters result;
-	__cpuidex(&result.eax, func, subfunc); 
+	__cpuidex(&result.eax, func, subfunc);
 	return result;
 }
 
@@ -174,7 +174,7 @@ CpuInfo get_cpu_info() {
 
 	assert(processorInfoLength % sizeof(buffer[0]) == 0);
 
-	
+
 	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {
 		switch (v) {
 			case CacheUnified: return CpuCacheType::unified;
@@ -222,9 +222,9 @@ CpuInfo get_cpu_info() {
 		((s32 *)vendorName)[0] = data[0].ebx;
 		((s32 *)vendorName)[1] = data[0].edx;
 		((s32 *)vendorName)[2] = data[0].ecx;
-		if (starts_with(vendorName, 24, "GenuineIntel")) {
+		if (starts_with(array_as_span(vendorName), "GenuineIntel"s)) {
 			result.vendor = CpuVendor::intel;
-		} else if (starts_with(vendorName, 24, "AuthenticAMD")) {
+		} else if (starts_with(array_as_span(vendorName), "AuthenticAMD"s)) {
 			result.vendor = CpuVendor::amd;
 		}
 	}
@@ -311,7 +311,7 @@ CpuInfo get_cpu_info() {
     set(CpuFeature::rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor::intel);
     set(CpuFeature::_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor::amd);
     set(CpuFeature::_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor::amd);
-	
+
 	return result;
 }
 

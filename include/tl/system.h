@@ -184,10 +184,11 @@ using u32 = unsigned int;
 using u64 = unsigned long long;
 #endif
 
-using f32   = float;
-using f64   = double;
-using b32   = s32;
-using b64   = s64;
+using f32 = float;
+using f64 = double;
+using f80 = long double;
+using b32 = s32;
+using b64 = s64;
 
 #if ARCH_X64
 using umm = u64;

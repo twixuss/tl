@@ -69,16 +69,16 @@ namespace TL {
 	forceinline constexpr v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
 
 #define EQ_2 \
-	forceinline constexpr bool operator==(v2 b) { return x == b.x && y == b.y; } \
-	forceinline constexpr bool operator!=(v2 b) { return x != b.x || y != b.y; }
+	forceinline constexpr bool operator==(v2 b) const { return x == b.x && y == b.y; } \
+	forceinline constexpr bool operator!=(v2 b) const { return x != b.x || y != b.y; }
 
 #define EQ_3 \
-	forceinline constexpr bool operator==(v3 b) { return x == b.x && y == b.y && z == b.z; } \
-	forceinline constexpr bool operator!=(v3 b) { return x != b.x || y != b.y || z != b.z; }
+	forceinline constexpr bool operator==(v3 b) const { return x == b.x && y == b.y && z == b.z; } \
+	forceinline constexpr bool operator!=(v3 b) const { return x != b.x || y != b.y || z != b.z; }
 
 #define EQ_4 \
-	forceinline constexpr bool operator==(v4 b) { return x == b.x && y == b.y && z == b.z && w == b.w; } \
-	forceinline constexpr bool operator!=(v4 b) { return x != b.x || y != b.y || z != b.z || w != b.w; }
+	forceinline constexpr bool operator==(v4 b) const { return x == b.x && y == b.y && z == b.z && w == b.w; } \
+	forceinline constexpr bool operator!=(v4 b) const { return x != b.x || y != b.y || z != b.z || w != b.w; }
 
 
 template <class _Scalar>

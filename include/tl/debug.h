@@ -43,6 +43,12 @@ TL_API bool debugger_attached();
 
 #include "compiler.h"
 
+#pragma warning(push, 0)
+#include <DbgHelp.h>
+#pragma warning(pop)
+
+#pragma comment(lib, "dbghelp")
+
 namespace TL {
 
 static HANDLE debug_process;

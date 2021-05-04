@@ -128,7 +128,7 @@ inline void free(Json::Object &obj) {
 	obj.type = Json::Type_null;
 }
 
-void append(StringBuilder &b, Json::Object obj) {
+inline void append(StringBuilder &b, Json::Object obj) {
 	switch (obj.type) {
 		case Json::Type_number: {
 			append(b, obj.number);

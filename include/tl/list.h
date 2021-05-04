@@ -591,7 +591,6 @@ struct Queue {
 	}
 
 	operator Span<T>() { return {data, size}; }
-	operator Span<T const>() const { return {data, size}; }
 
 	void _reallocate(umm new_capacity) {
 	}

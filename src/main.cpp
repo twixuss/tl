@@ -13,7 +13,6 @@
 #include "../include/tl/math.h"
 #include "../include/tl/math_random.h"
 #include "../include/tl/mesh.h"
-#include "../include/tl/net.h"
 #include "../include/tl/opengl.h"
 #include "../include/tl/optional.h"
 #include "../include/tl/profiler.h"
@@ -33,9 +32,6 @@
 using namespace TL;
 
 #pragma warning(disable: 4100)
-
-#include "math.cpp"
-#include "string.cpp"
 
 #pragma warning(push, 0)
 #include <stdio.h>
@@ -58,8 +54,8 @@ void bubbleSort(Span<T> span) {
 
 	while (doSwap) {
 		doSwap = false;
-		for (auto cursor = span.begin() + 1; 
-			 cursor != span.end(); 
+		for (auto cursor = span.begin() + 1;
+			 cursor != span.end();
 			 ++cursor)
 		{
 			if (cursor[0] < cursor[-1]) {
@@ -285,7 +281,7 @@ void sort_test() {
 	std::shuffle(origList.begin(), origList.end(), std::mt19937{std::random_device{}()});
 
 	List<u32> list;
-	
+
 #define SORT_TEST(name)						  \
 	{										  \
 		printf("%s ... ", #name);             \
@@ -307,7 +303,7 @@ void sort_perf() {
 	for (u32 i = 0; i < origList.size(); ++i)
 		origList[i] = i;
 	std::shuffle(origList.begin(), origList.end(), std::mt19937{std::random_device{}()});
-	
+
 	TIMER("std::sort") { std::sort(list.begin(), list.end()); };
 	TIMER("quickSort") { quickSort(list); };
 	TIMER("mergeSort") { mergeSort(list); };
@@ -326,7 +322,7 @@ void buffer_test() {
 		buffer.push_back('b');
 		buffer.push_back('c');
 		buffer.push_back('d');
-	
+
 		assert(!buffer.empty());
 		assert(!buffer.full());
 		assert(memequ(buffer._allocBegin, "abcd", 4));
@@ -337,7 +333,7 @@ void buffer_test() {
 		buffer.push_front('f');
 		buffer.push_front('g');
 		buffer.push_front('h');
-	
+
 		assert(!buffer.empty());
 		assert(buffer.full());
 		assert(memequ(buffer._allocBegin, "abcdhgfe", 8));
@@ -393,17 +389,20 @@ void rand_test() {
 	print("Median: %, Max: %, Min: %\n", counts[count_of(counts) / 2], *std::max_element(std::begin(counts), std::end(counts)), *std::min_element(std::begin(counts), std::end(counts)));
 }
 #endif
+
 int main() {
 	init_allocator();
+	defer { deinit_allocator(); };
 
-	//rand_test();
-	//buffer_test();
-	//sort_test();
-	//sort_perf();
+	init_printer();
+	defer { deinit_printer(); };
 
-	string_test();
-
-	math_test();
+#define TEST(name) print("% ... ", #name); extern void name(); name(); print("ok\n")
+	TEST(string_test);
+	TEST(math_test);
+	TEST(common_test);
+	TEST(compiler_test);
+#undef TEST;
 
 	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};
 	u16 test16[][2] = {{0, 16}, {0xFF,  8}, {0xFFFF,  0}};
@@ -419,7 +418,7 @@ int main() {
 	//	assert(count_leading_zeros((u32)(1 << i)) == (31 - i));
 	//}
 
-	
+
 	Queue<int> test;
 
 	assert(test.allocator != 0);
@@ -427,16 +426,16 @@ int main() {
 	assert(test.size == 0);
 	assert(test.alloc_data == 0);
 	assert(test.alloc_size == 0);
-	
+
 	test.push(42);
-	
+
 	assert(test.size == 1);
 	assert(test.alloc_size == 1);
 	assert(test.data[0] == 42);
 	assert(test.alloc_data[0] == 42);
-	
+
 	test.push(69);
-	
+
 	assert(test.size == 2);
 	assert(test.alloc_size == 2);
 	assert(test.data[0] == 42);
@@ -445,7 +444,7 @@ int main() {
 	assert(test.alloc_data[1] == 69);
 
 	test.push(23);
-	
+
 	assert(test.size == 3);
 	assert(test.alloc_size == 4);
 	assert(test.data[0] == 42);
@@ -454,9 +453,9 @@ int main() {
 	assert(test.alloc_data[0] == 42);
 	assert(test.alloc_data[1] == 69);
 	assert(test.alloc_data[2] == 23);
-	
+
 	test.pop();
-	
+
 	assert(test.size == 2);
 	assert(test.alloc_size == 4);
 	assert(test.data[0] == 69);

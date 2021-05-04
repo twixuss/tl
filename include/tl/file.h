@@ -624,7 +624,7 @@ ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allo
 List<filechar> get_current_directory() {
 	List<filechar> temp;
 	temp.resize(GetCurrentDirectoryW(0, 0));
-	GetCurrentDirectoryW(temp.size, (wchar *)temp.data);
+	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
 	return temp;
 }
 
