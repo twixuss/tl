@@ -183,8 +183,8 @@ List<ascii> demangle(ascii const *function_name) {
 	StringBuilder builder;
 
 	if (*function_name == '?') {
-		append(builder, function_name);
-		append(builder, ' ');
+		// append(builder, function_name);
+		// append(builder, ' ');
 
 		// ?fn35@@YA@U?$TemplatedChild@C@?$Templated@E@@@Z - auto f35(Templated<u8>::TemplatedChild<s8>)
 
