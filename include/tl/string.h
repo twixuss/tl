@@ -557,6 +557,7 @@ inline void append_format(StringBuilder &b, Span<Char> format_string) {
 		if (previous_is_percent) {
 			if (*c == '`') {
 				append(b, '%');
+				continue;
 			} else {
 				invalid_code_path("not enough arguments were provided for 'append_format'");
 				return;
@@ -576,6 +577,7 @@ void append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, A
 		if (previous_is_percent) {
 			if (*c == '`') {
 				append(b, '%');
+				continue;
 			} else {
 				append(b, arg);
 				append_format(b, Span(c, end), args...);

@@ -14,11 +14,10 @@ struct List {
 		size = list.size();
 		memcpy(data, list.begin(), list.size() * sizeof(T));
 	}
-	List &operator=(Span<T> span) {
+	void set(Span<T> span) {
 		reserve(span.size);
 		size = span.size;
 		memcpy(data, span.data, span.size * sizeof(T));
-		return *this;
 	}
 	T &add() {
 		reserve_exponential(size + 1);

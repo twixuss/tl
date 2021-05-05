@@ -36,6 +36,12 @@ inline constexpr umm count_of(Array<T, size> const &arr) {
 	return size;
 }
 
+
+template <class T, umm size>
+inline constexpr Span<T> as_span(Array<T, size> &arr) {
+	return {arr.data, arr.size};
+}
+
 template <class T, class _IndexType, _IndexType _size_x, _IndexType _size_y>
 struct Array2 {
 	using IndexType = _IndexType;

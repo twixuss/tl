@@ -15,7 +15,8 @@ struct TimeSpan {
 	u32 thread_id;
 };
 
-extern TL_API bool enabled;
+extern TL_API Allocator name_allocator;
+extern TL_API thread_local bool enabled;
 
 TL_API void init();
 TL_API void deinit();
@@ -35,7 +36,8 @@ TL_API List<ascii> output_for_chrome();
 #define timed_begin(name) ::TL::Profiler::begin(name, __FILE__, __LINE__)
 #define timed_end() ::TL::Profiler::end()
 #define timed_block(name) timed_begin(name); defer{ timed_end(); }
-#define timed_function() timed_block(([](char const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
+//#define timed_function() timed_block(([](char const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
+#define timed_function() timed_block(as_span(__FUNCSIG__))
 #else
 #define timed_begin(name)
 #define timed_end()
@@ -54,16 +56,17 @@ TL_API List<ascii> output_for_chrome();
 #include <unordered_map>
 namespace TL { namespace Profiler {
 
+Allocator name_allocator;
+
 List<TimeSpan> recorded_time_spans;
 Mutex recorded_time_spans_mutex;
 
 std::unordered_map<u32, List<TimeSpan>> current_time_spans;
 Mutex current_time_spans_mutex;
-//f64 startTime;
-s64 start_time;
-bool enabled = TL_ENABLE_PROFILER;
+thread_local bool enabled = TL_ENABLE_PROFILER;
 
 void init() {
+	name_allocator = default_allocator;
 	recorded_time_spans.allocator = default_allocator;
 }
 void deinit() {
@@ -76,14 +79,12 @@ void begin(Span<char> name, char const *file, u32 line) {
 	scoped_lock(current_time_spans_mutex);
 	auto &span = current_time_spans[thread_id].add();
 
-	span.name = name;
+	span.name.allocator = name_allocator;
+	span.name.set(name);
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
 	span.begin = get_performance_counter();
-
-	if (!start_time)
-		start_time = span.begin;
 }
 void end() {
 	if (!enabled)
@@ -129,7 +130,7 @@ List<ascii> output_for_chrome() {
 				FormatFloat((span.end - span.begin) * 1000000. / performance_frequency, 6),
 				span.name,
 				span.thread_id,
-				FormatFloat((span.begin - start_time) * 1000000. / performance_frequency, 6)
+				FormatFloat(span.begin * 1000000. / performance_frequency, 6)
 			);
 			needComma = true;
 		}
@@ -153,8 +154,8 @@ List<u8> output_for_timed() {
 	builder.allocator = temporary_allocator;
 	if (!recorded_time_spans.empty()) {
 		for (auto span : recorded_time_spans) {
-			append_bytes(builder, (s64)((span.begin - start_time) * 1000000 / performance_frequency));
-			append_bytes(builder, (s64)((span.end   - start_time) * 1000000 / performance_frequency));
+			append_bytes(builder, (s64)(span.begin * 1000000 / performance_frequency));
+			append_bytes(builder, (s64)(span.end   * 1000000 / performance_frequency));
 			append_bytes(builder, (u32)span.thread_id);
 			append_bytes(builder, (u16)span.name.size);
 			append_bytes(builder, span.name);

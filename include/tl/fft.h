@@ -84,4 +84,22 @@ bool fft(Span<Complex<Float>> span) {
 	return true;
 }
 
+template <class Float>
+void time_domain_to_frequency_domain(Span<Float> span) {
+	scoped_allocator(temporary_allocator);
+
+	List<Complex<Float>> complexs;
+	complexs.reserve(span.size);
+	for (umm i = 0; i < span.size; ++i) {
+		Complex<Float> v;
+		v.real = span.data[i];
+		v.imaginary = 0;
+		complexs.add(v);
+	}
+	fft(as_span(complexs));
+	for (umm i = 0; i < span.size; ++i) {
+		span.data[i] = length(complexs.data[i]);
+	}
+}
+
 }
