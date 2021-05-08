@@ -101,7 +101,7 @@ bool update(Catalog<T> &catalog) {
 	timed_function();
 	bool any_updated = false;
 	for (auto &[name, entry] : catalog.entries) {
-		any_updated |= update_file_tracker(entry.tracker);
+		any_updated |= update(entry.tracker);
 	}
 	return any_updated;
 }

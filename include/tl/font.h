@@ -256,6 +256,9 @@ void free(FontCollection *_collection) {
 }
 
 aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
+	if (!text.size)
+		return {};
+
 	auto collection = (FontCollectionFT *)font->collection;
 
 	scoped_allocator(collection->allocator);

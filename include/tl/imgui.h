@@ -21,6 +21,7 @@ aabb<v2s> current_region;
 aabb<v2s> current_visible_region;
 List<utf8> tooltip;
 bool show_tooltip;
+f32 tooltip_opacity;
 f32 tooltip_opacity_t;
 v4f slider_background_color = {.1,.1,.1,1};
 v4f slider_foreground_color = {.2,.2,.2,1};
@@ -148,6 +149,11 @@ void end() {
 
 bool hovering_interactive_element;
 
+bool should_set_tooltip;
+void set_tooltip(Span<utf8> new_tooltip) {
+	tooltip.set(new_tooltip);
+}
+
 void draw_and_free_layer(UILayer &layer) {
 	_draw_and_free_elements(layer.elements);
 	free(layer.elements);
@@ -179,12 +185,12 @@ void label(u32 id, Label l) {
 	UIElement e;
 	e.kind = UIElement_text;
 	e.text.text.allocator = temporary_allocator;
-	e.text.text           = l.text;
-	e.text.rect           = region_to_client(l.rect);
-	e.text.alignment      = l.alignment;
-	e.text.font_size      = l.font_size;
-	e.text.color          = l.color;
-	e.text.id             = id;
+	e.text.text.set(l.text);
+	e.text.rect      = region_to_client(l.rect);
+	e.text.alignment = l.alignment;
+	e.text.font_size = l.font_size;
+	e.text.color     = l.color;
+	e.text.id        = id;
 	current_layer->elements.add(e);
 }
 void label(u32 id, Span<utf8> text, aabb<v2s> rect, TextAlignment alignment, u32 size, v4f color = V4f(1)) {
@@ -223,7 +229,6 @@ struct Button {
 	v4f background_color = {};
 	Texture background_texture = {};
 	Texture foreground_texture = {};
-	Span<utf8> tooltip = {};
 	u32 content_padding = {};
 };
 
@@ -243,6 +248,8 @@ struct ButtonState {
 };
 
 ButtonState button(Button &b) {
+	should_set_tooltip = false;
+
 	defer { ++b.id; };
 	static u32 current_id = -1;
 
@@ -278,10 +285,9 @@ ButtonState button(Button &b) {
 	ButtonState state = {};
 	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position - current_visible_region.min, background_rect)) {
 		hovering_interactive_element = true;
-		if (b.tooltip.size) {
-			tooltip = b.tooltip;
-			show_tooltip = true;
-		}
+		should_set_tooltip = tooltip_opacity > 0;
+		tooltip.clear();
+		show_tooltip = true;
 		if (current_id == id) {
 			if (mouse_up(start_button)) {
 				state.mouse_button = start_button;
@@ -355,17 +361,17 @@ struct Slider {
 	T lower_bound;
 	T upper_bound;
 	aabb<v2s> rect;
-	Span<utf8> tooltip;
 	Texture texture;
 };
 
 template <class T>
 bool slider(u32 id, Slider<T> s) {
+	should_set_tooltip = false;
+
 	auto value       = s.value;
 	auto lower_bound = s.lower_bound;
 	auto upper_bound = s.upper_bound;
 	auto rect        = s.rect;
-	auto tooltip     = s.tooltip;
 	auto texture     = s.texture;
 
 	static u32 current_id = -1;
@@ -375,8 +381,8 @@ bool slider(u32 id, Slider<T> s) {
 	bool clicked = false;
 	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position, rect)) {
 		hovering_interactive_element = true;
-		::tooltip = tooltip;
 		::show_tooltip = true;
+		tooltip.clear();
 		if (mouse_down(0)) {
 			current_id = id;
 		}
@@ -433,13 +439,12 @@ bool slider(u32 id, Slider<T> s) {
 Texture *default_slider_texture;
 
 template <class T>
-bool slider(u32 id, T &value, T lower_bound, T upper_bound, aabb<v2s> rect, Span<utf8> tooltip) {
+bool slider(u32 id, T &value, T lower_bound, T upper_bound, aabb<v2s> rect) {
 	Slider<T> s;
 	s.value       = &value;
 	s.lower_bound = lower_bound;
 	s.upper_bound = upper_bound;
 	s.rect        = rect;
-	s.tooltip     = tooltip;
 	s.texture     = *default_slider_texture;
 	return slider(id, s);
 }
@@ -461,6 +466,8 @@ struct ScrollBar {
 	aabb<v2s> rect = {};
 	ScrollBarFlags flags = {};
 	T *scale = {};
+	T min_scale = {};
+	T max_scale = {};
 };
 
 template <class T>
@@ -477,6 +484,8 @@ bool scroll_bar(ScrollBar<T> &s) {
 	defer { scroll_amount = roundf(lerp((f32)scroll_amount, (f32)target_scroll_amount, 0.5f)); };
 
 	static u32 panning_id = -1;
+	static s32 panning_scroll_start;
+	static s32 panning_mouse_start;
 
 	if (in_bounds(window->mouse_position, current_visible_region)) {
 		if (window->mouse_wheel) {
@@ -486,7 +495,11 @@ bool scroll_bar(ScrollBar<T> &s) {
 				} else {
 					auto old_scale = scale;
 					scale /= powf(1.1f, window->mouse_wheel);
+					scale = clamp(scale, s.min_scale, s.max_scale);
 					target_scroll_amount = scroll_amount = lerp<f32>(window->mouse_position.x, target_scroll_amount, old_scale / scale);
+
+					panning_mouse_start = window->mouse_position.x;
+					panning_scroll_start = target_scroll_amount;
 				}
 			} else if (s.flags & ScrollBar_zoom_with_wheel) {
 				target_scroll_amount += window->mouse_wheel * max_visible_dim / 8;
@@ -503,15 +516,17 @@ bool scroll_bar(ScrollBar<T> &s) {
 			target_scroll_amount = 0;
 		}
 		if (key_down(Key_end)) {
-			target_scroll_amount = min_value<T>;
+			target_scroll_amount = current_visible_region.size().x - s.total_size; // flipped because target_scroll_amount is negative at the end
 		}
 		if (s.flags & ScrollBar_pan_with_mouse) {
 			if (mouse_down(0)) {
 				panning_id = id;
+				panning_mouse_start = window->mouse_position.x;
+				panning_scroll_start = target_scroll_amount;
 			}
 			if (panning_id == id) {
 				if (mouse_held(0)) {
-					target_scroll_amount = scroll_amount = target_scroll_amount + window->mouse_delta.x * 2;
+					target_scroll_amount = scroll_amount = panning_scroll_start + window->mouse_position.x - panning_mouse_start;
 				}
 			}
 			if (mouse_up(0)) {
@@ -692,9 +707,7 @@ void end_frame() {
 	}
 	layers.clear();
 
-	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)show_tooltip, 1 / 60.0f);
-	f32 tooltip_opacity = smoothstep(clamp(map(tooltip_opacity_t, 0.0f, 1.0f, -3.0f, 1.0f), 0.0f, 1.0f));
-	if (tooltip_opacity) {
+	if (tooltip_opacity > 0 && tooltip.size != 0) {
 		UILayer tooltip_layer;
 		current_layer = &tooltip_layer;
 		auto tooltip_font_size = 16;
@@ -709,6 +722,9 @@ void end_frame() {
 		label(-2, tooltip, panel_rect, TextAlignment_center, tooltip_font_size, V4f(1,1,1,tooltip_opacity));
 		draw_and_free_layer(tooltip_layer);
 	}
+	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)show_tooltip, 1 / 60.0f);
+	tooltip_opacity = smoothstep(clamp(map(tooltip_opacity_t, 0.0f, 1.0f, -3.0f, 1.0f), 0.0f, 1.0f));
+
 	show_tooltip = false;
 }
 

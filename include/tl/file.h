@@ -174,7 +174,10 @@ inline FileTracker create_file_tracker(Span<filechar> path, Fn &&on_update) {
 	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), std::forward<Fn>(on_update));
 }
 
-inline bool update_file_tracker(FileTracker &tracker) {
+inline bool update(FileTracker &tracker) {
+	if (!tracker.path.data)
+		return false;
+
 	u64 last_write_time = get_file_write_time(tracker.path);
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
@@ -185,11 +188,24 @@ inline bool update_file_tracker(FileTracker &tracker) {
 }
 
 inline void free(FileTracker &tracker) {
-	if (tracker.allocator) {
-		FREE(tracker.allocator, tracker.state);
+	if (tracker.path.data) {
+		if (tracker.allocator) {
+			FREE(tracker.allocator, tracker.state);
+		}
+		free(tracker.path);
+		tracker = {};
 	}
-	free(tracker.path);
-	tracker = {};
+}
+
+template <class Fn>
+inline void reset(FileTracker &tracker, Span<filechar> path, Fn &&on_update) {
+	if (tracker.path.data) {
+		if (tracker.allocator) {
+			FREE(tracker.allocator, tracker.state);
+		}
+	}
+	tracker.path.set(path);
+	tracker = create_file_tracker_steal_path(tracker.path, std::forward<Fn>(on_update));
 }
 
 inline s64 length(File file) {
