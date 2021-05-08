@@ -33,6 +33,10 @@ inline StringizedCallStack get_stack_trace() {
 	return to_string(call_stack);
 }
 
+#ifdef CreateWindow
+TL_API StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip);
+#endif
+
 TL_API bool debugger_attached();
 
 }
@@ -164,7 +168,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 	return result;
 }
 
-static StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
+StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 	auto call_stack = with(temporary_allocator, get_call_stack(context, frames_to_skip));
 	return to_string(call_stack);
 }
