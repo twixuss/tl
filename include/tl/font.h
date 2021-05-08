@@ -77,6 +77,8 @@ FontChar get_char_info(u32 ch, SizedFont *font) {
 // Returns true if new characters were added
 //
 bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
+	timed_function();
+
 	auto collection = (FontCollectionFT *)font->collection;
 
 	scoped_allocator(collection->allocator);
@@ -199,6 +201,8 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 }
 
 SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
+	timed_function();
+
 	auto found = collection->size_to_font.find(size);
 	if (found != collection->size_to_font.end()) {
 		return &found->second;
@@ -216,6 +220,8 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 static FT_Library ft_library;
 
 FontCollection *create_font_collection(Span<Span<filechar>> font_paths) {
+	timed_function();
+
 	if (!ft_library) {
 		auto error = FT_Init_FreeType(&ft_library);
 		assert(!error, "FT_Init_FreeType Error %", FT_Error_String(error));
@@ -258,6 +264,8 @@ void free(FontCollection *_collection) {
 aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 	if (!text.size)
 		return {};
+
+	timed_function();
 
 	auto collection = (FontCollectionFT *)font->collection;
 
@@ -302,6 +310,8 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 }
 
 List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink) {
+	timed_function();
+
 	List<PlacedChar> result;
 
 	ensure_all_chars_present(text, font);
@@ -339,6 +349,8 @@ List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink) {
 
 }
 
+#else
+#error No font rasterization library detected
 #endif
 
 #endif

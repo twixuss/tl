@@ -1177,6 +1177,12 @@ extern TL_API thread_local Allocator current_allocator;
 extern TL_API Allocator tracking_allocator;
 #endif
 
+#if TL_COUNT_ALLOCATIONS
+extern umm frees_count;
+extern umm allocations_count;
+extern umm allocations_size;
+#endif
+
 struct AllocatorPusher {
 	Allocator old_allocator;
 	forceinline AllocatorPusher(Allocator new_allocator) {
@@ -1208,12 +1214,33 @@ struct AllocatorPusher {
 #endif
 #endif
 
+#if TL_COUNT_ALLOCATIONS
+umm frees_count = 0;
+umm allocations_count = 0;
+umm allocations_size = 0;
+#endif
+
 Allocator default_allocator = {
 	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
 		switch (mode) {
-			case Allocator_allocate:   return tl_allocate(size, align);
-			case Allocator_reallocate: return tl_reallocate(data, size, align);
-			case Allocator_free:       tl_free(data); return 0;
+			case Allocator_allocate:
+#if TL_COUNT_ALLOCATIONS
+				++allocations_count;
+				allocations_size += size;
+#endif
+				return tl_allocate(size, align);
+			case Allocator_reallocate:
+#if TL_COUNT_ALLOCATIONS
+				++allocations_count;
+				allocations_size += size;
+#endif
+				return tl_reallocate(data, size, align);
+			case Allocator_free:
+#if TL_COUNT_ALLOCATIONS
+				++frees_count;
+#endif
+				tl_free(data);
+				return 0;
 		}
 		return 0;
 	},
