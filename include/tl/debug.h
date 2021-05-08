@@ -93,7 +93,6 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	defer { CloseHandle(thread); };
 
 	CallStack call_stack;
-
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (frames_to_skip) {
 			--frames_to_skip;
@@ -139,13 +138,19 @@ StringizedCallStack to_string(CallStack &call_stack) {
 				break;
 			}
 
+#if 1
+			char name_buffer[256];
+			name.data = name_buffer;
+			name.size = UnDecorateSymbolName(symbol->Name, name_buffer, count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
+#else
 			name = with(temporary_allocator, demangle(symbol->Name));
+#endif
 
 			IMAGEHLP_LINE64 line = {};
 			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
 			DWORD line_displacement;
 
-			if (SymGetLineFromAddr64(debug_process, symbol->Address, &line_displacement, &line)) {
+			if (SymGetLineFromAddr64(debug_process, (ULONG64)call, &line_displacement, &line)) {
 				entry.line = line.LineNumber;
 				file = as_span(line.FileName);
 			}

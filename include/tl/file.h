@@ -48,7 +48,13 @@ enum FileCursorOrigin {
 	File_end,
 };
 
-TL_DECLARE_HANDLE(File);
+struct File {
+	void *handle;
+};
+
+inline bool valid(File file) {
+	return file.handle != 0;
+}
 
 TL_API File open_file(filechar const *path, u32 open_flags);
 inline File open_file(Span<filechar> path, u32 open_flags) {
@@ -77,6 +83,8 @@ TL_API void truncate_to_cursor(File file);
 TL_API bool file_exists(Span<filechar> path);
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
+	timed_function();
+
 	auto oldCursor = get_cursor(file);
 	defer { set_cursor(file, oldCursor, File_begin); };
 
@@ -91,7 +99,7 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 }
 inline Buffer read_entire_file(Span<filechar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
 	File file = open_file(path, File_read);
-	if (!file) return {};
+	if (!valid(file)) return {};
 	defer { close(file); };
 	return read_entire_file(file, extra_space_before, extra_space_after);
 }
@@ -105,7 +113,7 @@ inline bool write_entire_file(File file, void const *data, u64 size) {
 }
 inline bool write_entire_file(filechar const *path, void const *data, u64 size) {
 	File file = open_file(path, File_write);
-	if (!file) return false;
+	if (!valid(file)) return false;
 	defer { close(file); };
 	return write_entire_file(file, data, size);
 }
@@ -290,7 +298,7 @@ File open_file(filechar const *path, u32 open_flags) {
 	}
 	if (handle == INVALID_HANDLE_VALUE)
 		handle = 0;
-	return (File)handle;
+	return {handle};
 }
 
 void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
@@ -303,11 +311,11 @@ void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
 		case File_end: moveMethod = FILE_END; break;
 		default: return;
 	}
-	SetFilePointerEx((HANDLE)file, newP, 0, moveMethod);
+	SetFilePointerEx(file.handle, newP, 0, moveMethod);
 }
 s64 get_cursor(File file) {
 	LARGE_INTEGER curP;
-	SetFilePointerEx((HANDLE)file, {}, &curP, FILE_CURRENT);
+	SetFilePointerEx(file.handle, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
 }
 bool read(File file, void *data_, u64 size) {
@@ -317,13 +325,13 @@ bool read(File file, void *data_, u64 size) {
 	u64 total_bytes_read = 0;
 	u64 remaining = size;
 	while (remaining > max_bytes) {
-		ReadFile((HANDLE)file, data, max_bytes, &bytes_read, 0);
+		ReadFile(file.handle, data, max_bytes, &bytes_read, 0);
 		data += max_bytes;
 		remaining -= max_bytes;
 		total_bytes_read += bytes_read;
 	}
 	if (remaining) {
-		ReadFile((HANDLE)file, data, (DWORD)remaining, &bytes_read, 0);
+		ReadFile(file.handle, data, (DWORD)remaining, &bytes_read, 0);
 		total_bytes_read += bytes_read;
 	}
 	return total_bytes_read == size;
@@ -335,22 +343,22 @@ bool write(File file, void const *data_, u64 size) {
 	u64 total_bytes_written = 0;
 	u64 remaining = size;
 	while (remaining > max_bytes) {
-		WriteFile((HANDLE)file, data, max_bytes, &bytes_written, 0);
+		WriteFile(file.handle, data, max_bytes, &bytes_written, 0);
 		data += max_bytes;
 		remaining -= max_bytes;
 		total_bytes_written += bytes_written;
 	}
 	if (remaining) {
-		WriteFile((HANDLE)file, data, (DWORD)remaining, &bytes_written, 0);
+		WriteFile(file.handle, data, (DWORD)remaining, &bytes_written, 0);
 		total_bytes_written += bytes_written;
 	}
 	return total_bytes_written == size;
 }
 void truncate_to_cursor(File file) {
-	SetEndOfFile((HANDLE)file);
+	SetEndOfFile(file.handle);
 }
 void close(File file) {
-	CloseHandle((HANDLE)file);
+	CloseHandle(file.handle);
 }
 
 bool file_exists(Span<filechar> path) {
