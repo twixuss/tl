@@ -234,8 +234,12 @@ FontCollection *create_font_collection(Span<Span<filechar>> font_paths) {
 		auto file = read_entire_file(path);
 		result->files.add(file);
 
+		FT_Error error;
 		FT_Face face;
-		auto error = FT_New_Memory_Face(ft_library, file.data, file.size, 0, &face);
+		{
+			timed_block("FT_New_Memory_Face"s);
+			error = FT_New_Memory_Face(ft_library, file.data, file.size, 0, &face);
+		}
 		if (error) {
 			invalid_code_path("FT_New_Face failed: %", FT_Error_String(error));
 		}

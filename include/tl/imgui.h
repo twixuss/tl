@@ -140,11 +140,11 @@ void free(UIElement &elem) {
 	}
 }
 
-void begin() {
+void begin_base() {
 	current_layer = &layers.add();
 }
 
-void end() {
+void end_base() {
 }
 
 bool hovering_interactive_element;
@@ -152,6 +152,7 @@ bool hovering_interactive_element;
 bool should_set_tooltip;
 void set_tooltip(Span<utf8> new_tooltip) {
 	tooltip.set(new_tooltip);
+	should_set_tooltip = false;
 }
 
 void draw_and_free_layer(UILayer &layer) {
@@ -219,6 +220,10 @@ enum UIElementState {
 	UIElement_pressed,
 };
 
+Span<utf8> get_tooltip_stub() {
+	return {};
+}
+
 struct Button {
 	u32 id = {};
 	aabb<v2s> rect = {};
@@ -230,6 +235,7 @@ struct Button {
 	Texture background_texture = {};
 	Texture foreground_texture = {};
 	u32 content_padding = {};
+	Span<utf8> (*get_tooltip)() = get_tooltip_stub;
 };
 
 using ButtonStateFlags = u8;
@@ -247,8 +253,16 @@ struct ButtonState {
 	}
 };
 
+void check_if_tooltip_was_set_properly() {
+	if (should_set_tooltip) {
+		// tooltip was not set
+		should_set_tooltip = false;
+		show_tooltip = false;
+	}
+}
+
 ButtonState button(Button &b) {
-	should_set_tooltip = false;
+	check_if_tooltip_was_set_properly();
 
 	defer { ++b.id; };
 	static u32 current_id = -1;
@@ -285,9 +299,8 @@ ButtonState button(Button &b) {
 	ButtonState state = {};
 	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position - current_visible_region.min, background_rect)) {
 		hovering_interactive_element = true;
-		should_set_tooltip = tooltip_opacity > 0;
-		tooltip.clear();
 		show_tooltip = true;
+		should_set_tooltip = true;
 		if (current_id == id) {
 			if (mouse_up(start_button)) {
 				state.mouse_button = start_button;
@@ -304,6 +317,8 @@ ButtonState button(Button &b) {
 			}
 			state.flags |= ButtonState_hovered;
 		}
+	} else {
+		should_set_tooltip = false;
 	}
 	if (current_id == id) {
 		state.flags |= ButtonState_pressed;
@@ -697,17 +712,17 @@ aabb<v2s> get_other_dock(s32 size, Dock dock) {
 	}
 }
 
-void begin_frame() {
+void begin_frame_base() {
 	current_scissor = current_region = current_visible_region = aabb_min_max({}, (v2s)window->client_size);
 	hovering_interactive_element = false;
 }
-void end_frame() {
+void end_frame_base() {
 	for (auto &layer : reverse(layers)) {
 		draw_and_free_layer(layer);
 	}
 	layers.clear();
 
-	if (tooltip_opacity > 0 && tooltip.size != 0) {
+	if (tooltip_opacity > 0) {
 		UILayer tooltip_layer;
 		current_layer = &tooltip_layer;
 		auto tooltip_font_size = 16;
@@ -722,7 +737,7 @@ void end_frame() {
 		label(-2, tooltip, panel_rect, TextAlignment_center, tooltip_font_size, V4f(1,1,1,tooltip_opacity));
 		draw_and_free_layer(tooltip_layer);
 	}
-	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)show_tooltip, 1 / 60.0f);
+	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)(show_tooltip && tooltip.size), 1 / 60.0f);
 	tooltip_opacity = smoothstep(clamp(map(tooltip_opacity_t, 0.0f, 1.0f, -3.0f, 1.0f), 0.0f, 1.0f));
 
 	show_tooltip = false;

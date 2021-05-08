@@ -47,6 +47,38 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_DEBUG_TYPE_PUSH_GROUP          0x8269
 #define GL_DEBUG_TYPE_POP_GROUP           0x826A
 #define GL_DEBUG_SEVERITY_NOTIFICATION    0x826B
+#define GL_TEXTURE0                       0x84C0
+#define GL_TEXTURE1                       0x84C1
+#define GL_TEXTURE2                       0x84C2
+#define GL_TEXTURE3                       0x84C3
+#define GL_TEXTURE4                       0x84C4
+#define GL_TEXTURE5                       0x84C5
+#define GL_TEXTURE6                       0x84C6
+#define GL_TEXTURE7                       0x84C7
+#define GL_TEXTURE8                       0x84C8
+#define GL_TEXTURE9                       0x84C9
+#define GL_TEXTURE10                      0x84CA
+#define GL_TEXTURE11                      0x84CB
+#define GL_TEXTURE12                      0x84CC
+#define GL_TEXTURE13                      0x84CD
+#define GL_TEXTURE14                      0x84CE
+#define GL_TEXTURE15                      0x84CF
+#define GL_TEXTURE16                      0x84D0
+#define GL_TEXTURE17                      0x84D1
+#define GL_TEXTURE18                      0x84D2
+#define GL_TEXTURE19                      0x84D3
+#define GL_TEXTURE20                      0x84D4
+#define GL_TEXTURE21                      0x84D5
+#define GL_TEXTURE22                      0x84D6
+#define GL_TEXTURE23                      0x84D7
+#define GL_TEXTURE24                      0x84D8
+#define GL_TEXTURE25                      0x84D9
+#define GL_TEXTURE26                      0x84DA
+#define GL_TEXTURE27                      0x84DB
+#define GL_TEXTURE28                      0x84DC
+#define GL_TEXTURE29                      0x84DD
+#define GL_TEXTURE30                      0x84DE
+#define GL_TEXTURE31                      0x84DF
 #define GL_TEXTURE_COMPARE_MODE           0x884C
 #define GL_TEXTURE_COMPARE_FUNC           0x884D
 #define GL_COMPARE_REF_TO_TEXTURE         0x884E
@@ -58,6 +90,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_DEPTH24_STENCIL8               0x88F0
 #define GL_SRC1_COLOR                     0x88F9
 #define GL_ONE_MINUS_SRC1_COLOR           0x88FA
+#define GL_UNIFORM_BUFFER                 0x8A11
 #define GL_VERTEX_SHADER                  0x8B31
 #define GL_FRAGMENT_SHADER                0x8B30
 #define GL_COMPILE_STATUS                 0x8B81
@@ -416,7 +449,11 @@ D(glSamplerParameterf,       void,   (GLuint sampler, GLenum pname, GLfloat para
 D(glSamplerParameteri,       void,   (GLuint sampler, GLenum pname, GLint param),                                                               (sampler, pname, param))\
 D(glGenerateMipmap,          void,   (GLenum target),                                                                                           (target))\
 D(glTexStorage2D,            void,   (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height),                     (target, levels, internalformat, width, height))\
-D(glBlendFuncSeparate,       void,   (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha),                                          (srcRGB, dstRGB, srcAlpha, dstAlpha))
+D(glBlendFuncSeparate,       void,   (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha),                                          (srcRGB, dstRGB, srcAlpha, dstAlpha))\
+D(glActiveTexture,           void,   (GLenum texture), (texture))\
+D(glGetUniformBlockIndex,    GLuint, (GLuint program, const GLchar *uniformBlockName), (program, uniformBlockName))\
+D(glUniformBlockBinding,     void,   (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding), (program, uniformBlockIndex, uniformBlockBinding))\
+D(glBindBufferBase,          void,   (GLenum target, GLuint index, GLuint buffer), (target, index, buffer))\
 
 #if OS_WINDOWS
 
@@ -489,11 +526,18 @@ inline void glClearColor(v4f color) {
 	::glClearColor(color.x, color.y, color.z, color.w);
 }
 
+inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, v4f value) { glUniform4fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, m4  value) { glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, false, value.s); }
+
+inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 index) {
+	glActiveTexture(GL_TEXTURE0 + index);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glUniform1i(glGetUniformLocation(shader, name), index);
+}
 
 inline void use_shader(GLuint shader) { glUseProgram(shader); }
 
