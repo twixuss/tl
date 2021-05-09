@@ -522,8 +522,8 @@ bool scroll_bar(ScrollBar<T> &s) {
 					panning_scroll_start = target_scroll_amount;
 				}
 			} else if (s.flags & ScrollBar_zoom_with_wheel) {
-				target_scroll_amount += window->mouse_wheel * max_visible_dim / 8;
 			} else if (s.flags & ScrollBar_pan_with_wheel) {
+				target_scroll_amount += window->mouse_wheel * max_visible_dim / 8;
 			}
 		}
 		if (key_down(Key_page_down)) {
@@ -723,6 +723,8 @@ void begin_frame_base() {
 	hovering_interactive_element = false;
 }
 void end_frame_base() {
+	timed_function();
+
 	assert(frame_has_begun);
 	frame_has_begun = false;
 	assert(region_stack.size == 0);

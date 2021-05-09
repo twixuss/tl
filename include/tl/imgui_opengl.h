@@ -99,6 +99,8 @@ u32 texture_shader;
 UniformBlock<TextureUniforms> texture_uniforms;
 
 void init(Window *window, FontCollection *font_collection) {
+	timed_function();
+
 	using namespace ::TL::OpenGL;
 	init_base(window);
 	::TL::Imgui::font_collection = font_collection;
@@ -287,6 +289,8 @@ void _set_scissor_impl(aabb<v2s> region) {
 }
 
 void _draw_and_free_elements(Span<UIElement> elements) {
+	timed_function();
+
 	using namespace OpenGL;
 
 	auto element = elements.data;
