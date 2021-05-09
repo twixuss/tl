@@ -27,6 +27,8 @@ List<utf8> tooltip;
 bool show_tooltip;
 f32 tooltip_opacity;
 f32 tooltip_opacity_t;
+f32 frame_time = 1.0f / 60.0f;
+s64 previous_performance_counter;
 
 enum UIElementKind {
 	UIElement_unknown,
@@ -90,6 +92,7 @@ void init_base(Window *window) {
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
 	::TL::Imgui::window = window;
+	previous_performance_counter = get_performance_counter();
 }
 
 void begin_region(aabb<v2s> new_region) {
@@ -339,10 +342,10 @@ ButtonState button(Button &b) {
 	}
 
 	if (text.size) {
-		//begin_region(foreground_rect);
-		label(id, text, foreground_rect, TextAlignment_top_left, font_size, foreground_color);
-		//label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
-		//end_region();
+		begin_region(foreground_rect);
+		//label(id, text, foreground_rect, TextAlignment_top_left, font_size, foreground_color);
+		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
+		end_region();
 	}
 
 	return state;
@@ -742,10 +745,14 @@ void end_frame_base() {
 		label(-2, tooltip, panel_rect, TextAlignment_center, tooltip_font_size, V4f(1,1,1,tooltip_opacity));
 		draw_and_free_layer(tooltip_layer);
 	}
-	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)(show_tooltip && tooltip.size), 1 / 60.0f);
+	tooltip_opacity_t = move_toward(tooltip_opacity_t, (f32)(show_tooltip && tooltip.size), frame_time);
 	tooltip_opacity = smoothstep(clamp(map(tooltip_opacity_t, 0.0f, 1.0f, -3.0f, 1.0f), 0.0f, 1.0f));
 
 	show_tooltip = false;
+
+	auto end_perf_counter = get_performance_counter();
+	frame_time = (f32)(end_perf_counter - previous_performance_counter) / performance_frequency;
+	previous_performance_counter = end_perf_counter;
 }
 
 }
