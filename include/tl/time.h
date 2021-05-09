@@ -9,7 +9,7 @@ struct PreciseTimer {
 
 TL_API PreciseTimer create_precise_timer();
 TL_API f64 get_time(PreciseTimer timer);
-TL_API f64 reset_timer(PreciseTimer &timer);
+TL_API f64 reset(PreciseTimer &timer);
 
 TL_API u64 read_timestamp_counter();
 
@@ -31,7 +31,7 @@ PreciseTimer create_precise_timer() {
 f64 get_time(PreciseTimer timer) {
 	return (f64)(get_performance_counter() - timer.counter) / performance_frequency;
 }
-f64 reset_timer(PreciseTimer &timer) {
+f64 reset(PreciseTimer &timer) {
 	s64 end = get_performance_counter();
 	defer { timer.counter = end; };
 	return (f64)(end - timer.counter) / performance_frequency;

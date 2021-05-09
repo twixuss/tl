@@ -2,6 +2,7 @@
 #include "math.h"
 #include "window.h"
 #include "font.h"
+#include "time.h"
 
 #ifndef TL_IMGUI_TEXTURE
 #error TL_IMGUI_TEXTURE must be defined before including tl/imgui.h
@@ -28,7 +29,7 @@ bool show_tooltip;
 f32 tooltip_opacity;
 f32 tooltip_opacity_t;
 f32 frame_time = 1.0f / 60.0f;
-s64 previous_performance_counter;
+PreciseTimer frame_timer;
 
 enum UIElementKind {
 	UIElement_unknown,
@@ -92,7 +93,7 @@ void init_base(Window *window) {
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
 	::TL::Imgui::window = window;
-	previous_performance_counter = get_performance_counter();
+	frame_timer = create_precise_timer();
 }
 
 void begin_region(aabb<v2s> new_region) {
@@ -750,9 +751,7 @@ void end_frame_base() {
 
 	show_tooltip = false;
 
-	auto end_perf_counter = get_performance_counter();
-	frame_time = (f32)(end_perf_counter - previous_performance_counter) / performance_frequency;
-	previous_performance_counter = end_perf_counter;
+	frame_time = reset(frame_timer);
 }
 
 }
