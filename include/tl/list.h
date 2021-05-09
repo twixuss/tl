@@ -87,8 +87,9 @@ struct List {
 		size = 0;
 	}
 
-	void pop() {
+	T pop() {
 		--size;
+		return data[size];
 	}
 
 	T &operator[](umm i) {

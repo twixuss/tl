@@ -1209,7 +1209,7 @@ INTERSECTS3(bool, v3u)
 #undef INTERSECTS3
 
 template <class T>
-forceinline aabb<T> operator&(aabb<T> const &a, aabb<T> const &b) {
+forceinline aabb<T> Union(aabb<T> const &a, aabb<T> const &b) {
 	aabb<T> result;
 	result.min = max(a.min, b.min);
 	result.max = min(a.max, b.max);

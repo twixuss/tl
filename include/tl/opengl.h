@@ -18,9 +18,6 @@
 #pragma comment(lib, "gdi32")
 #endif
 
-namespace TL {
-namespace OpenGL {
-
 using GLchar = char;
 using GLsizeiptr = umm;
 using GLintptr = smm;
@@ -473,6 +470,9 @@ D(wglGetPixelFormatAttribivARB, BOOL,  (HDC hdc, int iPixelFormat, int iLayerPla
 ALL_FUNCS
 #undef D
 
+namespace TL {
+namespace OpenGL {
+
 enum TextureFormat {
 	Format_d24_s8,
 	Format_d32,
@@ -666,9 +666,15 @@ ALL_FUNCS
 #undef D
 };
 
-#define D(name, ret, args, params) ret name args{return procedures.name params;}
+}
+}
+
+#define D(name, ret, args, params) ret name args{return ::TL::OpenGL::procedures.name params;}
 ALL_FUNCS
 #undef D
+
+namespace TL {
+namespace OpenGL {
 
 static GLuint compile_shader(GLuint shader) {
 	timed_function();

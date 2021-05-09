@@ -3,28 +3,30 @@
 #include "window.h"
 #include "font.h"
 
-#ifndef TL_IMGUI_TEXTURE_HANDLE
-#error TL_IMGUI_TEXTURE_HANDLE must be defined before including tl/imgui.h
+#ifndef TL_IMGUI_TEXTURE
+#error TL_IMGUI_TEXTURE must be defined before including tl/imgui.h
 #endif
 
-#ifndef TL_IMGUI_SHADER_HANDLE
-#error TL_IMGUI_SHADER_HANDLE must be defined before including tl/imgui.h
+#ifndef TL_IMGUI_SHADER
+#error TL_IMGUI_SHADER must be defined before including tl/imgui.h
 #endif
 
 namespace TL {
 namespace Imgui {
 
-using Texture = typename TL_IMGUI_TEXTURE_HANDLE;
-using Shader = typename TL_IMGUI_SHADER_HANDLE;
+using Texture = typename TL_IMGUI_TEXTURE;
+using Shader = typename TL_IMGUI_SHADER;
 
-aabb<v2s> current_region;
-aabb<v2s> current_visible_region;
+struct Region {
+	aabb<v2s> rect;
+	aabb<v2s> visible_rect;
+};
+
+Region current_region;
 List<utf8> tooltip;
 bool show_tooltip;
 f32 tooltip_opacity;
 f32 tooltip_opacity_t;
-v4f slider_background_color = {.1,.1,.1,1};
-v4f slider_foreground_color = {.2,.2,.2,1};
 
 enum UIElementKind {
 	UIElement_unknown,
@@ -42,7 +44,7 @@ struct UIElement {
 	UIElementKind kind;
 	UIElement() {
 		memset(this, 0, sizeof(*this));
-		scissor_rect = current_visible_region;
+		scissor_rect = current_region.visible_rect;
 	}
 	aabb<v2s> scissor_rect;
 	union {
@@ -81,33 +83,26 @@ List<UILayer> layers;
 UILayer *current_layer = 0;
 Texture button_background_texture;
 
+List<Region> region_stack;
+
 void init_base(Window *window) {
 	layers.allocator = current_allocator;
 	tooltip.allocator = current_allocator;
+	region_stack.allocator = current_allocator;
 	::TL::Imgui::window = window;
 }
 
-struct RegionPusher {
-	aabb<v2s> old_region;
-	aabb<v2s> old_visible_region;
-	RegionPusher(aabb<v2s> new_region) {
-		old_region         = current_region;
-		old_visible_region = current_visible_region;
+void begin_region(aabb<v2s> new_region) {
+	region_stack.add(current_region);
 
-		new_region += current_region.min;
-		current_region = new_region;
-		current_visible_region = new_region & current_visible_region;
-	}
-	~RegionPusher() {
-		current_region         = old_region;
-		current_visible_region = old_visible_region;
-	}
-	operator bool() {
-		return volume(current_visible_region) != 0;
-	}
-};
+	new_region += current_region.rect.min;
+	current_region.rect = new_region;
+	current_region.visible_rect = Union(current_region.visible_rect, new_region);
+}
+void end_region() {
+	current_region = region_stack.pop();
+}
 
-#define push_region(region) tl_push(::TL::Imgui::RegionPusher, region)
 
 aabb<v2s> current_scissor;
 
@@ -123,13 +118,8 @@ v2f client_to_ndc(v2u p) { return client_to_ndc((v2f)p); }
 v2f client_to_ndc(v2s p) { return client_to_ndc((v2f)p); }
 aabb<v2f> client_to_ndc(aabb<v2s> p) { return aabb_min_max(client_to_ndc((v2f)p.min), client_to_ndc((v2f)p.max)); }
 
-v2f region_to_ndc(v2f p) { return client_to_ndc(p + (v2f)current_visible_region.min); }
-v2f region_to_ndc(v2s p) { return client_to_ndc(p + current_visible_region.min); }
-v2f region_to_ndc(v2u p) { return region_to_ndc((v2s)p); }
-aabb<v2f> region_to_ndc(aabb<v2s> p) { return client_to_ndc(p + current_visible_region.min); }
-
-v2f region_to_client(v2f p) { return p + (v2f)current_region.min; }
-v2s region_to_client(v2s p) { return p + current_region.min; }
+v2f region_to_client(v2f p) { return p + (v2f)current_region.rect.min; }
+v2s region_to_client(v2s p) { return p + current_region.rect.min; }
 aabb<v2s> region_to_client(aabb<v2s> p) { return {region_to_client(p.min), region_to_client(p.max)}; }
 
 void free(UIElement &elem) {
@@ -205,7 +195,7 @@ void label(u32 id, Span<utf8> text, aabb<v2s> rect, TextAlignment alignment, u32
 }
 
 void panel(aabb<v2s> rect, v4f color) {
-	if (!intersects(rect, current_visible_region - current_visible_region.min)) return;
+	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return;
 
 	UIElement e;
 	e.kind = UIElement_panel;
@@ -291,13 +281,13 @@ ButtonState button(Button &b) {
 	auto &background_rect = b.rect;
 	background_rect.max += content_padding * 2;
 
-	if (!intersects(background_rect, current_visible_region - current_visible_region.min)) return {};
+	if (!intersects(background_rect, current_region.visible_rect - current_region.visible_rect.min)) return {};
 
 	auto mouse_position = window->mouse_position;
 
 	static u8 start_button;
 	ButtonState state = {};
-	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position - current_visible_region.min, background_rect)) {
+	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_region.visible_rect) && in_bounds(mouse_position - current_region.visible_rect.min, background_rect)) {
 		hovering_interactive_element = true;
 		show_tooltip = true;
 		should_set_tooltip = true;
@@ -349,9 +339,9 @@ ButtonState button(Button &b) {
 	}
 
 	if (text.size) {
-		push_region(foreground_rect) {
-			label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
-		}
+		begin_region(foreground_rect);
+		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
+		end_region();
 	}
 
 	return state;
@@ -360,7 +350,7 @@ ButtonState button(Button &b) {
 template <class T>
 T get_hovered_slider_value(aabb<v2s> rect, T lower_bound, T upper_bound) {
 	auto size = rect.size();
-	auto mouse_position = window->mouse_position - current_visible_region.min;
+	auto mouse_position = window->mouse_position - current_region.visible_rect.min;
 	if (size.y > size.x) {
 		s32 thickness = size.x;
 		return map_clamped((T)mouse_position.y, (T)(rect.min.y + thickness/2), (T)(rect.min.y + size.y - thickness/2), upper_bound, lower_bound);
@@ -372,17 +362,19 @@ T get_hovered_slider_value(aabb<v2s> rect, T lower_bound, T upper_bound) {
 
 template <class T>
 struct Slider {
+	u32 id;
 	T *value;
 	T lower_bound;
 	T upper_bound;
 	aabb<v2s> rect;
 	Texture texture;
+	v4f background_color = {.1,.1,.1,1};
+	v4f foreground_color = {.2,.2,.2,1};
 };
 
 template <class T>
-bool slider(u32 id, Slider<T> s) {
-	should_set_tooltip = false;
-
+bool slider(Slider<T> &s) {
+	auto id          = s.id++;
 	auto value       = s.value;
 	auto lower_bound = s.lower_bound;
 	auto upper_bound = s.upper_bound;
@@ -391,19 +383,21 @@ bool slider(u32 id, Slider<T> s) {
 
 	static u32 current_id = -1;
 
-	auto mouse_position = window->mouse_position - current_visible_region.min;
+	auto mouse_position = window->mouse_position - current_region.visible_rect.min;
 	UIElementState state = UIElement_normal;
 	bool clicked = false;
-	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position, rect)) {
+	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_region.visible_rect) && in_bounds(mouse_position, rect)) {
 		hovering_interactive_element = true;
-		::show_tooltip = true;
-		tooltip.clear();
+		show_tooltip = true;
+		should_set_tooltip = true;
 		if (mouse_down(0)) {
 			current_id = id;
 		}
 		if (current_id != id) {
 			state = UIElement_hovered;
 		}
+	} else {
+		should_set_tooltip = false;
 	}
 	if (current_id == id) {
 		state = UIElement_pressed;
@@ -435,18 +429,21 @@ bool slider(u32 id, Slider<T> s) {
 		}
 	}
 
-	if (!intersects(rect, current_visible_region - current_visible_region.min)) return false;
+	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return false;
 
-	if (texture.handle) {
-		draw_texture(rect,      texture, slider_background_color);
-		draw_texture(knob_rect, texture, slider_foreground_color);
+	//if (texture.handle) {
+	//	draw_texture(rect,      texture, s.background_color);
+	//	draw_texture(knob_rect, texture, s.foreground_color);
+	//	if (state != UIElement_normal) {
+	//		draw_texture(rect, texture, V4f(V3f(state == UIElement_hovered), 0.05f));
+	//	}
+	//} else {
+		panel(rect, s.background_color);
+		panel(knob_rect, s.foreground_color);
 		if (state != UIElement_normal) {
-			draw_texture(rect, texture, V4f(V3f(state == UIElement_hovered), 0.05f));
+			panel(rect, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
-	} else {
-		panel(rect, slider_background_color);
-		panel(knob_rect, slider_foreground_color);
-	}
+	//}
 
 	return holding;
 }
@@ -483,6 +480,8 @@ struct ScrollBar {
 	T *scale = {};
 	T min_scale = {};
 	T max_scale = {};
+	v4f background_color = {.1,.1,.1,1};
+	v4f foreground_color = {.2,.2,.2,1};
 };
 
 template <class T>
@@ -494,7 +493,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 	auto total_size = s.total_size;
 	auto rect = s.rect;
 
-	auto max_visible_dim = max(current_visible_region.size());
+	auto max_visible_dim = max(current_region.visible_rect.size());
 	s32 max_scroll = total_size - max_visible_dim;
 	defer { scroll_amount = roundf(lerp((f32)scroll_amount, (f32)target_scroll_amount, 0.5f)); };
 
@@ -502,7 +501,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 	static s32 panning_scroll_start;
 	static s32 panning_mouse_start;
 
-	if (in_bounds(window->mouse_position, current_visible_region)) {
+	if (in_bounds(window->mouse_position, current_region.visible_rect)) {
 		if (window->mouse_wheel) {
 			if ((s.flags & ScrollBar_zoom_with_wheel) && (s.flags & ScrollBar_pan_with_wheel)) {
 				if (key_held(Key_shift)) {
@@ -531,7 +530,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 			target_scroll_amount = 0;
 		}
 		if (key_down(Key_end)) {
-			target_scroll_amount = current_visible_region.size().x - s.total_size; // flipped because target_scroll_amount is negative at the end
+			target_scroll_amount = current_region.visible_rect.size().x - s.total_size; // flipped because target_scroll_amount is negative at the end
 		}
 		if (s.flags & ScrollBar_pan_with_mouse) {
 			if (mouse_down(0)) {
@@ -560,12 +559,12 @@ bool scroll_bar(ScrollBar<T> &s) {
 	static u32 current_id = -1;
 	static s32 pick_offset = 0;
 
-	auto mouse_position = window->mouse_position - current_visible_region.min;
+	auto mouse_position = window->mouse_position - current_region.visible_rect.min;
 
 	bool clicked = false;
 	bool set_offset = false;
 	UIElementState state = UIElement_normal;
-	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_visible_region) && in_bounds(mouse_position, rect)) {
+	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_region.visible_rect) && in_bounds(mouse_position, rect)) {
 		hovering_interactive_element = true;
 		if (mouse_down(0)) {
 			current_id = id;
@@ -647,17 +646,17 @@ bool scroll_bar(ScrollBar<T> &s) {
 		target_scroll_amount = scroll_amount;
 	}
 
-	if (!intersects(rect, current_visible_region - current_visible_region.min)) return false;
+	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return false;
 
 	if (default_slider_texture) {
-		draw_texture(rect, *default_slider_texture, slider_background_color);
-		draw_texture(aabb_min_size(knob_position, knob_size), *default_slider_texture, slider_foreground_color);
+		draw_texture(rect, *default_slider_texture, s.background_color);
+		draw_texture(aabb_min_size(knob_position, knob_size), *default_slider_texture, s.foreground_color);
 		if (state != UIElement_normal) {
 			draw_texture(rect, *default_slider_texture, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
 	} else {
-		panel(rect, slider_background_color);
-		panel(aabb_min_size(knob_position, knob_size), slider_foreground_color);
+		panel(rect, s.background_color);
+		panel(aabb_min_size(knob_position, knob_size), s.foreground_color);
 		if (state != UIElement_normal) {
 			panel(rect, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
@@ -666,9 +665,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 	return holding;
 }
 
-struct Anchor {
-	f32 x, y;
-};
+using Anchor = v2f;
 
 inline static constexpr Anchor anchor_top_left      = {0.0f, 0.0f};
 inline static constexpr Anchor anchor_top_right     = {1.0f, 0.0f};
@@ -689,34 +686,41 @@ enum Dock {
 
 // Returns a rectancle relative to current_region
 aabb<v2s> get_rect(v2s pos, v2s size, Anchor anchor) {
-	return aabb_min_size((v2s)lerp((v2f)pos, (v2f)(current_region.size() - pos - size), V2f(anchor.x)), size);
+	return aabb_min_size((v2s)lerp((v2f)pos, (v2f)(current_region.rect.size() - pos - size), anchor), size);
 }
 
 aabb<v2s> get_dock(s32 size, Dock dock) {
 	switch (dock) {
-		case Dock_top: return aabb_min_max(v2s{}, {current_visible_region.size().x, size});
-		case Dock_bottom: return aabb_min_max({0, current_visible_region.size().y - size}, current_visible_region.size());
-		case Dock_right: return aabb_min_max({current_visible_region.size().x - size, 0}, current_visible_region.size());
-		case Dock_left: return aabb_min_max(v2s{}, {size, current_visible_region.size().y});
+		case Dock_top: return aabb_min_max(v2s{}, {current_region.visible_rect.size().x, size});
+		case Dock_bottom: return aabb_min_max({0, current_region.visible_rect.size().y - size}, current_region.visible_rect.size());
+		case Dock_right: return aabb_min_max({current_region.visible_rect.size().x - size, 0}, current_region.visible_rect.size());
+		case Dock_left: return aabb_min_max(v2s{}, {size, current_region.visible_rect.size().y});
 		default: invalid_code_path("bad Dock");
 	}
 }
 
 aabb<v2s> get_other_dock(s32 size, Dock dock) {
 	switch (dock) {
-		case Dock_top: return aabb_min_max(v2s{0, size}, current_visible_region.size());
-		case Dock_bottom: return aabb_min_max(v2s{}, current_visible_region.size() - v2s{0, size});
-		case Dock_right: return aabb_min_max(v2s{}, current_visible_region.size() - v2s{size, 0});
-		case Dock_left: return aabb_min_max(v2s{size, 0}, current_visible_region.size());
+		case Dock_top: return aabb_min_max(v2s{0, size}, current_region.visible_rect.size());
+		case Dock_bottom: return aabb_min_max(v2s{}, current_region.visible_rect.size() - v2s{0, size});
+		case Dock_right: return aabb_min_max(v2s{}, current_region.visible_rect.size() - v2s{size, 0});
+		case Dock_left: return aabb_min_max(v2s{size, 0}, current_region.visible_rect.size());
 		default: invalid_code_path("bad Dock");
 	}
 }
 
+bool frame_has_begun;
 void begin_frame_base() {
-	current_scissor = current_region = current_visible_region = aabb_min_max({}, (v2s)window->client_size);
+	assert(!frame_has_begun);
+	frame_has_begun = true;
+	current_scissor = current_region.rect = current_region.visible_rect = aabb_min_max({}, (v2s)window->client_size);
 	hovering_interactive_element = false;
 }
 void end_frame_base() {
+	assert(frame_has_begun);
+	frame_has_begun = false;
+	assert(region_stack.size == 0);
+
 	for (auto &layer : reverse(layers)) {
 		draw_and_free_layer(layer);
 	}

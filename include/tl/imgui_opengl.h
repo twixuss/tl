@@ -1,6 +1,14 @@
 #pragma once
-#define TL_IMGUI_TEXTURE_HANDLE u32
-#define TL_IMGUI_SHADER_HANDLE u32
+#ifdef TL_IMGUI_TEXTURE
+#ifndef TL_IMGUI_TEXTURE_GET
+#error TL_IMGUI_TEXTURE_GET must be defined along with TL_IMGUI_TEXTURE
+#endif
+#else
+#define TL_IMGUI_TEXTURE u32
+#endif
+
+#define TL_IMGUI_SHADER u32
+
 #include "shader_catalog_opengl.h"
 #include "imgui.h"
 #include "font.h"
@@ -21,15 +29,7 @@ struct TextCache {
 };
 
 u32 just_color_batch_shader;
-ShaderCatalog::Entry *texture_shader;
-u32 font_shader;
-u32 font_uniforms;
-
-struct FontUniforms {
-	v2f position_offset;
-	v2f position_scale;
-	v4f color;
-};
+u32 just_color_shader;
 
 FontCollection *font_collection;
 
@@ -49,10 +49,97 @@ void end() {
 	end_base();
 }
 
+template <class T>
+struct UniformBlock : T {
+	GLuint gl_handle;
+};
+
+template <class T>
+UniformBlock<T> create_uniform_block(GLuint shader, u32 slot) {
+	UniformBlock<T> result = {};
+
+	glGenBuffers(1, &result.gl_handle);
+	glBindBuffer(GL_UNIFORM_BUFFER, result.gl_handle);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(T), NULL, GL_STATIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, result.gl_handle);
+
+	return result;
+}
+
+template <class T>
+void init_uniform_block(UniformBlock<T> &block, GLuint shader, u32 slot) {
+	block = create_uniform_block<T>(shader, slot);
+}
+
+template <class T>
+void update(UniformBlock<T> &block) {
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(T), &block);
+}
+
+struct FontUniforms {
+	v2f position_offset;
+	v2f position_scale;
+	v4f color;
+};
+
+u32 font_shader;
+UniformBlock<FontUniforms> font_uniforms;
+
+
+struct TextureUniforms {
+	v4f color;
+	v2f position_min;
+	v2f position_max;
+};
+
+u32 texture_shader;
+UniformBlock<TextureUniforms> texture_uniforms;
+
 void init(Window *window, FontCollection *font_collection) {
 	using namespace ::TL::OpenGL;
 	init_base(window);
 	::TL::Imgui::font_collection = font_collection;
+
+	auto just_color_source = R"(
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
+uniform vec2 position_min;
+uniform vec2 position_max;
+uniform vec4 color;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec2 positions[] = vec2[](
+		vec2(position_min.x, position_min.y),
+		vec2(position_max.x, position_min.y),
+		vec2(position_max.x, position_max.y),
+		vec2(position_min.x, position_max.y)
+	);
+	gl_Position = vec4(positions[gl_VertexID], 0, 1);
+}
+
+#endif
+
+#ifdef FRAGMENT_SHADER
+
+out vec4 fragment_color;
+
+void main() {
+	fragment_color = color;
+}
+
+#endif)"s;
+
+	auto vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, just_color_source);
+	auto fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, just_color_source);
+	just_color_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
 	auto just_color_batch_source = R"(
 #ifdef VERTEX_SHADER
@@ -85,8 +172,8 @@ void main() {
 
 #endif)"s;
 
-	auto vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, just_color_batch_source);
-	auto fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, just_color_batch_source);
+	vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, just_color_batch_source);
+	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, just_color_batch_source);
 	just_color_batch_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
 
@@ -98,11 +185,11 @@ void main() {
 #endif
 
 uniform sampler2D main_texture;
-layout(std140) uniform _ {
-	vec2 position_offset;
-	vec2 position_scale;
-	vec4 color;
-};
+//layout(std140, binding = 0) uniform _ {
+uniform vec2 position_offset;
+uniform vec2 position_scale;
+uniform vec4 color;
+//};
 
 V2F vec2 vertex_uv;
 
@@ -132,18 +219,66 @@ void main() {
 
 #endif
 )"s;
-	vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, font_source);
-	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, font_source);
+	vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 420, true, font_source);
+	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, font_source);
 	font_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
-	glGenBuffers(1, &font_uniforms);
-	glBindBuffer(GL_UNIFORM_BUFFER, font_uniforms);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(FontUniforms), NULL, GL_STATIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	init_uniform_block(font_uniforms, font_shader, 0);
 
-	u32 buffer_index = glGetUniformBlockIndex(font_shader, "_");
-	glUniformBlockBinding(font_shader, buffer_index, 0);
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, font_uniforms);
+
+	auto texture_source = R"(
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
+uniform sampler2D base_texture;
+//layout(std140, binding = 0) uniform _ {
+uniform vec4 color;
+uniform vec2 position_min;
+uniform vec2 position_max;
+//};
+
+V2F vec2 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec2 positions[] = vec2[](
+		vec2(position_min.x, position_min.y),
+		vec2(position_max.x, position_min.y),
+		vec2(position_max.x, position_max.y),
+		vec2(position_min.x, position_max.y)
+	);
+	vec2 uvs[] = vec2[](
+		vec2(0, 0),
+		vec2(1, 0),
+		vec2(1, 1),
+		vec2(0, 1)
+	);
+	vec2 position = positions[gl_VertexID];
+	gl_Position = vec4(position, 0, 1);
+	vertex_uv = uvs[gl_VertexID];
+}
+
+#endif
+
+#ifdef FRAGMENT_SHADER
+
+out vec4 fragment_color;
+
+void main() {
+	fragment_color = texture(base_texture, vertex_uv) * color;
+}
+
+#endif)"s;
+	vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 420, true, texture_source);
+	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, texture_source);
+	texture_shader = OpenGL::create_program(vertex_shader, fragment_shader);
+
+	init_uniform_block(texture_uniforms, texture_shader, 0);
+
 }
 
 void _set_scissor_impl(aabb<v2s> region) {
@@ -153,79 +288,89 @@ void _set_scissor_impl(aabb<v2s> region) {
 void _draw_and_free_elements(Span<UIElement> elements) {
 	using namespace OpenGL;
 
-	struct PanelVertex {
-		v2f position;
-		v4f color;
-	};
+	auto element = elements.data;
+	while (element != elements.end()) {
+		defer { free(*element); };
 
-	List<PanelVertex> panel_vertices;
-	panel_vertices.allocator = temporary_allocator;
-
-	for (auto &element : elements) {
-		switch (element.kind) {
-			case UIElement_panel: {
-				auto p = element.panel;
-				auto color = p.color;
-				auto rect  = p.rect;
-
-				auto min = client_to_ndc(rect.min);
-				auto max = client_to_ndc(rect.max);
-
-				panel_vertices.add({
-					{{min.x, min.y}, color},
-					{{min.x, max.y}, color},
-					{{max.x, max.y}, color},
-					{{max.x, min.y}, color},
-				});
-
-				break;
-			}
-		}
-	}
-
-	static GrowingBuffer<PanelVertex> panel_vertex_buffer;
-	panel_vertex_buffer.usage = GL_STATIC_COPY;
-	panel_vertex_buffer.init();
-	panel_vertex_buffer.reset(panel_vertices);
-
-	glUseProgram(just_color_batch_shader);
-	glEnable(GL_BLEND);
-	glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
-	glBindBuffer(GL_ARRAY_BUFFER, panel_vertex_buffer.buffer);
-	glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, position));
-	glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, color));
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glDrawArrays(GL_QUADS, 0, panel_vertices.size);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	for (auto &element : elements) {
-		defer { free(element); };
-
-		if (volume(element.scissor_rect) <= 0) {
+		if (volume(element->scissor_rect) <= 0) {
 			continue; // Maybe do early check??
 		}
 
 		auto old_scissor = current_scissor;
 		defer { set_scissor(old_scissor); };
-		set_scissor(element.scissor_rect);
-		switch (element.kind) {
+		set_scissor(element->scissor_rect);
+		switch (element->kind) {
+			case UIElement_panel: {
+				struct PanelVertex {
+					v2f position;
+					v4f color;
+				};
+
+				List<PanelVertex> panel_vertices;
+				panel_vertices.allocator = temporary_allocator;
+
+				do {
+					auto p = element->panel;
+					auto color = p.color;
+					auto rect  = p.rect;
+
+					auto min = client_to_ndc(rect.min);
+					auto max = client_to_ndc(rect.max);
+
+					panel_vertices.add({
+						{{min.x, min.y}, color},
+						{{min.x, max.y}, color},
+						{{max.x, max.y}, color},
+						{{max.x, min.y}, color},
+					});
+					++element;
+				} while (element != elements.end() && element->kind == UIElement_panel);
+
+				static GrowingBuffer<PanelVertex> panel_vertex_buffer;
+				panel_vertex_buffer.usage = GL_STATIC_COPY;
+				panel_vertex_buffer.init();
+				panel_vertex_buffer.reset(panel_vertices);
+
+				glUseProgram(just_color_batch_shader);
+				glEnable(GL_BLEND);
+				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+				glBindBuffer(GL_ARRAY_BUFFER, panel_vertex_buffer.buffer);
+				glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, position));
+				glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, color));
+				glEnableVertexAttribArray(0);
+				glEnableVertexAttribArray(1);
+				glDrawArrays(GL_QUADS, 0, panel_vertices.size);
+				glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+				break;
+			}
 			case UIElement_texture: {
-				auto t = element.texture;
+				defer { ++element; };
+				auto t = element->texture;
 				auto texture = t.texture;
 				auto color   = t.color;
 				auto rect    = t.rect;
 
-				glBindTexture(GL_TEXTURE_2D, texture);
-				use_shader(*texture_shader);
-				set_uniform(*texture_shader, "color", color);
-				set_uniform(*texture_shader, "position_min", client_to_ndc(rect.min));
-				set_uniform(*texture_shader, "position_max", client_to_ndc(rect.max));
+				glUseProgram(texture_shader);
+				glBindTexture(GL_TEXTURE_2D, TL_IMGUI_TEXTURE_GET(texture));
+				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+
+				//glBindBuffer(GL_UNIFORM_BUFFER, texture_uniforms.gl_handle);
+				//texture_uniforms.color = color;
+				//texture_uniforms.position_min = client_to_ndc(rect.min);
+				//texture_uniforms.position_max = client_to_ndc(rect.max);
+				//update(texture_uniforms);
+				set_uniform(texture_shader, "color", color);
+				set_uniform(texture_shader, "position_min", client_to_ndc(rect.min));
+				set_uniform(texture_shader, "position_max", client_to_ndc(rect.max));
 				glDrawArrays(GL_QUADS, 0, 4);
+
+				//glBindBuffer(GL_UNIFORM_BUFFER, 0);
 				break;
 			}
 			case UIElement_text: {
-				auto t         = element.text;
+				defer { ++element; };
+				auto t         = element->text;
 				auto id        = t.id;
 				auto color     = t.color;
 				auto rect      = t.rect;
@@ -296,18 +441,22 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 				v2f const shadow_offset = {1,1};
 
-				glBindBuffer(GL_UNIFORM_BUFFER, font_uniforms);
-				FontUniforms font_uniforms_data;
-
-				font_uniforms_data.color = color * v4f{0,0,0,1};
-				font_uniforms_data.position_offset = (v2f)position + shadow_offset;
-				font_uniforms_data.position_scale = 2.0f / (v2f)window->client_size;
-				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(font_uniforms_data), &font_uniforms_data);
+				//glBindBuffer(GL_UNIFORM_BUFFER, font_uniforms.gl_handle);
+				//font_uniforms.position_scale = 2.0f / (v2f)window->client_size;
+				//
+				//font_uniforms.color = color * v4f{0,0,0,1};
+				//font_uniforms.position_offset = (v2f)position + shadow_offset;
+				//update(font_uniforms);
+				set_uniform(font_shader, "position_scale", 2.0f / (v2f)window->client_size);
+				set_uniform(font_shader, "color", color * v4f{0,0,0,1});
+				set_uniform(font_shader, "position_offset", (v2f)position + shadow_offset);
 				glDrawArrays(GL_QUADS, 0, vertices.size);
 
-				font_uniforms_data.color = color;
-				font_uniforms_data.position_offset = (v2f)position;
-				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(font_uniforms_data), &font_uniforms_data);
+				//font_uniforms.color = color;
+				//font_uniforms.position_offset = (v2f)position;
+				//update(font_uniforms);
+				set_uniform(font_shader, "color", color);
+				set_uniform(font_shader, "position_offset", (v2f)position);
 				glDrawArrays(GL_QUADS, 0, vertices.size);
 
 				glBindBuffer(GL_UNIFORM_BUFFER, 0);

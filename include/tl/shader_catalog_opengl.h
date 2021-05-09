@@ -234,11 +234,11 @@ GLuint get_uniform_location(Shader &shader, Span<char> name) {
 	return it->second;
 }
 
-void set_uniform(Shader &shader, Span<char> name, f32 value) { OpenGL::glUniform1f(get_uniform_location(shader, name), value); }
-void set_uniform(Shader &shader, Span<char> name, v2f value) { OpenGL::glUniform2fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, v3f value) { OpenGL::glUniform3fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, v4f value) { OpenGL::glUniform4fv(get_uniform_location(shader, name), 1, value.s); }
-void set_uniform(Shader &shader, Span<char> name, m4  value) { OpenGL::glUniformMatrix4fv(get_uniform_location(shader, name), 1, false, value.s); }
+void set_uniform(Shader &shader, Span<char> name, f32 value) { glUniform1f(get_uniform_location(shader, name), value); }
+void set_uniform(Shader &shader, Span<char> name, v2f value) { glUniform2fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, v3f value) { glUniform3fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, v4f value) { glUniform4fv(get_uniform_location(shader, name), 1, value.s); }
+void set_uniform(Shader &shader, Span<char> name, m4  value) { glUniformMatrix4fv(get_uniform_location(shader, name), 1, false, value.s); }
 
 void set_uniform(Shader &shader, char const *name, f32 value) { set_uniform(shader, as_span(name), value); }
 void set_uniform(Shader &shader, char const *name, v2f value) { set_uniform(shader, as_span(name), value); }
