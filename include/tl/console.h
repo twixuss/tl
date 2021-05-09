@@ -40,6 +40,9 @@ inline void print(T const &value) {
 template <> inline void print(Span<char> const &span) { current_printer((Span<utf8>)span); }
 template <> inline void print(Span<utf8> const &span) { current_printer(span); }
 
+template <> inline void print(List<char> const &list) { current_printer((Span<utf8>)(Span<char>)list); }
+template <> inline void print(List<utf8> const &list) { current_printer((Span<utf8>)list); }
+
 template <class ...Args>
 inline void print(char const *fmt, Args const &...args) {
 	StringBuilder builder;

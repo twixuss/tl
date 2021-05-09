@@ -1216,13 +1216,29 @@ forceinline aabb<T> Union(aabb<T> const &a, aabb<T> const &b) {
 	return result;
 }
 
-forceinline s32 volume(aabb<v2s> const &box) {
-	v2s diameter = box.max - box.min;
+template <class Scalar>
+forceinline auto volume(aabb<v2<Scalar>> const &box) {
+	auto diameter = box.max - box.min;
 	return diameter.x * diameter.y;
 }
-forceinline s32 volume(aabb<v3s> const &box) {
-	v3s diameter = box.max - box.min;
+
+template <class Scalar>
+forceinline auto volume(aabb<v3<Scalar>> const &box) {
+	auto diameter = box.max - box.min;
 	return diameter.x * diameter.y * diameter.z;
+}
+
+template <class Scalar>
+forceinline bool has_volume(aabb<v2<Scalar>> rect) {
+	return rect.min.x < rect.max.x
+		&& rect.min.y < rect.max.y;
+}
+
+template <class Scalar>
+forceinline bool has_volume(aabb<v3<Scalar>> rect) {
+	return rect.min.x < rect.max.x
+		&& rect.min.y < rect.max.y
+		&& rect.min.z < rect.max.z;
 }
 
 // Axis aligned bounding box subrtacion routines

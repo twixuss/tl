@@ -111,15 +111,15 @@ struct List {
 		T *operator->() { return pointer; }
 	};
 
-	ReverseIterator rbegin() { return data + size - 1; }
-	ReverseIterator rend() { return data - 1; }
+	ReverseIterator rbegin() const { return data + size - 1; }
+	ReverseIterator rend() const { return data - 1; }
 
-	T &front() { bounds_check(size); return data[0]; }
-	T &back() { bounds_check(size); return data[size - 1]; }
+	T &front() const { bounds_check(size); return data[0]; }
+	T &back() const { bounds_check(size); return data[size - 1]; }
 
-	bool empty() { return size == 0; }
+	bool empty() const { return size == 0; }
 
-	operator Span<T>() { return {data, size}; }
+	operator Span<T>() const { return {data, size}; }
 
 	template <class U>
 	explicit operator List<U>() const {

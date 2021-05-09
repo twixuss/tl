@@ -1200,6 +1200,29 @@ struct AllocatorPusher {
 
 #define with(allocator, ...) ([&]{scoped_allocator(allocator);return __VA_ARGS__;}())
 
+template <class T>
+void rotate(Span<T> span, T *to_be_first) {
+	umm left_count = to_be_first - span.data;
+	umm right_count = span.size - left_count;
+
+	if (right_count < left_count) {
+		T *temp = ALLOCATE(T, temporary_allocator, right_count);
+		memcpy(temp, to_be_first, sizeof(T) * right_count);
+		memmove(span.data + right_count, span.data, sizeof(T) * left_count);
+		memcpy(span.data, temp, sizeof(T) * right_count);
+	} else {
+		T *temp = ALLOCATE(T, temporary_allocator, left_count);
+		memcpy(temp, span.data, sizeof(T) * left_count);
+		memmove(span.data, span.data + left_count, sizeof(T) * right_count);
+		memcpy(to_be_first, temp, sizeof(T) * left_count);
+	}
+}
+
+template <class T>
+void rotate(Span<T> span, umm to_be_first_index) {
+	return rotate(span, span.data + to_be_first_index);
+}
+
 #ifdef TL_IMPL
 
 #if OS_WINDOWS
@@ -1247,6 +1270,10 @@ Allocator default_allocator = {
 	0
 };
 
+#ifndef TL_TEMP_STORAGE_LIMIT
+#define TL_TEMP_STORAGE_LIMIT 0x10000000
+#endif
+
 struct TemporaryAllocatorState {
 	struct Block {
 		Block *next;
@@ -1256,7 +1283,8 @@ struct TemporaryAllocatorState {
 	};
 	Block *first = 0;
 	Block *last = 0;
-	umm last_block_size = 0x10000;
+	umm last_block_capacity = 0x10000;
+	umm total_block_capacity = 0;
 };
 
 void free(TemporaryAllocatorState &state) {
@@ -1271,8 +1299,8 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *_state) -> void * {
-		auto &state = *(TemporaryAllocatorState *)_state;
+	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
+		auto &state = temporary_allocator_state;
 		switch (mode) {
 			case TL::Allocator_allocate: {
 				auto block = state.first;
@@ -1287,13 +1315,13 @@ thread_local Allocator temporary_allocator = {
 				}
 
 				// Block with enough space was not found. Create a new bigger one
-				while (state.last_block_size < size) {
-					state.last_block_size *= 2;
+				while (state.last_block_capacity < size) {
+					state.last_block_capacity *= 2;
 				}
 
-				block = (TemporaryAllocatorState::Block *)ALLOCATE(u8, default_allocator, sizeof(TemporaryAllocatorState::Block) + state.last_block_size);
+				block = (TemporaryAllocatorState::Block *)ALLOCATE(u8, default_allocator, sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
 				block->size = size;
-				block->capacity = state.last_block_size;
+				block->capacity = state.last_block_capacity;
 				block->next = 0;
 
 				if (state.first) {
@@ -1302,6 +1330,15 @@ thread_local Allocator temporary_allocator = {
 					state.first = block;
 				}
 				state.last = block;
+
+				state.total_block_capacity += block->capacity;
+
+#if TL_TEMP_STORAGE_LIMIT != 0
+				bounds_check(state.total_block_capacity < TL_TEMP_STORAGE_LIMIT,
+					"Capacity of temporary storage has exceeded the limit of % bytes. "
+					"You can either clear the storage by calling clear_temporary_storage (Make sure you don't reference previously allocated memory). "
+					"Or you can #define TL_TEMP_STORAGE_LIMIT to some bigger number.", TL_TEMP_STORAGE_LIMIT);
+#endif
 
 				return block->data();
 			}
@@ -1313,14 +1350,12 @@ thread_local Allocator temporary_allocator = {
 		}
 		return 0;
 	},
-	&temporary_allocator_state
+	0
 };
 
 void clear_temporary_storage() {
-	umm total_size = 0;
 	auto block = temporary_allocator_state.first;
 	while (block) {
-		total_size += block->size;
 		block->size = 0;
 		block = block->next;
 	}
@@ -1465,3 +1500,4 @@ main:
 	return tl_main(arguments);
 }
 #endif
+

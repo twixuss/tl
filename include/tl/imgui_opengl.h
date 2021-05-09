@@ -56,7 +56,7 @@ struct UniformBlock : T {
 };
 
 template <class T>
-UniformBlock<T> create_uniform_block(GLuint shader, u32 slot) {
+UniformBlock<T> create_uniform_block(GLuint shader, u32 slot, char const *name) {
 	UniformBlock<T> result = {};
 
 	glGenBuffers(1, &result.gl_handle);
@@ -64,14 +64,16 @@ UniformBlock<T> create_uniform_block(GLuint shader, u32 slot) {
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(T), NULL, GL_STATIC_DRAW);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, result.gl_handle);
+	u32 index = glGetUniformBlockIndex(shader, name);
+	glUniformBlockBinding(shader, index, slot);
+	glBindBufferBase(GL_UNIFORM_BUFFER, slot, result.gl_handle);
 
 	return result;
 }
 
 template <class T>
-void init_uniform_block(UniformBlock<T> &block, GLuint shader, u32 slot) {
-	block = create_uniform_block<T>(shader, slot);
+void init_uniform_block(UniformBlock<T> &block, GLuint shader, u32 slot, char const *name) {
+	block = create_uniform_block<T>(shader, slot, name);
 }
 
 template <class T>
@@ -188,11 +190,11 @@ void main() {
 #endif
 
 uniform sampler2D main_texture;
-//layout(std140, binding = 0) uniform _ {
-uniform vec2 position_offset;
-uniform vec2 position_scale;
-uniform vec4 color;
-//};
+layout(std140, binding = 0) uniform _ {
+	vec2 position_offset;
+	vec2 position_scale;
+	vec4 color;
+};
 
 V2F vec2 vertex_uv;
 
@@ -226,7 +228,7 @@ void main() {
 	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, font_source);
 	font_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
-	init_uniform_block(font_uniforms, font_shader, 0);
+	init_uniform_block(font_uniforms, font_shader, 0, "_");
 
 
 	auto texture_source = R"(
@@ -237,11 +239,11 @@ void main() {
 #endif
 
 uniform sampler2D base_texture;
-//layout(std140, binding = 0) uniform _ {
-uniform vec4 color;
-uniform vec2 position_min;
-uniform vec2 position_max;
-//};
+layout(std140, binding = 1) uniform _ {
+	vec4 color;
+	vec2 position_min;
+	vec2 position_max;
+};
 
 V2F vec2 vertex_uv;
 
@@ -280,7 +282,7 @@ void main() {
 	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, texture_source);
 	texture_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
-	init_uniform_block(texture_uniforms, texture_shader, 0);
+	init_uniform_block(texture_uniforms, texture_shader, 1, "_");
 
 }
 
@@ -296,77 +298,71 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 	auto element = elements.data;
 
 	while (element != elements.end()) {
-		if (volume(element->scissor_rect) <= 0) {
-			continue; // Maybe do early check??
-		}
-
 		auto next_element = [&]() {
 			free(*element++);
 			return element != elements.end();
 		};
 
+		auto old_scissor = current_scissor;
+		defer { set_scissor(old_scissor); };
+		set_scissor(element->scissor_rect);
+
 		switch (element->kind) {
 			case UIElement_panel: {
-#if 0
-				defer { next_element(); };
-				auto t = element->panel;
-				auto color   = t.color;
-				auto rect    = t.rect;
-
-				glUseProgram(just_color_shader);
-				glEnable(GL_BLEND);
-				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
-
-				set_uniform(just_color_shader, "color", color);
-				set_uniform(just_color_shader, "position_min", client_to_ndc(rect.min));
-				set_uniform(just_color_shader, "position_max", client_to_ndc(rect.max));
-				glDrawArrays(GL_QUADS, 0, 4);
-#else
+				timed_block("UIElement_panel"s);
 				struct PanelVertex {
 					v2f position;
 					v4f color;
 				};
 
 				List<PanelVertex> panel_vertices;
-				panel_vertices.allocator = temporary_allocator;
+				{
+					timed_block("vertex building"s);
+					panel_vertices.allocator = temporary_allocator;
 
-				do {
-					auto p = element->panel;
-					auto color = p.color;
-					auto rect  = p.rect;
+					do {
+						auto p = element->panel;
+						auto color = p.color;
+						auto rect  = p.rect;
 
-					auto min = client_to_ndc(rect.min);
-					auto max = client_to_ndc(rect.max);
+						auto min = client_to_ndc(rect.min);
+						auto max = client_to_ndc(rect.max);
 
-					panel_vertices.add({
-						{{min.x, min.y}, color},
-						{{min.x, max.y}, color},
-						{{max.x, max.y}, color},
-						{{max.x, min.y}, color},
-					});
-					if (!next_element())
-						break;
-				} while (element->kind == UIElement_panel);
+						panel_vertices.add({
+							{{min.x, min.y}, color},
+							{{min.x, max.y}, color},
+							{{max.x, max.y}, color},
+							{{max.x, min.y}, color},
+						});
+						if (!next_element())
+							break;
+					} while (element->kind == UIElement_panel && element->scissor_rect == current_scissor);
+				}
 
 				static GrowingBuffer<PanelVertex> panel_vertex_buffer;
-				panel_vertex_buffer.usage = GL_STATIC_COPY;
-				panel_vertex_buffer.init();
-				panel_vertex_buffer.reset(panel_vertices);
-
-				glUseProgram(just_color_batch_shader);
-				glEnable(GL_BLEND);
-				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
-				glBindBuffer(GL_ARRAY_BUFFER, panel_vertex_buffer.buffer);
-				glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, position));
-				glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, color));
-				glEnableVertexAttribArray(0);
-				glEnableVertexAttribArray(1);
-				glDrawArrays(GL_QUADS, 0, panel_vertices.size);
-				glBindBuffer(GL_ARRAY_BUFFER, 0);
-#endif
+				{
+					timed_block("vertex transfer"s);
+					panel_vertex_buffer.usage = GL_STATIC_COPY;
+					panel_vertex_buffer.init();
+					panel_vertex_buffer.reset(panel_vertices);
+				}
+				{
+					timed_block("opengl"s);
+					glUseProgram(just_color_batch_shader);
+					glEnable(GL_BLEND);
+					glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+					glBindBuffer(GL_ARRAY_BUFFER, panel_vertex_buffer.buffer);
+					glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, position));
+					glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(PanelVertex), (void *)offsetof(PanelVertex, color));
+					glEnableVertexAttribArray(0);
+					glEnableVertexAttribArray(1);
+					glDrawArrays(GL_QUADS, 0, panel_vertices.size);
+					glBindBuffer(GL_ARRAY_BUFFER, 0);
+				}
 				break;
 			}
 			case UIElement_texture: {
+				timed_block("UIElement_texture"s);
 				defer { next_element(); };
 				auto t = element->texture;
 				auto texture = t.texture;
@@ -378,20 +374,21 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				glEnable(GL_BLEND);
 				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
 
-				//glBindBuffer(GL_UNIFORM_BUFFER, texture_uniforms.gl_handle);
-				//texture_uniforms.color = color;
-				//texture_uniforms.position_min = client_to_ndc(rect.min);
-				//texture_uniforms.position_max = client_to_ndc(rect.max);
-				//update(texture_uniforms);
-				set_uniform(texture_shader, "color", color);
-				set_uniform(texture_shader, "position_min", client_to_ndc(rect.min));
-				set_uniform(texture_shader, "position_max", client_to_ndc(rect.max));
+				glBindBuffer(GL_UNIFORM_BUFFER, texture_uniforms.gl_handle);
+				texture_uniforms.color = color;
+				texture_uniforms.position_min = client_to_ndc(rect.min);
+				texture_uniforms.position_max = client_to_ndc(rect.max);
+				update(texture_uniforms);
+				//set_uniform(texture_shader, "color", color);
+				//set_uniform(texture_shader, "position_min", client_to_ndc(rect.min));
+				//set_uniform(texture_shader, "position_max", client_to_ndc(rect.max));
 				glDrawArrays(GL_QUADS, 0, 4);
 
-				//glBindBuffer(GL_UNIFORM_BUFFER, 0);
+				glBindBuffer(GL_UNIFORM_BUFFER, 0);
 				break;
 			}
 			case UIElement_text: {
+				timed_block("UIElement_text"s);
 				defer { next_element(); };
 				auto t         = element->text;
 				auto id        = t.id;
@@ -400,10 +397,6 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				auto alignment = t.alignment;
 				auto font_size = t.font_size;
 				auto text      = t.text;
-
-				auto old_scissor = current_scissor;
-				defer { set_scissor(old_scissor); };
-				set_scissor(element->scissor_rect);
 
 				auto font = get_font_at_size(font_collection, font_size);
 
@@ -425,6 +418,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				auto &vertices = cache.vertices;
 
 				if (rehash) {
+					timed_block("rehash"s);
 					free(cache.text);
 					cache.text = copy(text);
 
@@ -468,22 +462,22 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 				v2f const shadow_offset = {1,1};
 
-				//glBindBuffer(GL_UNIFORM_BUFFER, font_uniforms.gl_handle);
-				//font_uniforms.position_scale = 2.0f / (v2f)window->client_size;
-				//
-				//font_uniforms.color = color * v4f{0,0,0,1};
-				//font_uniforms.position_offset = (v2f)position + shadow_offset;
-				//update(font_uniforms);
-				set_uniform(font_shader, "position_scale", 2.0f / (v2f)window->client_size);
-				set_uniform(font_shader, "color", color * v4f{0,0,0,1});
-				set_uniform(font_shader, "position_offset", (v2f)position + shadow_offset);
+				glBindBuffer(GL_UNIFORM_BUFFER, font_uniforms.gl_handle);
+				font_uniforms.position_scale = 2.0f / (v2f)window->client_size;
+
+				font_uniforms.color = color * v4f{0,0,0,1};
+				font_uniforms.position_offset = (v2f)position + shadow_offset;
+				update(font_uniforms);
+				//set_uniform(font_shader, "position_scale", 2.0f / (v2f)window->client_size);
+				//set_uniform(font_shader, "color", color * v4f{0,0,0,1});
+				//set_uniform(font_shader, "position_offset", (v2f)position + shadow_offset);
 				glDrawArrays(GL_QUADS, 0, vertices.size);
 
-				//font_uniforms.color = color;
-				//font_uniforms.position_offset = (v2f)position;
-				//update(font_uniforms);
-				set_uniform(font_shader, "color", color);
-				set_uniform(font_shader, "position_offset", (v2f)position);
+				font_uniforms.color = color;
+				font_uniforms.position_offset = (v2f)position;
+				update(font_uniforms);
+				//set_uniform(font_shader, "color", color);
+				//set_uniform(font_shader, "position_offset", (v2f)position);
 				glDrawArrays(GL_QUADS, 0, vertices.size);
 
 				glBindBuffer(GL_UNIFORM_BUFFER, 0);

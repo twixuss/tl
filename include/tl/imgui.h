@@ -155,6 +155,8 @@ void draw_and_free_layer(UILayer &layer) {
 }
 
 void draw_texture(aabb<v2s> rect, Texture texture, v4f color = V4f(1)) {
+	if (!has_volume(current_region.visible_rect)) return;
+
 	UIElement e;
 	e.kind = UIElement_texture;
 	e.texture.texture = texture;
@@ -172,8 +174,8 @@ struct Label {
 };
 
 void label(u32 id, Label l) {
-	if (!l.text.size)
-		return;
+	if (!l.text.size) return;
+	if (!has_volume(current_region.visible_rect)) return;
 
 	assert(l.font_size);
 
@@ -200,6 +202,7 @@ void label(u32 id, Span<utf8> text, aabb<v2s> rect, TextAlignment alignment, u32
 
 void panel(aabb<v2s> rect, v4f color) {
 	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return;
+	if (!has_volume(current_region.visible_rect)) return;
 
 	UIElement e;
 	e.kind = UIElement_panel;
@@ -499,9 +502,28 @@ bool scroll_bar(ScrollBar<T> &s) {
 	auto total_size = s.total_size;
 	auto rect = s.rect;
 
-	auto max_visible_dim = max(current_region.visible_rect.size());
-	s32 max_scroll = total_size - max_visible_dim;
-	defer { scroll_amount = roundf(lerp((f32)scroll_amount, (f32)target_scroll_amount, 0.5f)); };
+	auto size = rect.size();
+
+	s32 visible_size;
+	if (size.y > size.x) {
+		visible_size = current_region.visible_rect.size().y;
+	} else {
+		visible_size = current_region.visible_rect.size().x;
+	}
+
+	s32 max_scroll = total_size - visible_size;
+	defer {
+		if constexpr (is_integer<T>) {
+			f32 f = lerp<f32>(scroll_amount, target_scroll_amount, frame_time * 30);
+			if (target_scroll_amount > scroll_amount) {
+				scroll_amount = ceil(f);
+			} else {
+				scroll_amount = floor(f);
+			}
+		} else {
+			scroll_amount = lerp<T>(scroll_amount, target_scroll_amount, frame_time * 30);
+		}
+	};
 
 	static u32 panning_id = -1;
 	static s32 panning_scroll_start;
@@ -511,7 +533,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 		if (window->mouse_wheel) {
 			if ((s.flags & ScrollBar_zoom_with_wheel) && (s.flags & ScrollBar_pan_with_wheel)) {
 				if (key_held(Key_shift)) {
-					target_scroll_amount += window->mouse_wheel * max_visible_dim / 8;
+					target_scroll_amount += window->mouse_wheel * visible_size / 8;
 				} else {
 					auto old_scale = scale;
 					scale /= powf(1.1f, window->mouse_wheel);
@@ -523,14 +545,14 @@ bool scroll_bar(ScrollBar<T> &s) {
 				}
 			} else if (s.flags & ScrollBar_zoom_with_wheel) {
 			} else if (s.flags & ScrollBar_pan_with_wheel) {
-				target_scroll_amount += window->mouse_wheel * max_visible_dim / 8;
+				target_scroll_amount += window->mouse_wheel * visible_size / 8;
 			}
 		}
 		if (key_down(Key_page_down)) {
-			target_scroll_amount -= max_visible_dim;
+			target_scroll_amount -= visible_size;
 		}
 		if (key_down(Key_page_up)) {
-			target_scroll_amount += max_visible_dim;
+			target_scroll_amount += visible_size;
 		}
 		if (key_down(Key_home)) {
 			target_scroll_amount = 0;
@@ -586,11 +608,10 @@ bool scroll_bar(ScrollBar<T> &s) {
 
 	v2s knob_position;
 	v2s knob_size;
-	auto size = rect.size();
 	bool holding = false;
 
 	if (size.y > size.x) {
-		knob_size = {size.x, (s32)((f32)pow2(max_visible_dim) / total_size)};
+		knob_size = {size.x, (s32)((f32)pow2(visible_size) / total_size)};
 
 		knob_position = {
 			rect.min.x,
@@ -616,7 +637,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 			}
 		}
 	} else {
-		knob_size = {(s32)((f32)pow2(max_visible_dim) / total_size), size.y};
+		knob_size = {(s32)((f32)pow2(visible_size) / total_size), size.y};
 
 		knob_position = {
 			(s32)map_clamped<T>(scroll_amount, -max_scroll, 0, rect.min.x + size.x - knob_size.x, rect.min.x),
