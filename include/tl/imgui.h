@@ -379,7 +379,8 @@ struct Slider {
 
 template <class T>
 bool slider(Slider<T> &s) {
-	auto id          = s.id++;
+	defer { ++s.id; };
+	auto id          = s.id;
 	auto value       = s.value;
 	auto lower_bound = s.lower_bound;
 	auto upper_bound = s.upper_bound;

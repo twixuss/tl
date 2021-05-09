@@ -290,6 +290,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 	using namespace OpenGL;
 
 	auto element = elements.data;
+
 	while (element != elements.end()) {
 		if (volume(element->scissor_rect) <= 0) {
 			continue; // Maybe do early check??
@@ -300,11 +301,23 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 			return element != elements.end();
 		};
 
-		auto old_scissor = current_scissor;
-		defer { set_scissor(old_scissor); };
-		set_scissor(element->scissor_rect);
 		switch (element->kind) {
 			case UIElement_panel: {
+#if 0
+				defer { next_element(); };
+				auto t = element->panel;
+				auto color   = t.color;
+				auto rect    = t.rect;
+
+				glUseProgram(just_color_shader);
+				glEnable(GL_BLEND);
+				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+
+				set_uniform(just_color_shader, "color", color);
+				set_uniform(just_color_shader, "position_min", client_to_ndc(rect.min));
+				set_uniform(just_color_shader, "position_max", client_to_ndc(rect.max));
+				glDrawArrays(GL_QUADS, 0, 4);
+#else
 				struct PanelVertex {
 					v2f position;
 					v4f color;
@@ -346,7 +359,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				glEnableVertexAttribArray(1);
 				glDrawArrays(GL_QUADS, 0, panel_vertices.size);
 				glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+#endif
 				break;
 			}
 			case UIElement_texture: {
@@ -358,6 +371,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 				glUseProgram(texture_shader);
 				glBindTexture(GL_TEXTURE_2D, TL_IMGUI_TEXTURE_GET(texture));
+				glEnable(GL_BLEND);
 				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
 
 				//glBindBuffer(GL_UNIFORM_BUFFER, texture_uniforms.gl_handle);
@@ -382,6 +396,10 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				auto alignment = t.alignment;
 				auto font_size = t.font_size;
 				auto text      = t.text;
+
+				auto old_scissor = current_scissor;
+				defer { set_scissor(old_scissor); };
+				set_scissor(element->scissor_rect);
 
 				auto font = get_font_at_size(font_collection, font_size);
 
