@@ -189,7 +189,7 @@ CpuInfo get_cpu_info() {
 
 	for (auto &info : Span{buffer, processorInfoLength / sizeof(buffer[0])}) {
 		switch (info.Relationship) {
-			case RelationProcessorCore: result.logicalProcessorCount += count_bits(info.ProcessorMask); break;
+			case RelationProcessorCore: result.logicalProcessorCount += count_bits((ulong_s)info.ProcessorMask); break;
 			case RelationCache: {
 				auto &cache = result.cache[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
 				cache.size += info.Cache.Size;

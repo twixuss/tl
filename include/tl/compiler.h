@@ -11,12 +11,57 @@ TL_API List<ascii> demangle(ascii const *function_name);
 #if COMPILER_MSVC
 
 #include "string.h"
+#include "console.h"
 
 namespace TL {
 
 struct DemangleState {
 	List<char> last_argument;
 };
+
+static void append_one_type(StringBuilder &builder, char const *&c) {
+	if (*c == 'Y') {
+		++c;
+		if (*c == 'A' || *c == 'G' || *c == 'I' || *c == 'Q') {
+			++c;
+			if (*c == 'A' || *c == 'P') {
+				++c;
+				if (*c == 'E') {
+					c += 2;
+				} else {
+					c += 1;
+				}
+				//c += 3; // skip calling convention, pointer/reference and const/volatile
+			}
+		} else {
+			c += 1; // It is 'A' otherwise ??? not sure if it's always like that
+		}
+	}
+	switch (*c++) {
+		case 'C': append(builder, "s8"s);    break;
+		case 'D': append(builder, "ascii"s); break;
+		case 'E': append(builder, "u8"s);    break;
+		case 'F': append(builder, "s16"s);   break;
+		case 'G': append(builder, "u16"s);   break;
+		case 'H': append(builder, "s32"s);   break;
+		case 'I': append(builder, "u32"s);   break;
+		case 'J': append(builder, "slong"s); break;
+		case 'K': append(builder, "ulong"s); break;
+		case 'M': append(builder, "f32"s);   break;
+		case 'N': append(builder, "f64"s);   break;
+		case 'O': append(builder, "f80"s);   break;
+		case 'X': break; // void
+		default:
+			//invalid_code_path();
+			break;
+	}
+}
+
+static List<char> parse_one_type(char const *&c) {
+	StringBuilder builder;
+	append_one_type(builder, c);
+	return to_string(builder);
+}
 
 static void parse_arguments(DemangleState &state, StringBuilder &builder, char const *&c, bool add_comma = false) {
 	if (add_comma) {
@@ -161,6 +206,7 @@ static void parse_arguments(DemangleState &state, StringBuilder &builder, char c
 			append(builder, "nullptr_t"s);
 			state.last_argument = as_list("nullptr_t"s);
 			break;
+		case '@': return;
 		default: {
 			invalid_code_path();
 		}
@@ -199,13 +245,13 @@ List<ascii> demangle(ascii const *function_name) {
 		append(builder, "("s);
 		++c;
 		if (*c++ != '@') goto end;
-		if (*c++ != 'Y') goto end;
-		if (*c++ != 'A') goto end;
-		if (*c++ != '@') goto end;
-		parse_arguments(state, builder, c);
-		while (*c++ == '0') {
-			append(builder, ", "s);
-			append(builder, state.last_argument);
+		print("%\n", parse_one_type(c)); // return value. why???
+
+		bool comma = false;
+		while (*c != 'Z') {
+			if (comma) append(builder, ", "s);
+			append(builder, parse_one_type(c));
+			comma = true;
 		}
 		append(builder, ")"s);
 

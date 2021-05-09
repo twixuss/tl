@@ -74,10 +74,15 @@ void debug_deinit() {
 
 static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	STACKFRAME64 frame = {};
-
+#if ARCH_X64
 	frame.AddrPC.Offset    = context.Rip;
 	frame.AddrStack.Offset = context.Rsp;
 	frame.AddrFrame.Offset = context.Rbp;
+#else
+	frame.AddrPC.Offset    = context.Eip;
+	frame.AddrStack.Offset = context.Esp;
+	frame.AddrFrame.Offset = context.Ebp;
+#endif
 	frame.AddrPC.Mode      = AddrModeFlat;
 	frame.AddrStack.Mode   = AddrModeFlat;
 	frame.AddrFrame.Mode   = AddrModeFlat;

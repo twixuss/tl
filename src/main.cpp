@@ -407,12 +407,16 @@ int main() {
 	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};
 	u16 test16[][2] = {{0, 16}, {0xFF,  8}, {0xFFFF,  0}};
 	u32 test32[][2] = {{0, 32}, {0xFF, 24}, {0xFFFF, 16}, {0xFFFFFFFF,  0}};
+#if ARCH_X64
 	u64 test64[][2] = {{0, 64}, {0xFF, 56}, {0xFFFF, 48}, {0xFFFFFFFF, 32}, {0xFFFFFFFFFFFFFFFF, 0}};
+#endif
 
 	for (auto &t : test8 ) assert(t[1] == count_leading_zeros(t[0]));
 	for (auto &t : test16) assert(t[1] == count_leading_zeros(t[0]));
 	for (auto &t : test32) assert(t[1] == count_leading_zeros(t[0]));
+#if ARCH_X64
 	for (auto &t : test64) assert(t[1] == count_leading_zeros(t[0]));
+#endif
 
 	//for (u32 i = 0; i < 32; ++i) {
 	//	assert(count_leading_zeros((u32)(1 << i)) == (31 - i));

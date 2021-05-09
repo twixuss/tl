@@ -22,15 +22,17 @@ forceinline void spin_iteration() { _mm_pause(); }
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
 forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
+#if ARCH_X64
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
+#endif
 
 template <class T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
-	     if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src);
-	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
+	     if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
 	else if constexpr (sizeof(T) == 2) result = _InterlockedExchange16((short    *)dst, *(short    *)&src);
-	else if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
+	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
+	else if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src);
 	else static_assert(false, "lockSet is not available for this size");
 	return *(T *)&result;
 }
@@ -89,14 +91,9 @@ forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
 forceinline u8  atomic_add(u8  volatile *a, u8  b) { return (u8 )atomic_add((s8  *)a, (s8 )b); }
 forceinline u16 atomic_add(u16 volatile *a, u16 b) { return (u16)atomic_add((s16 *)a, (s16)b); }
 forceinline u32 atomic_add(u32 volatile *a, u32 b) { return (u32)atomic_add((s32 *)a, (s32)b); }
+#if ARCH_X64
 forceinline u64 atomic_add(u64 volatile *a, u64 b) { return (u64)atomic_add((s64 *)a, (s64)b); }
-
-forceinline s16 atomic_add(s16 volatile &a, s16 b) { return atomic_add(&a, b); }
-forceinline s32 atomic_add(s32 volatile &a, s32 b) { return atomic_add(&a, b); }
-forceinline s64 atomic_add(s64 volatile &a, s64 b) { return atomic_add(&a, b); }
-forceinline u16 atomic_add(u16 volatile &a, u16 b) { return atomic_add(&a, b); }
-forceinline u32 atomic_add(u32 volatile &a, u32 b) { return atomic_add(&a, b); }
-forceinline u64 atomic_add(u64 volatile &a, u64 b) { return atomic_add(&a, b); }
+#endif
 
 #ifdef TL_IMPL
 
@@ -177,7 +174,7 @@ inline SyncPoint create_sync_point(u32 target_counter) {
 }
 
 inline void sync(SyncPoint &point) {
-	atomic_add(point.current_counter, 1);
+	atomic_add(&point.current_counter, 1);
 	loop_until([&] { return point.current_counter == point.target_counter; });
 }
 
@@ -392,7 +389,7 @@ struct WorkQueue {
 			auto fnParams = ALLOCATE(Tuple, pool->allocator);
 			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-			atomic_add(work_to_do, 1);
+			atomic_add(&work_to_do, 1);
 			push((void (*)(void *))invokerProc, (void *)fnParams);
 		} else {
 			std::invoke(fn, std::forward<Args>(args)...);
@@ -424,7 +421,7 @@ inline WorkQueue make_work_queue(ThreadPool &pool, bool important = false) {
 inline void do_work(ThreadWork work) {
 	work.fn(work.param);
 	FREE(work.queue->pool->allocator, work.param);
-	atomic_add(work.queue->work_to_do, (u32)-1);
+	atomic_add(&work.queue->work_to_do, (u32)-1);
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
@@ -454,13 +451,13 @@ inline bool do_work(ThreadPool *pool) {
 }
 
 inline void default_thread_pool_proc(ThreadPool *pool) {
-	atomic_add(pool->initialized_thread_count, 1);
+	atomic_add(&pool->initialized_thread_count, 1);
 	loop_until([&] { return pool->running || pool->stopping; });
 	while (1) {
 		if (!do_work(pool))
 			break;
 	}
-	atomic_add(pool->dead_thread_count, 1);
+	atomic_add(&pool->dead_thread_count, 1);
 }
 template <class ThreadProc = decltype(default_thread_pool_proc)>
 bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_proc = default_thread_pool_proc) {

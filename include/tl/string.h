@@ -92,6 +92,34 @@ inline ParseResult<f64> parseDecimalFloat(Span<char> s) {
 }
 #endif
 
+enum FormatAlignKind : u8 {
+	FormatAlign_left,
+	FormatAlign_right,
+};
+
+template <class Char>
+struct FormatAlign {
+	FormatAlignKind kind;
+	Char fill;
+	u32 count;
+};
+
+template <class Char>
+FormatAlign<Char> align_left(u16 count, Char fill) {
+	FormatAlign<Char> result;
+	result.count = count;
+	result.fill = fill;
+	result.kind = FormatAlign_left;
+	return result;
+}
+
+template <class T, class Char>
+struct Format {
+	T value;
+	FormatAlign<Char> align;
+	Format(T value, FormatAlign<Char> align) : value(value), align(align) {}
+};
+
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
 
@@ -368,7 +396,7 @@ forceinline void append_bytes(StringBuilder &b, List<T> list) {
 	append_bytes(b, list.data, list.size * sizeof(T));
 }
 
-inline void append(StringBuilder &b, ascii ch) {
+inline umm append(StringBuilder &b, ascii ch) {
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
@@ -384,8 +412,9 @@ inline void append(StringBuilder &b, ascii ch) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return 1;
 }
-inline void append(StringBuilder &b, utf8 ch) {
+inline umm append(StringBuilder &b, utf8 ch) {
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
@@ -401,8 +430,9 @@ inline void append(StringBuilder &b, utf8 ch) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return 1;
 }
-inline void append(StringBuilder &b, utf16 ch) {
+inline umm append(StringBuilder &b, utf16 ch) {
 	switch (b.encoding) {
 		case Encoding_ascii:
 			if (ch >= 256) {
@@ -424,9 +454,10 @@ inline void append(StringBuilder &b, utf16 ch) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return 1;
 }
 
-inline void append(StringBuilder &b, Span<ascii> string) {
+inline umm append(StringBuilder &b, Span<ascii> string) {
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
@@ -448,9 +479,10 @@ inline void append(StringBuilder &b, Span<ascii> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return string.size;
 }
 
-inline void append(StringBuilder &b, Span<utf8> string) {
+inline umm append(StringBuilder &b, Span<utf8> string) {
 	switch (b.encoding) {
 		case Encoding_utf8:
 			append_bytes(b, string);
@@ -465,8 +497,8 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 					append_bytes(b, b.unfound_ascii);
 					u32 byte_count = char_byte_count(string.data);
 					if (byte_count == ~0u) {
-						invalid_code_path("string was invalid");
-						return;
+						// print("string was invalid\n");
+						return 0;
 					}
 					string.data += byte_count;
 				}
@@ -485,9 +517,10 @@ inline void append(StringBuilder &b, Span<utf8> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return string.size;
 }
 
-inline void append(StringBuilder &b, Span<utf16> string) {
+inline umm append(StringBuilder &b, Span<utf16> string) {
 	switch (b.encoding) {
 		case Encoding_utf8: {
 			auto utf8 = with(temporary_allocator, utf16_to_utf8(string));
@@ -515,31 +548,33 @@ inline void append(StringBuilder &b, Span<utf16> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
+	return string.size;
 }
-inline void append(StringBuilder &b, Span<utf32> string) {
+inline umm append(StringBuilder &b, Span<utf32> string) {
 	invalid_code_path("not implemented");
+	return string.size;
 }
-inline void append(StringBuilder &b, Span<wchar> string) {
-	append(b, (Span<wchar_s>)string);
+inline umm append(StringBuilder &b, Span<wchar> string) {
+	return append(b, (Span<wchar_s>)string);
 }
 
-forceinline void append(StringBuilder &b, ascii const *string) { append(b, as_span(string)); }
-forceinline void append(StringBuilder &b, utf8  const *string) { append(b, as_span(string)); }
-forceinline void append(StringBuilder &b, utf16 const *string) { append(b, as_span(string)); }
-forceinline void append(StringBuilder &b, utf32 const *string) { append(b, as_span(string)); }
-forceinline void append(StringBuilder &b, wchar const *string) {
+forceinline umm append(StringBuilder &b, ascii const *string) { return append(b, as_span(string)); }
+forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b, as_span(string)); }
+forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b, as_span(string)); }
+forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
+forceinline umm append(StringBuilder &b, wchar const *string) {
 	if constexpr (sizeof(wchar) == sizeof(utf16)) {
-		append(b, as_span((utf16 *)string));
+		return append(b, as_span((utf16 *)string));
 	} else {
-		append(b, as_span((utf32 *)string));
+		return append(b, as_span((utf32 *)string));
 	}
 }
 
-forceinline void append(StringBuilder &b, List<ascii> list) { append(b, as_span(list)); }
-forceinline void append(StringBuilder &b, List<utf8 > list) { append(b, as_span(list)); }
-forceinline void append(StringBuilder &b, List<utf16> list) { append(b, as_span(list)); }
-forceinline void append(StringBuilder &b, List<utf32> list) { append(b, as_span(list)); }
-forceinline void append(StringBuilder &b, List<wchar> list) { append(b, (Span<utf16>)as_span(list)); }
+forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
+forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
+forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
+forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
+forceinline umm append(StringBuilder &b, List<wchar> list) { return append(b, (Span<utf16>)as_span(list)); }
 
 template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
@@ -603,12 +638,28 @@ void append_format(StringBuilder &b, Char const *format_string, Args const &...a
 	append_format(b, as_span(format_string), args...);
 }
 
-inline void append(StringBuilder &builder, bool value) {
-	append(builder, value ? "true"s : "false"s);
+inline umm append(StringBuilder &builder, bool value) {
+	return append(builder, value ? "true"s : "false"s);
 }
 
+template <class T, class Char>
+umm append(StringBuilder &builder, Format<T, Char> format) {
+	if (format.align.count) {
+		if (format.align.kind == FormatAlign_left) {
+			auto appended_char_count = append(builder, format.value);
+			for (; appended_char_count < format.align.count; ++appended_char_count) {
+				append(builder, format.align.fill);
+			}
+			return appended_char_count;
+		} else {
+			invalid_code_path("not implemented");
+		}
+	} else {
+		return append(builder, format.value);
+	}
+}
 template <class Int>
-void append(StringBuilder &builder, FormatInt<Int> f) {
+umm append(StringBuilder &builder, FormatInt<Int> f) {
 	Int v = f.value;
 	u32 radix = f.radix;
 	constexpr u32 maxDigits = _intToStringSize<Int>;
@@ -652,19 +703,25 @@ void append(StringBuilder &builder, FormatInt<Int> f) {
 		if (f.pad_to_length > charsWritten)
 			charsWritten = f.pad_to_length;
 	}
-	append(builder, Span(lsc + 1, charsWritten));
+	return append(builder, Span(lsc + 1, charsWritten));
 }
 
 template <class Int, class = EnableIf<is_integer<Int>>>
-void append(StringBuilder &builder, Int v) {
-	append(builder, FormatInt(v));
+umm append(StringBuilder &builder, Int v) {
+	return append(builder, FormatInt(v));
 }
 
-forceinline void append(StringBuilder &builder, void const *p) {
-	append(builder, FormatInt((umm)p, 16, true));
+forceinline umm append(StringBuilder &builder, void const *p) {
+	return append(builder, FormatInt((umm)p, 16, true));
 }
 
-inline void append(StringBuilder &builder, FormatFloat<f64> f) {
+inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
+	umm chars_appended = 0;
+
+	auto append = [&](StringBuilder &builder, auto const &value) {
+		chars_appended += ::TL::append(builder, value);
+	};
+
 	auto value = f.value;
 	auto precision = f.precision;
 	if (is_negative(value)) {
@@ -728,13 +785,14 @@ inline void append(StringBuilder &builder, FormatFloat<f64> f) {
 			break;
 		}
 	}
+	return chars_appended;
 }
-inline void append(StringBuilder &builder, FormatFloat<f32> f) {
-	append(builder, FormatFloat((f64)f.value, f.precision, f.format));
+inline umm append(StringBuilder &builder, FormatFloat<f32> f) {
+	return append(builder, FormatFloat((f64)f.value, f.precision, f.format));
 }
 
-forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormatFloat(v)); }
-forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormatFloat(v)); }
+forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat(v)); }
+forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat(v)); }
 
 // Always allocates memory for the string
 inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
