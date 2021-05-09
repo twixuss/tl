@@ -91,14 +91,15 @@ u32 font_shader;
 UniformBlock<FontUniforms> font_uniforms;
 
 
-struct TextureUniforms {
-	v4f color;
-	v2f position_min;
-	v2f position_max;
-};
+//struct TextureUniforms {
+//	v4f color;
+//	v2f position_min;
+//	v2f position_max;
+//};
 
 u32 texture_shader;
-UniformBlock<TextureUniforms> texture_uniforms;
+u32 texture_stretched_shader;
+//UniformBlock<TextureUniforms> texture_uniforms;
 
 void init(Window *window, FontCollection *font_collection) {
 	timed_function();
@@ -239,11 +240,11 @@ void main() {
 #endif
 
 uniform sampler2D base_texture;
-layout(std140, binding = 1) uniform _ {
-	vec4 color;
-	vec2 position_min;
-	vec2 position_max;
-};
+//layout(std140, binding = 1) uniform _ {
+uniform vec4 color;
+uniform vec2 position_min;
+uniform vec2 position_max;
+//};
 
 V2F vec2 vertex_uv;
 
@@ -282,8 +283,85 @@ void main() {
 	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, texture_source);
 	texture_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 
-	init_uniform_block(texture_uniforms, texture_shader, 1, "_");
+	//init_uniform_block(texture_uniforms, texture_shader, 1, "_");
 
+
+	auto texture_stretched_source = R"(
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
+uniform sampler2D base_texture;
+uniform vec4 color;
+uniform vec2 position_min;
+uniform vec2 position_max;
+uniform vec2 stretch_position_min;
+uniform vec2 stretch_position_max;
+uniform vec2 stretch_uv_min;
+uniform vec2 stretch_uv_max;
+
+V2F vec2 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec2 p0 = position_min;
+	vec2 p3 = position_max;
+	vec2 p1 = mix(p0, p3, stretch_position_min);
+	vec2 p2 = mix(p3, p0, stretch_position_max);
+	vec2 positions[] = vec2[](
+		vec2(p0.x, p0.y), vec2(p1.x, p0.y), vec2(p1.x, p1.y), vec2(p0.x, p1.y),
+		vec2(p0.x, p1.y), vec2(p1.x, p1.y), vec2(p1.x, p2.y), vec2(p0.x, p2.y),
+		vec2(p0.x, p2.y), vec2(p1.x, p2.y), vec2(p1.x, p3.y), vec2(p0.x, p3.y),
+
+		vec2(p1.x, p0.y), vec2(p2.x, p0.y), vec2(p2.x, p1.y), vec2(p1.x, p1.y),
+		vec2(p1.x, p1.y), vec2(p2.x, p1.y), vec2(p2.x, p2.y), vec2(p1.x, p2.y),
+		vec2(p1.x, p2.y), vec2(p2.x, p2.y), vec2(p2.x, p3.y), vec2(p1.x, p3.y),
+
+		vec2(p2.x, p0.y), vec2(p3.x, p0.y), vec2(p3.x, p1.y), vec2(p2.x, p1.y),
+		vec2(p2.x, p1.y), vec2(p3.x, p1.y), vec2(p3.x, p2.y), vec2(p2.x, p2.y),
+		vec2(p2.x, p2.y), vec2(p3.x, p2.y), vec2(p3.x, p3.y), vec2(p2.x, p3.y)
+	);
+	gl_Position = vec4(positions[gl_VertexID], 0, 1);
+
+	vec2 u0 = vec2(0, 0);
+	vec2 u3 = vec2(1, 1);
+	vec2 u1 = mix(u0, u3, stretch_uv_min);
+	vec2 u2 = mix(u3, u0, stretch_uv_max);
+	vec2 uvs[] = vec2[](
+		vec2(u0.x, u0.y), vec2(u1.x, u0.y), vec2(u1.x, u1.y), vec2(u0.x, u1.y),
+		vec2(u0.x, u1.y), vec2(u1.x, u1.y), vec2(u1.x, u2.y), vec2(u0.x, u2.y),
+		vec2(u0.x, u2.y), vec2(u1.x, u2.y), vec2(u1.x, u3.y), vec2(u0.x, u3.y),
+
+		vec2(u1.x, u0.y), vec2(u2.x, u0.y), vec2(u2.x, u1.y), vec2(u1.x, u1.y),
+		vec2(u1.x, u1.y), vec2(u2.x, u1.y), vec2(u2.x, u2.y), vec2(u1.x, u2.y),
+		vec2(u1.x, u2.y), vec2(u2.x, u2.y), vec2(u2.x, u3.y), vec2(u1.x, u3.y),
+
+		vec2(u2.x, u0.y), vec2(u3.x, u0.y), vec2(u3.x, u1.y), vec2(u2.x, u1.y),
+		vec2(u2.x, u1.y), vec2(u3.x, u1.y), vec2(u3.x, u2.y), vec2(u2.x, u2.y),
+		vec2(u2.x, u2.y), vec2(u3.x, u2.y), vec2(u3.x, u3.y), vec2(u2.x, u3.y)
+	);
+	vertex_uv = uvs[gl_VertexID];
+}
+
+#endif
+
+#ifdef FRAGMENT_SHADER
+
+out vec4 fragment_color;
+
+void main() {
+	fragment_color = texture(base_texture, vertex_uv) * color;
+}
+
+#endif
+
+)"s;
+	vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 420, true, texture_stretched_source);
+	fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 420, true, texture_stretched_source);
+	texture_stretched_shader = OpenGL::create_program(vertex_shader, fragment_shader);
 }
 
 void _set_scissor_impl(aabb<v2s> region) {
@@ -369,6 +447,30 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				auto color   = t.color;
 				auto rect    = t.rect;
 
+
+				glBindTexture(GL_TEXTURE_2D, TL_IMGUI_TEXTURE_GET(texture.handle));
+				glEnable(GL_BLEND);
+				glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+				if (texture.stretch_min == v2s{} && texture.stretch_max == v2s{}) {
+					glUseProgram(texture_shader);
+					set_uniform(texture_shader, "color", color);
+					set_uniform(texture_shader, "position_min", client_to_ndc(rect.min));
+					set_uniform(texture_shader, "position_max", client_to_ndc(rect.max));
+					glDrawArrays(GL_QUADS, 0, 4);
+				} else {
+					glUseProgram(texture_stretched_shader);
+					set_uniform(texture_stretched_shader, "color", color);
+					set_uniform(texture_stretched_shader, "position_min", client_to_ndc(rect.min));
+					set_uniform(texture_stretched_shader, "position_max", client_to_ndc(rect.max));
+					set_uniform(texture_stretched_shader, "stretch_position_min", (v2f)texture.stretch_min / rect.size().y * v2f{(f32)rect.size().y / (f32)rect.size().x, 1});
+					set_uniform(texture_stretched_shader, "stretch_position_max", (v2f)texture.stretch_max / rect.size().y * v2f{(f32)rect.size().y / (f32)rect.size().x, 1});
+					set_uniform(texture_stretched_shader, "stretch_uv_min", (v2f)texture.stretch_min / (v2f)texture.size);
+					set_uniform(texture_stretched_shader, "stretch_uv_max", (v2f)texture.stretch_max / (v2f)texture.size);
+					glDrawArrays(GL_QUADS, 0, 36);
+				}
+
+
+#if 0
 				glUseProgram(texture_shader);
 				glBindTexture(GL_TEXTURE_2D, TL_IMGUI_TEXTURE_GET(texture));
 				glEnable(GL_BLEND);
@@ -385,6 +487,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				glDrawArrays(GL_QUADS, 0, 4);
 
 				glBindBuffer(GL_UNIFORM_BUFFER, 0);
+#endif
 				break;
 			}
 			case UIElement_text: {

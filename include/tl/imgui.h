@@ -15,7 +15,13 @@
 namespace TL {
 namespace Imgui {
 
-using Texture = typename TL_IMGUI_TEXTURE;
+struct Texture {
+	TL_IMGUI_TEXTURE handle;
+	v2s stretch_min;
+	v2s stretch_max;
+	v2s size;
+};
+
 using Shader = typename TL_IMGUI_SHADER;
 
 struct Region {
@@ -325,23 +331,23 @@ ButtonState button(Button &b) {
 		}
 	}
 
-	if (background_texture) {
+	if (background_texture.handle) {
 		draw_texture(background_rect, background_texture, background_color);
 	} else {
-		if (!foreground_texture) {
+		if (!foreground_texture.handle) {
 			panel(background_rect, background_color);
 		}
 	}
 
 	if (state.flags & (ButtonState_hovered | ButtonState_pressed)) {
-		if (button_background_texture) {
+		if (button_background_texture.handle) {
 			draw_texture(background_rect, button_background_texture, V4f(V3f((state.flags & ButtonState_hovered) != 0), 0.1f));
 		} else {
 			panel(background_rect, V4f(V3f((state.flags & ButtonState_hovered) != 0), 0.1f));
 		}
 	}
 
-	if (foreground_texture) {
+	if (foreground_texture.handle) {
 		draw_texture(foreground_rect, foreground_texture, foreground_color);
 	}
 
