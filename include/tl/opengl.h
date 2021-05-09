@@ -19,8 +19,8 @@
 #endif
 
 using GLchar = char;
-using GLsizeiptr = umm;
-using GLintptr = smm;
+using GLsizeiptr = TL::umm;
+using GLintptr = TL::smm;
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
 #define GL_TEXTURE_MAX_LEVEL              0x813D

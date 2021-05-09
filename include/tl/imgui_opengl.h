@@ -5,6 +5,7 @@
 #endif
 #else
 #define TL_IMGUI_TEXTURE u32
+#define TL_IMGUI_TEXTURE_GET(x) (x)
 #endif
 
 #define TL_IMGUI_SHADER u32
@@ -290,11 +291,14 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 	auto element = elements.data;
 	while (element != elements.end()) {
-		defer { free(*element); };
-
 		if (volume(element->scissor_rect) <= 0) {
 			continue; // Maybe do early check??
 		}
+
+		auto next_element = [&]() {
+			free(*element++);
+			return element != elements.end();
+		};
 
 		auto old_scissor = current_scissor;
 		defer { set_scissor(old_scissor); };
@@ -323,8 +327,9 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 						{{max.x, max.y}, color},
 						{{max.x, min.y}, color},
 					});
-					++element;
-				} while (element != elements.end() && element->kind == UIElement_panel);
+					if (!next_element())
+						break;
+				} while (element->kind == UIElement_panel);
 
 				static GrowingBuffer<PanelVertex> panel_vertex_buffer;
 				panel_vertex_buffer.usage = GL_STATIC_COPY;
@@ -345,7 +350,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				break;
 			}
 			case UIElement_texture: {
-				defer { ++element; };
+				defer { next_element(); };
 				auto t = element->texture;
 				auto texture = t.texture;
 				auto color   = t.color;
@@ -369,7 +374,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				break;
 			}
 			case UIElement_text: {
-				defer { ++element; };
+				defer { next_element(); };
 				auto t         = element->text;
 				auto id        = t.id;
 				auto color     = t.color;

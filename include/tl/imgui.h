@@ -339,9 +339,10 @@ ButtonState button(Button &b) {
 	}
 
 	if (text.size) {
-		begin_region(foreground_rect);
-		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
-		end_region();
+		//begin_region(foreground_rect);
+		label(id, text, foreground_rect, TextAlignment_top_left, font_size, foreground_color);
+		//label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
+		//end_region();
 	}
 
 	return state;
