@@ -92,4 +92,29 @@ void common_test() {
 	static_assert(TL::midpoint((u32)0xFFFFFFFF, (u32)0xFFFFFFFD) == (u32)0xFFFFFFFE);
 	static_assert(TL::midpoint((s32)0xFFFFFFFD, (s32)0xFFFFFFFF) == (s32)0xFFFFFFFE);
 	static_assert(TL::midpoint((s32)0xFFFFFFFF, (s32)0xFFFFFFFD) == (s32)0xFFFFFFFE);
+
+
+	int arr[] = {0,1,2,3,4,5,6,7};
+	rotate(array_as_span(arr), 2);
+
+	assert(arr[0] == 2);
+	assert(arr[1] == 3);
+	assert(arr[2] == 4);
+	assert(arr[3] == 5);
+	assert(arr[4] == 6);
+	assert(arr[5] == 7);
+	assert(arr[6] == 0);
+	assert(arr[7] == 1);
+
+	rotate(array_as_span(arr), -2);
+
+	assert(arr[0] == 0);
+	assert(arr[1] == 1);
+	assert(arr[2] == 2);
+	assert(arr[3] == 3);
+	assert(arr[4] == 4);
+	assert(arr[5] == 5);
+	assert(arr[6] == 6);
+	assert(arr[7] == 7);
+
 }

@@ -1214,13 +1214,17 @@ void rotate(Span<T> span, T *to_be_first) {
 		T *temp = ALLOCATE(T, temporary_allocator, left_count);
 		memcpy(temp, span.data, sizeof(T) * left_count);
 		memmove(span.data, span.data + left_count, sizeof(T) * right_count);
-		memcpy(to_be_first, temp, sizeof(T) * left_count);
+		memcpy(span.data + right_count, temp, sizeof(T) * left_count);
 	}
 }
 
 template <class T>
-void rotate(Span<T> span, umm to_be_first_index) {
-	return rotate(span, span.data + to_be_first_index);
+void rotate(Span<T> span, smm to_be_first_index) {
+	if (to_be_first_index < 0) {
+		return rotate(span, span.end() + to_be_first_index);
+	} else {
+		return rotate(span, span.data + to_be_first_index);
+	}
 }
 
 #ifdef TL_IMPL
