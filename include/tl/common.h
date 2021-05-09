@@ -202,11 +202,15 @@ template<> inline static constexpr ulong max_value<ulong> = (ulong)max_value<ulo
 template<> inline static constexpr slong min_value<slong> = (slong)min_value<slong_s>;
 template<> inline static constexpr slong max_value<slong> = (slong)max_value<slong_s>;
 
-template<> inline static constexpr f32 min_value<f32> = 1.175494351e-38f;
-template<> inline static constexpr f32 max_value<f32> = 3.402823466e+38f;
+template<> inline static constexpr f32 min_value<f32> = -3.402823466e+38f;
+template<> inline static constexpr f32 max_value<f32> = +3.402823466e+38f;
 
-template<> inline static constexpr f64 min_value<f64> = 2.2250738585072014e-308;
-template<> inline static constexpr f64 max_value<f64> = 1.7976931348623158e+308;
+template<> inline static constexpr f64 min_value<f64> = -1.7976931348623158e+308;
+template<> inline static constexpr f64 max_value<f64> = +1.7976931348623158e+308;
+
+template <class T> inline static constexpr T epsilon = {};
+template<> inline static constexpr f32 epsilon<f32> = 1.175494351e-38f;
+template<> inline static constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
 #pragma warning(pop)
 

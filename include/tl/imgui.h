@@ -531,10 +531,30 @@ bool scroll_bar(ScrollBar<T> &s) {
 		}
 	};
 
+
+	if (max_scroll <= 0) {
+		rect = {};
+	}
+
 	static u32 panning_id = -1;
 	static s32 panning_scroll_start;
 	static s32 panning_mouse_start;
 
+	if (!(s.flags & ScrollBar_no_clamp) && max_scroll <= 0) {
+		target_scroll_amount = 0;
+		scroll_amount = 0;
+		return false;
+	}
+
+
+	static u32 current_id = -1;
+	static s32 pick_offset = 0;
+
+	auto mouse_position = window->mouse_position - current_region.visible_rect.min;
+
+	bool clicked = false;
+	bool set_offset = false;
+	UIElementState state = UIElement_normal;
 	if (in_bounds(window->mouse_position, current_region.visible_rect)) {
 		if (window->mouse_wheel) {
 			if ((s.flags & ScrollBar_zoom_with_wheel) && (s.flags & ScrollBar_pan_with_wheel)) {
@@ -564,48 +584,36 @@ bool scroll_bar(ScrollBar<T> &s) {
 			target_scroll_amount = 0;
 		}
 		if (key_down(Key_end)) {
-			target_scroll_amount = current_region.visible_rect.size().x - s.total_size; // flipped because target_scroll_amount is negative at the end
+			target_scroll_amount = current_region.visible_rect.size().x - s.total_size;
 		}
-		if (s.flags & ScrollBar_pan_with_mouse) {
-			if (mouse_down(0)) {
-				panning_id = id;
-				panning_mouse_start = window->mouse_position.x;
-				panning_scroll_start = target_scroll_amount;
-			}
-			if (panning_id == id) {
-				if (mouse_held(0)) {
-					target_scroll_amount = scroll_amount = panning_scroll_start + window->mouse_position.x - panning_mouse_start;
+
+		if (in_bounds(mouse_position, rect)) {
+			if (!hovering_interactive_element) {
+				hovering_interactive_element = true;
+				if (mouse_down(0)) {
+					current_id = id;
+					set_offset = true;
+				}
+				if (current_id != id) {
+					state = UIElement_hovered;
 				}
 			}
-			if (mouse_up(0)) {
-				panning_id = -1;
+		} else {
+			if (s.flags & ScrollBar_pan_with_mouse) {
+				if (mouse_down(0)) {
+					panning_id = id;
+					panning_mouse_start = window->mouse_position.x;
+					panning_scroll_start = target_scroll_amount;
+				}
+				if (panning_id == id) {
+					if (mouse_held(0)) {
+						target_scroll_amount = scroll_amount = panning_scroll_start + window->mouse_position.x - panning_mouse_start;
+					}
+				}
+				if (mouse_up(0)) {
+					panning_id = -1;
+				}
 			}
-		}
-	}
-
-	if (!(s.flags & ScrollBar_no_clamp) && max_scroll <= 0) {
-		target_scroll_amount = 0;
-		scroll_amount = 0;
-		return false;
-	}
-
-
-	static u32 current_id = -1;
-	static s32 pick_offset = 0;
-
-	auto mouse_position = window->mouse_position - current_region.visible_rect.min;
-
-	bool clicked = false;
-	bool set_offset = false;
-	UIElementState state = UIElement_normal;
-	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_region.visible_rect) && in_bounds(mouse_position, rect)) {
-		hovering_interactive_element = true;
-		if (mouse_down(0)) {
-			current_id = id;
-			set_offset = true;
-		}
-		if (current_id != id) {
-			state = UIElement_hovered;
 		}
 	}
 	if (current_id == id) {
