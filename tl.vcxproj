@@ -22,8 +22,10 @@
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\compiler.cpp" />
     <ClCompile Include="src\definitions.cpp" />
+    <ClCompile Include="src\list.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\math.cpp" />
+    <ClCompile Include="src\stream.cpp" />
     <ClCompile Include="src\string.cpp" />
   </ItemGroup>
   <ItemGroup>

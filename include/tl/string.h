@@ -653,6 +653,7 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 			return appended_char_count;
 		} else {
 			invalid_code_path("not implemented");
+			return 0;
 		}
 	} else {
 		return append(builder, format.value);
