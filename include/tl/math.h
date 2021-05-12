@@ -701,6 +701,15 @@ forceinline v2s round_to_int(v2f v) { return {round_to_int(v.x), round_to_int(v.
 forceinline v3s round_to_int(v3f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z)}; }
 forceinline v4s round_to_int(v4f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z), round_to_int(v.w)}; }
 
+template <class Int, class T>
+forceinline constexpr auto lerp_int(Int a, Int b, T t) {
+	auto r = lerp((T)a, (T)b, t);
+	if (a > b) {
+		return floor_to_int(r);
+	} else {
+		return ceil_to_int(r);
+	}
+}
 forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
 forceinline v2f absolute(v2f v) { return {absolute(v.x), absolute(v.y)}; }
 forceinline v3f absolute(v3f v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }

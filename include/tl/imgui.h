@@ -3,6 +3,7 @@
 #include "window.h"
 #include "font.h"
 #include "time.h"
+#include "texture.h"
 
 #ifndef TL_IMGUI_TEXTURE
 #error TL_IMGUI_TEXTURE must be defined before including tl/imgui.h
@@ -16,10 +17,10 @@ namespace TL {
 namespace Imgui {
 
 struct Texture {
-	TL_IMGUI_TEXTURE handle;
-	v2s stretch_min;
-	v2s stretch_max;
-	v2s size;
+	TL_IMGUI_TEXTURE handle = {};
+	v2s stretch_min = {};
+	v2s stretch_max = {};
+	v2s size = {};
 };
 
 using Shader = typename TL_IMGUI_SHADER;
@@ -36,6 +37,11 @@ f32 tooltip_opacity;
 f32 tooltip_opacity_t;
 f32 frame_time = 1.0f / 60.0f;
 PreciseTimer frame_timer;
+Texture tooltip_texture;
+Texture texture_round_4;
+Texture texture_round_4_top;
+Texture texture_round_4_bottom;
+Texture texture_round_8;
 
 enum UIElementKind {
 	UIElement_unknown,
@@ -86,11 +92,11 @@ struct UILayer {
 extern void _set_scissor_impl(aabb<v2s> region);
 extern void _draw_and_free_elements(Span<UIElement> e);
 extern v2s _get_text_bounds(Span<utf8> text, u32 font_size);
+extern TL_IMGUI_TEXTURE _create_texture(void *pixels, v2u size, TextureFormat format);
 
 Window *window;
 List<UILayer> layers;
 UILayer *current_layer = 0;
-Texture button_background_texture;
 
 List<Region> region_stack;
 
@@ -99,6 +105,51 @@ void init_base(Window *window) {
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
 	::TL::Imgui::window = window;
+
+	{
+
+		u32 round_4_pixels[8*8];
+		for (s32 y = 0; y < 8; ++y)
+		for (s32 x = 0; x < 8; ++x)
+		{
+			v2f p = V2f(x, y) - 4 + 0.5f;
+			round_4_pixels[y*8+x] = ((u32)(clamp<f32>(4 + 0.5f - length(p), 0, 1) * 255) << 24) | 0xffffff;
+		}
+
+		texture_round_4.handle = _create_texture(round_4_pixels, {8, 8}, TextureFormat_u8_rgba);
+		texture_round_4.stretch_min = V2s(4);
+		texture_round_4.stretch_max = V2s(4);
+		texture_round_4.size = V2s(8);
+
+		texture_round_4_top.handle = _create_texture(round_4_pixels, {8, 4}, TextureFormat_u8_rgba);
+		texture_round_4_top.stretch_min = {4, 4};
+		texture_round_4_top.stretch_max = {4, 0};
+		texture_round_4_top.size = {8, 4};
+
+		texture_round_4_bottom.handle = _create_texture(round_4_pixels+8*4, {8, 4}, TextureFormat_u8_rgba);
+		texture_round_4_bottom.stretch_min = {4, 0};
+		texture_round_4_bottom.stretch_max = {4, 4};
+		texture_round_4_bottom.size = {8, 4};
+	}
+
+	{
+		u32 round_8_pixels[16*16];
+		for (s32 y = 0; y < 16; ++y)
+		for (s32 x = 0; x < 16; ++x)
+		{
+			v2f p = V2f(x, y) - 8 + 0.5f;
+			round_8_pixels[y*16+x] = ((u32)(clamp<f32>(8 + 0.5f - length(p), 0, 1) * 255) << 24) | 0xffffff;
+		}
+
+		texture_round_8.handle = _create_texture(round_8_pixels, {16, 16}, TextureFormat_u8_rgba);
+		texture_round_8.stretch_min = V2s(8);
+		texture_round_8.stretch_max = V2s(8);
+		texture_round_8.size = V2s(16);
+	}
+
+	tooltip_texture = texture_round_4;
+
+
 	frame_timer = create_precise_timer();
 }
 
@@ -168,6 +219,9 @@ void draw_texture(aabb<v2s> rect, Texture texture, v4f color = V4f(1)) {
 	e.texture.texture = texture;
 	e.texture.color = color;
 	e.texture.rect = region_to_client(rect);
+	if (texture.stretch_max != v2s{} || texture.stretch_min != v2s{}) {
+		assert(texture.size != v2s{});
+	}
 	current_layer->elements.add(e);
 }
 
@@ -223,10 +277,6 @@ enum UIElementState {
 	UIElement_pressed,
 };
 
-Span<utf8> get_tooltip_stub() {
-	return {};
-}
-
 struct Button {
 	u32 id = {};
 	aabb<v2s> rect = {};
@@ -238,7 +288,6 @@ struct Button {
 	Texture background_texture = {};
 	Texture foreground_texture = {};
 	u32 content_padding = {};
-	Span<utf8> (*get_tooltip)() = get_tooltip_stub;
 };
 
 using ButtonStateFlags = u8;
@@ -256,7 +305,7 @@ struct ButtonState {
 	}
 };
 
-void check_if_tooltip_was_set_properly() {
+void check_if_tooltip_was_set() {
 	if (should_set_tooltip) {
 		// tooltip was not set
 		should_set_tooltip = false;
@@ -265,7 +314,7 @@ void check_if_tooltip_was_set_properly() {
 }
 
 ButtonState button(Button &b) {
-	check_if_tooltip_was_set_properly();
+	check_if_tooltip_was_set();
 
 	defer { ++b.id; };
 	static u32 current_id = -1;
@@ -331,23 +380,23 @@ ButtonState button(Button &b) {
 		}
 	}
 
-	if (background_texture.handle) {
+	if (TL_IMGUI_TEXTURE_GET(background_texture.handle)) {
 		draw_texture(background_rect, background_texture, background_color);
 	} else {
-		if (!foreground_texture.handle) {
+		if (!TL_IMGUI_TEXTURE_GET(foreground_texture.handle)) {
 			panel(background_rect, background_color);
 		}
 	}
 
 	if (state.flags & (ButtonState_hovered | ButtonState_pressed)) {
-		if (button_background_texture.handle) {
-			draw_texture(background_rect, button_background_texture, V4f(V3f((state.flags & ButtonState_hovered) != 0), 0.1f));
+		if (TL_IMGUI_TEXTURE_GET(background_texture.handle)) {
+			draw_texture(background_rect, background_texture, V4f(V3f((state.flags & ButtonState_hovered) != 0), 0.1f));
 		} else {
 			panel(background_rect, V4f(V3f((state.flags & ButtonState_hovered) != 0), 0.1f));
 		}
 	}
 
-	if (foreground_texture.handle) {
+	if (TL_IMGUI_TEXTURE_GET(foreground_texture.handle)) {
 		draw_texture(foreground_rect, foreground_texture, foreground_color);
 	}
 
@@ -384,10 +433,13 @@ struct Slider {
 	Texture texture;
 	v4f background_color = {.1,.1,.1,1};
 	v4f foreground_color = {.2,.2,.2,1};
+	s32 knob_padding = 0;
 };
 
 template <class T>
 bool slider(Slider<T> &s) {
+	check_if_tooltip_was_set();
+
 	defer { ++s.id; };
 	auto id          = s.id;
 	auto value       = s.value;
@@ -446,34 +498,23 @@ bool slider(Slider<T> &s) {
 
 	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return false;
 
-	//if (texture.handle) {
-	//	draw_texture(rect,      texture, s.background_color);
-	//	draw_texture(knob_rect, texture, s.foreground_color);
-	//	if (state != UIElement_normal) {
-	//		draw_texture(rect, texture, V4f(V3f(state == UIElement_hovered), 0.05f));
-	//	}
-	//} else {
+	knob_rect = extend(knob_rect, V2s(-s.knob_padding));
+
+	if (TL_IMGUI_TEXTURE_GET(texture.handle)) {
+		draw_texture(rect,      texture, s.background_color);
+		draw_texture(knob_rect, texture, s.foreground_color);
+		if (state != UIElement_normal) {
+			draw_texture(rect, texture, V4f(V3f(state == UIElement_hovered), 0.05f));
+		}
+	} else {
 		panel(rect, s.background_color);
 		panel(knob_rect, s.foreground_color);
 		if (state != UIElement_normal) {
 			panel(rect, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
-	//}
+	}
 
 	return holding;
-}
-
-Texture *default_slider_texture;
-
-template <class T>
-bool slider(u32 id, T &value, T lower_bound, T upper_bound, aabb<v2s> rect) {
-	Slider<T> s;
-	s.value       = &value;
-	s.lower_bound = lower_bound;
-	s.upper_bound = upper_bound;
-	s.rect        = rect;
-	s.texture     = *default_slider_texture;
-	return slider(id, s);
 }
 
 using ScrollBarFlags = u8;
@@ -497,10 +538,14 @@ struct ScrollBar {
 	T max_scale = {};
 	v4f background_color = {.1,.1,.1,1};
 	v4f foreground_color = {.2,.2,.2,1};
+	s32 knob_padding = 0;
+	Texture texture;
 };
 
 template <class T>
 bool scroll_bar(ScrollBar<T> &s) {
+	check_if_tooltip_was_set();
+
 	auto id = s.id;
 	auto &scroll_amount = *s.scroll_amount;
 	auto &target_scroll_amount = *s.target_scroll_amount;
@@ -689,15 +734,17 @@ bool scroll_bar(ScrollBar<T> &s) {
 
 	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return false;
 
-	if (default_slider_texture) {
-		draw_texture(rect, *default_slider_texture, s.background_color);
-		draw_texture(aabb_min_size(knob_position, knob_size), *default_slider_texture, s.foreground_color);
+	auto knob_rect = extend(aabb_min_size(knob_position, knob_size), V2s(-s.knob_padding));
+
+	if (TL_IMGUI_TEXTURE_GET(s.texture.handle)) {
+		draw_texture(rect, s.texture, s.background_color);
+		draw_texture(knob_rect, s.texture, s.foreground_color);
 		if (state != UIElement_normal) {
-			draw_texture(rect, *default_slider_texture, V4f(V3f(state == UIElement_hovered), 0.05f));
+			draw_texture(rect, s.texture, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
 	} else {
 		panel(rect, s.background_color);
-		panel(aabb_min_size(knob_position, knob_size), s.foreground_color);
+		panel(knob_rect, s.foreground_color);
 		if (state != UIElement_normal) {
 			panel(rect, V4f(V3f(state == UIElement_hovered), 0.05f));
 		}
@@ -780,7 +827,11 @@ void end_frame_base() {
 		auto panel_rect = clamp(extend(aabb_min_max({}, bounds), V2s(margin)) + window->mouse_position + v2s{-32, -24}, aabb_min_max(v2s{}, (v2s)window->client_size));
 
 		v4f background_color = {.2,.3,.1,1.};
-		panel(panel_rect, V4f(background_color.xyz, tooltip_opacity * 0.5f));
+		if (TL_IMGUI_TEXTURE_GET(tooltip_texture.handle)) {
+			draw_texture(panel_rect, tooltip_texture, V4f(background_color.xyz, tooltip_opacity * 0.5f));
+		} else {
+			panel(panel_rect, V4f(background_color.xyz, tooltip_opacity * 0.5f));
+		}
 		label(-2, tooltip, panel_rect, TextAlignment_center, tooltip_font_size, V4f(1,1,1,tooltip_opacity));
 		draw_and_free_layer(tooltip_layer);
 	}

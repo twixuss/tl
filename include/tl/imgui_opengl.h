@@ -3,9 +3,13 @@
 #ifndef TL_IMGUI_TEXTURE_GET
 #error TL_IMGUI_TEXTURE_GET must be defined along with TL_IMGUI_TEXTURE
 #endif
+#ifndef TL_IMGUI_CREATE_TEXTURE
+#error TL_IMGUI_CREATE_TEXTURE must be defined along with TL_IMGUI_TEXTURE
+#endif
 #else
 #define TL_IMGUI_TEXTURE u32
 #define TL_IMGUI_TEXTURE_GET(x) (x)
+#define TL_IMGUI_CREATE_TEXTURE(x) (x)
 #endif
 
 #define TL_IMGUI_SHADER u32
@@ -447,6 +451,8 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 				auto color   = t.color;
 				auto rect    = t.rect;
 
+				assert(TL_IMGUI_TEXTURE_GET(texture.handle));
+
 
 				glBindTexture(GL_TEXTURE_2D, TL_IMGUI_TEXTURE_GET(texture.handle));
 				glEnable(GL_BLEND);
@@ -592,6 +598,39 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 v2s _get_text_bounds(Span<utf8> text, u32 font_size) {
 	return get_text_bounds(text, get_font_at_size(font_collection, font_size), false).max;
+}
+
+GLenum texture_format_gl_format(TextureFormat format) {
+	switch (format) 	{
+		case TL::TextureFormat_u8_rgba: return GL_RGBA;
+	}
+	return 0;
+}
+
+GLenum texture_format_gl_type(TextureFormat format) {
+	switch (format) 	{
+		case TL::TextureFormat_u8_rgba: return GL_UNSIGNED_BYTE;
+	}
+	return 0;
+}
+
+TL_IMGUI_TEXTURE create_empty_texture() {
+	GLuint texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	return TL_IMGUI_CREATE_TEXTURE(texture);
+}
+
+TL_IMGUI_TEXTURE _create_texture(void *pixels, v2u size, TextureFormat format) {
+	auto texture = create_empty_texture();
+	auto gl_format = texture_format_gl_format(format);
+	auto gl_type   = texture_format_gl_type(format);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, gl_format, size.x, size.y, 0, gl_format, gl_type, pixels);
+	return texture;
 }
 
 }

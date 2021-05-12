@@ -74,8 +74,18 @@ inline void update_key_state(Span<KeyState> key_state) {
 	}
 }
 
+extern void (*on_key_down)(u8 key);
+extern void (*on_key_repeat)(u8 key);
+extern void (*on_key_up)(u8 key);
+extern void (*on_char)(u32 ch);
+
 #ifdef TL_IMPL
 #if OS_WINDOWS
+void (*on_key_down)(u8 key);
+void (*on_key_repeat)(u8 key);
+void (*on_key_up)(u8 key);
+void (*on_char)(u32 ch);
+
 bool process_mouse_message(MSG message, Span<KeyState> mouse_state, v2s *mouse_delta = 0, s32 *wheel = 0) {
 	switch (message.message) {
 		case WM_LBUTTONDOWN: { mouse_state[0] = KeyState_down | KeyState_held; return true; }
@@ -123,8 +133,11 @@ bool process_keyboard_message(MSG message, Span<KeyState> key_state) {
 
 			if (is_repeated) {
 				key_state[key] |= KeyState_repeated;
+				if (on_key_repeat) on_key_repeat(key);
 			} else {
 				key_state[key] = KeyState_repeated | KeyState_down | KeyState_held;
+				if (on_key_down) on_key_down(key);
+				if (on_key_repeat) on_key_repeat(key);
 			}
 
 			return true;
@@ -133,6 +146,12 @@ bool process_keyboard_message(MSG message, Span<KeyState> key_state) {
 		case WM_KEYUP: {
 			u8 key = message.wParam;
 			key_state[key] = KeyState_up | KeyState_held;
+			if (on_key_up) on_key_up(key);
+			return true;
+		}
+		case WM_UNICHAR: {
+			if (on_char)
+				on_char(message.wParam);
 			return true;
 		}
 	}

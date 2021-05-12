@@ -9,7 +9,16 @@ namespace TL {
 
 template <class EntryAddition>
 struct Catalog {
-	struct Entry : EntryAddition {
+	template <class T, bool fundamental>
+	struct SelectEntryBase : T {
+	};
+
+	template <class T>
+	struct SelectEntryBase<T, true> {
+		T handle;
+	};
+
+	struct Entry : SelectEntryBase<EntryAddition, std::is_fundamental_v<EntryAddition>> {
 		List<utf8> name;
 		FileTracker tracker;
 		bool initialized;
@@ -59,6 +68,13 @@ Catalog<T>::Entry *find(Catalog<T> &catalog, Span<utf8> name) {
 		print("% '%' not found\n", catalog.entry_string, name);
 	}
 	return catalog.fallback;
+}
+
+template <class T>
+Catalog<T>::Entry &add_entry(Catalog<T> &catalog, Span<filechar> name) {
+	auto &entry = catalog.entries[name];
+	entry.name = name;
+	return entry;
 }
 
 template <class T>
