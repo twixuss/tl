@@ -93,6 +93,7 @@ extern void _set_scissor_impl(aabb<v2s> region);
 extern void _draw_and_free_elements(Span<UIElement> e);
 extern v2s _get_text_bounds(Span<utf8> text, u32 font_size);
 extern TL_IMGUI_TEXTURE _create_texture(void *pixels, v2u size, TextureFormat format);
+extern void _ensure_all_chars_present(Span<utf8> text, u32 font_size);
 
 Window *window;
 List<UILayer> layers;
@@ -101,6 +102,8 @@ UILayer *current_layer = 0;
 List<Region> region_stack;
 
 void init_base(Window *window) {
+	timed_function();
+
 	layers.allocator = current_allocator;
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
@@ -233,11 +236,14 @@ struct Label {
 	v4f color = V4f(1);
 };
 
-void label(u32 id, Label l) {
+void label(u32 id, Label l, bool check_present = true) {
 	if (!l.text.size) return;
 	if (!has_volume(current_region.visible_rect)) return;
 
 	assert(l.font_size);
+
+	if (check_present)
+		_ensure_all_chars_present(l.text, l.font_size);
 
 	UIElement e;
 	e.kind = UIElement_text;
@@ -250,14 +256,14 @@ void label(u32 id, Label l) {
 	e.text.id        = id;
 	current_layer->elements.add(e);
 }
-void label(u32 id, Span<utf8> text, aabb<v2s> rect, TextAlignment alignment, u32 size, v4f color = V4f(1)) {
+void label(u32 id, Span<utf8> text, aabb<v2s> rect, TextAlignment alignment, u32 size, v4f color = V4f(1), bool check_present = true) {
 	Label l;
 	l.text = text;
 	l.rect = rect;
 	l.alignment = alignment;
 	l.font_size = size;
 	l.color = color;
-	label(id, l);
+	label(id, l, check_present);
 }
 
 void panel(aabb<v2s> rect, v4f color) {
@@ -321,6 +327,7 @@ ButtonState button(Button &b) {
 
 	if (b.text.size) {
 		assert(b.font_size);
+		_ensure_all_chars_present(b.text, b.font_size);
 	}
 
 	auto id                 = b.id;
@@ -403,7 +410,7 @@ ButtonState button(Button &b) {
 	if (text.size) {
 		begin_region(foreground_rect);
 		//label(id, text, foreground_rect, TextAlignment_top_left, font_size, foreground_color);
-		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color);
+		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color, false);
 		end_region();
 	}
 
@@ -519,10 +526,10 @@ bool slider(Slider<T> &s) {
 
 using ScrollBarFlags = u8;
 enum : ScrollBarFlags {
-	ScrollBar_zoom_with_wheel = 0x1,
-	ScrollBar_pan_with_wheel  = 0x2,
-	ScrollBar_pan_with_mouse  = 0x4,
-	ScrollBar_no_clamp        = 0x8,
+	ScrollBar_zoom_with_wheel   = 0x1,
+	ScrollBar_no_pan_with_wheel = 0x2,
+	ScrollBar_pan_with_mouse    = 0x4,
+	ScrollBar_no_clamp          = 0x8,
 };
 
 template <class T>
@@ -543,6 +550,37 @@ struct ScrollBar {
 };
 
 template <class T>
+aabb<v2s> get_knob_rect(ScrollBar<T> const &s) {
+	auto rect = s.rect;
+	auto size = rect.size();
+	auto total_size = (s.flags & ScrollBar_zoom_with_wheel) ? (s.total_size / *s.scale) : s.total_size;
+	auto scroll_amount = *s.scroll_amount;
+
+	s32 visible_size = current_region.visible_rect.size().s[size.y > size.x];
+	s32 max_scroll = total_size - visible_size;
+
+
+	v2s knob_position;
+	v2s knob_size;
+	if (size.y > size.x) {
+		knob_size = {size.x, (s32)((f32)pow2(visible_size) / total_size)};
+
+		knob_position = {
+			rect.min.x,
+			(s32)map_clamped<T>(scroll_amount, -max_scroll, 0, rect.min.y + size.y - knob_size.y, rect.min.y),
+		};
+	} else {
+		knob_size = {(s32)((f32)pow2(visible_size) / total_size), size.y};
+
+		knob_position = {
+			(s32)map_clamped<T>(scroll_amount, -max_scroll, 0, rect.min.x + size.x - knob_size.x, rect.min.x),
+			rect.min.y,
+		};
+	}
+	return aabb_min_size(knob_position, knob_size);
+}
+
+template <class T>
 bool scroll_bar(ScrollBar<T> &s) {
 	check_if_tooltip_was_set();
 
@@ -550,31 +588,14 @@ bool scroll_bar(ScrollBar<T> &s) {
 	auto &scroll_amount = *s.scroll_amount;
 	auto &target_scroll_amount = *s.target_scroll_amount;
 	auto &scale = *s.scale;
-	auto total_size = s.total_size;
+	auto total_size = (s.flags & ScrollBar_zoom_with_wheel) ? (s.total_size / *s.scale) : s.total_size;
 	auto rect = s.rect;
 
 	auto size = rect.size();
 
-	s32 visible_size;
-	if (size.y > size.x) {
-		visible_size = current_region.visible_rect.size().y;
-	} else {
-		visible_size = current_region.visible_rect.size().x;
-	}
+	s32 visible_size = current_region.visible_rect.size().s[size.y > size.x];
 
 	s32 max_scroll = total_size - visible_size;
-	defer {
-		if constexpr (is_integer<T>) {
-			f32 f = lerp<f32>(scroll_amount, target_scroll_amount, frame_time * 30);
-			if (target_scroll_amount > scroll_amount) {
-				scroll_amount = ceil(f);
-			} else {
-				scroll_amount = floor(f);
-			}
-		} else {
-			scroll_amount = lerp<T>(scroll_amount, target_scroll_amount, frame_time * 30);
-		}
-	};
 
 
 	if (max_scroll <= 0) {
@@ -582,7 +603,7 @@ bool scroll_bar(ScrollBar<T> &s) {
 	}
 
 	static u32 panning_id = -1;
-	static s32 panning_scroll_start;
+	static T panning_scroll_start;
 	static s32 panning_mouse_start;
 
 	if (!(s.flags & ScrollBar_no_clamp) && max_scroll <= 0) {
@@ -602,20 +623,20 @@ bool scroll_bar(ScrollBar<T> &s) {
 	UIElementState state = UIElement_normal;
 	if (in_bounds(window->mouse_position, current_region.visible_rect)) {
 		if (window->mouse_wheel) {
-			if ((s.flags & ScrollBar_zoom_with_wheel) && (s.flags & ScrollBar_pan_with_wheel)) {
+			if ((s.flags & ScrollBar_zoom_with_wheel) && !(s.flags & ScrollBar_no_pan_with_wheel)) {
 				if (key_held(Key_shift)) {
 					target_scroll_amount += window->mouse_wheel * visible_size / 8;
 				} else {
 					auto old_scale = scale;
 					scale /= powf(1.1f, window->mouse_wheel);
 					scale = clamp(scale, s.min_scale, s.max_scale);
-					target_scroll_amount = scroll_amount = lerp<f32>(window->mouse_position.x, target_scroll_amount, old_scale / scale);
+					target_scroll_amount = scroll_amount = lerp<f32>(mouse_position.x, target_scroll_amount, old_scale / scale);
 
-					panning_mouse_start = window->mouse_position.x;
+					panning_mouse_start = mouse_position.x;
 					panning_scroll_start = target_scroll_amount;
 				}
 			} else if (s.flags & ScrollBar_zoom_with_wheel) {
-			} else if (s.flags & ScrollBar_pan_with_wheel) {
+			} else if (!(s.flags & ScrollBar_no_pan_with_wheel)) {
 				target_scroll_amount += window->mouse_wheel * visible_size / 8;
 			}
 		}
@@ -647,12 +668,12 @@ bool scroll_bar(ScrollBar<T> &s) {
 			if (s.flags & ScrollBar_pan_with_mouse) {
 				if (mouse_down(0)) {
 					panning_id = id;
-					panning_mouse_start = window->mouse_position.x;
+					panning_mouse_start = mouse_position.x;
 					panning_scroll_start = target_scroll_amount;
 				}
 				if (panning_id == id) {
 					if (mouse_held(0)) {
-						target_scroll_amount = scroll_amount = panning_scroll_start + window->mouse_position.x - panning_mouse_start;
+						target_scroll_amount = scroll_amount = panning_scroll_start + mouse_position.x - panning_mouse_start;
 					}
 				}
 				if (mouse_up(0)) {
@@ -665,28 +686,20 @@ bool scroll_bar(ScrollBar<T> &s) {
 		state = UIElement_pressed;
 	}
 
-	v2s knob_position;
-	v2s knob_size;
+	auto knob_rect = get_knob_rect(s);
 	bool holding = false;
 
 	if (size.y > size.x) {
-		knob_size = {size.x, (s32)((f32)pow2(visible_size) / total_size)};
-
-		knob_position = {
-			rect.min.x,
-			(s32)map_clamped<T>(scroll_amount, -max_scroll, 0, rect.min.y + size.y - knob_size.y, rect.min.y),
-		};
-
 		if (set_offset) {
-			pick_offset = mouse_position.y - knob_position.y;
-			if (pick_offset < 0 || pick_offset >= knob_size.y) {
-				pick_offset = knob_size.y / 2;
+			pick_offset = mouse_position.y - knob_rect.min.y;
+			if (pick_offset < 0 || pick_offset >= knob_rect.size().y) {
+				pick_offset = knob_rect.size().y / 2;
 			}
 		}
 
 		mouse_position.y -= pick_offset;
 
-		s32 thickness = knob_size.y;
+		s32 thickness = knob_rect.size().y;
 		if (current_id == id) {
 			scroll_amount = map_clamped<T>(mouse_position.y, rect.min.y, rect.min.y + size.y - thickness, 0, -max_scroll);
 			holding = true;
@@ -696,23 +709,16 @@ bool scroll_bar(ScrollBar<T> &s) {
 			}
 		}
 	} else {
-		knob_size = {(s32)((f32)pow2(visible_size) / total_size), size.y};
-
-		knob_position = {
-			(s32)map_clamped<T>(scroll_amount, -max_scroll, 0, rect.min.x + size.x - knob_size.x, rect.min.x),
-			rect.min.y,
-		};
-
 		if (set_offset) {
-			pick_offset = mouse_position.x - knob_position.x;
-			if (pick_offset < 0 || pick_offset >= knob_size.x) {
-				pick_offset = knob_size.x / 2;
+			pick_offset = mouse_position.x - knob_rect.min.x;
+			if (pick_offset < 0 || pick_offset >= knob_rect.size().x) {
+				pick_offset = knob_rect.size().x / 2;
 			}
 		}
 
 		mouse_position.x -= pick_offset;
 
-		s32 thickness = knob_size.x;
+		s32 thickness = knob_rect.size().x;
 		if (current_id == id) {
 			scroll_amount = map_clamped<T>(mouse_position.x, rect.min.x, rect.min.x + size.x - thickness, 0, -max_scroll);
 			holding = true;
@@ -732,9 +738,20 @@ bool scroll_bar(ScrollBar<T> &s) {
 		target_scroll_amount = scroll_amount;
 	}
 
+	if constexpr (is_integer<T>) {
+		f32 f = lerp<f32>(scroll_amount, target_scroll_amount, frame_time * 30);
+		if (target_scroll_amount > scroll_amount) {
+			scroll_amount = ceil(f);
+		} else {
+			scroll_amount = floor(f);
+		}
+	} else {
+		scroll_amount = lerp<T>(scroll_amount, target_scroll_amount, frame_time * 30);
+	}
+
 	if (!intersects(rect, current_region.visible_rect - current_region.visible_rect.min)) return false;
 
-	auto knob_rect = extend(aabb_min_size(knob_position, knob_size), V2s(-s.knob_padding));
+	knob_rect = extend(get_knob_rect(s), V2s(-s.knob_padding));
 
 	if (TL_IMGUI_TEXTURE_GET(s.texture.handle)) {
 		draw_texture(rect, s.texture, s.background_color);
@@ -797,6 +814,13 @@ aabb<v2s> get_other_dock(s32 size, Dock dock) {
 	}
 }
 
+Array<aabb<v2s>, 2> split(s32 size, Dock dock) {
+	Array<aabb<v2s>, 2> result;
+	result.data[0] = get_dock(size, dock);
+	result.data[1] = get_other_dock(size, dock);
+	return result;
+}
+
 bool frame_has_begun;
 void begin_frame_base() {
 	assert(!frame_has_begun);
@@ -821,6 +845,7 @@ void end_frame_base() {
 		current_layer = &tooltip_layer;
 		auto tooltip_font_size = 16;
 
+		_ensure_all_chars_present(tooltip, tooltip_font_size);
 		auto bounds = _get_text_bounds(tooltip, tooltip_font_size);
 
 		s32 const margin = 4;

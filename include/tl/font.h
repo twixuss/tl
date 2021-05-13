@@ -122,7 +122,10 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 	new_chars.allocator = temporary_allocator;
 
 	while (current_char < text.end()) {
-		u32 code_point = get_char_and_advance_utf8(current_char);
+		u32 code_point;
+		if (!get_char_and_advance_utf8(current_char, &code_point)) {
+			invalid_code_path();
+		}
 		auto found = font->chars.find(code_point);
 		if (found == font->chars.end()) {
 			auto inserted = font->chars.insert({code_point, FontChar{}}).first;
@@ -301,8 +304,6 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 
 	scoped_allocator(collection->allocator);
 
-	ensure_all_chars_present(text, font);
-
 	v2s pos = {};
 
 	aabb<v2s> result;
@@ -317,7 +318,10 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 
 	auto current_char = text.data;
 	while (current_char < text.end()) {
-		auto ch = get_char_and_advance_utf8(current_char);
+		u32 ch;
+		if (!get_char_and_advance_utf8(current_char, &ch)) {
+			invalid_code_path();
+		}
 
 		auto d = get_char_info(ch, font);
 
@@ -344,14 +348,15 @@ List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink) {
 
 	List<PlacedChar> result;
 
-	ensure_all_chars_present(text, font);
-
 	f32 posX = 0;
 	f32 posY = 0;
 
 	auto current_char = text.data;
 	while (current_char < text.end()) {
-		auto ch = get_char_and_advance_utf8(current_char);
+		u32 ch;
+		if (!get_char_and_advance_utf8(current_char, &ch)) {
+			invalid_code_path();
+		}
 
 		auto d = get_char_info(ch, font);
 

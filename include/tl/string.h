@@ -197,27 +197,30 @@ inline u32 get_char_utf8(void const *_ptr) {
 	}
 }
 
-inline u32 get_char_and_advance_utf8(utf8 const *&ptr) {
+inline bool get_char_and_advance_utf8(utf8 const *&ptr, u32 *code_point) {
 	if (*ptr < 0x80) {
 		defer { ++ptr; };
-		return *ptr;
+		*code_point = *ptr;
+		return true;
 	}
 
 	u32 byte_count = count_leading_ones((u8)*ptr);
 	if (byte_count == 1 || byte_count > 4)
-		return ~0u;
+		return false;
 
 	defer { ptr += byte_count; };
 
+	u32 result;
 	switch (byte_count) {
-		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
-		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
-		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
-		default: return ~0u;
+		case 2: result = ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu)); break;
+		case 3: result = ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu)); break;
+		case 4: result = ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu)); break;
 	}
+	*code_point = result;
+	return true;
 }
-inline u32 get_char_and_advance_utf8(utf8 *&ptr) {
-	return get_char_and_advance_utf8((utf8 const *&)ptr);
+inline bool get_char_and_advance_utf8(utf8 *&ptr, u32 *code_point) {
+	return get_char_and_advance_utf8((utf8 const *&)ptr, code_point);
 }
 
 // NOTE: TODO: surrogate pairs ate not supported

@@ -633,5 +633,9 @@ TL_IMGUI_TEXTURE _create_texture(void *pixels, v2u size, TextureFormat format) {
 	return texture;
 }
 
+void _ensure_all_chars_present(Span<utf8> text, u32 font_size) {
+	ensure_all_chars_present(text, get_font_at_size(font_collection, font_size));
+}
+
 }
 }
