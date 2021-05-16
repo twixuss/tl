@@ -770,6 +770,66 @@ bool scroll_bar(ScrollBar<T> &s) {
 	return holding;
 }
 
+struct Split {
+	u32 id = 0;
+	aabb<v2s> rect = to_zero(current_region.rect);
+	aabb<v2s> half[2] = {};
+	s32 half_min_size[2] = {32,32};
+	s32 width = 8;
+	f32 split_t = 0.5f;
+	v4f color = {.3,.4,.5,1.};
+};
+
+void split(Split &split) {
+	check_if_tooltip_was_set();
+
+	static u32 current_id = -1;
+
+	if (!intersects(split.rect, to_zero(current_region.visible_rect)))
+		return;
+
+	auto mouse_position = window->mouse_position;
+	auto local_mouse_position = mouse_position - current_region.visible_rect.min;
+
+	auto get_bar_rect = [&]() {
+		aabb<v2s> bar_rect = split.rect;
+		bar_rect.min.x = lerp<f32>(split.rect.min.x, split.rect.max.x - split.width, split.split_t);
+		bar_rect.min.x = clamp(bar_rect.min.x, split.rect.min.x + split.half_min_size[0], split.rect.max.x - split.half_min_size[1] - split.width);
+		bar_rect.max.x = bar_rect.min.x + split.width;
+		return bar_rect;
+	};
+
+	auto bar_rect = get_bar_rect();
+
+	if (!hovering_interactive_element && in_bounds(window->mouse_position, current_region.visible_rect) && in_bounds(local_mouse_position, bar_rect)) {
+		hovering_interactive_element = true;
+		if (current_id == split.id) {
+		} else {
+			if (mouse_down(0)) {
+				current_id = split.id;
+			}
+		}
+	} else {
+		should_set_tooltip = false;
+	}
+
+	if (current_id == split.id) {
+		split.split_t = map<f32>(local_mouse_position.x, split.rect.min.x, split.rect.max.x, 0, 1);
+
+		if (mouse_up(0)) {
+			current_id = -1;
+		}
+
+		bar_rect = get_bar_rect();
+	}
+
+	split.half[0] = split.half[1] = split.rect;
+	split.half[0].max.x = bar_rect.min.x;
+	split.half[1].min.x = bar_rect.max.x;
+
+	panel(bar_rect, split.color);
+}
+
 using Anchor = v2f;
 
 inline static constexpr Anchor anchor_top_left      = {0.0f, 0.0f};
