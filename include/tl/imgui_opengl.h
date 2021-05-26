@@ -35,6 +35,7 @@ struct TextCache {
 
 u32 just_color_batch_shader;
 u32 just_color_shader;
+u32 updated_text_count;
 
 FontCollection *font_collection;
 
@@ -43,6 +44,7 @@ std::unordered_map<u32, TextCache> text_caches;
 void begin_frame() {
 	begin_frame_base();
 	glEnable(GL_SCISSOR_TEST);
+	updated_text_count = 0;
 }
 void end_frame() {
 	end_frame_base();
@@ -518,29 +520,32 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 
 				auto &cache = text_caches[id];
 
-				bool rehash = true;
+				bool need_update = true;
 
 				if (cache.text == text) {
-					rehash = false;
+					need_update = false;
 				}
 
 				auto &vertices = cache.vertices;
 
-				if (rehash) {
-					timed_block("rehash"s);
-					free(cache.text);
-					cache.text = copy(text);
+				if (need_update) {
+					++updated_text_count;
+					cache.text.set(text);
 
-					List<PlacedChar> chars = with(temporary_allocator, place_text(text, font, true));
+					{
+						timed_block("vertex building"s);
 
-					vertices.clear();
-					for (auto c : chars) {
-						vertices += {
-							{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
-							{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
-							{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
-							{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
-						};
+						List<PlacedChar> chars = with(temporary_allocator, place_text(text, font, true));
+
+						vertices.clear();
+						for (auto c : chars) {
+							vertices += {
+								{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
+								{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
+								{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
+								{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
+							};
+						}
 					}
 
 					if (!cache.buffer) {

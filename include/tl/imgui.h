@@ -288,6 +288,7 @@ struct Button {
 	aabb<v2s> rect = {};
 	Span<utf8> text = {};
 	TextAlignment text_alignment = {};
+	bool align_text_to_visible_rect = false;
 	u32 font_size = {};
 	v4f foreground_color = {1,1,1,1};
 	v4f background_color = {};
@@ -322,7 +323,6 @@ void check_if_tooltip_was_set() {
 ButtonState button(Button &b) {
 	check_if_tooltip_was_set();
 
-	defer { ++b.id; };
 	static u32 current_id = -1;
 
 	if (b.text.size) {
@@ -409,8 +409,8 @@ ButtonState button(Button &b) {
 
 	if (text.size) {
 		begin_region(foreground_rect);
-		//label(id, text, foreground_rect, TextAlignment_top_left, font_size, foreground_color);
-		label(id, text, to_zero(foreground_rect), b.text_alignment, font_size, foreground_color, false);
+		auto label_rect = (b.align_text_to_visible_rect ? current_region.visible_rect : current_region.rect) - current_region.rect.min;
+		label(id, text, label_rect, b.text_alignment, font_size, foreground_color, false);
 		end_region();
 	}
 
@@ -447,7 +447,6 @@ template <class T>
 bool slider(Slider<T> &s) {
 	check_if_tooltip_was_set();
 
-	defer { ++s.id; };
 	auto id          = s.id;
 	auto value       = s.value;
 	auto lower_bound = s.lower_bound;
