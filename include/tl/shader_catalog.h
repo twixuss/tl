@@ -9,9 +9,15 @@ namespace TL {
 
 using ShaderCatalog = Catalog<TL_SHADER_CATALOG_ENTRY>;
 
+TL_API void init(ShaderCatalog &catalog, Span<filechar> directory);
+
+#ifdef TL_IMPL
+
 void init(ShaderCatalog &catalog, Span<filechar> directory) {
 	catalog.entry_string = "Shader"s;
 	init_catalog(catalog, directory);
 }
+
+#endif
 
 }

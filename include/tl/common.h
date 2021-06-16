@@ -948,6 +948,9 @@ struct StaticList {
 		return *new (this) StaticList(that);
 	}
 
+	forceinline constexpr T const *begin() const { return data; }
+	forceinline constexpr T const *end() const { return data + size; }
+
 	forceinline constexpr T *begin() { return data; }
 	forceinline constexpr T *end() { return data + size; }
 

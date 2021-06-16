@@ -26,6 +26,23 @@ struct Shader {
 
 namespace TL {
 
+TL_API void use_shader(Shader &shader);
+TL_API void set_uniform(Shader &shader, Span<char> name, f32 value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v2f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v3f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, v4f value);
+TL_API void set_uniform(Shader &shader, Span<char> name, m4  value);
+
+TL_API void set_uniform(Shader &shader, char const *name, f32 value);
+TL_API void set_uniform(Shader &shader, char const *name, v2f value);
+TL_API void set_uniform(Shader &shader, char const *name, v3f value);
+TL_API void set_uniform(Shader &shader, char const *name, v4f value);
+TL_API void set_uniform(Shader &shader, char const *name, m4  value);
+
+TL_API void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<filechar> directory);
+
+#ifdef TL_IMPL
+
 bool parse_shader(Shader &shader, Span<char> source) {
 	timed_function();
 	shader.cull = 0;
@@ -333,5 +350,7 @@ void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<filechar> directory
 	};
 	init(catalog, directory);
 }
+
+#endif
 
 }

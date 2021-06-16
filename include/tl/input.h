@@ -26,40 +26,80 @@ enum : KeyState {
 
 #if OS_WINDOWS
 
-enum Key {
-	Key_tab           = 0x09,
-	Key_shift         = 0x10,
-	Key_control       = 0x11,
-	Key_alt           = 0x12,
-	Key_space         = ' ',
-	Key_page_up       = 0x21,
-	Key_page_down     = 0x22,
-	Key_end           = 0x23,
-	Key_home          = 0x24,
-	Key_semicolon     = 0xBA,
-	Key_plus          = 0xBB,
-	Key_comma         = 0xBC,
-	Key_period        = 0xBE,
-	Key_slash         = 0xBF,
-	Key_left_bracket  = 0xDB,
-	Key_backslash     = 0xDC,
-	Key_right_bracket = 0xDD,
-	Key_quote         = 0xDE,
-	Key_f1            = 0x70,
-	Key_f2            = 0x71,
-	Key_f3            = 0x72,
-	Key_f4            = 0x73,
-	Key_f5            = 0x74,
-	Key_f6            = 0x75,
-	Key_f7            = 0x76,
-	Key_f8            = 0x77,
-	Key_f9            = 0x78,
-	Key_f10           = 0x79,
-	Key_f11           = 0x7A,
-	Key_f12           = 0x7B,
-};
+#define ALL_KEYS(K) \
+	K(a            , 'A') \
+	K(b            , 'B') \
+	K(c            , 'C') \
+	K(d            , 'D') \
+	K(e            , 'E') \
+	K(f            , 'F') \
+	K(g            , 'G') \
+	K(h            , 'H') \
+	K(i            , 'I') \
+	K(j            , 'J') \
+	K(k            , 'K') \
+	K(l            , 'L') \
+	K(m            , 'M') \
+	K(n            , 'N') \
+	K(o            , 'O') \
+	K(p            , 'P') \
+	K(q            , 'Q') \
+	K(r            , 'R') \
+	K(s            , 'S') \
+	K(t            , 'T') \
+	K(u            , 'U') \
+	K(v            , 'V') \
+	K(w            , 'W') \
+	K(x            , 'X') \
+	K(y            , 'Y') \
+	K(z            , 'Z') \
+	K(tab          , 0x09) \
+	K(shift        , 0x10) \
+	K(control      , 0x11) \
+	K(alt          , 0x12) \
+	K(space        , ' ')  \
+	K(page_up      , 0x21) \
+	K(page_down    , 0x22) \
+	K(end          , 0x23) \
+	K(home         , 0x24) \
+	K(semicolon    , 0xBA) \
+	K(plus         , 0xBB) \
+	K(comma        , 0xBC) \
+	K(period       , 0xBE) \
+	K(slash        , 0xBF) \
+	K(left_bracket , 0xDB) \
+	K(backslash    , 0xDC) \
+	K(right_bracket, 0xDD) \
+	K(quote        , 0xDE) \
+	K(f1           , 0x70) \
+	K(f2           , 0x71) \
+	K(f3           , 0x72) \
+	K(f4           , 0x73) \
+	K(f5           , 0x74) \
+	K(f6           , 0x75) \
+	K(f7           , 0x76) \
+	K(f8           , 0x77) \
+	K(f9           , 0x78) \
+	K(f10          , 0x79) \
+	K(f11          , 0x7A) \
+	K(f12          , 0x7B)
 
 #endif
+
+enum Key {
+#define K(key, value) Key_##key = value,
+	ALL_KEYS(K)
+#undef K
+};
+
+inline char const *to_string(Key key) {
+	switch (key) {
+#define K(key, value) case Key_##key: return #key;
+	ALL_KEYS(K)
+#undef K
+	}
+	return "unknown";
+}
 
 inline void update_key_state(Span<KeyState> key_state) {
 	for (KeyState &key : key_state) {
