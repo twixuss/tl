@@ -251,43 +251,6 @@ union m3 {
 	static forceinline m3 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
 };
 
-#define V2(f32, v2f, V2f)                                     \
-	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
-	forceinline constexpr v2f V2f(f32 v) { return {v, v}; }
-V2(f32, v2f, V2f);
-V2(s32, v2s, V2s);
-V2(u32, v2u, V2u);
-#undef V2
-
-#define V3(f32, v2f, v3f, V3f)                                          \
-	forceinline constexpr v3f V3f(f32 x, f32 y, f32 z) { return {x, y, z}; } \
-	forceinline constexpr v3f V3f(f32 v) { return {v, v, v}; }               \
-	forceinline constexpr v3f V3f(v2f xy, f32 z) { return {xy.x, xy.y, z}; } \
-	forceinline constexpr v3f V3f(f32 x, v2f yz) { return {x, yz.x, yz.y}; }
-V3(f32, v2f, v3f, V3f);
-V3(s32, v2s, v3s, V3s);
-V3(u32, v2u, v3u, V3u);
-#undef V3
-
-#define V4(f32, v2f, v3f, v4f, V4f)                                        \
-	forceinline constexpr v4f V4f(f32 x, f32 y, f32 z, f32 w) { return {x, y, z, w}; } \
-	forceinline constexpr v4f V4f(f32 v) { return {v, v, v, v}; }                      \
-	forceinline constexpr v4f V4f(v2f xy, v2f zw) { return {xy.x, xy.y, zw.x, zw.y}; } \
-	forceinline constexpr v4f V4f(v2f xy, f32 z, f32 w) { return {xy.x, xy.y, z, w}; } \
-	forceinline constexpr v4f V4f(f32 x, f32 y, v2f zw) { return {x, y, zw.x, zw.y}; } \
-	forceinline constexpr v4f V4f(v3f xyz, f32 w) { return {xyz.x, xyz.y, xyz.z, w}; } \
-	forceinline constexpr v4f V4f(f32 x, v3f yzw) { return {x, yzw.x, yzw.y, yzw.z}; }
-V4(f32, v2f, v3f, v4f, V4f);
-V4(s32, v2s, v3s, v4s, V4s);
-V4(u32, v2u, v3u, v4u, V4u);
-#undef V4
-
-#define C(v4f, V4f) forceinline constexpr v4f V4f(v4f v) { return v; }
-C(v2f, V2f) C(v2s, V2s) C(v2u, V2u);
-C(v3f, V3f) C(v3s, V3s) C(v3u, V3u);
-C(v4f, V4f) C(v4s, V4s) C(v4u, V4u);
-#undef C
-
 namespace CE {
 
 template <class T>
@@ -1448,9 +1411,12 @@ struct RaycastHit {
 	bool hit = false;
 	v3f position = {};
 	v3f normal = {};
+	operator bool() {
+		return hit;
+	}
 };
 
-inline RaycastHit raycast_triangle(ray<v3f> ray, triangle<v3f> tri) {
+inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
     v3f e1 = tri.b - tri.a;
     v3f e2 = tri.c - tri.a;
     // ¬ычисление вектора нормали к плоскости
@@ -1590,7 +1556,7 @@ union m4 {
 	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
 	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
 	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
-	static forceinline m4 perspective_lh(f32 aspect, f32 fov, f32 nz, f32 fz) {
+	static forceinline m4 perspective_left_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 h	   = 1.0f / tanf(fov * 0.5f);
 		f32 w	   = h / aspect;
 		f32 fzdfmn = fz / (fz - nz);
@@ -1601,7 +1567,7 @@ union m4 {
 			0, 0, -fzdfmn * nz, 0
 		};
 	}
-	static forceinline m4 perspective_rh(f32 aspect, f32 fov, f32 nz, f32 fz) {
+	static forceinline m4 perspective_right_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 xymax = nz * tan(fov * 0.5f);
 		f32 depth = fz - nz;
 		f32 q = -(fz + nz) / depth;
@@ -1626,7 +1592,7 @@ union m4 {
 			0, 0, -nz / rz, 1,
 		};
 	}
-	static forceinline m4 rotationX(f32 a) {
+	static forceinline m4 rotation_x(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
@@ -1636,7 +1602,7 @@ union m4 {
 			0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotationY(f32 a) {
+	static forceinline m4 rotation_y(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
@@ -1646,7 +1612,7 @@ union m4 {
 			 0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotationZ(f32 a) {
+	static forceinline m4 rotation_z(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
@@ -1656,7 +1622,7 @@ union m4 {
 			 0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotationZXY(v3f v) {
+	static forceinline m4 rotation_zxy(v3f v) {
 		v3f sin;
 		v3f cos;
 		cos_sin(v, cos, sin);
@@ -1673,8 +1639,8 @@ union m4 {
 			                 0,     0,                 0, 1,
 		};
 	}
-	static forceinline m4 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
-	static forceinline m4 rotationYXZ(v3f v) {
+	static forceinline m4 rotation_zxy(f32 x, f32 y, f32 z) { return rotation_zxy({x, y, z}); }
+	static forceinline m4 rotation_yxz(v3f v) {
 		v3f sin;
 		v3f cos;
 		cos_sin(v, cos, sin);
@@ -1691,7 +1657,7 @@ union m4 {
 			                0,                  0,     0, 1,
 		};
 	}
-	static forceinline m4 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
+	static forceinline m4 rotation_yxz(f32 x, f32 y, f32 z) { return rotation_yxz({x, y, z}); }
 };
 
 forceinline constexpr m3 transpose(m3 const& m) {

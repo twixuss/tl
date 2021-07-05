@@ -37,13 +37,13 @@
 #define ASSERTION_FAILURE(cause_string, expression, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__))
 
 #ifndef bounds_check
-#define bounds_check(x, ...) (void)((x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
+#define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
 #endif
 
 #define TL_DISABLED_WARNINGS \
@@ -1506,6 +1506,7 @@ Allocator tracking_allocator = {
 #endif
 
 #ifdef TL_MAIN
+#ifdef TL_IMPL
 #include "string.h"
 extern TL::s32 tl_main(TL::Span<TL::Span<TL::utf8>> args);
 int wmain(int argc, wchar_t **argv) {
@@ -1521,5 +1522,6 @@ int wmain(int argc, wchar_t **argv) {
 
 	return tl_main(arguments);
 }
+#endif
 #endif
 

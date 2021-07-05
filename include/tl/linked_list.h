@@ -30,6 +30,7 @@ struct LinkedList {
 		bool operator==(Iterator const &that) const { return node == that.node; }
 		bool operator!=(Iterator const &that) const { return node != that.node; }
 		T *operator->() { return std::addressof(node->value); }
+		bool operator!() { return !node; }
 	};
 
 	LinkedList() = default;
@@ -69,14 +70,26 @@ struct LinkedList {
 		if (head == 0) {
 			head = tail = ALLOCATE(Node, allocator);
 		} else {
-			tail->next = ALLOCATE(Node, allocator);
+			if (!tail->next) {
+				tail->next = ALLOCATE(Node, allocator);
+			}
 			tail = tail->next;
 		}
-		tail->next = 0;
 
 		memcpy(&tail->value, &value, sizeof(value));
 
 		return tail->value;
+	}
+
+	void clear() {
+		auto node = head;
+		while (node) {
+			auto next = node->next;
+			FREE(allocator, node);
+			node = next;
+		}
+		head = 0;
+		tail = 0;
 	}
 
 	T &front() { bounds_check(head); return head->value; }
