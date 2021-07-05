@@ -486,10 +486,15 @@ TL_API void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, G
 
 TL_API BackBufferParams get_default_back_buffer_params();
 
-TL_API bool init_opengl(NativeWindowHandle window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
+using InitFlags = u32;
+enum : InitFlags {
+	Init_debug = 0x1,
+};
+
+TL_API bool init_opengl(NativeWindowHandle window, InitFlags flags, DEBUGPROC debug_proc, BackBufferParams back_buffer_params);
 inline bool init_opengl(NativeWindowHandle window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(NativeWindowHandle window, bool debug) { return init_opengl(window, debug, default_debug_proc, get_default_back_buffer_params()); }
-inline bool init_opengl(NativeWindowHandle window, bool debug, BackBufferParams back_buffer_params) { return init_opengl(window, debug, default_debug_proc, back_buffer_params); }
+inline bool init_opengl(NativeWindowHandle window, InitFlags flags) { return init_opengl(window, flags, default_debug_proc, get_default_back_buffer_params()); }
+inline bool init_opengl(NativeWindowHandle window, InitFlags flags, BackBufferParams back_buffer_params) { return init_opengl(window, flags, default_debug_proc, back_buffer_params); }
 
 TL_API void present();
 inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
@@ -801,7 +806,9 @@ static HGLRC context;
 
 static StaticList<int, 16> context_attribs;
 
-bool init_opengl(NativeWindowHandle _window, bool debug, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_proc, BackBufferParams back_buffer_params) {
+	bool debug = flags & Init_debug;
+
 	auto window = (HWND)_window;
 	u32 depth_bits = 0;
 	u32 stencil_bits = 0;

@@ -92,7 +92,7 @@ struct List {
 		return data[size];
 	}
 
-	T &operator[](umm i) {
+	T &operator[](umm i) const {
 		bounds_check(i < size);
 		return data[i];
 	}
@@ -996,142 +996,25 @@ struct BlockListIndex {
 };
 
 template <class T>
-struct LinearSet {
-	T &add(T value) {
-		auto found = find(value);
-		if (found) {
-			return *found;
-		} else {
-			reserve_exponential(size + 1);
-			memcpy(data + size, &value, sizeof(T));
-			return data[size++];
+struct LinearSet : private List<T> {
+	using Base = List<T>;
+	using Base::begin;
+	using Base::end;
+	using Base::clear;
+
+	T &insert(T const &value) {
+		for (auto &it : *this) {
+			if (it == value) {
+				return it;
+			}
 		}
+		return this->add(value);
 	}
-
-	T *find(T value) {
-		for (umm i = 0; i < size; ++i) {
-			if (data[i] == value)
-				return data + i;
-		}
-		return 0;
-	}
-
-	//Span<T> add(Span<T> span) {
-	//	reserve_exponential(size + span.size);
-	//	memcpy(data + size, span.data, span.size * sizeof(T));
-	//	size += span.size;
-	//	return {data + size - span.size, span.size};
-	//}
-	//
-	void reallocate(umm desired_capacity) {
-		auto new_data = ALLOCATE(T, allocator, desired_capacity);
-		memcpy(new_data, data, sizeof(T) * size);
-
-		if (data) FREE(allocator, data);
-		data = new_data;
-		capacity = desired_capacity;
-	}
-
-	//void reserve(umm desired_capacity) {
-	//	if (capacity >= desired_capacity) return;
-
-	//	reallocate(desired_capacity);
-	//}
-	void reserve_exponential(umm desired_capacity) {
-		if (capacity >= desired_capacity) return;
-
-		umm new_capacity = max(1, capacity);
-		while (new_capacity < desired_capacity) new_capacity *= 2;
-
-		reallocate(new_capacity);
-	}
-	//void resize(umm new_size) {
-	//	reserve(new_size);
-
-	//	if (new_size > size) {
-	//		for (umm i = size; i < new_size; ++i) {
-	//			new (data + i) T();
-	//		}
-	//	}
-	//	size = new_size;
-	//}
-
-	//void clear() {
-	//	size = 0;
-	//}
-
-	//T &operator[](umm i) {
-	//	bounds_check(i < size);
-	//	return data[i];
-	//}
-
-	//T *begin() { return data; }
-	//T *end() { return data + size; }
-	//
-	//T &front() { bounds_check(size); return data[0]; }
-	//T &back() { bounds_check(size); return data[size - 1]; }
-
-	//operator Span<T>() { return {data, size}; }
-	//
-	//List &operator+=(T const &v) { add(v); return *this; }
-	//List &operator+=(Span<T> v) { add(v); return *this; }
-	//List &operator+=(List<T> const &v) { add(as_span(v)); return *this; }
-	//List &operator+=(std::initializer_list<T> v) { add(Span((T *)v.begin(), (T *)v.end())); return *this; }
-	//
-	//T &insert(Span<T> span, umm where) {
-	//	bounds_check(where <= size);
-
-	//	umm required_size = size + span.size;
-	//	reserve(required_size);
-	//
-	//	for (auto i = where; i != size; ++i) {
-	//		data[i + span.size] = data[i];
-	//	}
-
-	//	for (umm i = 0; i < span.size; ++i) {
-	//		data[where + i] = span.data[i];
-	//	}
-
-	//	size += span.size;
-	//	return data[where];
-	//}
-	//T &insert(Span<T> span, T *where) {
-	//	return insert(span, where - data);
-	//}
-	//
-	//void erase_at(umm where) {
-	//	bounds_check(where < size);
-	//	--size;
-	//	for (umm i = where; i < size; ++i) {
-	//		data[i] = data[i + 1];
-	//	}
-	//}
-	//void erase(T *value) { erase_at(value - data); }
-
-	//bool find_and_erase(T value) {
-	//	auto found = find(as_span(*this), value);
-	//	if (found) {
-	//		erase(found);
-	//		return true;
-	//	} else {
-	//		return false;
-	//	}
-	//}
-
-	T *data = 0;
-	umm size = 0;
-	umm capacity = 0;
-	Allocator allocator = current_allocator;
 };
 
 template <class T>
 void free(LinearSet<T> &set) {
-	if (set.data == 0) return;
-
-	FREE(set.allocator, set.data);
-	set.data = 0;
-	set.size = 0;
-	set.capacity = 0;
+	free((List<T> &)set);
 }
 
 template <class T>

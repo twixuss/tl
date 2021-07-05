@@ -54,6 +54,26 @@ inline Mesh parse_glb_from_file(Span<filechar> path) {
 	return parse_glb_from_memory(with(temporary_allocator, read_entire_file(path)));
 }
 
+template <class Vertex, class Index>
+void calculate_normals(Span<Vertex> vertices, Span<Index> indices) {
+	for (auto &vertex : vertices) {
+		vertex.normal = {};
+	}
+
+	for (u32 i = 0; i < indices.size; i += 3) {
+		auto &a = vertices[indices[i + 0]];
+		auto &b = vertices[indices[i + 1]];
+		auto &c = vertices[indices[i + 2]];
+		v3f normal = normalize(cross(b.position - a.position, c.position - a.position));
+		a.normal += normal;
+		b.normal += normal;
+		c.normal += normal;
+	}
+
+	for (auto &vertex : vertices) {
+		vertex.normal = normalize(vertex.normal);
+	}
+}
 
 }
 

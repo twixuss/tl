@@ -127,7 +127,7 @@ bool process_keyboard_message(MSG message, Span<KeyState> key_state) {
 	switch (message.message) {
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN: {
-			u8 key = message.wParam;
+			u8 key = (u8)message.wParam;
 
 			bool is_repeated = message.lParam & (LPARAM)(1 << 30);
 
@@ -144,14 +144,14 @@ bool process_keyboard_message(MSG message, Span<KeyState> key_state) {
 		}
 		case WM_SYSKEYUP:
 		case WM_KEYUP: {
-			u8 key = message.wParam;
+			u8 key = (u8)message.wParam;
 			key_state[key] = KeyState_up | KeyState_held;
 			if (on_key_up) on_key_up(key);
 			return true;
 		}
 		case WM_UNICHAR: {
 			if (on_char)
-				on_char(message.wParam);
+				on_char((u32)message.wParam);
 			return true;
 		}
 	}

@@ -100,7 +100,8 @@ KeyState key_state[256 + 3];
 
 static void draw(Window &window) {
 	window.mouse_position = get_cursor_position() - window.client_position;
-	window.on_draw(window);
+	if (window.on_draw)
+		window.on_draw(window);
 	update_key_state(key_state);
 	window.mouse_delta = {};
 	window.mouse_wheel = 0;

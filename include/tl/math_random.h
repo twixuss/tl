@@ -344,6 +344,12 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 forceinline f32 value_noise_v2s_linear(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return v; }); }
 forceinline f32 value_noise_v3s_linear(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return v; }); }
 
+forceinline f32 value_noise_v2s_smooth(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return smoothstep(v); }); }
+forceinline f32 value_noise_v3s_smooth(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return smoothstep(v); }); }
+
+forceinline f32 value_noise_v2s(v2s coordinate, s32 step) { return value_noise_v2s_linear(coordinate, step); }
+forceinline f32 value_noise_v3s(v3s coordinate, s32 step) { return value_noise_v3s_linear(coordinate, step); }
+
 forceinline f32 gradient_noise_f32(f32 coordinate) {
     f32 tile = floor(coordinate);
     f32 local = frac(coordinate);

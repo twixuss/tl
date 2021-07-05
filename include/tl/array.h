@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "vector.h"
 
 namespace TL {
 
@@ -49,8 +50,7 @@ struct Array2 {
 	inline static constexpr IndexType size_y = _size_y;
 
 	constexpr T& at(IndexType x, IndexType y) {
-		bounds_check(x < size_x);
-		bounds_check(y < size_y);
+		bounds_check(&data[y][x] < end());
 		return data[y][x];
 	}
 
@@ -60,19 +60,18 @@ struct Array2 {
 	T data[size_y][size_x];
 };
 
-template <class T, class _IndexType, _IndexType _size_x, _IndexType _size_y, _IndexType _size_z>
+template <class T, umm _size_x, umm _size_y, umm _size_z>
 struct Array3 {
-	using IndexType = _IndexType;
-	inline static constexpr IndexType size_x = _size_x;
-	inline static constexpr IndexType size_y = _size_y;
-	inline static constexpr IndexType size_z = _size_z;
+	inline static constexpr umm size_x = _size_x;
+	inline static constexpr umm size_y = _size_y;
+	inline static constexpr umm size_z = _size_z;
 
-	constexpr T& at(IndexType x, IndexType y, IndexType z) {
-		bounds_check(x < size_x);
-		bounds_check(y < size_y);
-		bounds_check(z < size_z);
+	constexpr T& at(umm x, umm y, umm z) {
+		bounds_check(&data[z][y][x] < end());
 		return data[z][y][x];
 	}
+	constexpr T& at(v3s v) { return at(v.x, v.y, v.z); }
+	constexpr T& at(v3u v) { return at(v.x, v.y, v.z); }
 
 	constexpr T *begin() { return (T *)data; }
 	constexpr T *end() { return (T *)data + size_x * size_y * size_z; }
