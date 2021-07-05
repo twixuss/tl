@@ -1,88 +1,85 @@
 #pragma once
-#include "system.h"
-#include "list.h"
+#include "linked_list.h"
+#include "array.h"
 
 namespace TL {
 
-template <class T>
-struct Hash {
-	static umm get(T const &value) {
-		umm hash = (umm)0x0123456789ABCDEF;
-		u8 *ptr = (u8 *)std::addressof(value);
-		umm remainingSize = sizeof(value);
-		if constexpr (sizeof(umm) >= 8) {
-			while (remainingSize >= 8) {
-				remainingSize -= 8;
-				hash ^= *(u64 *)ptr;
-				ptr += 8;
+template <class Key, class Value, umm _capacity>
+struct StaticHashMap {
+	inline static constexpr umm capacity = _capacity;
+
+	struct Entry {
+		Key key;
+		Value value;
+	};
+
+	using Block = LinkedList<Entry>;
+
+	Array<Block, capacity> blocks;
+
+	Value &get_or_insert(Key const &key) {
+		umm hash = get_hash(key);
+		auto &block = blocks[hash % blocks.size];
+		for (auto &it : block) {
+			if (it.key == key) {
+				return it.value;
 			}
 		}
-		while (remainingSize >= 4) { remainingSize -= 4; hash ^= *(u32 *)ptr; ptr += 4; }
-		while (remainingSize >= 2) { remainingSize -= 2; hash ^= *(u16 *)ptr; ptr += 2; }
-		while (remainingSize >= 1) { remainingSize -= 1; hash ^= *(u8  *)ptr; ptr += 1; }
-		return hash;
+		auto &it = block.add();
+		it.key = key;
+		return it.value;
 	}
-};
-
-template <class T>
-struct Hash<Span<T>> {
-	static umm get(Span<T> value) {
-		umm hash = (umm)0x192837465AFBECD;
-		u32 index = 0;
-		for (auto &v : value) {
-			hash ^= Hash<T>::get(v) << (index++ & (sizeof(umm) * 8 - 1));
-		}
-		return hash;
-	}
-};
-
-template <class First, class Second>
-struct Pair {
-	First first;
-	Second second;
-};
-
-template <class Key, class Value, class Hasher = Hash<Key>, umm _capacity = 256, class Bucket = LinkedList<Pair<Key, Value>>>
-struct HashMap {
-	using Pair = typename Bucket::ValueType;
-	static constexpr umm capacity = _capacity;
-
-	List<Bucket> buckets;
-
-	HashMap() {
-		buckets.resize(capacity);
-	}
-	Value &operator[](Key const &key) {
-		umm index = getIndex(key);
-		Bucket &bucket = buckets[index];
-		auto it = find(bucket.begin(), bucket.end(), key, [](Pair const &a, Key const &b) {
-			return equals(a.first, b);
-		});
-		if (it == bucket.end()) {
-			bucket.push_front({key});
-			it = bucket.begin();
-		}
-		return it->second;
-	}
-	umm getIndex(Key const &key) {
-		umm hash = Hasher::get(key);
-		umm index = 0;
-		if constexpr(capacity <= 0x100) {
-			for (u32 i = 0; i < sizeof(umm); i += 1) {
-				index ^= hash >> (i * 8);
+	Value *find(Key const &key) {
+		umm hash = get_hash(key);
+		auto &block = blocks[hash % blocks.size];
+		for (auto &it : block) {
+			if (it.key == key) {
+				return &it.value;
 			}
-		} else if constexpr(capacity <= 0x10000) {
-			for (u32 i = 0; i < sizeof(umm); i += 2) {
-				index ^= hash >> (i * 8);
-			}
-		} else if constexpr(capacity <= 0x100000000) {
-			for (u32 i = 0; i < sizeof(umm); i += 4) {
-				index ^= hash >> (i * 8);
-			}
-		} else {
-			index = hash;
 		}
-		return index % capacity;
+		return 0;
+	}
+
+	struct Iterator {
+		StaticHashMap *map;
+		Block *block;
+		typename Block::Iterator value;
+
+		Iterator &operator++() {
+			++value;
+			if (value == block->end()) {
+				do {
+					++block;
+					if (block == map->blocks.end()) {
+						value = {};
+						return *this;
+					} else {
+						value = block->begin();
+					}
+				} while (!value);
+			}
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return value == that.value; }
+		bool operator!=(Iterator const &that) { return value != that.value; }
+		Entry &operator*() { return *value; }
+		Entry *operator->() { return &*value; }
+	};
+
+	Iterator begin() {
+		Iterator result;
+		result.map = this;
+		result.block = blocks.data;
+		result.value = result.block->begin();
+		return result;
+	}
+	Iterator end() {
+		return {};
 	}
 };
 
