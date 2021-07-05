@@ -48,7 +48,10 @@ TL_API bool debugger_attached();
 #include "compiler.h"
 
 #pragma warning(push, 0)
+#pragma push_macro("OS_WINDOWS")
+#undef OS_WINDOWS
 #include <DbgHelp.h>
+#pragma pop_macro("OS_WINDOWS")
 #pragma warning(pop)
 
 #pragma comment(lib, "dbghelp")
@@ -146,7 +149,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 #if 1
 			char name_buffer[256];
 			name.data = name_buffer;
-			name.size = UnDecorateSymbolName(symbol->Name, name_buffer, count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
+			name.size = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
 #else
 			name = with(temporary_allocator, demangle(symbol->Name));
 #endif

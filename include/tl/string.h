@@ -12,7 +12,7 @@ template <class T>
 List<T> null_terminate(Span<T> span) {
 	List<T> result;
 	result.size = span.size + 1;
-	result.data = ALLOCATE(T, result.allocator, result.size);
+	result.data = result.allocator.allocate<T>(result.size);
 	result.capacity = result.size;
 	memcpy(result.data, span.data, span.size * sizeof(T));
 	result.data[result.size - 1] = {};
@@ -353,14 +353,14 @@ struct StringBuilder {
 	}
 
 	Block *allocate_block() {
-		return new (ALLOCATE(Block, allocator)) Block;
+		return new (allocator.allocate<Block>()) Block;
 	}
 };
 
 inline void free(StringBuilder &builder) {
 	for (auto block = builder.first.next; block != 0;) {
 		auto next = block->next;
-		FREE(builder.allocator, block);
+		builder.allocator.free(block);
 		block = next;
 	}
 	builder.allocator = {};

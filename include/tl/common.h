@@ -7,8 +7,11 @@
 
 #ifdef TL_IMPL
 	#if OS_WINDOWS
+		#pragma push_macro("OS_WINDOWS")
+		#undef OS_WINDOWS
 		#define NOMINMAX
 		#include <Windows.h>
+		#pragma pop_macro("OS_WINDOWS")
 	#else
 		#include <pthread.h>
 	#endif
@@ -24,6 +27,7 @@
 #include <utility>
 #include <type_traits>
 #include <tuple>
+#include <source_location>
 
 #if COMPILER_MSVC
 	#pragma warning(pop)
@@ -671,6 +675,10 @@ forceinline constexpr Span<char > operator""s(char  const *string, umm size) { r
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm size) { return Span((utf8  *)string, size); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm size) { return Span((utf16 *)string, size); }
 forceinline constexpr Span<wchar> operator""s(wchar const *string, umm size) { return Span((wchar *)string, size); }
+forceinline constexpr Span<char > operator""ts(char  const *string, umm size) { return Span((char  *)string, size + 1); }
+forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm size) { return Span((utf8  *)string, size + 1); }
+forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm size) { return Span((utf16 *)string, size + 1); }
+forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm size) { return Span((wchar *)string, size + 1); }
 forceinline Span<u8> operator""b(char const *string, umm size) { return Span((u8 *)string, size); }
 
 template <class T, umm size>
@@ -1109,67 +1117,73 @@ bool find_and_erase(Collection &collection, T value) {
 
 using NativeWindowHandle = struct NativeWindow {} *;
 
-struct SourceLocation {
-	char const *file;
-	char const *function;
-	umm line;
-};
-
-#define get_source_location() SourceLocation{__FILE__, __FUNCTION__, __LINE__}
-
 enum AllocatorMode {
 	Allocator_allocate,
 	Allocator_reallocate,
 	Allocator_free,
 };
 
-#if TL_TRACK_ALLOCATIONS
-using AllocatorSourceLocation = SourceLocation;
-#else
-struct AllocatorSourceLocation {};
-#endif
+enum AllocateFlags {
+	Allocate_default       = 0,
+	Allocate_uninitialized = 0x1,
+};
 
 struct Allocator {
-	void *(*func)(AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *state) = 0;
+	void *(*func)(AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
 	void *state = 0;
 	forceinline operator bool() {
 		return func != 0;
 	}
-	forceinline void *operator()(AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location) {
-		return func(mode, size, align, data, location, state);
+
+	inline void *allocate(AllocateFlags flags, umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+		return func(Allocator_allocate, flags, 0, 0, size, align, location, state);
 	}
+
+	template <class T>
+	inline T *allocate(AllocateFlags flags, umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		T *result = (T *)func(Allocator_allocate, Allocate_uninitialized, 0, 0, count * sizeof(T), align, location, state);
+		if (flags & Allocate_uninitialized) {
+		} else {
+			for (auto it = result; it != result + count; ++it) {
+				new (it) T();
+			}
+		}
+		return result;
+	}
+
+
+	inline void *allocate(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+		return allocate(Allocate_default, size, align, location);
+	}
+
+	template <class T>
+	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		return allocate<T>(Allocate_default, count, align, location);
+	}
+
+
+	inline void *reallocate(AllocateFlags flags, void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
+		return func(Allocator_reallocate, flags, data, old_size, new_size, align, location, state);
+	}
+
+	template <class T>
+	inline T *reallocate(AllocateFlags flags, T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		T *result = (T *)func(Allocator_reallocate, Allocate_uninitialized, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
+		if (flags & Allocate_uninitialized) {
+		} else {
+			for (auto it = result + old_count; it != result + new_count; ++it) {
+				new (it) T();
+			}
+		}
+		return result;
+	}
+
+
+	void free(void *data, std::source_location location = std::source_location::current()) {
+		func(Allocator_free, Allocate_default, data, 0, 0, 0, location, state);
+	}
+
 };
-
-template <class T>
-T *_allocate(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
-	auto data = (T *)allocator(Allocator_allocate, sizeof(T) * count, align, 0, location);
-	for (umm i = 0; i < count; ++i) {
-		new (data + i) T();
-	}
-	return data;
-}
-template <class T>
-T *_allocate_noinit(Allocator allocator, AllocatorSourceLocation location, umm count = 1, umm align = alignof(T)) {
-	return (T *)allocator(Allocator_allocate, sizeof(T) * count, align, 0, location);
-}
-inline void *_reallocate(Allocator allocator, void *data) {
-	return allocator(Allocator_reallocate, 0, 0, data, {});
-}
-inline void _free(Allocator allocator, void *data) {
-	allocator(Allocator_free, 0, 0, data, {});
-}
-
-#if TL_TRACK_ALLOCATIONS
-#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, get_source_location(), __VA_ARGS__)
-#define ALLOCATE_NOINIT(t, allocator, ...) ::TL::_allocate_noinit<t>(allocator, get_source_location(), __VA_ARGS__)
-#else
-#define ALLOCATE(t, allocator, ...) ::TL::_allocate<t>(allocator, AllocatorSourceLocation {}, __VA_ARGS__)
-#define ALLOCATE_NOINIT(t, allocator, ...) ::TL::_allocate_noinit<t>(allocator, AllocatorSourceLocation {}, __VA_ARGS__)
-#endif
-
-#define FREE(allocator, data) ::TL::_free(allocator, data)
-
-
 
 #define tl_push(pusher, ...) if(auto CONCAT(_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_,__LINE__)=current;current=(new);defer{current=CONCAT(_,__LINE__);}
@@ -1213,12 +1227,12 @@ void rotate(Span<T> span, T *to_be_first) {
 	umm right_count = span.size - left_count;
 
 	if (right_count < left_count) {
-		T *temp = ALLOCATE(T, temporary_allocator, right_count);
+		T *temp = temporary_allocator.allocate<T>(Allocate_uninitialized, right_count);
 		memcpy(temp, to_be_first, sizeof(T) * right_count);
 		memmove(span.data + right_count, span.data, sizeof(T) * left_count);
 		memcpy(span.data, temp, sizeof(T) * right_count);
 	} else {
-		T *temp = ALLOCATE(T, temporary_allocator, left_count);
+		T *temp = temporary_allocator.allocate<T>(Allocate_uninitialized, left_count);
 		memcpy(temp, span.data, sizeof(T) * left_count);
 		memmove(span.data, span.data + left_count, sizeof(T) * right_count);
 		memcpy(span.data + right_count, temp, sizeof(T) * left_count);
@@ -1255,20 +1269,32 @@ umm allocations_size = 0;
 #endif
 
 Allocator default_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
+	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		switch (mode) {
-			case Allocator_allocate:
+			case Allocator_allocate: {
 #if TL_COUNT_ALLOCATIONS
 				++allocations_count;
 				allocations_size += size;
 #endif
-				return tl_allocate(size, align);
-			case Allocator_reallocate:
+				auto result = tl_allocate(new_size, align);
+				if (flags & Allocate_uninitialized) {
+				} else {
+					memset(result, 0, new_size);
+				}
+				return result;
+			}
+			case Allocator_reallocate: {
 #if TL_COUNT_ALLOCATIONS
 				++allocations_count;
 				allocations_size += size;
 #endif
-				return tl_reallocate(data, size, align);
+				auto result = tl_reallocate(data, new_size, align);
+				if (flags & Allocate_uninitialized) {
+				} else {
+					memset((u8 *)result + old_size, 0, new_size - old_size);
+				}
+				return result;
+			}
 			case Allocator_free:
 #if TL_COUNT_ALLOCATIONS
 				++frees_count;
@@ -1302,7 +1328,7 @@ void free(TemporaryAllocatorState &state) {
 	auto block = state.first;
 	while (block) {
 		auto next = block->next;
-		FREE(default_allocator, block);
+		default_allocator.free(block);
 		block = next;
 	}
 	state = {};
@@ -1310,15 +1336,15 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
+	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		auto &state = temporary_allocator_state;
 		switch (mode) {
 			case TL::Allocator_allocate: {
 				auto block = state.first;
 				while (block) {
 					auto candidate = (u8 *)ceil(block->data() + block->size, align);
-					if (candidate + size <= block->data() + block->capacity) {
-						block->size = (candidate - block->data()) + size;
+					if (candidate + new_size <= block->data() + block->capacity) {
+						block->size = (candidate - block->data()) + new_size;
 						assert(block->size <= block->capacity);
 						return candidate;
 					}
@@ -1326,12 +1352,12 @@ thread_local Allocator temporary_allocator = {
 				}
 
 				// Block with enough space was not found. Create a new bigger one
-				while (state.last_block_capacity < size) {
+				while (state.last_block_capacity < new_size) {
 					state.last_block_capacity *= 2;
 				}
 
-				block = (TemporaryAllocatorState::Block *)ALLOCATE(u8, default_allocator, sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
-				block->size = size;
+				block = (TemporaryAllocatorState::Block *)default_allocator.allocate(Allocate_uninitialized, sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
+				block->size = new_size;
 				block->capacity = state.last_block_capacity;
 				block->next = 0;
 
@@ -1351,11 +1377,22 @@ thread_local Allocator temporary_allocator = {
 					"Or you can #define TL_TEMP_STORAGE_LIMIT to some bigger number.", TL_TEMP_STORAGE_LIMIT);
 #endif
 
-				return block->data();
+				auto result = block->data();
+				if (flags & Allocate_uninitialized) {
+				} else {
+					memset(result, 0, new_size);
+				}
+				return result;
 			}
-			case TL::Allocator_reallocate:
-				invalid_code_path();
-				break;
+			case TL::Allocator_reallocate: {
+				auto new_data = temporary_allocator.allocate(Allocate_uninitialized, new_size);
+				memcpy(new_data, data, old_size);
+				if (flags & Allocate_uninitialized) {
+				} else {
+					memset((u8 *)new_data + old_size, 0, new_size - old_size);
+				}
+				return new_data;
+			}
 			case TL::Allocator_free:
 				break;
 		}
@@ -1471,43 +1508,17 @@ Allocator tracking_allocator = {
 #ifdef TL_MAIN
 #include "string.h"
 extern TL::s32 tl_main(TL::Span<TL::Span<TL::utf8>> args);
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR command_line_16, int) {
+int wmain(int argc, wchar_t **argv) {
 	using namespace TL;
 	init_allocator();
 	defer { deinit_allocator(); };
 
-	auto command_line = utf16_to_utf8(as_span((utf16 *)command_line_16));
+
 	List<Span<utf8>> arguments;
-
-	utf8 *c = command_line.data;
-	while (c != command_line.end()) {
-		while (is_whitespace(*c)) {
-			++c;
-			if (c == command_line.end())
-				goto main;
-		}
-
-		if (*c == '"') {
-			++c;
-			auto begin = c;
-			while (c != command_line.end()) {
-				++c;
-				if (*c == '"')
-					break;
-			}
-			arguments.add(Span(begin, c));
-			continue;
-		}
-
-		auto begin = c;
-		while (c != command_line.end()) {
-			++c;
-			if (is_whitespace(*c))
-				break;
-		}
-		arguments.add(Span(begin, c));
+	for (int i = 0; i < argc; ++i) {
+		arguments.add(utf16_to_utf8(as_span((utf16 *)argv[i])));
 	}
-main:
+
 	return tl_main(arguments);
 }
 #endif

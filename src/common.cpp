@@ -1,6 +1,17 @@
 #include "../include/tl/common.h"
 using namespace TL;
+
+void allocator_test(Allocator allocator) {
+	for (u32 i = 0; i < 1024; ++i) {
+		u32 *x = allocator.allocate<u32>();
+		assert(x);
+		assert(*x == 0);
+	}
+}
+
 void common_test() {
+	allocator_test(default_allocator);
+	allocator_test(temporary_allocator);
 	static_assert(TL::floor(-4, 3) == -6);
 	static_assert(TL::floor(-3, 3) == -3);
 	static_assert(TL::floor(-2, 3) == -3);

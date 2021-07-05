@@ -1590,7 +1590,7 @@ union m4 {
 	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
 	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
 	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
-	static forceinline m4 perspectiveLH(f32 aspect, f32 fov, f32 nz, f32 fz) {
+	static forceinline m4 perspective_lh(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 h	   = 1.0f / tanf(fov * 0.5f);
 		f32 w	   = h / aspect;
 		f32 fzdfmn = fz / (fz - nz);

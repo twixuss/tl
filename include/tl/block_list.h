@@ -134,7 +134,7 @@ struct BlockList {
 
 private:
 	void allocate_block(umm align = alignof(Block)) {
-		Block *result = ALLOCATE(Block, allocator, 1, align);
+		Block *result = allocator.allocate<Block>(Allocate_uninitialized, 1, align);
 		result->size = 0;
 		result->next = 0;
 		result->previous = alloc_last;

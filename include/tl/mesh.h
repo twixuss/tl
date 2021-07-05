@@ -37,21 +37,25 @@ forceinline u8 *chunk_data(Chunk *chunk) {
 
 }
 
-struct FatVertex {
+struct CommonVertex {
 	v3f position;
 	v3f normal;
 	v4f color;
 };
 
 struct Mesh {
-	List<FatVertex> vertices;
+	List<CommonVertex> vertices;
 	List<u32> indices;
 };
 
 TL_API Mesh parse_glb_from_memory(Span<u8> memory);
 
-inline Mesh parse_glb_from_file(Span<filechar> path) {
-	return parse_glb_from_memory(with(temporary_allocator, read_entire_file(path)));
+inline Optional<Mesh> parse_glb_from_file(Span<filechar> path) {
+	auto memory = with(temporary_allocator, read_entire_file(path));
+	if (memory.data) {
+		return parse_glb_from_memory(memory);
+	}
+	return {};
 }
 
 
@@ -173,7 +177,7 @@ Mesh parse_glb_from_memory(Span<u8> memory) {
 
 	mesh.vertices.reserve(vertex_count);
 	for (u32 i = 0; i < vertex_count; ++i) {
-		FatVertex v;
+		CommonVertex v;
 		v.position = positions[i];
 		if (normals) v.normal = normals[i];
 		if (colors ) v.color  = colors [i];

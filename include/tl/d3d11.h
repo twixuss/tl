@@ -6,11 +6,14 @@
 #endif
 
 #pragma warning(push, 0)
+#pragma push_macro("OS_WINDOWS")
+#undef OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <d3d11.h>
 #include <d3d11_3.h>
 #include <d3dcompiler.h>
+#pragma pop_macro("OS_WINDOWS")
 #pragma warning(pop)
 
 #pragma comment(lib, "d3d11")
@@ -100,7 +103,7 @@ struct State {
 	RenderTarget backBuffer;
 	RecursiveMutex immediateContextMutex;
 	u32 syncInterval = 1;
-	
+
 	template <class Fn>
 	inline void useContext(Fn &&fn) {
 		scoped_lock(immediateContextMutex);
@@ -680,10 +683,10 @@ void State::clearRenderTarget(ID3D11RenderTargetView* renderTarget, f32 const rg
 }
 void State::clearDepthStencil(ID3D11DepthStencilView *depthStencil, f32 depth) {
 	useContext([&] {
-		immediateContext->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, 0);	
+		immediateContext->ClearDepthStencilView(depthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, 0);
 	});
 }
-void State::draw(u32 vertexCount, u32 offset) { 
+void State::draw(u32 vertexCount, u32 offset) {
 	useContext([&] { immediateContext->Draw(vertexCount, offset); });
 }
 void State::present() {
@@ -698,7 +701,7 @@ void State::setTopology(D3D11_PRIMITIVE_TOPOLOGY topology) { useContext([&] { im
 void State::setVertexShader(ID3D11VertexShader *shader) { useContext([&] { immediateContext->VSSetShader(shader, 0, 0); }); }
 void State::setPixelShader(ID3D11PixelShader  *shader) { useContext([&] { immediateContext->PSSetShader(shader, 0, 0); }); }
 void State::setShaderResource(ShaderResource const &resource, char stage, u32 slot) {
-	useContext([&] { 
+	useContext([&] {
 		switch (stage) {
 			case 'V': immediateContext->VSSetShaderResources(slot, 1, &resource.srv); break;
 			case 'P': immediateContext->PSSetShaderResources(slot, 1, &resource.srv); break;
@@ -707,7 +710,7 @@ void State::setShaderResource(ShaderResource const &resource, char stage, u32 sl
 	});
 }
 void State::setSampler(Sampler const &sampler, char stage, u32 slot) {
-	useContext([&] { 
+	useContext([&] {
 		switch (stage) {
 			case 'V': immediateContext->VSSetSamplers(slot, 1, &sampler.sampler); break;
 			case 'P': immediateContext->PSSetSamplers(slot, 1, &sampler.sampler); break;
@@ -716,7 +719,7 @@ void State::setSampler(Sampler const &sampler, char stage, u32 slot) {
 	});
 }
 void State::setConstantBuffer(ConstantBuffer const &buffer, char stage, u32 slot) {
-	useContext([&] { 
+	useContext([&] {
 		switch (stage) {
 			case 'V': immediateContext->VSSetConstantBuffers(slot, 1, &buffer.buffer); break;
 			case 'P': immediateContext->PSSetConstantBuffers(slot, 1, &buffer.buffer); break;
@@ -734,18 +737,18 @@ void State::setViewport(f32 x, f32 y, f32 w, f32 h, f32 depthMin, f32 depthMax) 
 	v.MaxDepth = depthMax;
 	useContext([&] { immediateContext->RSSetViewports(1, &v); });
 }
-void State::setRenderTarget(ID3D11RenderTargetView *renderTarget, ID3D11DepthStencilView *depthStencil) { 
-	useContext([&] { 
+void State::setRenderTarget(ID3D11RenderTargetView *renderTarget, ID3D11DepthStencilView *depthStencil) {
+	useContext([&] {
 		immediateContext->OMSetRenderTargets(1, &renderTarget, depthStencil);
 	});
 }
-void State::setRasterizer(Rasterizer rasterizer) { 
-	useContext([&] { 
+void State::setRasterizer(Rasterizer rasterizer) {
+	useContext([&] {
 		immediateContext->RSSetState(rasterizer.raster);
 	});
 }
-void State::setBlend(Blend blend) { 
-	useContext([&] { 
+void State::setBlend(Blend blend) {
+	useContext([&] {
 		float factor[4]{};
 		immediateContext->OMSetBlendState(blend.blend, factor, ~0u);
 	});
@@ -779,7 +782,7 @@ void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT bac
 	IDXGIAdapter1 *adapter = 0;
 	for (UINT adapterIndex = 0; dxgiFactory->EnumAdapters1(adapterIndex, &adapter) != DXGI_ERROR_NOT_FOUND; ++adapterIndex) {
 		DXGI_ADAPTER_DESC1 desc;
-		adapter->GetDesc1(&desc);	
+		adapter->GetDesc1(&desc);
 		if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
 			TL_COM_RELEASE(adapter);
 			continue;
@@ -808,10 +811,10 @@ void initState(State &state, HWND window, u32 width, u32 height, DXGI_FORMAT bac
 	d.OutputWindow = window;
 	TL_HRESULT_HANDLER(dxgiFactory->CreateSwapChain(state.device, &d, &state.swapChain));
 
-	if (FAILED(state.device->QueryInterface(&state.device2))) { 
+	if (FAILED(state.device->QueryInterface(&state.device2))) {
 		state.device2 = 0;
 	}
-	if (FAILED(state.device->QueryInterface(&state.device3))) { 
+	if (FAILED(state.device->QueryInterface(&state.device3))) {
 		state.device3 = 0;
 	}
 

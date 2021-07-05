@@ -451,6 +451,7 @@ D(glActiveTexture,           void,   (GLenum texture), (texture))\
 D(glGetUniformBlockIndex,    GLuint, (GLuint program, const GLchar *uniformBlockName), (program, uniformBlockName))\
 D(glUniformBlockBinding,     void,   (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding), (program, uniformBlockIndex, uniformBlockBinding))\
 D(glBindBufferBase,          void,   (GLenum target, GLuint index, GLuint buffer), (target, index, buffer))\
+D(glBindBufferRange,         void,   (GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size), (target, index, buffer, offset, size))\
 
 #if OS_WINDOWS
 
@@ -687,7 +688,7 @@ static GLuint compile_shader(GLuint shader) {
 		GLint maxLength;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = ALLOCATE(char, temporary_allocator, maxLength);
+		auto message = temporary_allocator.allocate<char>(maxLength);
 		glGetShaderInfoLog(shader, maxLength, &maxLength, message);
 
 		glDeleteShader(shader);
@@ -763,7 +764,7 @@ GLuint create_program(GLuint vertexShader, GLuint fragmentShader) {
 		GLint maxLength;
 		glGetProgramiv(result, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = ALLOCATE(char, temporary_allocator, maxLength);
+		auto message = temporary_allocator.allocate<char>(maxLength);
 		glGetProgramInfoLog(result, maxLength, &maxLength, message);
 
 		glDeleteProgram(result);

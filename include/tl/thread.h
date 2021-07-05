@@ -420,7 +420,7 @@ inline WorkQueue make_work_queue(ThreadPool &pool, bool important = false) {
 
 inline void do_work(ThreadWork work) {
 	work.fn(work.param);
-	FREE(work.queue->pool->allocator, work.param);
+	work.queue->pool->allocator.free(work.param);
 	atomic_add(&work.queue->work_to_do, (u32)-1);
 }
 inline bool try_do_work(ThreadPool *pool) {

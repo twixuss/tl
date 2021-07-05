@@ -63,7 +63,7 @@ struct CreateWindowInfo {
 	WindowHitTest hit_test = 0;
 };
 
-TL_API bool create_window(Window **_window, CreateWindowInfo info);
+TL_API Window *create_window(CreateWindowInfo info);
 TL_API void free(Window *window);
 
 TL_API void close(Window *window);
@@ -249,9 +249,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 	return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-bool create_window(Window **_window, CreateWindowInfo info) {
-	*_window = 0;
-
+Window *create_window(CreateWindowInfo info) {
 	auto instance = GetModuleHandleA(0);
 
 	if (!window_class_created) {
@@ -266,15 +264,14 @@ bool create_window(Window **_window, CreateWindowInfo info) {
 		c.style = 0;
 		if (!RegisterClassExW(&c)) {
 			print("RegisterClassExW failed with error code: %\n", last_error());
-			return false;
+			return 0;
 		}
 	}
 
 	DWORD window_style = get_window_style(info.style_flags);
 
 	auto allocator = current_allocator;
-	Window *window = ALLOCATE(Window, allocator);
-	*_window = window;
+	Window *window = allocator.allocate<Window>();
 
 	window->allocator = allocator;
 	window->style_flags = info.style_flags;
@@ -293,14 +290,13 @@ bool create_window(Window **_window, CreateWindowInfo info) {
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleA(0), 0
 	);
 	if (!window->handle) {
-		*_window = 0;
 		print("CreateWindowExW failed with error code: %\n", last_error());
-		return false;
+		return 0;
 	}
 
 	init_rawinput(RawInput_mouse);
 
-	return true;
+	return window;
 }
 void close(Window *window) {
 	window->flags &= ~Window_open;
@@ -308,7 +304,7 @@ void close(Window *window) {
 }
 void free(Window *window) {
 	close(window);
-	FREE(window->allocator, window);
+	window->allocator.free(window);
 }
 
 bool update(Window *window) {

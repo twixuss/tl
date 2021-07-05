@@ -51,10 +51,12 @@ struct List {
 	}
 
 	void reallocate(umm desired_capacity) {
-		auto new_data = ALLOCATE(T, allocator, desired_capacity);
-		memcpy(new_data, data, sizeof(T) * size);
-
-		if (data) FREE(allocator, data);
+		T *new_data;
+		if (data) {
+			new_data = allocator.reallocate<T>(Allocate_uninitialized, data, size, desired_capacity);
+		} else {
+			new_data = allocator.allocate<T>(Allocate_uninitialized, desired_capacity);
+		}
 		data = new_data;
 		capacity = desired_capacity;
 	}
@@ -227,7 +229,7 @@ template <class T>
 void free(List<T> &list) {
 	if (list.data == 0) return;
 
-	FREE(list.allocator, list.data);
+	list.allocator.free(list.data);
 	list.data = 0;
 	list.size = 0;
 	list.capacity = 0;
@@ -238,7 +240,7 @@ List<T> copy(List<T> that) {
 	List<T> result;
 	result.size = that.size;
 	result.capacity = result.size;
-	result.data = ALLOCATE(T, result.allocator, result.size);
+	result.data = result.allocator.allocate<T>(result.size);
 	memcpy(result.data, that.data, result.size * sizeof(T));
 	return result;
 }
@@ -248,7 +250,7 @@ List<T> as_list(Span<T> that) {
 	List<T> result;
 	result.size = that.size;
 	result.capacity = result.size;
-	result.data = ALLOCATE(T, result.allocator, result.size);
+	result.data = result.allocator.allocate<T>(result.size);
 	memcpy(result.data, that.data, result.size * sizeof(T));
 	return result;
 }
@@ -295,7 +297,7 @@ struct BadList {
 		that._allocEnd = 0;
 	}
 	BadList(BadList const &that) {
-		_begin = ALLOCATE(T, allocator, that.size());
+		_begin = allocator.allocate<T>(that.size());
 		_allocEnd = _end = _begin + that.size();
 		_copyConstruct(that._begin, that._end);
 	}
@@ -303,7 +305,7 @@ struct BadList {
 	~BadList() {
 		clear();
 		if (_begin)
-			FREE(allocator, _begin);
+			allocator.free(_begin);
 		_begin = 0;
 		_end = 0;
 		_allocEnd = 0;
@@ -410,13 +412,13 @@ struct BadList {
 	void _reallocate(umm newCapacity) {
 		assert(capacity() < newCapacity);
 		umm oldSize = size();
-		T *newBegin = ALLOCATE(T, allocator, newCapacity);
+		T *newBegin = allocator.allocate<T>(newCapacity);
 		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
 			new (dst) T(std::move(*src));
 			src->~T();
 		}
 		if (_begin)
-			FREE(allocator, _begin);
+			allocator.free(_begin);
 		_begin = newBegin;
 		_end = _begin + oldSize;
 		_allocEnd = _begin + newCapacity;
@@ -629,12 +631,12 @@ struct Queue {
 			new_capacity *= 2;
 		}
 
-		T *new_data = ALLOCATE(T, allocator, new_capacity);
+		T *new_data = allocator.allocate<T>(new_capacity);
 		for (umm i = 0; i < size; ++i) {
 			new_data[i] = data[i];
 		}
 		if (alloc_data)
-			FREE(allocator, alloc_data);
+			allocator.free(alloc_data);
 
 		alloc_data = new_data;
 		data = new_data;
@@ -674,7 +676,7 @@ template <class T>
 void free(Queue<T> &queue) {
 	if (queue.alloc_data == 0) return;
 
-	FREE(queue.allocator, queue.alloc_data);
+	queue.allocator.free(queue.alloc_data);
 	queue.data = 0;
 	queue.size = 0;
 	queue.alloc_data = 0;
@@ -1024,10 +1026,12 @@ struct LinearSet {
 	//}
 	//
 	void reallocate(umm desired_capacity) {
-		auto new_data = ALLOCATE(T, allocator, desired_capacity);
+		auto new_data = allocator.allocate<T>(desired_capacity);
 		memcpy(new_data, data, sizeof(T) * size);
 
-		if (data) FREE(allocator, data);
+		if (data) {
+			allocator.free(data);
+		}
 		data = new_data;
 		capacity = desired_capacity;
 	}
@@ -1128,7 +1132,7 @@ template <class T>
 void free(LinearSet<T> &set) {
 	if (set.data == 0) return;
 
-	FREE(set.allocator, set.data);
+	set.allocator.free(set.data);
 	set.data = 0;
 	set.size = 0;
 	set.capacity = 0;

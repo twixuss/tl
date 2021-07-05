@@ -207,7 +207,7 @@ inline bool update(FileTracker &tracker) {
 inline void free(FileTracker &tracker) {
 	if (tracker.path.data) {
 		if (tracker.allocator) {
-			FREE(tracker.allocator, tracker.state);
+			tracker.allocator.free(tracker.state);
 		}
 		free(tracker.path);
 		tracker = {};
@@ -218,7 +218,7 @@ template <class Fn>
 inline void reset(FileTracker &tracker, Span<filechar> path, Fn &&on_update) {
 	if (tracker.path.data) {
 		if (tracker.allocator) {
-			FREE(tracker.allocator, tracker.state);
+			tracker.allocator.free(tracker.state);
 		}
 	}
 	tracker.path.set(path);
@@ -255,6 +255,7 @@ TL_API List<filechar> get_current_directory();
 #ifdef TL_IMPL
 
 #pragma push_macro("OS_WINDOWS")
+#undef OS_WINDOWS
 #pragma warning(push, 0)
 #include <Shlwapi.h>
 #include <shlobj.h>
@@ -404,12 +405,12 @@ static wchar *append_star(Span<utf16> directory) {
 		directory.size--;
 
 	if (directory.back() == u'\\' || directory.back() == u'/') {
-		directory_with_star = ALLOCATE(wchar, allocator, directory.size + 2);
+		directory_with_star = allocator.allocate<wchar>(directory.size + 2);
 		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
 		directory_with_star[directory.size + 0] = '*';
 		directory_with_star[directory.size + 1] = 0;
 	} else {
-		directory_with_star = ALLOCATE(wchar, allocator, directory.size + 3);
+		directory_with_star = allocator.allocate<wchar>(directory.size + 3);
 		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
 		directory_with_star[directory.size + 0] = '/';
 		directory_with_star[directory.size + 1] = '*';

@@ -48,7 +48,7 @@ Function create_function(Fn &&fn, Args &&...args) {
 		auto allocator = current_allocator;
 
 		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-		auto params = ALLOCATE_NOINIT(Tuple, allocator);
+		auto params = allocator.allocate<Tuple>(Allocate_uninitialized);
 		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 
 		Function result = {};
@@ -60,7 +60,7 @@ Function create_function(Fn &&fn, Args &&...args) {
 }
 inline void free(Function &function) {
 	if (function.allocator)
-		FREE(function.allocator, function.param);
+		function.allocator.free(function.param);
 	function = {};
 }
 

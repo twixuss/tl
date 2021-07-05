@@ -43,10 +43,13 @@ struct Pair {
 };
 
 template <class Key, class Value, class Hasher = Hash<Key>, umm _capacity = 256, class Bucket = LinkedList<Pair<Key, Value>>>
-struct HashTable {
+struct HashMap {
 	using Pair = typename Bucket::ValueType;
 	static constexpr umm capacity = _capacity;
-	HashTable() {
+
+	List<Bucket> buckets;
+
+	HashMap() {
 		buckets.resize(capacity);
 	}
 	Value &operator[](Key const &key) {
@@ -61,7 +64,6 @@ struct HashTable {
 		}
 		return it->second;
 	}
-	List<Bucket> buckets;
 	umm getIndex(Key const &key) {
 		umm hash = Hasher::get(key);
 		umm index = 0;

@@ -63,8 +63,7 @@ struct BlockListNoStack {
 		return block->add(value);
 	}
 	Block *allocate_block(Block *previous) {
-		Block *result = ALLOCATE(Block, allocator);
-		*result = {};
+		Block *result = allocator.allocate<Block>();
 		result->previous = previous;
 		return result;
 	}
