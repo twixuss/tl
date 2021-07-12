@@ -23,121 +23,149 @@ using GLsizeiptr = tl::umm;
 using GLintptr = tl::smm;
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
-#define GL_TEXTURE_MAX_LEVEL              0x813D
-#define GL_DEPTH_COMPONENT16              0x81A5
-#define GL_DEPTH_COMPONENT32              0x81A7
-#define GL_FRAMEBUFFER_UNDEFINED          0x8219
-#define GL_DEPTH_STENCIL_ATTACHMENT       0x821A
-#define GL_RG                             0x8227
-#define GL_RG_INTEGER                     0x8228
-#define GL_R8                             0x8229
-#define GL_R16                            0x822A
-#define GL_RG8                            0x822B
-#define GL_RG16                           0x822C
-#define GL_R16F                           0x822D
-#define GL_R32F                           0x822E
-#define GL_RG16F                          0x822F
-#define GL_RG32F                          0x8230
-#define GL_R8I                            0x8231
-#define GL_R8UI                           0x8232
-#define GL_R16I                           0x8233
-#define GL_R16UI                          0x8234
-#define GL_R32I                           0x8235
-#define GL_R32UI                          0x8236
-#define GL_RG8I                           0x8237
-#define GL_RG8UI                          0x8238
-#define GL_RG16I                          0x8239
-#define GL_RG16UI                         0x823A
-#define GL_RG32I                          0x823B
-#define GL_RG32UI                         0x823C
-#define GL_DEBUG_OUTPUT_SYNCHRONOUS       0x8242
-#define GL_DEBUG_SOURCE_API               0x8246
-#define GL_DEBUG_SOURCE_WINDOW_SYSTEM     0x8247
-#define GL_DEBUG_SOURCE_SHADER_COMPILER   0x8248
-#define GL_DEBUG_SOURCE_THIRD_PARTY       0x8249
-#define GL_DEBUG_SOURCE_APPLICATION       0x824A
-#define GL_DEBUG_SOURCE_OTHER             0x824B
-#define GL_DEBUG_TYPE_ERROR               0x824C
-#define GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR 0x824D
-#define GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR  0x824E
-#define GL_DEBUG_TYPE_PORTABILITY         0x824F
-#define GL_DEBUG_TYPE_PERFORMANCE         0x8250
-#define GL_DEBUG_TYPE_OTHER               0x8251
-#define GL_DEBUG_TYPE_MARKER              0x8268
-#define GL_DEBUG_TYPE_PUSH_GROUP          0x8269
-#define GL_DEBUG_TYPE_POP_GROUP           0x826A
-#define GL_DEBUG_SEVERITY_NOTIFICATION    0x826B
-#define GL_TEXTURE0                       0x84C0
-#define GL_TEXTURE1                       0x84C1
-#define GL_TEXTURE2                       0x84C2
-#define GL_TEXTURE3                       0x84C3
-#define GL_TEXTURE4                       0x84C4
-#define GL_TEXTURE5                       0x84C5
-#define GL_TEXTURE6                       0x84C6
-#define GL_TEXTURE7                       0x84C7
-#define GL_TEXTURE8                       0x84C8
-#define GL_TEXTURE9                       0x84C9
-#define GL_TEXTURE10                      0x84CA
-#define GL_TEXTURE11                      0x84CB
-#define GL_TEXTURE12                      0x84CC
-#define GL_TEXTURE13                      0x84CD
-#define GL_TEXTURE14                      0x84CE
-#define GL_TEXTURE15                      0x84CF
-#define GL_TEXTURE16                      0x84D0
-#define GL_TEXTURE17                      0x84D1
-#define GL_TEXTURE18                      0x84D2
-#define GL_TEXTURE19                      0x84D3
-#define GL_TEXTURE20                      0x84D4
-#define GL_TEXTURE21                      0x84D5
-#define GL_TEXTURE22                      0x84D6
-#define GL_TEXTURE23                      0x84D7
-#define GL_TEXTURE24                      0x84D8
-#define GL_TEXTURE25                      0x84D9
-#define GL_TEXTURE26                      0x84DA
-#define GL_TEXTURE27                      0x84DB
-#define GL_TEXTURE28                      0x84DC
-#define GL_TEXTURE29                      0x84DD
-#define GL_TEXTURE30                      0x84DE
-#define GL_TEXTURE31                      0x84DF
-#define GL_RGBA32F                        0x8814
-#define GL_RGB32F                         0x8815
-#define GL_RGBA16F                        0x881A
-#define GL_RGB16F                         0x881B
-#define GL_TEXTURE_COMPARE_MODE           0x884C
-#define GL_TEXTURE_COMPARE_FUNC           0x884D
-#define GL_COMPARE_REF_TO_TEXTURE         0x884E
-#define GL_ARRAY_BUFFER                   0x8892
-#define GL_ELEMENT_ARRAY_BUFFER           0x8893
-#define GL_STATIC_DRAW                    0x88E4
-#define GL_STATIC_COPY                    0x88E6
-#define GL_DYNAMIC_DRAW                   0x88E8
-#define GL_DEPTH24_STENCIL8               0x88F0
-#define GL_SRC1_COLOR                     0x88F9
-#define GL_ONE_MINUS_SRC1_COLOR           0x88FA
-#define GL_UNIFORM_BUFFER                 0x8A11
-#define GL_VERTEX_SHADER                  0x8B31
-#define GL_FRAGMENT_SHADER                0x8B30
-#define GL_COMPILE_STATUS                 0x8B81
-#define GL_LINK_STATUS                    0x8B82
-#define GL_INFO_LOG_LENGTH                0x8B84
-#define GL_ACTIVE_UNIFORMS                0x8B86
-#define GL_FRAMEBUFFER_COMPLETE           0x8CD5
-#define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT 0x8CD6
+#define GL_CLAMP_TO_EDGE                         0x812F
+#define GL_TEXTURE_MAX_LEVEL                     0x813D
+#define GL_DEPTH_COMPONENT16                     0x81A5
+#define GL_DEPTH_COMPONENT32                     0x81A7
+#define GL_FRAMEBUFFER_UNDEFINED                 0x8219
+#define GL_DEPTH_STENCIL_ATTACHMENT              0x821A
+#define GL_RG                                    0x8227
+#define GL_RG_INTEGER                            0x8228
+#define GL_R8                                    0x8229
+#define GL_R16                                   0x822A
+#define GL_RG8                                   0x822B
+#define GL_RG16                                  0x822C
+#define GL_R16F                                  0x822D
+#define GL_R32F                                  0x822E
+#define GL_RG16F                                 0x822F
+#define GL_RG32F                                 0x8230
+#define GL_R8I                                   0x8231
+#define GL_R8UI                                  0x8232
+#define GL_R16I                                  0x8233
+#define GL_R16UI                                 0x8234
+#define GL_R32I                                  0x8235
+#define GL_R32UI                                 0x8236
+#define GL_RG8I                                  0x8237
+#define GL_RG8UI                                 0x8238
+#define GL_RG16I                                 0x8239
+#define GL_RG16UI                                0x823A
+#define GL_RG32I                                 0x823B
+#define GL_RG32UI                                0x823C
+#define GL_DEBUG_OUTPUT_SYNCHRONOUS              0x8242
+#define GL_DEBUG_SOURCE_API                      0x8246
+#define GL_DEBUG_SOURCE_WINDOW_SYSTEM            0x8247
+#define GL_DEBUG_SOURCE_SHADER_COMPILER          0x8248
+#define GL_DEBUG_SOURCE_THIRD_PARTY              0x8249
+#define GL_DEBUG_SOURCE_APPLICATION              0x824A
+#define GL_DEBUG_SOURCE_OTHER                    0x824B
+#define GL_DEBUG_TYPE_ERROR                      0x824C
+#define GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR        0x824D
+#define GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR         0x824E
+#define GL_DEBUG_TYPE_PORTABILITY                0x824F
+#define GL_DEBUG_TYPE_PERFORMANCE                0x8250
+#define GL_DEBUG_TYPE_OTHER                      0x8251
+#define GL_DEBUG_TYPE_MARKER                     0x8268
+#define GL_DEBUG_TYPE_PUSH_GROUP                 0x8269
+#define GL_DEBUG_TYPE_POP_GROUP                  0x826A
+#define GL_DEBUG_SEVERITY_NOTIFICATION           0x826B
+#define GL_TEXTURE0                              0x84C0
+#define GL_TEXTURE1                              0x84C1
+#define GL_TEXTURE2                              0x84C2
+#define GL_TEXTURE3                              0x84C3
+#define GL_TEXTURE4                              0x84C4
+#define GL_TEXTURE5                              0x84C5
+#define GL_TEXTURE6                              0x84C6
+#define GL_TEXTURE7                              0x84C7
+#define GL_TEXTURE8                              0x84C8
+#define GL_TEXTURE9                              0x84C9
+#define GL_TEXTURE10                             0x84CA
+#define GL_TEXTURE11                             0x84CB
+#define GL_TEXTURE12                             0x84CC
+#define GL_TEXTURE13                             0x84CD
+#define GL_TEXTURE14                             0x84CE
+#define GL_TEXTURE15                             0x84CF
+#define GL_TEXTURE16                             0x84D0
+#define GL_TEXTURE17                             0x84D1
+#define GL_TEXTURE18                             0x84D2
+#define GL_TEXTURE19                             0x84D3
+#define GL_TEXTURE20                             0x84D4
+#define GL_TEXTURE21                             0x84D5
+#define GL_TEXTURE22                             0x84D6
+#define GL_TEXTURE23                             0x84D7
+#define GL_TEXTURE24                             0x84D8
+#define GL_TEXTURE25                             0x84D9
+#define GL_TEXTURE26                             0x84DA
+#define GL_TEXTURE27                             0x84DB
+#define GL_TEXTURE28                             0x84DC
+#define GL_TEXTURE29                             0x84DD
+#define GL_TEXTURE30                             0x84DE
+#define GL_TEXTURE31                             0x84DF
+#define GL_RGBA32F                               0x8814
+#define GL_RGB32F                                0x8815
+#define GL_RGBA16F                               0x881A
+#define GL_RGB16F                                0x881B
+#define GL_TEXTURE_COMPARE_MODE                  0x884C
+#define GL_TEXTURE_COMPARE_FUNC                  0x884D
+#define GL_COMPARE_REF_TO_TEXTURE                0x884E
+#define GL_ARRAY_BUFFER                          0x8892
+#define GL_ELEMENT_ARRAY_BUFFER                  0x8893
+#define GL_ARRAY_BUFFER_BINDING                  0x8894
+#define GL_ELEMENT_ARRAY_BUFFER_BINDING          0x8895
+#define GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING    0x889F
+#define GL_READ_ONLY                             0x88B8
+#define GL_WRITE_ONLY                            0x88B9
+#define GL_READ_WRITE                            0x88BA
+#define GL_BUFFER_ACCESS                         0x88BB
+#define GL_BUFFER_MAPPED                         0x88BC
+#define GL_BUFFER_MAP_POINTER                    0x88BD
+#define GL_STREAM_DRAW                           0x88E0
+#define GL_STREAM_READ                           0x88E1
+#define GL_STREAM_COPY                           0x88E2
+#define GL_STATIC_DRAW                           0x88E4
+#define GL_STATIC_READ                           0x88E5
+#define GL_STATIC_COPY                           0x88E6
+#define GL_DYNAMIC_DRAW                          0x88E8
+#define GL_DYNAMIC_READ                          0x88E9
+#define GL_DYNAMIC_COPY                          0x88EA
+#define GL_DEPTH24_STENCIL8                      0x88F0
+#define GL_SRC1_COLOR                            0x88F9
+#define GL_ONE_MINUS_SRC1_COLOR                  0x88FA
+#define GL_UNIFORM_BUFFER                        0x8A11
+#define GL_VERTEX_SHADER                         0x8B31
+#define GL_FRAGMENT_SHADER                       0x8B30
+#define GL_COMPILE_STATUS                        0x8B81
+#define GL_LINK_STATUS                           0x8B82
+#define GL_INFO_LOG_LENGTH                       0x8B84
+#define GL_ACTIVE_UNIFORMS                       0x8B86
+#define GL_FRAMEBUFFER_COMPLETE                  0x8CD5
+#define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT     0x8CD6
 #define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
-#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER 0x8CDB
-#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER 0x8CDC
-#define GL_FRAMEBUFFER_UNSUPPORTED        0x8CDD
-#define GL_COLOR_ATTACHMENT0              0x8CE0
-#define GL_DEPTH_ATTACHMENT               0x8D00
-#define GL_FRAMEBUFFER                    0x8D40
-#define GL_RENDERBUFFER                   0x8D41
-#define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE 0x8D56
-#define GL_COPY_READ_BUFFER               0x8F36
-#define GL_COPY_WRITE_BUFFER              0x8F37
-#define GL_DEBUG_SEVERITY_HIGH            0x9146
-#define GL_DEBUG_SEVERITY_MEDIUM          0x9147
-#define GL_DEBUG_SEVERITY_LOW             0x9148
-#define GL_DEBUG_OUTPUT                   0x92E0
+#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER    0x8CDB
+#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER    0x8CDC
+#define GL_FRAMEBUFFER_UNSUPPORTED               0x8CDD
+#define GL_COLOR_ATTACHMENT0                     0x8CE0
+#define GL_DEPTH_ATTACHMENT                      0x8D00
+#define GL_FRAMEBUFFER                           0x8D40
+#define GL_RENDERBUFFER                          0x8D41
+#define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE    0x8D56
+#define GL_COPY_READ_BUFFER                      0x8F36
+#define GL_COPY_WRITE_BUFFER                     0x8F37
+#define GL_SHADER_STORAGE_BUFFER                 0x90D2
+#define GL_DEBUG_SEVERITY_HIGH                   0x9146
+#define GL_DEBUG_SEVERITY_MEDIUM                 0x9147
+#define GL_DEBUG_SEVERITY_LOW                    0x9148
+#define GL_COMPUTE_SHADER                        0x91B9
+#define GL_DEBUG_OUTPUT                          0x92E0
+
+#define GL_SHADER_STORAGE_BARRIER_BIT 0x00002000
+
+#define GL_MAP_READ_BIT              0x0001
+#define GL_MAP_WRITE_BIT             0x0002
+#define GL_MAP_INVALIDATE_RANGE_BIT  0x0004
+#define GL_MAP_INVALIDATE_BUFFER_BIT 0x0008
+#define GL_MAP_FLUSH_EXPLICIT_BIT    0x0010
+#define GL_MAP_UNSYNCHRONIZED_BIT    0x0020
+
 #if OS_WINDOWS
 #define WGL_SAMPLE_BUFFERS_3DFX 0x2060
 #define WGL_SAMPLES_3DFX 0x2061
@@ -410,89 +438,97 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #endif
 
 #define BASE_FUNCS \
-D(glCreateShader,            GLuint, (GLenum shaderType),                                                                                       (shaderType))\
-D(glDeleteShader,            void,   (GLuint shader),                                                                                           (shader))\
-D(glShaderSource,            void,   (GLuint id, GLsizei count, const GLchar * const *string, const GLint *length),                             (id, count, string, length))\
-D(glCompileShader,           void,   (GLuint id),                                                                                               (id))\
-D(glGetShaderiv,             void,   (GLuint id, GLenum pname, GLint *params),                                                                  (id, pname, params))\
-D(glGetShaderInfoLog,        void,   (GLuint id, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                          (id, maxLength, length, infoLog))\
-D(glCreateProgram,           GLuint, (),                                                                                                        ())\
-D(glDeleteProgram,           void,   (GLuint program),                                                                                          (program))\
-D(glAttachShader,            void,   (GLuint program, GLuint id),                                                                               (program, id))\
-D(glDetachShader,            void,   (GLuint program, GLuint shader),                                                                           (program, shader))\
-D(glLinkProgram,             void,   (GLuint program),                                                                                          (program))\
-D(glGetProgramiv,            void,   (GLuint program, GLenum pname, GLint *params),                                                             (program, pname, params))\
-D(glGetProgramInfoLog,       void,   (GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                     (program, maxLength, length, infoLog))\
-D(glGenVertexArrays,         void,   (GLsizei n, GLuint *arrays),                                                                               (n, arrays))\
-D(glDeleteVertexArrays,      void,   (GLsizei n, const GLuint *arrays),                                                                         (n, arrays))\
-D(glBindVertexArray,         void,   (GLuint array),                                                                                            (array))\
-D(glGenBuffers,              void,   (GLsizei n, GLuint * buffers),                                                                             (n, buffers))\
-D(glBindBuffer,              void,   (GLenum target, GLuint buffer),                                                                            (target, buffer))\
-D(glDeleteBuffers,           void,   (GLsizei n, const GLuint *buffers),                                                                        (n, buffers))\
-D(glBufferData,              void,   (GLenum target, GLsizeiptr size, const void *data, GLenum usage),                                          (target, size, data, usage))\
-D(glBufferSubData,           void,   (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data),                                     (target, offset, size, data))\
-D(glCopyBufferSubData,       void,   (GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size),       (readtarget, writetarget, readoffset, writeoffset, size))\
-D(glVertexAttribPointer,     void,   (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer),       (index, size, type, normalized, stride, pointer))\
-D(glVertexAttribIPointer,    void,   (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer),                           (index, size, type, stride, pointer))\
-D(glEnableVertexAttribArray, void,   (GLuint index),                                                                                            (index))\
-D(glUseProgram,              void,   (GLuint program),                                                                                          (program))\
-D(glUniform1f,               void,   (GLint location, GLfloat v0),                                                                              (location, v0))\
-D(glUniform2f,               void,   (GLint location, GLfloat v0, GLfloat v1),                                                                  (location, v0, v1))\
-D(glUniform3f,               void,   (GLint location, GLfloat v0, GLfloat v1, GLfloat v2),                                                      (location, v0, v1, v2))\
-D(glUniform4f,               void,   (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3),                                          (location, v0, v1, v2, v3))\
-D(glUniform1i,               void,   (GLint location, GLint v0),                                                                                (location, v0))\
-D(glUniform2i,               void,   (GLint location, GLint v0, GLint v1),                                                                      (location, v0, v1))\
-D(glUniform3i,               void,   (GLint location, GLint v0, GLint v1, GLint v2),                                                            (location, v0, v1, v2))\
-D(glUniform4i,               void,   (GLint location, GLint v0, GLint v1, GLint v2, GLint v3),                                                  (location, v0, v1, v2, v3))\
-D(glUniform1ui,              void,   (GLint location, GLuint v0),                                                                               (location, v0))\
-D(glUniform2ui,              void,   (GLint location, GLuint v0, GLuint v1),                                                                    (location, v0, v1))\
-D(glUniform3ui,              void,   (GLint location, GLuint v0, GLuint v1, GLuint v2),                                                         (location, v0, v1, v2))\
-D(glUniform4ui,              void,   (GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3),                                              (location, v0, v1, v2, v3))\
-D(glUniform1fv,              void,   (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(glUniform2fv,              void,   (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(glUniform3fv,              void,   (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(glUniform4fv,              void,   (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(glUniform1iv,              void,   (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(glUniform2iv,              void,   (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(glUniform3iv,              void,   (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(glUniform4iv,              void,   (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(glUniform1uiv,             void,   (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(glUniform2uiv,             void,   (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(glUniform3uiv,             void,   (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(glUniform4uiv,             void,   (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(glUniformMatrix4fv,        void,   (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value),                                (location, count, transpose, value))\
-D(glGetUniformLocation,      GLint,  (GLuint program, const GLchar *name),                                                                      (program, name))\
-D(glDebugMessageCallback,    void,   (DEBUGPROC callback​, void * userParam​),                                                                    (callback​, userParam​))\
-D(glDebugMessageControl,     void,   (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled),        (source, type, severity, count, ids, enabled))\
-D(glGetActiveUniform,        void,   (GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name), (program, index, bufSize, length, size, type, name))\
-D(glGenFramebuffers,         void,   (GLsizei n, GLuint *ids),                                                                                  (n, ids))\
-D(glBindFramebuffer,         void,   (GLenum target, GLuint framebuffer),                                                                       (target, framebuffer))\
-D(glCheckFramebufferStatus,  GLenum, (GLenum target),                                                                                           (target))\
-D(glFramebufferTexture2D,    void,   (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level),                         (target, attachment, textarget, texture, level))\
-D(glGenRenderbuffers,        void,   (GLsizei n, GLuint *renderbuffers),                                                                        (n, renderbuffers))\
-D(glBindRenderbuffer,        void,   (GLenum target, GLuint renderbuffer),                                                                      (target, renderbuffer))\
-D(glRenderbufferStorage,     void,   (GLenum target, GLenum internalformat, GLsizei width, GLsizei height),                                     (target, internalformat, width, height))\
-D(glFramebufferRenderbuffer, void,   (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer),                        (target, attachment, renderbuffertarget, renderbuffer))\
-D(glGenSamplers,             void,   (GLsizei n, GLuint *samplers),                                                                             (n, samplers))\
-D(glBindSampler,             void,   (GLuint unit, GLuint sampler),                                                                             (unit, sampler))\
-D(glSamplerParameterf,       void,   (GLuint sampler, GLenum pname, GLfloat param),                                                             (sampler, pname, param))\
-D(glSamplerParameteri,       void,   (GLuint sampler, GLenum pname, GLint param),                                                               (sampler, pname, param))\
-D(glGenerateMipmap,          void,   (GLenum target),                                                                                           (target))\
-D(glTexStorage2D,            void,   (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height),                     (target, levels, internalformat, width, height))\
-D(glBlendFuncSeparate,       void,   (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha),                                          (srcRGB, dstRGB, srcAlpha, dstAlpha))\
-D(glActiveTexture,           void,   (GLenum texture), (texture))\
-D(glGetUniformBlockIndex,    GLuint, (GLuint program, const GLchar *uniformBlockName), (program, uniformBlockName))\
-D(glUniformBlockBinding,     void,   (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding), (program, uniformBlockIndex, uniformBlockBinding))\
-D(glBindBufferBase,          void,   (GLenum target, GLuint index, GLuint buffer), (target, index, buffer))\
-D(glBindBufferRange,         void,   (GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size), (target, index, buffer, offset, size))\
+D(GLuint, glCreateShader,            (GLenum shaderType),                                                                                       (shaderType))\
+D(void,   glDeleteShader,            (GLuint shader),                                                                                           (shader))\
+D(void,   glShaderSource,            (GLuint id, GLsizei count, const GLchar * const *string, const GLint *length),                             (id, count, string, length))\
+D(void,   glCompileShader,           (GLuint id),                                                                                               (id))\
+D(void,   glGetShaderiv,             (GLuint id, GLenum pname, GLint *params),                                                                  (id, pname, params))\
+D(void,   glGetShaderInfoLog,        (GLuint id, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                          (id, maxLength, length, infoLog))\
+D(GLuint, glCreateProgram,           (),                                                                                                        ())\
+D(void,   glDeleteProgram,           (GLuint program),                                                                                          (program))\
+D(void,   glAttachShader,            (GLuint program, GLuint id),                                                                               (program, id))\
+D(void,   glDetachShader,            (GLuint program, GLuint shader),                                                                           (program, shader))\
+D(void,   glLinkProgram,             (GLuint program),                                                                                          (program))\
+D(void,   glGetProgramiv,            (GLuint program, GLenum pname, GLint *params),                                                             (program, pname, params))\
+D(void,   glGetProgramInfoLog,       (GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                     (program, maxLength, length, infoLog))\
+D(void,   glGenVertexArrays,         (GLsizei n, GLuint *arrays),                                                                               (n, arrays))\
+D(void,   glDeleteVertexArrays,      (GLsizei n, const GLuint *arrays),                                                                         (n, arrays))\
+D(void,   glBindVertexArray,         (GLuint array),                                                                                            (array))\
+D(void,   glGenBuffers,              (GLsizei n, GLuint * buffers),                                                                             (n, buffers))\
+D(void,   glBindBuffer,              (GLenum target, GLuint buffer),                                                                            (target, buffer))\
+D(void,   glDeleteBuffers,           (GLsizei n, const GLuint *buffers),                                                                        (n, buffers))\
+D(void,   glBufferData,              (GLenum target, GLsizeiptr size, const void *data, GLenum usage),                                          (target, size, data, usage))\
+D(void,   glBufferSubData,           (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data),                                     (target, offset, size, data))\
+D(void,   glCopyBufferSubData,       (GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size),       (readtarget, writetarget, readoffset, writeoffset, size))\
+D(void,   glVertexAttribPointer,     (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer),       (index, size, type, normalized, stride, pointer))\
+D(void,   glVertexAttribIPointer,    (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer),                           (index, size, type, stride, pointer))\
+D(void,   glEnableVertexAttribArray, (GLuint index),                                                                                            (index))\
+D(void,   glUseProgram,              (GLuint program),                                                                                          (program))\
+D(void,   glUniform1f,               (GLint location, GLfloat v0),                                                                              (location, v0))\
+D(void,   glUniform2f,               (GLint location, GLfloat v0, GLfloat v1),                                                                  (location, v0, v1))\
+D(void,   glUniform3f,               (GLint location, GLfloat v0, GLfloat v1, GLfloat v2),                                                      (location, v0, v1, v2))\
+D(void,   glUniform4f,               (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3),                                          (location, v0, v1, v2, v3))\
+D(void,   glUniform1i,               (GLint location, GLint v0),                                                                                (location, v0))\
+D(void,   glUniform2i,               (GLint location, GLint v0, GLint v1),                                                                      (location, v0, v1))\
+D(void,   glUniform3i,               (GLint location, GLint v0, GLint v1, GLint v2),                                                            (location, v0, v1, v2))\
+D(void,   glUniform4i,               (GLint location, GLint v0, GLint v1, GLint v2, GLint v3),                                                  (location, v0, v1, v2, v3))\
+D(void,   glUniform1ui,              (GLint location, GLuint v0),                                                                               (location, v0))\
+D(void,   glUniform2ui,              (GLint location, GLuint v0, GLuint v1),                                                                    (location, v0, v1))\
+D(void,   glUniform3ui,              (GLint location, GLuint v0, GLuint v1, GLuint v2),                                                         (location, v0, v1, v2))\
+D(void,   glUniform4ui,              (GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3),                                              (location, v0, v1, v2, v3))\
+D(void,   glUniform1fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
+D(void,   glUniform2fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
+D(void,   glUniform3fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
+D(void,   glUniform4fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
+D(void,   glUniform1iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
+D(void,   glUniform2iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
+D(void,   glUniform3iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
+D(void,   glUniform4iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
+D(void,   glUniform1uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
+D(void,   glUniform2uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
+D(void,   glUniform3uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
+D(void,   glUniform4uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
+D(void,   glUniformMatrix4fv,        (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value),                                (location, count, transpose, value))\
+D(GLint,  glGetUniformLocation,      (GLuint program, const GLchar *name),                                                                      (program, name))\
+D(void,   glDebugMessageCallback,    (DEBUGPROC callback​, void * userParam​),                                                                    (callback​, userParam​))\
+D(void,   glDebugMessageControl,     (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled),        (source, type, severity, count, ids, enabled))\
+D(void,   glGetActiveUniform,        (GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name), (program, index, bufSize, length, size, type, name))\
+D(void,   glGenFramebuffers,         (GLsizei n, GLuint *ids),                                                                                  (n, ids))\
+D(void,   glBindFramebuffer,         (GLenum target, GLuint framebuffer),                                                                       (target, framebuffer))\
+D(GLenum, glCheckFramebufferStatus,  (GLenum target),                                                                                           (target))\
+D(void,   glFramebufferTexture2D,    (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level),                         (target, attachment, textarget, texture, level))\
+D(void,   glGenRenderbuffers,        (GLsizei n, GLuint *renderbuffers),                                                                        (n, renderbuffers))\
+D(void,   glBindRenderbuffer,        (GLenum target, GLuint renderbuffer),                                                                      (target, renderbuffer))\
+D(void,   glRenderbufferStorage,     (GLenum target, GLenum internalformat, GLsizei width, GLsizei height),                                     (target, internalformat, width, height))\
+D(void,   glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer),                        (target, attachment, renderbuffertarget, renderbuffer))\
+D(void,   glGenSamplers,             (GLsizei n, GLuint *samplers),                                                                             (n, samplers))\
+D(void,   glBindSampler,             (GLuint unit, GLuint sampler),                                                                             (unit, sampler))\
+D(void,   glSamplerParameterf,       (GLuint sampler, GLenum pname, GLfloat param),                                                             (sampler, pname, param))\
+D(void,   glSamplerParameteri,       (GLuint sampler, GLenum pname, GLint param),                                                               (sampler, pname, param))\
+D(void,   glGenerateMipmap,          (GLenum target),                                                                                           (target))\
+D(void,   glTexStorage2D,            (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height),                     (target, levels, internalformat, width, height))\
+D(void,   glBlendFuncSeparate,       (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha),                                          (srcRGB, dstRGB, srcAlpha, dstAlpha))\
+D(void,   glActiveTexture,           (GLenum texture), (texture))\
+D(GLuint, glGetUniformBlockIndex,    (GLuint program, const GLchar *uniformBlockName), (program, uniformBlockName))\
+D(void,   glUniformBlockBinding,     (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding), (program, uniformBlockIndex, uniformBlockBinding))\
+D(void,   glBindBufferBase,          (GLenum target, GLuint index, GLuint buffer), (target, index, buffer))\
+D(void,   glBindBufferRange,         (GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size), (target, index, buffer, offset, size))\
+D(void,   glDispatchCompute,         (GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z), (num_groups_x, num_groups_y, num_groups_z))\
+D(void,   glMemoryBarrier,           (GLbitfield barriers), (barriers))\
+D(void,   glGetBufferSubData,        (GLenum target, GLintptr offset, GLsizeiptr size, GLvoid *data), (target, offset, size, data))\
+D(void,   glBindImageTexture,        (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format), (unit, texture, level, layered, layer, access, format))\
+D(void *, glMapBufferRange,          (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access), (target, offset, length, access))\
+D(GLboolean, glUnmapBuffer,          (GLenum target), (target))\
+D(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels), (target, level, format, type, pixels))\
+D(void, glGetTextureImage, (GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, GLvoid *pixels), (texture, level, format, type, bufSize, pixels))\
 
 #if OS_WINDOWS
 
 #define ALL_FUNCS BASE_FUNCS \
-D(wglSwapIntervalEXT,           BOOL,  (int interval),                                                                                                       (interval))\
-D(wglCreateContextAttribsARB,   HGLRC, (HDC hDC, HGLRC hShareContext, const int *attribList),                                                                (hDC, hShareContext, attribList))\
-D(wglChoosePixelFormatARB,      BOOL,  (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats), (hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats))\
-D(wglGetPixelFormatAttribivARB, BOOL,  (HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues),               (hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues))
+D(BOOL,  wglSwapIntervalEXT,           (int interval),                                                                                                       (interval))\
+D(HGLRC, wglCreateContextAttribsARB,   (HDC hDC, HGLRC hShareContext, const int *attribList),                                                                (hDC, hShareContext, attribList))\
+D(BOOL,  wglChoosePixelFormatARB,      (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats), (hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats))\
+D(BOOL,  wglGetPixelFormatAttribivARB, (HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues),               (hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues))
 
 #else
 
@@ -500,7 +536,7 @@ D(wglGetPixelFormatAttribivARB, BOOL,  (HDC hdc, int iPixelFormat, int iLayerPla
 
 #endif
 
-#define D(name, ret, args, params) using name ## _t = ret(__stdcall*)args; TL_API ret name args;
+#define D(ret, name, args, params) using name ## _t = ret(__stdcall*)args; TL_API ret name args;
 ALL_FUNCS
 #undef D
 
@@ -545,7 +581,14 @@ TL_API GLuint create_shader(GLenum shaderType, Span<char> source);
 inline GLuint create_shader(GLenum shaderType, char const *source) {
 	return create_shader(shaderType, as_span(source));
 }
-TL_API GLuint create_program(GLuint vertexShader, GLuint fragmentShader);
+
+struct ProgramStages {
+	GLuint vertex;
+	GLuint fragment;
+	GLuint compute;
+};
+
+TL_API GLuint create_program(ProgramStages stages);
 #if 0
 TL_API void immediate_init();
 TL_API void immediate_set_matrix(m4 const &matrix);
@@ -692,7 +735,7 @@ namespace OpenGL {
 
 static union {
 	struct {
-#define D(name, ret, args, params) name##_t name;
+#define D(ret, name, args, params) name##_t name;
 		ALL_FUNCS
 #undef D
 	};
@@ -700,7 +743,7 @@ static union {
 } procedures;
 
 static char const *procedure_names[] {
-#define D(name, ret, args, params) #name,
+#define D(ret, name, args, params) #name,
 ALL_FUNCS
 #undef D
 };
@@ -708,7 +751,7 @@ ALL_FUNCS
 }
 }
 
-#define D(name, ret, args, params) ret name args{return ::tl::OpenGL::procedures.name params;}
+#define D(ret, name, args, params) ret name args{return ::tl::OpenGL::procedures.name params;}
 ALL_FUNCS
 #undef D
 
@@ -753,8 +796,10 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;
 	switch (shaderType) {
-		case GL_VERTEX_SHADER: stage_string += "VERTEX_SHADER"s; break;
+		case GL_VERTEX_SHADER:   stage_string += "VERTEX_SHADER"s; break;
 		case GL_FRAGMENT_SHADER: stage_string += "FRAGMENT_SHADER"s; break;
+		case GL_COMPUTE_SHADER:  stage_string += "COMPUTE_SHADER"s; break;
+		default: return 0;
 	}
 	stage_string += '\n';
 
@@ -786,14 +831,16 @@ GLuint create_shader(GLenum shaderType, Span<char> source) {
 	return compile_shader(shader);
 }
 
-GLuint create_program(GLuint vertexShader, GLuint fragmentShader) {
+GLuint create_program(ProgramStages stages) {
 	timed_function();
 	GLuint result = glCreateProgram();
-	glAttachShader(result, vertexShader);
-	glAttachShader(result, fragmentShader);
+	if (stages.vertex)   glAttachShader(result, stages.vertex);
+	if (stages.fragment) glAttachShader(result, stages.fragment);
+	if (stages.compute)  glAttachShader(result, stages.compute);
 	glLinkProgram(result);
-	glDetachShader(result, vertexShader);
-	glDetachShader(result, fragmentShader);
+	if (stages.vertex)   glDetachShader(result, stages.vertex);
+	if (stages.fragment) glDetachShader(result, stages.fragment);
+	if (stages.compute)  glDetachShader(result, stages.compute);
 
 	GLint status;
 	glGetProgramiv(result, GL_LINK_STATUS, &status);

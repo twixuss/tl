@@ -530,6 +530,8 @@ forceinline v2f floor(v2f v) { return { floor(v.x), floor(v.y) }; }
 forceinline v3f floor(v3f v) { return { floor(v.x), floor(v.y), floor(v.z) }; }
 forceinline v4f floor(v4f v) { return { floor(v.x), floor(v.y), floor(v.z), floor(v.w) }; }
 
+forceinline v2u floor_to_power_of_2(v2u v) { return {floor_to_power_of_2(v.x), floor_to_power_of_2(v.y)}; }
+
 #define FRAC(f32) forceinline f32 frac(f32 v) { return v - floor(v); }
 FRAC(f32)
 FRAC(f64)
