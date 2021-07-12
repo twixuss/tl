@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 struct Stream {
 	Allocator allocator;

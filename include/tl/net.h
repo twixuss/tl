@@ -9,7 +9,7 @@
 
 struct sockaddr_in;
 
-namespace TL { namespace net {
+namespace tl { namespace net {
 
 template <class T>
 struct MessageHeader {
@@ -93,7 +93,7 @@ TL_API void run_udp(TcpServer *server, void *context = 0);
 #pragma comment(lib, "iphlpapi")
 #pragma comment(lib, "ws2_32")
 
-namespace TL { namespace net {
+namespace tl { namespace net {
 
 bool init() {
 	WSADATA wsaData = {};

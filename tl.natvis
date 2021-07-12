@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="TL::Span&lt;char&gt;">
+  <Type Name="tl::Span&lt;char&gt;">
     <Intrinsic Name="size" Expression="_end-_begin" />
     <Intrinsic Name="data" Expression="_begin" />
     <DisplayString>{data(),[size()]s}</DisplayString>
@@ -13,7 +13,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::Span&lt;char const&gt;">
+  <Type Name="tl::Span&lt;char const&gt;">
     <DisplayString>{data,[size]s}</DisplayString>
     <StringView>data,[size]s</StringView>
     <Expand>
@@ -24,7 +24,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::Span&lt;*&gt;">
+  <Type Name="tl::Span&lt;*&gt;">
     <DisplayString>{data,[size]na}</DisplayString>
     <StringView>data,[size]na</StringView>
     <Expand>
@@ -35,7 +35,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::String&lt;*&gt;">
+  <Type Name="tl::String&lt;*&gt;">
     <Intrinsic Name="size" Expression="_end-_begin" />
     <Intrinsic Name="data" Expression="_begin" />
     <DisplayString>{data(),[size()]s}</DisplayString>
@@ -48,7 +48,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::List&lt;*&gt;">
+  <Type Name="tl::List&lt;*&gt;">
     <DisplayString>{data,[size]na}</DisplayString>
     <StringView>data,[size]na</StringView>
     <Expand>
@@ -60,7 +60,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::StaticList&lt;*&gt;">
+  <Type Name="tl::StaticList&lt;*&gt;">
     <DisplayString>{data,[size]na}</DisplayString>
     <StringView>data,[size]na</StringView>
     <Expand>
@@ -72,7 +72,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::Queue&lt;*&gt;">
+  <Type Name="tl::Queue&lt;*&gt;">
     <Intrinsic Name="size" Expression="_end - _begin" />
     <Intrinsic Name="capacity" Expression="_allocEnd - _begin" />
     <DisplayString>{{ size={size()}, capacity={capacity()} }}</DisplayString>
@@ -83,7 +83,7 @@
       </ArrayItems>
     </Expand>
   </Type>
-  <Type Name="TL::BlockList&lt;*&gt;::Block">
+  <Type Name="tl::BlockList&lt;*&gt;::Block">
     <Intrinsic Name="size" Expression="end - buffer" />
     <DisplayString>{{ size={size()} }}</DisplayString>
     <Expand>
@@ -94,10 +94,10 @@
       <Item Name="next" Condition="next!=0">next</Item>
     </Expand>
   </Type>
-  <Type Name="TL::Storage_Trivial&lt;*&gt;">
+  <Type Name="tl::Storage_Trivial&lt;*&gt;">
     <DisplayString>{value}</DisplayString>
   </Type>
-  <Type Name="TL::Storage_NonTrivial&lt;*&gt;">
+  <Type Name="tl::Storage_NonTrivial&lt;*&gt;">
     <DisplayString>{value}</DisplayString>
   </Type>
 </AutoVisualizer>

@@ -4,7 +4,7 @@
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
 
-namespace TL {
+namespace tl {
 
 template <class T>
 struct List {
@@ -25,7 +25,9 @@ struct List {
 	}
 	T &add(T value) {
 		reserve_exponential(size + 1);
-		memcpy(data + size, &value, sizeof(T));
+		auto dest = data + size;
+		assert(dest == (data + size));
+		memcpy(dest, &value, sizeof(T));
 		return data[size++];
 	}
 	Span<T> add(Span<T> span) {

@@ -12,7 +12,7 @@ inline bool key_down    (u32 key) { return (key_state)[key] & KeyState_down;    
 inline bool key_repeated(u32 key) { return (key_state)[key] & KeyState_repeated; } \
 inline bool key_up      (u32 key) { return (key_state)[key] & KeyState_up;       }
 
-namespace TL {
+namespace tl {
 
 using KeyState = u8;
 

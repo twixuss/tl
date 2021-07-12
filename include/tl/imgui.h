@@ -13,7 +13,7 @@
 #error TL_IMGUI_SHADER must be defined before including tl/imgui.h
 #endif
 
-namespace TL {
+namespace tl {
 namespace Imgui {
 
 struct Texture {
@@ -107,7 +107,7 @@ void init_base(Window *window) {
 	layers.allocator = current_allocator;
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
-	::TL::Imgui::window = window;
+	::tl::Imgui::window = window;
 
 	{
 

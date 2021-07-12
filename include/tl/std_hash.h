@@ -7,9 +7,9 @@
 namespace std {
 
 template <>
-struct hash<TL::Span<char>> {
-	TL::umm operator()(TL::Span<char> const &v) const {
-		using namespace TL;
+struct hash<tl::Span<char>> {
+	tl::umm operator()(tl::Span<char> const &v) const {
+		using namespace tl;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		umm index = 0;
 		for (auto c : v) {
@@ -20,9 +20,9 @@ struct hash<TL::Span<char>> {
 };
 
 template <>
-struct hash<TL::List<char>> {
-	TL::umm operator()(TL::List<char> const &v) const {
-		using namespace TL;
+struct hash<tl::List<char>> {
+	tl::umm operator()(tl::List<char> const &v) const {
+		using namespace tl;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		umm index = 0;
 		for (auto c : v) {
@@ -33,22 +33,22 @@ struct hash<TL::List<char>> {
 };
 
 template <>
-struct hash<TL::Span<TL::utf8>> {
-	TL::umm operator()(TL::Span<TL::utf8> const &v) const {
-		using namespace TL;
+struct hash<tl::Span<tl::utf8>> {
+	tl::umm operator()(tl::Span<tl::utf8> const &v) const {
+		using namespace tl;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		umm index = 0;
 		for (auto c : v) {
-			hash = TL::rotate_left(hash, 1) | c;
+			hash = tl::rotate_left(hash, 1) | c;
 		}
 		return hash;
 	}
 };
 
 template <>
-struct hash<TL::v3s> {
-	TL::umm operator()(TL::v3s const &v) const {
-		using namespace TL;
+struct hash<tl::v3s> {
+	tl::umm operator()(tl::v3s const &v) const {
+		using namespace tl;
 		umm hash = 0x0F1E2D3C4B5A6978;
 		hash ^= (umm)v.x << 0;
 		hash ^= (umm)v.y << 16;

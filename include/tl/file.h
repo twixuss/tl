@@ -4,7 +4,7 @@
 #include "string.h"
 #include "list_list.h"
 
-namespace TL {
+namespace tl {
 
 #if OS_WINDOWS
 using filechar = utf16;
@@ -267,7 +267,7 @@ TL_API List<filechar> get_current_directory();
 
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-namespace TL {
+namespace tl {
 
 #if OS_WINDOWS
 struct OpenFileParams {

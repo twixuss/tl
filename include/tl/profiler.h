@@ -5,8 +5,8 @@
 #endif
 
 #if TL_ENABLE_PROFILER
-#define timed_begin(name) ::TL::Profiler::begin(name, __FILE__, __LINE__)
-#define timed_end() ::TL::Profiler::end()
+#define timed_begin(name) ::tl::Profiler::begin(name, __FILE__, __LINE__)
+#define timed_end() ::tl::Profiler::end()
 #define timed_block(name) timed_begin(name); defer{ timed_end(); }
 //#define timed_function() timed_block(([](char const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
 #define timed_function() timed_block(as_span(__FUNCSIG__))
@@ -19,7 +19,7 @@
 
 #include "common.h"
 
-namespace TL { namespace Profiler {
+namespace tl { namespace Profiler {
 TL_API void begin(Span<char> name, char const *file, u32 line);
 TL_API void end();
 }}
@@ -28,7 +28,7 @@ TL_API void end();
 #include "list.h"
 #include "file.h"
 
-namespace TL { namespace Profiler {
+namespace tl { namespace Profiler {
 
 struct TimeSpan {
 	s64 begin;
@@ -65,7 +65,7 @@ TL_API List<u8> output_for_timed();
 #pragma optimize("t", on)
 #pragma optimize("y", on)
 
-namespace TL { namespace Profiler {
+namespace tl { namespace Profiler {
 
 Allocator name_allocator;
 

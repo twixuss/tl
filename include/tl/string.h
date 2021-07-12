@@ -6,7 +6,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
-namespace TL {
+namespace tl {
 
 template <class T>
 List<T> null_terminate(Span<T> span) {
@@ -723,7 +723,7 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
 	umm chars_appended = 0;
 
 	auto append = [&](StringBuilder &builder, auto const &value) {
-		chars_appended += ::TL::append(builder, value);
+		chars_appended += ::tl::append(builder, value);
 	};
 
 	auto value = f.value;
@@ -811,12 +811,23 @@ inline List<char> to_string(StringBuilder &builder) {
 	return to_string(builder, builder.allocator);
 }
 
-template <class ...Args>
-inline List<char> concatenate(Args &&...args) {
+template <class Char, class ...Args>
+inline List<Char> concatenate(Span<Char> arg0, Args const &...args) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.encoding = encoding_from_type<Char>;
+	append(builder, arg0);
 	int ___[] = { ((append(builder, args), ...), 0) };
-	return to_string(builder, current_allocator);
+	return (List<Char>)to_string(builder, current_allocator);
+}
+
+template <class Char, class ...Args>
+inline List<Char> concatenate(List<Char> arg0, Args const &...args) {
+	return concatenate((Span<Char>)arg0, args...);
+}
+
+template <class ...Args>
+inline auto tconcatenate(Args &&...args) {
+	return with(temporary_allocator, concatenate(args...));
 }
 
 template <class ...Args>
@@ -915,6 +926,10 @@ List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate) {
 
 	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, (wchar *)result.data, chars_required) != chars_required) {
 		return {};
+	}
+
+	if (terminate) {
+		result.back() = {};
 	}
 
 	return result;

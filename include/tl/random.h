@@ -1,6 +1,6 @@
 #pragma once
 #include "common.h"
-namespace TL {
+namespace tl {
 
 struct xorshift32 {
 	u32 v = 1;
@@ -161,16 +161,16 @@ template <class State> u8  next_u8 (State &state) { return (u8)next(state); }
 template <class State> u16 next_u16(State &state) { return (u16)next(state); }
 template <class State> u32 next_u32(State &state) { return (u32)next(state); }
 template <class State>
-u64 next_u64(State &state) { 
+u64 next_u64(State &state) {
 	if constexpr(sizeof(next(state)) == 4) {
 		return next(state) | (next(state) << 32);
 	}
 	return next(state);
 }
-template <class State> s8  next_s8 (State &state) { return (TL::s8 )next_u8 (state); }
-template <class State> s16 next_s16(State &state) { return (TL::s16)next_u16(state); }
-template <class State> s32 next_s32(State &state) { return (TL::s32)next_u32(state); }
-template <class State> s64 next_s64(State &state) { return (TL::s64)next_u64(state); }
+template <class State> s8  next_s8 (State &state) { return (tl::s8 )next_u8 (state); }
+template <class State> s16 next_s16(State &state) { return (tl::s16)next_u16(state); }
+template <class State> s32 next_s32(State &state) { return (tl::s32)next_u32(state); }
+template <class State> s64 next_s64(State &state) { return (tl::s64)next_u64(state); }
 template <class State> f32 next_f32(State &state) { return normalize_range_f32<f32>(next_u32(state)); }
 template <class State> f64 next_f64(State &state) { return normalize_range_f64<f64>(next_u64(state)); }
 

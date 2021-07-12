@@ -19,14 +19,37 @@
 #endif
 
 using GLchar = char;
-using GLsizeiptr = TL::umm;
-using GLintptr = TL::smm;
+using GLsizeiptr = tl::umm;
+using GLintptr = tl::smm;
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
 #define GL_TEXTURE_MAX_LEVEL              0x813D
 #define GL_DEPTH_COMPONENT16              0x81A5
 #define GL_DEPTH_COMPONENT32              0x81A7
+#define GL_FRAMEBUFFER_UNDEFINED          0x8219
 #define GL_DEPTH_STENCIL_ATTACHMENT       0x821A
+#define GL_RG                             0x8227
+#define GL_RG_INTEGER                     0x8228
+#define GL_R8                             0x8229
+#define GL_R16                            0x822A
+#define GL_RG8                            0x822B
+#define GL_RG16                           0x822C
+#define GL_R16F                           0x822D
+#define GL_R32F                           0x822E
+#define GL_RG16F                          0x822F
+#define GL_RG32F                          0x8230
+#define GL_R8I                            0x8231
+#define GL_R8UI                           0x8232
+#define GL_R16I                           0x8233
+#define GL_R16UI                          0x8234
+#define GL_R32I                           0x8235
+#define GL_R32UI                          0x8236
+#define GL_RG8I                           0x8237
+#define GL_RG8UI                          0x8238
+#define GL_RG16I                          0x8239
+#define GL_RG16UI                         0x823A
+#define GL_RG32I                          0x823B
+#define GL_RG32UI                         0x823C
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS       0x8242
 #define GL_DEBUG_SOURCE_API               0x8246
 #define GL_DEBUG_SOURCE_WINDOW_SYSTEM     0x8247
@@ -76,6 +99,10 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_TEXTURE29                      0x84DD
 #define GL_TEXTURE30                      0x84DE
 #define GL_TEXTURE31                      0x84DF
+#define GL_RGBA32F                        0x8814
+#define GL_RGB32F                         0x8815
+#define GL_RGBA16F                        0x881A
+#define GL_RGB16F                         0x881B
 #define GL_TEXTURE_COMPARE_MODE           0x884C
 #define GL_TEXTURE_COMPARE_FUNC           0x884D
 #define GL_COMPARE_REF_TO_TEXTURE         0x884E
@@ -95,10 +122,16 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_INFO_LOG_LENGTH                0x8B84
 #define GL_ACTIVE_UNIFORMS                0x8B86
 #define GL_FRAMEBUFFER_COMPLETE           0x8CD5
+#define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT 0x8CD6
+#define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
+#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER 0x8CDB
+#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER 0x8CDC
+#define GL_FRAMEBUFFER_UNSUPPORTED        0x8CDD
 #define GL_COLOR_ATTACHMENT0              0x8CE0
 #define GL_DEPTH_ATTACHMENT               0x8D00
 #define GL_FRAMEBUFFER                    0x8D40
 #define GL_RENDERBUFFER                   0x8D41
+#define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE 0x8D56
 #define GL_COPY_READ_BUFFER               0x8F36
 #define GL_COPY_WRITE_BUFFER              0x8F37
 #define GL_DEBUG_SEVERITY_HIGH            0x9146
@@ -471,7 +504,7 @@ D(wglGetPixelFormatAttribivARB, BOOL,  (HDC hdc, int iPixelFormat, int iLayerPla
 ALL_FUNCS
 #undef D
 
-namespace TL {
+namespace tl {
 namespace OpenGL {
 
 enum TextureFormat {
@@ -654,7 +687,7 @@ void free(GrowingBuffer<T> &buffer) {
 #define TL_OPENGL_LOG_LEVEL 3
 #endif
 
-namespace TL {
+namespace tl {
 namespace OpenGL {
 
 static union {
@@ -675,11 +708,11 @@ ALL_FUNCS
 }
 }
 
-#define D(name, ret, args, params) ret name args{return ::TL::OpenGL::procedures.name params;}
+#define D(name, ret, args, params) ret name args{return ::tl::OpenGL::procedures.name params;}
 ALL_FUNCS
 #undef D
 
-namespace TL {
+namespace tl {
 namespace OpenGL {
 
 static GLuint compile_shader(GLuint shader) {

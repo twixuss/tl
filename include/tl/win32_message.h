@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-namespace TL {
+namespace tl {
 
 Span<char> win32_message_to_string(UINT m) {
 	switch (m) {

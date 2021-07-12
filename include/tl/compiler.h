@@ -1,7 +1,7 @@
 #pragma once
 #include "list.h"
 
-namespace TL {
+namespace tl {
 
 TL_API List<ascii> demangle(ascii const *function_name);
 
@@ -13,7 +13,7 @@ TL_API List<ascii> demangle(ascii const *function_name);
 #include "string.h"
 #include "console.h"
 
-namespace TL {
+namespace tl {
 
 struct DemangleState {
 	List<char> last_argument;

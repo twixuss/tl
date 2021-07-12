@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 template <class T>
 struct LinkedList {
@@ -68,10 +68,10 @@ struct LinkedList {
 
 	T &add(T value = {}) {
 		if (head == 0) {
-			head = tail = ALLOCATE(Node, allocator);
+			head = tail = allocator.allocate<Node>();
 		} else {
 			if (!tail->next) {
-				tail->next = ALLOCATE(Node, allocator);
+				tail->next = allocator.allocate<Node>();
 			}
 			tail = tail->next;
 		}
@@ -85,7 +85,7 @@ struct LinkedList {
 		auto node = head;
 		while (node) {
 			auto next = node->next;
-			FREE(allocator, node);
+			allocator.free(node);
 			node = next;
 		}
 		head = 0;

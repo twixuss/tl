@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 template <class T, umm block_capacity_>
 struct BlockList {

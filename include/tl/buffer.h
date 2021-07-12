@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 struct Buffer : Span<u8> {
 	using Span<u8>::Span;

@@ -1,7 +1,7 @@
 #pragma once
 #include "catalog.h"
 
-namespace TL {
+namespace tl {
 
 #ifndef TL_SHADER_CATALOG_ENTRY
 #error TL_SHADER_CATALOG_ENTRY must be defined before including "shader_catalog.h"

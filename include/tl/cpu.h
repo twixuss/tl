@@ -4,7 +4,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4061)
 
-namespace TL {
+namespace tl {
 
 enum class CpuFeature : u8 {
 	_3dnow,
@@ -318,7 +318,7 @@ CpuInfo get_cpu_info() {
 #endif // OS_WINDOWS
 
 char const *to_string(CpuFeature f) {
-#define CASE(x) case TL::CpuFeature::x: return #x;
+#define CASE(x) case tl::CpuFeature::x: return #x;
 	switch (f) {
 		CASE(_3dnow)
 		CASE(_3dnowext)
@@ -377,7 +377,7 @@ char const *to_string(CpuFeature f) {
 #undef CASE
 }
 char const *to_string(CpuVendor v) {
-#define CASE(x) case TL::CpuVendor::x: return #x;
+#define CASE(x) case tl::CpuVendor::x: return #x;
 	switch (v) {
 		CASE(intel)
 		CASE(amd)

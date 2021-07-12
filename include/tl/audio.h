@@ -1,7 +1,7 @@
 #pragma once
 #include "buffer.h"
 
-namespace TL {
+namespace tl {
 
 #pragma pack(push, 1)
 struct WavChunk {

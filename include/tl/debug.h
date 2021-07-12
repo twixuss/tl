@@ -6,7 +6,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
-namespace TL {
+namespace tl {
 
 using CallStack = List<void *>;
 
@@ -56,7 +56,7 @@ TL_API bool debugger_attached();
 
 #pragma comment(lib, "dbghelp")
 
-namespace TL {
+namespace tl {
 
 static HANDLE debug_process;
 

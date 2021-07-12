@@ -1,7 +1,7 @@
 #pragma once
 #include "file.h"
 
-namespace TL {
+namespace tl {
 
 TL_DECLARE_HANDLE(Process);
 

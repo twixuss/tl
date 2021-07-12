@@ -6,7 +6,7 @@
 #pragma warning(push)
 //#pragma warning(disable : 4244)
 
-namespace TL {
+namespace tl {
 
 inline static constexpr u32 u32_random_primes[] = {
 	0x36DCD91D,

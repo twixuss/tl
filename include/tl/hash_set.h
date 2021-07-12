@@ -2,7 +2,7 @@
 #include "linked_list.h"
 #include "array.h"
 
-namespace TL {
+namespace tl {
 
 template <class Value, umm _capacity>
 struct StaticHashSet {

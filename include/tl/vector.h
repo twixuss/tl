@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 #define DEFN_2 \
 	struct { Scalar x, y; }; \
@@ -162,6 +162,37 @@ union v4 {
 	CMPOP_4(||)
 	EQ_4
 };
+
+/*
+#ifdef TL_ENABLE_VEC4_SIMD
+
+#undef BINOP_4
+#define BINOP_4(o, func, set1) \
+	forceinline v4 operator o(v4 b) const { return {.m = func(m, b.m)}; } \
+	forceinline v4 operator o(Scalar b) const { return {.m = func(m, set1(b))}; } \
+	forceinline friend v4 operator o(Scalar a, v4 b) { return {.m = func(set1(a), b.m)};} \
+	forceinline v4 &operator o=(v4 b) { return m = func(m, b.m), *this;} \
+	forceinline v4 &operator o=(Scalar b) { return m = func(m, set1(b)), *this;}
+
+template <>
+union v4<f32> {
+	using Scalar = f32;
+	using Mask = v4<bool>;
+	DEFN_4
+	f32x4 m;
+
+	forceinline v4 operator-() const { return {.m = _mm_xor_ps(m, _mm_set1_ps(-1))}; }
+
+	BINOP_4(+, f32x4_add, f32x4_set1)
+	BINOP_4(-, f32x4_sub, f32x4_set1)
+	BINOP_4(*, f32x4_mul, f32x4_set1)
+	BINOP_4(/, f32x4_div, f32x4_set1)
+
+	EQ_4
+};
+
+#endif
+*/
 
 #undef DEFN_2
 #undef DEFN_3

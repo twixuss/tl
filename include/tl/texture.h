@@ -1,6 +1,6 @@
 #pragma once
 
-namespace TL {
+namespace tl {
 
 enum TextureFormat {
 	TextureFormat_null,

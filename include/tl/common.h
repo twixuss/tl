@@ -60,7 +60,7 @@
 #define timed_function(...)
 #endif
 
-namespace TL {
+namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
 inline constexpr umm string_char_count(ascii *str) { return string_char_count((ascii const *)str); }
@@ -147,6 +147,20 @@ template <class T> using RemoveCVRef = RemoveConst<RemoveVolatile<RemoveReferenc
 template <bool v, class T = void> struct EnableIfT {};
 template <class T> struct EnableIfT<true, T> { using Type = T; };
 template <bool v, class T = void> using EnableIf = typename EnableIfT<v, T>::Type;
+
+template <class ToFind, class First, class ...Rest>
+inline constexpr u32 type_index(u32 start) {
+	if constexpr (is_same<ToFind, First>) {
+		return start;
+	} else {
+		return type_index<ToFind, Rest...>(start + 1);
+	}
+}
+
+template <class ...Rest>
+inline constexpr u32 type_count() {
+	return sizeof...(Rest);
+}
 
 struct EmptyStruct {};
 
@@ -597,7 +611,7 @@ private:
 };
 #endif
 
-#define defer ::TL::Deferrer CONCAT(_deferrer, __LINE__) = [&]
+#define defer ::tl::Deferrer CONCAT(_deferrer, __LINE__) = [&]
 
 template <class T>
 auto reverse(T &x) {
@@ -1142,11 +1156,12 @@ struct Allocator {
 	template <class T>
 	inline T *allocate(AllocateFlags flags, umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		T *result = (T *)func(Allocator_allocate, Allocate_uninitialized, 0, 0, count * sizeof(T), align, location, state);
+#ifndef TL_DEBUG
 		if (flags & Allocate_uninitialized) {
-		} else {
-			for (auto it = result; it != result + count; ++it) {
-				new (it) T();
-			}
+		} else
+#endif
+		for (auto it = result; it != result + count; ++it) {
+			new (it) T();
 		}
 		return result;
 	}
@@ -1169,11 +1184,12 @@ struct Allocator {
 	template <class T>
 	inline T *reallocate(AllocateFlags flags, T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		T *result = (T *)func(Allocator_reallocate, Allocate_uninitialized, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
+#ifndef TL_DEBUG
 		if (flags & Allocate_uninitialized) {
-		} else {
-			for (auto it = result + old_count; it != result + new_count; ++it) {
-				new (it) T();
-			}
+		} else
+#endif
+		for (auto it = result + old_count; it != result + new_count; ++it) {
+			new (it) T();
 		}
 		return result;
 	}
@@ -1216,8 +1232,8 @@ struct AllocatorPusher {
 	forceinline operator bool() { return true; }
 };
 
-#define push_allocator(allocator) tl_push(::TL::AllocatorPusher, allocator)
-#define scoped_allocator(allocator) tl_scoped(::TL::current_allocator, allocator)
+#define push_allocator(allocator) tl_push(::tl::AllocatorPusher, allocator)
+#define scoped_allocator(allocator) tl_scoped(::tl::current_allocator, allocator)
 
 #define with(allocator, ...) ([&]{scoped_allocator(allocator);return __VA_ARGS__;}())
 
@@ -1277,10 +1293,11 @@ Allocator default_allocator = {
 				allocations_size += size;
 #endif
 				auto result = tl_allocate(new_size, align);
+#ifndef TL_DEBUG
 				if (flags & Allocate_uninitialized) {
-				} else {
-					memset(result, 0, new_size);
-				}
+				} else
+#endif
+				memset(result, 0, new_size);
 				return result;
 			}
 			case Allocator_reallocate: {
@@ -1289,10 +1306,11 @@ Allocator default_allocator = {
 				allocations_size += size;
 #endif
 				auto result = tl_reallocate(data, new_size, align);
+#ifndef TL_DEBUG
 				if (flags & Allocate_uninitialized) {
-				} else {
-					memset((u8 *)result + old_size, 0, new_size - old_size);
-				}
+				} else
+#endif
+				memset((u8 *)result + old_size, 0, new_size - old_size);
 				return result;
 			}
 			case Allocator_free:
@@ -1339,7 +1357,7 @@ thread_local Allocator temporary_allocator = {
 	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		auto &state = temporary_allocator_state;
 		switch (mode) {
-			case TL::Allocator_allocate: {
+			case tl::Allocator_allocate: {
 				auto block = state.first;
 				while (block) {
 					auto candidate = (u8 *)ceil(block->data() + block->size, align);
@@ -1378,22 +1396,24 @@ thread_local Allocator temporary_allocator = {
 #endif
 
 				auto result = block->data();
+#ifndef TL_DEBUG
 				if (flags & Allocate_uninitialized) {
-				} else {
-					memset(result, 0, new_size);
-				}
+				} else
+#endif
+				memset(result, 0, new_size);
 				return result;
 			}
-			case TL::Allocator_reallocate: {
+			case tl::Allocator_reallocate: {
 				auto new_data = temporary_allocator.allocate(Allocate_uninitialized, new_size);
 				memcpy(new_data, data, old_size);
+#ifndef TL_DEBUG
 				if (flags & Allocate_uninitialized) {
-				} else {
-					memset((u8 *)new_data + old_size, 0, new_size - old_size);
-				}
+				} else
+#endif
+				memset((u8 *)new_data + old_size, 0, new_size - old_size);
 				return new_data;
 			}
-			case TL::Allocator_free:
+			case tl::Allocator_free:
 				break;
 		}
 		return 0;
@@ -1425,7 +1445,7 @@ void deinit_allocator() {
 
 #endif
 
-} // namespace TL
+} // namespace tl
 
 #if COMPILER_MSVC
 #pragma warning(pop)
@@ -1438,7 +1458,7 @@ void deinit_allocator() {
 #include "debug.h"
 #include <unordered_map>
 
-namespace TL {
+namespace tl {
 
 struct AllocationInfo {
 	umm size;
@@ -1508,9 +1528,9 @@ Allocator tracking_allocator = {
 #ifdef TL_MAIN
 #ifdef TL_IMPL
 #include "string.h"
-extern TL::s32 tl_main(TL::Span<TL::Span<TL::utf8>> args);
+extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 int wmain(int argc, wchar_t **argv) {
-	using namespace TL;
+	using namespace tl;
 	init_allocator();
 	defer { deinit_allocator(); };
 

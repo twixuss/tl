@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 template <class T>
 struct Optional {
@@ -15,7 +15,7 @@ struct Optional {
 	Optional &operator=(T that) {
 		return *new(this) Optional(that);
 	}
-	operator bool() const { return has_value; }
+	explicit operator bool() const { return has_value; }
 	union {
 		T value;
 	};

@@ -6,7 +6,7 @@
 #include "file.h"
 #include <unordered_map>
 
-namespace TL {
+namespace tl {
 
 struct FontChar {
 	v2u position;
@@ -55,7 +55,7 @@ TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink
 
 #ifdef FREETYPE_H_
 
-namespace TL {
+namespace tl {
 
 static FT_Library ft_library;
 

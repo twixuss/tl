@@ -2,7 +2,7 @@
 #include "stream.h"
 #include "file.h"
 
-namespace TL {
+namespace tl {
 
 struct FileStream : Stream {
 	File file;

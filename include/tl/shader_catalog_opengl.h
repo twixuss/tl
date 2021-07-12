@@ -3,7 +3,7 @@
 #include "std_hash.h"
 #include <unordered_map>
 
-namespace TL {
+namespace tl {
 
 struct Shader {
 	u32 program;
@@ -15,7 +15,7 @@ struct Shader {
 	bool depth_test;
 	bool enable_blend;
 };
-#define TL_SHADER_CATALOG_ENTRY ::TL::Shader
+#define TL_SHADER_CATALOG_ENTRY ::tl::Shader
 
 }
 
@@ -24,7 +24,7 @@ struct Shader {
 #include "console.h"
 #include "opengl.h"
 
-namespace TL {
+namespace tl {
 
 TL_API void use_shader(Shader &shader);
 TL_API void set_uniform(Shader &shader, Span<char> name, f32 value);

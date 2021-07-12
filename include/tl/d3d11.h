@@ -29,7 +29,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4820) // struct padding
 
-namespace TL { namespace D3D11 {
+namespace tl { namespace D3D11 {
 
 struct Shader {
 	ID3D11VertexShader *vs = 0;

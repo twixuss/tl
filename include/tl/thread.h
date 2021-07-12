@@ -11,7 +11,7 @@
 #pragma warning(disable: 4820)
 #pragma warning(disable: 5220)
 
-namespace TL {
+namespace tl {
 
 TL_API void sleep_milliseconds(u32 milliseconds);
 TL_API void sleep_seconds(u32 seconds);
@@ -513,5 +513,5 @@ inline void deinit_thread_pool(ThreadPool *pool, bool waitForThreads = true) {
 	pool->threads.clear();
 }
 
-} // namespace TL
+} // namespace tl
 #pragma warning(pop)

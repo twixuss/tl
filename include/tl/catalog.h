@@ -5,7 +5,7 @@
 #include "console.h"
 #include <unordered_map>
 
-namespace TL {
+namespace tl {
 
 template <class EntryAddition>
 struct Catalog {

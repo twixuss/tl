@@ -9,7 +9,7 @@
 #pragma warning(pop, 0)
 #pragma comment(lib, "user32.lib")
 
-namespace TL {
+namespace tl {
 
 enum RawInputDevice {
 	RawInput_mouse = 0x1,

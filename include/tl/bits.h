@@ -1,7 +1,7 @@
 #pragma once
 #include "system.h"
 
-namespace TL {
+namespace tl {
 
 inline constexpr u8 reverse_bits(u8 b) {
 	b = (u8)((b >> 4) | (b << 4));

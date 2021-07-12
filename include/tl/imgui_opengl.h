@@ -19,7 +19,7 @@
 #include "font.h"
 #include "opengl.h"
 #include <unordered_map>
-namespace TL {
+namespace tl {
 namespace Imgui {
 
 struct FontVertex {
@@ -110,9 +110,9 @@ u32 texture_stretched_shader;
 void init(Window *window, FontCollection *font_collection) {
 	timed_function();
 
-	using namespace ::TL::OpenGL;
+	using namespace ::tl::OpenGL;
 	init_base(window);
-	::TL::Imgui::font_collection = font_collection;
+	::tl::Imgui::font_collection = font_collection;
 
 	auto just_color_source = R"(
 #ifdef VERTEX_SHADER
@@ -607,14 +607,14 @@ v2s _get_text_bounds(Span<utf8> text, u32 font_size) {
 
 GLenum texture_format_gl_format(TextureFormat format) {
 	switch (format) 	{
-		case TL::TextureFormat_u8_rgba: return GL_RGBA;
+		case tl::TextureFormat_u8_rgba: return GL_RGBA;
 	}
 	return 0;
 }
 
 GLenum texture_format_gl_type(TextureFormat format) {
 	switch (format) 	{
-		case TL::TextureFormat_u8_rgba: return GL_UNSIGNED_BYTE;
+		case tl::TextureFormat_u8_rgba: return GL_UNSIGNED_BYTE;
 	}
 	return 0;
 }

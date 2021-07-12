@@ -1,7 +1,7 @@
 #pragma once
 #include "system.h"
 
-namespace TL {
+namespace tl {
 
 struct PreciseTimer {
 	s64 counter;
@@ -15,6 +15,8 @@ TL_API u64 read_timestamp_counter();
 
 TL_API List<char> get_time_string();
 
+TL_API void make_os_timing_precise();
+
 }
 
 #ifdef TL_IMPL
@@ -23,7 +25,9 @@ TL_API List<char> get_time_string();
 
 #include "win32.h"
 
-namespace TL {
+#pragma comment(lib, "winmm")
+
+namespace tl {
 
 PreciseTimer create_precise_timer() {
 	return {get_performance_counter()};
@@ -46,6 +50,10 @@ List<char> get_time_string() {
 	GetSystemTime(&t);
 
 	return format("%:%:%.%", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+}
+
+void make_os_timing_precise() {
+	timeBeginPeriod(1);
 }
 
 }

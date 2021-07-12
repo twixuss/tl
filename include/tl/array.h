@@ -2,7 +2,7 @@
 #include "common.h"
 #include "vector.h"
 
-namespace TL {
+namespace tl {
 
 template <class T, umm size_>
 struct Array {

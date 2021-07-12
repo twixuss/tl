@@ -3,7 +3,7 @@
 #include "common.h"
 #include "string.h"
 
-namespace TL {
+namespace tl {
 
 struct Printer {
 	void (*func)(Span<utf8> span, void *state);
@@ -181,8 +181,8 @@ struct PrinterPusher {
 	operator bool() { return true; }
 };
 
-#define push_printer(printer) tl_push(::TL::PrinterPusher, printer)
-#define scoped_printer(printer) tl_scoped(::TL::current_printer, printer)
+#define push_printer(printer) tl_push(::tl::PrinterPusher, printer)
+#define scoped_printer(printer) tl_scoped(::tl::current_printer, printer)
 
-} // namespace TL
+} // namespace tl
 

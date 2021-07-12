@@ -4,7 +4,7 @@
 #include "vector.h"
 #include "input.h"
 
-namespace TL {
+namespace tl {
 
 using WindowFlags = u32;
 enum : WindowFlags {
@@ -18,8 +18,9 @@ enum : WindowStyleFlags {
 
 struct Window;
 
-using WindowOnSize = void (*)(Window &);
+using WindowOnCreate = void (*)(Window &);
 using WindowOnDraw = void (*)(Window &);
+using WindowOnSize = void (*)(Window &);
 using WindowHitTest = u32 (*)(Window &);
 
 enum WindowState {
@@ -47,8 +48,9 @@ struct Window {
 	bool active = false;
 	WindowFlags flags = 0;
 	WindowStyleFlags style_flags = 0;
-	WindowOnSize on_size = 0;
+	WindowOnCreate on_create = 0;
 	WindowOnDraw on_draw = 0;
+	WindowOnSize on_size = 0;
 	WindowHitTest hit_test = 0;
 	WindowState state;
 };
@@ -58,6 +60,7 @@ struct CreateWindowInfo {
 	v2u client_size = {};
 	v2u min_client_size = {512, 512};
 	WindowStyleFlags style_flags = 0;
+	WindowOnCreate on_create = 0;
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
 	WindowHitTest hit_test = 0;
@@ -78,8 +81,8 @@ TL_API void restore(Window *window);
 
 extern TL_API KeyState key_state[256 + 3];
 
-TL_DEFINE_KEYBOARD_INPUT(Span(::TL::key_state,       256))
-TL_DEFINE_MOUSE_INPUT   (Span(::TL::key_state + 256,   3))
+TL_DEFINE_KEYBOARD_INPUT(Span(::tl::key_state,       256))
+TL_DEFINE_MOUSE_INPUT   (Span(::tl::key_state + 256,   3))
 
 }
 
@@ -91,7 +94,7 @@ TL_DEFINE_MOUSE_INPUT   (Span(::TL::key_state + 256,   3))
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi")
 
-namespace TL {
+namespace tl {
 
 static bool window_class_created = false;
 static constexpr auto class_name = L"tl_window";
@@ -126,6 +129,13 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 	static bool changing_state = false;
 
 	switch (message) {
+		case WM_CREATE: {
+			window.handle = (NativeWindowHandle)hwnd;
+			if (window.on_create) {
+				window.on_create(window);
+			}
+			return 0;
+		}
 		case WM_ACTIVATE: {
 			//if (window.style_flags & WindowStyle_no_frame) {
 			//	BOOL is_composition_enabled;
@@ -277,16 +287,18 @@ Window *create_window(CreateWindowInfo info) {
 	window->allocator = allocator;
 	window->style_flags = info.style_flags;
 	window->flags = Window_open;
-	window->on_size = info.on_size;
+	window->on_create = info.on_create;
 	window->on_draw = info.on_draw;
+	window->on_size = info.on_size;
 	window->hit_test = info.hit_test;
 	window->min_client_size = info.min_client_size;
 	window->min_window_size = get_window_size(info.min_client_size, window_style);
+	window->client_size = max(info.client_size, info.min_client_size);
 
 	auto window_size = get_window_size(info.client_size, window_style);
 
 	currently_creating_window = window;
-	window->handle = (NativeWindowHandle)CreateWindowExW(
+	CreateWindowExW(
 		0, class_name, with(temporary_allocator, (wchar *)utf8_to_utf16(info.title, true).data),
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleA(0), 0
 	);

@@ -1,7 +1,7 @@
 #pragma once
 #include "stream.h"
 
-namespace TL {
+namespace tl {
 
 struct MemoryStream : Stream {
 	Span<u8> memory;

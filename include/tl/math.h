@@ -27,7 +27,7 @@
 //#pragma warning(disable : 4820) // padding
 #endif
 
-namespace TL {
+namespace tl {
 
 constexpr f32 pi     = f32(3.1415926535897932384626433832795L);
 constexpr f32 tau    = f32(6.283185307179586476925286766559L);
@@ -191,64 +191,55 @@ union m3 {
 	}
 	static forceinline m3 translation(v2f v) { return translation(v.x, v.y); }
 	static forceinline m3 translation(f32 v) { return translation(v, v); }
-	static forceinline m3 rotationX(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
+	static forceinline m3 rotation_r_x(f32 a) {
+		f32 s, c;
+		cos_sin(a, c, s);
 		return {
 			1, 0, 0,
 			0, c, s,
 			0,-s, c,
 		};
 	}
-	static forceinline m3 rotationY(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
+	static forceinline m3 rotation_r_y(f32 a) {
+		f32 s, c;
+		cos_sin(a, c, s);
 		return {
-			c, 0, s,
+			c, 0,-s,
 			0, 1, 0,
-		   -s, 0, c,
+		    s, 0, c,
 		};
 	}
-	static forceinline m3 rotationZ(f32 a) {
-		f32 s = sinf(a), c = cosf(a);
+	static forceinline m3 rotation_r_z(f32 a) {
+		f32 s, c;
+		cos_sin(a, c, s);
 		return {
-			c, s, 0,
-		   -s, c, 0,
-			0, 0, 1,
+			 c, s, 0,
+			-s, c, 0,
+			 0, 0, 1,
 		};
 	}
-	static forceinline m3 rotationZXY(v3f v) {
-		v3f sin;
-		v3f cos;
-		cos_sin(v, cos, sin);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
+	static forceinline m3 rotation_r_zxy(v3f a) {
+		v3f s;
+		v3f c;
+		cos_sin(a, c, s);
 		return {
-			 d * f - a * c * e, b * e, a * d * e + c * f,
-			-a * c * f - d * e, b * f, a * d * f - c * e,
-			            -b * c,    -a,             b * d,
+			 c.z*c.y + s.z*s.x*s.y, s.z*c.x,  c.z*-s.y + s.z*s.x*c.y,
+			-s.z*c.y + c.z*s.x*s.y, c.z*c.x, -s.z*-s.y + c.z*s.x*c.y,
+			               c.x*s.y,    -s.x,                 c.x*c.y,
 		};
 	}
-	static forceinline m3 rotationZXY(f32 x, f32 y, f32 z) { return rotationZXY({x, y, z}); }
-	static forceinline m3 rotationYXZ(v3f v) {
-		v3f sin;
-		v3f cos;
-		cos_sin(v, cos, sin);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
+	static forceinline m3 rotation_r_zxy(f32 x, f32 y, f32 z) { return rotation_r_zxy({x, y, z}); }
+	static forceinline m3 rotation_r_yxz(v3f a) {
+		v3f s;
+		v3f c;
+		cos_sin(a, c, s);
 		return {
-			d * f + a * c * e,  d * e - a * c * f, b * c,
-			           -b * e,              b * f,     a,
-			a * d * e - c * f, -a * d * f - c * e, b * d,
+			c.y*c.z + -s.y*-s.x*-s.z, c.y*s.z + -s.y*-s.x*c.z, -s.y*c.x,
+			                c.x*-s.z,                 c.x*c.z,      s.x,
+			 s.y*c.z + c.y*-s.x*-s.z,  s.y*s.z + c.y*-s.x*c.z,  c.y*c.x,
 		};
 	}
-	static forceinline m3 rotationYXZ(f32 x, f32 y, f32 z) { return rotationYXZ({x, y, z}); }
+	static forceinline m3 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
 namespace CE {
@@ -813,7 +804,7 @@ DOT(u32, v3u)
 #undef DOT
 
 #define DOT(f32, v4f) forceinline constexpr f32 dot(v4f a, v4f b) { return a *= b, a.x + a.y + a.z + a.w; }
-DOT(f32, v4f)
+forceinline f32 dot(v4f a, v4f b) { return f32x4_dot(f32x4_load(&a), f32x4_load(&b)); }
 DOT(s32, v4s)
 DOT(u32, v4u)
 #undef DOT
@@ -1592,7 +1583,7 @@ union m4 {
 			0, 0, -nz / rz, 1,
 		};
 	}
-	static forceinline m4 rotation_x(f32 a) {
+	static forceinline m4 rotation_r_x(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
@@ -1602,17 +1593,17 @@ union m4 {
 			0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotation_y(f32 a) {
+	static forceinline m4 rotation_r_y(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
-			 c, 0, s, 0,
-			 0, 1, 0, 0,
-			-s, 0, c, 0,
-			 0, 0, 0, 1
+			c, 0,-s, 0,
+			0, 1, 0, 0,
+			s, 0, c, 0,
+			0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotation_z(f32 a) {
+	static forceinline m4 rotation_r_z(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
 		return {
@@ -1622,42 +1613,30 @@ union m4 {
 			 0, 0, 0, 1
 		};
 	}
-	static forceinline m4 rotation_zxy(v3f v) {
-		v3f sin;
-		v3f cos;
-		cos_sin(v, cos, sin);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
+	static forceinline m4 rotation_r_zxy(v3f a) {
+		v3f s;
+		v3f c;
+		cos_sin(a, c, s);
 		return {
-			 d * f - a * c * e, b * e, a * d * e + c * f, 0,
-			-a * c * f - d * e, b * f, a * d * f - c * e, 0,
-			            -b * c,    -a,             b * d, 0,
-			                 0,     0,                 0, 1,
+			 c.z*c.y + s.z*s.x*s.y, s.z*c.x,  c.z*-s.y + s.z*s.x*c.y, 0,
+			-s.z*c.y + c.z*s.x*s.y, c.z*c.x, -s.z*-s.y + c.z*s.x*c.y, 0,
+			               c.x*s.y,    -s.x,                 c.x*c.y, 0,
+			                     0,       0,                       0, 1,
 		};
 	}
-	static forceinline m4 rotation_zxy(f32 x, f32 y, f32 z) { return rotation_zxy({x, y, z}); }
-	static forceinline m4 rotation_yxz(v3f v) {
-		v3f sin;
-		v3f cos;
-		cos_sin(v, cos, sin);
-		f32 a = sin.x;
-		f32 c = sin.y;
-		f32 e = sin.z;
-		f32 b = cos.x;
-		f32 d = cos.y;
-		f32 f = cos.z;
+	static forceinline m4 rotation_r_zxy(f32 x, f32 y, f32 z) { return rotation_r_zxy({x, y, z}); }
+	static forceinline m4 rotation_r_yxz(v3f a) {
+		v3f s;
+		v3f c;
+		cos_sin(a, c, s);
 		return {
-			d * f + a * c * e,  d * e - a * c * f, b * c, 0,
-			           -b * e,              b * f,     a, 0,
-			a * d * e - c * f, -a * d * f - c * e, b * d, 0,
-			                0,                  0,     0, 1,
+			c.y*c.z + -s.y*-s.x*-s.z, c.y*s.z + -s.y*-s.x*c.z, -s.y*c.x, 0,
+			                c.x*-s.z,                 c.x*c.z,      s.x, 0,
+			 s.y*c.z + c.y*-s.x*-s.z,  s.y*s.z + c.y*-s.x*c.z,  c.y*c.x, 0,
+			                       0,                       0,        0, 1,
 		};
 	}
-	static forceinline m4 rotation_yxz(f32 x, f32 y, f32 z) { return rotation_yxz({x, y, z}); }
+	static forceinline m4 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
 forceinline constexpr m3 transpose(m3 const& m) {
@@ -1847,10 +1826,10 @@ forceinline constexpr u32 count_bits(u32 v) {
 }
 forceinline constexpr v4s frac(v4s v, s32 step) {
 	return {
-		TL::frac(v.x, step),
-		TL::frac(v.y, step),
-		TL::frac(v.z, step),
-		TL::frac(v.w, step),
+		tl::frac(v.x, step),
+		tl::frac(v.y, step),
+		tl::frac(v.z, step),
+		tl::frac(v.w, step),
 	};
 }
 
@@ -1934,7 +1913,7 @@ forceinline auto smoothstep(T x) {
 	return x*x*x*(x*(6*x - 15) + 10);
 }
 
-} // namespace TL
+} // namespace tl
 
 #undef MOP
 #undef MOPS

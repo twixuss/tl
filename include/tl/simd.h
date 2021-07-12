@@ -8,7 +8,7 @@
 #include <immintrin.h>
 #endif
 
-namespace TL {
+namespace tl {
 
  // simd register width in bytes
 #if ARCH_AVX512F
@@ -144,6 +144,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 
 #define f32x4_set(a,b,c,d) _mm_setr_ps(a,b,c,d)
 #define f32x4_set1(a) _mm_set1_ps(a)
+#define f32x4_load(address) _mm_load_ps((f32*)(address))
 #define f32x4_get(a,b) ([&]{int _wtf_=_mm_extract_ps(a,b);return*(f32*)&_wtf_;}())
 #if ARCH_AVX
 #define f32x4_lt(a,b) _mm_cmp_ps(a,b,_CMP_LT_OQ)
@@ -166,6 +167,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define f32x4_div(a,b) _mm_div_ps(a,b)
 #define f32x4_neg(a) _mm_xor_ps(a,_mm_set1_ps(-0.0f))
 #define f32x4_rcp(a) _mm_rcp_ps(a)
+#define f32x4_dot(a, b) _mm_cvtss_f32(_mm_dp_ps(a,b,0xf1))
 #define f32x4_trunc(a) _mm_round_ps(a,_MM_FROUND_TRUNC|_MM_FROUND_NO_EXC)
 #define f32x4_round(a) _mm_round_ps(a,_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)
 #define f32x4_floor(a) _mm_round_ps(a,_MM_FROUND_TO_NEG_INF|_MM_FROUND_NO_EXC)

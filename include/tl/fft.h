@@ -1,14 +1,14 @@
 #pragma once
 #include "complex.h"
 
-namespace TL {
+namespace tl {
 
 template <class Float>
 bool fft(Span<Complex<Float>> span) {
 	u32 N = span.size;
 	if (!is_power_of_2(N)) return false;
 
-	u32 LogN = TL::log2(N);
+	u32 LogN = tl::log2(N);
 	if (LogN < 2 || LogN > 24) return false;
 
 	static constexpr Complex<Float> ws[] = {

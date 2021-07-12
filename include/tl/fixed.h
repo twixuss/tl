@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 
-namespace TL {
+namespace tl {
 
 template <class Int, class Fract>
 Int fixed_addition_overflow(Fract a, Fract b, Fract *result) {
@@ -12,7 +12,7 @@ template <>
 s32 fixed_addition_overflow(f32 a, f32 b, f32 *result) {
 	f32 sum = a + b;
 	if (sum > 1) {
-	
+
 	}
 	return 0;
 }

@@ -10,7 +10,7 @@
 #pragma warning(disable: 4583) // destructor not called implicitly
 #pragma warning(disable: 4061 4062) // incomplete switch
 
-namespace TL {
+namespace tl {
 namespace Json {
 
 enum Type {
@@ -34,21 +34,21 @@ struct Object {
 	union {
 		MemberMap members;
 		Array array;
-		f64 number;
+		f64 _number;
 		String string;
 		bool boolean;
 	};
 	Object() {
 		memset(this, 0, sizeof(*this));
 	}
-	Object(f64 number) : type(Type_number), number(number) {}
+	Object(f64 number) : type(Type_number), _number(number) {}
 	Object(Span<utf8> string) : type(Type_string), string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
 			case Type_object:  new (&members) MemberMap(); break;
 			case Type_array:   new (&array)   Array    (); break;
-			case Type_number:  new (&number)  f64      (); break;
+			case Type_number:  new (&_number)  f64      (); break;
 			case Type_string:  new (&string)  String   (); break;
 			case Type_boolean: new (&boolean) bool     (); break;
 			default:
@@ -59,7 +59,7 @@ struct Object {
 	Object &operator=(f64 value) {
 		if (type != Type_null)
 			assert(type == Type_number);
-		number = value;
+		_number = value;
 		return *this;
 	}
 	Object &operator=(Span<utf8> value) {
@@ -84,6 +84,9 @@ struct Object {
 	Object *index(umm i) {
 		assert(type == Type_array);
 		return &array[i];
+	}
+	f64 number() {
+		return _number;
 	}
 };
 
@@ -131,7 +134,7 @@ inline void free(Json::Object &obj) {
 inline void append(StringBuilder &b, Json::Object obj) {
 	switch (obj.type) {
 		case Json::Type_number: {
-			append(b, obj.number);
+			append(b, obj.number());
 			break;
 		}
 		case Json::Type_string: {
@@ -177,7 +180,7 @@ inline void append(StringBuilder &b, Json::Object obj) {
 
 #ifdef TL_IMPL
 
-namespace TL {
+namespace tl {
 namespace Json {
 
 List<Token> lex(Span<utf8> json) {
@@ -290,7 +293,7 @@ Object parse(Token *&t) {
 		utf8 temp[256];
 		memcpy(temp, t->view.data, t->view.size);
 		temp[t->view.size] = 0;
-		result.number = atof((char *)temp);
+		result._number = atof((char *)temp);
 		++t;
 		return result;
 	} else if (t->type == Token_true || t->type == Token_false) {
