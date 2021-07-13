@@ -1,35 +1,35 @@
-#include "../include/tl/array.h"
-#include "../include/tl/bits.h"
-#include "../include/tl/buffer.h"
-#include "../include/tl/common.h"
-#include "../include/tl/console.h"
-#include "../include/tl/cpu.h"
-#include "../include/tl/debug.h"
-#include "../include/tl/file.h"
-#include "../include/tl/function.h"
-#include "../include/tl/hashtable.h"
-#include "../include/tl/json.h"
-#include "../include/tl/list.h"
-#include "../include/tl/math.h"
-#include "../include/tl/math_random.h"
-#include "../include/tl/mesh.h"
-#include "../include/tl/opengl.h"
-#include "../include/tl/optional.h"
-#include "../include/tl/profiler.h"
-#include "../include/tl/random.h"
-#include "../include/tl/simd.h"
-#include "../include/tl/std_hash.h"
-#include "../include/tl/string.h"
-#include "../include/tl/system.h"
-#include "../include/tl/thread.h"
-#include "../include/tl/time.h"
+#include <tl/array.h>
+#include <tl/bits.h>
+#include <tl/buffer.h>
+#include <tl/common.h>
+#include <tl/console.h>
+#include <tl/cpu.h>
+#include <tl/debug.h>
+#include <tl/file.h>
+#include <tl/function.h>
+#include <tl/hash_map.h>
+#include <tl/json.h>
+#include <tl/list.h>
+#include <tl/math.h>
+#include <tl/math_random.h>
+#include <tl/mesh.h>
+#include <tl/opengl.h>
+#include <tl/optional.h>
+#include <tl/profiler.h>
+#include <tl/random.h>
+#include <tl/simd.h>
+#include <tl/std_hash.h>
+#include <tl/string.h>
+#include <tl/system.h>
+#include <tl/thread.h>
+#include <tl/time.h>
 
 #if OS_WINDOWS
-#include "../include/tl/win32.h"
-#include "../include/tl/d3d11.h"
+#include <tl/win32.h>
+#include <tl/d3d11.h>
 #endif
 
-using namespace TL;
+using namespace tl;
 
 #pragma warning(disable: 4100)
 

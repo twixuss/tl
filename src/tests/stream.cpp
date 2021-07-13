@@ -1,7 +1,7 @@
-#include "../include/tl/memory_stream.h"
-#include "../include/tl/file_stream.h"
+#include <tl/memory_stream.h>
+#include <tl/file_stream.h>
 
-using namespace TL;
+using namespace tl;
 
 static void read_write_test(Stream *stream) {
 	u8 dest[2];

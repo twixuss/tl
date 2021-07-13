@@ -1,6 +1,6 @@
-#include "../include/tl/compiler.h"
-#include "../include/tl/console.h"
-using namespace TL;
+#include <tl/compiler.h>
+#include <tl/console.h>
+using namespace tl;
 
 struct EmptyStruct {
 };
@@ -60,7 +60,7 @@ static char const *mangled_name;
 //auto fn24(std::nullptr_t, std::nullptr_t){mangled_name=__FUNCDNAME__;}
 //auto fn25(std::nullptr_t, std::nullptr_t, std::nullptr_t){mangled_name=__FUNCDNAME__;}
 //auto fn26(::EmptyStruct){mangled_name=__FUNCDNAME__;}
-//auto fn27(TL::EmptyStruct){mangled_name=__FUNCDNAME__;}
+//auto fn27(tl::EmptyStruct){mangled_name=__FUNCDNAME__;}
 //auto fn28(N0::N1::EmptyStruct){mangled_name=__FUNCDNAME__;}
 //auto fn29(Parent::Child){mangled_name=__FUNCDNAME__;}
 //auto fn30(Parent::Child, Parent::Child){mangled_name=__FUNCDNAME__;}
@@ -169,7 +169,7 @@ void compiler_test() {
 	//TEST(fn24(0,0), "fn24(nullptr_t, nullptr_t)"s);
 	//TEST(fn25(0,0,0), "fn25(nullptr_t, nullptr_t, nullptr_t)"s);
 	//TEST(fn26({}), "fn26(EmptyStruct)"s);
-	//TEST(fn27({}), "fn27(TL::EmptyStruct)"s);
+	//TEST(fn27({}), "fn27(tl::EmptyStruct)"s);
 	//TEST(fn28({}), "fn28(N0::N1::EmptyStruct)"s);
 	//TEST(fn29({}), "fn29(Parent::Child)"s);
 	//TEST(fn30({},{}), "fn30(Parent::Child, Parent::Child)"s);

@@ -1,5 +1,5 @@
-#include "../include/tl/math.h"
-using namespace TL;
+#include <tl/math.h>
+using namespace tl;
 
 void math_test() {
 	aabb<v2s> a, b;

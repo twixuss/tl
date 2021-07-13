@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../include/tl/list.h"
+#include <tl/list.h>
 
-using namespace TL;
+using namespace tl;
 
 void list_test() {
 	Queue<int> test;

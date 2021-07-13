@@ -1025,8 +1025,8 @@ struct aabb {
 	}
 	template <class U>
 	aabb<T> operator*(U const &b) { return {min * b, max * b}; }
-	bool operator==(aabb const &that) const { return min == that.min && max == that.max; }
-	bool operator!=(aabb const &that) const { return min != that.min || max != that.max; }
+	auto operator==(aabb const &that) const { return min == that.min && max == that.max; }
+	auto operator!=(aabb const &that) const { return min != that.min || max != that.max; }
 	template <class U>
 	explicit operator aabb<U>() const { return { (U)min, (U)max }; }
 

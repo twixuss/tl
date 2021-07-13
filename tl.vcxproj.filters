@@ -1,16 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\definitions.cpp" />
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\math.cpp" />
-    <ClCompile Include="src\string.cpp" />
-    <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\compiler.cpp" />
-    <ClCompile Include="src\stream.cpp" />
-    <ClCompile Include="src\list.cpp" />
+    <Natvis Include="tl.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="tl.natvis" />
+    <ClCompile Include="src\tests.cpp" />
+    <ClCompile Include="src\tests\common.cpp" />
+    <ClCompile Include="src\tests\compiler.cpp" />
+    <ClCompile Include="src\tests\definitions.cpp" />
+    <ClCompile Include="src\tests\list.cpp" />
+    <ClCompile Include="src\tests\math.cpp" />
+    <ClCompile Include="src\tests\stream.cpp" />
+    <ClCompile Include="src\tests\string.cpp" />
   </ItemGroup>
 </Project>

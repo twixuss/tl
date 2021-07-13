@@ -437,111 +437,58 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define ERROR_INVALID_PROFILE_ARB               0x2096
 #endif
 
-#define BASE_FUNCS \
-D(GLuint, glCreateShader,            (GLenum shaderType),                                                                                       (shaderType))\
-D(void,   glDeleteShader,            (GLuint shader),                                                                                           (shader))\
-D(void,   glShaderSource,            (GLuint id, GLsizei count, const GLchar * const *string, const GLint *length),                             (id, count, string, length))\
-D(void,   glCompileShader,           (GLuint id),                                                                                               (id))\
-D(void,   glGetShaderiv,             (GLuint id, GLenum pname, GLint *params),                                                                  (id, pname, params))\
-D(void,   glGetShaderInfoLog,        (GLuint id, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                          (id, maxLength, length, infoLog))\
-D(GLuint, glCreateProgram,           (),                                                                                                        ())\
-D(void,   glDeleteProgram,           (GLuint program),                                                                                          (program))\
-D(void,   glAttachShader,            (GLuint program, GLuint id),                                                                               (program, id))\
-D(void,   glDetachShader,            (GLuint program, GLuint shader),                                                                           (program, shader))\
-D(void,   glLinkProgram,             (GLuint program),                                                                                          (program))\
-D(void,   glGetProgramiv,            (GLuint program, GLenum pname, GLint *params),                                                             (program, pname, params))\
-D(void,   glGetProgramInfoLog,       (GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog),                                     (program, maxLength, length, infoLog))\
-D(void,   glGenVertexArrays,         (GLsizei n, GLuint *arrays),                                                                               (n, arrays))\
-D(void,   glDeleteVertexArrays,      (GLsizei n, const GLuint *arrays),                                                                         (n, arrays))\
-D(void,   glBindVertexArray,         (GLuint array),                                                                                            (array))\
-D(void,   glGenBuffers,              (GLsizei n, GLuint * buffers),                                                                             (n, buffers))\
-D(void,   glBindBuffer,              (GLenum target, GLuint buffer),                                                                            (target, buffer))\
-D(void,   glDeleteBuffers,           (GLsizei n, const GLuint *buffers),                                                                        (n, buffers))\
-D(void,   glBufferData,              (GLenum target, GLsizeiptr size, const void *data, GLenum usage),                                          (target, size, data, usage))\
-D(void,   glBufferSubData,           (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data),                                     (target, offset, size, data))\
-D(void,   glCopyBufferSubData,       (GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size),       (readtarget, writetarget, readoffset, writeoffset, size))\
-D(void,   glVertexAttribPointer,     (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer),       (index, size, type, normalized, stride, pointer))\
-D(void,   glVertexAttribIPointer,    (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer),                           (index, size, type, stride, pointer))\
-D(void,   glEnableVertexAttribArray, (GLuint index),                                                                                            (index))\
-D(void,   glUseProgram,              (GLuint program),                                                                                          (program))\
-D(void,   glUniform1f,               (GLint location, GLfloat v0),                                                                              (location, v0))\
-D(void,   glUniform2f,               (GLint location, GLfloat v0, GLfloat v1),                                                                  (location, v0, v1))\
-D(void,   glUniform3f,               (GLint location, GLfloat v0, GLfloat v1, GLfloat v2),                                                      (location, v0, v1, v2))\
-D(void,   glUniform4f,               (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3),                                          (location, v0, v1, v2, v3))\
-D(void,   glUniform1i,               (GLint location, GLint v0),                                                                                (location, v0))\
-D(void,   glUniform2i,               (GLint location, GLint v0, GLint v1),                                                                      (location, v0, v1))\
-D(void,   glUniform3i,               (GLint location, GLint v0, GLint v1, GLint v2),                                                            (location, v0, v1, v2))\
-D(void,   glUniform4i,               (GLint location, GLint v0, GLint v1, GLint v2, GLint v3),                                                  (location, v0, v1, v2, v3))\
-D(void,   glUniform1ui,              (GLint location, GLuint v0),                                                                               (location, v0))\
-D(void,   glUniform2ui,              (GLint location, GLuint v0, GLuint v1),                                                                    (location, v0, v1))\
-D(void,   glUniform3ui,              (GLint location, GLuint v0, GLuint v1, GLuint v2),                                                         (location, v0, v1, v2))\
-D(void,   glUniform4ui,              (GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3),                                              (location, v0, v1, v2, v3))\
-D(void,   glUniform1fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(void,   glUniform2fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(void,   glUniform3fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(void,   glUniform4fv,              (GLint location, GLsizei count, const GLfloat *value),                                                     (location, count, value))\
-D(void,   glUniform1iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(void,   glUniform2iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(void,   glUniform3iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(void,   glUniform4iv,              (GLint location, GLsizei count, const GLint *value),                                                       (location, count, value))\
-D(void,   glUniform1uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(void,   glUniform2uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(void,   glUniform3uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(void,   glUniform4uiv,             (GLint location, GLsizei count, const GLuint *value),                                                      (location, count, value))\
-D(void,   glUniformMatrix4fv,        (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value),                                (location, count, transpose, value))\
-D(GLint,  glGetUniformLocation,      (GLuint program, const GLchar *name),                                                                      (program, name))\
-D(void,   glDebugMessageCallback,    (DEBUGPROC callback​, void * userParam​),                                                                    (callback​, userParam​))\
-D(void,   glDebugMessageControl,     (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled),        (source, type, severity, count, ids, enabled))\
-D(void,   glGetActiveUniform,        (GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name), (program, index, bufSize, length, size, type, name))\
-D(void,   glGenFramebuffers,         (GLsizei n, GLuint *ids),                                                                                  (n, ids))\
-D(void,   glBindFramebuffer,         (GLenum target, GLuint framebuffer),                                                                       (target, framebuffer))\
-D(GLenum, glCheckFramebufferStatus,  (GLenum target),                                                                                           (target))\
-D(void,   glFramebufferTexture2D,    (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level),                         (target, attachment, textarget, texture, level))\
-D(void,   glGenRenderbuffers,        (GLsizei n, GLuint *renderbuffers),                                                                        (n, renderbuffers))\
-D(void,   glBindRenderbuffer,        (GLenum target, GLuint renderbuffer),                                                                      (target, renderbuffer))\
-D(void,   glRenderbufferStorage,     (GLenum target, GLenum internalformat, GLsizei width, GLsizei height),                                     (target, internalformat, width, height))\
-D(void,   glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer),                        (target, attachment, renderbuffertarget, renderbuffer))\
-D(void,   glGenSamplers,             (GLsizei n, GLuint *samplers),                                                                             (n, samplers))\
-D(void,   glBindSampler,             (GLuint unit, GLuint sampler),                                                                             (unit, sampler))\
-D(void,   glSamplerParameterf,       (GLuint sampler, GLenum pname, GLfloat param),                                                             (sampler, pname, param))\
-D(void,   glSamplerParameteri,       (GLuint sampler, GLenum pname, GLint param),                                                               (sampler, pname, param))\
-D(void,   glGenerateMipmap,          (GLenum target),                                                                                           (target))\
-D(void,   glTexStorage2D,            (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height),                     (target, levels, internalformat, width, height))\
-D(void,   glBlendFuncSeparate,       (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha),                                          (srcRGB, dstRGB, srcAlpha, dstAlpha))\
-D(void,   glActiveTexture,           (GLenum texture), (texture))\
-D(GLuint, glGetUniformBlockIndex,    (GLuint program, const GLchar *uniformBlockName), (program, uniformBlockName))\
-D(void,   glUniformBlockBinding,     (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding), (program, uniformBlockIndex, uniformBlockBinding))\
-D(void,   glBindBufferBase,          (GLenum target, GLuint index, GLuint buffer), (target, index, buffer))\
-D(void,   glBindBufferRange,         (GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size), (target, index, buffer, offset, size))\
-D(void,   glDispatchCompute,         (GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z), (num_groups_x, num_groups_y, num_groups_z))\
-D(void,   glMemoryBarrier,           (GLbitfield barriers), (barriers))\
-D(void,   glGetBufferSubData,        (GLenum target, GLintptr offset, GLsizeiptr size, GLvoid *data), (target, offset, size, data))\
-D(void,   glBindImageTexture,        (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format), (unit, texture, level, layered, layer, access, format))\
-D(void *, glMapBufferRange,          (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access), (target, offset, length, access))\
-D(GLboolean, glUnmapBuffer,          (GLenum target), (target))\
-D(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels), (target, level, format, type, pixels))\
-D(void, glGetTextureImage, (GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, GLvoid *pixels), (texture, level, format, type, bufSize, pixels))\
 
-#if OS_WINDOWS
+namespace tl {
+namespace gl {
 
-#define ALL_FUNCS BASE_FUNCS \
-D(BOOL,  wglSwapIntervalEXT,           (int interval),                                                                                                       (interval))\
-D(HGLRC, wglCreateContextAttribsARB,   (HDC hDC, HGLRC hShareContext, const int *attribList),                                                                (hDC, hShareContext, attribList))\
-D(BOOL,  wglChoosePixelFormatARB,      (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats), (hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats))\
-D(BOOL,  wglGetPixelFormatAttribivARB, (HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues),               (hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues))
+#include "generated/opengl_all_funcs.h"
 
-#else
+#define D(ret, name, args, params) using name##_t=ret(__stdcall*)args;
+EXT_AND_OS_FUNCS
+#undef D
 
-#define ALL_FUNCS BASE_FUNCS
+#ifdef TL_GL_VALIDATE_EACH_CALL
+#define D(ret, name, args, params) extern TL_API ret _##name args;
+BASE_FUNCS
+#undef D
+#define D(ret, name, args, params) extern TL_API ret _##name args;
+EXT_AND_OS_FUNCS
+#undef D
+#endif
+
+union Functions {
+	struct {
+#define D(ret, name, args, params) name##_t _##name;
+		EXT_AND_OS_FUNCS
+#undef D
+	};
+	void *data[1];
+};
+
+extern TL_API Functions functions;
+
+#ifdef TL_IMPL
+
+#ifdef TL_GL_VALIDATE_EACH_CALL
+#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return ::name params;}
+BASE_FUNCS
+#undef D
+#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return functions._##name params;}
+EXT_AND_OS_FUNCS
+#undef D
+#endif
+
+Functions functions;
+
+static char const *function_names[] {
+#define D(ret, name, args, params) #name,
+EXT_AND_OS_FUNCS
+#undef D
+};
 
 #endif
 
-#define D(ret, name, args, params) using name ## _t = ret(__stdcall*)args; TL_API ret name args;
-ALL_FUNCS
-#undef D
-
-namespace tl {
-namespace OpenGL {
+#include "generated/opengl_redefine.h"
 
 enum TextureFormat {
 	Format_d24_s8,
@@ -567,15 +514,6 @@ inline bool init_opengl(NativeWindowHandle window, InitFlags flags) { return ini
 inline bool init_opengl(NativeWindowHandle window, InitFlags flags, BackBufferParams back_buffer_params) { return init_opengl(window, flags, default_debug_proc, back_buffer_params); }
 
 TL_API void present();
-inline void glViewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glViewport(v2u size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glViewport(v2u position, v2u size) { ::glViewport((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2f size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2s size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2u size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2f position, v2f size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2s position, v2s size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
-inline void glScissor(v2u position, v2u size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 TL_API GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source);
 TL_API GLuint create_shader(GLenum shaderType, Span<char> source);
 inline GLuint create_shader(GLenum shaderType, char const *source) {
@@ -589,126 +527,6 @@ struct ProgramStages {
 };
 
 TL_API GLuint create_program(ProgramStages stages);
-#if 0
-TL_API void immediate_init();
-TL_API void immediate_set_matrix(m4 const &matrix);
-TL_API void immediate_line(v3f position_a, v2f uv_a, v4f color_a, v3f position_b, v2f uv_b, v4f color_b);
-inline void immediate_line(v3f position_a, v4f color_a, v3f position_b, v4f color_b) {
-	immediate_line(position_a, {}, color_a, position_b, {}, color_b);
-}
-inline void immediate_line(v3f position_a, v3f position_b, v4f color) {
-	immediate_line(position_a, {}, color, position_b, {}, color);
-}
-TL_API void immediate_draw();
-#endif
-inline void glClearColor(v3f color) {
-	::glClearColor(color.x, color.y, color.z, 1);
-}
-inline void glClearColor(v4f color) {
-	::glClearColor(color.x, color.y, color.z, color.w);
-}
-
-inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
-inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
-inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
-inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }
-inline void set_uniform(GLuint shader, char const *name, v4f value) { glUniform4fv(glGetUniformLocation(shader, name), 1, value.s); }
-inline void set_uniform(GLuint shader, char const *name, m4  value) { glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, false, value.s); }
-
-inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 index) {
-	glActiveTexture(GL_TEXTURE0 + index);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(shader, name), index);
-}
-
-inline void use_shader(GLuint shader) { glUseProgram(shader); }
-
-template <class T, class Index = umm>
-struct GrowingBuffer {
-	void add(T value) {
-		reserve(size + 1);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), sizeof(T), &value);
-		++size;
-	}
-
-	void add(Span<T> span) {
-		reserve(size + span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), span.size * sizeof(T), span.data);
-		size += span.size;
-	}
-	void add(std::initializer_list<T> list) { add(as_span(list)); }
-	void set(Index index, T value) {
-		bounds_check(index < size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
-	}
-	void set(Index start, Span<T> span) {
-		bounds_check(start + span.size - 1 < size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
-	}
-	void reset(Span<T> span) {
-		reserve(span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, 0, span.size * sizeof(T), span.data);
-		size = span.size;
-	}
-	void init() {
-		if (!buffer) {
-			glGenBuffers(1, &buffer);
-		}
-	}
-	void clear() {
-		size = 0;
-	}
-	void reserve(Index amount) {
-		if (amount <= capacity)
-			return;
-
-		Index new_capacity = max(capacity, 1);
-		while (new_capacity < amount) new_capacity *= 2;
-
-		GLuint new_buffer;
-		glGenBuffers(1, &new_buffer);
-
-		glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
-		glBufferData(GL_COPY_WRITE_BUFFER, new_capacity * sizeof(T), 0, usage);
-
-		glBindBuffer(GL_COPY_READ_BUFFER, buffer);
-
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, capacity * sizeof(T));
-
-		glDeleteBuffers(1, &buffer);
-
-		buffer = new_buffer;
-		capacity = new_capacity;
-	}
-
-	GrowingBuffer &operator=(Span<T> span) {
-		reserve(span.size);
-		size = span.size;
-		set(0, span);
-		return *this;
-	}
-
-	Index size = 0;
-	Index capacity = 0;
-	GLuint buffer = 0;
-	GLenum usage = 0;
-};
-
-template <class T>
-void free(GrowingBuffer<T> &buffer) {
-	glDeleteBuffers(1, &buffer.buffer);
-	buffer.buffer = 0;
-	buffer.size = 0;
-	buffer.capacity = 0;
-}
-
-}
-}
 
 #ifdef TL_IMPL
 
@@ -729,34 +547,6 @@ void free(GrowingBuffer<T> &buffer) {
 // 4 - log high+medium+low+notification messages
 #define TL_OPENGL_LOG_LEVEL 3
 #endif
-
-namespace tl {
-namespace OpenGL {
-
-static union {
-	struct {
-#define D(ret, name, args, params) name##_t name;
-		ALL_FUNCS
-#undef D
-	};
-	void *data[1];
-} procedures;
-
-static char const *procedure_names[] {
-#define D(ret, name, args, params) #name,
-ALL_FUNCS
-#undef D
-};
-
-}
-}
-
-#define D(ret, name, args, params) ret name args{return ::tl::OpenGL::procedures.name params;}
-ALL_FUNCS
-#undef D
-
-namespace tl {
-namespace OpenGL {
 
 static GLuint compile_shader(GLuint shader) {
 	timed_function();
@@ -941,19 +731,19 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 
 	assert(wglGetCurrentContext());
 
-	static constexpr u32 procedure_count = sizeof(procedures) / sizeof(void *);
+	static constexpr u32 function_count = sizeof(functions) / sizeof(void *);
 
-	for (u32 procedure_index = 0; procedure_index < procedure_count; ++procedure_index) {
-		char const *name = procedure_names[procedure_index];
-		void *procedure = wglGetProcAddress(name);
-		if (!procedure) {
+	for (u32 function_index = 0; function_index < function_count; ++function_index) {
+		char const *name = function_names[function_index];
+		void *function = wglGetProcAddress(name);
+		if (!function) {
 			print("Failed to query '%'\n", name);
 		}
-		procedures.data[procedure_index] = procedure;
+		functions.data[function_index] = function;
 	}
 
 
-	if (procedures.wglCreateContextAttribsARB) {
+	if (functions._wglCreateContextAttribsARB) {
 #if 0
 		float required_attribs_f[] = {
 			0, 0
@@ -1337,11 +1127,130 @@ void immediate_draw() {
 #endif
 #endif
 
-#undef IF_OS_WINDOWS
-#undef ALL_FUNCS
+#endif
+
+inline void clear_color(f32 r, f32 g, f32 b, f32 a) { ::glClearColor(r, g, b, a); }
+inline void clear_color(f32 r, f32 g, f32 b) { ::glClearColor(r, g, b, 1); }
+inline void clear_color(v3f color) { ::glClearColor(color.x, color.y, color.z, 1); }
+inline void clear_color(v4f color) { ::glClearColor(color.x, color.y, color.z, color.w); }
+
+inline void viewport(v2f size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void viewport(v2u size) { ::glViewport(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void viewport(v2u position, v2u size) { ::glViewport((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+
+inline void scissor(v2f size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void scissor(v2s size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void scissor(v2u size) { ::glScissor(0, 0, (GLsizei)size.x, (GLsizei)size.y); }
+inline void scissor(v2f position, v2f size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+inline void scissor(v2s position, v2s size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+inline void scissor(v2u position, v2u size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
+
+inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, v4f value) { glUniform4fv(glGetUniformLocation(shader, name), 1, value.s); }
+inline void set_uniform(GLuint shader, char const *name, m4  value) { glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, false, value.s); }
+
+inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 index) {
+	glActiveTexture(GL_TEXTURE0 + index);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glUniform1i(glGetUniformLocation(shader, name), index);
+}
+
+inline void use_shader(GLuint shader) { glUseProgram(shader); }
+
+template <class T, class Index = umm>
+struct GrowingBuffer {
+	void add(T value) {
+		reserve(size + 1);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), sizeof(T), &value);
+		++size;
+	}
+
+	void add(Span<T> span) {
+		reserve(size + span.size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), span.size * sizeof(T), span.data);
+		size += span.size;
+	}
+	void add(std::initializer_list<T> list) { add(as_span(list)); }
+	void set(Index index, T value) {
+		bounds_check(index < size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
+	}
+	void set(Index start, Span<T> span) {
+		bounds_check(start + span.size - 1 < size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
+	}
+	void reset(Span<T> span) {
+		reserve(span.size);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+		glBufferSubData(GL_COPY_WRITE_BUFFER, 0, span.size * sizeof(T), span.data);
+		size = span.size;
+	}
+	void init() {
+		if (!buffer) {
+			glGenBuffers(1, &buffer);
+		}
+	}
+	void clear() {
+		size = 0;
+	}
+	void reserve(Index amount) {
+		if (amount <= capacity)
+			return;
+
+		Index new_capacity = max(capacity, 1);
+		while (new_capacity < amount) new_capacity *= 2;
+
+		GLuint new_buffer;
+		glGenBuffers(1, &new_buffer);
+
+		glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
+		glBufferData(GL_COPY_WRITE_BUFFER, new_capacity * sizeof(T), 0, usage);
+
+		glBindBuffer(GL_COPY_READ_BUFFER, buffer);
+
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, capacity * sizeof(T));
+
+		glDeleteBuffers(1, &buffer);
+
+		buffer = new_buffer;
+		capacity = new_capacity;
+	}
+
+	GrowingBuffer &operator=(Span<T> span) {
+		reserve(span.size);
+		size = span.size;
+		set(0, span);
+		return *this;
+	}
+
+	Index size = 0;
+	Index capacity = 0;
+	GLuint buffer = 0;
+	GLenum usage = 0;
+};
+
+template <class T>
+void free(GrowingBuffer<T> &buffer) {
+	glDeleteBuffers(1, &buffer.buffer);
+	buffer.buffer = 0;
+	buffer.size = 0;
+	buffer.capacity = 0;
+}
 
 }
 }
-#endif
+
+#undef BASE_FUNCS
+#undef EXTENSION_FUNCS
+#undef WINDOWS_FUNCS
+#undef EXT_AND_OS_FUNCS
+#undef ALL_FUNCS
 
 #pragma warning(pop)
