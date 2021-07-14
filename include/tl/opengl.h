@@ -23,6 +23,17 @@ using GLsizeiptr = tl::umm;
 using GLintptr = tl::smm;
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
+#define GL_CONSTANT_COLOR                        0x8001
+#define GL_ONE_MINUS_CONSTANT_COLOR              0x8002
+#define GL_CONSTANT_ALPHA                        0x8003
+#define GL_ONE_MINUS_CONSTANT_ALPHA              0x8004
+#define GL_BLEND_COLOR                           0x8005
+#define GL_FUNC_ADD                              0x8006
+#define GL_MIN                                   0x8007
+#define GL_MAX                                   0x8008
+#define GL_BLEND_EQUATION                        0x8009
+#define GL_FUNC_SUBTRACT                         0x800A
+#define GL_FUNC_REVERSE_SUBTRACT                 0x800B
 #define GL_CLAMP_TO_EDGE                         0x812F
 #define GL_TEXTURE_MAX_LEVEL                     0x813D
 #define GL_DEPTH_COMPONENT16                     0x81A5

@@ -1817,15 +1817,6 @@ forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 
 
 namespace CE {
 
-forceinline constexpr u32 count_bits(u32 v) {
-	u32 s = 0;
-	u32 r = v;
-	for (u32 i = 0; i < 32; ++i) {
-		s += r & 1;
-		r >>= 1;
-	}
-	return s;
-}
 forceinline constexpr v4s frac(v4s v, s32 step) {
 	return {
 		tl::frac(v.x, step),

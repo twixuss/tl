@@ -1,4 +1,5 @@
 #include <tl/common.h>
+#include <tl/console.h>
 using namespace tl;
 
 void allocator_test(Allocator allocator) {
@@ -104,6 +105,51 @@ void common_test() {
 	static_assert(tl::midpoint((s32)0xFFFFFFFD, (s32)0xFFFFFFFF) == (s32)0xFFFFFFFE);
 	static_assert(tl::midpoint((s32)0xFFFFFFFF, (s32)0xFFFFFFFD) == (s32)0xFFFFFFFE);
 
+#define T(x, t) \
+	assert(tl::floor_to_power_of_2((u8 )x) == t);\
+	assert(tl::floor_to_power_of_2((u16)x) == t);\
+	assert(tl::floor_to_power_of_2((u32)x) == t);\
+	assert(tl::floor_to_power_of_2((u64)x) == t);\
+	static_assert(tl::CE::floor_to_power_of_2((u8)x) == t);\
+	static_assert(tl::CE::floor_to_power_of_2((u16)x) == t);\
+	static_assert(tl::CE::floor_to_power_of_2((u32)x) == t);\
+	static_assert(tl::CE::floor_to_power_of_2((u64)x) == t);
+
+	T(0, 0);
+	T(1, 1);
+	T(2, 2);
+	T(3, 2);
+	T(4, 4);
+	T(5, 4);
+	T(6, 4);
+	T(7, 4);
+	T(8, 8);
+	T(9, 8);
+
+#undef T
+
+#define T(x, t) \
+	assert(tl::ceil_to_power_of_2((u8)x) == t);\
+	assert(tl::ceil_to_power_of_2((u16)x) == t);\
+	assert(tl::ceil_to_power_of_2((u32)x) == t);\
+	assert(tl::ceil_to_power_of_2((u64)x) == t);\
+	static_assert(tl::CE::ceil_to_power_of_2((u8)x) == t);\
+	static_assert(tl::CE::ceil_to_power_of_2((u16)x) == t);\
+	static_assert(tl::CE::ceil_to_power_of_2((u32)x) == t);\
+	static_assert(tl::CE::ceil_to_power_of_2((u64)x) == t);
+
+	T(0, 0);
+	T(1, 1);
+	T(2, 2);
+	T(3, 4);
+	T(4, 4);
+	T(5, 8);
+	T(6, 8);
+	T(7, 8);
+	T(8, 8);
+	T(9, 16);
+
+#undef T
 
 	int arr[] = {0,1,2,3,4,5,6,7};
 	rotate(array_as_span(arr), 2);

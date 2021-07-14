@@ -5,6 +5,7 @@ D(void, glScissor, (GLint x, GLint y, GLsizei width, GLsizei height), (x, y, wid
 D(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid * pixels), (target, level, format, type, pixels))\
 
 #define EXTENSION_FUNCS \
+D(void, glBlendEquation, (GLenum mode), (mode))\
 D(void, glBindTexture, (GLenum target, GLuint texture), (target, texture))\
 D(GLuint, glCreateShader, (GLenum shaderType), (shaderType))\
 D(void, glDeleteShader, (GLuint shader), (shader))\

@@ -5,6 +5,7 @@ void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, GLvoi
 
 EXTENSIONS
 
+void glBlendEquation(GLenum mode);
 void glBindTexture(GLenum target, GLuint texture);
 GLuint glCreateShader(GLenum shaderType);
 void glDeleteShader(GLuint shader);

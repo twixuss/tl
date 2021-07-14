@@ -278,6 +278,20 @@ forceinline u32 count_bits(u64 v) { return count_bits((u32)v) + count_bits((u32)
 forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
 forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
 
+namespace CE {
+
+forceinline constexpr u32 count_bits(u32 v) {
+	u32 s = 0;
+	u32 r = v;
+	for (u32 i = 0; i < 32; ++i) {
+		s += r & 1;
+		r >>= 1;
+	}
+	return s;
+}
+
+}
+
 forceinline bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
@@ -286,15 +300,6 @@ namespace CE {
 template <class T>
 constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
 }
-
-// forceinline u8  floor_to_power_of_2(u8  v) { return 1 << find_highest_one_bit(v); }
-// forceinline u16 floor_to_power_of_2(u16 v) { return 1 << find_highest_one_bit(v); }
-forceinline u32 floor_to_power_of_2(u32 v) { return (u32)1 << find_highest_one_bit(v); }
-#if ARCH_X64
-forceinline u64 floor_to_power_of_2(u64 v) { return (u64)1 << find_highest_one_bit(v); }
-#endif
-
-forceinline u32 ceil_to_power_of_2(u32 v) { return is_power_of_2(v) ? v : (floor_to_power_of_2(v) + 1); }
 
 template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
@@ -408,6 +413,63 @@ forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~v
 forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 #endif
 
+namespace CE {
+inline constexpr u32 count_leading_zeros(u32 v) {
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	return CE::count_bits(~v);
+}
+}
+
+forceinline u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )1 << (u8 )( 7 - count_leading_zeros(v)); }
+forceinline u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)1 << (u16)(15 - count_leading_zeros(v)); }
+forceinline u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)1 << (u32)(31 - count_leading_zeros(v)); }
+#if ARCH_X64
+forceinline u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)1 << (u64)(63 - count_leading_zeros(v)); }
+#endif
+
+namespace CE {
+inline constexpr u8 floor_to_power_of_2(u8 x) {
+    x = x | (x >> 1);
+    x = x | (x >> 2);
+    x = x | (x >> 4);
+    return x - (x >> 1);
+}
+inline constexpr u16 floor_to_power_of_2(u16 x) {
+    x = x | (x >> 1);
+    x = x | (x >> 2);
+    x = x | (x >> 4);
+    x = x | (x >> 8);
+    return x - (x >> 1);
+}
+inline constexpr u32 floor_to_power_of_2(u32 x) {
+    x = x | (x >> 1);
+    x = x | (x >> 2);
+    x = x | (x >> 4);
+    x = x | (x >> 8);
+    x = x | (x >> 16);
+    return x - (x >> 1);
+}
+inline constexpr u64 floor_to_power_of_2(u64 x) {
+    x = x | (x >> 1);
+    x = x | (x >> 2);
+    x = x | (x >> 4);
+    x = x | (x >> 8);
+    x = x | (x >> 16);
+    x = x | (x >> 32);
+    return x - (x >> 1);
+}
+}
+
+forceinline u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
+
+namespace CE {
+inline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - CE::count_leading_zeros(v - 1)); }
+}
+
 forceinline u32 log2(u8  n) { return  7u - count_leading_zeros(n); }
 forceinline u32 log2(u16 n) { return 15u - count_leading_zeros(n); }
 forceinline u32 log2(u32 n) { return 31u - count_leading_zeros(n); }
@@ -490,6 +552,13 @@ forceinline u16 rotate_right(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift
 forceinline u32 rotate_right(u32 v, s32 shift = 1) { return _rotr(v, shift); }
 forceinline u64 rotate_right(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
 #endif
+
+template <class T>
+void swap(T &a, T &b) {
+	T t = a;
+	a = b;
+	b = t;
+}
 
 template <class T>
 constexpr T midpoint(T a, T b) {
