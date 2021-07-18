@@ -962,7 +962,7 @@ forceinline auto length(line<T> line) {
 }
 
 template <class T>
-forceinline auto closest_point(T point, line<T> line) {
+forceinline auto closest_point_clamped(T point, line<T> line) {
 	auto l2 = length_squared(line);
 	if (l2 == 0) return line.a;
 
@@ -970,6 +970,25 @@ forceinline auto closest_point(T point, line<T> line) {
 
 	auto t = clamp(dot(point - line.a, line.b - line.a) / l2, (Scalar)0, (Scalar)1);
 	return line.a + t * (line.b - line.a);
+}
+template <class T>
+forceinline auto closest_point_clamped(line<T> line, T point) {
+	return closest_point_clamped(point, line);
+}
+
+template <class T>
+forceinline auto closest_point_unclamped(T point, line<T> line) {
+	auto l2 = length_squared(line);
+	if (l2 == 0) return line.a;
+
+	using Scalar = decltype(l2);
+
+	auto t = dot(point - line.a, line.b - line.a) / l2;
+	return line.a + t * (line.b - line.a);
+}
+template <class T>
+forceinline auto closest_point_unclamped(line<T> line, T point) {
+	return closest_point_unclamped(point, line);
 }
 
 template <class T>
@@ -992,23 +1011,32 @@ forceinline auto distance(T point, line<T> line) {
 	auto projection = line.a + t * (line.b - line.a);
 	return distance(point, projection);
 }
+template <class T>
+forceinline auto distance(line<T> line, T point) {
+	return distance(point, line);
+}
 
 template<class T>
 struct ray {
-	T begin, dir;
+	T origin, direction;
 	explicit operator line<T>() {
-		return {begin, begin + dir};
+		return {origin, origin + direction};
 	}
 };
 
 template <class T>
-forceinline ray<T> ray_begin_end(T begin, T end) {
-	return {begin, end - begin};
+forceinline ray<T> ray_origin_end(T origin, T end) {
+	return {origin, end - origin};
 }
 
 template <class T>
-forceinline ray<T> ray_begin_dir(T begin, T dir) {
-	return {begin, dir};
+forceinline ray<T> ray_origin_direction(T origin, T direction) {
+	return {origin, direction};
+}
+
+template <class T>
+forceinline line<T> as_line(ray<T> r) {
+	return {r.origin, r.origin + r.direction};
 }
 
 template <class T>
@@ -1413,7 +1441,7 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
     v3f e1 = tri.b - tri.a;
     v3f e2 = tri.c - tri.a;
     // Вычисление вектора нормали к плоскости
-    v3f pvec = cross(ray.dir, e2);
+    v3f pvec = cross(ray.direction, e2);
     f32 det = dot(e1, pvec);
 
     // Луч параллелен плоскости
@@ -1422,14 +1450,14 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
     }
 
     f32 inv_det = 1 / det;
-    v3f tvec = ray.begin - tri.a;
+    v3f tvec = ray.origin - tri.a;
     f32 u = dot(tvec, pvec) * inv_det;
     if (u < 0 || u > 1) {
 		return {};
     }
 
     v3f qvec = cross(tvec, e1);
-    f32 v = dot(ray.dir, qvec) * inv_det;
+    f32 v = dot(ray.direction, qvec) * inv_det;
     if (v < 0 || u + v > 1) {
 		return {};
     }
@@ -1440,15 +1468,15 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
 
 	RaycastHit hit;
 	hit.hit = true;
-	hit.position = ray.begin + ray.dir* t;
+	hit.position = ray.origin + ray.direction* t;
 	hit.normal = normalize(cross(e1, e2));
 	return hit;
 }
 
 inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box) {
-	v3f dirfrac = 1.0f / ray.dir;
-	v3f t1 = (box.min - ray.begin)*dirfrac;
-	v3f t2 = (box.max - ray.begin)*dirfrac;
+	v3f dirfrac = 1.0f / ray.direction;
+	v3f t1 = (box.min - ray.origin)*dirfrac;
+	v3f t2 = (box.max - ray.origin)*dirfrac;
 
 	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y), min(t1.z, t2.z));
 	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y), max(t1.z, t2.z));
@@ -1459,8 +1487,8 @@ inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box) {
 
 	RaycastHit hit = {};
 	hit.hit = true;
-	hit.position = ray.begin + ray.dir * tmin;
-	assert(dot(ray.dir, hit.position - ray.begin) > 0);
+	hit.position = ray.origin + ray.direction * tmin;
+	assert(dot(ray.direction, hit.position - ray.origin) > 0);
 	return hit;
 }
 
@@ -1880,12 +1908,17 @@ TO_STRING_V4(v4s)
 #undef TO_STRING_V3
 
 template <class T>
-void append(StringBuilder& builder, aabb<T> v) {
+void append(StringBuilder &builder, aabb<T> v) {
 	append(builder, "{ min: "s);
 	append(builder, v.min);
 	append(builder, ", max: "s);
 	append(builder, v.max);
 	append(builder, " }"s);
+}
+
+template <class T>
+void append(StringBuilder &builder, ray<T> r) {
+	append_format(builder, "ray{origin=%, direction=%}", r.origin, r.direction);
 }
 
 template <class To, class From> forceinline To cvt(From v) { return (To)v; }

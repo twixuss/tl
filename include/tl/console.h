@@ -5,12 +5,19 @@
 
 namespace tl {
 
+enum PrintKind {
+	Print_default,
+	Print_info,
+	Print_warning,
+	Print_error,
+};
+
 struct Printer {
-	void (*func)(Span<utf8> span, void *state);
+	void (*func)(PrintKind kind, Span<utf8> span, void *state);
 	void *state;
 
-	void operator()(Span<utf8> span) {
-		func(span, state);
+	void operator()(PrintKind kind, Span<utf8> span) {
+		func(kind, span, state);
 	}
 };
 
@@ -29,31 +36,36 @@ TL_API void print_to_console(Span<utf16> string);
 TL_API void print_to_console(Span<utf32> string);
 
 template <class T>
-inline void print(T const &value) {
+inline void print(PrintKind kind, T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append(builder, value);
 	auto string = to_string(builder);
-	current_printer(ascii_to_utf8(string));
+	current_printer(kind, ascii_to_utf8(string));
 }
 
-template <> inline void print(Span<char> const &span) { current_printer((Span<utf8>)span); }
-template <> inline void print(Span<utf8> const &span) { current_printer(span); }
+template <> inline void print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); }
+template <> inline void print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); }
 
-template <> inline void print(List<char> const &list) { current_printer((Span<utf8>)(Span<char>)list); }
-template <> inline void print(List<utf8> const &list) { current_printer((Span<utf8>)list); }
+template <> inline void print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); }
+template <> inline void print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); }
 
 template <class ...Args>
-inline void print(char const *fmt, Args const &...args) {
+inline void print(PrintKind kind, char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
 	auto string = to_string(builder);
-	print(string);
+	print(kind, string);
 }
 
-inline void print(char const *string) {
-	print(as_span(string));
+inline void print(PrintKind kind, char const *string) {
+	print(kind, as_span(string));
+}
+
+template <class ...T>
+inline void print(T const &...values) {
+	print(Print_default, values...);
 }
 
 TL_API void hide_console_window();
@@ -62,12 +74,7 @@ TL_API void toggle_console_window();
 
 #ifdef TL_IMPL
 
-Printer console_printer = {
-	[](Span<utf8> span, void *) { print_to_console(span); },
-	0
-};
-
-thread_local Printer current_printer = {[](Span<utf8> span, void *) {}};
+thread_local Printer current_printer = {[](PrintKind, Span<utf8>, void *) {}};
 
 void init_printer() {
 	current_printer = console_printer;
@@ -80,6 +87,19 @@ void deinit_printer() {
 
 static HANDLE console_output = GetStdHandle(STD_OUTPUT_HANDLE);
 static HWND console_window = GetConsoleWindow();
+
+Printer console_printer = {
+	[](PrintKind kind, Span<utf8> span, void *) {
+		switch (kind) {
+			case Print_default: SetConsoleTextAttribute(console_output, 7); break;
+			case Print_info:    SetConsoleTextAttribute(console_output, 7); break;
+			case Print_warning: SetConsoleTextAttribute(console_output, 14); break;
+			case Print_error:   SetConsoleTextAttribute(console_output, 12); break;
+		}
+		print_to_console(span);
+	},
+	0
+};
 
 void print_to_console(Span<ascii> span) {
 	DWORD charsWritten;

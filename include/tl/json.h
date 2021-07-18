@@ -32,25 +32,25 @@ struct Object {
 
 	Type type;
 	union {
-		MemberMap members;
-		Array array;
+		MemberMap _members;
+		Array _array;
 		f64 _number;
-		String string;
-		bool boolean;
+		String _string;
+		bool _boolean;
 	};
 	Object() {
 		memset(this, 0, sizeof(*this));
 	}
 	Object(f64 number) : type(Type_number), _number(number) {}
-	Object(Span<utf8> string) : type(Type_string), string({string}) {}
+	Object(Span<utf8> string) : type(Type_string), _string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
-			case Type_object:  new (&members) MemberMap(); break;
-			case Type_array:   new (&array)   Array    (); break;
+			case Type_object:  new (&_members) MemberMap(); break;
+			case Type_array:   new (&_array)   Array    (); break;
 			case Type_number:  new (&_number)  f64      (); break;
-			case Type_string:  new (&string)  String   (); break;
-			case Type_boolean: new (&boolean) bool     (); break;
+			case Type_string:  new (&_string)  String   (); break;
+			case Type_boolean: new (&_boolean) bool     (); break;
 			default:
 				break;
 		}
@@ -65,28 +65,40 @@ struct Object {
 	Object &operator=(Span<utf8> value) {
 		if (type != Type_null)
 			assert(type == Type_string);
-		string = value;
+		_string = value;
 		return *this;
 	}
 	Object &operator=(bool value) {
 		if (type != Type_null)
 			assert(type == Type_boolean);
-		boolean = value;
+		_boolean = value;
 		return *this;
 	}
 	Object *member(Span<utf8> name) {
 		assert(type == Type_object);
-		auto found = find(members.names, name);
+		auto found = find(_members.names, name);
 		if (found)
-			return &members.values[index_of(members.names, found)];
+			return &_members.values[index_of(_members.names, found)];
 		return 0;
 	}
 	Object *index(umm i) {
 		assert(type == Type_array);
-		return &array[i];
+		return &_array[i];
 	}
 	f64 number() {
 		return _number;
+	}
+	Array &array() {
+		assert(type == Type_array);
+		return _array;
+	}
+	String &string() {
+		assert(type == Type_string);
+		return _string;
+	}
+	bool &boolean() {
+		assert(type == Type_boolean);
+		return _boolean;
 	}
 };
 
@@ -112,18 +124,18 @@ TL_API Object parse(Span<utf8> json);
 inline void free(Json::Object &obj) {
 	switch (obj.type) {
 		case Json::Type_object: {
-			for (auto &member : obj.members.values) {
+			for (auto &member : obj._members.values) {
 				free(member);
 			}
-			free(obj.members.values);
-			free(obj.members.names);
+			free(obj._members.values);
+			free(obj._members.names);
 			break;
 		}
 		case Json::Type_array: {
-			for (auto &element : obj.array) {
+			for (auto &element : obj._array) {
 				free(element);
 			}
-			free(obj.array);
+			free(obj._array);
 			break;
 		}
 		default: break;
@@ -139,14 +151,14 @@ inline void append(StringBuilder &b, Json::Object obj) {
 		}
 		case Json::Type_string: {
 			append(b, '"');
-			append(b, obj.string);
+			append(b, obj._string);
 			append(b, '"');
 			break;
 		}
 		case Json::Type_array: {
 			append(b, '[');
 			bool comma = false;
-			for (auto &e : obj.array) {
+			for (auto &e : obj._array) {
 				if (comma) {
 					append(b, ',');
 				}
@@ -159,9 +171,9 @@ inline void append(StringBuilder &b, Json::Object obj) {
 		case Json::Type_object: {
 			append(b, '{');
 			bool comma = false;
-			for (u32 i = 0; i < obj.members.names.size; ++i) {
-				auto name = obj.members.names[i];
-				auto value = obj.members.values[i];
+			for (u32 i = 0; i < obj._members.names.size; ++i) {
+				auto name = obj._members.names[i];
+				auto value = obj._members.values[i];
 				if (comma) {
 					append(b, ',');
 				}
@@ -268,8 +280,8 @@ Object parse(Token *&t) {
 					Span<utf8> member_name = t->view;
 					++t;
 					assert(t++->type == ':');
-					result.members.names.add(member_name);
-					result.members.values.add(parse(t));
+					result._members.names.add(member_name);
+					result._members.values.add(parse(t));
 				} else {
 					invalid_code_path();
 				}
@@ -285,7 +297,7 @@ Object parse(Token *&t) {
 		return result;
 	} else if (t->type == '"') {
 		Object result = {Type_string};
-		result.string = t->view;
+		result._string = t->view;
 		++t;
 		return result;
 	} else if (t->type == Token_number) {
@@ -298,7 +310,7 @@ Object parse(Token *&t) {
 		return result;
 	} else if (t->type == Token_true || t->type == Token_false) {
 		Object result = {Type_boolean};
-		result.boolean = t->type == Token_true;
+		result._boolean = t->type == Token_true;
 		++t;
 		return result;
 	} else if (t->type == '[') {
@@ -306,7 +318,7 @@ Object parse(Token *&t) {
 		++t;
 		if (t->type != ']') {
 			while (1) {
-				result.array.add(parse(t));
+				result._array.add(parse(t));
 
 				if (t->type == ']') {
 					++t;

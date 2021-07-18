@@ -895,14 +895,14 @@ inline constexpr wchar to_upper_utf16(wchar c) {
 }
 
 template <class T, class U>
-inline constexpr bool equals(Span<T> a, Span<U> b) { \
-	if (a.size != b.size)                                    \
-		return false;                                        \
-	auto ap = a.begin();                                     \
-	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)     \
-		if (*ap != *bp)                                      \
-			return false;                                    \
-	return true;                                             \
+inline constexpr bool equals(Span<T> a, Span<U> b) {
+	if (a.size != b.size)
+		return false;
+	auto ap = a.begin();
+	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)
+		if (*ap != *bp)
+			return false;
+	return true;
 }
 
 template <class T, class U>
