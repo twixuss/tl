@@ -341,7 +341,9 @@ Object parse(List<Token> tokens) {
 	return parse(t);
 }
 Object parse(Span<utf8> json) {
-	return parse(lex(json));
+	auto tokens = lex(json);
+	defer { free(tokens); };
+	return parse(tokens);
 }
 
 }

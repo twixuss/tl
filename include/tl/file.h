@@ -11,7 +11,7 @@ using filechar = utf16;
 inline List<utf8> path_to_utf8(Span<filechar> span) {
 	return utf16_to_utf8(span);
 }
-#define TL_FILE_STRING(x) u ## x
+#define tl_file_string(x) u ## x
 #endif
 
 enum FileItemKind {

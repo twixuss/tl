@@ -509,7 +509,7 @@ struct BadList {
 };
 
 template <class T>
-Span<T> as_span(List<T> &list) {
+Span<T> as_span(List<T> const &list) {
 	return (Span<T>)list;
 }
 

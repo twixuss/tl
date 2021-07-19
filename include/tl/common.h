@@ -1279,9 +1279,6 @@ extern TL_API void clear_temporary_storage();
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
 extern TL_API thread_local Allocator current_allocator;
-#if TL_TRACK_ALLOCATIONS
-extern TL_API Allocator tracking_allocator;
-#endif
 
 #if TL_COUNT_ALLOCATIONS
 extern umm frees_count;
@@ -1501,11 +1498,7 @@ void clear_temporary_storage() {
 thread_local Allocator current_allocator;
 
 void init_allocator() {
-#if TL_TRACK_ALLOCATIONS
-	current_allocator = tracking_allocator;
-#else
 	current_allocator = default_allocator;
-#endif
 }
 
 void deinit_allocator() {
@@ -1518,80 +1511,6 @@ void deinit_allocator() {
 
 #if COMPILER_MSVC
 #pragma warning(pop)
-#endif
-
-#ifdef TL_IMPL
-
-#if TL_TRACK_ALLOCATIONS
-#include "thread.h"
-#include "debug.h"
-#include <unordered_map>
-
-namespace tl {
-
-struct AllocationInfo {
-	umm size;
-	AllocatorSourceLocation location;
-	CallStack call_stack;
-};
-std::unordered_map<void *, AllocationInfo> allocations;
-Mutex allocations_mutex;
-forceinline void track_allocation(void *pointer, umm size, AllocatorSourceLocation location) {
-	scoped_allocator(default_allocator);
-
-	scoped_lock(allocations_mutex);
-	AllocationInfo a;
-	a.size = size;
-	a.location = location;
-	a.call_stack = get_call_stack();
-	allocations[pointer] = a;
-}
-forceinline void untrack_allocation(void *pointer) {
-	scoped_lock(allocations_mutex);
-	allocations.erase(pointer);
-}
-forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm size, AllocatorSourceLocation location) {
-	scoped_allocator(default_allocator);
-
-	scoped_lock(allocations_mutex);
-	AllocationInfo a;
-	a.size = size;
-	a.location = location;
-	a.call_stack = get_call_stack();
-	allocations[new_pointer] = a;
-	allocations.erase(old_pointer);
-}
-Allocator tracking_allocator = {
-	[](AllocatorMode mode, umm size, umm align, void *data, AllocatorSourceLocation location, void *) -> void * {
-		switch (mode) {
-			case Allocator_allocate: {
-				auto result = tl_allocate(size, align);
-				track_allocation(result, size, location);
-				return result;
-			}
-			case Allocator_reallocate: {
-				auto result = tl_reallocate(data, size, align);
-				retrack_allocation(data, result, size, location);
-				return result;
-			}
-			case Allocator_free: {
-				tl_free(data);
-				untrack_allocation(data);
-				break;
-			}
-		}
-		return 0;
-	},
-	0
-};
-
-}
-#endif
-
-#undef tl_allocate
-#undef tl_reallocate
-#undef tl_free
-
 #endif
 
 #ifdef TL_MAIN

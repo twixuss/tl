@@ -111,7 +111,7 @@ void free(LinkedList<T> &list) {
 	auto node = list.head;
 	while (node) {
 		auto next = node->next;
-		FREE(list.allocator, node);
+		list.allocator.free(node);
 		node = next;
 	}
 	list.head = 0;
@@ -130,7 +130,7 @@ void erase(LinkedList<T> &list, T *value) {
 			}
 			if (node == list.head) list.head = list.head->next;
 			if (node == list.tail) list.tail = prev_node;
-			FREE(list.allocator, node);
+			list.allocator.free(node);
 			return;
 		}
 		prev_node = node;

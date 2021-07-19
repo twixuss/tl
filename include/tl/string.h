@@ -798,6 +798,16 @@ inline umm append(StringBuilder &builder, FormatFloat<f32> f) {
 forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat(v)); }
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat(v)); }
 
+inline void append(StringBuilder &builder, std::source_location location) {
+	append(builder, location.file_name());
+	append(builder, '(');
+	append(builder, location.line());
+	append(builder, ":");
+	append(builder, location.column());
+	append(builder, "):");
+	append(builder, location.function_name());
+}
+
 // Always allocates memory for the string
 inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
 	List<char> result;

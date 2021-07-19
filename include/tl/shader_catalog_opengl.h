@@ -206,7 +206,7 @@ Buffer load_shader_file(Span<filechar> terminated_full_path) {
 		if (quote_first && quote_last && quote_first != quote_last) {
 			Span<utf8> file_name = {(utf8 *)quote_first + 1, (utf8 *)quote_last};
 
-			auto file_path = format(TL_FILE_STRING("%%\0"s), directory, file_name);
+			auto file_path = format(tl_file_string("%%\0"s), directory, file_name);
 			auto included_file_buffer = load_shader_file(file_path);
 			auto included_file_source = as_chars(included_file_buffer);
 

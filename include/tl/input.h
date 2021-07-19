@@ -119,6 +119,10 @@ extern void (*on_key_repeat)(u8 key);
 extern void (*on_key_up)(u8 key);
 extern void (*on_char)(u32 ch);
 
+extern void (*on_mouse_down)(u8 button);
+extern void (*on_mouse_repeat)(u8 button);
+extern void (*on_mouse_up)(u8 button);
+
 #ifdef TL_IMPL
 #if OS_WINDOWS
 void (*on_key_down)(u8 key);
@@ -126,13 +130,32 @@ void (*on_key_repeat)(u8 key);
 void (*on_key_up)(u8 key);
 void (*on_char)(u32 ch);
 
+void (*on_mouse_down)(u8 button);
+void (*on_mouse_repeat)(u8 button);
+void (*on_mouse_up)(u8 button);
+
 bool process_mouse_message(MSG message, Span<KeyState> mouse_state, v2s *mouse_delta = 0, s32 *wheel = 0) {
 	switch (message.message) {
-		case WM_LBUTTONDOWN: { mouse_state[0] = KeyState_down | KeyState_held; return true; }
-		case WM_RBUTTONDOWN: { mouse_state[1] = KeyState_down | KeyState_held; return true; }
-		case WM_MBUTTONDOWN: { mouse_state[2] = KeyState_down | KeyState_held; return true; }
-		case WM_LBUTTONUP: { mouse_state[0] = KeyState_up; return true; }
-		case WM_RBUTTONUP: { mouse_state[1] = KeyState_up; return true; }
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		case WM_MBUTTONDOWN: {
+			SetCapture(message.hwnd);
+			break;
+		}
+		case WM_LBUTTONUP:
+		case WM_RBUTTONUP:
+		case WM_MBUTTONUP: {
+			ReleaseCapture();
+			break;
+		}
+	}
+	switch (message.message) {
+		case WM_LBUTTONDOWN: { mouse_state[0] = KeyState_down | KeyState_held; on_mouse_down(0); return true; }
+		case WM_RBUTTONDOWN: { mouse_state[1] = KeyState_down | KeyState_held; on_mouse_down(1); return true; }
+		case WM_MBUTTONDOWN: { mouse_state[2] = KeyState_down | KeyState_held; on_mouse_down(2); return true; }
+		case WM_LBUTTONUP: { mouse_state[0] = KeyState_up; on_mouse_up(0); return true; }
+		case WM_RBUTTONUP: { mouse_state[1] = KeyState_up; on_mouse_up(1); return true; }
+		case WM_MBUTTONUP: { mouse_state[2] = KeyState_up; on_mouse_up(2); return true; }
 		case WM_MOUSEWHEEL:
 			if (wheel) {
 				*wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA;

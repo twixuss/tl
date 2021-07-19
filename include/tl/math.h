@@ -936,8 +936,18 @@ inline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
 forceinline v3f rgb_to_hsv(v3f rgb) { return rgb_to_hsv(rgb.x, rgb.y, rgb.z); }
 forceinline v4f rgb_to_hsv(v4f rgb) { rgb.xyz = rgb_to_hsv(rgb.xyz); return rgb; }
 
+// This is a line with no bounds
 template<class T>
 struct line {
+	T a, b;
+	template <class U>
+	explicit operator line<U>() const {
+		return {(U)a, (U)b};
+	}
+};
+
+template<class T>
+struct line_segment {
 	T a, b;
 };
 
@@ -952,17 +962,42 @@ forceinline line<T> line_begin_dir(T begin, T dir) {
 }
 
 template <class T>
-forceinline auto length_squared(line<T> line) {
+forceinline line_segment<T> line_segment_begin_end(T begin, T end) {
+	return {begin, end};
+}
+
+template <class T>
+forceinline line_segment<T> line_segment_begin_dir(T begin, T dir) {
+	return {begin, begin + dir};
+}
+
+template <class T>
+forceinline auto length_squared(line_segment<T> line) {
 	return distance_squared(line.a, line.b);
 }
 
 template <class T>
-forceinline auto length(line<T> line) {
+forceinline auto length(line_segment<T> line) {
 	return distance(line.a, line.b);
 }
 
 template <class T>
-forceinline auto closest_point_clamped(T point, line<T> line) {
+forceinline auto closest_point(T point, line<T> line) {
+	auto l2 = distance_squared(line.a, line.b);
+	if (l2 == 0) return T{};
+
+	using Scalar = decltype(l2);
+
+	auto t = dot(point - line.a, line.b - line.a) / l2;
+	return line.a + t * (line.b - line.a);
+}
+template <class T>
+forceinline auto closest_point(line<T> line, T point) {
+	return closest_point(point, line);
+}
+
+template <class T>
+forceinline auto closest_point(T point, line_segment<T> line) {
 	auto l2 = length_squared(line);
 	if (l2 == 0) return line.a;
 
@@ -972,23 +1007,8 @@ forceinline auto closest_point_clamped(T point, line<T> line) {
 	return line.a + t * (line.b - line.a);
 }
 template <class T>
-forceinline auto closest_point_clamped(line<T> line, T point) {
-	return closest_point_clamped(point, line);
-}
-
-template <class T>
-forceinline auto closest_point_unclamped(T point, line<T> line) {
-	auto l2 = length_squared(line);
-	if (l2 == 0) return line.a;
-
-	using Scalar = decltype(l2);
-
-	auto t = dot(point - line.a, line.b - line.a) / l2;
-	return line.a + t * (line.b - line.a);
-}
-template <class T>
-forceinline auto closest_point_unclamped(line<T> line, T point) {
-	return closest_point_unclamped(point, line);
+forceinline auto closest_point(line_segment<T> line, T point) {
+	return closest_point(point, line);
 }
 
 template <class T>
@@ -1002,6 +1022,22 @@ forceinline auto closest_point(line<T> a, line<T> b) {
 
 template <class T>
 forceinline auto distance(T point, line<T> line) {
+	auto l2 = distance_squared(line.a, line.b);
+	if (l2 == 0) return (decltype(distance(T{}, T{})))-1;
+
+	using Scalar = decltype(l2);
+
+	auto t = dot(point - line.a, line.b - line.a) / l2;
+	auto projection = line.a + t * (line.b - line.a);
+	return distance(point, projection);
+}
+template <class T>
+forceinline auto distance(line<T> line, T point) {
+	return distance(point, line);
+}
+
+template <class T>
+forceinline auto distance(T point, line_segment<T> line) {
 	auto l2 = length_squared(line);
 	if (l2 == 0) return distance(point, line.a);
 
@@ -1012,7 +1048,7 @@ forceinline auto distance(T point, line<T> line) {
 	return distance(point, projection);
 }
 template <class T>
-forceinline auto distance(line<T> line, T point) {
+forceinline auto distance(line_segment<T> line, T point) {
 	return distance(point, line);
 }
 
@@ -1669,6 +1705,16 @@ union m4 {
 	static forceinline m4 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
+
+forceinline m4 to_m4(m3 m) {
+	return {
+		m.i.x, m.i.y, m.i.z, 0,
+		m.j.x, m.j.y, m.j.z, 0,
+		m.k.x, m.k.y, m.k.z, 0,
+			0,     0,     0, 1,
+	};
+}
+
 forceinline constexpr m3 transpose(m3 const& m) {
 	return {
 		m.i.x, m.j.x, m.k.x,
@@ -1906,6 +1952,10 @@ TO_STRING_V4(v4u)
 TO_STRING_V4(v4s)
 
 #undef TO_STRING_V3
+
+inline void append(StringBuilder &builder, m4 m) {
+	append_format(builder, "{%, %, %, %}", m.i, m.j, m.k, m.l);
+}
 
 template <class T>
 void append(StringBuilder &builder, aabb<T> v) {

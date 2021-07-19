@@ -83,4 +83,11 @@ struct StaticHashMap {
 	}
 };
 
+template <class Key, class Value, umm capacity>
+void free(StaticHashMap<Key, Value, capacity> &map) {
+	for (auto &block : map.blocks) {
+		free(block);
+	}
+}
+
 }

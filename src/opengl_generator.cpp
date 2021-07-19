@@ -25,7 +25,7 @@ s32 tl_main(Span<Span<utf8>> args) {
 	current_printer = console_printer;
 	current_allocator = temporary_allocator;
 
-	auto signature_path = TL_FILE_STRING("../data/opengl.h"ts);
+	auto signature_path = tl_file_string("../data/opengl.h"ts);
 	auto signature_file = read_entire_file(signature_path);
 	if (!signature_file.data) {
 		print("Failed to open %\n", signature_path);
@@ -188,7 +188,7 @@ begin_parse:
 	}
 	append(builder, "#endif\n");
 
-	write_entire_file(TL_FILE_STRING("../include/tl/generated/opengl_redefine.h"ts), as_bytes(to_string(builder)));
+	write_entire_file(tl_file_string("../include/tl/generated/opengl_redefine.h"ts), as_bytes(to_string(builder)));
 	builder.clear();
 
 	auto append_ds = [&](List<Func> &funcs) {
@@ -222,7 +222,7 @@ begin_parse:
 
 	append(builder, "\n#if OS_WINDOWS\n#define EXT_AND_OS_FUNCS EXTENSION_FUNCS WINDOWS_FUNCS\n#endif\n");
 
-	write_entire_file(TL_FILE_STRING("../include/tl/generated/opengl_all_funcs.h"ts), as_bytes(to_string(builder)));
+	write_entire_file(tl_file_string("../include/tl/generated/opengl_all_funcs.h"ts), as_bytes(to_string(builder)));
 
 
 	return 0;

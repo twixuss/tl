@@ -65,6 +65,26 @@ struct MaskedBlockList {
 		return add(T{});
 	}
 
+	void remove(T *value) {
+		auto block = &first;
+		while (block) {
+			if (block->values <= value && value < block->values + values_per_block) {
+				u32 value_index = value - block->values;
+				u32 mask_index = value_index / bits_in_mask;
+				u32 bit_index  = value_index % bits_in_mask;
+
+				block->masks[mask_index] &= ~((Mask)1 << bit_index);
+
+				return;
+			}
+			block = block->next;
+		}
+		bounds_check(false, "attempt to remove non-existant value from MaskedBlockList");
+	}
+	void remove(T &value) {
+		remove(&value);
+	}
+
 	T &operator[](umm index) {
 		umm block_index = index / values_per_block;
 		umm value_index = index % values_per_block;
@@ -83,7 +103,11 @@ struct MaskedBlockList {
 
 template <class T, umm values_per_block>
 void free(MaskedBlockList<T, values_per_block> &list) {
-
+	auto block = list.first.next;
+	while (block) {
+		list.allocator.free(block);
+		block = block->next;
+	}
 }
 
 template <class T, umm values_per_block>
@@ -96,6 +120,25 @@ Optional<umm> index_of(MaskedBlockList<T, values_per_block> const &list, T const
 		block = block->next;
 	}
 	return {};
+}
+
+
+template <class T, umm values_per_block, class Fn>
+void for_each(MaskedBlockList<T, values_per_block> &list, Fn &&fn) {
+	using MaskedBlockList = MaskedBlockList<T, values_per_block>;
+	using Mask = MaskedBlockList::Mask;
+	constexpr u32 bits_in_mask = MaskedBlockList::bits_in_mask;
+	auto block = &list.first;
+	while (block) {
+		for (u32 value_index = 0; value_index < values_per_block; ++value_index) {
+			u32 mask_index = value_index / bits_in_mask;
+			u32 bit_index  = value_index % bits_in_mask;
+			if (block->masks[mask_index] & ((Mask)1 << bit_index)) {
+				fn(block->values[value_index]);
+			}
+		}
+		block = block->next;
+	}
 }
 
 }

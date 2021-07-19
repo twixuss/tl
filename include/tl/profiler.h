@@ -183,7 +183,7 @@ List<u8> output_for_timed() {
 
 }}
 
-#if TL_DEBUG
+#ifdef TL_DEBUG
 #pragma optimize("", on)
 #endif
 
