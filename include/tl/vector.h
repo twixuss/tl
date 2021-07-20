@@ -24,8 +24,7 @@ namespace tl {
 	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
 	forceinline constexpr v3 operator+() const { return *this; } \
 	forceinline constexpr v3 yzx() const { return {y, z, x}; } \
-	forceinline constexpr v3 zxy() const { return {z, x, y}; } \
-	forceinline constexpr explicit operator bool() const { return x && y && z; }
+	forceinline constexpr v3 zxy() const { return {z, x, y}; }
 
 
 #define DEFN_4 \
@@ -39,8 +38,7 @@ namespace tl {
 	Scalar s[4];\
 	template <class U>\
 	forceinline constexpr explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
-	forceinline constexpr v4 operator+() const { return *this; } \
-	forceinline constexpr explicit operator bool() const { return x && y && z && w; }
+	forceinline constexpr v4 operator+() const { return *this; }
 
 #define UNOP_2(o) \
 	forceinline constexpr v2 operator o() const { return {o x, o y}; }

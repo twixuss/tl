@@ -949,6 +949,10 @@ struct line {
 template<class T>
 struct line_segment {
 	T a, b;
+	template <class U>
+	explicit operator line_segment<U>() const {
+		return {(U)a, (U)b};
+	}
 };
 
 template <class T>
