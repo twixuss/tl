@@ -1021,6 +1021,8 @@ void free(LinearSet<T> &set) {
 	free((List<T> &)set);
 }
 
+// Returns an index of the value
+// If value is not in the list, this function will return index >= list.size
 template <class T>
 umm index_of(List<T> const &list, T const *value) {
 	return value - list.data;

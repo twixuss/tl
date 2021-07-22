@@ -79,11 +79,6 @@ TL_API void maximize(Window *window);
 TL_API void minimize(Window *window);
 TL_API void restore(Window *window);
 
-extern TL_API KeyState key_state[256 + 3];
-
-TL_DEFINE_KEYBOARD_INPUT(Span(::tl::key_state,       256))
-TL_DEFINE_MOUSE_INPUT   (Span(::tl::key_state + 256,   3))
-
 }
 
 #ifdef TL_IMPL
@@ -99,13 +94,11 @@ namespace tl {
 static bool window_class_created = false;
 static constexpr auto class_name = L"tl_window";
 static Window *currently_creating_window = 0;
-KeyState key_state[256 + 3];
 
 static void draw(Window &window) {
 	window.mouse_position = get_cursor_position() - window.client_position;
 	if (window.on_draw)
 		window.on_draw(window);
-	update_key_state(key_state);
 	window.mouse_delta = {};
 	window.mouse_wheel = 0;
 }
@@ -324,31 +317,90 @@ bool update(Window *window) {
 	if (!(window->flags & Window_open)) {
 		return false;
 	}
-	MSG m;
-	while (PeekMessageA(&m, 0, 0, 0, PM_REMOVE)) {
-		if (process_keyboard_message(m, Span(key_state, 256))) continue;
-		if (process_mouse_message(m, Span(key_state + 256, 3), &window->mouse_delta)) continue;
-		switch (m.message) {
-			case WM_MOUSEWHEEL: window->mouse_wheel += GET_WHEEL_DELTA_WPARAM(m.wParam) / WHEEL_DELTA; continue;
+	MSG message;
+	while (PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
+		switch (message.message) {
+			case WM_LBUTTONDOWN:
+			case WM_RBUTTONDOWN:
+			case WM_MBUTTONDOWN: {
+				SetCapture(message.hwnd);
+				break;
+			}
+			case WM_LBUTTONUP:
+			case WM_RBUTTONUP:
+			case WM_MBUTTONUP: {
+				ReleaseCapture();
+				break;
+			}
 		}
-		TranslateMessage(&m);
-		DispatchMessageA(&m);
+		static bool alt_is_held;
+		switch (message.message) {
+			case WM_LBUTTONDOWN: { if (on_mouse_down) on_mouse_down(0); continue; }
+			case WM_RBUTTONDOWN: { if (on_mouse_down) on_mouse_down(1); continue; }
+			case WM_MBUTTONDOWN: { if (on_mouse_down) on_mouse_down(2); continue; }
+			case WM_LBUTTONUP: { if (on_mouse_up) on_mouse_up(0); continue; }
+			case WM_RBUTTONUP: { if (on_mouse_up) on_mouse_up(1); continue; }
+			case WM_MBUTTONUP: { if (on_mouse_up) on_mouse_up(2); continue; }
+			case WM_INPUT: {
+				RAWINPUT rawInput;
+				if (UINT rawInputSize = sizeof(rawInput);
+					GetRawInputData((HRAWINPUT)message.lParam, RID_INPUT, &rawInput, &rawInputSize,
+									sizeof(RAWINPUTHEADER)) == -1) {
+					invalid_code_path("Error: GetRawInputData");
+				}
+				if (rawInput.header.dwType == RIM_TYPEMOUSE) {
+					auto &mouse = rawInput.data.mouse;
+
+					window->mouse_delta += {mouse.lLastX, mouse.lLastY};
+				}
+				continue;
+			}
+			case WM_SYSKEYDOWN:
+			case WM_KEYDOWN: {
+				u8 key = (u8)message.wParam;
+
+				bool is_repeated = message.lParam & (LPARAM)(1 << 30);
+
+				if (is_repeated) {
+					if (on_key_repeat) on_key_repeat(key);
+				} else {
+					if (on_key_down) on_key_down(key);
+					if (on_key_repeat) on_key_repeat(key);
+
+					if (key == Key_alt) {
+						alt_is_held = true;
+					} else if (key == Key_f4) {
+						if (alt_is_held) {
+							close(window);
+							return false;
+						}
+					}
+				}
+
+				continue;
+			}
+			case WM_SYSKEYUP:
+			case WM_KEYUP: {
+				u8 key = (u8)message.wParam;
+				if (on_key_up) on_key_up(key);
+				if (key == Key_alt) {
+					alt_is_held = false;
+				}
+				continue;
+			}
+			case WM_UNICHAR: {
+				if (on_char) on_char((u32)message.wParam);
+				continue;
+			}
+			case WM_MOUSEWHEEL: window->mouse_wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; continue;
+		}
+		TranslateMessage(&message);
+		DispatchMessageA(&message);
 		if (!(window->flags & Window_open)) {
 			return false;
 		}
 	}
-	if (key_down(Key_f4) && key_held(Key_alt)) {
-		close(window);
-		return false;
-	}
 	draw(*window);
-	if (!window->has_focus) {
-		for (KeyState &key : key_state) {
-			if (key & KeyState_held) {
-				key = KeyState_up;
-			}
-		}
-	}
 	return true;
 }
 
