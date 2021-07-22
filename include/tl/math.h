@@ -1080,6 +1080,24 @@ forceinline line<T> as_line(ray<T> r) {
 }
 
 template <class T>
+struct plane {
+	T point;
+	T normal;
+};
+
+template <class T>
+plane<T> plane_point_normal(T point, T normal) {
+	return {point, normal};
+}
+
+template <class T>
+T intersect(ray<T> ray, plane<T> plane) {
+	auto d = dot(plane.point, -plane.normal);
+	auto t = -(d + dot(ray.origin, plane.normal)) / dot(ray.direction, plane.normal);
+	return ray.origin + t * ray.direction;
+}
+
+template <class T>
 struct triangle {
 	T a, b, c;
 };
@@ -1891,6 +1909,67 @@ forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 
 		}
 	}
 	return true;
+}
+
+forceinline f32 sdf_torus(v3f point, f32 radius, f32 thickness) {
+	return absolute(length(point) - radius) - thickness;
+}
+
+// https://iquilezles.org/www/articles/distfunctions2d/distfunctions2d.htm
+// https://www.shadertoy.com/view/4sS3zz
+forceinline f32 sdf_ellipse(v2f point, v2f radius) {
+	v2f p = point;
+	v2f ab = radius;
+	if (ab.x == ab.y) 
+		return length(p) - ab.x;
+
+	p = absolute(p);
+	if (p.x > p.y) {
+		p = p.yx();
+		ab = ab.yx();
+	}
+
+	float l = ab.y * ab.y - ab.x * ab.x;
+
+	float m = ab.x * p.x / l;
+	float n = ab.y * p.y / l;
+	float m2 = m * m;
+	float n2 = n * n;
+
+	float c = (m2 + n2 - 1.0f) / 3.0f;
+	float c3 = c * c * c;
+
+	float d = c3 + m2 * n2;
+	float q = d + m2 * n2;
+	float g = m + m * n2;
+
+	float co;
+
+	auto msign = [](float x) { return (x < 0.0f) ? -1.0f : 1.0f; };
+
+	if (d < 0.0f) {
+		float h = acos(q / c3) / 3.0f;
+		float s = cos(h) + 2.0f;
+		float t = sin(h) * sqrt(3.0f);
+		float rx = sqrt(m2 - c * (s + t));
+		float ry = sqrt(m2 - c * (s - t));
+		co = ry + sign(l) * rx + absolute(g) / (rx * ry);
+	} else {
+		float h = 2.0f * m * n * sqrt(d);
+		float s = msign(q + h) * pow(absolute(q + h), 1.0f / 3.0f);
+		float t = msign(q - h) * pow(absolute(q - h), 1.0f / 3.0f);
+		float rx = -(s + t) - c * 4.0f + 2.0f * m2;
+		float ry = (s - t) * sqrt(3.0f);
+		float rm = sqrt(rx * rx + ry * ry);
+		co = ry / sqrt(rm - rx) + 2.0f * g / rm;
+	}
+	co = (co - m) / 2.0f;
+
+	float si = sqrt(max(1.0f - co * co, 0.0f));
+
+	v2f r = ab * v2f{co,si};
+
+	return length(r - p) * msign(p.y - r.y);
 }
 
 namespace CE {

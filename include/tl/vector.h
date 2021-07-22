@@ -11,7 +11,6 @@ namespace tl {
 	forceinline constexpr explicit operator v2<U>() const { return {(U)x, (U)y}; } \
 	forceinline constexpr v2 operator+() const { return *this; } \
 	forceinline constexpr v2 yx() const { return {y, x}; } \
-	forceinline constexpr explicit operator bool() const { return x && y; }
 
 
 #define DEFN_3 \
@@ -23,6 +22,7 @@ namespace tl {
 	template <class U>\
 	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
 	forceinline constexpr v3 operator+() const { return *this; } \
+	forceinline constexpr v2 xz() const { return {x, z}; } \
 	forceinline constexpr v3 yzx() const { return {y, z, x}; } \
 	forceinline constexpr v3 zxy() const { return {z, x, y}; }
 

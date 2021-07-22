@@ -67,8 +67,8 @@ struct Scene3D {
 	List<CommonMesh> meshes;
 	List<Node> nodes;
 
-	Node &get_node(Span<utf8> name) {
-		return *find_if(nodes, [&](Node &node){return node.name == name;});
+	Node *get_node(Span<utf8> name) {
+		return find_if(nodes, [&](Node &node){return node.name == name;});
 	}
 };
 
