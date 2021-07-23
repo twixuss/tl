@@ -2,11 +2,11 @@ void glClearColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
 void glViewport(GLint x, GLint y, GLsizei width, GLsizei height);
 void glScissor(GLint x, GLint y, GLsizei width, GLsizei height);
 void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
+void glBindTexture(GLenum target, GLuint texture);
 
 EXTENSIONS
 
 void glBlendEquation(GLenum mode);
-void glBindTexture(GLenum target, GLuint texture);
 GLuint glCreateShader(GLenum shaderType);
 void glDeleteShader(GLuint shader);
 void glShaderSource(GLuint id, GLsizei count, const GLchar *const *string, const GLint *length);

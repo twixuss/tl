@@ -3,8 +3,8 @@
 #define glViewport tl::gl::_glViewport
 #define glScissor tl::gl::_glScissor
 #define glGetTexImage tl::gl::_glGetTexImage
-#define glBlendEquation tl::gl::_glBlendEquation
 #define glBindTexture tl::gl::_glBindTexture
+#define glBlendEquation tl::gl::_glBlendEquation
 #define glCreateShader tl::gl::_glCreateShader
 #define glDeleteShader tl::gl::_glDeleteShader
 #define glShaderSource tl::gl::_glShaderSource
@@ -95,7 +95,6 @@
 #endif
 #else
 #define glBlendEquation tl::gl::functions._glBlendEquation
-#define glBindTexture tl::gl::functions._glBindTexture
 #define glCreateShader tl::gl::functions._glCreateShader
 #define glDeleteShader tl::gl::functions._glDeleteShader
 #define glShaderSource tl::gl::functions._glShaderSource

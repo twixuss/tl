@@ -3,10 +3,10 @@ D(void, glClearColor, (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha),
 D(void, glViewport, (GLint x, GLint y, GLsizei width, GLsizei height), (x, y, width, height))\
 D(void, glScissor, (GLint x, GLint y, GLsizei width, GLsizei height), (x, y, width, height))\
 D(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid * pixels), (target, level, format, type, pixels))\
+D(void, glBindTexture, (GLenum target, GLuint texture), (target, texture))\
 
 #define EXTENSION_FUNCS \
 D(void, glBlendEquation, (GLenum mode), (mode))\
-D(void, glBindTexture, (GLenum target, GLuint texture), (target, texture))\
 D(GLuint, glCreateShader, (GLenum shaderType), (shaderType))\
 D(void, glDeleteShader, (GLuint shader), (shader))\
 D(void, glShaderSource, (GLuint id, GLsizei count, const GLchar *const * string, const GLint * length), (id, count, string, length))\
