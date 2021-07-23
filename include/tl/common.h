@@ -1270,8 +1270,8 @@ struct Allocator {
 
 };
 
-#define tl_push(pusher, ...) if(auto CONCAT(_, __LINE__)=pusher(__VA_ARGS__))
-#define tl_scoped(current, new) auto CONCAT(_,__LINE__)=current;current=(new);defer{current=CONCAT(_,__LINE__);}
+#define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
+#define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
 
 extern TL_API void init_allocator();
 extern TL_API void deinit_allocator();

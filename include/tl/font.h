@@ -6,6 +6,10 @@
 #include "file.h"
 #include <unordered_map>
 
+#ifndef TL_FONT_TEXTURE_HANDLE
+#define TL_FONT_TEXTURE_HANDLE void *
+#endif
+
 namespace tl {
 
 struct FontChar {
@@ -20,7 +24,7 @@ struct SizedFont {
 	FontCollection *collection;
 
 	std::unordered_map<u32, FontChar> chars;
-	umm texture_id;
+	TL_FONT_TEXTURE_HANDLE texture;
 	u32 size;
 
 	u8 *atlas_data = 0;
@@ -33,7 +37,7 @@ struct SizedFont {
 struct FontCollection {
 	Allocator allocator = current_allocator;
 	std::unordered_map<u32, SizedFont> size_to_font;
-	umm (*update_atlas)(umm texture_id, void *data, v2u size);
+	TL_FONT_TEXTURE_HANDLE (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size);
 };
 
 struct PlacedChar {
@@ -47,7 +51,7 @@ TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
 TL_API FontCollection *create_font_collection(Span<Span<filechar>> font_paths);
 TL_API void free(FontCollection *collection);
 TL_API aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero = false);
-TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink = false);
+TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font);
 
 }
 
@@ -106,7 +110,11 @@ void set_size(FontFace &face, u32 size) {
 bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 	timed_function();
 
+	assert(font);
+
 	auto collection = (FontCollectionFT *)font->collection;
+
+	assert(collection->update_atlas);
 
 	scoped_allocator(collection->allocator);
 
@@ -192,11 +200,11 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 
 				if (font->atlas_data) {
 					font->atlas_size *= 2;
-					FREE(current_allocator, font->atlas_data);
+					current_allocator.free(font->atlas_data);
 				} else {
 					font->atlas_size = V2u(font->size * 16);
 				}
-				font->atlas_data = ALLOCATE(u8, current_allocator, font->atlas_size.x * font->atlas_size.y * 3);
+				font->atlas_data = current_allocator.allocate<u8>(font->atlas_size.x * font->atlas_size.y * 3);
 				memset(font->atlas_data, 0, font->atlas_size.x * font->atlas_size.y * 3);
 
 				font->next_char_position = {};
@@ -237,7 +245,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 			font->current_row_height = max(font->current_row_height, char_size.y);
 		}
 
-		font->texture_id = collection->update_atlas(font->texture_id, font->atlas_data, font->atlas_size);
+		font->texture = collection->update_atlas(font->texture, font->atlas_data, font->atlas_size);
 
 		return true;
 	}
@@ -245,6 +253,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 }
 
 SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
+	assert(collection);
 	timed_function();
 
 	auto found = collection->size_to_font.find(size);
@@ -270,7 +279,7 @@ FontCollection *create_font_collection(Span<Span<filechar>> font_paths) {
 	}
 
 	auto allocator = current_allocator;
-	auto result = ALLOCATE(FontCollectionFT, allocator);
+	auto result = allocator.allocate<FontCollectionFT>();
 
 	for (auto &path : font_paths) {
 		auto &face = result->faces.add();
@@ -289,9 +298,9 @@ void free(FontCollection *_collection) {
 	}
 	free(collection->faces);
 	for (auto &[size, font] : collection->size_to_font) {
-		FREE(collection->allocator, font.atlas_data);
+		collection->allocator.free(font.atlas_data);
 	}
-	FREE(collection->allocator, collection);
+	collection->allocator.free(collection);
 }
 
 aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
@@ -343,7 +352,7 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 	return result;
 }
 
-List<PlacedChar> place_text(Span<utf8> text, SizedFont *font, bool shrink) {
+List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
 	timed_function();
 
 	List<PlacedChar> result;

@@ -1080,6 +1080,11 @@ forceinline line<T> as_line(ray<T> r) {
 }
 
 template <class T>
+forceinline ray<T> normalize(ray<T> r) {
+	return {r.origin, normalize(r.direction)};
+}
+
+template <class T>
 struct plane {
 	T point;
 	T normal;

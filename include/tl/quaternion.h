@@ -127,9 +127,10 @@ quaternion quaternion_from_euler(f32 ax, f32 ay, f32 az) {
 quaternion quaternion_from_euler(v3f v) {
 	return quaternion_from_euler(v.x, v.y, v.z);
 }
-quaternion quaternion_look_at(v3f from, v3f to, v3f up) {
+#if 0
+quaternion quaternion_look(v3f direction, v3f up) {
 	v3f the_forward = {0,0,-1};
-	v3f forward = normalize(to - from);
+	v3f forward = normalize(direction);
 
 	f32 d = dot(the_forward, forward);
 
@@ -145,6 +146,35 @@ quaternion quaternion_look_at(v3f from, v3f to, v3f up) {
 	rotAxis = normalize(rotAxis);
 	return quaternion_from_axis_angle(rotAxis, rotAngle);
 }
+#elif 0
+quaternion quaternion_look(v3f direction, v3f up) {
+	/*v3f forward = direction.Normalized();
+	v3f right = v3f::Cross(up.Normalized(), forward);
+	v3f up = v3f::Cross(forward, right);*/
+
+	up = normalize(up);
+	v3f forward = normalize(direction);
+	v3f right = normalize(cross(up, forward));
+	forward = cross(right, up);
+	//v3f::OrthoNormalize(&up, &forward); // Keeps up the same, make forward orthogonal to up
+
+	quaternion ret;
+	ret.w = sqrtf(1.0f + right.x + up.y + forward.z) * 0.5f;
+	float w4_recip = 1.0f / (4.0f * ret.w);
+	ret.x = (forward.y - up.z) * w4_recip;
+	ret.y = (right.z - forward.x) * w4_recip;
+	ret.z = (up.x - right.y) * w4_recip;
+
+	return ret;
+}
+#else
+quaternion quaternion_look(v3f direction) {
+	quaternion ry = quaternion_from_axis_angle({0,1,0}, atan2(direction.xz()));
+	quaternion rz = quaternion_from_axis_angle({0,0,1}, -atan2((ry * direction).xy));
+	return rz * ry;
+}
+#endif
+
 v3f to_euler_angles(quaternion q) {
 	// Store the Euler angles in radians
     v3f pitchYawRoll;
