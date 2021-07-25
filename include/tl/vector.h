@@ -87,19 +87,6 @@ namespace tl {
 	forceinline constexpr Mask operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
 	forceinline constexpr friend Mask operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
 
-#define EQ_2 \
-	forceinline constexpr Mask operator==(v2 b) const { return {x == b.x, y == b.y}; } \
-	forceinline constexpr Mask operator!=(v2 b) const { return {x != b.x, y != b.y}; }
-
-#define EQ_3 \
-	forceinline constexpr Mask operator==(v3 b) const { return {x == b.x, y == b.y, z == b.z}; } \
-	forceinline constexpr Mask operator!=(v3 b) const { return {x != b.x, y != b.y, z != b.z}; }
-
-#define EQ_4 \
-	forceinline constexpr Mask operator==(v4 b) const { return {x == b.x, y == b.y, z == b.z, w == b.w}; } \
-	forceinline constexpr Mask operator!=(v4 b) const { return {x != b.x, y != b.y, z != b.z, w != b.w}; }
-
-
 template <class _Scalar>
 union v2 {
 	using Scalar = _Scalar;
@@ -118,7 +105,12 @@ union v2 {
 	BINOP_2(>>)
 	CMPOP_2(&&)
 	CMPOP_2(||)
-	EQ_2
+	CMPOP_2(==)
+	CMPOP_2(!=)
+	CMPOP_2(<)
+	CMPOP_2(>)
+	CMPOP_2(<=)
+	CMPOP_2(>=)
 };
 
 template <class _Scalar>
@@ -139,7 +131,12 @@ union v3 {
 	BINOP_3(>>)
 	CMPOP_3(&&)
 	CMPOP_3(||)
-	EQ_3
+	CMPOP_3(==)
+	CMPOP_3(!=)
+	CMPOP_3(<)
+	CMPOP_3(>)
+	CMPOP_3(<=)
+	CMPOP_3(>=)
 };
 
 template <class _Scalar>
@@ -160,7 +157,12 @@ union v4 {
 	BINOP_4(>>)
 	CMPOP_4(&&)
 	CMPOP_4(||)
-	EQ_4
+	CMPOP_4(==)
+	CMPOP_4(!=)
+	CMPOP_4(<)
+	CMPOP_4(>)
+	CMPOP_4(<=)
+	CMPOP_4(>=)
 };
 
 /*

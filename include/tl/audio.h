@@ -90,7 +90,7 @@ Sound load_wav_from_memory(Span<u8> data) {
 	return result;
 }
 
-Sound load_wav_from_file(Span<filechar> path) {
+Sound load_wav_from_file(Span<pathchar> path) {
 	timed_function();
 
 	auto file = read_entire_file(path);

@@ -126,9 +126,9 @@ inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 
 template <class Int>
 struct FormatInt {
 	Int value;
-	u32 radix;
-	u32 pad_to_length;
-	explicit FormatInt(Int value, u32 radix = 10, u32 pad_to_length = 0) : value(value), radix(radix), pad_to_length(pad_to_length) {}
+	u32 radix = 10;
+	u32 leading_zeros = 0;
+	u32 skip_digits = 0;
 };
 
 enum FloatFormat {
@@ -142,10 +142,6 @@ struct FormatFloat {
 	Float value;
 	u32 precision = 3;
 	FloatFormat format = FloatFormat_default;
-	explicit FormatFloat(Float value, u32 precision, FloatFormat format) : value(value), precision(precision), format(format) {}
-	explicit FormatFloat(Float value, u32 precision) : value(value), precision(precision) {}
-	explicit FormatFloat(Float value, FloatFormat format) : value(value), format(format) {}
-	explicit FormatFloat(Float value) : value(value) {}
 };
 
 enum Encoding {
@@ -677,7 +673,7 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 		if (v < 0) {
 			negative = true;
 			if (v == min_value<Int>) {
-				*lsc-- = charMap[-(v % (Int)radix)];
+				*lsc-- = charMap[-(v % cvt<Int>(radix))];
 				v /= (Int)radix;
 				++charsWritten;
 			}
@@ -686,12 +682,14 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 	}
 
 	for (;;) {
-		*lsc-- = charMap[v % (Int)radix];
-		v /= (Int)radix;
+		*lsc-- = charMap[(u32)(v % cvt<Int>(radix))];
 		++charsWritten;
-		if (v == 0)
+		v /= cvt<Int>(radix);
+		if (v == Int{})
 			break;
 	}
+	lsc += f.skip_digits;
+	charsWritten -= f.skip_digits;
 	if constexpr (is_signed<Int>) {
 		if (negative) {
 			++charsWritten;
@@ -700,23 +698,23 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 	} else {
 		(void)negative;
 	}
-	if (f.pad_to_length) {
-		for (u32 i = charsWritten; i < f.pad_to_length; ++i) {
+	if (f.leading_zeros) {
+		for (u32 i = charsWritten; i < f.leading_zeros; ++i) {
 			*lsc-- = '0';
 		}
-		if (f.pad_to_length > charsWritten)
-			charsWritten = f.pad_to_length;
+		if (f.leading_zeros > charsWritten)
+			charsWritten = f.leading_zeros;
 	}
 	return append(builder, Span(lsc + 1, charsWritten));
 }
 
 template <class Int, class = EnableIf<is_integer<Int>>>
 umm append(StringBuilder &builder, Int v) {
-	return append(builder, FormatInt(v));
+	return append(builder, FormatInt{.value = v});
 }
 
 forceinline umm append(StringBuilder &builder, void const *p) {
-	return append(builder, FormatInt((umm)p, 16, true));
+	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zeros = true});
 }
 
 inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
@@ -792,11 +790,11 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
 	return chars_appended;
 }
 inline umm append(StringBuilder &builder, FormatFloat<f32> f) {
-	return append(builder, FormatFloat((f64)f.value, f.precision, f.format));
+	return append(builder, FormatFloat{.value = (f64)f.value, .precision = f.precision, .format = f.format});
 }
 
-forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat(v)); }
-forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat(v)); }
+forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat{.value = v}); }
+forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
 inline void append(StringBuilder &builder, std::source_location location) {
 	append(builder, location.file_name());
@@ -880,6 +878,15 @@ template <class ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...arg
 template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+
+template <class T>
+List<char> to_string(T const &value, Encoding encoding = Encoding_utf8) {
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	builder.encoding = encoding;
+	append(builder, value);
+	return to_string(builder, current_allocator);
+}
 
 #if 0
 

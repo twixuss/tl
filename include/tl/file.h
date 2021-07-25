@@ -7,8 +7,8 @@
 namespace tl {
 
 #if OS_WINDOWS
-using filechar = utf16;
-inline List<utf8> path_to_utf8(Span<filechar> span) {
+using pathchar = utf16;
+inline List<utf8> path_to_utf8(Span<pathchar> span) {
 	return utf16_to_utf8(span);
 }
 #define tl_file_string(x) u ## x
@@ -22,12 +22,12 @@ enum FileItemKind {
 
 struct FileItem {
 	FileItemKind kind;
-	Span<filechar> name;
+	Span<pathchar> name;
 };
 struct FileItemList : List<FileItem> {
 	using Base = List<FileItem>;
 
-	List<filechar> buffer;
+	List<pathchar> buffer;
 
 	Base &base() { return *this; }
 };
@@ -56,8 +56,8 @@ inline bool valid(File file) {
 	return file.handle != 0;
 }
 
-TL_API File open_file(filechar const *path, u32 open_flags);
-inline File open_file(Span<filechar> path, u32 open_flags) {
+TL_API File open_file(pathchar const *path, u32 open_flags);
+inline File open_file(Span<pathchar> path, u32 open_flags) {
 	assert(path.back() == 0);
 	return open_file(path.data, open_flags);
 }
@@ -80,7 +80,7 @@ TL_API s64 length(File file);
 TL_API void truncate_to_cursor(File file);
 
 
-TL_API bool file_exists(Span<filechar> path);
+TL_API bool file_exists(Span<pathchar> path);
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	timed_function();
@@ -97,13 +97,13 @@ inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_
 
 	return result;
 }
-inline Buffer read_entire_file(filechar const *path, umm extra_space_before = 0, umm extra_space_after = 0) {
+inline Buffer read_entire_file(pathchar const *path, umm extra_space_before = 0, umm extra_space_after = 0) {
 	File file = open_file(path, File_read);
 	if (!valid(file)) return {};
 	defer { close(file); };
 	return read_entire_file(file, extra_space_before, extra_space_after);
 }
-inline Buffer read_entire_file(Span<filechar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
+inline Buffer read_entire_file(Span<pathchar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
 	assert(path.back() == 0);
 	return read_entire_file(path.data, extra_space_before, extra_space_after);
 }
@@ -113,41 +113,41 @@ inline umm write_entire_file(File file, void const *data, umm size) {
 	defer { truncate_to_cursor(file); };
 	return write(file, data, size);
 }
-inline umm write_entire_file(filechar const *path, void const *data, umm size) {
+inline umm write_entire_file(pathchar const *path, void const *data, umm size) {
 	File file = open_file(path, File_write);
 	if (!valid(file)) return false;
 	defer { close(file); };
 	return write_entire_file(file, data, size);
 }
-inline umm write_entire_file(Span<filechar> path, void const *data, umm size) {
+inline umm write_entire_file(Span<pathchar> path, void const *data, umm size) {
 	assert(path.back() == 0);
 	return write_entire_file(path.data, data, size);
 }
 inline umm write_entire_file(File file, Span<u8> span) { return write_entire_file(file, span.data, span.size); }
-inline umm write_entire_file(filechar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
-inline umm write_entire_file(Span<filechar> path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
+inline umm write_entire_file(pathchar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
+inline umm write_entire_file(Span<pathchar> path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
 
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
-TL_API u64 get_file_write_time(Span<filechar> path);
+TL_API u64 get_file_write_time(Span<pathchar> path);
 
-TL_API ListList<filechar> get_files_in_directory(Span<filechar> directory);
+TL_API ListList<pathchar> get_files_in_directory(Span<pathchar> directory);
 
-TL_API FileItemList get_items_in_directory(Span<filechar> directory);
+TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
 
-TL_API void create_file(filechar const *path);
-inline void create_file(Span<filechar> path) {
+TL_API void create_file(pathchar const *path);
+inline void create_file(Span<pathchar> path) {
 	assert(path.back() == 0);
 	create_file(path.data);
 }
 
-TL_API void delete_file(filechar const *path);
-inline void delete_file(Span<filechar> path) {
+TL_API void delete_file(pathchar const *path);
+inline void delete_file(Span<pathchar> path) {
 	assert(path.back() == 0);
 	delete_file(path.data);
 }
 
 struct FileTracker {
-	List<filechar> path;
+	List<pathchar> path;
 	u64 last_write_time;
 
 	Allocator allocator;
@@ -155,7 +155,7 @@ struct FileTracker {
 	void *state;
 };
 
-inline FileTracker create_file_tracker_steal_path(List<filechar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+inline FileTracker create_file_tracker_steal_path(List<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
 	assert(path.back() == 0);
 	FileTracker result = {};
 	result.on_update = on_update;
@@ -163,11 +163,11 @@ inline FileTracker create_file_tracker_steal_path(List<filechar> path, void (*on
 	result.path = path;
 	return result;
 }
-inline FileTracker create_file_tracker_steal_path(List<filechar> path, void (*on_update)(FileTracker &tracker)) {
+inline FileTracker create_file_tracker_steal_path(List<pathchar> path, void (*on_update)(FileTracker &tracker)) {
 	return create_file_tracker_steal_path(path, (void(*)(FileTracker &, void *))on_update, 0);
 }
 template <class Fn>
-inline FileTracker create_file_tracker_steal_path(List<filechar> path, Fn &&on_update) {
+inline FileTracker create_file_tracker_steal_path(List<pathchar> path, Fn &&on_update) {
 	auto allocator = current_allocator;
 
 	auto params = ALLOCATE_NOINIT(Fn, allocator);
@@ -180,14 +180,14 @@ inline FileTracker create_file_tracker_steal_path(List<filechar> path, Fn &&on_u
 	result.allocator = allocator;
 	return result;
 }
-inline FileTracker create_file_tracker(Span<filechar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
+inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
 	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), on_update, state);
 }
-inline FileTracker create_file_tracker(Span<filechar> path, void (*on_update)(FileTracker &tracker)) {
+inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker)) {
 	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
 }
 template <class Fn>
-inline FileTracker create_file_tracker(Span<filechar> path, Fn &&on_update) {
+inline FileTracker create_file_tracker(Span<pathchar> path, Fn &&on_update) {
 	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), std::forward<Fn>(on_update));
 }
 
@@ -215,7 +215,7 @@ inline void free(FileTracker &tracker) {
 }
 
 template <class Fn>
-inline void reset(FileTracker &tracker, Span<filechar> path, Fn &&on_update) {
+inline void reset(FileTracker &tracker, Span<pathchar> path, Fn &&on_update) {
 	if (tracker.path.data) {
 		if (tracker.allocator) {
 			tracker.allocator.free(tracker.state);
@@ -246,9 +246,9 @@ enum : FileDialogFlags {
 	FileDialog_multiple  = 0x2,
 };
 
-TL_API ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
+TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
-TL_API List<filechar> get_current_directory();
+TL_API List<pathchar> get_current_directory();
 
 }
 
@@ -296,7 +296,7 @@ OpenFileParams get_open_file_params(u32 open_flags) {
 	}
 	return result;
 }
-File open_file(filechar const *path, u32 open_flags) {
+File open_file(pathchar const *path, u32 open_flags) {
 	auto params = get_open_file_params(open_flags);
 	auto handle = CreateFileW(
 		(wchar *)path,
@@ -371,7 +371,7 @@ void close(File file) {
 	CloseHandle(file.handle);
 }
 
-bool file_exists(Span<filechar> path) {
+bool file_exists(Span<pathchar> path) {
 	assert(path.back() == 0);
 	return PathFileExistsW((wchar *)path.data);
 }
@@ -383,7 +383,7 @@ static u64 get_file_write_time(HANDLE file) {
 
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
-u64 get_file_write_time(Span<filechar> path) {
+u64 get_file_write_time(Span<pathchar> path) {
 	assert(path.back() == 0);
 	HANDLE file = CreateFileW(
 		(wchar *)path.data,
@@ -419,7 +419,7 @@ static wchar *append_star(Span<utf16> directory) {
 	return directory_with_star;
 }
 
-ListList<filechar> get_files_in_directory(Span<filechar> directory) {
+ListList<pathchar> get_files_in_directory(Span<pathchar> directory) {
 	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
@@ -429,7 +429,7 @@ ListList<filechar> get_files_in_directory(Span<filechar> directory) {
 	}
 
 	u32 file_index = 0;
-	ListList<filechar> result;
+	ListList<pathchar> result;
 	do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
@@ -437,7 +437,7 @@ ListList<filechar> get_files_in_directory(Span<filechar> directory) {
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 			continue;
 		}
-		result.add(as_span((filechar *)find_data.cFileName));
+		result.add(as_span((pathchar *)find_data.cFileName));
 	} while (FindNextFileW(handle, &find_data));
 	FindClose(handle);
 
@@ -445,7 +445,7 @@ ListList<filechar> get_files_in_directory(Span<filechar> directory) {
 	return result;
 }
 
-FileItemList get_items_in_directory(Span<filechar> directory) {
+FileItemList get_items_in_directory(Span<pathchar> directory) {
 	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
@@ -472,7 +472,7 @@ FileItemList get_items_in_directory(Span<filechar> directory) {
 
 		FileItem item;
 		item.name.size = name.size;
-		item.name.data = (filechar *)result.buffer.size;
+		item.name.data = (pathchar *)result.buffer.size;
 
 		if (item.name.size > 200)
 			debug_break();
@@ -500,11 +500,11 @@ FileItemList get_items_in_directory(Span<filechar> directory) {
 	return result;
 }
 
-void create_file(filechar const *path) {
+void create_file(pathchar const *path) {
 	CloseHandle(CreateFileW((wchar *)path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL));
 }
 
-void delete_file(filechar const *path) {
+void delete_file(pathchar const *path) {
 	DeleteFileW((wchar *)path);
 }
 
@@ -564,7 +564,7 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 	return hr;
 }
 
-ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
+ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
 	IFileOpenDialog *dialog = NULL;
 	if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return {};
 	defer { dialog->Release(); };
@@ -618,7 +618,7 @@ ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allo
 	if (FAILED(dialog->Show(NULL))) return {};
 
 
-	ListList<filechar> result;
+	ListList<pathchar> result;
 
 	auto add_item = [&](IShellItem *item) {
 		PWSTR path = NULL;
@@ -659,8 +659,8 @@ ListList<filechar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allo
 	return result;
 }
 
-List<filechar> get_current_directory() {
-	List<filechar> temp;
+List<pathchar> get_current_directory() {
+	List<pathchar> temp;
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
 	return temp;

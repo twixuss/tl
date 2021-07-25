@@ -5,8 +5,8 @@ namespace tl {
 
 TL_DECLARE_HANDLE(Process);
 
-TL_API Process execute(filechar const *path, filechar const *arguments, bool visible);
-inline Process execute(Span<filechar> path, Span<filechar> arguments, bool visible) {
+TL_API Process execute(pathchar const *path, pathchar const *arguments, bool visible);
+inline Process execute(Span<pathchar> path, Span<pathchar> arguments, bool visible) {
 	assert(path.back() == 0);
 	assert(arguments.back() == 0);
 	return execute(path.data, arguments.data, visible);
@@ -24,7 +24,7 @@ void free(Process &process);
 
 #if OS_WINDOWS
 
-Process execute(filechar const *path, filechar const *arguments, bool visible) {
+Process execute(pathchar const *path, pathchar const *arguments, bool visible) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;

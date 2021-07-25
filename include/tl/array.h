@@ -24,6 +24,9 @@ struct Array {
 		return data[i];
 	}
 
+	constexpr T &back() { return data[size - 1]; }
+	constexpr T const &back() const { return data[size - 1]; }
+
 	constexpr Span<T> operator+(umm i) {
 		bounds_check(i <= size);
 		return {data + i, size - i};

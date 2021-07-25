@@ -25,6 +25,7 @@
 #include <tl/system.h>
 #include <tl/thread.h>
 #include <tl/time.h>
+#include <tl/u256.h>
 
 #if OS_WINDOWS
 #include <tl/win32.h>

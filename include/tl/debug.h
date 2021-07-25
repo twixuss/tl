@@ -142,7 +142,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 
 			if (!SymFromAddr(debug_process, (DWORD64)call, &displacement, symbol)) {
 				auto error = GetLastError();
-				print("SymFromAddr failed with code: 0x% (%)\n", FormatInt(error, 16), error);
+				print("SymFromAddr failed with code: 0x% (%)\n", FormatInt{.value = error, .radix = 16}, error);
 				break;
 			}
 

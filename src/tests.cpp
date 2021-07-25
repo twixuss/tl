@@ -23,6 +23,7 @@
 #include <tl/system.h>
 #include <tl/thread.h>
 #include <tl/time.h>
+#include <tl/u256.h>
 
 #if OS_WINDOWS
 #include <tl/win32.h>
@@ -390,12 +391,547 @@ void rand_test() {
 }
 #endif
 
+union F32 {
+	f32 value;
+	struct {
+		u32 mantissa : 23;
+		u32 exponent : 8;
+		u32 sign : 1;
+	};
+};
+
+
+struct u128 {
+	u64 low;
+	u64 high;
+
+	u128 &operator++() { return *this += {.low = 1}; }
+	u128 operator++(int) { u128 copy = *this; ++*this; return copy; }
+
+	u128 operator~() const { return {.low = ~low, .high = ~high}; }
+	u128 operator-() const { 
+		u128 result = ~*this;
+		result.low += 1;
+		if (result.low == 0) {
+			result.high += 1;
+		}
+		return result;
+	}
+
+	u128 operator|(u128 b) const { return {.low = low | b.low, .high = high | b.high }; }
+	u128 operator&(u128 b) const { return {.low = low & b.low, .high = high & b.high }; }
+	u128 operator<<(u32 b) const {
+		if (b == 0) return *this;
+		u128 result;
+		result.low = b < 64 ? low << b : 0;
+		result.high = (high << b) | (low >> (64 - b));
+		return result;
+	}
+	u128 operator>>(u32 b) const {
+		if (b == 0) return *this;
+		u128 result;
+		result.low = (low >> b) | (high << (64 - b));
+		result.high = high >> b;
+		return result;
+	}
+	u128 operator+(u128 b) const {
+		u128 result;
+		bool carry;
+		add_carry(low, b.low, &result.low, &carry);
+		result.high = high + b.high + carry;
+		return result;
+	}
+	u128 operator-(u128 b) const {
+		return *this + -b;
+	}
+	u128 operator*(u128 b) const {
+		u128 result = {};
+		for (u32 bit_index = 0; bit_index < 128; ++bit_index) {
+			if (b.bit_at(bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	u128 operator*(u8 b) const {
+		u128 result = {};
+		for (u32 bit_index = 0; bit_index < 8; ++bit_index) {
+			if (b & ((u8)1 << bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	u128 operator*(u16 b) const {
+		u128 result = {};
+		for (u32 bit_index = 0; bit_index < 16; ++bit_index) {
+			if (b & ((u16)1 << bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	u128 operator*(u32 b) const {
+		u128 result = {};
+		for (u32 bit_index = 0; bit_index < 32; ++bit_index) {
+			if (b & ((u32)1 << bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	u128 operator*(u64 b) const {
+		u128 result = {};
+		for (u32 bit_index = 0; bit_index < 64; ++bit_index) {
+			if (b & ((u64)1 << bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	u128 operator/(u128 b) const {
+		u128 result = {};
+
+		u128 remainder = *this;
+		while (remainder >= b) {
+			remainder -= b;
+			++result;
+		}
+
+		return result;
+	}
+	u128 operator%(u128 b) const {
+		u128 remainder = *this;
+		while (remainder >= b) {
+			remainder -= b;
+		}
+		return remainder;
+	}
+
+	bool operator==(u128 b) const { return low == b.low && high == b.high; }
+	bool operator!=(u128 b) const { return low != b.low || high != b.high; }
+
+	bool operator>(u128 b) const { return high >= b.high && low > b.low; }
+	bool operator<(u128 b) const { return high <= b.high && low < b.low; }
+	bool operator>=(u128 b) const { return high >= b.high && low >= b.low; }
+	bool operator<=(u128 b) const { return high <= b.high && low <= b.low; }
+
+	bool bit_at(u32 index) const {
+		return ((u32 *)this)[index >> 5] & ((u32)1 << (index & 31));
+		return index < 64 ? (low & ((u64)1 << index)) : (high & ((u64)1 << (index - 64)));
+	}
+
+	u128 &operator|=(u128 b) { return *this = *this | b; }
+	u128 &operator+=(u128 b) { return *this = *this + b; }
+	u128 &operator-=(u128 b) { return *this = *this - b; }
+	u128 &operator*=(u128 b) { return *this = *this * b; }
+	u128 &operator/=(u128 b) { return *this = *this / b; }
+	
+	u128 &operator+=(u64 b) { return *this = *this + u128{.low = b}; }
+
+	u128 &operator*=(u8  b) { return *this = *this * b; }
+	u128 &operator*=(u16 b) { return *this = *this * b; }
+	u128 &operator*=(u32 b) { return *this = *this * b; }
+	u128 &operator*=(u64 b) { return *this = *this * b; }
+
+	operator u64() const { return low; };
+};
+
+template <> inline static constexpr bool is_integer<u128> = true;
+template <> inline static constexpr bool is_integer_like<u128> = true;
+
+u128 U128(u64 val) {
+	return {.low = val};
+}
+
+u128 operator""su(u64 val) {
+	return {.low = val};
+}
+
+
+
+struct BigUInt {
+	List<u64> parts;
+	BigUInt() = default;
+	BigUInt(u64 value) : parts({value}) {}
+	BigUInt(BigUInt const &that) : parts(copy(that.parts)) {}
+	BigUInt(BigUInt &&that) : parts(that.parts) { that.parts = {}; }
+	~BigUInt() { free(parts); }
+	
+	BigUInt &operator=(BigUInt const &that) { free(parts); parts = copy(that.parts); return *this; }
+	BigUInt &operator=(BigUInt &&that) { free(parts); parts = that.parts; that.parts = {}; return *this; }
+
+	u64 try_get_part(umm index) const {
+		return index < parts.size ? parts[index] : (u64)0;
+	}
+	bool get_bit(umm index) const {
+		umm part_index = index / (sizeof(parts[0]) * 8);
+		umm bit_index  = index % (sizeof(parts[0]) * 8);
+		return parts[part_index] & ((u64)1 << bit_index);
+	}
+	void set_bit(umm index, bool value) {
+		umm part_index = index / (sizeof(parts[0]) * 8);
+		umm bit_index  = index % (sizeof(parts[0]) * 8);
+		if (value) parts[part_index] |=  ((u64)1 << bit_index);
+		else       parts[part_index] &= ~((u64)1 << bit_index);
+	}
+	
+	BigUInt operator~() const { 
+		BigUInt result;
+		result.parts.reserve(parts.size);
+		for (auto &part : parts) {
+			result.parts.add(~part);
+		}
+		return result;
+	}
+	BigUInt operator-() const { 
+		BigUInt result = ~*this;
+		return ++result;
+	}
+	
+	BigUInt &operator++() { return *this += 1; }
+	BigUInt operator++(int) { BigUInt copy = *this; ++*this; return copy; }
+
+	BigUInt operator<<(u64 b) const {
+		BigUInt result;
+		
+		u64 zero_part_count = b >> 6;
+		result.parts.resize(zero_part_count);
+		
+		if ((b & 63) == 0) {
+			for (auto &part : parts) {
+				result.parts.add(part);
+			}
+		} else {
+			if (parts.size) {
+				result.parts.add(parts[0] << b);
+				for (umm part_index = 1; part_index != parts.size; ++part_index) {
+					result.parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
+				}
+			}
+		}
+		
+		return result;
+	}
+
+	BigUInt operator+(BigUInt b) const {
+		BigUInt min_int = *this, max_int = b;
+		if (min_int.parts.size > max_int.parts.size) {
+			swap(min_int, max_int);
+		}
+	
+		BigUInt result;
+		result.parts.resize(max_int.parts.size);
+
+		bool carry = false;
+	
+		for (u32 part_index = 0; part_index < min_int.parts.size; ++part_index) {
+			add_carry(min_int.parts[part_index], max_int.parts[part_index], carry, &result.parts[part_index], &carry);
+		}
+		for (u32 part_index = min_int.parts.size; part_index < max_int.parts.size; ++part_index) {
+			add_carry(max_int.parts[part_index], 0, carry, &result.parts[part_index], &carry);
+		}
+
+		if (carry) {
+			result.parts.add(1);
+		}
+
+		return result;
+	}
+	BigUInt operator-(BigUInt const &b) const {
+		assert(*this >= b);
+		if (parts.size == 0)
+			return 0;
+
+		BigUInt result = *this;
+		if (result.parts[0] < b.parts[0]) {
+			for (umm part_index = 1; part_index != result.parts.size; part_index += 1) {
+				result.parts[part_index]--;
+				if (result.parts[part_index] != -1) {
+					break;
+				}
+			}
+		}
+		result.parts[0] -= b.parts[0];
+		return result;
+	}
+	BigUInt operator*(BigUInt b) const {
+		BigUInt result = {};
+		for (u32 bit_index = 0; bit_index < b.parts.size * (sizeof(b.parts[0]) * 8); ++bit_index) {
+			if (b.get_bit(bit_index)) {
+				result += *this << bit_index;
+			}
+		}
+		return result;
+	}
+	BigUInt operator/(BigUInt b) const {
+		BigUInt min_int = *this, max_int = b;
+		if (min_int.parts.size > max_int.parts.size) {
+			swap(min_int, max_int);
+		}
+
+		BigUInt N = *this;
+		BigUInt quotient;
+		BigUInt remainder;
+
+		N.parts.resize(max_int.parts.size);
+		quotient.parts.resize(max_int.parts.size);
+		remainder.parts.resize(max_int.parts.size);
+		
+		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
+			remainder <<= 1;
+			remainder.set_bit(0, N.get_bit(bit_index));
+			if (remainder >= b) {
+				remainder -= b;
+				quotient.set_bit(bit_index, 1);
+			}
+		}
+		return quotient;
+	}
+	BigUInt operator%(BigUInt b) const {
+		BigUInt min_int = *this, max_int = b;
+		if (min_int.parts.size > max_int.parts.size) {
+			swap(min_int, max_int);
+		}
+		
+		BigUInt N = *this;
+		BigUInt quotient;
+		BigUInt remainder;
+
+		N.parts.resize(max_int.parts.size);
+		quotient.parts.resize(max_int.parts.size);
+		remainder.parts.resize(max_int.parts.size);
+		
+		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
+			remainder <<= 1;
+			remainder.set_bit(0, N.get_bit(bit_index));
+			if (remainder >= b) {
+				remainder -= b;
+				quotient.set_bit(bit_index, 1);
+			}
+		}
+		return remainder;
+	}
+	bool operator==(BigUInt b) const {
+		BigUInt min_int = *this, max_int = b;
+		if (min_int.parts.size > max_int.parts.size) {
+			swap(min_int, max_int);
+		}
+		for (umm index = max_int.parts.size - 1; index != min_int.parts.size - 1; --index) {
+			if (max_int.parts[index] != 0) {
+				return false;
+			}
+		}
+		for (umm index = min_int.parts.size - 1; index != (umm)-1; --index) {
+			if (min_int.parts[index] != max_int.parts[index]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool operator!=(BigUInt b) const {
+		return !operator==(b);
+	}
+	
+	bool operator>(BigUInt b) const {
+		umm max_part_count = max(parts.size, b.parts.size);
+		if (max_part_count == 0)
+			return false;
+
+		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
+			if (parts[part_index] != b.parts[part_index]) {
+				return parts[part_index] > b.parts[part_index];
+			}
+		}
+
+		return parts[0] > b.parts[0];
+	}
+	bool operator<(BigUInt b) const {
+		umm max_part_count = max(parts.size, b.parts.size);
+		if (max_part_count == 0)
+			return false;
+
+		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
+			if (parts[part_index] != b.parts[part_index]) {
+				return parts[part_index] < b.parts[part_index];
+			}
+		}
+
+		return parts[0] < b.parts[0];
+	}
+	bool operator>=(BigUInt b) const {
+		umm max_part_count = max(parts.size, b.parts.size);
+		if (max_part_count == 0)
+			return false;
+
+		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
+			if (try_get_part(part_index) != b.try_get_part(part_index)) {
+				return try_get_part(part_index) >= b.try_get_part(part_index);
+			}
+		}
+
+		return parts[0] >= b.parts[0];
+	}
+	bool operator<=(BigUInt b) const {
+		umm max_part_count = max(parts.size, b.parts.size);
+		if (max_part_count == 0)
+			return false;
+
+		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
+			if (parts[part_index] != b.parts[part_index]) {
+				return parts[part_index] <= b.parts[part_index];
+			}
+		}
+
+		return parts[0] <= b.parts[0];
+	}
+
+	BigUInt &operator+=(BigUInt b) { return *this = *this + b; }
+	BigUInt &operator-=(BigUInt b) { return *this = *this - b; }
+	BigUInt &operator*=(BigUInt b) { return *this = *this * b; }
+	BigUInt &operator/=(BigUInt b) { return *this = *this / b; }
+	BigUInt &operator<<=(u64 b) { return *this = *this << b; }
+
+	explicit operator u8 () { return parts.size ? parts[0] : 0; }
+	explicit operator u16() { return parts.size ? parts[0] : 0; }
+	explicit operator u32() { return parts.size ? parts[0] : 0; }
+	explicit operator u64() { return parts.size ? parts[0] : 0; }
+};
+
+
+template <> inline static constexpr bool is_integer<BigUInt> = true;
+template <> inline static constexpr bool is_integer_like<BigUInt> = true;
+template <> inline static constexpr bool is_signed<BigUInt> = false;
+
+BigUInt operator""bu(u64 val) {
+	return val;
+}
+
+#if 1
+void append(StringBuilder &builder, F32 f) {
+	s8 actual_exponent = f.exponent - 127;
+	StringBuilder temp_builder;
+
+	if (actual_exponent < 0) {
+	} else {
+		BigUInt whole_part = BigUInt(1) << (u32)actual_exponent;
+
+
+		BigUInt fract_part = 1;
+
+		u32 remaining_mantissa = f.mantissa;
+		for (u32 bit_index = 0; bit_index < 23; ++bit_index) {
+			if (!(remaining_mantissa & 0x7fffff))
+				break;
+
+			u32 bit = (remaining_mantissa >> 22) & 1u;
+			remaining_mantissa <<= 1;
+			if ((s32)(actual_exponent - bit_index - 1) >= 0) {
+				if (bit)
+					whole_part += tl::pow(BigUInt(2), actual_exponent - bit_index - 1);
+			} else {
+				fract_part *= (u8)10;
+				if (bit) {
+					fract_part += tl::pow(BigUInt(5), bit_index - actual_exponent + 1);
+				}
+			}
+		}
+
+		if (f.sign)
+			append(builder, '-');
+		append(builder, whole_part);
+		if (fract_part != 1) {
+			append(builder, '.');
+			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+		}
+	}
+}
+#else
+void append(StringBuilder &builder, F32 f) {
+	s8 actual_exponent = f.exponent - 127;
+	StringBuilder temp_builder;
+
+	if (actual_exponent < 0) {
+	} else {
+		u256 whole_part = 1ou << (u32)actual_exponent;
+
+
+		u256 fract_part = {1};
+
+		u32 remaining_mantissa = f.mantissa;
+		for (u32 bit_index = 0; bit_index < 23; ++bit_index) {
+			if (!(remaining_mantissa & 0x7fffff))
+				break;
+
+			u32 bit = (remaining_mantissa >> 22) & 1u;
+			remaining_mantissa <<= 1;
+			if ((s32)(actual_exponent - bit_index - 1) >= 0) {
+				if (bit)
+					whole_part += tl::pow(2ou, actual_exponent - bit_index - 1);
+			} else {
+				fract_part *= (u8)10;
+				if (bit) {
+					fract_part += tl::pow(5ou, bit_index - actual_exponent + 1);
+				}
+			}
+		}
+
+		if (f.sign)
+			append(builder, '-');
+		append(builder, whole_part);
+		if (fract_part != u256{1}) {
+			append(builder, '.');
+			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+		}
+	}
+}
+#endif
+
 int main() {
 	init_allocator();
 	defer { deinit_allocator(); };
 
 	init_printer();
 	defer { deinit_printer(); };
+	
+	{
+		u128 test = 0su;
+		assert(++test == 1su);
+	}
+	{
+		u128 test = 0su;
+		assert(test++ == 0su);
+	}
+
+	{
+		u128 test = U128(~(u64)0);
+		assert(++test == U128(~(u64)0) + 1su);
+	}
+	{
+		u128 test = U128(~(u64)0);
+		assert(test++ == U128(~(u64)0));
+	}
+
+	assert((~0su).low == ~0);
+	assert((~0su).high == ~0);
+	{
+		u128 result = ((u128)(~(u64)0)) << 64u;
+		u128 expected = {.low = 0, .high = ~(u64)0};
+		assert(result == expected);
+	}
+
+	assert(27ou / 10ou == 2ou);
+	assert(27ou % 10ou == 7ou);
+
+	assert(27bu + 10bu == 37bu);
+	assert(37bu - 10bu == 27bu);
+	assert(27bu / 10bu == 2bu);
+	assert(27bu % 10bu == 7bu);
+
+	print("%\n", F32{.value = 7.6251f});
+	print("%\n", F32{.value = nextafterf(1, 2)});
+
 
 #define TEST(name) print("% ... ", #name); void name(); name(); print("ok\n")
 	TEST(string_test);

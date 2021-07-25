@@ -26,7 +26,7 @@ struct Catalog {
 	};
 	Allocator allocator;
 	std::unordered_map<Span<utf8>, Entry> entries;
-	ListList<filechar> file_names;
+	ListList<pathchar> file_names;
 	Entry *fallback = 0;
 	void (*update_entry)(Entry &) = 0;
 	bool (*entry_valid)(Entry &) = 0;
@@ -71,14 +71,14 @@ Catalog<T>::Entry *find(Catalog<T> &catalog, Span<utf8> name) {
 }
 
 template <class T>
-Catalog<T>::Entry &add_entry(Catalog<T> &catalog, Span<filechar> name) {
+Catalog<T>::Entry &add_entry(Catalog<T> &catalog, Span<pathchar> name) {
 	auto &entry = catalog.entries[name];
 	entry.name = name;
 	return entry;
 }
 
 template <class T>
-Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<filechar> directory, Span<filechar> full_name) {
+Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<pathchar> directory, Span<pathchar> full_name) {
 	auto file_name = full_name;
 	file_name.size = find(file_name, tl_file_string('.')) - file_name.data;
 
@@ -99,7 +99,7 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<filechar> directory, Span<
 }
 
 template <class T>
-void init_catalog(Catalog<T> &catalog, Span<filechar> directory) {
+void init_catalog(Catalog<T> &catalog, Span<pathchar> directory) {
 	catalog.allocator = current_allocator;
 	catalog.file_names = get_files_in_directory(directory);
 	for (auto &full_name : catalog.file_names) {

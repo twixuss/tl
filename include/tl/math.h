@@ -1961,8 +1961,8 @@ forceinline f32 sdf_ellipse(v2f point, v2f radius) {
 		co = ry + sign(l) * rx + absolute(g) / (rx * ry);
 	} else {
 		float h = 2.0f * m * n * sqrt(d);
-		float s = msign(q + h) * pow(absolute(q + h), 1.0f / 3.0f);
-		float t = msign(q - h) * pow(absolute(q - h), 1.0f / 3.0f);
+		float s = msign(q + h) * powf(absolute(q + h), 1.0f / 3.0f);
+		float t = msign(q - h) * powf(absolute(q - h), 1.0f / 3.0f);
 		float rx = -(s + t) - c * 4.0f + 2.0f * m2;
 		float ry = (s - t) * sqrt(3.0f);
 		float rm = sqrt(rx * rx + ry * ry);
@@ -1989,6 +1989,13 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 }
 
 } // namespace CE
+
+inline void append(StringBuilder &builder, FormatFloat<v2f> f) {
+	append_format(builder, "{%, %}", 
+		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
+		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
+	);
+}
 
 #define TO_STRING_V2(v2f)                           \
 inline void append(StringBuilder &builder, v2f v) { \
@@ -2059,13 +2066,12 @@ void append(StringBuilder &builder, ray<T> r) {
 	append_format(builder, "ray{origin=%, direction=%}", r.origin, r.direction);
 }
 
-template <class To, class From> forceinline To cvt(From v) { return (To)v; }
-template <> forceinline v2f cvt(f32 v) { return V2f(v); }
-template <> forceinline v3f cvt(f32 v) { return V3f(v); }
-template <> forceinline v2f cvt(s32 v) { return V2f((f32)v); }
-template <> forceinline v3f cvt(s32 v) { return V3f((f32)v); }
-template <> forceinline v2f cvt(u32 v) { return V2f((f32)v); }
-template <> forceinline v3f cvt(u32 v) { return V3f((f32)v); }
+template <> forceinline constexpr v2f cvt(f32 v) { return V2f(v); }
+template <> forceinline constexpr v3f cvt(f32 v) { return V3f(v); }
+template <> forceinline constexpr v2f cvt(s32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f cvt(s32 v) { return V3f((f32)v); }
+template <> forceinline constexpr v2f cvt(u32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f cvt(u32 v) { return V3f((f32)v); }
 
 template <class T>
 forceinline T saturate(T t) {

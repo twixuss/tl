@@ -217,4 +217,8 @@ v3f to_euler_angles(quaternion q) {
     return pitchYawRoll;
 }
 
+void append(StringBuilder &builder, quaternion q) {
+	append_format(builder, "{%, %, %, %}", q.x, q.y, q.z, q.w);
+}
+
 }

@@ -8,7 +8,7 @@ struct FilePrinter : Printer {
 	File file;
 };
 
-inline FilePrinter create_file_printer(Span<filechar> path) {
+inline FilePrinter create_file_printer(Span<pathchar> path) {
 	FilePrinter result;
 	result.file = open_file(path, File_write);
 	result.func = [](PrintKind kind, Span<utf8> data, void *state) {

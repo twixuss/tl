@@ -74,7 +74,7 @@ struct Scene3D {
 
 TL_API Scene3D parse_glb_from_memory(Span<u8> memory);
 
-inline Optional<Scene3D> parse_glb_from_file(Span<filechar> path) {
+inline Optional<Scene3D> parse_glb_from_file(Span<pathchar> path) {
 	auto memory = with(temporary_allocator, read_entire_file(path));
 	if (memory.data) {
 		return parse_glb_from_memory(memory);

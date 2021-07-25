@@ -144,10 +144,10 @@ List<ascii> output_for_chrome() {
 				append(builder, ",\n"s);
 			}
 			append_format(builder, R"({"cat":"function","dur":%,"name":"%","ph":"X","pid":0,"tid":%,"ts":%})",
-				FormatFloat((span.end - span.begin) * 1000000. / performance_frequency, 6),
+				FormatFloat{.value = (span.end - span.begin) * 1000000. / performance_frequency, .precision = 6},
 				span.name,
 				span.thread_id,
-				FormatFloat(span.begin * 1000000. / performance_frequency, 6)
+				FormatFloat{.value = span.begin * 1000000. / performance_frequency, .precision = 6}
 			);
 			needComma = true;
 		}

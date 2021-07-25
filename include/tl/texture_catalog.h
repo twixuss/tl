@@ -9,7 +9,7 @@ namespace tl {
 
 using TextureCatalog = Catalog<TL_TEXTURE_CATALOG_ENTRY>;
 
-void init(TextureCatalog &catalog, Span<filechar> directory) {
+void init(TextureCatalog &catalog, Span<pathchar> directory) {
 	catalog.entry_string = "Texture"s;
 	init_catalog(catalog, directory);
 }

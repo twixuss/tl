@@ -18,10 +18,18 @@ enum : WindowStyleFlags {
 
 struct Window;
 
+enum Cursor {
+	Cursor_default,
+	Cursor_horizontal,
+	Cursor_vertical,
+	Cursor_horizontal_and_vertical,
+};
+
 using WindowOnCreate = void (*)(Window &);
 using WindowOnDraw = void (*)(Window &);
 using WindowOnSize = void (*)(Window &);
 using WindowHitTest = u32 (*)(Window &);
+using WindowGetCursor = Cursor (*)(Window &);
 
 enum WindowState {
 	Window_normal,
@@ -42,8 +50,8 @@ struct Window {
 	v2s client_position = {};
 	v2s window_position = {};
 	v2s mouse_position = {};
-	v2s mouse_delta = {};
-	s32 mouse_wheel = 0;
+	v2f mouse_delta = {};
+	f32 mouse_wheel = 0;
 	bool has_focus = false;
 	bool active = false;
 	WindowFlags flags = 0;
@@ -52,7 +60,9 @@ struct Window {
 	WindowOnDraw on_draw = 0;
 	WindowOnSize on_size = 0;
 	WindowHitTest hit_test = 0;
+	WindowGetCursor get_cursor = 0;
 	WindowState state;
+	f32 mouse_sensitivity;
 };
 
 struct CreateWindowInfo {
@@ -64,6 +74,7 @@ struct CreateWindowInfo {
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
 	WindowHitTest hit_test = 0;
+	WindowGetCursor get_cursor = 0;
 };
 
 TL_API Window *create_window(CreateWindowInfo info);
@@ -78,6 +89,8 @@ TL_API void show(Window *window);
 TL_API void maximize(Window *window);
 TL_API void minimize(Window *window);
 TL_API void restore(Window *window);
+
+TL_API void set_cursor(Cursor cursor);
 
 }
 
@@ -107,6 +120,39 @@ static DWORD get_window_style(WindowStyleFlags flags) {
 	return WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 }
 
+static void update_mouse_speed(Window &window) {
+	// speed index, ranges from 1 to 20
+	int speed;
+	SystemParametersInfo(SPI_GETMOUSESPEED, 0, &speed, 0);
+
+	// all elements marked `unknown` are picked by eye because i can't test them
+
+	f32 map_speed[20] = {
+		0.031250f,
+		0.062500f,
+		0.125000f, // unknown
+		0.250000f,
+		0.353553f, // 2^-1.5 unknown
+		0.500000f,
+		0.666666f, // unknown
+		0.750000f,
+		0.875000f, // unknown
+		1.000000f,
+		1.250000f, // unknown
+		1.500000f,
+		1.750000f, // unknown
+		2.000000f,
+		2.250000f, // unknown
+		2.500000f,
+		2.750000f, // unknown
+		3.000000f,
+		3.250000f, // unknown
+		3.500000f,
+	};
+
+	window.mouse_sensitivity = map_speed[speed - 1];
+}
+
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
 	Window *window_pointer;
 	if (currently_creating_window) {
@@ -122,6 +168,19 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 	static bool changing_state = false;
 
 	switch (message) {
+		case WM_SETCURSOR: {
+			if (window.get_cursor && all_true((v2u)window.mouse_position < window.client_size)) {
+				set_cursor(window.get_cursor(window));
+				return 0;
+			}
+			break;
+		}
+		case WM_SETTINGCHANGE: {
+			if (wparam == SPI_SETMOUSESPEED) {
+				update_mouse_speed(window);
+			}
+			break;
+		}
 		case WM_CREATE: {
 			window.handle = (NativeWindowHandle)hwnd;
 			if (window.on_create) {
@@ -284,6 +343,7 @@ Window *create_window(CreateWindowInfo info) {
 	window->on_draw = info.on_draw;
 	window->on_size = info.on_size;
 	window->hit_test = info.hit_test;
+	window->get_cursor = info.get_cursor;
 	window->min_client_size = info.min_client_size;
 	window->min_window_size = get_window_size(info.min_client_size, window_style);
 	window->client_size = max(info.client_size, info.min_client_size);
@@ -301,6 +361,7 @@ Window *create_window(CreateWindowInfo info) {
 	}
 
 	init_rawinput(RawInput_mouse);
+	update_mouse_speed(*window);
 
 	return window;
 }
@@ -319,28 +380,23 @@ bool update(Window *window) {
 	}
 	MSG message;
 	while (PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
-		switch (message.message) {
-			case WM_LBUTTONDOWN:
-			case WM_RBUTTONDOWN:
-			case WM_MBUTTONDOWN: {
+		bool mouse_went_down = false;
+		bool mouse_went_up   = false;
+		defer {
+			if (mouse_went_down) {
+				print("SetCapture\n");
 				SetCapture(message.hwnd);
-				break;
 			}
-			case WM_LBUTTONUP:
-			case WM_RBUTTONUP:
-			case WM_MBUTTONUP: {
+			if (mouse_went_up) {
+				print("ReleaseCapture\n");
 				ReleaseCapture();
-				break;
 			}
-		}
+		};
 		static bool alt_is_held;
 		switch (message.message) {
-			case WM_LBUTTONDOWN: { if (on_mouse_down) on_mouse_down(0); continue; }
-			case WM_RBUTTONDOWN: { if (on_mouse_down) on_mouse_down(1); continue; }
-			case WM_MBUTTONDOWN: { if (on_mouse_down) on_mouse_down(2); continue; }
-			case WM_LBUTTONUP: { if (on_mouse_up) on_mouse_up(0); continue; }
-			case WM_RBUTTONUP: { if (on_mouse_up) on_mouse_up(1); continue; }
-			case WM_MBUTTONUP: { if (on_mouse_up) on_mouse_up(2); continue; }
+			case WM_LBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(0); continue; }
+			case WM_RBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(1); continue; }
+			case WM_MBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(2); continue; }
 			case WM_INPUT: {
 				RAWINPUT rawInput;
 				if (UINT rawInputSize = sizeof(rawInput);
@@ -351,7 +407,11 @@ bool update(Window *window) {
 				if (rawInput.header.dwType == RIM_TYPEMOUSE) {
 					auto &mouse = rawInput.data.mouse;
 
-					window->mouse_delta += {mouse.lLastX, mouse.lLastY};
+					window->mouse_delta += V2f(mouse.lLastX, mouse.lLastY) * window->mouse_sensitivity;
+
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(0); print("on_mouse_up(0)\n"); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(1); print("on_mouse_up(1)\n"); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(2); print("on_mouse_up(2)\n"); continue; }
 				}
 				continue;
 			}
@@ -392,7 +452,7 @@ bool update(Window *window) {
 				if (on_char) on_char((u32)message.wParam);
 				continue;
 			}
-			case WM_MOUSEWHEEL: window->mouse_wheel += GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; continue;
+			case WM_MOUSEWHEEL: window->mouse_wheel += (f32)GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; continue;
 		}
 		TranslateMessage(&message);
 		DispatchMessageA(&message);
@@ -419,6 +479,20 @@ void minimize(Window *window) {
 }
 void restore(Window *window) {
 	ShowWindow((HWND)window->handle, SW_RESTORE);
+}
+
+static HCURSOR get_cursor(Cursor cursor) {
+	switch (cursor) {
+		case Cursor_default:                   { static auto result = LoadCursor(0, IDC_ARROW);  return result; }
+		case Cursor_horizontal:                { static auto result = LoadCursor(0, IDC_SIZEWE); return result; }
+		case Cursor_vertical:                  { static auto result = LoadCursor(0, IDC_SIZENS); return result; }
+		case Cursor_horizontal_and_vertical:   { static auto result = LoadCursor(0, IDC_SIZEALL); return result; }
+	}
+	return 0;
+}
+
+void set_cursor(Cursor cursor) {
+	SetCursor(get_cursor(cursor));
 }
 
 }

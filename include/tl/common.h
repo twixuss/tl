@@ -232,11 +232,23 @@ template<> inline static constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
 #pragma warning(pop)
 
-forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry) { *carry = _addcarry_u8 (0, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry) { *carry = _addcarry_u16(0, a, b, result); }
-forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry) { *carry = _addcarry_u32(0, a, b, result); }
+template <class To, class From>
+inline constexpr To cvt(From from) {
+	return (To)from;
+}
+
+forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = _addcarry_u8 (0, a, b, result); }
+forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = _addcarry_u16(0, a, b, result); }
+forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { *carry_out = _addcarry_u32(0, a, b, result); }
 #if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry) { *carry = _addcarry_u64(0, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { *carry_out = _addcarry_u64(0, a, b, result); }
+#endif
+
+forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = _addcarry_u8 (carry_in, a, b, result); }
+forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = _addcarry_u16(carry_in, a, b, result); }
+forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = _addcarry_u32(carry_in, a, b, result); }
+#if ARCH_X64
+forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = _addcarry_u64(carry_in, a, b, result); }
 #endif
 
 forceinline constexpr bool is_nan(f32 v) {
@@ -360,8 +372,9 @@ forceinline f32 log(f32 x, f32 base) {
 	return ::logf(x) / ::logf(base);
 }
 
-forceinline constexpr s32 pow(s32 base, u32 exp) {
-	s32 res = 1;
+template <class Base, class Exponent, class = EnableIf<is_integer_like<Base> && is_integer_like<Exponent>>>
+forceinline constexpr Base pow(Base base, Exponent exp) {
+	Base res = cvt<Base>((u8)1);
 	while (exp) {
 		if (exp & 1)
 			res *= base;
@@ -623,6 +636,11 @@ inline bool memory_equals(T const *a, U const *b) {
 	return memcmp(a, b, sizeof(T)) == 0;
 }
 
+inline bool all_true(bool value) { return value; }
+inline bool any_true(bool value) { return value; }
+inline bool all_false(bool value) { return !value; }
+inline bool any_false(bool value) { return !value; }
+
 template <class Predicate, class Iterator>
 constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) {
 	for (Iterator it = begin; it != end; ++it) {
@@ -635,7 +653,7 @@ constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) 
 template <class T, class Iterator>
 constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
 	for (Iterator it = begin; it != end; ++it) {
-		if (*it == value) {
+		if (all_true(*it == value)) {
 			return it;
 		}
 	}

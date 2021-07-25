@@ -48,7 +48,7 @@ struct PlacedChar {
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
 TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
-TL_API FontCollection *create_font_collection(Span<Span<filechar>> font_paths);
+TL_API FontCollection *create_font_collection(Span<Span<pathchar>> font_paths);
 TL_API void free(FontCollection *collection);
 TL_API aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero = false);
 TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font);
@@ -64,7 +64,7 @@ namespace tl {
 static FT_Library ft_library;
 
 struct FontFace {
-	List<filechar> path;
+	List<pathchar> path;
 	Buffer file;
 	FT_Face ft;
 	u32 size;
@@ -270,7 +270,7 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 	return &font;
 }
 
-FontCollection *create_font_collection(Span<Span<filechar>> font_paths) {
+FontCollection *create_font_collection(Span<Span<pathchar>> font_paths) {
 	timed_function();
 
 	if (!ft_library) {

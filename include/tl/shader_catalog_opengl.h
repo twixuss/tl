@@ -39,7 +39,7 @@ TL_API void set_uniform(Shader &shader, char const *name, v3f value);
 TL_API void set_uniform(Shader &shader, char const *name, v4f value);
 TL_API void set_uniform(Shader &shader, char const *name, m4  value);
 
-TL_API void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<filechar> directory);
+TL_API void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<pathchar> directory);
 
 #ifdef TL_IMPL
 
@@ -160,7 +160,7 @@ bool parse_shader(Shader &shader, Span<char> source) {
 	return success;
 }
 
-Buffer load_shader_file(Span<filechar> terminated_full_path) {
+Buffer load_shader_file(Span<pathchar> terminated_full_path) {
 	timed_function();
 
 	scoped_allocator(temporary_allocator);
@@ -291,7 +291,7 @@ void use_shader(Shader &shader) {
 	}
 }
 
-void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<filechar> directory) {
+void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<pathchar> directory) {
 	using namespace OpenGL;
 
 	catalog.update_entry = [](ShaderCatalog::Entry &entry) {

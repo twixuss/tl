@@ -267,7 +267,7 @@ FormattedLastError last_error() {
 }
 
 inline void append(StringBuilder &b, FormattedLastError e) {
-	append_format(b, "0x% (%)", FormatInt(e.value, 16), e.value);
+	append_format(b, "0x% (%)", FormatInt{.value = e.value, .radix = 16}, e.value);
 }
 
 #endif
