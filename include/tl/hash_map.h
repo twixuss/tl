@@ -90,4 +90,69 @@ void free(StaticHashMap<Key, Value, capacity> &map) {
 	}
 }
 
+template <class Key, class Value>
+struct HashMap {
+	struct KeyValue {
+		Key key;
+		Value value;
+	};
+	using Bucket = LinkedList<KeyValue>;
+
+	Allocator allocator = current_allocator;
+	Bucket *buckets;
+	umm bucket_count;
+	umm total_value_count;
+	
+	Value &get_or_insert(Key const &key) {
+		if (!bucket_count) {
+			rehash(256);
+		}
+
+		umm hash = get_hash(key);
+		auto &bucket = buckets[hash & (bucket_count - 1)];
+		for (auto &it : bucket) {
+			if (it.key == key) {
+				return it.value;
+			}
+		}
+
+		if (total_value_count == bucket_count) {
+			rehash(bucket_count * 2);
+		}
+		++total_value_count;
+		auto &it = bucket.add();
+		it.key = key;
+		return it.value;
+	}
+	Value *find(Key const &key) {
+		umm hash = get_hash(key);
+		auto &bucket = buckets[hash & (bucket_count - 1)];
+		for (auto &it : bucket) {
+			if (it.key == key) {
+				return &it.value;
+			}
+		}
+		return 0;
+	}
+
+	void rehash(umm new_bucket_count) {
+		Bucket *old_buckets = buckets;
+
+		buckets = allocator.allocate<Bucket>(new_bucket_count);
+
+		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+			for (KeyValue &key_value : old_buckets[bucket_index]) {
+				auto hash = get_hash(key_value.key);
+				auto &new_bucket = buckets[hash & (new_bucket_count - 1)];
+				new_bucket.add(key_value);
+			}
+		}
+
+		if (old_buckets) {
+			allocator.free(old_buckets);
+		}
+		bucket_count = new_bucket_count;
+	}
+};
+
 }

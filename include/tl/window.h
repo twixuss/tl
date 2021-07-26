@@ -3,6 +3,7 @@
 #include "common.h"
 #include "vector.h"
 #include "input.h"
+#include "list.h"
 
 namespace tl {
 
@@ -92,6 +93,18 @@ TL_API void restore(Window *window);
 
 TL_API void set_cursor(Cursor cursor);
 
+enum ClipboardKind {
+	Clipboard_text,
+};
+
+TL_API bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data);
+template <class T>
+inline bool set_clipboard(Window *window, ClipboardKind kind, Span<T> span) {
+	return set_clipboard(window, kind, as_bytes(span));
+}
+
+TL_API List<u8> get_clipboard(Window *window, ClipboardKind kind);
+
 }
 
 #ifdef TL_IMPL
@@ -126,6 +139,7 @@ static void update_mouse_speed(Window &window) {
 	SystemParametersInfo(SPI_GETMOUSESPEED, 0, &speed, 0);
 
 	// all elements marked `unknown` are picked by eye because i can't test them
+	// and i couldn't find any information about this mapping
 
 	f32 map_speed[20] = {
 		0.031250f,
@@ -157,10 +171,10 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 	Window *window_pointer;
 	if (currently_creating_window) {
 		window_pointer = currently_creating_window;
-		SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)currently_creating_window);
+		SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)currently_creating_window);
 		currently_creating_window = 0;
 	} else {
-		window_pointer = (Window *)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
+		window_pointer = (Window *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 	}
 
 	auto &window = *window_pointer;
@@ -269,7 +283,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 					HMONITOR monitor = MonitorFromWindow((HWND)window.handle, MONITOR_DEFAULTTONEAREST);
 					MONITORINFO info;
 					info.cbSize = sizeof(info);
-					GetMonitorInfoA(monitor, &info);
+					GetMonitorInfoW(monitor, &info);
 
 					auto mr = info.rcWork;
 
@@ -308,12 +322,16 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 				return window.hit_test(window);
 			break;
 		}
+		case WM_CHAR: {
+			if (on_char) on_char((u32)wparam);
+			break;
+		}
 	}
 	return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
 Window *create_window(CreateWindowInfo info) {
-	auto instance = GetModuleHandleA(0);
+	auto instance = GetModuleHandleW(0);
 
 	if (!window_class_created) {
 		window_class_created = true;
@@ -353,7 +371,7 @@ Window *create_window(CreateWindowInfo info) {
 	currently_creating_window = window;
 	CreateWindowExW(
 		0, class_name, with(temporary_allocator, (wchar *)utf8_to_utf16(info.title, true).data),
-		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleA(0), 0
+		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleW(0), 0
 	);
 	if (!window->handle) {
 		print("CreateWindowExW failed with error code: %\n", last_error());
@@ -379,16 +397,14 @@ bool update(Window *window) {
 		return false;
 	}
 	MSG message;
-	while (PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
+	while (PeekMessageW(&message, 0, 0, 0, PM_REMOVE)) {
 		bool mouse_went_down = false;
 		bool mouse_went_up   = false;
 		defer {
 			if (mouse_went_down) {
-				print("SetCapture\n");
 				SetCapture(message.hwnd);
 			}
 			if (mouse_went_up) {
-				print("ReleaseCapture\n");
 				ReleaseCapture();
 			}
 		};
@@ -409,9 +425,9 @@ bool update(Window *window) {
 
 					window->mouse_delta += V2f(mouse.lLastX, mouse.lLastY) * window->mouse_sensitivity;
 
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(0); print("on_mouse_up(0)\n"); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(1); print("on_mouse_up(1)\n"); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(2); print("on_mouse_up(2)\n"); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(0); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(1); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(2); continue; }
 				}
 				continue;
 			}
@@ -437,7 +453,7 @@ bool update(Window *window) {
 					}
 				}
 
-				continue;
+				break;
 			}
 			case WM_SYSKEYUP:
 			case WM_KEYUP: {
@@ -448,14 +464,10 @@ bool update(Window *window) {
 				}
 				continue;
 			}
-			case WM_UNICHAR: {
-				if (on_char) on_char((u32)message.wParam);
-				continue;
-			}
 			case WM_MOUSEWHEEL: window->mouse_wheel += (f32)GET_WHEEL_DELTA_WPARAM(message.wParam) / WHEEL_DELTA; continue;
 		}
 		TranslateMessage(&message);
-		DispatchMessageA(&message);
+		DispatchMessageW(&message);
 		if (!(window->flags & Window_open)) {
 			return false;
 		}
@@ -493,6 +505,60 @@ static HCURSOR get_cursor(Cursor cursor) {
 
 void set_cursor(Cursor cursor) {
 	SetCursor(get_cursor(cursor));
+}
+
+bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data) {
+	assert(kind == Clipboard_text, "Not implemented");
+
+    if (!OpenClipboard((HWND)window->handle)) 
+        return false; 
+	defer { CloseClipboard(); };
+
+	EmptyClipboard();
+
+    auto global_memory = GlobalAlloc(GMEM_MOVEABLE, data.size + 1); 
+    if (!global_memory) { 
+        return false; 
+    } 
+ 
+    auto global_memory_pointer = GlobalLock(global_memory); 
+	if (!global_memory_pointer) 
+		return false;
+	defer { GlobalUnlock(global_memory); };
+
+    memcpy(global_memory_pointer, data.data, data.size);
+	((char *)global_memory_pointer)[data.size] = 0;
+ 
+    SetClipboardData(CF_TEXT, global_memory); 
+	return true;
+}
+
+List<u8> get_clipboard(Window *window, ClipboardKind kind) {
+	assert(kind == Clipboard_text, "Not implemented");
+
+    if (!IsClipboardFormatAvailable(CF_TEXT)) 
+		return {}; 
+    if (!OpenClipboard((HWND)window->handle)) 
+        return {}; 
+	defer { CloseClipboard(); };
+ 
+    auto global_memory = GetClipboardData(CF_TEXT); 
+    if (!global_memory)
+		return {};
+
+    auto global_memory_pointer = GlobalLock(global_memory); 
+    if (!global_memory_pointer) 
+		return {};
+	defer { GlobalUnlock(global_memory); };
+
+	umm size = string_byte_count((char *)global_memory_pointer);
+
+	List<u8> result;
+	result.resize(size);
+
+	memcpy(result.data, global_memory_pointer, size);
+
+	return result;
 }
 
 }

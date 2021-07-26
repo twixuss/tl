@@ -142,6 +142,7 @@ struct FormatFloat {
 	Float value;
 	u32 precision = 3;
 	FloatFormat format = FloatFormat_default;
+	bool trailing_zeros = false;
 };
 
 enum Encoding {
@@ -217,6 +218,26 @@ inline bool get_char_and_advance_utf8(utf8 const *&ptr, u32 *code_point) {
 }
 inline bool get_char_and_advance_utf8(utf8 *&ptr, u32 *code_point) {
 	return get_char_and_advance_utf8((utf8 const *&)ptr, code_point);
+}
+
+inline StaticList<utf8, 4> encode_utf8(u32 ch) {
+	StaticList<utf8, 4> result;
+	if (ch <= 0x80) {
+		result.add(ch);
+	} else if (ch <= 0x800) {
+		result.add(0xC0 | ((ch >> 6) & 0x1f));
+		result.add(0x80 | (ch & 0x3f));
+	} else if (ch <= 0x10000) {
+		result.add(0xE0 | ((ch >> 12) & 0x0f));
+		result.add(0x80 | ((ch >>  6) & 0x3f));
+		result.add(0x80 | (ch & 0x3f));
+	} else {
+		result.add(0xF0 | ((ch >> 18) & 0x07));
+		result.add(0x80 | ((ch >> 12) & 0x3f));
+		result.add(0x80 | ((ch >>  6) & 0x3f));
+		result.add(0x80 | (ch & 0x3f));
+	}
+	return result;
 }
 
 // NOTE: TODO: surrogate pairs ate not supported
@@ -717,15 +738,15 @@ forceinline umm append(StringBuilder &builder, void const *p) {
 	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zeros = true});
 }
 
-inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
+inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 	umm chars_appended = 0;
 
 	auto append = [&](StringBuilder &builder, auto const &value) {
 		chars_appended += ::tl::append(builder, value);
 	};
 
-	auto value = f.value;
-	auto precision = f.precision;
+	auto value = format.value;
+	auto precision = format.precision;
 	if (is_negative(value)) {
 		append(builder, "-");
 		value = -value;
@@ -733,16 +754,26 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> f) {
 
 	auto append_float = [&](f64 f) {
 		append(builder, (u64)f);
-		append(builder, ".");
+		u64 fract_part = 1;
 		for (u32 i = 0; i < precision; ++i) {
-			f = f - (f64)(s64)f;
-			f = (f < 0 ? f + 1 : f) * 10;
-			ascii ch = (ascii)((u32)f + '0');
-			append(builder, Span(&ch, 1));
+			f = frac(f) * 10;
+			fract_part *= 10;
+			fract_part += (u32)f;
+		}
+
+		if (!format.trailing_zeros) {
+			while ((fract_part % 10) == 0) {
+				fract_part /= 10;
+			}
+		}
+
+		if (fract_part != 1) {
+			append(builder, '.');
+			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
 		}
 	};
 
-	switch (f.format) {
+	switch (format.format) {
 		case FloatFormat_default: {
 			append_float(value);
 			break;

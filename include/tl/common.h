@@ -535,10 +535,16 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 	return i;
 }
 
+forceinline f32 floor(f32 v) { return ::floorf(v); }
+forceinline f64 floor(f64 v) { return ::floor(v); }
+
 forceinline f32 ceil(f32 v) { return ::ceilf(v); }
 forceinline f64 ceil(f64 v) { return ::ceil(v); }
 forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
 forceinline s64 ceil_to_int(f64 v) { return (s64)ceil(v); }
+
+forceinline f32 frac(f32 v) { return v - floor(v); }
+forceinline f64 frac(f64 v) { return v - floor(v); }
 
 forceinline constexpr bool is_negative(f32 v) { return *(u32 *)&v & 0x80000000; }
 forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
@@ -1243,7 +1249,7 @@ struct Allocator {
 	template <class T>
 	inline T *allocate(AllocateFlags flags, umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		T *result = (T *)func(Allocator_allocate, Allocate_uninitialized, 0, 0, count * sizeof(T), align, location, state);
-#ifndef TL_DEBUG
+#if !TL_DEBUG
 		if (flags & Allocate_uninitialized) {
 		} else
 #endif

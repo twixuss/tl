@@ -524,18 +524,11 @@ HALF(v3u)
 HALF(v4u)
 #undef HALF
 
-forceinline f32 floor(f32 v) { return ::floorf(v); }
-forceinline f64 floor(f64 v) { return ::floor(v); }
 forceinline v2f floor(v2f v) { return { floor(v.x), floor(v.y) }; }
 forceinline v3f floor(v3f v) { return { floor(v.x), floor(v.y), floor(v.z) }; }
 forceinline v4f floor(v4f v) { return { floor(v.x), floor(v.y), floor(v.z), floor(v.w) }; }
 
 forceinline v2u floor_to_power_of_2(v2u v) { return {floor_to_power_of_2(v.x), floor_to_power_of_2(v.y)}; }
-
-#define FRAC(f32) forceinline f32 frac(f32 v) { return v - floor(v); }
-FRAC(f32)
-FRAC(f64)
-#undef FRAC
 
 forceinline v2f frac(v2f v) { return { frac(v.x), frac(v.y) }; }
 forceinline v3f frac(v3f v) { return { frac(v.x), frac(v.y), frac(v.z) }; }

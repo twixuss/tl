@@ -152,7 +152,6 @@ struct List {
 
 	T &insert_at(T value, umm where) {
 		bounds_check(where <= size);
-		bounds_check(size < capacity);
 
 		reserve_exponential(size + 1);
 
@@ -164,7 +163,6 @@ struct List {
 	}
 	Span<T> insert_at(Span<T> span, umm where) {
 		bounds_check(where <= size);
-		bounds_check(size + span.size <= capacity);
 
 		reserve_exponential(size + span.size);
 
@@ -177,12 +175,57 @@ struct List {
 	T &insert(T &value, T *where) { return insert(value, where - data); }
 	Span<T> insert(Span<T> span, T *where) { return insert(span, where - data); }
 
+	void erase(Span<T> where) {
+		bounds_check(
+			where.size <= size && 
+			begin() <= where.begin() && where.begin() < end() && 
+			where.end() <= end()
+		);
+
+		memmove(where.data, where.data + where.size, size - where.size + data - where.data);
+		size -= where.size;
+	}
 	void erase_at(umm where) {
 		bounds_check(where < size);
 		--size;
 		for (umm i = where; i < size; ++i) {
 			data[i] = data[i + 1];
 		}
+	}
+	
+	void replace(Span<T> where, T with_what) {
+		bounds_check(
+			where.size <= size && 
+			begin() <= where.begin() && where.begin() < end() && 
+			where.end() <= end()
+		);
+
+		memmove(where.data + 1, where.data + where.size, end() - where.end());
+		*where.data = with_what;
+
+		size -= where.size - 1;
+	}
+
+	void replace(Span<T> where, Span<T> with_what) {
+		assert(begin() <= where.begin());
+		bounds_check(
+			where.size <= size && 
+			begin() <= where.begin() && where.begin() < end() && 
+			where.end() <= end()
+		);
+
+		T *old_data = data;
+		reserve_exponential(size - where.size + with_what.size);
+		where.data += data - old_data;
+
+		memmove(
+			where.data + with_what.size,
+			where.data + where.size,
+			(end() - where.end()) * sizeof(T)
+		);
+		memcpy(where.data, with_what.data, with_what.size * sizeof(T));
+
+		size -= where.size - with_what.size;
 	}
 
 	bool operator==(List that) const {
