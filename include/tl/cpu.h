@@ -6,86 +6,105 @@
 
 namespace tl {
 
-enum class CpuFeature : u8 {
-	_3dnow,
-	_3dnowext,
-	abm,
-	adx,
-	aes,
-	avx,
-	avx2,
-	avx512cd,
-	avx512er,
-	avx512f,
-	avx512pf,
-	bmi1,
-	bmi2,
-	clfsh,
-	cmov,
-	cmpxchg16b,
-	cx8,
-	erms,
-	f16c,
-	fma,
-	fsgsbase,
-	fxsr,
-	hle,
-	invpcid,
-	lahf,
-	lzcnt,
-	mmx,
-	mmxext,
-	monitor,
-	movbe,
-	msr,
-	osxsave,
-	pclmulqdq,
-	popcnt,
-	prefetchwt1,
-	rdrand,
-	rdseed,
-	rdtscp,
-	rtm,
-	sep,
-	sha,
-	sse,
-	sse2,
-	sse3,
-	sse41,
-	sse42,
-	sse4a,
-	ssse3,
-	syscall,
-	tbm,
-	xop,
-	xsave,
+#define tl_all_cpu_features(f) \
+f(3dnow) \
+f(3dnowext) \
+f(abm) \
+f(adx) \
+f(aes) \
+f(avx) \
+f(avx2) \
+f(avx512cd) \
+f(avx512er) \
+f(avx512f) \
+f(avx512pf) \
+f(bmi1) \
+f(bmi2) \
+f(clfsh) \
+f(cmov) \
+f(cmpxchg16b) \
+f(cx8) \
+f(erms) \
+f(f16c) \
+f(fma) \
+f(fsgsbase) \
+f(fxsr) \
+f(hle) \
+f(invpcid) \
+f(lahf) \
+f(lzcnt) \
+f(mmx) \
+f(mmxext) \
+f(monitor) \
+f(movbe) \
+f(msr) \
+f(osxsave) \
+f(pclmulqdq) \
+f(popcnt) \
+f(prefetchwt1) \
+f(rdrand) \
+f(rdseed) \
+f(rdtscp) \
+f(rtm) \
+f(sep) \
+f(sha) \
+f(sse) \
+f(sse2) \
+f(sse3) \
+f(sse41) \
+f(sse42) \
+f(sse4a) \
+f(ssse3) \
+f(syscall) \
+f(tbm) \
+f(xop) \
+f(xsave) \
 
-	count,
+enum CpuFeature : u8 {
+#define f(x) CpuFeature_##x,
+	tl_all_cpu_features(f)
+#undef f
+	CpuFeature_count,
 };
 
-enum class CpuVendor : u8 {
-	unknown,
-	intel,
-	amd,
 
-	count,
+#define tl_all_cpu_vendors(f) \
+f(unknown) \
+f(intel) \
+f(amd) \
+
+enum CpuVendor : u8 {
+#define f(x) CpuVendor_##x,
+	tl_all_cpu_vendors(f)
+#undef f
+	CpuVendor_count,
 };
 
-enum class CpuCacheType : u8 {
-	unified,
-	instruction,
-	data,
-	trace,
 
-	count,
+#define tl_all_cpu_cache_types(f) \
+f(unified) \
+f(instruction) \
+f(data) \
+f(trace) \
+
+enum CpuCacheType : u8 {
+#define f(x) CpuCacheType_##x,
+	tl_all_cpu_cache_types(f)
+#undef f
+	CpuCacheType_count,
 };
 
-enum class CpuCacheLevel : u8 {
-	l1,
-	l2,
-	l3,
 
-	count,
+#define tl_all_cpu_cache_levels(f) \
+f(l1) \
+f(l2) \
+f(l3) \
+
+enum CpuCacheLevel : u8 {
+#define f(x) CpuCacheLevel_##x,
+	tl_all_cpu_cache_levels(f)
+#undef f
+	CpuCacheLevel_count,
 };
 
 struct CpuFeatureIndex {
@@ -108,9 +127,9 @@ struct CpuCache {
 struct CpuInfo {
 
 	u32 logicalProcessorCount;
-	CpuCache cache[(u32)CpuCacheLevel::count][(u32)CpuCacheType::count];
+	CpuCache cache[CpuCacheLevel_count][CpuCacheType_count];
 	u32 cacheLineSize;
-	u32 features[ceil((u32)CpuFeature::count, 32u) / 32];
+	u32 features[ceil((u32)CpuFeature_count, 32u) / 32];
 	CpuVendor vendor;
 	char brand[49];
 
@@ -132,9 +151,12 @@ struct CpuInfo {
 #pragma warning(suppress: 4820)
 };
 
-TL_API char const *to_string(CpuFeature);
-TL_API char const *to_string(CpuVendor);
 TL_API CpuInfo get_cpu_info();
+
+TL_API Span<char> to_string(CpuCacheLevel level);
+TL_API Span<char> to_string(CpuCacheType type);
+TL_API Span<char> to_string(CpuFeature feature);
+TL_API Span<char> to_string(CpuVendor vendor);
 
 #ifdef TL_IMPL
 #if OS_WINDOWS
@@ -177,10 +199,10 @@ CpuInfo get_cpu_info() {
 
 	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {
 		switch (v) {
-			case CacheUnified: return CpuCacheType::unified;
-			case CacheInstruction: return CpuCacheType::instruction;
-			case CacheData: return CpuCacheType::data;
-			case CacheTrace: return CpuCacheType::trace;
+			case CacheUnified: return CpuCacheType_unified;
+			case CacheInstruction: return CpuCacheType_instruction;
+			case CacheData: return CpuCacheType_data;
+			case CacheTrace: return CpuCacheType_trace;
 		}
 		invalid_code_path();
 		return {};
@@ -223,9 +245,9 @@ CpuInfo get_cpu_info() {
 		((s32 *)vendorName)[1] = data[0].edx;
 		((s32 *)vendorName)[2] = data[0].ecx;
 		if (starts_with(array_as_span(vendorName), "GenuineIntel"s)) {
-			result.vendor = CpuVendor::intel;
+			result.vendor = CpuVendor_intel;
 		} else if (starts_with(array_as_span(vendorName), "AuthenticAMD"s)) {
-			result.vendor = CpuVendor::amd;
+			result.vendor = CpuVendor_amd;
 		}
 	}
 	if (data.size > 1) {
@@ -259,131 +281,98 @@ CpuInfo get_cpu_info() {
 		result.features[index.slot] |= (u32)value << index.bit;
 	};
 
-	set(CpuFeature::sse3,		(ecx1	& (1 <<  0)));
-    set(CpuFeature::pclmulqdq,	(ecx1	& (1 <<  1)));
-    set(CpuFeature::monitor,	(ecx1	& (1 <<  3)));
-    set(CpuFeature::ssse3,		(ecx1	& (1 <<  9)));
-    set(CpuFeature::fma,		(ecx1	& (1 << 12)));
-    set(CpuFeature::cmpxchg16b,	(ecx1	& (1 << 13)));
-    set(CpuFeature::sse41,		(ecx1	& (1 << 19)));
-    set(CpuFeature::sse42,		(ecx1	& (1 << 20)));
-    set(CpuFeature::movbe,		(ecx1	& (1 << 22)));
-    set(CpuFeature::popcnt,		(ecx1	& (1 << 23)));
-    set(CpuFeature::aes,		(ecx1	& (1 << 25)));
-    set(CpuFeature::xsave,		(ecx1	& (1 << 26)));
-    set(CpuFeature::osxsave,	(ecx1	& (1 << 27)));
-    set(CpuFeature::avx,		(ecx1	& (1 << 28)));
-    set(CpuFeature::f16c,		(ecx1	& (1 << 29)));
-    set(CpuFeature::rdrand,		(ecx1	& (1 << 30)));
-    set(CpuFeature::msr,		(edx1	& (1 <<  5)));
-    set(CpuFeature::cx8,		(edx1	& (1 <<  8)));
-    set(CpuFeature::sep,		(edx1	& (1 << 11)));
-    set(CpuFeature::cmov,		(edx1	& (1 << 15)));
-    set(CpuFeature::clfsh,		(edx1	& (1 << 19)));
-    set(CpuFeature::mmx,		(edx1	& (1 << 23)));
-    set(CpuFeature::fxsr,		(edx1	& (1 << 24)));
-    set(CpuFeature::sse,		(edx1	& (1 << 25)));
-    set(CpuFeature::sse2,		(edx1	& (1 << 26)));
-    set(CpuFeature::fsgsbase,	(ebx7	& (1 <<  0)));
-    set(CpuFeature::bmi1,		(ebx7	& (1 <<  3)));
-    set(CpuFeature::hle,		(ebx7	& (1 <<  4)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::avx2,		(ebx7	& (1 <<  5)));
-    set(CpuFeature::bmi2,		(ebx7	& (1 <<  8)));
-    set(CpuFeature::erms,		(ebx7	& (1 <<  9)));
-    set(CpuFeature::invpcid,	(ebx7	& (1 << 10)));
-    set(CpuFeature::rtm,		(ebx7	& (1 << 11)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::avx512f,	(ebx7	& (1 << 16)));
-    set(CpuFeature::rdseed,		(ebx7	& (1 << 18)));
-    set(CpuFeature::adx,		(ebx7	& (1 << 19)));
-    set(CpuFeature::avx512pf,	(ebx7	& (1 << 26)));
-    set(CpuFeature::avx512er,	(ebx7	& (1 << 27)));
-    set(CpuFeature::avx512cd,	(ebx7	& (1 << 28)));
-    set(CpuFeature::sha,		(ebx7	& (1 << 29)));
-    set(CpuFeature::prefetchwt1,(ecx7	& (1 <<  0)));
-    set(CpuFeature::lahf,		(ecx1ex	& (1 <<  0)));
-    set(CpuFeature::lzcnt,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::abm,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::sse4a,		(ecx1ex	& (1 <<  6)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::xop,		(ecx1ex	& (1 << 11)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::tbm,		(ecx1ex	& (1 << 21)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::syscall,	(edx1ex	& (1 << 11)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::mmxext,		(edx1ex	& (1 << 22)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor::intel);
-    set(CpuFeature::_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor::amd);
-    set(CpuFeature::_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor::amd);
+	set(CpuFeature_sse3,		(ecx1	& (1 <<  0)));
+    set(CpuFeature_pclmulqdq,	(ecx1	& (1 <<  1)));
+    set(CpuFeature_monitor,	(ecx1	& (1 <<  3)));
+    set(CpuFeature_ssse3,		(ecx1	& (1 <<  9)));
+    set(CpuFeature_fma,		(ecx1	& (1 << 12)));
+    set(CpuFeature_cmpxchg16b,	(ecx1	& (1 << 13)));
+    set(CpuFeature_sse41,		(ecx1	& (1 << 19)));
+    set(CpuFeature_sse42,		(ecx1	& (1 << 20)));
+    set(CpuFeature_movbe,		(ecx1	& (1 << 22)));
+    set(CpuFeature_popcnt,		(ecx1	& (1 << 23)));
+    set(CpuFeature_aes,		(ecx1	& (1 << 25)));
+    set(CpuFeature_xsave,		(ecx1	& (1 << 26)));
+    set(CpuFeature_osxsave,	(ecx1	& (1 << 27)));
+    set(CpuFeature_avx,		(ecx1	& (1 << 28)));
+    set(CpuFeature_f16c,		(ecx1	& (1 << 29)));
+    set(CpuFeature_rdrand,		(ecx1	& (1 << 30)));
+    set(CpuFeature_msr,		(edx1	& (1 <<  5)));
+    set(CpuFeature_cx8,		(edx1	& (1 <<  8)));
+    set(CpuFeature_sep,		(edx1	& (1 << 11)));
+    set(CpuFeature_cmov,		(edx1	& (1 << 15)));
+    set(CpuFeature_clfsh,		(edx1	& (1 << 19)));
+    set(CpuFeature_mmx,		(edx1	& (1 << 23)));
+    set(CpuFeature_fxsr,		(edx1	& (1 << 24)));
+    set(CpuFeature_sse,		(edx1	& (1 << 25)));
+    set(CpuFeature_sse2,		(edx1	& (1 << 26)));
+    set(CpuFeature_fsgsbase,	(ebx7	& (1 <<  0)));
+    set(CpuFeature_bmi1,		(ebx7	& (1 <<  3)));
+    set(CpuFeature_hle,		(ebx7	& (1 <<  4)) && result.vendor == CpuVendor_intel);
+    set(CpuFeature_avx2,		(ebx7	& (1 <<  5)));
+    set(CpuFeature_bmi2,		(ebx7	& (1 <<  8)));
+    set(CpuFeature_erms,		(ebx7	& (1 <<  9)));
+    set(CpuFeature_invpcid,	(ebx7	& (1 << 10)));
+    set(CpuFeature_rtm,		(ebx7	& (1 << 11)) && result.vendor == CpuVendor_intel);
+    set(CpuFeature_avx512f,	(ebx7	& (1 << 16)));
+    set(CpuFeature_rdseed,		(ebx7	& (1 << 18)));
+    set(CpuFeature_adx,		(ebx7	& (1 << 19)));
+    set(CpuFeature_avx512pf,	(ebx7	& (1 << 26)));
+    set(CpuFeature_avx512er,	(ebx7	& (1 << 27)));
+    set(CpuFeature_avx512cd,	(ebx7	& (1 << 28)));
+    set(CpuFeature_sha,		(ebx7	& (1 << 29)));
+    set(CpuFeature_prefetchwt1,(ecx7	& (1 <<  0)));
+    set(CpuFeature_lahf,		(ecx1ex	& (1 <<  0)));
+    set(CpuFeature_lzcnt,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor_intel);
+    set(CpuFeature_abm,		(ecx1ex	& (1 <<  5)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_sse4a,		(ecx1ex	& (1 <<  6)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_xop,		(ecx1ex	& (1 << 11)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_tbm,		(ecx1ex	& (1 << 21)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_syscall,	(edx1ex	& (1 << 11)) && result.vendor == CpuVendor_intel);
+    set(CpuFeature_mmxext,		(edx1ex	& (1 << 22)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_rdtscp,		(edx1ex	& (1 << 27)) && result.vendor == CpuVendor_intel);
+    set(CpuFeature_3dnowext,	(edx1ex	& (1 << 30)) && result.vendor == CpuVendor_amd);
+    set(CpuFeature_3dnow,		(edx1ex	& (1 << 31)) && result.vendor == CpuVendor_amd);
 
 	return result;
 }
 
 #endif // OS_WINDOWS
 
-char const *to_string(CpuFeature f) {
-#define CASE(x) case tl::CpuFeature::x: return #x;
-	switch (f) {
-		CASE(_3dnow)
-		CASE(_3dnowext)
-		CASE(abm)
-		CASE(adx)
-		CASE(aes)
-		CASE(avx)
-		CASE(avx2)
-		CASE(avx512cd)
-		CASE(avx512er)
-		CASE(avx512f)
-		CASE(avx512pf)
-		CASE(bmi1)
-		CASE(bmi2)
-		CASE(clfsh)
-		CASE(cmov)
-		CASE(cmpxchg16b)
-		CASE(cx8)
-		CASE(erms)
-		CASE(f16c)
-		CASE(fma)
-		CASE(fsgsbase)
-		CASE(fxsr)
-		CASE(hle)
-		CASE(invpcid)
-		CASE(lahf)
-		CASE(lzcnt)
-		CASE(mmx)
-		CASE(mmxext)
-		CASE(monitor)
-		CASE(movbe)
-		CASE(msr)
-		CASE(osxsave)
-		CASE(pclmulqdq)
-		CASE(popcnt)
-		CASE(prefetchwt1)
-		CASE(rdrand)
-		CASE(rdseed)
-		CASE(rdtscp)
-		CASE(rtm)
-		CASE(sep)
-		CASE(sha)
-		CASE(sse)
-		CASE(sse2)
-		CASE(sse3)
-		CASE(sse41)
-		CASE(sse42)
-		CASE(sse4a)
-		CASE(ssse3)
-		CASE(syscall)
-		CASE(tbm)
-		CASE(xop)
-		CASE(xsave)
-		default: return "unknown";
+Span<char> to_string(CpuCacheLevel level) {
+	switch (level) {
+#define f(x) case CpuCacheLevel_##x: return #x##s;
+		tl_all_cpu_cache_levels(f);
+#undef f
 	}
-#undef CASE
+	return "unknown"s;
 }
-char const *to_string(CpuVendor v) {
-#define CASE(x) case tl::CpuVendor::x: return #x;
-	switch (v) {
-		CASE(intel)
-		CASE(amd)
-		default: return "unknown";
+
+Span<char> to_string(CpuCacheType type) {
+	switch (type) {
+#define f(x) case CpuCacheType_##x: return #x##s;
+		tl_all_cpu_cache_types(f);
+#undef f
 	}
-#undef CASE
+	return "unknown"s;
+}
+
+Span<char> to_string(CpuFeature feature) {
+	switch (feature) {
+#define f(x) case CpuFeature_##x: return #x##s;
+		tl_all_cpu_features(f);
+#undef f
+	}
+	return "unknown"s;
+}
+
+Span<char> to_string(CpuVendor vendor) {
+	switch (vendor) {
+#define f(x) case CpuVendor_##x: return #x##s;
+		tl_all_cpu_vendors(f);
+#undef f
+	}
+	return "unknown"s;
 }
 
 #endif // TL_IMPL

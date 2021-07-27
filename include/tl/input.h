@@ -3,16 +3,6 @@
 
 namespace tl {
 
-using KeyState = u8;
-
-enum : KeyState {
-	KeyState_none     = 0,
-	KeyState_held     = 1,
-	KeyState_down     = 2,
-	KeyState_up       = 4,
-	KeyState_repeated = 8,
-};
-
 #if OS_WINDOWS
 
 #define ALL_KEYS(K) \
@@ -96,7 +86,7 @@ inline char const *to_string(Key key) {
 	}
 	return "unknown";
 }
-
+/*
 inline void update_key_state(Span<KeyState> key_state) {
 	for (KeyState &key : key_state) {
 		if (key & KeyState_down) {
@@ -109,6 +99,7 @@ inline void update_key_state(Span<KeyState> key_state) {
 		}
 	}
 }
+*/
 
 extern void (*on_key_down)(u8 key);
 extern void (*on_key_repeat)(u8 key);

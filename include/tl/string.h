@@ -919,6 +919,58 @@ List<char> to_string(T const &value, Encoding encoding = Encoding_utf8) {
 	return to_string(builder, current_allocator);
 }
 
+struct FormattedBytes {
+	f32 count;
+	u8 unit;
+	bool kilo_is_1024;
+};
+
+struct FormatBytesParams {
+	bool kilo_is_1024 = true;
+};
+
+inline FormattedBytes format_bytes(umm _count, FormatBytesParams params = {}) {
+	FormattedBytes result{};
+
+	result.kilo_is_1024 = params.kilo_is_1024;
+
+	f64 kilo = params.kilo_is_1024 ? 1024 : 1000;
+
+	f64 count = (f64)_count;
+	while (count > kilo) {
+		count /= kilo;
+		result.unit += 1;
+	}
+	result.count = (f32)count;
+
+	return result;
+}
+
+inline void append(StringBuilder &builder, FormattedBytes bytes) {
+	append(builder, FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false});
+	append(builder, ' ');
+	static constexpr Span<char> unit_strings[2][7] = {
+		{
+			"B"s,
+			"KB"s,
+			"MB"s,
+			"GB"s,
+			"TB"s,
+			"PB"s,
+			"EB"s,
+		}, {
+			"B"s,
+			"KiB"s,
+			"MiB"s,
+			"GiB"s,
+			"TiB"s,
+			"PiB"s,
+			"EiB"s,
+		}
+	};
+	append(builder, unit_strings[bytes.kilo_is_1024][bytes.unit]);
+}
+
 #if 0
 
 template <class Allocator = TL_DEFAULT_ALLOCATOR, class Char, class ...Args>
