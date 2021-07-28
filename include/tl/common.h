@@ -5,18 +5,6 @@
 	#pragma warning(push, 0)
 #endif
 
-#ifdef TL_IMPL
-	#if OS_WINDOWS
-		#pragma push_macro("OS_WINDOWS")
-		#undef OS_WINDOWS
-		#define NOMINMAX
-		#include <Windows.h>
-		#pragma pop_macro("OS_WINDOWS")
-	#else
-		#include <pthread.h>
-	#endif
-#endif // TL_IMPL
-
 #if COMPILER_MSVC
 	#include <intrin.h>
 	#include <vcruntime_new.h>
@@ -806,6 +794,16 @@ inline constexpr Span<T> as_span(Span<T> span) {
 }
 
 template <class T>
+constexpr Span<utf8> as_utf8(Span<T> span) {
+	return {(utf8 *)span.begin(), span.size * sizeof(T)};
+}
+template <class T>
+constexpr Span<utf8> as_utf8(T span_like) {
+	return as_utf8(as_span(span_like));
+}
+
+
+template <class T>
 constexpr Span<u8> as_bytes(T span_like) {
 	return as_bytes(as_span(span_like));
 }
@@ -1549,7 +1547,7 @@ int wmain(int argc, wchar_t **argv) {
 
 	List<Span<utf8>> arguments;
 	for (int i = 0; i < argc; ++i) {
-		arguments.add(utf16_to_utf8(as_span((utf16 *)argv[i])));
+		arguments.add(to_utf8(as_span((utf16 *)argv[i])));
 	}
 
 	return tl_main(arguments);

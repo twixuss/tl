@@ -25,6 +25,9 @@ struct MaskedBlockList {
 	Block first;
 	Block *last = &first;
 
+	MaskedBlockList &operator=(MaskedBlockList const &that) = delete;
+	MaskedBlockList &operator=(MaskedBlockList &&that) = delete;
+
 	T &add(T that) {
 		auto block = last;
 

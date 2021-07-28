@@ -82,7 +82,7 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<pathchar> directory, Span<
 	auto file_name = full_name;
 	file_name.size = find(file_name, tl_file_string('.')) - file_name.data;
 
-	auto name = path_to_utf8(file_name);
+	auto name = to_utf8(file_name);
 
 	auto &entry = catalog.entries[name];
 	entry.name = name;

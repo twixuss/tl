@@ -39,9 +39,9 @@ template <class T>
 inline void print(PrintKind kind, T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
+	builder.encoding = Encoding_utf8;
 	append(builder, value);
-	auto string = to_string(builder);
-	current_printer(kind, ascii_to_utf8(string));
+	current_printer(kind, as_utf8(to_string(builder)));
 }
 
 template <> inline void print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); }

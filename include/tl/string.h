@@ -241,7 +241,7 @@ inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 }
 
 // NOTE: TODO: surrogate pairs ate not supported
-inline List<ascii> utf16_to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
+inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
 	List<ascii> result;
 	result.reserve(span.size);
 	for (auto u16 : span) {
@@ -253,11 +253,11 @@ inline List<ascii> utf16_to_ascii(Span<utf16> span, bool terminate = false, asci
 	return result;
 }
 
-inline Span<utf8> ascii_to_utf8(Span<ascii> span) {
+inline Span<utf8> to_utf8(Span<ascii> span) {
 	return Span((utf8 *)span.data, span.size);
 }
 
-inline List<utf16> ascii_to_utf16(Span<ascii> span, bool terminate = false) {
+inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 	List<utf16> result;
 	result.reserve(span.size);
 	for (auto ch : span) {
@@ -269,8 +269,8 @@ inline List<utf16> ascii_to_utf16(Span<ascii> span, bool terminate = false) {
 	return result;
 }
 
-TL_API List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate = false);
-TL_API List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate = false);
+TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false);
+TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false);
 
 #ifndef TL_STRING_BUILDER_BLOCK_SIZE
 #define TL_STRING_BUILDER_BLOCK_SIZE 0x4000
@@ -462,7 +462,7 @@ inline umm append(StringBuilder &b, utf16 ch) {
 			}
 			break;
 		case Encoding_utf8:
-			append_bytes(b, with(temporary_allocator, utf16_to_utf8(Span(&ch, 1))));
+			append_bytes(b, with(temporary_allocator, to_utf8(Span(&ch, 1))));
 			break;
 		case Encoding_utf16:
 			append_bytes(b, ch);
@@ -526,7 +526,7 @@ inline umm append(StringBuilder &b, Span<utf8> string) {
 			break;
 		}
 		case Encoding_utf16: {
-			auto utf16 = with(temporary_allocator, utf8_to_utf16(string));
+			auto utf16 = with(temporary_allocator, to_utf16(string));
 			append_bytes(b, utf16);
 			break;
 		}
@@ -543,7 +543,7 @@ inline umm append(StringBuilder &b, Span<utf8> string) {
 inline umm append(StringBuilder &b, Span<utf16> string) {
 	switch (b.encoding) {
 		case Encoding_utf8: {
-			auto utf8 = with(temporary_allocator, utf16_to_utf8(string));
+			auto utf8 = with(temporary_allocator, to_utf8(string));
 			append_bytes(b, utf8);
 			break;
 		}
@@ -988,7 +988,7 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 
 #ifdef TL_IMPL
 
-List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate) {
+List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 	List<utf8> result;
 
 	if (utf16.size > max_value<int>)
@@ -1011,7 +1011,7 @@ List<utf8> utf16_to_utf8(Span<utf16> utf16, bool terminate) {
 	return result;
 }
 
-List<utf16> utf8_to_utf16(Span<utf8> utf8, bool terminate) {
+List<utf16> to_utf16(Span<utf8> utf8, bool terminate) {
 	List<utf16> result;
 
 	if (utf8.size > max_value<int>)

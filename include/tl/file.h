@@ -8,9 +8,7 @@ namespace tl {
 
 #if OS_WINDOWS
 using pathchar = utf16;
-inline List<utf8> path_to_utf8(Span<pathchar> span) {
-	return utf16_to_utf8(span);
-}
+inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false) { return to_utf16(string, terminate); }
 #define tl_file_string(x) u ## x
 #endif
 
@@ -56,9 +54,17 @@ inline bool valid(File file) {
 	return file.handle != 0;
 }
 
+#if TL_DEBUG
+#define tl_check_null_terminator(path) \
+	auto chars_until_terminator = string_unit_count(path.data); \
+	assert(chars_until_terminator <= path.size)
+#else
+#define tl_check_null_terminator(path)
+#endif
+
 TL_API File open_file(pathchar const *path, u32 open_flags);
 inline File open_file(Span<pathchar> path, u32 open_flags) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	return open_file(path.data, open_flags);
 }
 TL_API void close(File file);
@@ -104,7 +110,7 @@ inline Buffer read_entire_file(pathchar const *path, umm extra_space_before = 0,
 	return read_entire_file(file, extra_space_before, extra_space_after);
 }
 inline Buffer read_entire_file(Span<pathchar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	return read_entire_file(path.data, extra_space_before, extra_space_after);
 }
 
@@ -120,7 +126,7 @@ inline umm write_entire_file(pathchar const *path, void const *data, umm size) {
 	return write_entire_file(file, data, size);
 }
 inline umm write_entire_file(Span<pathchar> path, void const *data, umm size) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	return write_entire_file(path.data, data, size);
 }
 inline umm write_entire_file(File file, Span<u8> span) { return write_entire_file(file, span.data, span.size); }
@@ -136,13 +142,13 @@ TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	create_file(path.data);
 }
 
 TL_API void delete_file(pathchar const *path);
 inline void delete_file(Span<pathchar> path) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	delete_file(path.data);
 }
 
@@ -156,7 +162,7 @@ struct FileTracker {
 };
 
 inline FileTracker create_file_tracker_steal_path(List<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	FileTracker result = {};
 	result.on_update = on_update;
 	result.state = state;
@@ -372,7 +378,7 @@ void close(File file) {
 }
 
 bool file_exists(Span<pathchar> path) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	return PathFileExistsW((wchar *)path.data);
 }
 
@@ -384,7 +390,7 @@ static u64 get_file_write_time(HANDLE file) {
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
 u64 get_file_write_time(Span<pathchar> path) {
-	assert(path.back() == 0);
+	tl_check_null_terminator(path);
 	HANDLE file = CreateFileW(
 		(wchar *)path.data,
 		0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0

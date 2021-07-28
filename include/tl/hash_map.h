@@ -125,6 +125,9 @@ struct HashMap {
 		return it.value;
 	}
 	Value *find(Key const &key) {
+		if (bucket_count == 0)
+			return 0;
+
 		umm hash = get_hash(key);
 		auto &bucket = buckets[hash & (bucket_count - 1)];
 		for (auto &it : bucket) {

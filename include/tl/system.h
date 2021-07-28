@@ -245,3 +245,15 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 #else
 #define TL_DEBUG 1
 #endif
+
+#ifdef TL_IMPL
+	#if OS_WINDOWS
+		#pragma push_macro("OS_WINDOWS")
+		#undef OS_WINDOWS
+		#define NOMINMAX
+		#include <Windows.h>
+		#pragma pop_macro("OS_WINDOWS")
+	#else
+		#include <pthread.h>
+	#endif
+#endif // TL_IMPL
