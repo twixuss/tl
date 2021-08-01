@@ -567,8 +567,8 @@ v2u get_client_size(NativeWindowHandle window) {
 	RECT rect;
 	GetClientRect((HWND)window, &rect);
 	return {
-		rect.right - rect.left,
-		rect.bottom - rect.top,
+		(u32)(rect.right - rect.left),
+		(u32)(rect.bottom - rect.top),
 	};
 }
 
