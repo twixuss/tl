@@ -105,6 +105,8 @@ inline bool set_clipboard(Window *window, ClipboardKind kind, Span<T> span) {
 
 TL_API List<u8> get_clipboard(Window *window, ClipboardKind kind);
 
+TL_API v2u get_client_size(NativeWindowHandle window);
+
 }
 
 #ifdef TL_IMPL
@@ -559,6 +561,15 @@ List<u8> get_clipboard(Window *window, ClipboardKind kind) {
 	memcpy(result.data, global_memory_pointer, size);
 
 	return result;
+}
+
+v2u get_client_size(NativeWindowHandle window) {
+	RECT rect;
+	GetClientRect((HWND)window, &rect);
+	return {
+		rect.right - rect.left,
+		rect.bottom - rect.top,
+	};
 }
 
 }
