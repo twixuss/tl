@@ -1168,7 +1168,7 @@ forceinline aabb<T> to_zero(aabb<T> box) {
 
 
 template <class T>
-forceinline aabb<T> mask(aabb<T> box, aabb<T> bounds) {
+forceinline aabb<T> intersection(aabb<T> box, aabb<T> bounds) {
 	box.min = clamp(box.min, bounds.min, bounds.max);
 	box.max = clamp(box.max, bounds.min, bounds.max);
 	return box;

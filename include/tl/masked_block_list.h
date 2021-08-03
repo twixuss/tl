@@ -6,6 +6,8 @@ namespace tl {
 
 template <class T, umm _values_per_block>
 struct MaskedBlockList {
+	using ValueType = T;
+
 	static constexpr u32 values_per_block = _values_per_block;
 
 	using Mask = umm;

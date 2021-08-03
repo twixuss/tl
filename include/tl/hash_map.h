@@ -2,6 +2,11 @@
 #include "linked_list.h"
 #include "array.h"
 
+template <class T>
+umm get_hash(T *value) {
+	return (umm)value / alignof(T);
+}
+
 namespace tl {
 
 template <class Key, class Value, umm _capacity>

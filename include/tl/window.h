@@ -20,6 +20,7 @@ enum : WindowStyleFlags {
 struct Window;
 
 enum Cursor {
+	Cursor_none,
 	Cursor_default,
 	Cursor_horizontal,
 	Cursor_vertical,
@@ -91,7 +92,7 @@ TL_API void maximize(Window *window);
 TL_API void minimize(Window *window);
 TL_API void restore(Window *window);
 
-TL_API void set_cursor(Cursor cursor);
+TL_API void set_cursor(Window &window, Cursor cursor);
 
 enum ClipboardKind {
 	Clipboard_text,
@@ -104,6 +105,11 @@ inline bool set_clipboard(Window *window, ClipboardKind kind, Span<T> span) {
 }
 
 TL_API List<u8> get_clipboard(Window *window, ClipboardKind kind);
+
+TL_API void lock_cursor();
+TL_API void unlock_cursor();
+
+TL_API v2u client_size_to_window_size(Window &window, v2u client_size);
 
 }
 
@@ -183,10 +189,10 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 
 	switch (message) {
 		case WM_SETCURSOR: {
-			if (window.get_cursor && all_true((v2u)window.mouse_position < window.client_size)) {
-				set_cursor(window.get_cursor(window));
-				return 0;
-			}
+			//if (window.get_cursor && all_true((v2u)window.mouse_position < window.client_size)) {
+			//	set_cursor(window.get_cursor(window));
+			//	return 0;
+			//}
 			break;
 		}
 		case WM_SETTINGCHANGE: {
@@ -503,8 +509,15 @@ static HCURSOR get_cursor(Cursor cursor) {
 	return 0;
 }
 
-void set_cursor(Cursor cursor) {
-	SetCursor(get_cursor(cursor));
+void set_cursor(Window &window, Cursor cursor) {
+	if (cursor == Cursor_none) {
+		while (ShowCursor(false) >= 0) {
+		}
+	} else {
+		while (ShowCursor(true) < 0) {
+		}
+		SetClassLongPtrW((HWND)window.handle, GCLP_HCURSOR, (LONG_PTR)get_cursor(cursor));
+	}
 }
 
 bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data) {
@@ -559,6 +572,25 @@ List<u8> get_clipboard(Window *window, ClipboardKind kind) {
 	memcpy(result.data, global_memory_pointer, size);
 
 	return result;
+}
+
+void lock_cursor() {
+	POINT cursor_position;
+	GetCursorPos(&cursor_position);
+	RECT rect = {
+		.left   = cursor_position.x,
+		.top    = cursor_position.y,
+		.right  = cursor_position.x + 1,
+		.bottom = cursor_position.y + 1,
+	};
+	ClipCursor(&rect);
+}
+void unlock_cursor() {
+	ClipCursor(0);
+}
+
+v2u client_size_to_window_size(Window &window, v2u client_size) {
+	return get_window_size(client_size, get_window_style(window.style_flags));
 }
 
 }
