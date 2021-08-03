@@ -1,6 +1,15 @@
 #pragma once
 #include "linked_list.h"
 #include "array.h"
+#include <typeinfo>
+
+template <class T>
+tl::umm get_hash(T value);
+
+template <class T>
+tl::umm get_hash(T *value) {
+	return (tl::umm)value / alignof(T);
+}
 
 namespace tl {
 

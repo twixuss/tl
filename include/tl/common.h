@@ -635,6 +635,57 @@ inline bool any_true(bool value) { return value; }
 inline bool all_false(bool value) { return !value; }
 inline bool any_false(bool value) { return !value; }
 
+enum ForEachDirective {
+	ForEach_continue,
+	ForEach_break,
+};
+
+#define for_each_break    return ForEach_break
+#define for_each_continue return ForEach_continue
+
+template <class T, umm count, class Fn>
+void for_each(T (&array)[count], Fn &&fn) {
+	using FnRet = decltype(fn(*(T*)0));
+
+	for (auto &it : array) {
+		if constexpr (is_same<FnRet, void>) {
+			fn(it);
+		} else if constexpr (is_same<FnRet, ForEachDirective>) {
+			if (fn(it) == ForEach_break) {
+				break;
+			}
+		} else {
+			static_assert(false, "Invalid return type of for_each function");
+		}
+	}
+}
+
+template <class Container>
+struct ValueTypeOfT {
+	using Type = typename Container::ValueType;
+};
+
+template <class T, umm count>
+struct ValueTypeOfT<T[count]> {
+	using Type = T *;
+};
+
+template <class T>
+using ValueTypeOf = ValueTypeOfT<T>::Type;
+
+template <class Container, class Predicate>
+constexpr auto find_if(Container &container, Predicate &&predicate) {
+	ValueTypeOf<Container> *result = 0;
+	for_each(container, [&] (auto &it) {
+		if (predicate(it)) {
+			result = &it;
+			for_each_break;
+		}
+		for_each_continue;
+	});
+	return result;
+}
+
 template <class Predicate, class Iterator>
 constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) {
 	for (Iterator it = begin; it != end; ++it) {
