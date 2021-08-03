@@ -208,6 +208,8 @@ begin_parse:
 				}
 			}
 			append_format(builder, "))\\\n");
+
+			print("%\n", f.name);
 		}
 	};
 
@@ -224,6 +226,7 @@ begin_parse:
 
 	write_entire_file(tl_file_string("../include/tl/generated/opengl_all_funcs.h"ts), as_bytes(to_string(builder)));
 
+	print("Done\n");
 
 	return 0;
 }

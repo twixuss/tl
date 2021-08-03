@@ -87,8 +87,11 @@ D(void, glMemoryBarrier, (GLbitfield barriers), (barriers))\
 D(void, glGetBufferSubData, (GLenum target, GLintptr offset, GLsizeiptr size, GLvoid * data), (target, offset, size, data))\
 D(void, glBindImageTexture, (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format), (unit, texture, level, layered, layer, access, format))\
 D(void *, glMapBufferRange, (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access), (target, offset, length, access))\
-D(GLboolean, glUnmapBuffer, (GLenum target), (target))\
 D(void, glGetTextureImage, (GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, GLvoid * pixels), (texture, level, format, type, bufSize, pixels))\
+D(void *, glMapBuffer, (GLenum target, GLenum access), (target, access))\
+D(void *, glMapNamedBuffer, (GLuint buffer, GLenum access), (buffer, access))\
+D(GLboolean, glUnmapBuffer, (GLenum target), (target))\
+D(GLboolean, glUnmapNamedBuffer, (GLuint buffer), (buffer))\
 
 #define WINDOWS_FUNCS \
 D(BOOL, wglSwapIntervalEXT, (int interval), (interval))\

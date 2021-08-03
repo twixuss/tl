@@ -87,8 +87,11 @@ void glMemoryBarrier(GLbitfield barriers);
 void glGetBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, GLvoid *data);
 void glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
 void * glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
-GLboolean glUnmapBuffer(GLenum target);
 void glGetTextureImage(GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, GLvoid *pixels);
+void *glMapBuffer(GLenum target, GLenum access);
+void *glMapNamedBuffer(GLuint buffer, GLenum access);
+GLboolean glUnmapBuffer(GLenum target);
+GLboolean glUnmapNamedBuffer(GLuint buffer);
 
 WINDOWS
 

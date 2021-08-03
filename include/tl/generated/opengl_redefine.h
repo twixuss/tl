@@ -85,8 +85,11 @@
 #define glGetBufferSubData tl::gl::_glGetBufferSubData
 #define glBindImageTexture tl::gl::_glBindImageTexture
 #define glMapBufferRange tl::gl::_glMapBufferRange
-#define glUnmapBuffer tl::gl::_glUnmapBuffer
 #define glGetTextureImage tl::gl::_glGetTextureImage
+#define glMapBuffer tl::gl::_glMapBuffer
+#define glMapNamedBuffer tl::gl::_glMapNamedBuffer
+#define glUnmapBuffer tl::gl::_glUnmapBuffer
+#define glUnmapNamedBuffer tl::gl::_glUnmapNamedBuffer
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::_wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::_wglCreateContextAttribsARB
@@ -175,8 +178,11 @@
 #define glGetBufferSubData tl::gl::functions._glGetBufferSubData
 #define glBindImageTexture tl::gl::functions._glBindImageTexture
 #define glMapBufferRange tl::gl::functions._glMapBufferRange
-#define glUnmapBuffer tl::gl::functions._glUnmapBuffer
 #define glGetTextureImage tl::gl::functions._glGetTextureImage
+#define glMapBuffer tl::gl::functions._glMapBuffer
+#define glMapNamedBuffer tl::gl::functions._glMapNamedBuffer
+#define glUnmapBuffer tl::gl::functions._glUnmapBuffer
+#define glUnmapNamedBuffer tl::gl::functions._glUnmapNamedBuffer
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::functions._wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::functions._wglCreateContextAttribsARB
