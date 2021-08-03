@@ -111,6 +111,8 @@ TL_API void unlock_cursor();
 
 TL_API v2u client_size_to_window_size(Window &window, v2u client_size);
 
+TL_API v2u get_client_size(NativeWindowHandle window);
+
 }
 
 #ifdef TL_IMPL
@@ -591,6 +593,14 @@ void unlock_cursor() {
 
 v2u client_size_to_window_size(Window &window, v2u client_size) {
 	return get_window_size(client_size, get_window_style(window.style_flags));
+}
+v2u get_client_size(NativeWindowHandle window) {
+	RECT rect;
+	GetClientRect((HWND)window, &rect);
+	return {
+		(u32)(rect.right - rect.left),
+		(u32)(rect.bottom - rect.top),
+	};
 }
 
 }
