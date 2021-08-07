@@ -6,13 +6,21 @@ namespace tl {
 
 struct Stream {
 	Allocator allocator;
-	umm (*read)(Stream *stream, Span<u8> destination) = 0;
-	umm (*write)(Stream *stream, Span<u8> source) = 0;
+	umm (*_read)(Stream *stream, Span<u8> destination) = 0;
+	umm (*_write)(Stream *stream, Span<u8> source) = 0;
+	umm (*_remaining_bytes)(Stream *stream) = 0;
+	
+	forceinline umm read(Span<u8> destination) { return _read(this, destination); }
+	forceinline bool b_read(Span<u8> destination) { return _read(this, destination) == destination.size; }
+
+	forceinline umm write(Span<u8> source) { return _write(this, source); }
+	forceinline bool b_write(Span<u8> source) { return _write(this, source) == source.size; }
+
+	forceinline umm remaining_bytes() { return _remaining_bytes(this); }
+
+	forceinline void free() { return allocator.free(this); }
 };
 
-forceinline umm read(Stream *stream, Span<u8> destination) { return stream->read(stream, destination); }
-forceinline umm write(Stream *stream, Span<u8> source) { return stream->write(stream, source); }
-forceinline void free(Stream *stream) { return stream->allocator.free(stream); }
 
 template <class T>
 T *create_stream() {

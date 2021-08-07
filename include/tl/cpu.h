@@ -112,38 +112,40 @@ struct CpuFeatureIndex {
 	u8 bit;
 };
 
-inline CpuFeatureIndex getCpuFeatureIndex(CpuFeature f) {
-	CpuFeatureIndex result;
-	result.slot = (u32)f >> 5;
-	result.bit = (u32)f & 0x1F;
-	return result;
-}
-
 struct CpuCache {
 	u32 count;
 	u32 size;
 };
 
-struct CpuInfo {
+using CpuFeatureMask = umm;
+inline static constexpr u32 bits_in_cpu_feature_mask = sizeof(CpuFeatureMask) * 8;
 
-	u32 logicalProcessorCount;
-	CpuCache cache[CpuCacheLevel_count][CpuCacheType_count];
-	u32 cacheLineSize;
-	u32 features[ceil((u32)CpuFeature_count, 32u) / 32];
+inline CpuFeatureIndex get_cpu_feature_index(CpuFeature f) {
+	CpuFeatureIndex result;
+	result.slot = (CpuFeatureMask)f >> ce::log2(bits_in_cpu_feature_mask);
+	result.bit  = (CpuFeatureMask)f & (bits_in_cpu_feature_mask - 1);
+	return result;
+}
+
+struct CpuInfo {
+	u32 logical_processor_count;
+	CpuCache caches_by_level_and_type[CpuCacheLevel_count][CpuCacheType_count];
+	u32 cache_line_size;
+	CpuFeatureMask feature_masks[ceil<umm>(CpuFeature_count, sizeof(CpuFeatureMask) * 8) / (sizeof(CpuFeatureMask) * 8)];
 	CpuVendor vendor;
 	char brand[49];
 
-	inline bool hasFeature(CpuFeature feature) const {
-		CpuFeatureIndex index = getCpuFeatureIndex(feature);
-		if (index.slot >= count_of(features))
+	inline bool has_feature(CpuFeature feature) const {
+		CpuFeatureIndex index = get_cpu_feature_index(feature);
+		if (index.slot >= count_of(feature_masks))
 			return 0;
-		return features[index.slot] & (1 << index.bit);
+		return feature_masks[index.slot] & (1 << index.bit);
 	}
-	u32 totalCacheSize(CpuCacheLevel level) const {
+	u32 total_cache_size(CpuCacheLevel level) const {
 		u32 index = (u32)level;
-		assert(index < count_of(cache));
+		assert(index < count_of(caches_by_level_and_type));
 		u32 result = 0;
-		for (auto &c : cache[index]) {
+		for (auto &c : caches_by_level_and_type[index]) {
 			result += c.size;
 		}
 		return result;
@@ -211,12 +213,12 @@ CpuInfo get_cpu_info() {
 
 	for (auto &info : Span{buffer, processorInfoLength / sizeof(buffer[0])}) {
 		switch (info.Relationship) {
-			case RelationProcessorCore: result.logicalProcessorCount += count_bits((ulong_s)info.ProcessorMask); break;
+			case RelationProcessorCore: result.logical_processor_count += count_bits((ulong_s)info.ProcessorMask); break;
 			case RelationCache: {
-				auto &cache = result.cache[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
+				auto &cache = result.caches_by_level_and_type[info.Cache.Level - 1][(u8)convertCacheType(info.Cache.Type)];
 				cache.size += info.Cache.Size;
 				++cache.count;
-				result.cacheLineSize = info.Cache.LineSize;
+				result.cache_line_size = info.Cache.LineSize;
 				break;
 			}
 			default:
@@ -277,8 +279,8 @@ CpuInfo get_cpu_info() {
 	}
 
 	auto set = [&](CpuFeature feature, bool value) {
-		CpuFeatureIndex index = getCpuFeatureIndex(feature);
-		result.features[index.slot] |= (u32)value << index.bit;
+		CpuFeatureIndex index = get_cpu_feature_index(feature);
+		result.feature_masks[index.slot] |= (CpuFeatureMask)value << index.bit;
 	};
 
 	set(CpuFeature_sse3,        (ecx1 & (1 << 0)));

@@ -81,14 +81,14 @@ inline constexpr T smooth_max(T a, T b, f32 k) {
 	return smooth_min(a, b, -k);
 }
 
-namespace CE {
+namespace ce {
 
 template <class To, class From>
 forceinline constexpr To cvt(From v) {
 	return (To)v;
 }
 
-} // namespace CE
+} // namespace ce
 
 union m3;
 union m4;
@@ -242,7 +242,7 @@ union m3 {
 	static forceinline m3 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
-namespace CE {
+namespace ce {
 
 template <class T>
 constexpr T sqrt_newton_raphson(T x, T curr, T prev) {
@@ -256,35 +256,35 @@ constexpr auto sqrt(T x) {
 
 template <class T>
 constexpr auto length(T a) {
-	return CE::sqrt(dot(a, a));
+	return ce::sqrt(dot(a, a));
 }
 template <class T>
 constexpr auto normalize(T a) {
-	return a * (1.0f / CE::length(a));
+	return a * (1.0f / ce::length(a));
 }
 
-} // namespace CE
+} // namespace ce
 
-namespace CE {
+namespace ce {
 
-#define CVT(v2f, v2s, s32) template<> constexpr v2s cvt(v2f v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y)}; }
+#define CVT(v2f, v2s, s32) template<> constexpr v2s cvt(v2f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y)}; }
 CVT(v2f, v2s, s32) CVT(v2f, v2u, u32)
 CVT(v2s, v2f, f32) CVT(v2s, v2u, u32)
 CVT(v2u, v2f, f32) CVT(v2u, v2s, s32)
 #undef CVT
 
-#define CVT(v3f, v3s, s32) template<> constexpr v3s cvt(v3f v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y), CE::cvt<s32>(v.z)}; }
+#define CVT(v3f, v3s, s32) template<> constexpr v3s cvt(v3f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y), ce::cvt<s32>(v.z)}; }
 CVT(v3f, v3s, s32) CVT(v3f, v3u, u32)
 CVT(v3s, v3f, f32) CVT(v3s, v3u, u32)
 CVT(v3u, v3f, f32) CVT(v3u, v3s, s32)
 #undef CVT
 
-#define CVT(v4f, v4s, s32) template<> constexpr v4s cvt(v4f v) { return {CE::cvt<s32>(v.x), CE::cvt<s32>(v.y), CE::cvt<s32>(v.z), CE::cvt<s32>(v.w)}; }
+#define CVT(v4f, v4s, s32) template<> constexpr v4s cvt(v4f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y), ce::cvt<s32>(v.z), ce::cvt<s32>(v.w)}; }
 CVT(v4f, v4s, s32) CVT(v4f, v4u, u32)
 CVT(v4s, v4f, f32) CVT(v4s, v4u, u32)
 CVT(v4u, v4f, f32) CVT(v4u, v4s, s32)
 #undef CVT
-} // namespace CE
+} // namespace ce
 
 #define SHUFFLE(a, s0, s1, b, s2, s3) _mm_shuffle_ps(a, b, _MM_SHUFFLE(s3, s2, s1, s0))
 
@@ -1129,12 +1129,12 @@ forceinline aabb<T> aabb_min_size(T min, T size) {
 	return {min, min + size};
 }
 template <class T>
-forceinline aabb<T> aabbCenterDim(T center, T dim) {
-	dim = half(dim);
-	return {center - dim, center + dim};
+forceinline aabb<T> aabb_center_diameter(T center, T diameter) {
+	auto radius = half(diameter);
+	return {center - radius, center + radius};
 }
 template <class T>
-forceinline aabb<T> aabbCenterRadius(T center, T radius) {
+forceinline aabb<T> aabb_center_radius(T center, T radius) {
 	return {center - radius, center + radius};
 }
 
@@ -1970,7 +1970,7 @@ forceinline f32 sdf_ellipse(v2f point, v2f radius) {
 	return length(r - p) * msign(p.y - r.y);
 }
 
-namespace CE {
+namespace ce {
 
 forceinline constexpr v4s frac(v4s v, s32 step) {
 	return {
@@ -1981,7 +1981,7 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 	};
 }
 
-} // namespace CE
+} // namespace ce
 
 inline void append(StringBuilder &builder, FormatFloat<v2f> f) {
 	append_format(builder, "{%, %}", 

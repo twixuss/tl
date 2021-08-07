@@ -24,7 +24,7 @@ struct StaticHashMap {
 
 	using Block = LinkedList<Entry>;
 
-	Array<Block, capacity> blocks;
+	Array<Block, capacity> blocks = {};
 
 	Value &get_or_insert(Key const &key) {
 		umm hash = get_hash(key);
@@ -108,9 +108,9 @@ struct HashMap {
 	using Bucket = LinkedList<KeyValue>;
 
 	Allocator allocator = current_allocator;
-	Bucket *buckets;
-	umm bucket_count;
-	umm total_value_count;
+	Bucket *buckets = 0;
+	umm bucket_count = 0;
+	umm total_value_count = 0;
 	
 	Value &get_or_insert(Key const &key) {
 		if (!bucket_count) {

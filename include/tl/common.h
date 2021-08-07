@@ -278,7 +278,7 @@ forceinline u32 count_bits(u64 v) { return count_bits((u32)v) + count_bits((u32)
 forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
 forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
 
-namespace CE {
+namespace ce {
 
 forceinline constexpr u32 count_bits(u32 v) {
 	u32 s = 0;
@@ -296,7 +296,7 @@ forceinline bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
 forceinline bool is_power_of_2(u64 v) { return count_bits(v) == 1; }
-namespace CE {
+namespace ce {
 template <class T>
 constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
 }
@@ -372,7 +372,7 @@ forceinline constexpr Base pow(Base base, Exponent exp) {
 	return res;
 }
 
-namespace CE {
+namespace ce {
 
 // https://stackoverflow.com/a/24748637
 #define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
@@ -414,14 +414,14 @@ forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~v
 forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 #endif
 
-namespace CE {
+namespace ce {
 inline constexpr u32 count_leading_zeros(u32 v) {
 	v |= v >> 1;
 	v |= v >> 2;
 	v |= v >> 4;
 	v |= v >> 8;
 	v |= v >> 16;
-	return CE::count_bits(~v);
+	return ce::count_bits(~v);
 }
 }
 
@@ -432,7 +432,7 @@ forceinline u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)1 << 
 forceinline u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)1 << (u64)(63 - count_leading_zeros(v)); }
 #endif
 
-namespace CE {
+namespace ce {
 inline constexpr u8 floor_to_power_of_2(u8 x) {
     x = x | (x >> 1);
     x = x | (x >> 2);
@@ -467,8 +467,8 @@ inline constexpr u64 floor_to_power_of_2(u64 x) {
 
 forceinline u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
 
-namespace CE {
-inline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - CE::count_leading_zeros(v - 1)); }
+namespace ce {
+inline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - ce::count_leading_zeros(v - 1)); }
 }
 
 forceinline u32 log2(u8  n) { return  7u - count_leading_zeros(n); }

@@ -110,10 +110,10 @@ void common_test() {
 	assert(tl::floor_to_power_of_2((u16)x) == t);\
 	assert(tl::floor_to_power_of_2((u32)x) == t);\
 	assert(tl::floor_to_power_of_2((u64)x) == t);\
-	static_assert(tl::CE::floor_to_power_of_2((u8)x) == t);\
-	static_assert(tl::CE::floor_to_power_of_2((u16)x) == t);\
-	static_assert(tl::CE::floor_to_power_of_2((u32)x) == t);\
-	static_assert(tl::CE::floor_to_power_of_2((u64)x) == t);
+	static_assert(tl::ce::floor_to_power_of_2((u8)x) == t);\
+	static_assert(tl::ce::floor_to_power_of_2((u16)x) == t);\
+	static_assert(tl::ce::floor_to_power_of_2((u32)x) == t);\
+	static_assert(tl::ce::floor_to_power_of_2((u64)x) == t);
 
 	T(0, 0);
 	T(1, 1);
@@ -133,10 +133,10 @@ void common_test() {
 	assert(tl::ceil_to_power_of_2((u16)x) == t);\
 	assert(tl::ceil_to_power_of_2((u32)x) == t);\
 	assert(tl::ceil_to_power_of_2((u64)x) == t);\
-	static_assert(tl::CE::ceil_to_power_of_2((u8)x) == t);\
-	static_assert(tl::CE::ceil_to_power_of_2((u16)x) == t);\
-	static_assert(tl::CE::ceil_to_power_of_2((u32)x) == t);\
-	static_assert(tl::CE::ceil_to_power_of_2((u64)x) == t);
+	static_assert(tl::ce::ceil_to_power_of_2((u8)x) == t);\
+	static_assert(tl::ce::ceil_to_power_of_2((u16)x) == t);\
+	static_assert(tl::ce::ceil_to_power_of_2((u32)x) == t);\
+	static_assert(tl::ce::ceil_to_power_of_2((u64)x) == t);
 
 	T(0, 0);
 	T(1, 1);

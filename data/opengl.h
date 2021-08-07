@@ -75,6 +75,7 @@ void glBindSampler(GLuint unit, GLuint sampler);
 void glSamplerParameterf(GLuint sampler, GLenum pname, GLfloat param);
 void glSamplerParameteri(GLuint sampler, GLenum pname, GLint param);
 void glGenerateMipmap(GLenum target);
+void glGenerateTextureMipmap(GLuint texture);
 void glTexStorage2D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
 void glBlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha);
 void glActiveTexture(GLenum texture);

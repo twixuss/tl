@@ -19,7 +19,7 @@ List<T> null_terminate(Span<T> span) {
 	return result;
 }
 
-inline u32 character_to_digit(char character, u32 base) {
+inline u32 character_to_digit(utf8 character, u32 base) {
 	u32 digit;
 	if (base > 10) {
 		digit = (u64)character - '0';
@@ -30,7 +30,7 @@ inline u32 character_to_digit(char character, u32 base) {
 	return digit;
 }
 
-inline Optional<u64> parse_u64(Span<char> string, u32 base) {
+inline Optional<u64> parse_u64(Span<utf8> string, u32 base) {
 	u64 result = 0;
 	u64 previous = 0;
 	for (auto character : string) {
@@ -43,7 +43,7 @@ inline Optional<u64> parse_u64(Span<char> string, u32 base) {
 	return result;
 }
 
-inline Optional<u64> parse_u64(Span<char> string) {
+inline Optional<u64> parse_u64(Span<utf8> string) {
 	if (string.size > 1) {
 		if (string[1] == 'x') {
 			string.data += 2;
@@ -847,7 +847,7 @@ inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
 	return result;
 }
 inline List<char> to_string(StringBuilder &builder) {
-	return to_string(builder, builder.allocator);
+	return to_string(builder, current_allocator);
 }
 
 template <class Char, class ...Args>

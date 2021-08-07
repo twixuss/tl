@@ -73,6 +73,7 @@
 #define glSamplerParameterf tl::gl::_glSamplerParameterf
 #define glSamplerParameteri tl::gl::_glSamplerParameteri
 #define glGenerateMipmap tl::gl::_glGenerateMipmap
+#define glGenerateTextureMipmap tl::gl::_glGenerateTextureMipmap
 #define glTexStorage2D tl::gl::_glTexStorage2D
 #define glBlendFuncSeparate tl::gl::_glBlendFuncSeparate
 #define glActiveTexture tl::gl::_glActiveTexture
@@ -166,6 +167,7 @@
 #define glSamplerParameterf tl::gl::functions._glSamplerParameterf
 #define glSamplerParameteri tl::gl::functions._glSamplerParameteri
 #define glGenerateMipmap tl::gl::functions._glGenerateMipmap
+#define glGenerateTextureMipmap tl::gl::functions._glGenerateTextureMipmap
 #define glTexStorage2D tl::gl::functions._glTexStorage2D
 #define glBlendFuncSeparate tl::gl::functions._glBlendFuncSeparate
 #define glActiveTexture tl::gl::functions._glActiveTexture

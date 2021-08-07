@@ -113,6 +113,8 @@ TL_API v2u client_size_to_window_size(Window &window, v2u client_size);
 
 TL_API v2u get_client_size(NativeWindowHandle window);
 
+TL_API void resize(Window &window, v2u size);
+
 }
 
 #ifdef TL_IMPL
@@ -601,6 +603,11 @@ v2u get_client_size(NativeWindowHandle window) {
 		(u32)(rect.right - rect.left),
 		(u32)(rect.bottom - rect.top),
 	};
+}
+
+void resize(Window &window, v2u size) {
+	size = client_size_to_window_size(window, size);
+	SetWindowPos((HWND)window.handle, 0, 0, 0, size.x, size.y, SWP_NOMOVE);
 }
 
 }

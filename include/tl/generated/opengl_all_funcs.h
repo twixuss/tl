@@ -75,6 +75,7 @@ D(void, glBindSampler, (GLuint unit, GLuint sampler), (unit, sampler))\
 D(void, glSamplerParameterf, (GLuint sampler, GLenum pname, GLfloat param), (sampler, pname, param))\
 D(void, glSamplerParameteri, (GLuint sampler, GLenum pname, GLint param), (sampler, pname, param))\
 D(void, glGenerateMipmap, (GLenum target), (target))\
+D(void, glGenerateTextureMipmap, (GLuint texture), (texture))\
 D(void, glTexStorage2D, (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height), (target, levels, internalformat, width, height))\
 D(void, glBlendFuncSeparate, (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha), (srcRGB, dstRGB, srcAlpha, dstAlpha))\
 D(void, glActiveTexture, (GLenum texture), (texture))\
