@@ -59,8 +59,6 @@ inline void free(CommonMesh &mesh) {
 }
 
 struct Scene3D {
-	List<utf8> name;
-
 	struct Node {
 		Span<utf8> name;
 		CommonMesh *mesh;
@@ -75,7 +73,6 @@ struct Scene3D {
 };
 
 inline void free(Scene3D &scene) {
-	free(scene.name);
 	for (auto &mesh : scene.meshes) {
 		free(mesh.indices);
 		free(mesh.vertices);
@@ -92,9 +89,7 @@ TL_API Scene3D parse_glb_from_memory(Span<u8> memory);
 inline Optional<Scene3D> parse_glb_from_file(Span<utf8> path) {
 	auto memory = with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
 	if (memory.data) {
-		auto result = parse_glb_from_memory(memory);
-		result.name = as_list(path);
-		return result;
+		return parse_glb_from_memory(memory);
 	}
 	return {};
 }

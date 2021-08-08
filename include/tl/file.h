@@ -10,6 +10,9 @@ namespace tl {
 using pathchar = utf16;
 inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false) { return to_utf16(string, terminate); }
 #define tl_file_string(x) u ## x
+
+inline static constexpr pathchar path_separator = u'\\';
+
 #endif
 
 enum FileItemKind {
@@ -55,9 +58,7 @@ inline bool valid(File file) {
 }
 
 #if TL_DEBUG
-#define tl_check_null_terminator(path) \
-	auto chars_until_terminator = string_unit_count(path.data); \
-	assert(chars_until_terminator <= path.size)
+#define tl_check_null_terminator(path) assert(string_unit_count(path.data) <= path.size)
 #else
 #define tl_check_null_terminator(path)
 #endif
@@ -87,6 +88,7 @@ TL_API void truncate_to_cursor(File file);
 
 
 TL_API bool file_exists(Span<pathchar> path);
+TL_API bool directory_exists(Span<pathchar> path);
 
 inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
 	timed_function();
@@ -256,6 +258,10 @@ TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8
 
 TL_API List<pathchar> get_current_directory();
 
+TL_API bool create_directory(Span<pathchar> path);
+
+TL_API Span<u8> map_file(File file);
+
 }
 
 #ifdef TL_IMPL
@@ -270,6 +276,7 @@ TL_API List<pathchar> get_current_directory();
 
 #pragma comment(lib, "shlwapi")
 #pragma comment(lib, "comctl32")
+#pragma comment(lib, "Ole32.lib")
 
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -378,6 +385,10 @@ void close(File file) {
 }
 
 bool file_exists(Span<pathchar> path) {
+	tl_check_null_terminator(path);
+	return PathFileExistsW((wchar *)path.data);
+}
+bool directory_exists(Span<pathchar> path) {
 	tl_check_null_terminator(path);
 	return PathFileExistsW((wchar *)path.data);
 }
@@ -670,6 +681,17 @@ List<pathchar> get_current_directory() {
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
 	return temp;
+}
+
+bool create_directory(Span<pathchar> path) {
+	tl_check_null_terminator(path);
+	return (bool)CreateDirectoryW((wchar *)path.data, 0);
+}
+
+Span<u8> map_file(File file) {
+	auto mapping = CreateFileMappingW(file.handle, 0, PAGE_READONLY, 0, 0, 0);
+	void *data = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+	return {(u8 *)data, (umm)length(file)};
 }
 
 #else

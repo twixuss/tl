@@ -5,12 +5,25 @@ namespace tl {
 
 TL_DECLARE_HANDLE(Process);
 
-TL_API Process execute(pathchar const *path, pathchar const *arguments, bool visible);
-inline Process execute(Span<pathchar> path, Span<pathchar> arguments, bool visible) {
-	assert(path.back() == 0);
-	assert(arguments.back() == 0);
-	return execute(path.data, arguments.data, visible);
+struct ExecuteParams {
+	bool visible = true;
+};
+
+TL_API Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params = {});
+inline Process execute(pathchar const *path, ExecuteParams params = {}) {
+	return execute(path, 0, params);
 }
+
+inline Process execute(Span<pathchar> path, Span<pathchar> arguments, ExecuteParams params = {}) {
+	tl_check_null_terminator(path);
+	tl_check_null_terminator(arguments);
+	return execute(path.data, arguments.data, params);
+}
+inline Process execute(Span<pathchar> path, ExecuteParams params = {}) {
+	tl_check_null_terminator(path);
+	return execute(path.data, 0, params);
+}
+
 TL_API bool wait(Process process, u32 timeout = -1);
 TL_API u32 get_exit_code(Process process);
 TL_API void terminate(Process process);
@@ -24,7 +37,9 @@ void free(Process &process);
 
 #if OS_WINDOWS
 
-Process execute(pathchar const *path, pathchar const *arguments, bool visible) {
+#pragma comment(lib, "Shell32.lib")
+
+Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
@@ -33,11 +48,11 @@ Process execute(pathchar const *path, pathchar const *arguments, bool visible) {
 	ShExecInfo.lpFile = (wchar *)path;
 	ShExecInfo.lpParameters = (wchar *)arguments;
 	ShExecInfo.lpDirectory = NULL;
-	ShExecInfo.nShow = visible ? SW_SHOW : SW_HIDE;
+	ShExecInfo.nShow = params.visible ? SW_SHOW : SW_HIDE;
 	ShExecInfo.hInstApp = NULL;
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
-		print("ShellExecuteExA failed with error code 0x% (%)\n", FormatInt(error, 16), error);
+		print(Print_error, "ShellExecuteExA failed with error code 0x% (%)\n", FormatInt{.value = error, .radix = 16}, error);
 		return 0;
 	}
 

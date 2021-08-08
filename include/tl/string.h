@@ -478,28 +478,31 @@ inline umm append(StringBuilder &b, utf16 ch) {
 }
 
 inline umm append(StringBuilder &b, Span<ascii> string) {
+	umm appended_char_count = string.size;
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
 			append_bytes(b, string);
 			break;
 		case Encoding_utf16:
-			while (*string.data) {
+			while (string.size) {
 				append_bytes(b, (utf16)*string.data);
 				++string.data;
+				--string.size;
 			}
 			break;
 		case Encoding_utf32:
-			while (*string.data) {
+			while (string.size) {
 				append_bytes(b, (utf32)*string.data);
 				++string.data;
+				--string.size;
 			}
 			break;
 		default:
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
-	return string.size;
+	return appended_char_count;
 }
 
 inline umm append(StringBuilder &b, Span<utf8> string) {
