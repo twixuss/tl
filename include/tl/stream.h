@@ -30,4 +30,9 @@ T *create_stream() {
 	return result;
 }
 
+
+void free(Stream *stream) {
+	stream->free();
+	*stream = {};
+}
 }

@@ -139,9 +139,9 @@ struct CpuInfo {
 		CpuFeatureIndex index = get_cpu_feature_index(feature);
 		if (index.slot >= count_of(feature_masks))
 			return 0;
-		return feature_masks[index.slot] & (1 << index.bit);
+		return feature_masks[index.slot] & ((umm)1 << index.bit);
 	}
-	u32 total_cache_size(CpuCacheLevel level) const {
+	inline u32 total_cache_size(CpuCacheLevel level) const {
 		u32 index = (u32)level;
 		assert(index < count_of(caches_by_level_and_type));
 		u32 result = 0;

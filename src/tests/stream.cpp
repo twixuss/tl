@@ -5,13 +5,14 @@ using namespace tl;
 
 static void read_write_test(Stream *stream) {
 	u8 dest[2];
-	read(stream, dest);
+	stream->read(dest);
 	assert(dest[0] == '0');
 	assert(dest[1] == '1');
-	read(stream, dest);
+	stream->read(dest);
 	assert(dest[0] == '2');
 	assert(dest[1] == '3');
-	write(stream, dest);
+	assert(stream->remaining_bytes() == 4);
+	stream->write(dest);
 }
 static void result_test(Span<u8> result) {
 	assert(result.size == 8);

@@ -6,19 +6,17 @@ namespace tl {
 
 struct FileStream : Stream {
 	File file;
+	umm read(Span<u8> destination) { return tl::read(file, destination); }
+	umm write(Span<u8> source) { return tl::write(file, source); }
+	umm remaining_bytes() { return tl::remaining_bytes(file); }
 };
 
 Stream *create_file_stream(File file) {
 	auto result = create_stream<FileStream>();
 	result->file = file;
-	result->read = [](Stream *stream_, Span<u8> destination) {
-		auto stream = (FileStream *)stream_;
-		return read(stream->file, destination);
-	};
-	result->write = [](Stream *stream_, Span<u8> source) {
-		auto stream = (FileStream *)stream_;
-		return write(stream->file, source);
-	};
+	result->_read = [](Stream *stream, Span<u8> destination) { return ((FileStream *)stream)->read(destination); };
+	result->_write = [](Stream *stream, Span<u8> destination) { return ((FileStream *)stream)->write(destination); };
+	result->_remaining_bytes = [](Stream *stream) { return ((FileStream *)stream)->remaining_bytes(); };
 	return result;
 }
 

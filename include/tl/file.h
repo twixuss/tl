@@ -83,7 +83,6 @@ inline umm write_bytes(File file, T const &value) {
 
 TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
 TL_API s64 get_cursor(File file);
-TL_API s64 length(File file);
 TL_API void truncate_to_cursor(File file);
 
 
@@ -233,11 +232,17 @@ inline void reset(FileTracker &tracker, Span<pathchar> path, Fn &&on_update) {
 	tracker = create_file_tracker_steal_path(tracker.path, std::forward<Fn>(on_update));
 }
 
-inline s64 length(File file) {
-	auto oldCursor = get_cursor(file);
-	defer { set_cursor(file, oldCursor, File_begin); };
+inline u64 length(File file) {
+	auto old_cursor = get_cursor(file);
+	defer { set_cursor(file, old_cursor, File_begin); };
 	set_cursor(file, 0, File_end);
 	return get_cursor(file);
+}
+inline u64 remaining_bytes(File file) {
+	auto old_cursor = get_cursor(file);
+	defer { set_cursor(file, old_cursor, File_begin); };
+	set_cursor(file, 0, File_end);
+	return get_cursor(file) - old_cursor;
 }
 forceinline umm read(File file, Span<u8> span) { return read(file, span.data, span.size); }
 forceinline umm write(File file, Span<u8> span) { return write(file, span.data, span.size);}
