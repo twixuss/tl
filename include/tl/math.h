@@ -71,9 +71,8 @@ template <class T> forceinline constexpr auto pow4(T v) { return pow2(v * v); }
 
 template <class T>
 inline constexpr T smooth_min(T a, T b, f32 k) {
-	f32 h = max(0, min(1, (b - a) / k + .5f));
-	f32 m = h * (1 - h) * k;
-	return lerp(b, a, h) - m * .5f;
+	f32 h = clamp((b - a) / k + .5f, 0, 1);
+	return b + h * (a - b + k * 0.5f * (h - 1));
 }
 
 template <class T>
