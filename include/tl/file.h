@@ -70,14 +70,14 @@ inline File open_file(Span<pathchar> path, u32 open_flags) {
 }
 TL_API void close(File file);
 
-TL_API umm read(File file, void *data, umm size);
+TL_API bool read(File file, void *data, umm size);
 template <class T>
-inline umm read_bytes(File file, T &value) {
+inline bool read_bytes(File file, T &value) {
 	return read(file, &value, sizeof(value));
 }
-TL_API umm write(File file, void const *data, umm size);
+TL_API bool write(File file, void const *data, umm size);
 template <class T>
-inline umm write_bytes(File file, T const &value) {
+inline bool write_bytes(File file, T const &value) {
 	return write(file, &value, sizeof(value));
 }
 
@@ -244,8 +244,8 @@ inline u64 remaining_bytes(File file) {
 	set_cursor(file, 0, File_end);
 	return get_cursor(file) - old_cursor;
 }
-forceinline umm read(File file, Span<u8> span) { return read(file, span.data, span.size); }
-forceinline umm write(File file, Span<u8> span) { return write(file, span.data, span.size);}
+forceinline bool read(File file, Span<u8> span) { return read(file, span.data, span.size); }
+forceinline bool write(File file, Span<u8> span) { return write(file, span.data, span.size);}
 
 inline void truncate(File file, u64 size) {
 	set_cursor(file, (s64)size, File_begin);
