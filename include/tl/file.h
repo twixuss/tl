@@ -346,7 +346,7 @@ s64 get_cursor(File file) {
 	SetFilePointerEx(file.handle, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
 }
-umm read(File file, void *data_, umm size) {
+bool read(File file, void *data_, umm size) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_read = 0;
 	u8 *data = (u8 *)data_;
@@ -362,9 +362,9 @@ umm read(File file, void *data_, umm size) {
 		ReadFile(file.handle, data, (DWORD)remaining, &bytes_read, 0);
 		total_bytes_read += bytes_read;
 	}
-	return total_bytes_read;
+	return total_bytes_read == size;
 }
-umm write(File file, void const *data_, umm size) {
+bool write(File file, void const *data_, umm size) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_written = 0;
 	u8 *data = (u8 *)data_;
@@ -380,7 +380,7 @@ umm write(File file, void const *data_, umm size) {
 		WriteFile(file.handle, data, (DWORD)remaining, &bytes_written, 0);
 		total_bytes_written += bytes_written;
 	}
-	return total_bytes_written;
+	return total_bytes_written == size;
 }
 void truncate_to_cursor(File file) {
 	SetEndOfFile(file.handle);
