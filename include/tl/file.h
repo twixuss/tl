@@ -263,6 +263,64 @@ TL_API List<pathchar> get_current_directory();
 
 TL_API Span<u8> map_file(File file);
 
+struct ParsedPath {
+	Span<utf8> directory;
+	Span<utf8> name;
+	Span<utf8> extension;
+};
+
+inline ParsedPath parse_path(Span<utf8> path) {
+	ParsedPath result = {};
+
+	auto last_slash = find_last_any(path, u8"/\\"s);
+	auto last_dot = find_last(path, u8'.');
+	if (last_dot) {
+		if (last_slash) {
+			if (last_dot > last_slash) {
+				result.directory = {path.data, last_slash};
+				result.name      = {last_slash + 1, last_dot};
+				result.extension = {last_dot + 1, path.end()};
+				// Include the dot into the name because the extension is empty
+				if (result.extension.size == 0) {
+					result.name.size += 1;
+				}
+				if (result.name.size == 0) {
+					result.name = result.extension;
+					result.extension = {};
+					result.name.data --;
+					result.name.size ++;
+				}
+			} else {
+				result.directory = {path.data, last_slash};
+				result.name      = {last_slash + 1, path.end()};
+			}
+
+		} else {
+			result.name      = {path.data, last_dot};
+			result.extension = {last_dot + 1, path.end()};
+			// Include the dot into the name because the extension is empty
+			if (result.extension.size == 0) {
+				result.name.size += 1;
+			}
+			if (result.name.size == 0) {
+				result.name = result.extension;
+				result.extension = {};
+				result.name.data --;
+				result.name.size ++;
+			}
+		}
+	} else {
+		if (last_slash) {
+			result.directory = {path.data, last_slash};
+			result.name      = {last_slash + 1, path.end()};
+		} else {
+			result.name = path;
+		}
+	}
+
+	return result;
+}
+
 }
 
 #ifdef TL_IMPL

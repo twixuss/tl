@@ -648,19 +648,43 @@ enum ForEachDirective {
 #define for_each_break    return ForEach_break
 #define for_each_continue return ForEach_continue
 
-template <class T, umm count, class Fn>
-void for_each(T (&array)[count], Fn &&fn) {
+using ForEachFlags = u8;
+enum : ForEachFlags {
+	ForEach_reverse = 0x1,
+};
+
+template <class Container, class Fn>
+constexpr void for_each(Container &&container, Fn &&fn) {
+	return for_each<(ForEachFlags)0>(ForEachFlags{}, container, fn);
+}
+
+template <ForEachFlags flags, class T, umm count, class Fn>
+constexpr void for_each(T (&array)[count], Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
-	for (auto &it : array) {
-		if constexpr (is_same<FnRet, void>) {
-			fn(it);
-		} else if constexpr (is_same<FnRet, ForEachDirective>) {
-			if (fn(it) == ForEach_break) {
-				break;
+	if constexpr (flags & ForEach_reverse) {
+		for (auto it = (array + count - 1); it >= array; --it) {
+			if constexpr (is_same<FnRet, void>) {
+				fn(*it);
+			} else if constexpr (is_same<FnRet, ForEachDirective>) {
+				if (fn(*it) == ForEach_break) {
+					break;
+				}
+			} else {
+				static_assert(false, "Invalid return type of for_each function");
 			}
-		} else {
-			static_assert(false, "Invalid return type of for_each function");
+		}
+	} else {
+		for (auto &it : array) {
+			if constexpr (is_same<FnRet, void>) {
+				fn(it);
+			} else if constexpr (is_same<FnRet, ForEachDirective>) {
+				if (fn(it) == ForEach_break) {
+					break;
+				}
+			} else {
+				static_assert(false, "Invalid return type of for_each function");
+			}
 		}
 	}
 }
@@ -822,6 +846,36 @@ struct Span {
 	umm size = 0;
 };
 
+template <ForEachFlags flags, class T, class Fn>
+constexpr void for_each(Span<T> span, Fn &&fn) {
+	using FnRet = decltype(fn(*(T*)0));
+
+	T *start = 0;
+	T *end = 0;
+	umm step = 0;
+	if constexpr (flags & ForEach_reverse) {
+		start = span.data + span.size - 1;
+		end = span.data - 1;
+		step = -1;
+	} else {
+		start = span.data;
+		end = span.data + span.size;
+		step = 1;
+	}
+
+	for (auto it = start; it != end; it += step) {
+		if constexpr (is_same<FnRet, void>) {
+			fn(*it);
+		} else if constexpr (is_same<FnRet, ForEachDirective>) {
+			if (fn(*it) == ForEach_break) {
+				break;
+			}
+		} else {
+			static_assert(false, "Invalid return type of for_each function");
+		}
+	}
+}
+
 forceinline constexpr Span<char > operator""s(char  const *string, umm size) { return Span((char  *)string, size); }
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm size) { return Span((utf8  *)string, size); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm size) { return Span((utf16 *)string, size); }
@@ -921,6 +975,20 @@ constexpr T *find_any(Span<T> where, Span<T> what) {
 		}
 	}
 	return 0;
+}
+
+template <class T>
+constexpr T *find_last_any(Span<T> where, Span<T> what) {
+	T *result = 0;
+	for_each<ForEach_reverse>(where, [&](T &a) {
+		for (auto &b : what) {
+			if (a == b) {
+				result = &a;
+				for_each_break;
+			}
+		}
+	});
+	return result;
 }
 
 inline constexpr bool is_whitespace(u32 c) {
