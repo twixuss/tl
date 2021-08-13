@@ -4,6 +4,11 @@
 
 namespace tl {
 
+struct BlockListIndex {
+	umm block_index;
+	umm value_index;
+};
+
 template <class T, umm block_capacity_>
 struct BlockList {
 	static constexpr umm block_capacity = block_capacity_;

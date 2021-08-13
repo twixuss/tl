@@ -6,8 +6,8 @@ namespace tl {
 
 struct FileStream : Stream {
 	File file;
-	umm read(Span<u8> destination) { return tl::read(file, destination); }
-	umm write(Span<u8> source) { return tl::write(file, source); }
+	bool read(Span<u8> destination) { return tl::read(file, destination); }
+	bool write(Span<u8> source) { return tl::write(file, source); }
 	umm remaining_bytes() { return tl::remaining_bytes(file); }
 };
 

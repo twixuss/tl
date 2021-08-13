@@ -1037,11 +1037,6 @@ struct StaticCircularQueue : private StaticCircularBuffer<T, _capacity> {
 	void pop() { this->pop_front(); }
 };
 
-struct BlockListIndex {
-	umm block_index;
-	umm value_index;
-};
-
 template <class T>
 struct LinearSet : private List<T> {
 	using Base = List<T>;

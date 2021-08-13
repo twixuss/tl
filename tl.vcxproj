@@ -23,9 +23,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\tests.cpp" />
+    <ClCompile Include="src\tests\allocation.cpp" />
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
     <ClCompile Include="src\tests\definitions.cpp" />
+    <ClCompile Include="src\tests\file.cpp" />
     <ClCompile Include="src\tests\list.cpp" />
     <ClCompile Include="src\tests\math.cpp" />
     <ClCompile Include="src\tests\stream.cpp" />

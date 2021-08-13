@@ -12,5 +12,7 @@
     <ClCompile Include="src\tests\math.cpp" />
     <ClCompile Include="src\tests\stream.cpp" />
     <ClCompile Include="src\tests\string.cpp" />
+    <ClCompile Include="src\tests\allocation.cpp" />
+    <ClCompile Include="src\tests\file.cpp" />
   </ItemGroup>
 </Project>

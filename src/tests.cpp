@@ -935,11 +935,13 @@ int main() {
 
 #define TEST(name) print("% ... ", #name); void name(); name(); print("ok\n")
 	TEST(string_test);
+	TEST(file_test);
 	TEST(math_test);
 	TEST(common_test);
 	//TEST(compiler_test);
 	TEST(stream_test);
 	TEST(list_test);
+	TEST(allocation_test);
 #undef TEST;
 
 	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};

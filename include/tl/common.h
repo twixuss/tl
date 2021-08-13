@@ -220,6 +220,11 @@ template<> inline static constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
 #pragma warning(pop)
 
+#define tl_enum_flags(t) \
+forceinline constexpr t operator~(t a){using u=std::underlying_type_t<t>;return (t)~(u)a;} \
+forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a|(u)b);} \
+forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
+
 template <class To, class From>
 inline constexpr To cvt(From from) {
 	return (To)from;
@@ -870,7 +875,7 @@ constexpr Span<char> as_chars(Span<T> span) {
 }
 
 template <class T>
-constexpr Span<u8> value_as_bytes(T &value) {
+constexpr Span<u8> value_as_bytes(T const &value) {
 	return {(u8 *)&value, sizeof(T)};
 }
 
@@ -1273,13 +1278,18 @@ bool find_and_erase(Collection &collection, T value) {
 
 using NativeWindowHandle = struct NativeWindow {} *;
 
-enum AllocatorMode {
+enum Ownership : u8 {
+	Ownership_copy,
+	Ownership_transfer,
+};
+
+enum AllocatorMode : u8 {
 	Allocator_allocate,
 	Allocator_reallocate,
 	Allocator_free,
 };
 
-enum AllocateFlags {
+enum AllocateFlags : u8 {
 	Allocate_default       = 0,
 	Allocate_uninitialized = 0x1,
 };

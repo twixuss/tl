@@ -15,6 +15,111 @@ inline static constexpr pathchar path_separator = u'\\';
 
 #endif
 
+struct OpenFileParams {
+	u8 read : 1;
+	u8 write : 1;
+};
+
+enum FileCursorOrigin {
+	File_begin,
+	File_cursor,
+	File_end,
+};
+
+struct File {
+	void *handle;
+};
+
+inline bool is_valid(File file) {
+	return file.handle != 0;
+}
+
+TL_API File open_file(pathchar const *path, OpenFileParams params);
+inline File open_file(Span<pathchar> path, OpenFileParams params) {
+	return open_file(temporary_null_terminate(path).data, params);
+}
+TL_API void close(File file);
+
+TL_API bool read(File file, Span<u8> data);
+TL_API bool write(File file, Span<u8> data);
+
+TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
+TL_API s64 get_cursor(File file);
+TL_API void truncate_to_cursor(File file);
+
+
+TL_API bool file_exists(pathchar const *path);
+inline bool file_exists(Span<pathchar> path) {
+	return file_exists(temporary_null_terminate(path).data);
+}
+TL_API bool directory_exists(pathchar const *path);
+inline bool directory_exists(Span<pathchar> path) {
+	return directory_exists(temporary_null_terminate(path).data);
+}
+
+
+struct ReadEntireFileParams {
+	umm extra_space_before = 0;
+	umm extra_space_after = 0;
+};
+inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
+	timed_function();
+
+	auto oldCursor = get_cursor(file);
+	defer { set_cursor(file, oldCursor, File_begin); };
+
+	set_cursor(file, 0, File_end);
+	auto size = (umm)get_cursor(file);
+	set_cursor(file, 0, File_begin);
+
+	auto result = create_buffer(size + params.extra_space_before + params.extra_space_after);
+	read(file, {result.data + params.extra_space_before, size});
+
+	return result;
+}
+inline Buffer read_entire_file(pathchar const *path, ReadEntireFileParams params = {}) {
+	File file = open_file(path, {.read = true});
+	if (!is_valid(file)) return {};
+	defer { close(file); };
+	return read_entire_file(file, params);
+}
+inline Buffer read_entire_file(Span<pathchar> path, ReadEntireFileParams params = {}) {
+	return read_entire_file(temporary_null_terminate(path).data, params);
+}
+
+
+inline bool write_entire_file(File file, Span<u8> span) {
+	set_cursor(file, 0, File_begin);
+	defer { truncate_to_cursor(file); };
+	return write(file, span);
+}
+inline bool write_entire_file(pathchar const *path, Span<u8> span) {
+	File file = open_file(path, {.write = true});
+	if (!is_valid(file)) return false;
+	defer { close(file); };
+	return write(file, span);
+}
+inline bool write_entire_file(Span<pathchar> path, Span<u8> span) {
+	return write_entire_file(temporary_null_terminate(path).data, span);
+}
+
+
+ // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+TL_API Optional<u64> get_file_write_time(File file);
+inline Optional<u64> get_file_write_time(pathchar const *path) {
+	auto file = open_file(path, {});
+	if (!is_valid(file)) return {};
+	defer { close(file); };
+	return get_file_write_time(file);
+}
+inline Optional<u64> get_file_write_time(Span<pathchar> path) {
+	return get_file_write_time(temporary_null_terminate(path).data);
+}
+
+
+TL_API ListList<pathchar> get_file_names_in_directory(Span<pathchar> directory);
+
+
 enum FileItemKind {
 	FileItem_unknown,
 	FileItem_file,
@@ -38,123 +143,26 @@ inline void free(FileItemList &list) {
 	free(list.base());
 }
 
-enum FileOpenFlags {
-	File_read  = 0x1,
-	File_write = 0x2,
-};
-
-enum FileCursorOrigin {
-	File_begin,
-	File_cursor,
-	File_end,
-};
-
-struct File {
-	void *handle;
-};
-
-inline bool valid(File file) {
-	return file.handle != 0;
-}
-
-#if TL_DEBUG
-#define tl_check_null_terminator(path) assert(string_unit_count(path.data) <= path.size)
-#else
-#define tl_check_null_terminator(path)
-#endif
-
-TL_API File open_file(pathchar const *path, u32 open_flags);
-inline File open_file(Span<pathchar> path, u32 open_flags) {
-	tl_check_null_terminator(path);
-	return open_file(path.data, open_flags);
-}
-TL_API void close(File file);
-
-TL_API bool read(File file, void *data, umm size);
-template <class T>
-inline bool read_bytes(File file, T &value) {
-	return read(file, &value, sizeof(value));
-}
-TL_API bool write(File file, void const *data, umm size);
-template <class T>
-inline bool write_bytes(File file, T const &value) {
-	return write(file, &value, sizeof(value));
-}
-
-TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
-TL_API s64 get_cursor(File file);
-TL_API void truncate_to_cursor(File file);
-
-
-TL_API bool file_exists(Span<pathchar> path);
-TL_API bool directory_exists(Span<pathchar> path);
-
-inline Buffer read_entire_file(File file, umm extra_space_before = 0, umm extra_space_after= 0) {
-	timed_function();
-
-	auto oldCursor = get_cursor(file);
-	defer { set_cursor(file, oldCursor, File_begin); };
-
-	set_cursor(file, 0, File_end);
-	auto size = (umm)get_cursor(file);
-	set_cursor(file, 0, File_begin);
-
-	auto result = create_buffer(size + extra_space_before + extra_space_after);
-	read(file, result.data + extra_space_before, size);
-
-	return result;
-}
-inline Buffer read_entire_file(pathchar const *path, umm extra_space_before = 0, umm extra_space_after = 0) {
-	File file = open_file(path, File_read);
-	if (!valid(file)) return {};
-	defer { close(file); };
-	return read_entire_file(file, extra_space_before, extra_space_after);
-}
-inline Buffer read_entire_file(Span<pathchar> path, umm extra_space_before = 0, umm extra_space_after = 0) {
-	tl_check_null_terminator(path);
-	return read_entire_file(path.data, extra_space_before, extra_space_after);
-}
-
-inline umm write_entire_file(File file, void const *data, umm size) {
-	set_cursor(file, 0, File_begin);
-	defer { truncate_to_cursor(file); };
-	return write(file, data, size);
-}
-inline umm write_entire_file(pathchar const *path, void const *data, umm size) {
-	File file = open_file(path, File_write);
-	if (!valid(file)) return false;
-	defer { close(file); };
-	return write_entire_file(file, data, size);
-}
-inline umm write_entire_file(Span<pathchar> path, void const *data, umm size) {
-	tl_check_null_terminator(path);
-	return write_entire_file(path.data, data, size);
-}
-inline umm write_entire_file(File file, Span<u8> span) { return write_entire_file(file, span.data, span.size); }
-inline umm write_entire_file(pathchar const *path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
-inline umm write_entire_file(Span<pathchar> path, Span<u8> span) { return write_entire_file(path, span.data, span.size); }
-
- // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
-TL_API u64 get_file_write_time(Span<pathchar> path);
-
-TL_API ListList<pathchar> get_files_in_directory(Span<pathchar> directory);
-
 TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
+
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	create_file(path.data);
+	return create_file(temporary_null_terminate(path).data);
 }
 
 TL_API void delete_file(pathchar const *path);
 inline void delete_file(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	delete_file(path.data);
+	return delete_file(temporary_null_terminate(path).data);
+}
+
+TL_API bool create_directory(pathchar const *path);
+inline bool create_directory(Span<pathchar> path) {
+	return create_directory(temporary_null_terminate(path).data);
 }
 
 struct FileTracker {
-	List<pathchar> path;
+	File file;
 	u64 last_write_time;
 
 	Allocator allocator;
@@ -162,74 +170,66 @@ struct FileTracker {
 	void *state;
 };
 
-inline FileTracker create_file_tracker_steal_path(List<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	tl_check_null_terminator(path);
+inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker &tracker, void *state), void *state) {
 	FileTracker result = {};
 	result.on_update = on_update;
 	result.state = state;
-	result.path = path;
+	result.file = file;
 	return result;
 }
-inline FileTracker create_file_tracker_steal_path(List<pathchar> path, void (*on_update)(FileTracker &tracker)) {
-	return create_file_tracker_steal_path(path, (void(*)(FileTracker &, void *))on_update, 0);
-}
-template <class Fn>
-inline FileTracker create_file_tracker_steal_path(List<pathchar> path, Fn &&on_update) {
-	auto allocator = current_allocator;
-
-	auto params = ALLOCATE_NOINIT(Fn, allocator);
-	new(params) Fn(std::forward<Fn>(on_update));
-
-	FileTracker result = create_file_tracker_steal_path(path, [](FileTracker &tracker, void *state) {
-		Fn &fn = *(Fn *)state;
-		fn(tracker);
-	}, params);
-	result.allocator = allocator;
-	return result;
+inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker &tracker)) {
+	return create_file_tracker(file, (void(*)(FileTracker &, void *))on_update, 0);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), on_update, state);
+	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, 0);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker)) {
 	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
 }
 template <class Fn>
 inline FileTracker create_file_tracker(Span<pathchar> path, Fn &&on_update) {
-	return create_file_tracker_steal_path((path.back() == 0) ? as_list(path) : null_terminate(path), std::forward<Fn>(on_update));
+	auto allocator = current_allocator;
+
+	auto params = ALLOCATE_NOINIT(Fn, allocator);
+	new(params) Fn(std::forward<Fn>(on_update));
+
+	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
+		Fn &fn = *(Fn *)state;
+		fn(tracker);
+	}, params);
+	result.allocator = allocator;
+	return result;
 }
 
-inline bool update(FileTracker &tracker) {
-	if (!tracker.path.data)
-		return false;
+enum class FileTrackerUpdateState {
+	none,
+	needs_update,
+	failure,
+};
 
-	u64 last_write_time = get_file_write_time(tracker.path);
+inline FileTrackerUpdateState update(FileTracker &tracker) {
+	auto retrieved_time = get_file_write_time(tracker.file);
+	if (!retrieved_time) {
+		return FileTrackerUpdateState::failure;
+	}
+
+	u64 last_write_time = retrieved_time.value;
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
 		tracker.on_update(tracker, tracker.state);
-		return true;
+		return FileTrackerUpdateState::needs_update;
 	}
-	return false;
+	return FileTrackerUpdateState::none;
 }
 
 inline void free(FileTracker &tracker) {
-	if (tracker.path.data) {
+	if (is_valid(tracker.file)) {
 		if (tracker.allocator) {
 			tracker.allocator.free(tracker.state);
 		}
-		free(tracker.path);
+		close(tracker.file);
 		tracker = {};
 	}
-}
-
-template <class Fn>
-inline void reset(FileTracker &tracker, Span<pathchar> path, Fn &&on_update) {
-	if (tracker.path.data) {
-		if (tracker.allocator) {
-			tracker.allocator.free(tracker.state);
-		}
-	}
-	tracker.path.set(path);
-	tracker = create_file_tracker_steal_path(tracker.path, std::forward<Fn>(on_update));
 }
 
 inline u64 length(File file) {
@@ -244,8 +244,6 @@ inline u64 remaining_bytes(File file) {
 	set_cursor(file, 0, File_end);
 	return get_cursor(file) - old_cursor;
 }
-forceinline bool read(File file, Span<u8> span) { return read(file, span.data, span.size); }
-forceinline bool write(File file, Span<u8> span) { return write(file, span.data, span.size);}
 
 inline void truncate(File file, u64 size) {
 	set_cursor(file, (s64)size, File_begin);
@@ -262,8 +260,6 @@ enum : FileDialogFlags {
 TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
 TL_API List<pathchar> get_current_directory();
-
-TL_API bool create_directory(Span<pathchar> path);
 
 TL_API Span<u8> map_file(File file);
 
@@ -288,42 +284,38 @@ TL_API Span<u8> map_file(File file);
 namespace tl {
 
 #if OS_WINDOWS
-struct OpenFileParams {
+struct WinOpenFileParams {
 	DWORD access;
 	DWORD share;
 	DWORD creation;
 };
-OpenFileParams get_open_file_params(u32 open_flags) {
-	OpenFileParams result;
-	if ((open_flags & File_read) && (open_flags & File_write)) {
+WinOpenFileParams get_open_file_params(OpenFileParams params) {
+	WinOpenFileParams result;
+	if (params.read && params.write) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
 		result.share = 0;
 		result.creation = OPEN_ALWAYS;
-	} else if (open_flags & File_read) {
+	} else if (params.read) {
 		result.access = GENERIC_READ;
 		result.share = FILE_SHARE_READ;
 		result.creation = OPEN_EXISTING;
-	} else if (open_flags & File_write) {
+	} else if (params.write) {
 		result.access = GENERIC_WRITE;
 		result.share = 0;
 		result.creation = CREATE_ALWAYS;
 	} else {
 		result.access = 0;
-		result.share = 0;
-		result.creation = 0;
+		result.share = FILE_SHARE_READ | FILE_SHARE_WRITE;
+		result.creation = OPEN_EXISTING;
 	}
 	return result;
 }
-File open_file(pathchar const *path, u32 open_flags) {
-	auto params = get_open_file_params(open_flags);
+File open_file(pathchar const *path, OpenFileParams params) {
+	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileW(
 		(wchar *)path,
-		params.access, params.share, 0, params.creation, 0, 0
+		win_params.access, win_params.share, 0, win_params.creation, 0, 0
 	);
-	if (!params.access) {
-		CloseHandle(handle);
-		handle = 0;
-	}
 	if (handle == INVALID_HANDLE_VALUE)
 		handle = 0;
 	return {handle};
@@ -346,41 +338,51 @@ s64 get_cursor(File file) {
 	SetFilePointerEx(file.handle, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
 }
-bool read(File file, void *data_, umm size) {
+bool read(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_read = 0;
-	u8 *data = (u8 *)data_;
-	umm total_bytes_read = 0;
-	umm remaining = size;
-	while (remaining > max_bytes) {
-		ReadFile(file.handle, data, max_bytes, &bytes_read, 0);
-		data += max_bytes;
-		remaining -= max_bytes;
-		total_bytes_read += bytes_read;
+	while (span.size > max_bytes) {
+		if (!ReadFile(file.handle, span.data, max_bytes, &bytes_read, 0)) {
+			return false;
+		}
+		span.data += max_bytes;
+		span.size -= max_bytes;
+		if (bytes_read != max_bytes) {
+			return false;
+		}
 	}
-	if (remaining) {
-		ReadFile(file.handle, data, (DWORD)remaining, &bytes_read, 0);
-		total_bytes_read += bytes_read;
+	if (span.size) {
+		if (!ReadFile(file.handle, span.data, (DWORD)span.size, &bytes_read, 0)) {
+			return false;
+		}
+		if (bytes_read != span.size) {
+			return false;
+		}
 	}
-	return total_bytes_read == size;
+	return true;
 }
-bool write(File file, void const *data_, umm size) {
+bool write(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_written = 0;
-	u8 *data = (u8 *)data_;
-	umm total_bytes_written = 0;
-	umm remaining = size;
-	while (remaining > max_bytes) {
-		WriteFile(file.handle, data, max_bytes, &bytes_written, 0);
-		data += max_bytes;
-		remaining -= max_bytes;
-		total_bytes_written += bytes_written;
+	while (span.size > max_bytes) {
+		if (!WriteFile(file.handle, span.data, max_bytes, &bytes_written, 0)) {
+			return false;
+		}
+		span.data += max_bytes;
+		span.size -= max_bytes;
+		if (bytes_written != max_bytes) {
+			return false;
+		}
 	}
-	if (remaining) {
-		WriteFile(file.handle, data, (DWORD)remaining, &bytes_written, 0);
-		total_bytes_written += bytes_written;
+	if (span.size) {
+		if (!WriteFile(file.handle, span.data, (DWORD)span.size, &bytes_written, 0)) {
+			return false;
+		}
+		if (bytes_written != span.size) {
+			return false;
+		}
 	}
-	return total_bytes_written == size;
+	return true;
 }
 void truncate_to_cursor(File file) {
 	SetEndOfFile(file.handle);
@@ -389,34 +391,21 @@ void close(File file) {
 	CloseHandle(file.handle);
 }
 
-bool file_exists(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	return PathFileExistsW((wchar *)path.data);
+bool file_exists(pathchar const *path) {
+	DWORD attr = GetFileAttributesW((wchar *)path);
+	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }
-bool directory_exists(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	return PathFileExistsW((wchar *)path.data);
+bool directory_exists(pathchar const *path) {
+	DWORD attr = GetFileAttributesW((wchar *)path);
+	return ((attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-static u64 get_file_write_time(HANDLE file) {
+Optional<u64> get_file_write_time(File file) {
 	FILETIME last_write_time;
-	if (!GetFileTime(file, 0, 0, &last_write_time))
-		return 0;
+	if (!GetFileTime(file.handle, 0, 0, &last_write_time))
+		return {};
 
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
-}
-u64 get_file_write_time(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	HANDLE file = CreateFileW(
-		(wchar *)path.data,
-		0, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0
-	);
-	if (file == INVALID_HANDLE_VALUE)
-		return 0;
-
-	defer { CloseHandle(file); };
-
-	return get_file_write_time(file);
 }
 
 static wchar *append_star(Span<utf16> directory) {
@@ -441,7 +430,7 @@ static wchar *append_star(Span<utf16> directory) {
 	return directory_with_star;
 }
 
-ListList<pathchar> get_files_in_directory(Span<pathchar> directory) {
+ListList<pathchar> get_file_names_in_directory(Span<pathchar> directory) {
 	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
@@ -528,6 +517,10 @@ void create_file(pathchar const *path) {
 
 void delete_file(pathchar const *path) {
 	DeleteFileW((wchar *)path);
+}
+
+bool create_directory(pathchar const *path) {
+	return (bool)CreateDirectoryW((wchar *)path, 0);
 }
 
 class CDialogEventHandler : public IFileDialogEvents, public IFileDialogControlEvents {
@@ -686,11 +679,6 @@ List<pathchar> get_current_directory() {
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
 	return temp;
-}
-
-bool create_directory(Span<pathchar> path) {
-	tl_check_null_terminator(path);
-	return (bool)CreateDirectoryW((wchar *)path.data, 0);
 }
 
 Span<u8> map_file(File file) {

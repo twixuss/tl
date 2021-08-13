@@ -19,6 +19,11 @@ List<T> null_terminate(Span<T> span) {
 	return result;
 }
 
+template <class T>
+forceinline List<T> temporary_null_terminate(Span<T> span) {
+	return with(temporary_allocator, null_terminate(span));
+}
+
 inline u32 character_to_digit(utf8 character, u32 base) {
 	u32 digit;
 	if (base > 10) {
