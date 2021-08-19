@@ -8,15 +8,17 @@ struct Buffer : Span<u8> {
 	Allocator allocator = {};
 };
 
-inline Buffer create_buffer(AllocateFlags flags, umm size) {
+inline Buffer create_buffer_uninitialized(umm size) {
 	Buffer result;
 	result.allocator = current_allocator;
-	result.data = result.allocator.allocate<u8>(flags, size);
+	result.data = result.allocator.allocate_uninitialized<u8>(size);
 	result.size = size;
 	return result;
 }
 inline Buffer create_buffer(umm size) {
-	return create_buffer(Allocate_default, size);
+	auto result = create_buffer_uninitialized(size);
+	memset(result.data, 0, result.size);
+	return result;
 }
 
 inline void free(Buffer buffer) {

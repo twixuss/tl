@@ -987,56 +987,53 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 				for_each_break;
 			}
 		}
+		for_each_continue;
 	});
 	return result;
 }
 
-inline constexpr bool is_whitespace(u32 c) {
+inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
 }
 
-inline constexpr bool is_alpha(char c) {
+inline constexpr bool is_whitespace(utf32 c) {
+	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
+}
+
+inline constexpr bool is_alpha(ascii c) {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-inline constexpr bool is_digit(char c) {
+inline constexpr bool is_alpha(utf32 c) {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
+inline constexpr bool is_digit(ascii c) {
+	return c >= '0' && c <= '9';
+}
+inline constexpr bool is_digit(utf32 c) {
 	return c >= '0' && c <= '9';
 }
 
-inline constexpr char to_lower_ascii(char c) {
+inline constexpr ascii to_lower(ascii c) {
 	if (c >= 'A' && c <= 'Z')
 		return (char)(c + ('a' - 'A'));
 	return c;
 }
-inline constexpr u32 to_lower_utf8(u32 c) {
+inline constexpr utf32 to_lower(utf32 c) {
 	if (c >= 'A' && c <= 'Z')
 		return c + ('a' - 'A');
 	return c;
 }
-inline constexpr wchar to_lower_utf16(wchar c) {
-	if (c >= L'A' && c <= L'Z')
-		return (wchar)(c + (L'a' - L'A'));
-	return c;
-}
 
-forceinline constexpr ascii to_lower(ascii c) { return to_lower_ascii(c); }
-forceinline constexpr utf8  to_lower(utf8  c) { return to_lower_utf8(c); }
-forceinline constexpr utf16 to_lower(utf16 c) { return to_lower_utf16(c); }
-forceinline constexpr wchar to_lower(wchar c) { return to_lower((wchar_s)c); }
-
-inline constexpr char to_upper_ascii(char c) {
+inline constexpr ascii to_upper(ascii c) {
 	if (c >= 'a' && c <= 'z')
-		return (char)(c - ('a' - 'A'));
+		return (ascii)(c - ('a' - 'A'));
 	return c;
 }
-inline constexpr u32 to_upper_utf8(u32 c) {
+inline constexpr utf32 to_upper(utf32 c) {
 	if (c >= 'a' && c <= 'z')
 		return c - ('a' - 'A');
-	return c;
-}
-inline constexpr wchar to_upper_utf16(wchar c) {
-	if (c >= L'a' && c <= L'z')
-		return (wchar)(c - (L'a' - L'A'));
 	return c;
 }
 
@@ -1076,8 +1073,8 @@ inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
 	return true;
 }
 
-inline bool equals_case_insensitive(char a, char b) { return to_lower(a) == to_lower(b); }
-inline bool equals_case_insensitive(utf8 a, utf8 b) { return to_lower(a) == to_lower(b); }
+inline bool equals_case_insensitive(ascii a, ascii b) { return to_lower(a) == to_lower(b); }
+inline bool equals_case_insensitive(utf32 a, utf32 b) { return to_lower(a) == to_lower(b); }
 
 template <class T, class Predicate, class = EnableIf<is_invocable<Predicate, T, T>>>
 inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {
@@ -1092,14 +1089,14 @@ inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predic
 	return true;
 }
 
-inline constexpr void set_to_lower_case(Span<char> span) {
+inline constexpr void set_to_lower_case(Span<ascii> span) {
 	for (auto &c : span) {
-		c = to_lower_ascii(c);
+		c = to_lower(c);
 	}
 }
-inline constexpr void set_to_lower_case(Span<wchar> span) {
+inline constexpr void set_to_lower_case(Span<utf32> span) {
 	for (auto &c : span) {
-		c = to_lower_utf16(c);
+		c = to_lower(c);
 	}
 }
 
@@ -1357,57 +1354,62 @@ enum AllocatorMode : u8 {
 	Allocator_free,
 };
 
-enum AllocateFlags : u8 {
-	Allocate_default       = 0,
-	Allocate_uninitialized = 0x1,
-};
-
 struct Allocator {
-	void *(*func)(AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
+	void *(*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
 	void *state = 0;
 	forceinline operator bool() {
 		return func != 0;
 	}
-
-	inline void *allocate(AllocateFlags flags, umm size, umm align = 1, std::source_location location = std::source_location::current()) {
-		return func(Allocator_allocate, flags, 0, 0, size, align, location, state);
+	
+	inline void *allocate_uninitialized(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+		return func(Allocator_allocate, 0, 0, size, align, location, state);
+	}
+	inline void *allocate(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+		auto result = allocate_uninitialized(size, align, location);
+		if (result) {
+			memset(result, 0, size);
+		}
+		return result;
+	}
+	
+	template <class T>
+	inline T *allocate_uninitialized(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		return (T *)func(Allocator_allocate, 0, 0, count * sizeof(T), align, location, state);
 	}
 
 	template <class T>
-	inline T *allocate(AllocateFlags flags, umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		T *result = (T *)func(Allocator_allocate, Allocate_uninitialized, 0, 0, count * sizeof(T), align, location, state);
-#if !TL_DEBUG
-		if (flags & Allocate_uninitialized) {
-		} else
-#endif
-		for (auto it = result; it != result + count; ++it) {
-			new (it) T();
+	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		T *result = allocate_uninitialized<T>(count, align, location);
+		if (result) {
+			for (auto it = result; it != result + count; ++it) {
+				new (it) T();
+			}
 		}
 		return result;
 	}
 
 
-	inline void *allocate(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
-		return allocate(Allocate_default, size, align, location);
+
+	
+	inline void *reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
+		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
+	}
+	inline void *reallocate(void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
+		auto result = reallocate_uninitialized(data, old_size, new_size, align, location);
+		if (result && (new_size > old_size)) {
+			memset((u8 *)result + old_size, 0, new_size - old_size);
+		}
+		return result;
 	}
 
 	template <class T>
-	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		return allocate<T>(Allocate_default, count, align, location);
-	}
-
-
-	inline void *reallocate(AllocateFlags flags, void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
-		return func(Allocator_reallocate, flags, data, old_size, new_size, align, location, state);
+	inline T *reallocate_uninitialized(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		return (T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
 	}
 
 	template <class T>
-	inline T *reallocate(AllocateFlags flags, T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		T *result = (T *)func(Allocator_reallocate, Allocate_uninitialized, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
-#ifndef TL_DEBUG
-		if (flags & Allocate_uninitialized) {
-		} else
-#endif
+	inline T *reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		T *result = reallocate_uninitialized(data, old_count, new_count, align, location);
 		for (auto it = result + old_count; it != result + new_count; ++it) {
 			new (it) T();
 		}
@@ -1416,7 +1418,7 @@ struct Allocator {
 
 
 	void free(void *data, std::source_location location = std::source_location::current()) {
-		func(Allocator_free, Allocate_default, data, 0, 0, 0, location, state);
+		func(Allocator_free, data, 0, 0, 0, location, state);
 	}
 
 };
@@ -1460,12 +1462,12 @@ void rotate(Span<T> span, T *to_be_first) {
 	umm right_count = span.size - left_count;
 
 	if (right_count < left_count) {
-		T *temp = temporary_allocator.allocate<T>(Allocate_uninitialized, right_count);
+		T *temp = temporary_allocator.allocate_uninitialized<T>(right_count);
 		memcpy(temp, to_be_first, sizeof(T) * right_count);
 		memmove(span.data + right_count, span.data, sizeof(T) * left_count);
 		memcpy(span.data, temp, sizeof(T) * right_count);
 	} else {
-		T *temp = temporary_allocator.allocate<T>(Allocate_uninitialized, left_count);
+		T *temp = temporary_allocator.allocate_uninitialized<T>(left_count);
 		memcpy(temp, span.data, sizeof(T) * left_count);
 		memmove(span.data, span.data + left_count, sizeof(T) * right_count);
 		memcpy(span.data + right_count, temp, sizeof(T) * left_count);
@@ -1502,33 +1504,21 @@ umm allocations_size = 0;
 #endif
 
 Allocator default_allocator = {
-	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate: {
 #if TL_COUNT_ALLOCATIONS
 				++allocations_count;
 				allocations_size += size;
 #endif
-				auto result = tl_allocate(new_size, align);
-#ifndef TL_DEBUG
-				if (flags & Allocate_uninitialized) {
-				} else
-#endif
-				memset(result, 0, new_size);
-				return result;
+				return tl_allocate(new_size, align);
 			}
 			case Allocator_reallocate: {
 #if TL_COUNT_ALLOCATIONS
 				++allocations_count;
 				allocations_size += size;
 #endif
-				auto result = tl_reallocate(data, new_size, align);
-#ifndef TL_DEBUG
-				if (flags & Allocate_uninitialized) {
-				} else
-#endif
-				memset((u8 *)result + old_size, 0, new_size - old_size);
-				return result;
+				return tl_reallocate(data, new_size, align);
 			}
 			case Allocator_free:
 #if TL_COUNT_ALLOCATIONS
@@ -1571,7 +1561,7 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		auto &state = temporary_allocator_state;
 		switch (mode) {
 			case tl::Allocator_allocate: {
@@ -1591,7 +1581,7 @@ thread_local Allocator temporary_allocator = {
 					state.last_block_capacity *= 2;
 				}
 
-				block = (TemporaryAllocatorState::Block *)default_allocator.allocate(Allocate_uninitialized, sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
+				block = (TemporaryAllocatorState::Block *)default_allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
 				block->size = new_size;
 				block->capacity = state.last_block_capacity;
 				block->next = 0;
@@ -1612,23 +1602,12 @@ thread_local Allocator temporary_allocator = {
 					"Or you can #define TL_TEMP_STORAGE_LIMIT to some bigger number.", TL_TEMP_STORAGE_LIMIT);
 #endif
 
-				auto result = block->data();
-#ifndef TL_DEBUG
-				if (flags & Allocate_uninitialized) {
-				} else
-#endif
-				memset(result, 0, new_size);
-				return result;
+				return block->data();
 			}
 			case tl::Allocator_reallocate: {
-				auto new_data = temporary_allocator.allocate(Allocate_uninitialized, new_size);
-				memcpy(new_data, data, old_size);
-#ifndef TL_DEBUG
-				if (flags & Allocate_uninitialized) {
-				} else
-#endif
-				memset((u8 *)new_data + old_size, 0, new_size - old_size);
-				return new_data;
+				auto result = temporary_allocator.allocate_uninitialized(new_size);
+				memcpy(result, data, old_size);
+				return result;
 			}
 			case tl::Allocator_free:
 				break;

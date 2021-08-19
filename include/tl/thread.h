@@ -26,6 +26,18 @@ forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExc
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
 #endif
 
+forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((SHORT *)a); }
+forceinline u32 atomic_increment(u32 volatile *a) { return _InterlockedIncrement(a); }
+#if ARCH_X64
+forceinline u64 atomic_increment(u64 volatile *a) { return _InterlockedIncrement(a); }
+#endif
+
+forceinline s16 atomic_increment(s16 volatile *a) { return (s16)atomic_increment((u16 *)a); }
+forceinline s32 atomic_increment(s32 volatile *a) { return (s32)atomic_increment((u32 *)a); }
+#if ARCH_X64
+forceinline s64 atomic_increment(s64 volatile *a) { return (s64)atomic_increment((u64 *)a); }
+#endif
+
 template <class T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
@@ -105,21 +117,26 @@ void switch_thread() { SwitchToThread(); }
 
 Thread create_thread(Function function) {
 	struct Data {
-		Function *function;
+		Function function;
 		bool volatile acquired;
 	};
 	Thread result;
 	result.function = function;
 
 	Data data = {};
-	data.function = &result.function;
+	data.function = result.function;
 	data.acquired = false;
 
 	result.handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
-		(*data.function)();
+		
+		init_allocator();
+		defer {deinit_allocator();};
+		current_printer = console_printer;
+		
+		data.function();
 		return 0;
 	}, &data, 0, 0);
 	while (!data.acquired);
@@ -149,9 +166,9 @@ u32 get_thread_id(Thread thread) {
 #endif // TL_IMPL
 
 template <class Predicate>
-void loop_until(Predicate &&predicate) {
+void loop_while(Predicate &&predicate) {
 	u32 try_count = 0;
-	while (!predicate()) {
+	while (predicate()) {
 		spin_iteration();
 		if (try_count >= 64)
 			switch_thread();
@@ -159,6 +176,10 @@ void loop_until(Predicate &&predicate) {
 			sleep_milliseconds(1);
 		++try_count;
 	}
+}
+template <class Predicate>
+void loop_until(Predicate &&predicate) {
+	return loop_while([&]{return!predicate();});
 }
 
 struct SyncPoint {

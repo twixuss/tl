@@ -24,11 +24,11 @@ forceinline List<T> temporary_null_terminate(Span<T> span) {
 	return with(temporary_allocator, null_terminate(span));
 }
 
-inline u32 character_to_digit(utf8 character, u32 base) {
+inline u32 character_to_digit(utf32 character, u32 base) {
 	u32 digit;
 	if (base > 10) {
 		digit = (u64)character - '0';
-		if (digit > 9) digit = (u64)to_lower_ascii(character) - ('a' - 10);
+		if (digit > 9) digit = (u64)to_lower(character) - ('a' - 10);
 	} else {
 		digit = (u64)character - '0';
 	}
@@ -185,44 +185,41 @@ inline u8 const *advance_utf8(u8 const *string) {
 template <class Ptr>
 inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
 
-inline u32 get_char_utf8(void const *_ptr) {
-	auto ptr = (u8 const *)_ptr;
+inline Optional<utf32> get_char_utf8(utf8 const *ptr) {
 	if (*ptr < 0x80) {
 		return *ptr;
 	}
 
-	switch (count_leading_ones(*ptr)) {
+	switch (count_leading_ones((u8)*ptr)) {
 		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
 		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
 		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
-		default: return ~0u;
 	}
+	return {};
 }
 
-inline bool get_char_and_advance_utf8(utf8 const *&ptr, u32 *code_point) {
-	if (*ptr < 0x80) {
-		defer { ++ptr; };
-		*code_point = *ptr;
-		return true;
+inline Optional<utf32> get_char_and_advance_utf8(utf8 const **ptr) {
+	auto &text = *ptr;
+	if (*text < 0x80) {
+		defer { ++text; };
+		return *text;
 	}
 
-	u32 byte_count = count_leading_ones((u8)*ptr);
+	u32 byte_count = count_leading_ones((u8)*text);
 	if (byte_count == 1 || byte_count > 4)
-		return false;
+		return {};
 
-	defer { ptr += byte_count; };
+	defer { text += byte_count; };
 
-	u32 result;
 	switch (byte_count) {
-		case 2: result = ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu)); break;
-		case 3: result = ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu)); break;
-		case 4: result = ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu)); break;
+		case 2: return ((text[0] & 0x1Fu) <<  6u) | ((text[1] & 0x3Fu));
+		case 3: return ((text[0] & 0x0Fu) << 12u) | ((text[1] & 0x3Fu) <<  6u) | ((text[2] & 0x3Fu));
+		case 4: return ((text[0] & 0x07u) << 18u) | ((text[1] & 0x3Fu) << 12u) | ((text[2] & 0x3Fu) << 6u) | ((text[3] & 0x3Fu));
 	}
-	*code_point = result;
-	return true;
+	return {};
 }
-inline bool get_char_and_advance_utf8(utf8 *&ptr, u32 *code_point) {
-	return get_char_and_advance_utf8((utf8 const *&)ptr, code_point);
+inline Optional<utf32> get_char_and_advance_utf8(utf8 **ptr) {
+	return get_char_and_advance_utf8((utf8 const **)ptr);
 }
 
 inline StaticList<utf8, 4> encode_utf8(u32 ch) {

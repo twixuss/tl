@@ -49,11 +49,13 @@ struct BlockList {
 		}
 
 		if (!dstBlock) {
-			auto new_block = allocate_block();
-			alloc_last->next = new_block;
-			dstBlock = last = alloc_last = new_block;
+			dstBlock = allocator.allocate<Block>(1);
+			dstBlock->next = 0;
+			dstBlock->previous = alloc_last;
+			alloc_last->next = dstBlock;
+			last = alloc_last = dstBlock;
 		}
-		return *new (dstBlock->end++) T(std::forward<Args>(args)...);
+		return dstBlock->add(std::forward<Args>(args)...);
 	}
 
 	T &add(T const &value) { return add_in_place(value); }
@@ -119,16 +121,16 @@ struct BlockList {
 			bounds_check(block);
 		}
 		bounds_check(index.value_index < block->size());
-		return block->buffer[index.value_index].value;
+		return block->data[index.value_index];
 	}
 	T &operator[](umm index) {
 		auto block = &first;
-		while (index >= block->size()) {
-			index -= block->size();
+		while (index >= block->size) {
+			index -= block->size;
 			block = block->next;
 			bounds_check(block);
 		}
-		return block->buffer[index].value;
+		return block->data[index];
 	}
 
 	BlockList &operator+=(T const &v) { this->add(v); return *this; }
@@ -136,16 +138,6 @@ struct BlockList {
 	BlockList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	BlockList &operator+=(BlockList const &v) { this->insert(as_span(v), this->end()); return *this; }
 	BlockList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
-
-private:
-	void allocate_block(umm align = alignof(Block)) {
-		Block *result = allocator.allocate<Block>(Allocate_uninitialized, 1, align);
-		result->size = 0;
-		result->next = 0;
-		result->previous = alloc_last;
-		alloc_last->next = result;
-		alloc_last = result;
-	}
 };
 
 template <class T, umm block_size>
@@ -202,16 +194,17 @@ void for_each(BlockList<T, block_size> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool breakable = is_same<bool, ReturnType>;
+		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+
 		BlockListIndex index = {};
 		auto block = &list.first;
 		do {
-			for (auto it = block->buffer; it != block->end; ++it) {
-				if constexpr (breakable) {
-					if (fn(it->value, index))
+			for (auto &it : *block) {
+				if constexpr (returns_directive) {
+					if (fn(it, index) == ForEach_break)
 						return;
 				} else {
-					fn(it->value, index);
+					fn(it, index);
 				}
 				++index.value_index;
 			}
@@ -221,15 +214,16 @@ void for_each(BlockList<T, block_size> &list, Fn &&fn) {
 		} while (block);
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool breakable = is_same<bool, ReturnType>;
+		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+
 		auto block = &list.first;
 		do {
-			for (auto it = block->buffer; it != block->end; ++it) {
-				if constexpr (breakable) {
-					if (fn(it->value))
+			for (auto it : *block) {
+				if constexpr (returns_directive) {
+					if (fn(it) == ForEach_break)
 						return;
 				} else {
-					fn(it->value);
+					fn(it);
 				}
 			}
 			block = block->next;

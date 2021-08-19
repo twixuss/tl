@@ -55,9 +55,9 @@ struct List {
 	void reallocate(umm desired_capacity) {
 		T *new_data;
 		if (data) {
-			new_data = allocator.reallocate<T>(Allocate_uninitialized, data, size, desired_capacity);
+			new_data = allocator.reallocate_uninitialized<T>(data, size, desired_capacity);
 		} else {
-			new_data = allocator.allocate<T>(Allocate_uninitialized, desired_capacity);
+			new_data = allocator.allocate_uninitialized<T>(desired_capacity);
 		}
 		data = new_data;
 		capacity = desired_capacity;

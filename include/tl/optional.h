@@ -22,7 +22,6 @@ struct Optional {
 	bool has_value;
 
 	T get() const {
-
 		return value;
 	}
 #pragma warning(suppress: 4820)
