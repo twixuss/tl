@@ -101,24 +101,4 @@ inline void update_key_state(Span<KeyState> key_state) {
 }
 */
 
-extern void (*on_key_down)(u8 key);
-extern void (*on_key_repeat)(u8 key);
-extern void (*on_key_up)(u8 key);
-extern void (*on_char)(u32 ch);
-
-extern void (*on_mouse_down)(u8 button);
-extern void (*on_mouse_up)(u8 button);
-
-#ifdef TL_IMPL
-
-void (*on_key_down)(u8 key);
-void (*on_key_repeat)(u8 key);
-void (*on_key_up)(u8 key);
-void (*on_char)(u32 ch);
-
-void (*on_mouse_down)(u8 button);
-void (*on_mouse_up)(u8 button);
-
-#endif
-
 }
