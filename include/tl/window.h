@@ -4,6 +4,7 @@
 #include "vector.h"
 #include "input.h"
 #include "list.h"
+#include "hash_map.h"
 
 namespace tl {
 
@@ -15,6 +16,7 @@ enum : WindowFlags {
 using WindowStyleFlags = u32;
 enum : WindowStyleFlags {
 	WindowStyle_no_frame = 0x1,
+	WindowStyle_topmost  = 0x2,
 };
 
 struct Window;
@@ -27,10 +29,24 @@ enum Cursor {
 	Cursor_horizontal_and_vertical,
 };
 
+enum WindowHitResult {
+	WindowHit_miss         = 0,
+	WindowHit_client       = 1,
+	WindowHit_title        = 2,
+	WindowHit_left         = 10,
+	WindowHit_right        = 11,
+	WindowHit_top          = 12,
+	WindowHit_top_left     = 13,
+	WindowHit_top_right    = 14,
+	WindowHit_bottom       = 15,
+	WindowHit_bottom_left  = 16,
+	WindowHit_bottom_right = 17,
+};
+
 using WindowOnCreate = void (*)(Window &);
 using WindowOnDraw = void (*)(Window &);
 using WindowOnSize = void (*)(Window &);
-using WindowHitTest = u32 (*)(Window &);
+using WindowHitTest = WindowHitResult (*)(Window &);
 using WindowGetCursor = Cursor (*)(Window &);
 
 enum WindowState {
@@ -40,7 +56,7 @@ enum WindowState {
 };
 
 #ifdef TL_WINDOW_EXTRA_STATE
-struct Window : TL_WINDOW_EXTRA_STATE {
+struct Window : TL_WINDOW_EXTRA_STATE, WindowCallbacks {
 #else
 struct Window {
 #endif
@@ -58,25 +74,43 @@ struct Window {
 	bool active = false;
 	WindowFlags flags = 0;
 	WindowStyleFlags style_flags = 0;
-	WindowOnCreate on_create = 0;
-	WindowOnDraw on_draw = 0;
-	WindowOnSize on_size = 0;
-	WindowHitTest hit_test = 0;
-	WindowGetCursor get_cursor = 0;
 	WindowState state;
 	f32 mouse_sensitivity;
+	Window *parent = 0;
+
+	WindowOnCreate on_create = 0;
+	WindowOnSize on_size = 0;
+	WindowOnDraw on_draw = 0;
+	WindowHitTest hit_test = 0;
+	WindowGetCursor get_cursor = 0;
+	void (*on_key_down)(u8 key);
+	void (*on_key_repeat)(u8 key);
+	void (*on_key_up)(u8 key);
+	void (*on_char)(u32 ch);
+	void (*on_mouse_down)(u8 button);
+	void (*on_mouse_up)(u8 button);
+
+	void *hdc;
 };
 
 struct CreateWindowInfo {
 	Span<utf8> title;
 	v2u client_size = {};
-	v2u min_client_size = {512, 512};
+	v2u min_client_size = {256, 256};
 	WindowStyleFlags style_flags = 0;
+	Window *parent = 0;
+
 	WindowOnCreate on_create = 0;
 	WindowOnSize on_size = 0;
 	WindowOnDraw on_draw = 0;
 	WindowHitTest hit_test = 0;
 	WindowGetCursor get_cursor = 0;
+	void (*on_key_down)(u8 key);
+	void (*on_key_repeat)(u8 key);
+	void (*on_key_up)(u8 key);
+	void (*on_char)(u32 ch);
+	void (*on_mouse_down)(u8 button);
+	void (*on_mouse_up)(u8 button);
 };
 
 TL_API Window *create_window(CreateWindowInfo info);
@@ -115,6 +149,8 @@ TL_API v2u get_client_size(NativeWindowHandle window);
 
 TL_API void resize(Window &window, v2u size);
 
+TL_API void draw_rect(Window &window, s32 x, s32 y, u32 w, u32 h);
+
 }
 
 #ifdef TL_IMPL
@@ -130,6 +166,7 @@ namespace tl {
 static bool window_class_created = false;
 static constexpr auto class_name = L"tl_window";
 static Window *currently_creating_window = 0;
+static HashMap<HWND, Window *> handle_to_window;
 
 static void draw(Window &window) {
 	window.mouse_position = get_cursor_position() - window.client_position;
@@ -140,7 +177,18 @@ static void draw(Window &window) {
 }
 
 static DWORD get_window_style(WindowStyleFlags flags) {
+	//if (flags & WindowStyle_no_frame) return WS_CAPTION | WS_VISIBLE;
 	return WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+}
+
+static DWORD get_extended_window_style(WindowStyleFlags flags) {
+	DWORD result = 0;
+	if (flags & WindowStyle_topmost) result |= WS_EX_TOPMOST;
+	return result;
+}
+
+static HDC hdc(Window &window) {
+	return (HDC)window.hdc;
 }
 
 static void update_mouse_speed(Window &window) {
@@ -152,26 +200,26 @@ static void update_mouse_speed(Window &window) {
 	// and i couldn't find any information about this mapping
 
 	f32 map_speed[20] = {
-		0.031250f,
-		0.062500f,
-		0.125000f, // unknown
-		0.250000f,
+		0.03125f,
+		0.0625f,
+		0.125f, // unknown
+		0.25f,
 		0.353553f, // 2^-1.5 unknown
-		0.500000f,
+		0.5f,
 		0.666666f, // unknown
-		0.750000f,
-		0.875000f, // unknown
-		1.000000f,
-		1.250000f, // unknown
-		1.500000f,
-		1.750000f, // unknown
-		2.000000f,
-		2.250000f, // unknown
-		2.500000f,
-		2.750000f, // unknown
-		3.000000f,
-		3.250000f, // unknown
-		3.500000f,
+		0.75f,
+		0.875f, // unknown
+		1,
+		1.25f, // unknown
+		1.5f,
+		1.75f, // unknown
+		2,
+		2.25f, // unknown
+		2.5f,
+		2.75f, // unknown
+		3,
+		3.25f, // unknown
+		3.5f,
 	};
 
 	window.mouse_sensitivity = map_speed[speed - 1];
@@ -213,14 +261,16 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 			return 0;
 		}
 		case WM_ACTIVATE: {
-			//if (window.style_flags & WindowStyle_no_frame) {
-			//	BOOL is_composition_enabled;
-			//	DwmIsCompositionEnabled(&is_composition_enabled);
-			//	if (is_composition_enabled) {
-			//		MARGINS margins = {1,1,1,1};
-			//		DwmExtendFrameIntoClientArea((HWND)window.handle, &margins);
-			//	}
-			//}
+			// This is shit
+			// There is no way to have shadows and no borders at the same time
+			if (window.style_flags & WindowStyle_no_frame) {
+				BOOL is_composition_enabled;
+				DwmIsCompositionEnabled(&is_composition_enabled);
+				if (is_composition_enabled) {
+					MARGINS margins = {0,0,0,1};
+					DwmExtendFrameIntoClientArea((HWND)window.handle, &margins);
+				}
+			}
 			window.active = wparam != WA_INACTIVE;
 			return 0;
 		}
@@ -328,12 +378,13 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 			break;
 		}
 		case WM_NCHITTEST: {
-			if (window.hit_test)
-				return window.hit_test(window);
+			if (window.hit_test) {
+				return (int)window.hit_test(window);
+			}
 			break;
 		}
 		case WM_CHAR: {
-			if (on_char) on_char((u32)wparam);
+			if (window.on_char) window.on_char((u32)wparam);
 			break;
 		}
 	}
@@ -341,6 +392,9 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 }
 
 Window *create_window(CreateWindowInfo info) {
+	if (!handle_to_window.allocator.func)
+		construct(handle_to_window);
+
 	auto instance = GetModuleHandleW(0);
 
 	if (!window_class_created) {
@@ -360,6 +414,7 @@ Window *create_window(CreateWindowInfo info) {
 	}
 
 	DWORD window_style = get_window_style(info.style_flags);
+	DWORD extended_window_style = get_extended_window_style(info.style_flags);
 
 	auto allocator = current_allocator;
 	Window *window = allocator.allocate<Window>();
@@ -372,21 +427,37 @@ Window *create_window(CreateWindowInfo info) {
 	window->on_size = info.on_size;
 	window->hit_test = info.hit_test;
 	window->get_cursor = info.get_cursor;
+
+	window->on_char = info.on_char;
+	window->on_key_down = info.on_key_down;
+	window->on_key_repeat = info.on_key_repeat;
+	window->on_key_up = info.on_key_up;
+	window->on_mouse_down = info.on_mouse_down;
+	window->on_mouse_up = info.on_mouse_up;
+
 	window->min_client_size = info.min_client_size;
-	window->min_window_size = get_window_size(info.min_client_size, window_style);
+	if (info.style_flags & WindowStyle_no_frame) {
+		window->min_window_size = info.min_client_size;
+	} else {
+		window->min_window_size = get_window_size(info.min_client_size, window_style);
+	}
 	window->client_size = max(info.client_size, info.min_client_size);
 
 	auto window_size = get_window_size(info.client_size, window_style);
 
 	currently_creating_window = window;
 	CreateWindowExW(
-		0, class_name, with(temporary_allocator, (wchar *)to_utf16(info.title, true).data),
-		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, 0, 0, GetModuleHandleW(0), 0
+		extended_window_style, class_name, with(temporary_allocator, (wchar *)to_utf16(info.title, true).data),
+		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, info.parent ? (HWND)info.parent->handle : 0, 0, GetModuleHandleW(0), 0
 	);
 	if (!window->handle) {
 		print("CreateWindowExW failed with error code: %\n", last_error());
 		return 0;
 	}
+
+	window->hdc = GetDC((HWND)window->handle);
+
+	handle_to_window.get_or_insert((HWND)window->handle) = window;
 
 	init_rawinput(RawInput_mouse);
 	update_mouse_speed(*window);
@@ -420,9 +491,9 @@ bool update(Window *window) {
 		};
 		static bool alt_is_held;
 		switch (message.message) {
-			case WM_LBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(0); continue; }
-			case WM_RBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(1); continue; }
-			case WM_MBUTTONDOWN: { mouse_went_down = true; if (on_mouse_down) on_mouse_down(2); continue; }
+			case WM_LBUTTONDOWN: { mouse_went_down = true; if (window->on_mouse_down) window->on_mouse_down(0); continue; }
+			case WM_RBUTTONDOWN: { mouse_went_down = true; if (window->on_mouse_down) window->on_mouse_down(1); continue; }
+			case WM_MBUTTONDOWN: { mouse_went_down = true; if (window->on_mouse_down) window->on_mouse_down(2); continue; }
 			case WM_INPUT: {
 				RAWINPUT rawInput;
 				if (UINT rawInputSize = sizeof(rawInput);
@@ -435,9 +506,9 @@ bool update(Window *window) {
 
 					window->mouse_delta += V2f(mouse.lLastX, mouse.lLastY) * window->mouse_sensitivity;
 
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(0); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(1); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (on_mouse_up) on_mouse_up(2); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(0); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(1); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(2); continue; }
 				}
 				continue;
 			}
@@ -448,10 +519,10 @@ bool update(Window *window) {
 				bool is_repeated = message.lParam & (LPARAM)(1 << 30);
 
 				if (is_repeated) {
-					if (on_key_repeat) on_key_repeat(key);
+					if (window->on_key_repeat) window->on_key_repeat(key);
 				} else {
-					if (on_key_down) on_key_down(key);
-					if (on_key_repeat) on_key_repeat(key);
+					if (window->on_key_down) window->on_key_down(key);
+					if (window->on_key_repeat) window->on_key_repeat(key);
 
 					if (key == Key_alt) {
 						alt_is_held = true;
@@ -468,7 +539,7 @@ bool update(Window *window) {
 			case WM_SYSKEYUP:
 			case WM_KEYUP: {
 				u8 key = (u8)message.wParam;
-				if (on_key_up) on_key_up(key);
+				if (window->on_key_up) window->on_key_up(key);
 				if (key == Key_alt) {
 					alt_is_held = false;
 				}
@@ -527,44 +598,44 @@ void set_cursor(Window &window, Cursor cursor) {
 bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data) {
 	assert(kind == Clipboard_text, "Not implemented");
 
-    if (!OpenClipboard((HWND)window->handle)) 
-        return false; 
+    if (!OpenClipboard((HWND)window->handle))
+        return false;
 	defer { CloseClipboard(); };
 
 	EmptyClipboard();
 
-    auto global_memory = GlobalAlloc(GMEM_MOVEABLE, data.size + 1); 
-    if (!global_memory) { 
-        return false; 
-    } 
- 
-    auto global_memory_pointer = GlobalLock(global_memory); 
-	if (!global_memory_pointer) 
+    auto global_memory = GlobalAlloc(GMEM_MOVEABLE, data.size + 1);
+    if (!global_memory) {
+        return false;
+    }
+
+    auto global_memory_pointer = GlobalLock(global_memory);
+	if (!global_memory_pointer)
 		return false;
 	defer { GlobalUnlock(global_memory); };
 
     memcpy(global_memory_pointer, data.data, data.size);
 	((char *)global_memory_pointer)[data.size] = 0;
- 
-    SetClipboardData(CF_TEXT, global_memory); 
+
+    SetClipboardData(CF_TEXT, global_memory);
 	return true;
 }
 
 List<u8> get_clipboard(Window *window, ClipboardKind kind) {
 	assert(kind == Clipboard_text, "Not implemented");
 
-    if (!IsClipboardFormatAvailable(CF_TEXT)) 
-		return {}; 
-    if (!OpenClipboard((HWND)window->handle)) 
-        return {}; 
+    if (!IsClipboardFormatAvailable(CF_TEXT))
+		return {};
+    if (!OpenClipboard((HWND)window->handle))
+        return {};
 	defer { CloseClipboard(); };
- 
-    auto global_memory = GetClipboardData(CF_TEXT); 
+
+    auto global_memory = GetClipboardData(CF_TEXT);
     if (!global_memory)
 		return {};
 
-    auto global_memory_pointer = GlobalLock(global_memory); 
-    if (!global_memory_pointer) 
+    auto global_memory_pointer = GlobalLock(global_memory);
+    if (!global_memory_pointer)
 		return {};
 	defer { GlobalUnlock(global_memory); };
 
@@ -608,6 +679,10 @@ v2u get_client_size(NativeWindowHandle window) {
 void resize(Window &window, v2u size) {
 	size = client_size_to_window_size(window, size);
 	SetWindowPos((HWND)window.handle, 0, 0, 0, size.x, size.y, SWP_NOMOVE);
+}
+
+void draw_rect(Window &window, s32 x, s32 y, u32 w, u32 h) {
+	Rectangle(hdc(window), x, y, x + w, y + h);
 }
 
 }

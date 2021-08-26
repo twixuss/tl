@@ -240,17 +240,17 @@ List<Token> lex(Span<utf8> json) {
 		if (check_keyword(u8"true"s,  Token_true)) continue;
 		if (check_keyword(u8"false"s, Token_false)) continue;
 
-		if (is_digit(*c) || *c == '-') {
+		if (is_digit((ascii)*c) || *c == '-') {
 			Token token;
 			token.type = Token_number;
 			token.view.data = c;
 			++c;
 			while (1) {
-				if (is_digit(*c) || *c == '.') {
+				if (is_digit((ascii)*c) || *c == '.') {
 					++c;
 				} else if (*c == 'e') {
 					c += 2;
-					while (is_digit(*c)) {
+					while (is_digit((ascii)*c)) {
 						++c;
 					}
 					break;
