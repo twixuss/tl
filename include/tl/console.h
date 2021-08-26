@@ -1,5 +1,13 @@
 #pragma once
 
+/*
+
+print:
+	Prints the arguments to `current_printer`.
+	Returns number of bytes printed.
+
+*/
+
 #include "common.h"
 #include "string.h"
 
@@ -36,36 +44,39 @@ TL_API void print_to_console(Span<utf16> string);
 TL_API void print_to_console(Span<utf32> string);
 
 template <class T>
-inline void print(PrintKind kind, T const &value) {
+inline umm print(PrintKind kind, T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_utf8;
 	append(builder, value);
-	current_printer(kind, as_utf8(to_string(builder)));
+	auto string = as_utf8(to_string(builder));
+	current_printer(kind, string);
+	return string.size;
 }
 
-template <> inline void print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); }
-template <> inline void print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); }
+template <> inline umm print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); return span.size; }
+template <> inline umm print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); return span.size; }
 
-template <> inline void print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); }
-template <> inline void print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); }
+template <> inline umm print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); return list.size; }
+template <> inline umm print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); return list.size; }
 
 template <class ...Args>
-inline void print(PrintKind kind, char const *fmt, Args const &...args) {
+inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
 	auto string = to_string(builder);
 	print(kind, string);
+	return string.size;
 }
 
-inline void print(PrintKind kind, char const *string) {
-	print(kind, as_span(string));
+inline umm print(PrintKind kind, char const *string) {
+	return print(kind, as_span(string));
 }
 
 template <class ...T>
-inline void print(T const &...values) {
-	print(Print_default, values...);
+inline umm print(T const &...values) {
+	return print(Print_default, values...);
 }
 
 TL_API void hide_console_window();

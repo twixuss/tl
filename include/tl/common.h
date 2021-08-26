@@ -28,7 +28,7 @@
 #define assert_always(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__))
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
 #define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
@@ -272,39 +272,35 @@ forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~va
 #endif
 #endif
 
-forceinline u32 count_bits(u32 v) { return (u32)_mm_popcnt_u32(v); }
-
-#if ARCH_X64
-forceinline u32 count_bits(u64 v) { return (u32)_mm_popcnt_u64(v); }
-#else
-forceinline u32 count_bits(u64 v) { return count_bits((u32)v) + count_bits((u32)(v >> 32)); }
-#endif
-
-forceinline u32 count_bits(s32 v) { return count_bits((u32)v); }
-forceinline u32 count_bits(s64 v) { return count_bits((u64)v); }
-
 namespace ce {
 
-forceinline constexpr u32 count_bits(u32 v) {
+constexpr u32 count_bits(auto v) {
 	u32 s = 0;
-	u32 r = v;
-	for (u32 i = 0; i < 32; ++i) {
-		s += r & 1;
-		r >>= 1;
-	}
+	for (u32 i = 0; i < (sizeof(v) * 8); ++i)  s += v & 1, v >>= 1;
 	return s;
 }
 
 }
 
-forceinline bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
-forceinline bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
-forceinline bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
-forceinline bool is_power_of_2(u64 v) { return count_bits(v) == 1; }
-namespace ce {
-template <class T>
-constexpr bool is_power_of_2(T v) { return (v != 0) && ((v & (v - 1)) == 0); }
-}
+forceinline constexpr u32 count_bits(u8  v) { return std::is_constant_evaluated() ? ce::count_bits(v) : (u32)_mm_popcnt_u32(v); }
+forceinline constexpr u32 count_bits(u16 v) { return std::is_constant_evaluated() ? ce::count_bits(v) : (u32)_mm_popcnt_u32(v); }
+forceinline constexpr u32 count_bits(u32 v) { return std::is_constant_evaluated() ? ce::count_bits(v) : (u32)_mm_popcnt_u32(v); }
+
+#if ARCH_X64
+forceinline constexpr u32 count_bits(u64 v) { return std::is_constant_evaluated() ? ce::count_bits(v) : (u32)_mm_popcnt_u64(v); }
+#else
+forceinline constexpr u32 count_bits(u64 v) { return std::is_constant_evaluated() ? ce::count_bits(v) : (count_bits((u32)v) + count_bits((u32)(v >> 32))); }
+#endif
+
+forceinline constexpr u32 count_bits(s8  v) { return count_bits((u8 )v); }
+forceinline constexpr u32 count_bits(s16 v) { return count_bits((u16)v); }
+forceinline constexpr u32 count_bits(s32 v) { return count_bits((u32)v); }
+forceinline constexpr u32 count_bits(s64 v) { return count_bits((u64)v); }
+
+forceinline constexpr bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(u64 v) { return count_bits(v) == 1; }
 
 template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
@@ -1360,7 +1356,7 @@ struct Allocator {
 	forceinline operator bool() {
 		return func != 0;
 	}
-	
+
 	inline void *allocate_uninitialized(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
 		return func(Allocator_allocate, 0, 0, size, align, location, state);
 	}
@@ -1371,7 +1367,7 @@ struct Allocator {
 		}
 		return result;
 	}
-	
+
 	template <class T>
 	inline T *allocate_uninitialized(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		return (T *)func(Allocator_allocate, 0, 0, count * sizeof(T), align, location, state);
@@ -1390,7 +1386,7 @@ struct Allocator {
 
 
 
-	
+
 	inline void *reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
 		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
 	}
