@@ -687,7 +687,7 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 template <class Int>
 umm append(StringBuilder &builder, FormatInt<Int> f) {
 	Int v = f.value;
-	u32 radix = f.radix;
+	auto radix = convert<Int>(f.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
 	constexpr char charMap[] = "0123456789ABCDEF";
@@ -699,8 +699,8 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 		if (v < 0) {
 			negative = true;
 			if (v == min_value<Int>) {
-				*lsc-- = charMap[-(v % cvt<Int>(radix))];
-				v /= (Int)radix;
+				*lsc-- = charMap[-(v % radix)];
+				v /= radix;
 				++charsWritten;
 			}
 			v = -v;
@@ -708,9 +708,9 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 	}
 
 	for (;;) {
-		*lsc-- = charMap[(u32)(v % cvt<Int>(radix))];
+		*lsc-- = charMap[(u32)(v % radix)];
 		++charsWritten;
-		v /= cvt<Int>(radix);
+		v /= radix;
 		if (v == Int{})
 			break;
 	}

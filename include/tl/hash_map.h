@@ -204,4 +204,13 @@ struct HashMap {
 	}
 };
 
+template <class Key, class Value, class Fn>
+void for_each(HashMap<Key, Value> &map, Fn &&fn) {
+	for (u32 i = 0; i < map.bucket_count; ++i) {
+		for (auto &it : map.buckets[i]) {
+			fn(it.key, it.value);
+		}
+	}
+}
+
 }

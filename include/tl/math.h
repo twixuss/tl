@@ -80,15 +80,6 @@ inline constexpr T smooth_max(T a, T b, f32 k) {
 	return smooth_min(a, b, -k);
 }
 
-namespace ce {
-
-template <class To, class From>
-forceinline constexpr To cvt(From v) {
-	return (To)v;
-}
-
-} // namespace ce
-
 union m3;
 union m4;
 
@@ -241,49 +232,23 @@ union m3 {
 	static forceinline m3 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
-namespace ce {
+#define C(v2f, v2s, s32) template<> constexpr v2s convert(v2f v) { return {convert<s32>(v.x), convert<s32>(v.y)}; }
+C(v2f, v2s, s32) C(v2f, v2u, u32)
+C(v2s, v2f, f32) C(v2s, v2u, u32)
+C(v2u, v2f, f32) C(v2u, v2s, s32)
+#undef C
 
-template <class T>
-constexpr T sqrt_newton_raphson(T x, T curr, T prev) {
-    return curr == prev ? curr : sqrt_newton_raphson(x, (T)(0.5 * (curr + x / curr)), curr);
-};
+#define C(v3f, v3s, s32) template<> constexpr v3s convert(v3f v) { return {convert<s32>(v.x), convert<s32>(v.y), convert<s32>(v.z)}; }
+C(v3f, v3s, s32) C(v3f, v3u, u32)
+C(v3s, v3f, f32) C(v3s, v3u, u32)
+C(v3u, v3f, f32) C(v3u, v3s, s32)
+#undef C
 
-template <class T>
-constexpr auto sqrt(T x) {
-	return sqrt_newton_raphson(x, x, T{});
-}
-
-template <class T>
-constexpr auto length(T a) {
-	return ce::sqrt(dot(a, a));
-}
-template <class T>
-constexpr auto normalize(T a) {
-	return a * (1.0f / ce::length(a));
-}
-
-} // namespace ce
-
-namespace ce {
-
-#define CVT(v2f, v2s, s32) template<> constexpr v2s cvt(v2f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y)}; }
-CVT(v2f, v2s, s32) CVT(v2f, v2u, u32)
-CVT(v2s, v2f, f32) CVT(v2s, v2u, u32)
-CVT(v2u, v2f, f32) CVT(v2u, v2s, s32)
-#undef CVT
-
-#define CVT(v3f, v3s, s32) template<> constexpr v3s cvt(v3f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y), ce::cvt<s32>(v.z)}; }
-CVT(v3f, v3s, s32) CVT(v3f, v3u, u32)
-CVT(v3s, v3f, f32) CVT(v3s, v3u, u32)
-CVT(v3u, v3f, f32) CVT(v3u, v3s, s32)
-#undef CVT
-
-#define CVT(v4f, v4s, s32) template<> constexpr v4s cvt(v4f v) { return {ce::cvt<s32>(v.x), ce::cvt<s32>(v.y), ce::cvt<s32>(v.z), ce::cvt<s32>(v.w)}; }
-CVT(v4f, v4s, s32) CVT(v4f, v4u, u32)
-CVT(v4s, v4f, f32) CVT(v4s, v4u, u32)
-CVT(v4u, v4f, f32) CVT(v4u, v4s, s32)
-#undef CVT
-} // namespace ce
+#define C(v4f, v4s, s32) template<> constexpr v4s convert(v4f v) { return {convert<s32>(v.x), convert<s32>(v.y), convert<s32>(v.z), convert<s32>(v.w)}; }
+C(v4f, v4s, s32) C(v4f, v4u, u32)
+C(v4s, v4f, f32) C(v4s, v4u, u32)
+C(v4u, v4f, f32) C(v4u, v4s, s32)
+#undef C
 
 #define SHUFFLE(a, s0, s1, b, s2, s3) _mm_shuffle_ps(a, b, _MM_SHUFFLE(s3, s2, s1, s0))
 
@@ -658,19 +623,19 @@ forceinline constexpr auto lerp_int(Int a, Int b, T t) {
 		return ceil_to_int(r);
 	}
 }
-forceinline f32 absolute(f32 v) { return *(u32*)&v &= 0x7FFFFFFF, v; }
-forceinline v2f absolute(v2f v) { return {absolute(v.x), absolute(v.y)}; }
-forceinline v3f absolute(v3f v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
-forceinline v4f absolute(v4f v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
+forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
+forceinline constexpr v2f absolute(v2f v) { return {absolute(v.x), absolute(v.y)}; }
+forceinline constexpr v3f absolute(v3f v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
+forceinline constexpr v4f absolute(v4f v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
 
-forceinline s32 absolute(s32 v) { return v < 0 ? -v :v; }
-forceinline v2s absolute(v2s a) { return {absolute(a.x), absolute(a.y)}; }
-forceinline v3s absolute(v3s a) { return {absolute(a.x), absolute(a.y), absolute(a.z)}; }
-forceinline v4s absolute(v4s a) { return {absolute(a.x), absolute(a.y), absolute(a.z), absolute(a.w)}; }
+forceinline constexpr s32 absolute(s32 v) { return v < 0 ? -v :v; }
+forceinline constexpr v2s absolute(v2s a) { return {absolute(a.x), absolute(a.y)}; }
+forceinline constexpr v3s absolute(v3s a) { return {absolute(a.x), absolute(a.y), absolute(a.z)}; }
+forceinline constexpr v4s absolute(v4s a) { return {absolute(a.x), absolute(a.y), absolute(a.z), absolute(a.w)}; }
 
-forceinline u32 absolute(u32 v) { return v; }
+forceinline constexpr u32 absolute(u32 v) { return v; }
 
-forceinline f64 absolute(f64 v) { return *(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v; }
+forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v); }
 
 forceinline f32 set_sign(f32 dst, f32 src) {
     *(u32*)&dst &= 0x7FFFFFFF;
@@ -715,15 +680,19 @@ forceinline v2f positive_modulo(v2f a, v2f b) { return {positive_modulo(a.x, b.x
 forceinline v3f positive_modulo(v3f a, v3f b) { return {positive_modulo(a.x, b.x), positive_modulo(a.y, b.y), positive_modulo(a.z, b.z)}; }
 forceinline v4f positive_modulo(v4f a, v4f b) { return {positive_modulo(a.x, b.x), positive_modulo(a.y, b.y), positive_modulo(a.z, b.z), positive_modulo(a.w, b.w)}; }
 
-forceinline f32 sqrt(f32 v) { return sqrtf(v); }
-forceinline v2f sqrt(v2f v) { return {sqrtf(v.x), sqrtf(v.y)}; }
-forceinline v3f sqrt(v3f v) { return {sqrtf(v.x), sqrtf(v.y), sqrtf(v.z)}; }
-forceinline v4f sqrt(v4f v) { return {sqrtf(v.x), sqrtf(v.y), sqrtf(v.z), sqrtf(v.w)}; }
+constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
+    return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
+};
 
-forceinline f32 reciprocal(f32 v) { return _mm_cvtss_f32(_mm_rcp_ss(_mm_set_ss(v))); }
-forceinline v2f reciprocal(v2f v) { return {reciprocal(v.x), reciprocal(v.y)}; }
-forceinline v3f reciprocal(v3f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z)}; }
-forceinline v4f reciprocal(v4f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z), reciprocal(v.w)}; }
+forceinline constexpr f32 sqrt(f32 v) { return std::is_constant_evaluated() ? sqrt_newton_raphson(v, v, 0) : sqrtf(v); }
+forceinline constexpr v2f sqrt(v2f v) { return {sqrt(v.x), sqrt(v.y)}; }
+forceinline constexpr v3f sqrt(v3f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z)}; }
+forceinline constexpr v4f sqrt(v4f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z), sqrt(v.w)}; }
+
+forceinline constexpr f32 reciprocal(f32 v) { return std::is_constant_evaluated() ? (1.0f / v) : _mm_cvtss_f32(_mm_rcp_ss(_mm_set_ss(v))); }
+forceinline constexpr v2f reciprocal(v2f v) { return {reciprocal(v.x), reciprocal(v.y)}; }
+forceinline constexpr v3f reciprocal(v3f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z)}; }
+forceinline constexpr v4f reciprocal(v4f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z), reciprocal(v.w)}; }
 
 forceinline f32 sin(f32 v) { return ::sinf(v); }
 forceinline v2f sin(v2f v) { return {sin(v.x), sin(v.y)}; }
@@ -757,7 +726,7 @@ forceinline f32 sin_bhaskara(f32 v) {
 }
 forceinline f32 cos_bhaskara(f32 v) { return sin_bhaskara(v + pi*0.5f); }
 
-forceinline v2f sincos_bhaskara(f32 v) { return {cos_bhaskara(v), sin_bhaskara(v)}; }
+forceinline v2f cos_sin_bhaskara(f32 v) { return {cos_bhaskara(v), sin_bhaskara(v)}; }
 
 forceinline f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
 forceinline f32 atan2(v2f v) { return atan2(v.y, v.x); }
@@ -823,36 +792,36 @@ forceinline f32 sum(v2f v) { return v.x + v.y; }
 forceinline f32 rsqrt(f32 v) { return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(v))); }
 
 template <class T>
-forceinline auto length_squared(T a) {
+forceinline constexpr auto length_squared(T a) {
 	return dot(a, a);
 }
 template <class T>
-forceinline auto length(T a) {
+forceinline constexpr auto length(T a) {
 	return sqrt(dot(a, a));
 }
 template <class T>
-forceinline auto normalize(T a) {
+forceinline constexpr auto normalize(T a) {
 	return a / sqrt(dot(a, a));
 }
 template <class T>
-forceinline auto normalize(T a, T fallback) {
+forceinline constexpr auto normalize(T a, T fallback) {
 	auto lsq = length_squared(a);
 	if (lsq == decltype(lsq){})
 		return fallback;
 	return a * (1.0f / sqrt(lsq));
 }
 template <class T>
-forceinline auto distance_squared(T a, T b) {
+forceinline constexpr auto distance_squared(T a, T b) {
 	return length_squared(a - b);
 }
 template <class T>
-forceinline auto distance(T a, T b) {
+forceinline constexpr auto distance(T a, T b) {
 	return sqrt(distance_squared(a, b));
 }
-template <> forceinline auto distance(f32 a, f32 b) { return absolute(a - b); }
-template <> forceinline auto distance(f64 a, f64 b) { return absolute(a - b); }
+template <> forceinline constexpr auto distance(f32 a, f32 b) { return absolute(a - b); }
+template <> forceinline constexpr auto distance(f64 a, f64 b) { return absolute(a - b); }
 template <class T>
-forceinline auto manhattan(T a, T b) {
+forceinline constexpr auto manhattan(T a, T b) {
 	return sum(abs(a - b));
 }
 forceinline s32 maxDistance(v3s a, v3s b) {
@@ -1917,7 +1886,7 @@ forceinline f32 sdf_torus(v3f point, f32 radius, f32 thickness) {
 forceinline f32 sdf_ellipse(v2f point, v2f radius) {
 	v2f p = point;
 	v2f ab = radius;
-	if (ab.x == ab.y) 
+	if (ab.x == ab.y)
 		return length(p) - ab.x;
 
 	p = absolute(p);
@@ -1983,7 +1952,7 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 } // namespace ce
 
 inline void append(StringBuilder &builder, FormatFloat<v2f> f) {
-	append_format(builder, "{%, %}", 
+	append_format(builder, "{%, %}",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
@@ -2058,12 +2027,12 @@ void append(StringBuilder &builder, ray<T> r) {
 	append_format(builder, "ray{origin=%, direction=%}", r.origin, r.direction);
 }
 
-template <> forceinline constexpr v2f cvt(f32 v) { return V2f(v); }
-template <> forceinline constexpr v3f cvt(f32 v) { return V3f(v); }
-template <> forceinline constexpr v2f cvt(s32 v) { return V2f((f32)v); }
-template <> forceinline constexpr v3f cvt(s32 v) { return V3f((f32)v); }
-template <> forceinline constexpr v2f cvt(u32 v) { return V2f((f32)v); }
-template <> forceinline constexpr v3f cvt(u32 v) { return V3f((f32)v); }
+template <> forceinline constexpr v2f convert(f32 v) { return V2f(v); }
+template <> forceinline constexpr v3f convert(f32 v) { return V3f(v); }
+template <> forceinline constexpr v2f convert(s32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f convert(s32 v) { return V3f((f32)v); }
+template <> forceinline constexpr v2f convert(u32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f convert(u32 v) { return V3f((f32)v); }
 
 template <class T>
 forceinline T saturate(T t) {

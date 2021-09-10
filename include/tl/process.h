@@ -15,13 +15,10 @@ inline Process execute(pathchar const *path, ExecuteParams params = {}) {
 }
 
 inline Process execute(Span<pathchar> path, Span<pathchar> arguments, ExecuteParams params = {}) {
-	tl_check_null_terminator(path);
-	tl_check_null_terminator(arguments);
-	return execute(path.data, arguments.data, params);
+	return execute(temporary_null_terminate(path).data, temporary_null_terminate(arguments).data, params);
 }
 inline Process execute(Span<pathchar> path, ExecuteParams params = {}) {
-	tl_check_null_terminator(path);
-	return execute(path.data, 0, params);
+	return execute(temporary_null_terminate(path).data, 0, params);
 }
 
 TL_API bool wait(Process process, u32 timeout = -1);

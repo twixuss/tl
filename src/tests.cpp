@@ -409,7 +409,7 @@ struct u128 {
 	u128 operator++(int) { u128 copy = *this; ++*this; return copy; }
 
 	u128 operator~() const { return {.low = ~low, .high = ~high}; }
-	u128 operator-() const { 
+	u128 operator-() const {
 		u128 result = ~*this;
 		result.low += 1;
 		if (result.low == 0) {
@@ -526,7 +526,7 @@ struct u128 {
 	u128 &operator-=(u128 b) { return *this = *this - b; }
 	u128 &operator*=(u128 b) { return *this = *this * b; }
 	u128 &operator/=(u128 b) { return *this = *this / b; }
-	
+
 	u128 &operator+=(u64 b) { return *this = *this + u128{.low = b}; }
 
 	u128 &operator*=(u8  b) { return *this = *this * b; }
@@ -557,7 +557,7 @@ struct BigUInt {
 	BigUInt(BigUInt const &that) : parts(copy(that.parts)) {}
 	BigUInt(BigUInt &&that) : parts(that.parts) { that.parts = {}; }
 	~BigUInt() { free(parts); }
-	
+
 	BigUInt &operator=(BigUInt const &that) { free(parts); parts = copy(that.parts); return *this; }
 	BigUInt &operator=(BigUInt &&that) { free(parts); parts = that.parts; that.parts = {}; return *this; }
 
@@ -575,8 +575,8 @@ struct BigUInt {
 		if (value) parts[part_index] |=  ((u64)1 << bit_index);
 		else       parts[part_index] &= ~((u64)1 << bit_index);
 	}
-	
-	BigUInt operator~() const { 
+
+	BigUInt operator~() const {
 		BigUInt result;
 		result.parts.reserve(parts.size);
 		for (auto &part : parts) {
@@ -584,20 +584,20 @@ struct BigUInt {
 		}
 		return result;
 	}
-	BigUInt operator-() const { 
+	BigUInt operator-() const {
 		BigUInt result = ~*this;
 		return ++result;
 	}
-	
+
 	BigUInt &operator++() { return *this += 1; }
 	BigUInt operator++(int) { BigUInt copy = *this; ++*this; return copy; }
 
 	BigUInt operator<<(u64 b) const {
 		BigUInt result;
-		
+
 		u64 zero_part_count = b >> 6;
 		result.parts.resize(zero_part_count);
-		
+
 		if ((b & 63) == 0) {
 			for (auto &part : parts) {
 				result.parts.add(part);
@@ -610,7 +610,7 @@ struct BigUInt {
 				}
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -619,12 +619,12 @@ struct BigUInt {
 		if (min_int.parts.size > max_int.parts.size) {
 			swap(min_int, max_int);
 		}
-	
+
 		BigUInt result;
 		result.parts.resize(max_int.parts.size);
 
 		bool carry = false;
-	
+
 		for (u32 part_index = 0; part_index < min_int.parts.size; ++part_index) {
 			add_carry(min_int.parts[part_index], max_int.parts[part_index], carry, &result.parts[part_index], &carry);
 		}
@@ -677,7 +677,7 @@ struct BigUInt {
 		N.parts.resize(max_int.parts.size);
 		quotient.parts.resize(max_int.parts.size);
 		remainder.parts.resize(max_int.parts.size);
-		
+
 		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
 			remainder <<= 1;
 			remainder.set_bit(0, N.get_bit(bit_index));
@@ -693,7 +693,7 @@ struct BigUInt {
 		if (min_int.parts.size > max_int.parts.size) {
 			swap(min_int, max_int);
 		}
-		
+
 		BigUInt N = *this;
 		BigUInt quotient;
 		BigUInt remainder;
@@ -701,7 +701,7 @@ struct BigUInt {
 		N.parts.resize(max_int.parts.size);
 		quotient.parts.resize(max_int.parts.size);
 		remainder.parts.resize(max_int.parts.size);
-		
+
 		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
 			remainder <<= 1;
 			remainder.set_bit(0, N.get_bit(bit_index));
@@ -733,7 +733,7 @@ struct BigUInt {
 	bool operator!=(BigUInt b) const {
 		return !operator==(b);
 	}
-	
+
 	bool operator>(BigUInt b) const {
 		umm max_part_count = max(parts.size, b.parts.size);
 		if (max_part_count == 0)
@@ -894,7 +894,7 @@ int main() {
 
 	init_printer();
 	defer { deinit_printer(); };
-	
+
 	{
 		u128 test = 0su;
 		assert(++test == 1su);
@@ -941,7 +941,7 @@ int main() {
 	//TEST(compiler_test);
 	TEST(stream_test);
 	TEST(list_test);
-	TEST(allocation_test);
+	//TEST(allocation_test);
 #undef TEST;
 
 	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};

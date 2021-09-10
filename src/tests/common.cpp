@@ -106,14 +106,58 @@ void common_test() {
 	static_assert(tl::midpoint((s32)0xFFFFFFFF, (s32)0xFFFFFFFD) == (s32)0xFFFFFFFE);
 
 #define T(x, t) \
+	assert(tl::count_bits((u8 )x) == t);\
+	assert(tl::count_bits((u16)x) == t);\
+	assert(tl::count_bits((u32)x) == t);\
+	assert(tl::count_bits((u64)x) == t);\
+	static_assert(tl::count_bits((u8)x) == t);\
+	static_assert(tl::count_bits((u16)x) == t);\
+	static_assert(tl::count_bits((u32)x) == t);\
+	static_assert(tl::count_bits((u64)x) == t);
+
+	T(0b00000001, 1);
+	T(0b00000110, 2);
+	T(0b00111000, 3);
+	T(0b01010101, 4);
+	T(0b11100011, 5);
+
+#undef T
+
+#define T(x, t) \
+	assert(tl::log2((u8 )x) == t);\
+	assert(tl::log2((u16)x) == t);\
+	assert(tl::log2((u32)x) == t);\
+	assert(tl::log2((u64)x) == t);\
+	static_assert(tl::log2((u8)x) == t);\
+	static_assert(tl::log2((u16)x) == t);\
+	static_assert(tl::log2((u32)x) == t);\
+	static_assert(tl::log2((u64)x) == t);
+
+	constexpr auto x = tl::log2((u8 )1);
+	constexpr auto y = tl::log2((u16)1);
+	constexpr auto z = tl::log2((u32)1);
+	constexpr auto w = tl::log2((u64)1);
+
+	T(1, 0);
+	T(2, 1);
+	T(3, 1);
+	T(4, 2);
+	T(5, 2);
+	T(6, 2);
+	T(7, 2);
+	T(8, 3);
+
+#undef T
+
+#define T(x, t) \
 	assert(tl::floor_to_power_of_2((u8 )x) == t);\
 	assert(tl::floor_to_power_of_2((u16)x) == t);\
 	assert(tl::floor_to_power_of_2((u32)x) == t);\
 	assert(tl::floor_to_power_of_2((u64)x) == t);\
-	static_assert(tl::ce::floor_to_power_of_2((u8)x) == t);\
-	static_assert(tl::ce::floor_to_power_of_2((u16)x) == t);\
-	static_assert(tl::ce::floor_to_power_of_2((u32)x) == t);\
-	static_assert(tl::ce::floor_to_power_of_2((u64)x) == t);
+	static_assert(tl::floor_to_power_of_2((u8)x) == t);\
+	static_assert(tl::floor_to_power_of_2((u16)x) == t);\
+	static_assert(tl::floor_to_power_of_2((u32)x) == t);\
+	static_assert(tl::floor_to_power_of_2((u64)x) == t);
 
 	T(0, 0);
 	T(1, 1);
@@ -133,10 +177,10 @@ void common_test() {
 	assert(tl::ceil_to_power_of_2((u16)x) == t);\
 	assert(tl::ceil_to_power_of_2((u32)x) == t);\
 	assert(tl::ceil_to_power_of_2((u64)x) == t);\
-	static_assert(tl::ce::ceil_to_power_of_2((u8)x) == t);\
-	static_assert(tl::ce::ceil_to_power_of_2((u16)x) == t);\
-	static_assert(tl::ce::ceil_to_power_of_2((u32)x) == t);\
-	static_assert(tl::ce::ceil_to_power_of_2((u64)x) == t);
+	static_assert(tl::ceil_to_power_of_2((u8)x) == t);\
+	static_assert(tl::ceil_to_power_of_2((u16)x) == t);\
+	static_assert(tl::ceil_to_power_of_2((u32)x) == t);\
+	static_assert(tl::ceil_to_power_of_2((u64)x) == t);
 
 	T(0, 0);
 	T(1, 1);

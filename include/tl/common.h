@@ -226,9 +226,16 @@ forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;ret
 forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
 
 template <class To, class From>
-inline constexpr To cvt(From from) {
+forceinline constexpr To convert(From from) {
 	return (To)from;
 }
+namespace ce {
+template <class To, class From>
+constexpr To convert(From from) {
+	return (To)from;
+}
+} // namespace ce
+
 
 forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = _addcarry_u8 (0, a, b, result); }
 forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = _addcarry_u16(0, a, b, result); }
@@ -276,7 +283,10 @@ namespace ce {
 
 constexpr u32 count_bits(auto v) {
 	u32 s = 0;
-	for (u32 i = 0; i < (sizeof(v) * 8); ++i)  s += v & 1, v >>= 1;
+	for (u32 i = 0; i < (sizeof(v) * 8); ++i) {
+		s += v & 1;
+		v >>= 1;
+	}
 	return s;
 }
 
@@ -363,7 +373,7 @@ forceinline f32 log(f32 x, f32 base) {
 
 template <class Base, class Exponent, class = EnableIf<is_integer_like<Base> && is_integer_like<Exponent>>>
 forceinline constexpr Base pow(Base base, Exponent exp) {
-	Base res = cvt<Base>((u8)1);
+	Base res = convert<Base>((u8)1);
 	while (exp) {
 		if (exp & 1)
 			res *= base;
@@ -374,63 +384,95 @@ forceinline constexpr Base pow(Base base, Exponent exp) {
 }
 
 namespace ce {
-
-// https://stackoverflow.com/a/24748637
-#define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
-forceinline constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
-forceinline constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
-forceinline constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
-forceinline constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
-#undef S
-
+constexpr u32 count_leading_zeros(u8 v) {
+	v |= v >> (u8)(1 << 0);
+	v |= v >> (u8)(1 << 1);
+	v |= v >> (u8)(1 << 2);
+	return ce::count_bits((u8)~v);
+}
+constexpr u32 count_leading_zeros(u16 v) {
+	v |= v >> (u16)(1 << 0);
+	v |= v >> (u16)(1 << 1);
+	v |= v >> (u16)(1 << 2);
+	v |= v >> (u16)(1 << 3);
+	return ce::count_bits((u16)~v);
+}
+constexpr u32 count_leading_zeros(u32 v) {
+	v |= v >> (u32)(1 << 0);
+	v |= v >> (u32)(1 << 1);
+	v |= v >> (u32)(1 << 2);
+	v |= v >> (u32)(1 << 3);
+	v |= v >> (u32)(1 << 4);
+	return ce::count_bits((u32)~v);
+}
+constexpr u32 count_leading_zeros(u64 v) {
+	v |= v >> (u64)(1 << 0);
+	v |= v >> (u64)(1 << 1);
+	v |= v >> (u64)(1 << 2);
+	v |= v >> (u64)(1 << 3);
+	v |= v >> (u64)(1 << 4);
+	v |= v >> (u64)(1 << 5);
+	return ce::count_bits((u64)~v);
+}
 }
 
 #if COMPILER_MSVC
 #if ARCH_LZCNT
-forceinline u32 count_leading_zeros(u8  val) { return __lzcnt16(val) - 8; }
-forceinline u32 count_leading_zeros(u16 val) { return __lzcnt16(val); }
-forceinline u32 count_leading_zeros(u32 val) { return __lzcnt32(val); }
-forceinline u32 count_leading_zeros(u64 val) { return (u32)__lzcnt64(val); }
+forceinline constexpr u32 count_leading_zeros(u8  val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val) - 8; }
+forceinline constexpr u32 count_leading_zeros(u16 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val); }
+forceinline constexpr u32 count_leading_zeros(u32 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(val); }
+forceinline constexpr u32 count_leading_zeros(u64 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(val); }
 #else
-forceinline u32 count_leading_zeros(u8  val) { ulong r; return _BitScanReverse  (&r, val) ?  7 - r :  8; }
-forceinline u32 count_leading_zeros(u16 val) { ulong r; return _BitScanReverse  (&r, val) ? 15 - r : 16; }
-forceinline u32 count_leading_zeros(u32 val) { ulong r; return _BitScanReverse  (&r, val) ? 31 - r : 32; }
+forceinline constexpr u32 count_leading_zeros(u8  v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
+forceinline constexpr u32 count_leading_zeros(u16 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 32 : (_BitScanReverse(&r, v), 31 - r))); }
 #if ARCH_X64
-forceinline u32 count_leading_zeros(u64 val) { ulong r; return _BitScanReverse64(&r, val) ? 63 - r : 64; }
+forceinline constexpr u32 count_leading_zeros(u64 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
 #endif
 #endif
 #endif
 
-forceinline u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
-forceinline u32 count_leading_zeros(s16 val) { return count_leading_zeros((u16)val); }
-forceinline u32 count_leading_zeros(s32 val) { return count_leading_zeros((u32)val); }
+forceinline constexpr u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
+forceinline constexpr u32 count_leading_zeros(s16 val) { return count_leading_zeros((u16)val); }
+forceinline constexpr u32 count_leading_zeros(s32 val) { return count_leading_zeros((u32)val); }
 #if ARCH_X64
-forceinline u32 count_leading_zeros(s64 val) { return count_leading_zeros((u64)val); }
+forceinline constexpr u32 count_leading_zeros(s64 val) { return count_leading_zeros((u64)val); }
 #endif
 
-forceinline u32 count_leading_ones(u8  val) { return count_leading_zeros((u8 )~val); }
-forceinline u32 count_leading_ones(u16 val) { return count_leading_zeros((u16)~val); }
-forceinline u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~val); }
+
+forceinline constexpr u32 count_leading_ones(u8  val) { return count_leading_zeros((u8 )~val); }
+forceinline constexpr u32 count_leading_ones(u16 val) { return count_leading_zeros((u16)~val); }
+forceinline constexpr u32 count_leading_ones(u32 val) { return count_leading_zeros((u32)~val); }
 #if ARCH_X64
-forceinline u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
+forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 #endif
+
 
 namespace ce {
-inline constexpr u32 count_leading_zeros(u32 v) {
-	v |= v >> 1;
-	v |= v >> 2;
-	v |= v >> 4;
-	v |= v >> 8;
-	v |= v >> 16;
-	return ce::count_bits(~v);
+// https://stackoverflow.com/a/24748637
+#define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
+constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
+constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
+#undef S
 }
-}
+forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (_BitScanReverse64(&r, v), r)); }
 
-forceinline u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )1 << (u8 )( 7 - count_leading_zeros(v)); }
-forceinline u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)1 << (u16)(15 - count_leading_zeros(v)); }
-forceinline u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)1 << (u32)(31 - count_leading_zeros(v)); }
+forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
+forceinline constexpr u32 log2(s16 v) { return log2((u16)v); }
+forceinline constexpr u32 log2(s32 v) { return log2((u32)v); }
+forceinline constexpr u32 log2(s64 v) { return log2((u64)v); }
+
+
+forceinline constexpr u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )1 << (u8 )log2(v); }
+forceinline constexpr u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)1 << (u16)log2(v); }
+forceinline constexpr u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)1 << (u32)log2(v); }
 #if ARCH_X64
-forceinline u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)1 << (u64)(63 - count_leading_zeros(v)); }
+forceinline constexpr u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)1 << (u64)log2(v); }
 #endif
 
 namespace ce {
@@ -466,25 +508,7 @@ inline constexpr u64 floor_to_power_of_2(u64 x) {
 }
 }
 
-forceinline u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
-
-namespace ce {
-inline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - ce::count_leading_zeros(v - 1)); }
-}
-
-forceinline u32 log2(u8  n) { return  7u - count_leading_zeros(n); }
-forceinline u32 log2(u16 n) { return 15u - count_leading_zeros(n); }
-forceinline u32 log2(u32 n) { return 31u - count_leading_zeros(n); }
-#if ARCH_X64
-forceinline u32 log2(u64 n) { return 63u - count_leading_zeros(n); }
-#endif
-
-forceinline u32 log2(s8  n) { return  7u - count_leading_zeros(n); }
-forceinline u32 log2(s16 n) { return 15u - count_leading_zeros(n); }
-forceinline u32 log2(s32 n) { return 31u - count_leading_zeros(n); }
-#if ARCH_X64
-forceinline u32 log2(s64 n) { return 63u - count_leading_zeros(n); }
-#endif
+forceinline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u8  n) { s32 i = -(n == 0); S(2,100)S(1,10)return i; }
@@ -524,8 +548,8 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 	return i;
 }
 
-forceinline f32 floor(f32 v) { return ::floorf(v); }
-forceinline f64 floor(f64 v) { return ::floor(v); }
+forceinline constexpr f32 floor(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f32)(s32)v : ((f32)(s32)v - 1)) : ::floorf(v); }
+forceinline constexpr f64 floor(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f64)(s64)v : ((f64)(s64)v - 1)) : ::floor (v); }
 
 forceinline f32 ceil(f32 v) { return ::ceilf(v); }
 forceinline f64 ceil(f64 v) { return ::ceil(v); }
@@ -651,7 +675,7 @@ enum : ForEachFlags {
 
 template <class Container, class Fn>
 constexpr void for_each(Container &&container, Fn &&fn) {
-	return for_each<(ForEachFlags)0>(ForEachFlags{}, container, fn);
+	return for_each<(ForEachFlags)0>(container, fn);
 }
 
 template <ForEachFlags flags, class T, umm count, class Fn>
@@ -938,9 +962,47 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 	}
 }
 
+template <class T, class U>
+inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
+	if (sub_str.size > str.size)
+		return false;
+	for (umm i = 0; i < sub_str.size; ++i) {
+		if (str.data[i] != sub_str.data[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <class T, class U>
+inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
+	if (sub_str.size > str.size)
+		return false;
+	umm base_offset = str.size - sub_str.size;
+	for (umm i = 0; i < sub_str.size; ++i) {
+		if (str.data[i + base_offset] != sub_str.data[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 template <class T, umm size> constexpr T *find(T (&arr)[size], T const &value) { return find(arr, arr + size, value); }
 template <class T> constexpr T *find(Span<T> span, T const &value) { return find(span.begin(), span.end(), value); }
 template <class T> constexpr T *find(Span<T> span, Span<T> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+
+template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
+	while (where.size) {
+		for (auto what : whats) {
+			if (starts_with(where, what)) {
+				return where.data;
+			}
+		}
+		where.data += 1;
+		where.size -= 1;
+	}
+	return 0;
+}
 
 template <class T>
 constexpr T *find_last(Span<T> span, T const &value) {
@@ -1041,31 +1103,6 @@ inline constexpr bool equals(Span<T> a, Span<U> b) {
 	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)
 		if (*ap != *bp)
 			return false;
-	return true;
-}
-
-template <class T, class U>
-inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
-	if (sub_str.size > str.size)
-		return false;
-	for (umm i = 0; i < sub_str.size; ++i) {
-		if (str.data[i] != sub_str.data[i]) {
-			return false;
-		}
-	}
-	return true;
-}
-
-template <class T, class U>
-inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
-	if (sub_str.size > str.size)
-		return false;
-	umm base_offset = str.size - sub_str.size;
-	for (umm i = 0; i < sub_str.size; ++i) {
-		if (str.data[i + base_offset] != sub_str.data[i]) {
-			return false;
-		}
-	}
 	return true;
 }
 

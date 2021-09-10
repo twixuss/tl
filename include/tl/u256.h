@@ -9,7 +9,7 @@ union u256 {
 	u256 &operator++() { return *this += {.s = {1}}; }
 	u256 operator++(int) { u256 copy = *this; ++*this; return copy; }
 
-	u256 operator~() const { 
+	u256 operator~() const {
 		return {
 			~s[0],
 			~s[1],
@@ -17,7 +17,7 @@ union u256 {
 			~s[3],
 		};
 	}
-	u256 operator-() const { 
+	u256 operator-() const {
 		u256 result = ~*this;
 		return ++result;
 	}
@@ -178,7 +178,7 @@ union u256 {
 
 	bool operator==(u256 b) const { return s[0] == b.s[0] && s[1] == b.s[1] && s[2] == b.s[2] && s[3] == b.s[3]; }
 	bool operator!=(u256 b) const { return s[0] != b.s[0] || s[1] != b.s[1] || s[2] != b.s[2] || s[3] != b.s[3]; }
-	
+
 	bool operator>(u256 b) const {
 		if (s[3] != b.s[3]) return s[3] > b.s[3];
 		if (s[2] != b.s[2]) return s[2] > b.s[2];
@@ -210,7 +210,7 @@ union u256 {
 		if (s[1] != 0) return true;
 		return s[0] > b;
 	}
-	
+
 	bool get_bit(u64 index) const {
 		return ((u64 *)this)[index >> 6] & ((u64)1 << (index & 63));
 	}
@@ -250,10 +250,10 @@ inline u256 operator""ou(u64 val) {
 }
 
 
-template <> inline constexpr u256 cvt(u8   val) { return {.s = {val}}; }
-template <> inline constexpr u256 cvt(u16  val) { return {.s = {val}}; }
-template <> inline constexpr u256 cvt(u32  val) { return {.s = {val}}; }
-template <> inline constexpr u256 cvt(u64  val) { return {.s = {val}}; }
+template <> forceinline constexpr u256 convert(u8   val) { return {.s = {val}}; }
+template <> forceinline constexpr u256 convert(u16  val) { return {.s = {val}}; }
+template <> forceinline constexpr u256 convert(u32  val) { return {.s = {val}}; }
+template <> forceinline constexpr u256 convert(u64  val) { return {.s = {val}}; }
 
 
 }

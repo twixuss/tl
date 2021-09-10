@@ -411,14 +411,14 @@ forceinline f32 gradient_noise_v3f(v3f coordinate) {
     v3f t1 = t0 - 1;
 
 	static constexpr v3f directions[] = {
-		ce::normalize(v3f{ 1, 1, 1}),
-		ce::normalize(v3f{-1, 1, 1}),
-		ce::normalize(v3f{ 1,-1, 1}),
-		ce::normalize(v3f{-1,-1, 1}),
-		ce::normalize(v3f{ 1, 1,-1}),
-		ce::normalize(v3f{-1, 1,-1}),
-		ce::normalize(v3f{ 1,-1,-1}),
-		ce::normalize(v3f{-1,-1,-1})
+		normalize(v3f{ 1, 1, 1}),
+		normalize(v3f{-1, 1, 1}),
+		normalize(v3f{ 1,-1, 1}),
+		normalize(v3f{-1,-1, 1}),
+		normalize(v3f{ 1, 1,-1}),
+		normalize(v3f{-1, 1,-1}),
+		normalize(v3f{ 1,-1,-1}),
+		normalize(v3f{-1,-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 
@@ -499,14 +499,14 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
 		// v3f{ 0,-1, 0},
 		// v3f{ 0, 0, 1},
 		// v3f{ 0, 0,-1},
-		ce::normalize(v3f{ 1, 1, 1}),
-		ce::normalize(v3f{-1, 1, 1}),
-		ce::normalize(v3f{ 1,-1, 1}),
-		ce::normalize(v3f{-1,-1, 1}),
-		ce::normalize(v3f{ 1, 1,-1}),
-		ce::normalize(v3f{-1, 1,-1}),
-		ce::normalize(v3f{ 1,-1,-1}),
-		ce::normalize(v3f{-1,-1,-1})
+		normalize(v3f{ 1, 1, 1}),
+		normalize(v3f{-1, 1, 1}),
+		normalize(v3f{ 1,-1, 1}),
+		normalize(v3f{-1,-1, 1}),
+		normalize(v3f{ 1, 1,-1}),
+		normalize(v3f{-1, 1,-1}),
+		normalize(v3f{ 1,-1,-1}),
+		normalize(v3f{-1,-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 
