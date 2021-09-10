@@ -1,7 +1,7 @@
 #pragma once
 #include "linked_list.h"
 #include "array.h"
-#include <typeinfo>
+#include "optional.h"
 
 template <class T>
 tl::umm get_hash(T value);
@@ -166,6 +166,22 @@ struct HashMap {
 			}
 		}
 		return 0;
+	}
+	Optional<Value> erase(Key const &key) {
+		if (bucket_count == 0)
+			return {};
+
+		umm hash = Hasher::get_hash(key);
+		auto &bucket = buckets[hash & (bucket_count - 1)];
+		for (auto &it : bucket) {
+			if (it.key == key) {
+				auto result = it.value;
+				tl::erase(bucket, &it);
+				return result;
+			}
+		}
+
+		return {};
 	}
 
 	void rehash(umm new_bucket_count) {

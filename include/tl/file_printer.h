@@ -10,7 +10,7 @@ struct FilePrinter : Printer {
 
 inline FilePrinter create_file_printer(Span<pathchar> path) {
 	FilePrinter result;
-	result.file = open_file(path, File_write);
+	result.file = open_file(path, {.write = true});
 	result.func = [](PrintKind kind, Span<utf8> data, void *state) {
 		File file = {state};
 		write(file, as_bytes(data));
