@@ -150,4 +150,18 @@ T *find_if(LinkedList<T> list, Predicate &&predicate) {
 	return 0;
 }
 
+template <ForEachFlags flags, class T, class Fn>
+void for_each(LinkedList<T> list, Fn &&fn) {
+	auto node = list.head;
+	while (node) {
+		if constexpr (is_same<decltype(fn(*(T*)0)), ForEachDirective>) {
+			if (fn(node->value) == ForEach_break)
+				return;
+		} else {
+			fn(node->value);
+		}
+		node = node->next;
+	}
+}
+
 }

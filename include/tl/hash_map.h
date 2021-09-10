@@ -111,7 +111,7 @@ struct HashMap {
 	Bucket *buckets = 0;
 	umm bucket_count = 0;
 	umm total_value_count = 0;
-	
+
 	Value &get_or_insert(Key const &key) {
 		if (!bucket_count) {
 			rehash(256);
@@ -166,5 +166,14 @@ struct HashMap {
 		bucket_count = new_bucket_count;
 	}
 };
+
+template <class Key, class Value, class Fn>
+void for_each(HashMap<Key, Value> &map, Fn &&fn) {
+	for (u32 i = 0; i < map.bucket_count; ++i) {
+		for (auto &it : map.buckets[i]) {
+			fn(it.key, it.value);
+		}
+	}
+}
 
 }
