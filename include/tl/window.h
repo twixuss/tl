@@ -27,10 +27,12 @@ enum Cursor {
 	Cursor_horizontal,
 	Cursor_vertical,
 	Cursor_horizontal_and_vertical,
+	Cursor_diagonal_forward,
+	Cursor_diagonal_backward,
 };
 
 enum WindowHitResult {
-	WindowHit_miss         = 0,
+	WindowHit_none         = 0,
 	WindowHit_client       = 1,
 	WindowHit_title        = 2,
 	WindowHit_left         = 10,
@@ -576,10 +578,12 @@ void restore(Window *window) {
 
 static HCURSOR get_cursor(Cursor cursor) {
 	switch (cursor) {
-		case Cursor_default:                   { static auto result = LoadCursor(0, IDC_ARROW);  return result; }
-		case Cursor_horizontal:                { static auto result = LoadCursor(0, IDC_SIZEWE); return result; }
-		case Cursor_vertical:                  { static auto result = LoadCursor(0, IDC_SIZENS); return result; }
-		case Cursor_horizontal_and_vertical:   { static auto result = LoadCursor(0, IDC_SIZEALL); return result; }
+		case Cursor_default:                 { static auto result = LoadCursor(0, IDC_ARROW   );  return result; }
+		case Cursor_horizontal:              { static auto result = LoadCursor(0, IDC_SIZEWE  ); return result; }
+		case Cursor_vertical:                { static auto result = LoadCursor(0, IDC_SIZENS  ); return result; }
+		case Cursor_horizontal_and_vertical: { static auto result = LoadCursor(0, IDC_SIZEALL ); return result; }
+		case Cursor_diagonal_backward:       { static auto result = LoadCursor(0, IDC_SIZENWSE); return result; }
+		case Cursor_diagonal_forward:        { static auto result = LoadCursor(0, IDC_SIZENESW); return result; }
 	}
 	return 0;
 }
