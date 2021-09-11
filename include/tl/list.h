@@ -6,8 +6,13 @@
 
 namespace tl {
 
-template <class T>
+template <class T, class Allocator = Allocator>
 struct List {
+	T *data = 0;
+	umm size = 0;
+	umm capacity = 0;
+	[[no_unique_address]] Allocator allocator = get_current_allocator<Allocator>();
+
 	List() = default;
 	List(std::initializer_list<T> list) {
 		reserve(list.size());
@@ -139,7 +144,7 @@ struct List {
 			} else {
 				static_assert(sizeof(U) % sizeof(T) == 0);
 			}
-			result.size      = size * sizeof(T) / sizeof(U);
+			result.size      = size     * sizeof(T) / sizeof(U);
 			result.capacity  = capacity * sizeof(T) / sizeof(U);
 		}
 		return result;
@@ -177,8 +182,8 @@ struct List {
 
 	void erase(Span<T> where) {
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 
@@ -192,11 +197,11 @@ struct List {
 			data[i] = data[i + 1];
 		}
 	}
-	
+
 	void replace(Span<T> where, T with_what) {
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 
@@ -209,8 +214,8 @@ struct List {
 	void replace(Span<T> where, Span<T> with_what) {
 		assert(begin() <= where.begin());
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 
@@ -253,11 +258,6 @@ struct List {
 		return true;
 	}
 	bool operator!=(Span<T> that) const { return !(*this == that); }
-
-	T *data = 0;
-	umm size = 0;
-	umm capacity = 0;
-	Allocator allocator = current_allocator;
 };
 
 template <class T>
@@ -322,234 +322,6 @@ T *previous(List<T> list, T *value) {
 template <class T> constexpr T *find(List<T> list, T const &value) { return find(as_span(list), value); }
 template <class T> constexpr T *find(List<T> list, Span<T> cmp) { return find(as_span(list), cmp); }
 template <class T> constexpr T *find_last(List<T> list, T const &value) { return find_last(as_span(list), value); }
-
-template <class T>
-struct BadList {
-	BadList() = default;
-	explicit BadList(umm length) { resize(length); }
-	BadList(Span<T> span) {
-		reserve(span.size);
-		_copyConstruct(span.begin(), span.end());
-		_end = _begin + span.size;
-	}
-	BadList(T const *begin, umm length) : BadList(Span(begin, length)) {}
-	BadList(BadList &&that) {
-		_begin = that._begin;
-		_end = that._end;
-		_allocEnd = that._allocEnd;
-		that._begin = 0;
-		that._end = 0;
-		that._allocEnd = 0;
-	}
-	BadList(BadList const &that) {
-		_begin = allocator.allocate<T>(that.size());
-		_allocEnd = _end = _begin + that.size();
-		_copyConstruct(that._begin, that._end);
-	}
-	BadList(std::initializer_list<T> v) : BadList(Span(v.begin(), v.end())) {}
-	~BadList() {
-		clear();
-		if (_begin)
-			allocator.free(_begin);
-		_begin = 0;
-		_end = 0;
-		_allocEnd = 0;
-	}
-	BadList &set(Span<T> span) {
-		clear();
-		if (span.size > capacity()) {
-			_reallocate(span.size);
-		}
-		_copyConstruct(span.begin(), span.end());
-		_end = _begin + span.size;
-		return *this;
-	}
-	BadList &operator=(BadList const &that) {
-		clear();
-		reserve(that.size());
-		_end = _begin + that.size();
-		_copyConstruct(that._begin, that._end);
-		return *this;
-	}
-	BadList &operator=(BadList &&that) {
-		this->~BadList();
-		return *new(this) BadList(std::move(that));
-	}
-	BadList &operator=(std::initializer_list<T> v) {
-		this->~BadList();
-		return *new(this) BadList(Span(v.begin(), v.end()));
-	}
-
-	void _copyConstruct(T const *srcBegin, T const *srcEnd) {
-		umm srcSize = (umm)(srcEnd - srcBegin);
-		for (umm i = 0; i < srcSize; ++i) {
-			new (_begin + i) T(srcBegin[i]);
-		}
-	}
-
-	T *begin() { return _begin; }
-	T *end() { return _end; }
-	T const *begin() const { return _begin; }
-	T const *end() const { return _end; }
-
-	umm remainingCapacity() const { return (umm)(_allocEnd - _end); }
-	umm capacity() const { return (umm)(_allocEnd - _begin); }
-
-	umm size() const { return (umm)(_end - _begin); }
-	bool empty() const { return size() == 0; }
-
-	T *data() { return _begin; }
-	T &front() { bounds_check(size()); return *_begin; }
-	T &back() { bounds_check(size()); return _end[-1]; }
-	T &operator[](umm i) { bounds_check(size()); return _begin[i]; }
-
-	T const *data() const { return _begin; }
-	T const &front() const { bounds_check(size()); return *_begin; }
-	T const &back() const { bounds_check(size()); return _end[-1]; }
-	T const &operator[](umm i) const { bounds_check(size()); return _begin[i]; }
-
-	void pop_back() { bounds_check(size()); (--_end)->~T(); }
-	void reserve(umm count) {
-		if (count > capacity())
-			_reallocate(count);
-	}
-	void resize(umm newSize) {
-		if (newSize > capacity())
-			_reallocate(newSize);
-		if (newSize > size()) {
-			for (T *t = _end; t < _begin + newSize; ++t)
-				new (t) T();
-			_end = _begin + newSize;
-		} else if (newSize < size()) {
-			for (T *t = _begin + newSize; t < _end; ++t)
-				t->~T();
-			_end = _begin + newSize;
-		}
-	}
-	void clear() {
-		for (auto &val : *this) {
-			val.~T();
-		}
-		_end = _begin;
-	}
-
-	T *insert(Span<T> span, T *where) {
-		bounds_check(_begin <= where && where <= _end);
-
-		umm where_index = where - _begin;
-		umm required_size = size() + span.size;
-		_grow_if_needed(required_size);
-		where = _begin + where_index;
-
-		for (auto src = where; src != _end; ++src) {
-			new (src + span.size) T(std::move(*src));
-		}
-		for (umm i = 0; i < span.size; ++i) {
-			where[i] = span[i];
-		}
-		_end += span.size;
-		return where;
-	}
-
-	operator Span<T>() { return {begin(), end()}; }
-	operator Span<T>() const { return {begin(), end()}; }
-
-	void _reallocate(umm newCapacity) {
-		assert(capacity() < newCapacity);
-		umm oldSize = size();
-		T *newBegin = allocator.allocate<T>(newCapacity);
-		for (T *src = _begin, *dst = newBegin; src != _end; ++src, ++dst) {
-			new (dst) T(std::move(*src));
-			src->~T();
-		}
-		if (_begin)
-			allocator.free(_begin);
-		_begin = newBegin;
-		_end = _begin + oldSize;
-		_allocEnd = _begin + newCapacity;
-	}
-	bool _grow_if_needed(umm requiredSize) {
-		if (requiredSize <= capacity())
-			return false;
-		umm newCapacity = capacity();
-		if (newCapacity == 0)
-			newCapacity = 1;
-		while (newCapacity < requiredSize) {
-			newCapacity *= 2;
-		}
-		_reallocate(newCapacity);
-		return true;
-	}
-	template <class... Args>
-	T &emplace_back(Args &&...args) {
-		_grow_if_needed(size() + 1);
-		return *new ((void *)_end++) T(std::forward<Args>(args)...);
-	}
-	T &push_back(T const &value) { return emplace_back(value); }
-	T &push_back(T &&value) { return emplace_back(std::move(value)); }
-	T &add(T const &value) { return emplace_back(value); }
-	T &add(T &&value) { return emplace_back(std::move(value)); }
-
-	template <class... Args>
-	T &push_front(Args &&... args) {
-		if (this->remainingCapacity() == 0) {
-			umm newCapacity = this->capacity() * 2;
-			if (newCapacity == 0)
-				newCapacity = 1;
-			this->_reallocate(newCapacity);
-		}
-		new (this->_end) T(std::move(this->_end[-1]));
-		for (T *dest = this->_end - 1; dest > this->_begin; --dest) {
-			*dest = std::move(dest[-1]);
-		}
-		++this->_end;
-		return *new (this->_begin) T(std::forward<Args>(args)...);
-	}
-	template <class... Args>
-	void push_front_unordered(Args &&... args) {
-		if (this->remainingCapacity() == 0) {
-			umm newCapacity = this->capacity() * 2;
-			if (newCapacity == 0)
-				newCapacity = 1;
-			this->_reallocate(newCapacity);
-		}
-		new (this->_end) T(std::move(*this->_begin));
-		++this->_end;
-		new (this->_begin) T(std::forward<Args>(args)...);
-	}
-	void erase(T *val) {
-		bounds_check(this->_begin <= val && val < this->_end);
-		val->~T();
-		--this->_end;
-		for (T *dest = val; dest != this->_end; ++dest) {
-			*dest = std::move(dest[1]);
-		}
-		this->_end->~T();
-	}
-	void erase(T &val) { erase(std::addressof(val)); }
-
-	void erase_unordered(T *val) {
-		bounds_check(this->_begin <= val && val < this->_end);
-		val->~T();
-		new (val) T(std::move(*(this->_end-- - 1)));
-	}
-	void erase_unordered(T &val) { erase_unordered(std::addressof(val)); }
-
-	BadList &operator+=(T const &v) { this->push_back(v); return *this; }
-	BadList &operator+=(T &&v) { this->push_back(std::move(v)); return *this; }
-	BadList &operator+=(Span<T> v) { this->insert(v, this->end()); return *this; }
-	BadList &operator+=(BadList<T> const &v) { this->insert(as_span(v), this->end()); return *this; }
-	BadList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
-
-	void free() {
-		this->~List();
-	}
-
-	Allocator allocator = current_allocator;
-	T *_begin = 0;
-	T *_end = 0;
-	T *_allocEnd = 0;
-};
 
 template <class T>
 Span<T> as_span(List<T> const &list) {

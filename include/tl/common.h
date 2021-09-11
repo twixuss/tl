@@ -1376,11 +1376,6 @@ bool find_and_erase(Collection &collection, T value) {
 
 using NativeWindowHandle = struct NativeWindow {} *;
 
-enum Ownership : u8 {
-	Ownership_copy,
-	Ownership_transfer,
-};
-
 enum AllocatorMode : u8 {
 	Allocator_allocate,
 	Allocator_reallocate,
@@ -1465,6 +1460,23 @@ extern TL_API void clear_temporary_storage();
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
 extern TL_API thread_local Allocator current_allocator;
+
+}
+
+
+// Specialize this function for custom current allocator
+template <class T>
+inline T get_current_allocator() {
+	return {};
+}
+
+template <>
+inline tl::Allocator get_current_allocator<tl::Allocator>() {
+	return tl::current_allocator;
+}
+
+
+namespace tl {
 
 #if TL_COUNT_ALLOCATIONS
 extern umm frees_count;

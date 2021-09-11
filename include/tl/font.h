@@ -122,7 +122,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 	auto current_char = text.data;
 
 	struct CharPointer {
-		u32 code_point;
+		utf32 code_point;
 		FontChar *info;
 	};
 
@@ -130,10 +130,11 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 	new_chars.allocator = temporary_allocator;
 
 	while (current_char < text.end()) {
-		u32 code_point;
-		if (!get_char_and_advance_utf8(current_char, &code_point)) {
+		auto got_char = get_char_and_advance_utf8(&current_char);
+		if (!got_char.has_value) {
 			invalid_code_path();
 		}
+		auto code_point = got_char.value;
 		auto found = font->chars.find(code_point);
 		if (found == font->chars.end()) {
 			auto inserted = font->chars.insert({code_point, FontChar{}}).first;
@@ -327,14 +328,15 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 
 	auto current_char = text.data;
 	while (current_char < text.end()) {
-		u32 ch;
-		if (!get_char_and_advance_utf8(current_char, &ch)) {
+		auto got_char = get_char_and_advance_utf8(&current_char);
+		if (!got_char.has_value) {
 			invalid_code_path();
 		}
+		auto code_point = got_char.value;
 
-		auto d = get_char_info(ch, font);
+		auto d = get_char_info(code_point, font);
 
-		if (ch == '\n') {
+		if (code_point == '\n') {
 			pos.x = 0;
 			pos.x += font->size;
 			continue;
@@ -362,14 +364,15 @@ List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
 
 	auto current_char = text.data;
 	while (current_char < text.end()) {
-		u32 ch;
-		if (!get_char_and_advance_utf8(current_char, &ch)) {
+		auto got_char = get_char_and_advance_utf8(&current_char);
+		if (!got_char.has_value) {
 			invalid_code_path();
 		}
+		auto code_point = got_char.value;
 
-		auto d = get_char_info(ch, font);
+		auto d = get_char_info(code_point, font);
 
-		if (ch == '\n') {
+		if (code_point == '\n') {
 			posX = 0;
 			posY += font->size;
 			continue;
