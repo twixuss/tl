@@ -17,12 +17,12 @@ template <class T>
 struct ListList : List<Span<T>> {
 	using Base = List<Span<T>>;
 	List<T> buffer;
-#ifdef TL_DEBUG
+#if TL_DEBUG
 	bool is_absolute = false;
 #endif
 
 	void add(Span<T> string) {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		assert(is_absolute == false);
 #endif
 
@@ -35,7 +35,7 @@ struct ListList : List<Span<T>> {
 	}
 
 	void make_absolute() {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		is_absolute = true;
 #endif
 		for (auto &string : *this) {
@@ -43,7 +43,7 @@ struct ListList : List<Span<T>> {
 		}
 	}
 	void make_relative() {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		is_absolute = false;
 #endif
 		for (auto &string : *this) {
@@ -58,7 +58,7 @@ template <class T>
 void free(ListList<T> &list) {
 	free(list.base());
 	free(list.buffer);
-#ifdef TL_DEBUG
+#if TL_DEBUG
 	list.is_absolute = false;
 #endif
 }

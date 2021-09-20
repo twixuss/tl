@@ -85,12 +85,12 @@ struct Window {
 	WindowOnDraw on_draw = 0;
 	WindowHitTest hit_test = 0;
 	WindowGetCursor get_cursor = 0;
-	void (*on_key_down)(u8 key);
-	void (*on_key_repeat)(u8 key);
-	void (*on_key_up)(u8 key);
-	void (*on_char)(u32 ch);
-	void (*on_mouse_down)(u8 button);
-	void (*on_mouse_up)(u8 button);
+	void (*on_key_down)(u8 key) = 0;
+	void (*on_key_repeat)(u8 key) = 0;
+	void (*on_key_up)(u8 key) = 0;
+	void (*on_char)(u32 ch) = 0;
+	void (*on_mouse_down)(u8 button) = 0;
+	void (*on_mouse_up)(u8 button) = 0;
 
 	void *hdc;
 };
@@ -107,12 +107,12 @@ struct CreateWindowInfo {
 	WindowOnDraw on_draw = 0;
 	WindowHitTest hit_test = 0;
 	WindowGetCursor get_cursor = 0;
-	void (*on_key_down)(u8 key);
-	void (*on_key_repeat)(u8 key);
-	void (*on_key_up)(u8 key);
-	void (*on_char)(u32 ch);
-	void (*on_mouse_down)(u8 button);
-	void (*on_mouse_up)(u8 button);
+	void (*on_key_down)(u8 key) = 0;
+	void (*on_key_repeat)(u8 key) = 0;
+	void (*on_key_up)(u8 key) = 0;
+	void (*on_char)(u32 ch) = 0;
+	void (*on_mouse_down)(u8 button) = 0;
+	void (*on_mouse_up)(u8 button) = 0;
 };
 
 TL_API Window *create_window(CreateWindowInfo info);

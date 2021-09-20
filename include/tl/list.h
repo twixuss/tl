@@ -324,6 +324,25 @@ template <class T> constexpr T *find(List<T> list, Span<T> cmp) { return find(as
 template <class T> constexpr T *find_last(List<T> list, T const &value) { return find_last(as_span(list), value); }
 
 template <class T>
+List<Span<T>> find_all(Span<T> where, Span<T> what) {
+	List<Span<T>> result;
+
+	for (umm where_start = 0; where_start != where.size - what.size + 1; ++where_start) {
+		for (umm what_index = 0; what_index < what.size; ++what_index) {
+			if (where.data[where_start + what_index] != what.data[what_index]) {
+				goto continue_where;
+			}
+		}
+
+		result.add(Span<T>(where.data + where_start, what.size));
+
+	continue_where:;
+	}
+
+	return result;
+}
+
+template <class T>
 Span<T> as_span(List<T> const &list) {
 	return (Span<T>)list;
 }

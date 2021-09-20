@@ -218,6 +218,12 @@ template <class T> inline static constexpr T epsilon = {};
 template<> inline static constexpr f32 epsilon<f32> = 1.175494351e-38f;
 template<> inline static constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
+template <class T> inline static constexpr T infinity = {};
+template<> inline static constexpr f32 infinity<f32> = 1e300 * 1e300;
+template<> inline static constexpr f64 infinity<f64> = 1e300 * 1e300;
+
+template <class T> inline static constexpr T nan = infinity<T> * 0;
+
 #pragma warning(pop)
 
 #define tl_enum_flags(t) \
@@ -258,6 +264,16 @@ forceinline constexpr bool is_nan(f32 v) {
 	};
 	f = v;
 	return ((u & 0x7f800000) == 0x7f800000) && (u & 0x007fffff);
+}
+
+forceinline constexpr bool is_nan(f64 v) {
+	union {
+		u64 u;
+		f64 f;
+	};
+	f = v;
+
+	return ((u & 0x7ff0000000000000) == 0x7ff0000000000000) && (u & 0x000fffffffffffff);
 }
 
 #if COMPILER_GCC
@@ -674,7 +690,7 @@ enum : ForEachFlags {
 };
 
 template <class Container, class Fn>
-constexpr void for_each(Container &&container, Fn &&fn) {
+constexpr void for_each(Container container, Fn &&fn) {
 	return for_each<(ForEachFlags)0>(container, fn);
 }
 
@@ -1312,7 +1328,6 @@ struct StaticList {
 		return erased;
 	}
 	forceinline T erase(T *where) { return erase_at(where - data); }
-	forceinline T erase(T &value) { return erase(&value); }
 
 	T erase_at_unordered(umm where) {
 		bounds_check(where < size);
@@ -1324,7 +1339,6 @@ struct StaticList {
 		return erased;
 	}
 	forceinline T erase_unordered(T *where) { return erase_at_unordered(where - data); }
-	forceinline T erase_unordered(T &where) { return erase_unordered(&where); }
 
 	constexpr void clear() {
 		size = 0;
@@ -1349,6 +1363,9 @@ template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity>
 template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T> cmp) { return find(as_span(list), cmp); }
 
 template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
+
+template <class T, umm capacity>
+forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
 
 template <class Collection, class T>
 T *find_previous(Collection collection, T value) {

@@ -49,7 +49,7 @@ inline umm print(PrintKind kind, T const &value) {
 	builder.allocator = temporary_allocator;
 	builder.encoding = Encoding_utf8;
 	append(builder, value);
-	auto string = as_utf8(to_string(builder));
+	auto string = as_utf8(to_string(builder, temporary_allocator));
 	current_printer(kind, string);
 	return string.size;
 }
@@ -65,7 +65,7 @@ inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
-	auto string = to_string(builder);
+	auto string = to_string(builder, temporary_allocator);
 	print(kind, string);
 	return string.size;
 }

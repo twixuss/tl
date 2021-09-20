@@ -888,12 +888,47 @@ void append(StringBuilder &builder, F32 f) {
 }
 #endif
 
+
+template <class T>
+void print_floats(T x) {
+	print("%\n", x);
+	print("%\n", FormatFloat{.value = x, .precision = 6});
+	print("%\n", FormatFloat{.value = x, .precision = 6, .trailing_zeros = true});
+	print("%\n", FormatFloat{.value = x, .precision = 30});
+	print("%\n", FormatFloat{.value = x, .precision = 30, .trailing_zeros = true});
+}
+
+float pow2(float a) {
+	return a * a;
+}
+
 int main() {
+	powf(1, 2);
+	::pow2(2);
+
 	init_allocator();
 	defer { deinit_allocator(); };
 
 	init_printer();
 	defer { deinit_printer(); };
+
+
+	print_floats(0.f);
+	print_floats(5.87747175411e-39f);
+	print_floats(1.17549435082e-38f);
+	print_floats(0.01f);
+	print_floats(1.2345f);
+	print_floats(1.23456789f);
+	print_floats(0.045161361356f);
+	print_floats(13516.5161361356f);
+	print_floats(max_value<f32>);
+	print_floats(min_value<f32>);
+	print_floats(+epsilon<f32>);
+	print_floats(-epsilon<f32>);
+	print_floats(+infinity<f32>);
+	print_floats(-infinity<f32>);
+	print_floats(+tl::nan<f32>);
+	print_floats(-tl::nan<f32>);
 
 	{
 		u128 test = 0su;

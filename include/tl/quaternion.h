@@ -40,16 +40,16 @@ union quaternion {
 	quaternion &operator*=(quaternion b) { return *this = *this * b, *this; }
 };
 
-quaternion Quaternion(v3f xyz, f32 w) {
+inline quaternion Quaternion(v3f xyz, f32 w) {
 	return {xyz.x, xyz.y, xyz.z, w};
 }
 
-quaternion normalize(quaternion q) {
+inline quaternion normalize(quaternion q) {
 	f32 il = 1 / length(v4f{q.x,q.y,q.z,q.w});
 	return {q.x*il,q.y*il,q.z*il,q.w*il};
 }
 
-quaternion quaternion_from_axis_angle(v3f axis, f32 angle) {
+inline quaternion quaternion_from_axis_angle(v3f axis, f32 angle) {
 	f32 half_angle = angle * 0.5f;
 	f32 s = tl::sin(half_angle);
 	return {
@@ -59,7 +59,7 @@ quaternion quaternion_from_axis_angle(v3f axis, f32 angle) {
 		tl::cos(half_angle),
 	};
 }
-quaternion quaternion_from_euler(f32 ax, f32 ay, f32 az) {
+inline quaternion quaternion_from_euler(f32 ax, f32 ay, f32 az) {
 	v3f half_angle = v3f{ax, ay, az} * 0.5f;
 	v2f csx = cos_sin(half_angle.x);
 	v2f csy = cos_sin(half_angle.y);
@@ -79,17 +79,17 @@ quaternion quaternion_from_euler(f32 ax, f32 ay, f32 az) {
 		c*a*e + d*b*f,
 	};
 }
-quaternion quaternion_from_euler(v3f v) {
+inline quaternion quaternion_from_euler(v3f v) {
 	return quaternion_from_euler(v.x, v.y, v.z);
 }
 
-quaternion quaternion_look(v3f direction) {
+inline quaternion quaternion_look(v3f direction) {
 	quaternion ry = quaternion_from_axis_angle({0,1,0}, -atan2(direction.xz()));
 	quaternion rz = quaternion_from_axis_angle({0,0,1}, atan2((-ry * direction).xy));
 	return ry * rz;
 }
 
-v3f to_euler_angles(quaternion q) {
+inline v3f to_euler_angles(quaternion q) {
 	v3f angles = {};
 	v3f rotated_x = q * v3f{1, 0, 0};
 	v3f rotated_z = q * v3f{0, 0, 1};
@@ -99,7 +99,7 @@ v3f to_euler_angles(quaternion q) {
 	rotated_x = q * rotated_x;
 	rotated_z = q * rotated_z;
 	angles.x = -atan2(rotated_z.zy());
-	
+
 	q = quaternion_from_axis_angle({1, 0, 0}, -angles.x);
 	rotated_x = q * rotated_x;
 	rotated_z = q * rotated_z;
@@ -109,7 +109,7 @@ v3f to_euler_angles(quaternion q) {
 	return angles;
 }
 
-void append(StringBuilder &builder, quaternion q) {
+inline void append(StringBuilder &builder, quaternion q) {
 	append_format(builder, "{%, %, %, %}", q.x, q.y, q.z, q.w);
 }
 

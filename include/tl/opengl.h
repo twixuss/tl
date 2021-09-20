@@ -121,6 +121,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z           0x851A
 #define GL_PROXY_TEXTURE_CUBE_MAP                0x851B
 #define GL_MAX_CUBE_MAP_TEXTURE_SIZE             0x851C
+#define GL_DEPTH_CLAMP                           0x864F
 #define GL_RGBA32F                               0x8814
 #define GL_RGB32F                                0x8815
 #define GL_RGBA16F                               0x881A

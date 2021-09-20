@@ -4,7 +4,7 @@
 #include "list.h"
 #include "buffer.h"
 #include "file.h"
-#include <unordered_map>
+#include "hash_map.h"
 
 #ifndef TL_FONT_TEXTURE_HANDLE
 #define TL_FONT_TEXTURE_HANDLE void *
@@ -23,7 +23,7 @@ struct FontCollection;
 struct SizedFont {
 	FontCollection *collection;
 
-	std::unordered_map<u32, FontChar> chars;
+	HashMap<u32, FontChar> chars;
 	TL_FONT_TEXTURE_HANDLE texture;
 	u32 size;
 
@@ -76,8 +76,8 @@ struct FontCollectionFT : FontCollection {
 
 FontChar get_char_info(u32 ch, SizedFont *font) {
 	auto found = font->chars.find(ch);
-	assert(found != font->chars.end(), "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
-	return found->second;
+	assert(found, "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
+	return *found;
 }
 
 void init_face(FontFace &face) {
@@ -131,16 +131,17 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 
 	while (current_char < text.end()) {
 		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.has_value) {
+		if (!got_char.valid()) {
 			invalid_code_path();
 		}
-		auto code_point = got_char.value;
+		auto code_point = got_char.get();
 		auto found = font->chars.find(code_point);
-		if (found == font->chars.end()) {
-			auto inserted = font->chars.insert({code_point, FontChar{}}).first;
+		if (!found) {
+			auto &inserted = font->chars.get_or_insert(code_point);
+
 			CharPointer p;
-			p.code_point = inserted->first;
-			p.info = &inserted->second;
+			p.code_point = code_point;
+			p.info = &inserted;
 			new_chars.add(p);
 		}
 	}
@@ -212,12 +213,12 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 				font->current_row_height = 0;
 
 				new_chars.clear();
-				for (auto &[code_point, new_char] : font->chars) {
+				for_each(font->chars, [&] (u32 &code_point, FontChar &new_char) {
 					CharPointer p;
 					p.code_point = code_point;
 					p.info = &new_char;
 					new_chars.add(p);
-				}
+				});
 
 				goto redo_all;
 			}
@@ -329,10 +330,10 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 	auto current_char = text.data;
 	while (current_char < text.end()) {
 		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.has_value) {
+		if (!got_char.valid()) {
 			invalid_code_path();
 		}
-		auto code_point = got_char.value;
+		auto code_point = got_char.get();
 
 		auto d = get_char_info(code_point, font);
 
@@ -365,10 +366,10 @@ List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
 	auto current_char = text.data;
 	while (current_char < text.end()) {
 		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.has_value) {
+		if (!got_char.valid()) {
 			invalid_code_path();
 		}
-		auto code_point = got_char.value;
+		auto code_point = got_char.get();
 
 		auto d = get_char_info(code_point, font);
 

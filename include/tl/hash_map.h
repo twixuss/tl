@@ -9,7 +9,7 @@ inline tl::umm get_hash(T value);
 template <class T>
 inline tl::umm get_hash(T *value) { return (tl::umm)value / alignof(T); }
 
-inline tl::umm get_hash(void *value) { return (tl::umm)value / sizeof(umm); }
+inline tl::umm get_hash(void *value) { return (tl::umm)value / sizeof(tl::umm); }
 
 template <> inline tl::umm get_hash(tl::u8    value) { return value; }
 template <> inline tl::umm get_hash(tl::u16   value) { return value; }
@@ -125,6 +125,8 @@ void free(StaticHashMap<Key, Value, capacity, Hasher> &map) {
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>>
 struct HashMap {
+	using ValueType = Value;
+
 	struct KeyValue {
 		Key key;
 		Value value;
@@ -205,15 +207,40 @@ struct HashMap {
 		}
 		bucket_count = new_bucket_count;
 	}
+
+	void clear() {
+		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+			buckets[bucket_index].clear();
+		}
+	}
 };
 
-template <class Key, class Value, class Fn>
-void for_each(HashMap<Key, Value> &map, Fn &&fn) {
+template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
+void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+	static_assert(flags == 0, "Only default flags supported");
+
 	for (u32 i = 0; i < map.bucket_count; ++i) {
 		for (auto &it : map.buckets[i]) {
 			fn(it.key, it.value);
 		}
 	}
+}
+
+template <class Key, class Value, class Hasher>
+HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source) {
+	HashMap<Key, Value, Hasher> result;
+	for_each(source, [&](Key const &key, Value const &value) {
+		result.get_or_insert(key) = value;
+	});
+	return result;
+}
+
+template <class Key, class Value, class Hasher>
+void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source) {
+	destination.clear();
+	for_each(source, [&](Key const &key, Value const &value) {
+		destination.get_or_insert(key) = value;
+	});
 }
 
 }

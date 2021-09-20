@@ -131,11 +131,11 @@ Thread create_thread(Function function) {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
-		
+
 		init_allocator();
 		defer {deinit_allocator();};
 		current_printer = console_printer;
-		
+
 		data.function();
 		return 0;
 	}, &data, 0, 0);
@@ -281,7 +281,7 @@ struct MutexQueue {
 		if (base.size) {
 			result = base.front();
 			base.pop();
-			fn(result.value);
+			fn(result.get());
 		}
 		return result;
 	}
@@ -291,7 +291,7 @@ struct MutexQueue {
 			opt = try_pop();
 			return opt.has_value();
 		});
-		return opt.value();
+		return opt.get();
 	}
 	void clear() {
 		scoped_lock(mutex);
@@ -352,7 +352,7 @@ struct StaticMutexCircularQueue {
 			opt = try_pop();
 			return opt.has_value();
 		});
-		return opt.value();
+		return opt.get();
 	}
 	void clear() {
 		scoped_lock(mutex);
@@ -446,7 +446,7 @@ inline void do_work(ThreadWork work) {
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
-		do_work(popped.value);
+		do_work(popped.get());
 		return true;
 	}
 	return false;
@@ -458,7 +458,7 @@ inline bool do_work(ThreadPool *pool) {
 			return true;
 		}
 		if (auto popped = pool->all_work.try_pop()) {
-			work = popped.value;
+			work = popped.get();
 			return true;
 		}
 		return false;

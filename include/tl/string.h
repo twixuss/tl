@@ -712,8 +712,8 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 		return append(builder, format.value);
 	}
 }
-template <class Int>
-umm append(StringBuilder &builder, FormatInt<Int> f) {
+template <class Int, umm capacity>
+umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	Int v = f.value;
 	auto radix = convert<Int>(f.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
@@ -759,7 +759,19 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 		if (f.leading_zeros > charsWritten)
 			charsWritten = f.leading_zeros;
 	}
-	return append(builder, Span(lsc + 1, charsWritten));
+	buffer.add(Span(lsc + 1, charsWritten));
+	return charsWritten;
+}
+template <class Int, umm capacity, class = EnableIf<is_integer<Int>>>
+umm write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
+	return write_as_string(buffer, FormatInt{.value = v});
+}
+
+template <class Int>
+umm append(StringBuilder &builder, FormatInt<Int> f) {
+	StaticList<ascii, _intToStringSize<Int>> buffer;
+	umm chars_written = write_as_string(buffer, f);
+	return append(builder, buffer);
 }
 
 template <class Int, class = EnableIf<is_integer<Int>>>
@@ -771,38 +783,75 @@ forceinline umm append(StringBuilder &builder, void const *p) {
 	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zeros = true});
 }
 
-inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
-	umm chars_appended = 0;
-
-	auto append = [&](StringBuilder &builder, auto const &value) {
-		chars_appended += ::tl::append(builder, value);
-	};
+template <class Float>
+inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
+	scoped_allocator(temporary_allocator);
 
 	auto value = format.value;
+
+	if (is_nan(value)) {
+		return append(builder, "NaN");
+	}
+
 	auto precision = format.precision;
+
+	StaticList<ascii, 128> buffer;
+
 	if (is_negative(value)) {
-		append(builder, "-");
+		buffer.add('-');
 		value = -value;
 	}
 
-	auto append_float = [&](f64 f) {
-		append(builder, (u64)f);
-		u64 fract_part = 1;
-		for (u32 i = 0; i < precision; ++i) {
-			f = frac(f) * 10;
-			fract_part *= 10;
-			fract_part += (u32)f;
-		}
+	if (value == infinity<Float>) {
+		return append(builder, "inf");
+	}
 
-		if (!format.trailing_zeros) {
-			while ((fract_part % 10) == 0) {
-				fract_part /= 10;
+	auto append_float = [&](Float f) {
+		write_as_string(buffer, (u64)f);
+
+		auto round_and_trim = [&] {
+			f = frac(f);
+			if (f != 0) {
+				if (f >= 0.5f) {
+					auto it = buffer.end() - 1;
+					while (1) {
+						*it += 1;
+						if (*it == (char)('9' + 1)) {
+							buffer.pop_back();
+							--it;
+							if (*it == '.')
+								break;
+							else
+								continue;
+						}
+						break;
+					}
+				}
 			}
-		}
+			while (buffer.back() == '0')
+				buffer.pop_back();
+			if (buffer.back() == '.')
+				buffer.pop_back();
+		};
 
-		if (fract_part != 1) {
-			append(builder, '.');
-			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+		if (format.trailing_zeros) {
+			if (precision) {
+				buffer.add('.');
+				for (u32 i = 0; i < precision; ++i) {
+					f = frac(f) * 10;
+					buffer.add((ascii)((u32)f + '0'));
+				}
+				round_and_trim();
+			}
+		} else {
+			if (frac(f) != 0) {
+				buffer.add('.');
+				for (u32 i = 0; i < precision && f != 0; ++i) {
+					f = frac(f) * 10;
+					buffer.add((ascii)((u32)f + '0'));
+				}
+				round_and_trim();
+			}
 		}
 	};
 
@@ -812,7 +861,7 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			break;
 		}
 		case FloatFormat_exponential: {
-			f64 mantissa = value;
+			Float mantissa = value;
 			s32 exponent = 0;
 			while (mantissa >= 10) {
 				mantissa /= 10;
@@ -824,13 +873,13 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			}
 			append_float(mantissa);
 
-			append(builder, "*10^"s);
-			append(builder, exponent);
+			buffer.add("*10^"s);
+			write_as_string(buffer, exponent);
 
 			break;
 		}
 		case FloatFormat_exponential_e: {
-			f64 mantissa = value;
+			Float mantissa = value;
 			s32 exponent = 0;
 			while (mantissa >= 10) {
 				mantissa /= 10;
@@ -842,20 +891,19 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			}
 			append_float(mantissa);
 
-			append(builder, "e");
+			buffer.add('e');
 
-			if (exponent >= 0) append(builder, "+");
+			if (exponent >= 0) buffer.add('+');
 
-			append(builder, exponent);
+			write_as_string(buffer, exponent);
 
 			break;
 		}
 	}
-	return chars_appended;
+	return append(builder, buffer);
 }
-inline umm append(StringBuilder &builder, FormatFloat<f32> f) {
-	return append(builder, FormatFloat{.value = (f64)f.value, .precision = f.precision, .format = f.format});
-}
+inline umm append(StringBuilder &builder, FormatFloat<f32> f) { return append_float(builder, f); }
+inline umm append(StringBuilder &builder, FormatFloat<f64> f) { return append_float(builder, f); }
 
 forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat{.value = v}); }
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }

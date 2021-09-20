@@ -145,7 +145,6 @@ inline void free(FileItemList &list) {
 
 TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
 
-
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
 	return create_file(temporary_null_terminate(path).data);
@@ -213,7 +212,7 @@ inline FileTrackerUpdateState update(FileTracker &tracker) {
 		return FileTrackerUpdateState::failure;
 	}
 
-	u64 last_write_time = retrieved_time.value;
+	u64 last_write_time = retrieved_time.get();
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
 		tracker.on_update(tracker, tracker.state);
@@ -261,7 +260,13 @@ TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8
 
 TL_API List<pathchar> get_current_directory();
 
-TL_API Span<u8> map_file(File file);
+struct MappedFile {
+	Span<u8> data;
+	void *mapping;
+};
+
+TL_API MappedFile map_file(File file);
+TL_API void unmap_file(MappedFile &file);
 
 struct ParsedPath {
 	Span<utf8> directory;
@@ -739,10 +744,26 @@ List<pathchar> get_current_directory() {
 	return temp;
 }
 
-Span<u8> map_file(File file) {
+MappedFile map_file(File file) {
+
+	MappedFile result = {};
+
 	auto mapping = CreateFileMappingW(file.handle, 0, PAGE_READONLY, 0, 0, 0);
+
 	void *data = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
-	return {(u8 *)data, (umm)length(file)};
+
+	result.data = {(u8 *)data, (umm)length(file)};
+	result.mapping = mapping;
+
+	return result;
+}
+
+void unmap_file(MappedFile &file) {
+	// TODO: proper error handling
+	assert(UnmapViewOfFile(file.data.data));
+	assert(CloseHandle(file.mapping));
+
+	file = {};
 }
 
 #else
