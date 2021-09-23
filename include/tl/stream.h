@@ -9,7 +9,7 @@ struct Stream {
 	bool (*_read)(Stream *stream, Span<u8> destination) = 0;
 	bool (*_write)(Stream *stream, Span<u8> source) = 0;
 	umm (*_remaining_bytes)(Stream *stream) = 0;
-	
+
 	forceinline bool read(Span<u8> destination) { return _read(this, destination); }
 	forceinline bool write(Span<u8> source) { return _write(this, source); }
 	forceinline umm remaining_bytes() { return _remaining_bytes(this); }
@@ -27,7 +27,7 @@ T *create_stream() {
 }
 
 
-void free(Stream *stream) {
+inline void free(Stream *stream) {
 	stream->free();
 	*stream = {};
 }

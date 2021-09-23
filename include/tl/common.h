@@ -43,11 +43,6 @@
 #pragma warning(disable: TL_DISABLED_WARNINGS 4820 4455)
 #endif
 
-#if !TL_ENABLE_PROFILER
-#define timed_block(...)
-#define timed_function(...)
-#endif
-
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -878,6 +873,10 @@ struct Span {
 	}
 	constexpr bool operator!=(Span<ValueType> that) const { return !(*this == that); }
 
+	constexpr Span<T> subspan(umm subspan_start, umm subspan_count) const {
+		return Span(data + subspan_start, subspan_count);
+	}
+
 	ValueType *data = 0;
 	umm size = 0;
 };
@@ -1471,12 +1470,20 @@ struct Allocator {
 #define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
 
-extern TL_API void init_allocator();
-extern TL_API void deinit_allocator();
-extern TL_API void clear_temporary_storage();
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
 extern TL_API thread_local Allocator current_allocator;
+
+extern TL_API void init_allocator(Allocator tempory_allocator_backup = default_allocator);
+extern TL_API void deinit_allocator();
+extern TL_API void clear_temporary_storage();
+
+
+template <class T>
+inline void allocate(T *&val) {
+	val = current_allocator.allocate<T>();
+}
+
 
 }
 
@@ -1516,7 +1523,7 @@ struct AllocatorPusher {
 #define push_allocator(allocator) tl_push(::tl::AllocatorPusher, allocator)
 #define scoped_allocator(allocator) tl_scoped(::tl::current_allocator, allocator)
 
-#define with(allocator, ...) ([&]{scoped_allocator(allocator);return __VA_ARGS__;}())
+#define with(allocator, ...) ([&]()->decltype(auto){scoped_allocator(allocator);return __VA_ARGS__;}())
 
 template <class T>
 void rotate(Span<T> span, T *to_be_first) {
@@ -1605,6 +1612,7 @@ struct TemporaryAllocatorState {
 		umm capacity;
 		forceinline u8 *data() { return (u8 *)(this + 1); }
 	};
+	Allocator allocator;
 	Block *first = 0;
 	Block *last = 0;
 	umm last_block_capacity = 0x10000;
@@ -1615,7 +1623,7 @@ void free(TemporaryAllocatorState &state) {
 	auto block = state.first;
 	while (block) {
 		auto next = block->next;
-		default_allocator.free(block);
+		state.allocator.free(block);
 		block = next;
 	}
 	state = {};
@@ -1643,7 +1651,7 @@ thread_local Allocator temporary_allocator = {
 					state.last_block_capacity *= 2;
 				}
 
-				block = (TemporaryAllocatorState::Block *)default_allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
+				block = (TemporaryAllocatorState::Block *)state.allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
 				block->size = new_size;
 				block->capacity = state.last_block_capacity;
 				block->next = 0;
@@ -1689,8 +1697,9 @@ void clear_temporary_storage() {
 
 thread_local Allocator current_allocator;
 
-void init_allocator() {
+void init_allocator(Allocator tempory_allocator_backup) {
 	current_allocator = default_allocator;
+	temporary_allocator_state.allocator = tempory_allocator_backup;
 }
 
 void deinit_allocator() {
@@ -1706,7 +1715,6 @@ void deinit_allocator() {
 #endif
 
 #ifdef TL_MAIN
-#ifdef TL_IMPL
 #include "string.h"
 #include "console.h"
 extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
@@ -1724,6 +1732,5 @@ int wmain(int argc, wchar_t **argv) {
 
 	return tl_main(arguments);
 }
-#endif
 #endif
 

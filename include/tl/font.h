@@ -36,7 +36,7 @@ struct SizedFont {
 
 struct FontCollection {
 	Allocator allocator = current_allocator;
-	std::unordered_map<u32, SizedFont> size_to_font;
+	HashMap<u32, SizedFont> size_to_font;
 	TL_FONT_TEXTURE_HANDLE (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size);
 };
 
@@ -108,8 +108,6 @@ void set_size(FontFace &face, u32 size) {
 // Returns true if new characters were added
 //
 bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
-	timed_function();
-
 	assert(font);
 
 	auto collection = (FontCollectionFT *)font->collection;
@@ -256,14 +254,13 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 
 SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 	assert(collection);
-	timed_function();
 
 	auto found = collection->size_to_font.find(size);
-	if (found != collection->size_to_font.end()) {
-		return &found->second;
+	if (found) {
+		return found;
 	}
 
-	SizedFont &font = collection->size_to_font[size];
+	SizedFont &font = collection->size_to_font.get_or_insert(size);
 
 	font.collection = collection;
 
@@ -273,8 +270,6 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 }
 
 FontCollection *create_font_collection(Span<Span<pathchar>> font_paths) {
-	timed_function();
-
 	if (!ft_library) {
 		auto error = FT_Init_FreeType(&ft_library);
 		assert(!error, "FT_Init_FreeType Error %", FT_Error_String(error));
@@ -299,17 +294,15 @@ void free(FontCollection *_collection) {
 		FT_Done_Face(face.ft);
 	}
 	free(collection->faces);
-	for (auto &[size, font] : collection->size_to_font) {
+	for_each(collection->size_to_font, [&](u32 size, SizedFont &font) {
 		collection->allocator.free(font.atlas_data);
-	}
+	});
 	collection->allocator.free(collection);
 }
 
 aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 	if (!text.size)
 		return {};
-
-	timed_function();
 
 	auto collection = (FontCollectionFT *)font->collection;
 
@@ -356,8 +349,6 @@ aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
 }
 
 List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
-	timed_function();
-
 	List<PlacedChar> result;
 
 	f32 posX = 0;

@@ -190,6 +190,8 @@ struct HashMap {
 	}
 
 	void rehash(umm new_bucket_count) {
+		scoped_allocator(allocator);
+
 		Bucket *old_buckets = buckets;
 
 		buckets = allocator.allocate<Bucket>(new_bucket_count);

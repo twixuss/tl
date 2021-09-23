@@ -571,7 +571,6 @@ TL_API GLuint create_program(ProgramStages stages);
 #endif
 
 static GLuint compile_shader(GLuint shader) {
-	timed_function();
 	glCompileShader(shader);
 
 	GLint status;
@@ -593,7 +592,6 @@ static GLuint compile_shader(GLuint shader) {
 }
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
-	timed_function();
 	StringBuilder version_builder;
 	version_builder.allocator = temporary_allocator;
 	append(version_builder, "#version "s);
@@ -644,7 +642,6 @@ GLuint create_shader(GLenum shaderType, Span<char> source) {
 }
 
 GLuint create_program(ProgramStages stages) {
-	timed_function();
 	GLuint result = glCreateProgram();
 	if (stages.vertex)   glAttachShader(result, stages.vertex);
 	if (stages.fragment) glAttachShader(result, stages.fragment);

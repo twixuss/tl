@@ -23,7 +23,7 @@ struct MemoryStream : Stream {
 	}
 };
 
-MemoryStream *create_memory_stream(Span<u8> memory) {
+inline MemoryStream *create_memory_stream(Span<u8> memory) {
 	auto result = create_stream<MemoryStream>();
 	result->memory = memory;
 	result->_read = [](Stream *stream, Span<u8> destination) { return ((MemoryStream *)stream)->read(destination); };

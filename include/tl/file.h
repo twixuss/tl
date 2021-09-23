@@ -35,9 +35,13 @@ inline bool is_valid(File file) {
 }
 
 TL_API File open_file(pathchar const *path, OpenFileParams params);
-inline File open_file(Span<pathchar> path, OpenFileParams params) {
+TL_API File open_file(ascii const *path, OpenFileParams params);
+
+template <class Char>
+inline File open_file(Span<Char> path, OpenFileParams params) {
 	return open_file(temporary_null_terminate(path).data, params);
 }
+
 TL_API void close(File file);
 
 TL_API bool read(File file, Span<u8> data);
@@ -63,10 +67,8 @@ struct ReadEntireFileParams {
 	umm extra_space_after = 0;
 };
 inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
-	timed_function();
-
-	auto oldCursor = get_cursor(file);
-	defer { set_cursor(file, oldCursor, File_begin); };
+	auto old_cursor = get_cursor(file);
+	defer { set_cursor(file, old_cursor, File_begin); };
 
 	set_cursor(file, 0, File_end);
 	auto size = (umm)get_cursor(file);
@@ -77,14 +79,17 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
 
 	return result;
 }
-inline Buffer read_entire_file(pathchar const *path, ReadEntireFileParams params = {}) {
+
+template <class Char>
+inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {}) {
 	File file = open_file(path, {.read = true});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return read_entire_file(file, params);
 }
-inline Buffer read_entire_file(Span<pathchar> path, ReadEntireFileParams params = {}) {
-	return read_entire_file(temporary_null_terminate(path).data, params);
+template <class Path>
+inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {}) {
+	return read_entire_file(as_span(path), params);
 }
 
 
@@ -259,6 +264,10 @@ enum : FileDialogFlags {
 TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
 TL_API List<pathchar> get_current_directory();
+TL_API void set_current_directory(pathchar const *path);
+inline void set_current_directory(Span<pathchar> path) {
+	return set_current_directory(temporary_null_terminate(path).data);
+}
 
 struct MappedFile {
 	Span<u8> data;
@@ -326,6 +335,11 @@ inline ParsedPath parse_path(Span<utf8> path) {
 	return result;
 }
 
+TL_API bool copy_file(pathchar const *source, pathchar const *destination);
+inline bool copy_file(Span<utf8> source, Span<utf8> destination) {
+	return copy_file(with(temporary_allocator, to_pathchars(source, true).data), with(temporary_allocator, to_pathchars(destination, true).data));
+}
+
 }
 
 #ifdef TL_IMPL
@@ -373,12 +387,16 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 	}
 	return result;
 }
+File open_file(ascii const *path, OpenFileParams params) {
+	auto win_params = get_open_file_params(params);
+	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
+	if (handle == INVALID_HANDLE_VALUE)
+		handle = 0;
+	return {handle};
+}
 File open_file(pathchar const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
-	auto handle = CreateFileW(
-		(wchar *)path,
-		win_params.access, win_params.share, 0, win_params.creation, 0, 0
-	);
+	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE)
 		handle = 0;
 	return {handle};
@@ -741,7 +759,12 @@ List<pathchar> get_current_directory() {
 	List<pathchar> temp;
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
+	temp.size--;
 	return temp;
+}
+
+void set_current_directory(pathchar const *path) {
+	SetCurrentDirectoryW((wchar *)path);
 }
 
 MappedFile map_file(File file) {
@@ -764,6 +787,10 @@ void unmap_file(MappedFile &file) {
 	assert(CloseHandle(file.mapping));
 
 	file = {};
+}
+
+bool copy_file(pathchar const *source, pathchar const *destination) {
+	return CopyFileW((wchar *)source, (wchar *)destination, false);
 }
 
 #else

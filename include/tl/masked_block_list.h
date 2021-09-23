@@ -87,11 +87,8 @@ struct MaskedBlockList {
 		}
 		bounds_check(false, "attempt to remove non-existant value from MaskedBlockList");
 	}
-	void remove(T &value) {
-		remove(&value);
-	}
 
-	T &operator[](umm index) {
+	T &at(umm index) {
 		umm block_index = index / values_per_block;
 		umm value_index = index % values_per_block;
 
@@ -104,6 +101,9 @@ struct MaskedBlockList {
 		bounds_check(block->masks[value_index / bits_in_mask] & (1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in MaskedBlockList");
 
 		return block->values[value_index];
+	}
+	T &operator[](umm index) {
+		return at(index);
 	}
 };
 

@@ -623,10 +623,40 @@ forceinline umm append(StringBuilder &b, wchar const *string) {
 	}
 }
 
+template <class T>
+struct FormatList {
+	Span<ascii> before = "{"s;
+	Span<ascii> separator = ", "s;
+	Span<ascii> after = "}"s;
+	List<T> list;
+};
+
+template <class T>
+forceinline umm append(StringBuilder &b, FormatList<T> format) {
+	umm count = 0;
+	count += append(b, format.before);
+	for (auto &val : format.list) {
+		if (&val != format.list.data) {
+			count += append(b, format.separator);
+		}
+		count += append(b, val);
+	}
+	count += append(b, format.after);
+	return count;
+}
+
+template <class T>
+forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatList{.list = list}); }
+
+template <>
 forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<wchar> list) { return append(b, (Span<utf16>)as_span(list)); }
 
 template <class T>

@@ -3,7 +3,6 @@
 #include "window.h"
 #include "font.h"
 #include "time.h"
-#include "texture.h"
 
 #ifndef TL_IMGUI_TEXTURE
 #error TL_IMGUI_TEXTURE must be defined before including tl/imgui.h
@@ -102,8 +101,6 @@ UILayer *current_layer = 0;
 List<Region> region_stack;
 
 void init_base(Window *window) {
-	timed_function();
-
 	layers.allocator = current_allocator;
 	tooltip.allocator = current_allocator;
 	region_stack.allocator = current_allocator;
@@ -888,8 +885,6 @@ void begin_frame_base() {
 	hovering_interactive_element = false;
 }
 void end_frame_base() {
-	timed_function();
-
 	assert(frame_has_begun);
 	frame_has_begun = false;
 	assert(region_stack.size == 0);

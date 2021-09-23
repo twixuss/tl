@@ -372,6 +372,38 @@ constexpr void for_each(List<T> list, Fn &&fn) {
 }
 
 template <class T>
+List<Span<T>> split(Span<T> what, Span<T> by) {
+	List<Span<T>> result;
+
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.size - by.size + 1;) {
+		if (what.subspan(what_start, by.size) == by) {
+			result.add(what.subspan(start, what_start - start));
+			what_start += by.size;
+			start = what_start;
+		} else {
+			++what_start;
+		}
+	}
+
+	result.add(Span(what.data + start, what.end()));
+
+	return result;
+}
+
+template <class T>
+List<T> replace(Span<T> where, T what, T with) {
+	List<T> result;
+	result.reserve(where.size);
+	for (auto &v : where) {
+		result.add(v == what ? with : v);
+	}
+	return result;
+}
+
+template <class T>
 struct Queue {
 	Queue() = default;
 	Queue(Queue const &that) = default;

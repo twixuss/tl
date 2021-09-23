@@ -11,7 +11,7 @@ struct FileStream : Stream {
 	umm remaining_bytes() { return tl::remaining_bytes(file); }
 };
 
-Stream *create_file_stream(File file) {
+inline Stream *create_file_stream(File file) {
 	auto result = create_stream<FileStream>();
 	result->file = file;
 	result->_read = [](Stream *stream, Span<u8> destination) { return ((FileStream *)stream)->read(destination); };
