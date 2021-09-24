@@ -20,7 +20,11 @@ struct Optional {
 	bool valid() const {
 		return has_value;
 	}
-	T get() const {
+	T const &get() const {
+		assert(has_value);
+		return value;
+	}
+	T &get() {
 		assert(has_value);
 		return value;
 	}

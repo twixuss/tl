@@ -9,16 +9,19 @@ struct ExecuteParams {
 	bool visible = true;
 };
 
-TL_API Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params = {});
-inline Process execute(pathchar const *path, ExecuteParams params = {}) {
+TL_API Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params = {});
+inline Process execute(utf16 const *path, ExecuteParams params = {}) {
 	return execute(path, 0, params);
 }
 
-inline Process execute(Span<pathchar> path, Span<pathchar> arguments, ExecuteParams params = {}) {
+inline Process execute(Span<utf16> path, Span<utf16> arguments, ExecuteParams params = {}) {
 	return execute(temporary_null_terminate(path).data, temporary_null_terminate(arguments).data, params);
 }
-inline Process execute(Span<pathchar> path, ExecuteParams params = {}) {
+inline Process execute(Span<utf16> path, ExecuteParams params = {}) {
 	return execute(temporary_null_terminate(path).data, 0, params);
+}
+inline Process execute(Span<utf8> path, ExecuteParams params = {}) {
+	return execute(to_utf16(path, true).data, 0, params);
 }
 
 TL_API bool wait(Process process, u32 timeout = -1);
@@ -36,7 +39,7 @@ void free(Process &process);
 
 #pragma comment(lib, "Shell32.lib")
 
-Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params) {
+Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;

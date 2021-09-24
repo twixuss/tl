@@ -2,6 +2,8 @@
 #include <tl/console.h>
 using namespace tl;
 void file_test() {
+	auto test = make_absolute_path(u8"local.txt"s);
+
 	struct PathTest {
 		Span<utf8> path;
 		ParsedPath expected;
@@ -38,7 +40,7 @@ void file_test() {
 	assert(is_valid(file));
 	write(file, value_as_bytes((u32)1337));
 	close(file);
-	
+
 	file = open_file(tl_file_string("../test/test.txt"), {.read=true});
 	assert(is_valid(file));
 	assert(remaining_bytes(file) == 4);

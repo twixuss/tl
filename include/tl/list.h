@@ -394,6 +394,26 @@ List<Span<T>> split(Span<T> what, Span<T> by) {
 }
 
 template <class T>
+List<Span<T>> split(Span<T> what, T by) {
+	List<Span<T>> result;
+
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.size;) {
+		if (what.data[what_start] == by) {
+			result.add(what.subspan(start, what_start - start));
+			start = what_start + 1;
+		}
+		++what_start;
+	}
+
+	result.add(Span(what.data + start, what.end()));
+
+	return result;
+}
+
+template <class T>
 List<T> replace(Span<T> where, T what, T with) {
 	List<T> result;
 	result.reserve(where.size);

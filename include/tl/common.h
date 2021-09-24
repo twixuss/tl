@@ -1601,10 +1601,6 @@ Allocator default_allocator = {
 	0
 };
 
-#ifndef TL_TEMP_STORAGE_LIMIT
-#define TL_TEMP_STORAGE_LIMIT 0x10000000
-#endif
-
 struct TemporaryAllocatorState {
 	struct Block {
 		Block *next;
@@ -1616,7 +1612,6 @@ struct TemporaryAllocatorState {
 	Block *first = 0;
 	Block *last = 0;
 	umm last_block_capacity = 0x10000;
-	umm total_block_capacity = 0;
 };
 
 void free(TemporaryAllocatorState &state) {
@@ -1647,9 +1642,9 @@ thread_local Allocator temporary_allocator = {
 				}
 
 				// Block with enough space was not found. Create a new bigger one
-				while (state.last_block_capacity < new_size) {
+				do {
 					state.last_block_capacity *= 2;
-				}
+				} while (state.last_block_capacity < new_size);
 
 				block = (TemporaryAllocatorState::Block *)state.allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
 				block->size = new_size;
@@ -1662,15 +1657,6 @@ thread_local Allocator temporary_allocator = {
 					state.first = block;
 				}
 				state.last = block;
-
-				state.total_block_capacity += block->capacity;
-
-#if TL_TEMP_STORAGE_LIMIT != 0
-				bounds_check(state.total_block_capacity < TL_TEMP_STORAGE_LIMIT,
-					"Capacity of temporary storage has exceeded the limit of % bytes. "
-					"You can either clear the storage by calling clear_temporary_storage (Make sure you don't reference previously allocated memory). "
-					"Or you can #define TL_TEMP_STORAGE_LIMIT to some bigger number.", TL_TEMP_STORAGE_LIMIT);
-#endif
 
 				return block->data();
 			}

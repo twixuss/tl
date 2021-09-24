@@ -34,13 +34,12 @@ inline bool is_valid(File file) {
 	return file.handle != 0;
 }
 
-TL_API File open_file(pathchar const *path, OpenFileParams params);
 TL_API File open_file(ascii const *path, OpenFileParams params);
+TL_API File open_file(utf16 const *path, OpenFileParams params);
 
-template <class Char>
-inline File open_file(Span<Char> path, OpenFileParams params) {
-	return open_file(temporary_null_terminate(path).data, params);
-}
+inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(temporary_null_terminate(path).data, params); }
+inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(temporary_null_terminate(path).data, params); }
+inline File open_file(Span<utf8> path, OpenFileParams params) { return open_file(with(temporary_allocator, to_utf16(path, true).data), params); }
 
 TL_API void close(File file);
 
@@ -56,11 +55,13 @@ TL_API bool file_exists(pathchar const *path);
 inline bool file_exists(Span<pathchar> path) {
 	return file_exists(temporary_null_terminate(path).data);
 }
-TL_API bool directory_exists(pathchar const *path);
-inline bool directory_exists(Span<pathchar> path) {
+TL_API bool directory_exists(utf16 const *path);
+inline bool directory_exists(Span<utf16> path) {
 	return directory_exists(temporary_null_terminate(path).data);
 }
-
+inline bool directory_exists(Span<utf8> path) {
+	return directory_exists(to_utf16(path, true).data);
+}
 
 struct ReadEntireFileParams {
 	umm extra_space_before = 0;
@@ -104,8 +105,17 @@ inline bool write_entire_file(pathchar const *path, Span<u8> span) {
 	defer { close(file); };
 	return write(file, span);
 }
-inline bool write_entire_file(Span<pathchar> path, Span<u8> span) {
-	return write_entire_file(temporary_null_terminate(path).data, span);
+inline bool write_entire_file(Span<utf8> path, Span<u8> span) {
+	File file = open_file(path, {.write = true});
+	if (!is_valid(file)) return false;
+	defer { close(file); };
+	return write(file, span);
+}
+inline bool write_entire_file(Span<utf16> path, Span<u8> span) {
+	File file = open_file(path, {.write = true});
+	if (!is_valid(file)) return false;
+	defer { close(file); };
+	return write(file, span);
 }
 
 
@@ -160,10 +170,11 @@ inline void delete_file(Span<pathchar> path) {
 	return delete_file(temporary_null_terminate(path).data);
 }
 
-TL_API bool create_directory(pathchar const *path);
-inline bool create_directory(Span<pathchar> path) {
-	return create_directory(temporary_null_terminate(path).data);
-}
+TL_API bool create_directory(ascii const *path);
+TL_API bool create_directory(utf16 const *path);
+inline bool create_directory(Span<ascii> path) { return create_directory(temporary_null_terminate(path).data); }
+inline bool create_directory(Span<utf8>  path) { return create_directory(to_utf16(path, true).data); }
+inline bool create_directory(Span<utf16> path) { return create_directory(temporary_null_terminate(path).data); }
 
 struct FileTracker {
 	File file;
@@ -333,6 +344,54 @@ inline ParsedPath parse_path(Span<utf8> path) {
 	}
 
 	return result;
+}
+
+inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = false) {
+	if (path.size == 0)
+		return path;
+
+	if (path.back() == '\\' || path.back() == '/') {
+		path.size--;
+	}
+
+	while (path.size && !(path.back() == '\\' || path.back() == '/')) {
+		path.size--;
+	}
+
+	if (path.size && remove_last_slash) {
+		path.size--;
+	}
+
+	return path;
+}
+
+inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
+	return concatenate(with(temporary_allocator, to_utf8(get_current_directory())), path_separator, relative_path);
+}
+
+inline bool is_absolute_path(Span<utf8> path) {
+	if (path.size < 2)
+		return false;
+	return path.data[1] == ':';
+}
+
+inline bool create_directories(Span<utf8> path) {
+	List<Span<utf8>> directories_to_create;
+	directories_to_create.allocator = temporary_allocator;
+	while (1) {
+		if (directory_exists(path)) {
+			break;
+		}
+		directories_to_create.add(path);
+		path = parent_directory(path);
+		if (path.size == 0)
+			break;
+	}
+	for (auto dir : reverse(directories_to_create)) {
+		if (!create_directory(dir))
+			return false;
+	}
+	return true;
 }
 
 TL_API bool copy_file(pathchar const *source, pathchar const *destination);
@@ -600,7 +659,10 @@ void delete_file(pathchar const *path) {
 	DeleteFileW((wchar *)path);
 }
 
-bool create_directory(pathchar const *path) {
+bool create_directory(ascii const *path) {
+	return (bool)CreateDirectoryA(path, 0);
+}
+bool create_directory(utf16 const *path) {
 	return (bool)CreateDirectoryW((wchar *)path, 0);
 }
 
