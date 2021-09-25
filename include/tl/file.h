@@ -43,8 +43,8 @@ inline File open_file(Span<utf8> path, OpenFileParams params) { return open_file
 
 TL_API void close(File file);
 
-TL_API bool read(File file, Span<u8> data);
-TL_API bool write(File file, Span<u8> data);
+TL_API umm read(File file, Span<u8> data);
+TL_API umm write(File file, Span<u8> data);
 
 TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
 TL_API s64 get_cursor(File file);
@@ -478,48 +478,54 @@ s64 get_cursor(File file) {
 	SetFilePointerEx(file.handle, {}, &curP, FILE_CURRENT);
 	return curP.QuadPart;
 }
-bool read(File file, Span<u8> span) {
+umm read(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_read = 0;
+	umm total_bytes_read = 0;
 	while (span.size > max_bytes) {
 		if (!ReadFile(file.handle, span.data, max_bytes, &bytes_read, 0)) {
-			return false;
+			return total_bytes_read;
 		}
 		span.data += max_bytes;
 		span.size -= max_bytes;
+		total_bytes_read += bytes_read;
 		if (bytes_read != max_bytes) {
-			return false;
+			return total_bytes_read;
 		}
 	}
 	if (span.size) {
 		if (!ReadFile(file.handle, span.data, (DWORD)span.size, &bytes_read, 0)) {
-			return false;
+			return total_bytes_read;
 		}
+		total_bytes_read += bytes_read;
 		if (bytes_read != span.size) {
-			return false;
+			return total_bytes_read;
 		}
 	}
-	return true;
+	return total_bytes_read;
 }
-bool write(File file, Span<u8> span) {
+umm write(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_written = 0;
+	umm total_bytes_written = 0;
 	while (span.size > max_bytes) {
 		if (!WriteFile(file.handle, span.data, max_bytes, &bytes_written, 0)) {
-			return false;
+			return total_bytes_written;
 		}
 		span.data += max_bytes;
 		span.size -= max_bytes;
+		total_bytes_written += bytes_written;
 		if (bytes_written != max_bytes) {
-			return false;
+			return total_bytes_written;
 		}
 	}
 	if (span.size) {
 		if (!WriteFile(file.handle, span.data, (DWORD)span.size, &bytes_written, 0)) {
-			return false;
+			return total_bytes_written;
 		}
+		total_bytes_written += bytes_written;
 		if (bytes_written != span.size) {
-			return false;
+			return total_bytes_written;
 		}
 	}
 	return true;

@@ -43,6 +43,8 @@
 #pragma warning(disable: TL_DISABLED_WARNINGS 4820 4455)
 #endif
 
+#define is_statically_overridden(function, derived, base) (&base::function != &derived::function)
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -1021,6 +1023,9 @@ template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
 
 template <class T>
 constexpr T *find_last(Span<T> span, T const &value) {
+	if (span.size == 0)
+		return 0;
+
 	for (auto it = span.end() - 1; it >= span.begin(); --it) {
 		if (*it == value)
 			return it;

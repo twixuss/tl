@@ -88,7 +88,6 @@ void init_face(FontFace &face) {
 	};
 
 	{
-		timed_block("FT_New_Memory_Face"s);
 		auto error = FT_New_Memory_Face(ft_library, face.file.data, face.file.size, 0, &face.ft);
 		if (error) {
 			invalid_code_path("FT_New_Face failed: %", FT_Error_String(error));

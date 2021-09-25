@@ -26,10 +26,10 @@ forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExc
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
 #endif
 
-forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((SHORT *)a); }
-forceinline u32 atomic_increment(u32 volatile *a) { return _InterlockedIncrement(a); }
+forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((short *)a); }
+forceinline u32 atomic_increment(u32 volatile *a) { return (u32)_InterlockedIncrement((long *)a); }
 #if ARCH_X64
-forceinline u64 atomic_increment(u64 volatile *a) { return _InterlockedIncrement(a); }
+forceinline u64 atomic_increment(u64 volatile *a) { return (u64)_InterlockedIncrement64((long long *)a); }
 #endif
 
 forceinline s16 atomic_increment(s16 volatile *a) { return (s16)atomic_increment((u16 *)a); }
