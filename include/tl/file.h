@@ -105,6 +105,12 @@ inline bool write_entire_file(pathchar const *path, Span<u8> span) {
 	defer { close(file); };
 	return write(file, span);
 }
+inline bool write_entire_file(Span<ascii> path, Span<u8> span) {
+	File file = open_file(path, {.write = true});
+	if (!is_valid(file)) return false;
+	defer { close(file); };
+	return write(file, span);
+}
 inline bool write_entire_file(Span<utf8> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
