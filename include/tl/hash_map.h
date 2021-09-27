@@ -2,6 +2,7 @@
 #include "linked_list.h"
 #include "array.h"
 #include "optional.h"
+#include "pointer.h"
 
 template <class T>
 inline tl::umm get_hash(T value);
@@ -35,7 +36,6 @@ template <class T> tl::umm get_hash(tl::Span<T> value) {
 namespace tl {
 
 template <class T> struct DefaultHasher { static umm get_hash(T value) { return ::get_hash(value); } };
-
 
 template <class Key, class Value, umm _capacity, class Hasher = DefaultHasher<Key>>
 struct StaticHashMap {
@@ -159,7 +159,7 @@ struct HashMap {
 		it.key = key;
 		return it.value;
 	}
-	Value *find(Key const &key) {
+	Pointer<Value> find(Key const &key) {
 		if (bucket_count == 0)
 			return 0;
 

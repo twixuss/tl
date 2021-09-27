@@ -51,10 +51,19 @@ TL_API s64 get_cursor(File file);
 TL_API void truncate_to_cursor(File file);
 
 
-TL_API bool file_exists(pathchar const *path);
-inline bool file_exists(Span<pathchar> path) {
+TL_API bool file_exists(ascii const *path);
+TL_API bool file_exists(utf16 const *path);
+
+inline bool file_exists(Span<ascii> path) {
 	return file_exists(temporary_null_terminate(path).data);
 }
+inline bool file_exists(Span<utf8> path) {
+	return file_exists(to_utf16(path, true).data);
+}
+inline bool file_exists(Span<utf16> path) {
+	return file_exists(temporary_null_terminate(path).data);
+}
+
 TL_API bool directory_exists(utf16 const *path);
 inline bool directory_exists(Span<utf16> path) {
 	return directory_exists(temporary_null_terminate(path).data);
@@ -543,7 +552,11 @@ void close(File file) {
 	CloseHandle(file.handle);
 }
 
-bool file_exists(pathchar const *path) {
+bool file_exists(ascii const *path) {
+	DWORD attr = GetFileAttributesA(path);
+	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
+}
+bool file_exists(utf16 const *path) {
 	DWORD attr = GetFileAttributesW((wchar *)path);
 	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }
