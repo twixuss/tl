@@ -663,10 +663,13 @@ template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
 
 template <class Char, class = EnableIf<is_char<Char>>>
-inline void append_format(StringBuilder &b, Span<Char> format_string) {
+inline umm append_format(StringBuilder &b, Span<Char> format_string) {
 	bool previous_is_percent = false;
 	auto c = format_string.data;
 	auto end = format_string.end();
+
+	umm appended_char_count = 0;
+
 	for (;c != end; ++c) {
 		if (*c == '%') {
 			previous_is_percent = true;
@@ -674,51 +677,54 @@ inline void append_format(StringBuilder &b, Span<Char> format_string) {
 		}
 		if (previous_is_percent) {
 			if (*c == '`') {
-				append(b, '%');
+				appended_char_count += append(b, '%');
 				continue;
 			} else {
 				invalid_code_path("not enough arguments were provided for 'append_format'");
-				return;
+				return appended_char_count;
 			}
 		}
-		append(b, *c);
+		appended_char_count += append(b, *c);
 		previous_is_percent = false;
 	}
+	return appended_char_count;
 }
 
 template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
-void append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
+umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
 	bool previous_is_percent = false;
 	auto c = format_string.data;
 	auto end = format_string.end();
+	umm appended_char_count = 0;
 	for (;c != end; ++c) {
 		if (previous_is_percent) {
 			if (*c == '`') {
-				append(b, '%');
+				appended_char_count += append(b, '%');
 				continue;
 			} else {
-				append(b, arg);
-				append_format(b, Span(c, end), args...);
-				return;
+				appended_char_count += append(b, arg);
+				appended_char_count += append_format(b, Span(c, end), args...);
+				return appended_char_count;
 			}
 		}
 		if (*c == '%') {
 			previous_is_percent = true;
 			continue;
 		}
-		append(b, *c);
+		appended_char_count += append(b, *c);
 		previous_is_percent = false;
 	}
 	if (previous_is_percent) {
-		append(b, arg);
-		append_format(b, Span(c, end), args...);
+		appended_char_count += append(b, arg);
+		appended_char_count += append_format(b, Span(c, end), args...);
 	} else {
 		invalid_code_path("too many arguments were provided for 'append_format'");
 	}
+	return appended_char_count;
 }
 template <class ...Args, class Char, class = EnableIf<is_char<Char>>>
-void append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
-	append_format(b, as_span(format_string), args...);
+umm append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
+	return append_format(b, as_span(format_string), args...);
 }
 
 inline umm append(StringBuilder &builder, bool value) {
@@ -938,14 +944,8 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> f) { return append_fl
 forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat{.value = v}); }
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
-inline void append(StringBuilder &builder, std::source_location location) {
-	append(builder, location.file_name());
-	append(builder, '(');
-	append(builder, location.line());
-	append(builder, ":");
-	append(builder, location.column());
-	append(builder, "):");
-	append(builder, location.function_name());
+inline umm append(StringBuilder &builder, std::source_location location) {
+	return append_format(builder, "%(%:%):%", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
 // Always allocates memory for the string
@@ -1057,9 +1057,7 @@ inline FormattedBytes format_bytes(umm _count, FormatBytesParams params = {}) {
 	return result;
 }
 
-inline void append(StringBuilder &builder, FormattedBytes bytes) {
-	append(builder, FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false});
-	append(builder, ' ');
+inline umm append(StringBuilder &builder, FormattedBytes bytes) {
 	static constexpr Span<char> unit_strings[2][7] = {
 		{
 			"B"s,
@@ -1079,7 +1077,7 @@ inline void append(StringBuilder &builder, FormattedBytes bytes) {
 			"EiB"s,
 		}
 	};
-	append(builder, unit_strings[bytes.kilo_is_1024][bytes.unit]);
+	return append_format(builder, "% %", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
 }
 
 #if 0

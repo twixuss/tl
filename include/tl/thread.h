@@ -446,7 +446,7 @@ inline void do_work(ThreadWork work) {
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
-		do_work(popped.get());
+		do_work(popped.value_unchecked());
 		return true;
 	}
 	return false;
@@ -458,7 +458,7 @@ inline bool do_work(ThreadPool *pool) {
 			return true;
 		}
 		if (auto popped = pool->all_work.try_pop()) {
-			work = popped.get();
+			work = popped.value_unchecked();
 			return true;
 		}
 		return false;

@@ -676,6 +676,7 @@ inline bool any_false(bool value) { return !value; }
 enum ForEachDirective {
 	ForEach_continue,
 	ForEach_break,
+	ForEach_erase,
 };
 
 #define for_each_break    return ForEach_break
@@ -695,29 +696,27 @@ template <ForEachFlags flags, class T, umm count, class Fn>
 constexpr void for_each(T (&array)[count], Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
+	T *start;
+	T *end;
+	umm step;
 	if constexpr (flags & ForEach_reverse) {
-		for (auto it = (array + count - 1); it >= array; --it) {
-			if constexpr (is_same<FnRet, void>) {
-				fn(*it);
-			} else if constexpr (is_same<FnRet, ForEachDirective>) {
-				if (fn(*it) == ForEach_break) {
-					break;
-				}
-			} else {
-				static_assert(false, "Invalid return type of for_each function");
-			}
-		}
+		start = array + count - 1;
+		end = array - 1;
+		step = -1;
 	} else {
-		for (auto &it : array) {
-			if constexpr (is_same<FnRet, void>) {
-				fn(it);
-			} else if constexpr (is_same<FnRet, ForEachDirective>) {
-				if (fn(it) == ForEach_break) {
-					break;
-				}
-			} else {
-				static_assert(false, "Invalid return type of for_each function");
+		start = array;
+		end = array + count;
+		step = 1;
+	}
+	for (auto it = start; it != end; it += step) {
+		if constexpr (is_same<FnRet, void>) {
+			fn(*it);
+		} else if constexpr (is_same<FnRet, ForEachDirective>) {
+			switch (fn(*it)) {
+				case ForEach_break: return;
 			}
+		} else {
+			static_assert(false, "Invalid return type of for_each function");
 		}
 	}
 }
@@ -1724,4 +1723,3 @@ int wmain(int argc, wchar_t **argv) {
 	return tl_main(arguments);
 }
 #endif
-

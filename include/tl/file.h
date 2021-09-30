@@ -64,12 +64,15 @@ inline bool file_exists(Span<utf16> path) {
 	return file_exists(temporary_null_terminate(path).data);
 }
 
+TL_API bool directory_exists(ascii const *path);
 TL_API bool directory_exists(utf16 const *path);
 inline bool directory_exists(Span<utf16> path) {
 	return directory_exists(temporary_null_terminate(path).data);
 }
 inline bool directory_exists(Span<utf8> path) {
 	return directory_exists(to_utf16(path, true).data);
+}
+inline bool directory_exists(Span<ascii> path) {
 }
 
 struct ReadEntireFileParams {
@@ -243,7 +246,7 @@ inline FileTrackerUpdateState update(FileTracker &tracker) {
 		return FileTrackerUpdateState::failure;
 	}
 
-	u64 last_write_time = retrieved_time.get();
+	u64 last_write_time = retrieved_time.value();
 	if (last_write_time > tracker.last_write_time) {
 		tracker.last_write_time = last_write_time;
 		tracker.on_update(tracker, tracker.state);
@@ -287,7 +290,7 @@ enum : FileDialogFlags {
 	FileDialog_multiple  = 0x2,
 };
 
-TL_API ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
+TL_API Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
 TL_API List<pathchar> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
@@ -310,8 +313,13 @@ struct ParsedPath {
 };
 
 inline ParsedPath parse_path(Span<utf8> path) {
+	if (!path.size)
+		return {};
 	ParsedPath result = {};
 
+	while (path.size && (path.back() == '\\' || path.back() == '/')) {
+		path.size -= 1;
+	}
 	auto last_slash = find_last_any(path, u8"/\\"s);
 	auto last_dot = find_last(path, u8'.');
 	if (last_dot) {
@@ -412,6 +420,19 @@ inline bool create_directories(Span<utf8> path) {
 TL_API bool copy_file(pathchar const *source, pathchar const *destination);
 inline bool copy_file(Span<utf8> source, Span<utf8> destination) {
 	return copy_file(with(temporary_allocator, to_pathchars(source, true).data), with(temporary_allocator, to_pathchars(destination, true).data));
+}
+
+template <class Fn>
+void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
+	auto items = get_items_in_directory(with(temporary_allocator, to_pathchars(directory)));
+	for (auto &item : items) {
+		auto item_path = with(temporary_allocator, concatenate(directory, '/', item.name));
+		if (item.kind == FileItem_directory) {
+			for_each_file_recursive<Fn>(item_path, std::forward<Fn>(fn));
+		} else {
+			fn(item_path);
+		}
+	}
 }
 
 }
@@ -560,7 +581,11 @@ bool file_exists(utf16 const *path) {
 	DWORD attr = GetFileAttributesW((wchar *)path);
 	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }
-bool directory_exists(pathchar const *path) {
+bool directory_exists(ascii const *path) {
+	DWORD attr = GetFileAttributesA(path);
+	return ((attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY));
+}
+bool directory_exists(utf16 const *path) {
 	DWORD attr = GetFileAttributesW((wchar *)path);
 	return ((attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -747,7 +772,7 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 	return hr;
 }
 
-ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
+Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
 	IFileOpenDialog *dialog = NULL;
 	if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return {};
 	defer { dialog->Release(); };
@@ -781,16 +806,14 @@ ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allo
 		if (allowed_extensions.size) {
 			scoped_allocator(temporary_allocator);
 			StringBuilder builder;
-			builder.encoding = Encoding_utf16;
 			for (auto &ext : allowed_extensions) {
 				if (&ext == &allowed_extensions.back()) {
-					append_format(builder, u"*.%", ext);
+					append_format(builder, "*.%", ext);
 				} else {
-					append_format(builder, u"*.%;", ext);
+					append_format(builder, "*.%;", ext);
 				}
 			}
-			append(builder, u'\0');
-			file_type = {L"Files", (wchar *)to_string(builder).data};
+			file_type = {L"Files", (wchar *)to_utf16(to_string(builder), true).data};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
@@ -801,16 +824,14 @@ ListList<pathchar> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allo
 	if (FAILED(dialog->Show(NULL))) return {};
 
 
-	ListList<pathchar> result;
+	ListList<utf8> result;
 
 	auto add_item = [&](IShellItem *item) {
 		PWSTR path = NULL;
 		if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) return;
 		defer { CoTaskMemFree(path); };
 
-		auto span = as_span((utf16 *)path);
-		++span.size;
-		result.add(span);
+		result.add(to_utf8(as_span((utf16 *)path)));
 	};
 
 	IShellItem *item;

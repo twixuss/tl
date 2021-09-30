@@ -50,6 +50,10 @@ struct ListList : List<Span<T>> {
 			string.data = (T *)(string.data - buffer.data);
 		}
 	}
+	void clear() {
+		Base::clear();
+		buffer.clear();
+	}
 
 	Base &base() { return *this; }
 };

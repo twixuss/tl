@@ -93,6 +93,7 @@ void *glMapBuffer(GLenum target, GLenum access);
 void *glMapNamedBuffer(GLuint buffer, GLenum access);
 GLboolean glUnmapBuffer(GLenum target);
 GLboolean glUnmapNamedBuffer(GLuint buffer);
+void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
 
 WINDOWS
 

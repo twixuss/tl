@@ -139,6 +139,8 @@ struct HashMap {
 	umm total_value_count = 0;
 
 	Value &get_or_insert(Key const &key) {
+		scoped_allocator(allocator);
+
 		if (!bucket_count) {
 			rehash(256);
 		}

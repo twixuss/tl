@@ -32,6 +32,10 @@ struct SizedFont {
 
 	v2u next_char_position = {};
 	u32 current_row_height = 0;
+
+	s32 line_spacing = 0;
+	s32 ascender     = 0;
+	s32 descender    = 0;
 };
 
 struct FontCollection {
@@ -41,8 +45,19 @@ struct FontCollection {
 };
 
 struct PlacedChar {
-	aabb<v2f> position;
+	aabb<v2s> position;
 	aabb<v2f> uv;
+};
+
+struct TextInfo {
+	List<PlacedChar> placed_chars;
+	aabb<v2s> bounds;
+	u32 line_count;
+};
+
+struct GetTextInfoParams {
+	bool place_chars = false;
+	bool bounds = false;
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
@@ -50,8 +65,13 @@ TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
 TL_API FontCollection *create_font_collection(Span<Span<pathchar>> font_paths);
 TL_API void free(FontCollection *collection);
-TL_API aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero = false);
-TL_API List<PlacedChar> place_text(Span<utf8> text, SizedFont *font);
+TL_API TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params = {});
+inline List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
+	return get_text_info(text, font, {.place_chars=true}).placed_chars;
+}
+inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font) {
+	return get_text_info(text, font, {.bounds=true}).bounds;
+}
 
 }
 
@@ -74,12 +94,6 @@ struct FontCollectionFT : FontCollection {
 	List<FontFace> faces;
 };
 
-FontChar get_char_info(u32 ch, SizedFont *font) {
-	auto found = font->chars.find(ch);
-	assert(found, "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
-	return *found;
-}
-
 void init_face(FontFace &face) {
 	face.file = read_entire_file(face.path);
 	defer {
@@ -95,12 +109,6 @@ void init_face(FontFace &face) {
 	}
 
 	face.ft->glyph->format = FT_GLYPH_FORMAT_BITMAP;
-}
-void set_size(FontFace &face, u32 size) {
-	if (face.size == size) return;
-	face.size = size;
-	auto error = FT_Set_Pixel_Sizes(face.ft, size, size);
-	assert(!error);
 }
 
 //
@@ -128,10 +136,10 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 
 	while (current_char < text.end()) {
 		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.valid()) {
+		if (!got_char.has_value()) {
 			invalid_code_path();
 		}
-		auto code_point = got_char.get();
+		auto code_point = got_char.value();
 		auto found = font->chars.find(code_point);
 		if (!found) {
 			auto &inserted = font->chars.get_or_insert(code_point);
@@ -153,7 +161,17 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 			if (!current_face->ft) {
 				init_face(*current_face);
 			}
-			set_size(*current_face, font->size);
+
+			if (current_face->size != font->size) {
+				current_face->size = font->size;
+				auto error = FT_Set_Pixel_Sizes(current_face->ft, font->size, font->size);
+				assert(!error);
+
+				font->line_spacing = current_face->ft->size->metrics.height / 64;
+				font->ascender     = current_face->ft->size->metrics.ascender / 64;
+				font->descender    = current_face->ft->size->metrics.descender / 64;
+			}
+
 			auto glyph_index = FT_Get_Char_Index(current_face->ft, new_char_code_point);
 
 			auto error = FT_Load_Glyph(current_face->ft, glyph_index, 0);
@@ -253,10 +271,11 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 
 SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 	assert(collection);
+	assert(size);
 
 	auto found = collection->size_to_font.find(size);
 	if (found) {
-		return found;
+		return found.raw();
 	}
 
 	SizedFont &font = collection->size_to_font.get_or_insert(size);
@@ -299,96 +318,73 @@ void free(FontCollection *_collection) {
 	collection->allocator.free(collection);
 }
 
-aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font, bool min_at_zero) {
-	if (!text.size)
-		return {};
-
-	auto collection = (FontCollectionFT *)font->collection;
-
-	scoped_allocator(collection->allocator);
-
-	v2s pos = {};
-
-	aabb<v2s> result;
-
-	result.max = min_value<v2s>;
-
-	if (min_at_zero) {
-		result.min = {};
-	} else {
-		result.min = max_value<v2s>;
-	}
-
-	auto current_char = text.data;
-	while (current_char < text.end()) {
-		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.valid()) {
-			invalid_code_path();
-		}
-		auto code_point = got_char.get();
-
-		auto d = get_char_info(code_point, font);
-
-		if (code_point == '\n') {
-			pos.x = 0;
-			pos.x += font->size;
-			continue;
-		}
-
-
-		v2s position_min = {pos.x + d.offset.x, pos.y + font->size - d.offset.y};
-		v2s position_max = position_min + (v2s)d.size;
-		result.max = max(result.max, position_max);
-		result.min = min(result.min, position_min);
-
-		pos.x += d.advance.x;
-	}
-
-	return result;
 }
 
-List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
-	List<PlacedChar> result;
-
-	f32 posX = 0;
-	f32 posY = 0;
-
-	auto current_char = text.data;
-	while (current_char < text.end()) {
-		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char.valid()) {
-			invalid_code_path();
-		}
-		auto code_point = got_char.get();
-
-		auto d = get_char_info(code_point, font);
-
-		if (code_point == '\n') {
-			posX = 0;
-			posY += font->size;
-			continue;
-		}
-
-		PlacedChar c;
-
-		c.position.min = {posX + d.offset.x, posY + font->size - d.offset.y};
-		c.position.max = c.position.min + (v2f)d.size;
-
-		c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
-		c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
-
-		result.add(c);
-
-		posX += d.advance.x;
-	}
-
-	return result;
-}
-
-}
-
-#else
-#error No font rasterization library detected
 #endif
+
+namespace tl {
+
+FontChar get_char_info(u32 ch, SizedFont *font) {
+	auto found = font->chars.find(ch);
+	assert(found, "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
+	return *found;
+}
+
+TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params) {
+	TextInfo info = {};
+	v2s char_position = {};
+	char_position.y = font->ascender - font->line_spacing;
+
+	if (params.bounds) {
+		info.bounds.min = max_value<v2s>;
+		info.bounds.max = min_value<v2s>;
+	}
+	info.line_count = 1;
+
+	auto current_char = text.data;
+	while (current_char < text.end()) {
+		auto got_char = get_char_and_advance_utf8(&current_char);
+		if (!got_char) {
+			invalid_code_path();
+		}
+		auto code_point = got_char.value();
+
+		auto d = get_char_info(code_point, font);
+
+		if (code_point == '\n') {
+			char_position.x = 0;
+			char_position.y += font->line_spacing;
+			info.line_count += 1;
+		}
+		if (params.place_chars) {
+			if (code_point != '\n') {
+				PlacedChar c;
+
+				c.position.min = {char_position.x + d.offset.x, char_position.y + (s32)font->size - d.offset.y};
+				c.position.max = c.position.min + (v2s)d.size;
+
+				c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
+				c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
+
+				info.placed_chars.add(c);
+			}
+		}
+		if (params.bounds) {
+			if (code_point != '\n') {
+				v2s position_min = {char_position.x + d.offset.x, char_position.y + font->size - d.offset.y};
+				v2s position_max = position_min + (v2s)d.size;
+				info.bounds.max = max(info.bounds.max, position_max);
+				info.bounds.min = min(info.bounds.min, position_min);
+
+			}
+		}
+		if (code_point != '\n') {
+			char_position.x += d.advance.x;
+		}
+	}
+	return info;
+}
+
+}
 
 #endif

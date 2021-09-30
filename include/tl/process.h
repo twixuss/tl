@@ -137,7 +137,7 @@ Process start_process(utf16 const *command_line) {
 
 	PROCESS_INFORMATION piProcInfo = {};
 
-	STARTUPINFO siStartInfo = {};
+	STARTUPINFOW siStartInfo = {};
 	siStartInfo.cb = sizeof(STARTUPINFO);
 	siStartInfo.hStdError = child_stdout_write;
 	siStartInfo.hStdOutput = child_stdout_write;

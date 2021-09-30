@@ -233,6 +233,19 @@ struct List {
 		size -= where.size - with_what.size;
 	}
 
+	void move(T *from, T *to) {
+		T temp = *from;
+		if (to < from) {
+			memmove(to + 1, to, sizeof(T) * (from - to));
+		} else {
+			memmove(from, from + 1, sizeof(T) * (to - from));
+		}
+		*to = temp;
+	}
+	void move_at(T *from, umm destination_index) {
+		move(from, data + destination_index);
+	}
+
 	bool operator==(List that) const {
 		if (size != that.size)
 			return false;

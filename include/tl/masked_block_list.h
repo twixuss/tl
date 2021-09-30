@@ -68,7 +68,7 @@ struct MaskedBlockList {
 						block->free_mask_count -= 1;
 
 					block->values[value_index] = that;
-					result.value = &block->values[value_index];
+					result.pointer = &block->values[value_index];
 					result.index = block_index * values_per_block + value_index;
 					goto _return;
 				}

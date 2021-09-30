@@ -492,10 +492,10 @@ extern TL_API Functions functions;
 #ifdef TL_IMPL
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
-#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return ::name params;}
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return ::name params;}
 BASE_FUNCS
 #undef D
-#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return functions._##name params;}
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return functions._##name params;}
 EXT_AND_OS_FUNCS
 #undef D
 #endif
