@@ -46,7 +46,8 @@ enum WindowHitResult {
 };
 
 using WindowOnCreate = void (*)(Window &);
-using WindowOnDraw = void (*)(Window &);
+using WindowOnUpdate = void (*)(Window &);
+using WindowOnPaint = void (*)(Window &, void *);
 using WindowOnSize = void (*)(Window &);
 using WindowHitTest = WindowHitResult (*)(Window &);
 using WindowGetCursor = Cursor (*)(Window &);
@@ -82,7 +83,8 @@ struct Window {
 
 	WindowOnCreate on_create = 0;
 	WindowOnSize on_size = 0;
-	WindowOnDraw on_draw = 0;
+	WindowOnUpdate on_update = 0;
+	WindowOnPaint on_paint = 0;
 	WindowHitTest hit_test = 0;
 	WindowGetCursor get_cursor = 0;
 	void (*on_key_down)(u8 key) = 0;
@@ -92,7 +94,8 @@ struct Window {
 	void (*on_mouse_down)(u8 button) = 0;
 	void (*on_mouse_up)(u8 button) = 0;
 
-	void *hdc;
+	void *hdc = 0;
+	void *user_data = 0;
 };
 
 struct CreateWindowInfo {
@@ -104,7 +107,8 @@ struct CreateWindowInfo {
 
 	WindowOnCreate on_create = 0;
 	WindowOnSize on_size = 0;
-	WindowOnDraw on_draw = 0;
+	WindowOnUpdate on_update = 0;
+	WindowOnPaint on_paint = 0;
 	WindowHitTest hit_test = 0;
 	WindowGetCursor get_cursor = 0;
 	void (*on_key_down)(u8 key) = 0;
@@ -113,6 +117,8 @@ struct CreateWindowInfo {
 	void (*on_char)(u32 ch) = 0;
 	void (*on_mouse_down)(u8 button) = 0;
 	void (*on_mouse_up)(u8 button) = 0;
+
+	void *user_data = 0;
 };
 
 TL_API Window *create_window(CreateWindowInfo info);
@@ -170,10 +176,10 @@ static constexpr auto class_name = L"tl_window";
 static Window *currently_creating_window = 0;
 static HashMap<HWND, Window *> handle_to_window;
 
-static void draw(Window &window) {
+static void internal_update(Window &window) {
 	window.mouse_position = get_cursor_position() - window.client_position;
-	if (window.on_draw)
-		window.on_draw(window);
+	if (window.on_update)
+		window.on_update(window);
 	window.mouse_delta = {};
 	window.mouse_wheel = 0;
 }
@@ -242,6 +248,16 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 	static bool changing_state = false;
 
 	switch (message) {
+		case WM_PAINT: {
+			if (window.on_paint) {
+				PAINTSTRUCT ps;
+				auto hdc = BeginPaint((HWND)window.handle, &ps);
+				window.on_paint(window, hdc);
+				EndPaint((HWND)window.handle, &ps);
+				return 0;
+			}
+			break;
+		}
 		case WM_SETCURSOR: {
 			//if (window.get_cursor && all_true((v2u)window.mouse_position < window.client_size)) {
 			//	set_cursor(window.get_cursor(window));
@@ -293,7 +309,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
 			return 0;
 		}
 		case WM_TIMER: {
-			draw(window);
+			internal_update(window);
 			break;
 		}
 		case WM_ENTERSIZEMOVE: {
@@ -425,7 +441,8 @@ Window *create_window(CreateWindowInfo info) {
 	window->style_flags = info.style_flags;
 	window->flags = Window_open;
 	window->on_create = info.on_create;
-	window->on_draw = info.on_draw;
+	window->on_update = info.on_update;
+	window->on_paint = info.on_paint;
 	window->on_size = info.on_size;
 	window->hit_test = info.hit_test;
 	window->get_cursor = info.get_cursor;
@@ -436,6 +453,8 @@ Window *create_window(CreateWindowInfo info) {
 	window->on_key_up = info.on_key_up;
 	window->on_mouse_down = info.on_mouse_down;
 	window->on_mouse_up = info.on_mouse_up;
+
+	window->user_data = info.user_data;
 
 	window->min_client_size = info.min_client_size;
 	if (info.style_flags & WindowStyle_no_frame) {
@@ -555,7 +574,7 @@ bool update(Window *window) {
 			return false;
 		}
 	}
-	draw(*window);
+	internal_update(*window);
 	return true;
 }
 
