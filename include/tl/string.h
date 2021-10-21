@@ -11,11 +11,11 @@ namespace tl {
 template <class T>
 List<T> null_terminate(Span<T> span) {
 	List<T> result;
-	result.size = span.size + 1;
-	result.data = result.allocator.allocate<T>(result.size);
-	result.capacity = result.size;
-	memcpy(result.data, span.data, span.size * sizeof(T));
-	result.data[result.size - 1] = {};
+	result.count = span.count + 1;
+	result.data = result.allocator.allocate<T>(result.count);
+	result.capacity = result.count;
+	memcpy(result.data, span.data, span.count * sizeof(T));
+	result.data[result.count - 1] = {};
 	return result;
 }
 
@@ -49,7 +49,7 @@ inline Optional<u64> parse_u64(Span<utf8> string, u32 base) {
 }
 
 inline Optional<u64> parse_u64(Span<utf8> string) {
-	if (string.size > 1) {
+	if (string.count > 1) {
 		if (string[1] == 'x') {
 			string.data += 2;
 			return parse_u64(string, 16);
@@ -132,7 +132,7 @@ template <class Int>
 struct FormatInt {
 	Int value;
 	u32 radix = 10;
-	u32 leading_zeros = 0;
+	u32 leading_zero_count = 0;
 	u32 skip_digits = 0;
 };
 
@@ -245,7 +245,7 @@ inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 // NOTE: TODO: surrogate pairs ate not supported
 inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
 	List<ascii> result;
-	result.reserve(span.size);
+	result.reserve(span.count);
 	for (auto u16 : span) {
 		result.add(u16 > 0xFF ? unfound : (ascii)u16);
 	}
@@ -256,12 +256,12 @@ inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfo
 }
 
 inline Span<utf8> to_utf8(Span<ascii> span) {
-	return Span((utf8 *)span.data, span.size);
+	return Span((utf8 *)span.data, span.count);
 }
 
 inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 	List<utf16> result;
-	result.reserve(span.size);
+	result.reserve(span.count);
 	for (auto ch : span) {
 		result.add((utf16)ch);
 	}
@@ -283,7 +283,7 @@ struct StringBuilder {
 	struct Block {
 		StaticList<utf8, block_size> buffer;
 		Block *next = 0;
-		umm available_space() { return block_size - buffer.size; }
+		umm available_space() { return block_size - buffer.count; }
 	};
 
 	Allocator allocator = {};
@@ -327,26 +327,26 @@ struct StringBuilder {
 			}
 		}
 	}
-	umm size() {
-		umm total_size = 0;
+	umm count() {
+		umm total_count = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
-			total_size += block->buffer.size;
+			total_count += block->buffer.count;
 		}
-		return total_size;
+		return total_count;
 	}
 	Span<char> fill(Span<char> dst_string) {
 		char *dst_char = dst_string.data;
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dst_char, block->buffer.data, block->buffer.size * sizeof(char));
-			dst_char += block->buffer.size;
+			memcpy(dst_char, block->buffer.data, block->buffer.count * sizeof(char));
+			dst_char += block->buffer.count;
 		}
 		return Span<char>(dst_string.begin(), dst_char);
 	}
 	List<char> getNullTerminated() {
 		List<char> result;
-		result.reserve(size() + 1);
+		result.reserve(count() + 1);
 		fill(result);
-		result.size = result.capacity;
+		result.count = result.capacity;
 		result.back() = '\0';
 		return result;
 	}
@@ -355,7 +355,7 @@ struct StringBuilder {
 	void for_each_block(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto block_size = block->buffer.size;
+			auto block_size = block->buffer.count;
 			if (block_size) {
 				fn(block->buffer);
 			}
@@ -365,7 +365,7 @@ struct StringBuilder {
 	void clear() {
 		Block *block = &first;
 		do {
-			block->buffer.size = 0;
+			block->buffer.count = 0;
 			block = block->next;
 		} while (block);
 		last = &first;
@@ -392,7 +392,7 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 		umm space_in_block = b.last->available_space();
 		memcpy(b.last->buffer.end(), data, space_in_block);
 		chars_to_write -= space_in_block;
-		b.last->buffer.size += space_in_block;
+		b.last->buffer.count += space_in_block;
 		data += space_in_block;
 		if (!b.last->next) {
 			b.last->next = b.alloc_last = b.allocate_block();
@@ -400,7 +400,7 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 		}
 	}
 	memcpy(b.last->buffer.end(), data, chars_to_write);
-	b.last->buffer.size += chars_to_write;
+	b.last->buffer.count += chars_to_write;
 }
 
 template <class T>
@@ -410,12 +410,12 @@ forceinline void append_bytes(StringBuilder &b, T const &value) {
 
 template <class T>
 forceinline void append_bytes(StringBuilder &b, Span<T> span) {
-	append_bytes(b, span.data, span.size * sizeof(T));
+	append_bytes(b, span.data, span.count * sizeof(T));
 }
 
 template <class T>
 forceinline void append_bytes(StringBuilder &b, List<T> list) {
-	append_bytes(b, list.data, list.size * sizeof(T));
+	append_bytes(b, list.data, list.count * sizeof(T));
 }
 
 inline umm append(StringBuilder &b, ascii ch) {
@@ -508,24 +508,24 @@ inline umm append(StringBuilder &b, utf32 ch) {
 }
 
 inline umm append(StringBuilder &b, Span<ascii> string) {
-	umm appended_char_count = string.size;
+	umm appended_char_count = string.count;
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
 			append_bytes(b, string);
 			break;
 		case Encoding_utf16:
-			while (string.size) {
+			while (string.count) {
 				append_bytes(b, (utf16)*string.data);
 				++string.data;
-				--string.size;
+				--string.count;
 			}
 			break;
 		case Encoding_utf32:
-			while (string.size) {
+			while (string.count) {
 				append_bytes(b, (utf32)*string.data);
 				++string.data;
-				--string.size;
+				--string.count;
 			}
 			break;
 		default:
@@ -570,7 +570,7 @@ inline umm append(StringBuilder &b, Span<utf8> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
-	return string.size;
+	return string.count;
 }
 
 inline umm append(StringBuilder &b, Span<utf16> string) {
@@ -601,11 +601,11 @@ inline umm append(StringBuilder &b, Span<utf16> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
-	return string.size;
+	return string.count;
 }
 inline umm append(StringBuilder &b, Span<utf32> string) {
 	invalid_code_path("not implemented");
-	return string.size;
+	return string.count;
 }
 inline umm append(StringBuilder &b, Span<wchar> string) {
 	return append(b, (Span<wchar_s>)string);
@@ -788,12 +788,12 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	} else {
 		(void)negative;
 	}
-	if (f.leading_zeros) {
-		for (u32 i = charsWritten; i < f.leading_zeros; ++i) {
+	if (f.leading_zero_count) {
+		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
 			*lsc-- = '0';
 		}
-		if (f.leading_zeros > charsWritten)
-			charsWritten = f.leading_zeros;
+		if (f.leading_zero_count > charsWritten)
+			charsWritten = f.leading_zero_count;
 	}
 	buffer.add(Span(lsc + 1, charsWritten));
 	return charsWritten;
@@ -816,7 +816,7 @@ umm append(StringBuilder &builder, Int v) {
 }
 
 forceinline umm append(StringBuilder &builder, void const *p) {
-	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zeros = true});
+	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zero_count = sizeof(void *) * 2});
 }
 
 template <class Float>
@@ -952,9 +952,9 @@ inline umm append(StringBuilder &builder, std::source_location location) {
 inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
 	List<char> result;
 	result.allocator = allocator;
-	result.reserve(builder.size());
+	result.reserve(builder.count());
 	builder.fill(result);
-	result.size = result.capacity;
+	result.count = result.capacity;
 	return result;
 }
 inline List<char> to_string(StringBuilder &builder) {
@@ -1100,17 +1100,17 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 	List<utf8> result;
 
-	if (utf16.size > max_value<int>)
+	if (utf16.count > max_value<int>)
 		return {};
 
-	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, 0, 0, 0, 0);
+	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, 0, 0, 0, 0);
 	if (!bytes_required)
 		return {};
 
 	result.reserve(bytes_required + terminate);
-	result.size = bytes_required + terminate;
+	result.count = bytes_required + terminate;
 
-	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
+	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
 		return {};
 	}
 
@@ -1123,17 +1123,17 @@ List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 List<utf16> to_utf16(Span<utf8> utf8, bool terminate) {
 	List<utf16> result;
 
-	if (utf8.size > max_value<int>)
+	if (utf8.count > max_value<int>)
 		return {};
 
-	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, 0, 0);
+	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, 0, 0);
 	if (!chars_required)
 		return {};
 
 	result.reserve(chars_required + terminate);
-	result.size = chars_required + terminate;
+	result.count = chars_required + terminate;
 
-	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, (wchar *)result.data, chars_required) != chars_required) {
+	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, chars_required) != chars_required) {
 		return {};
 	}
 

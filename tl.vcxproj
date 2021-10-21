@@ -22,16 +22,6 @@
     <Natvis Include="tl.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\0.cpp" />
-    <ClCompile Include="src\1.cpp" />
-    <ClCompile Include="src\2.cpp" />
-    <ClCompile Include="src\3.cpp" />
-    <ClCompile Include="src\4.cpp" />
-    <ClCompile Include="src\5.cpp" />
-    <ClCompile Include="src\6.cpp" />
-    <ClCompile Include="src\7.cpp" />
-    <ClCompile Include="src\8.cpp" />
-    <ClCompile Include="src\9.cpp" />
     <ClCompile Include="src\tests.cpp" />
     <ClCompile Include="src\tests\allocation.cpp" />
     <ClCompile Include="src\tests\common.cpp" />

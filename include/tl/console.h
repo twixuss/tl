@@ -51,14 +51,14 @@ inline umm print(PrintKind kind, T const &value) {
 	append(builder, value);
 	auto string = as_utf8(to_string(builder, temporary_allocator));
 	current_printer(kind, string);
-	return string.size;
+	return string.count;
 }
 
-template <> inline umm print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); return span.size; }
-template <> inline umm print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); return span.size; }
+template <> inline umm print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); return span.count; }
+template <> inline umm print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); return span.count; }
 
-template <> inline umm print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); return list.size; }
-template <> inline umm print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); return list.size; }
+template <> inline umm print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); return list.count; }
+template <> inline umm print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); return list.count; }
 
 template <class ...Args>
 inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
@@ -67,7 +67,7 @@ inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
 	append_format(builder, fmt, args...);
 	auto string = to_string(builder, temporary_allocator);
 	print(kind, string);
-	return string.size;
+	return string.count;
 }
 
 inline umm print(PrintKind kind, char const *string) {
@@ -114,15 +114,15 @@ Printer console_printer = {
 
 void print_to_console(Span<ascii> span) {
 	DWORD charsWritten;
-	WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
+	WriteConsoleA(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 void print_to_console(Span<utf8> span) {
 	DWORD charsWritten;
-	WriteConsoleA(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
+	WriteConsoleA(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 void print_to_console(Span<utf16> span) {
 	DWORD charsWritten;
-	WriteConsoleW(console_output, span.data, (DWORD)span.size, &charsWritten, 0);
+	WriteConsoleW(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 
 void clear_console() {

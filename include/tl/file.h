@@ -313,12 +313,12 @@ struct ParsedPath {
 };
 
 inline ParsedPath parse_path(Span<utf8> path) {
-	if (!path.size)
+	if (!path.count)
 		return {};
 	ParsedPath result = {};
 
-	while (path.size && (path.back() == '\\' || path.back() == '/')) {
-		path.size -= 1;
+	while (path.count && (path.back() == '\\' || path.back() == '/')) {
+		path.count -= 1;
 	}
 	auto last_slash = find_last_any(path, u8"/\\"s);
 	auto last_dot = find_last(path, u8'.');
@@ -329,14 +329,14 @@ inline ParsedPath parse_path(Span<utf8> path) {
 				result.name      = {last_slash + 1, last_dot};
 				result.extension = {last_dot + 1, path.end()};
 				// Include the dot into the name because the extension is empty
-				if (result.extension.size == 0) {
-					result.name.size += 1;
+				if (result.extension.count == 0) {
+					result.name.count += 1;
 				}
-				if (result.name.size == 0) {
+				if (result.name.count == 0) {
 					result.name = result.extension;
 					result.extension = {};
 					result.name.data --;
-					result.name.size ++;
+					result.name.count ++;
 				}
 			} else {
 				result.directory = {path.data, last_slash};
@@ -347,14 +347,14 @@ inline ParsedPath parse_path(Span<utf8> path) {
 			result.name      = {path.data, last_dot};
 			result.extension = {last_dot + 1, path.end()};
 			// Include the dot into the name because the extension is empty
-			if (result.extension.size == 0) {
-				result.name.size += 1;
+			if (result.extension.count == 0) {
+				result.name.count += 1;
 			}
-			if (result.name.size == 0) {
+			if (result.name.count == 0) {
 				result.name = result.extension;
 				result.extension = {};
 				result.name.data --;
-				result.name.size ++;
+				result.name.count ++;
 			}
 		}
 	} else {
@@ -370,19 +370,19 @@ inline ParsedPath parse_path(Span<utf8> path) {
 }
 
 inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = false) {
-	if (path.size == 0)
+	if (path.count == 0)
 		return path;
 
 	if (path.back() == '\\' || path.back() == '/') {
-		path.size--;
+		path.count--;
 	}
 
-	while (path.size && !(path.back() == '\\' || path.back() == '/')) {
-		path.size--;
+	while (path.count && !(path.back() == '\\' || path.back() == '/')) {
+		path.count--;
 	}
 
-	if (path.size && remove_last_slash) {
-		path.size--;
+	if (path.count && remove_last_slash) {
+		path.count--;
 	}
 
 	return path;
@@ -393,7 +393,7 @@ inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
 }
 
 inline bool is_absolute_path(Span<utf8> path) {
-	if (path.size < 2)
+	if (path.count < 2)
 		return false;
 	return path.data[1] == ':';
 }
@@ -407,7 +407,7 @@ inline bool create_directories(Span<utf8> path) {
 		}
 		directories_to_create.add(path);
 		path = parent_directory(path);
-		if (path.size == 0)
+		if (path.count == 0)
 			break;
 	}
 	for (auto dir : reverse(directories_to_create)) {
@@ -518,23 +518,23 @@ umm read(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_read = 0;
 	umm total_bytes_read = 0;
-	while (span.size > max_bytes) {
+	while (span.count > max_bytes) {
 		if (!ReadFile(file.handle, span.data, max_bytes, &bytes_read, 0)) {
 			return total_bytes_read;
 		}
 		span.data += max_bytes;
-		span.size -= max_bytes;
+		span.count -= max_bytes;
 		total_bytes_read += bytes_read;
 		if (bytes_read != max_bytes) {
 			return total_bytes_read;
 		}
 	}
-	if (span.size) {
-		if (!ReadFile(file.handle, span.data, (DWORD)span.size, &bytes_read, 0)) {
+	if (span.count) {
+		if (!ReadFile(file.handle, span.data, (DWORD)span.count, &bytes_read, 0)) {
 			return total_bytes_read;
 		}
 		total_bytes_read += bytes_read;
-		if (bytes_read != span.size) {
+		if (bytes_read != span.count) {
 			return total_bytes_read;
 		}
 	}
@@ -544,23 +544,23 @@ umm write(File file, Span<u8> span) {
 	DWORD const max_bytes = (DWORD)~0;
 	DWORD bytes_written = 0;
 	umm total_bytes_written = 0;
-	while (span.size > max_bytes) {
+	while (span.count > max_bytes) {
 		if (!WriteFile(file.handle, span.data, max_bytes, &bytes_written, 0)) {
 			return total_bytes_written;
 		}
 		span.data += max_bytes;
-		span.size -= max_bytes;
+		span.count -= max_bytes;
 		total_bytes_written += bytes_written;
 		if (bytes_written != max_bytes) {
 			return total_bytes_written;
 		}
 	}
-	if (span.size) {
-		if (!WriteFile(file.handle, span.data, (DWORD)span.size, &bytes_written, 0)) {
+	if (span.count) {
+		if (!WriteFile(file.handle, span.data, (DWORD)span.count, &bytes_written, 0)) {
 			return total_bytes_written;
 		}
 		total_bytes_written += bytes_written;
-		if (bytes_written != span.size) {
+		if (bytes_written != span.count) {
 			return total_bytes_written;
 		}
 	}
@@ -603,19 +603,19 @@ static wchar *append_star(Span<utf16> directory) {
 	wchar *directory_with_star;
 
 	if (directory.back() == u'\0')
-		directory.size--;
+		directory.count--;
 
 	if (directory.back() == u'\\' || directory.back() == u'/') {
-		directory_with_star = allocator.allocate<wchar>(directory.size + 2);
-		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
-		directory_with_star[directory.size + 0] = '*';
-		directory_with_star[directory.size + 1] = 0;
+		directory_with_star = allocator.allocate<wchar>(directory.count + 2);
+		memcpy(directory_with_star, directory.data, directory.count * sizeof(directory.data[0]));
+		directory_with_star[directory.count + 0] = '*';
+		directory_with_star[directory.count + 1] = 0;
 	} else {
-		directory_with_star = allocator.allocate<wchar>(directory.size + 3);
-		memcpy(directory_with_star, directory.data, directory.size * sizeof(directory.data[0]));
-		directory_with_star[directory.size + 0] = '/';
-		directory_with_star[directory.size + 1] = '*';
-		directory_with_star[directory.size + 2] = 0;
+		directory_with_star = allocator.allocate<wchar>(directory.count + 3);
+		memcpy(directory_with_star, directory.data, directory.count * sizeof(directory.data[0]));
+		directory_with_star[directory.count + 0] = '/';
+		directory_with_star[directory.count + 1] = '*';
+		directory_with_star[directory.count + 2] = 0;
 	}
 	return directory_with_star;
 }
@@ -668,14 +668,14 @@ FileItemList get_items_in_directory(Span<pathchar> directory) {
 
 		auto name = as_span((utf16 *)find_data.cFileName);
 
-		if (name.size > 200)
+		if (name.count > 200)
 			debug_break();
 
 		FileItem item;
-		item.name.size = name.size;
-		item.name.data = (pathchar *)result.buffer.size;
+		item.name.count = name.count;
+		item.name.data = (pathchar *)result.buffer.count;
 
-		if (item.name.size > 200)
+		if (item.name.count > 200)
 			debug_break();
 
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -695,7 +695,7 @@ FileItemList get_items_in_directory(Span<pathchar> directory) {
 	}
 
 	for (auto &item : result) {
-		if (item.name.size > 200)
+		if (item.name.count > 200)
 			debug_break();
 	}
 	return result;
@@ -803,7 +803,7 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 
 	if (kind != FileDialog_directory) {
 		COMDLG_FILTERSPEC file_type;
-		if (allowed_extensions.size) {
+		if (allowed_extensions.count) {
 			scoped_allocator(temporary_allocator);
 			StringBuilder builder;
 			for (auto &ext : allowed_extensions) {
@@ -866,8 +866,8 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 List<pathchar> get_current_directory() {
 	List<pathchar> temp;
 	temp.resize(GetCurrentDirectoryW(0, 0));
-	GetCurrentDirectoryW((DWORD)temp.size, (wchar *)temp.data);
-	temp.size--;
+	GetCurrentDirectoryW((DWORD)temp.count, (wchar *)temp.data);
+	temp.count--;
 	return temp;
 }
 

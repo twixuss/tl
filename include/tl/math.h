@@ -1283,7 +1283,7 @@ inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 		aabb_min_max(v2s{a.min.x, b.min.y}, v2s{b.min.x, b.max.y}),
 		aabb_min_max(v2s{b.max.x, b.min.y}, v2s{a.max.x, b.max.y}),
 	};
-	for (u32 i = 0; i < boxes.size; ++i) {
+	for (u32 i = 0; i < boxes.count; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
@@ -1326,7 +1326,7 @@ inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
 		aabb_min_max(v3s{b.min.x, b.max.y, b.min.z}, v3s{b.max.x, a.max.y, b.max.z}), // top
 		aabb_min_max(v3s{b.min.x, a.min.y, b.min.z}, v3s{b.max.x, b.min.y, b.max.z}), // bottom
 	};
-	for (u32 i = 0; i < boxes.size; ++i) {
+	for (u32 i = 0; i < boxes.count; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
