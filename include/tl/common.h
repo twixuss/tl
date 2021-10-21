@@ -45,6 +45,10 @@
 
 #define is_statically_overridden(function, derived, base) (&base::function != &derived::function)
 
+#if COMPILER_MSVC
+#define tl_base __super
+#endif
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -333,19 +337,19 @@ template <class T, class U, class... Rest> forceinline constexpr auto max(T a, U
 template <class T, class U, class V, class W> forceinline constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 template <class T, class U> forceinline constexpr void minmax(T& mn, U &mx) { minmax(mn, mx, mn, mx); }
 
-template <class T, umm size>
-forceinline constexpr auto min(T (&array)[size]) {
+template <class T, umm count>
+forceinline constexpr auto min(T (&array)[count]) {
 	T result = array[0];
-	for (umm i = 1; i < size; ++i) {
+	for (umm i = 1; i < count; ++i) {
 		result = min(result, array[i]);
 	}
 	return result;
 }
 
-template <class T, umm size>
-forceinline constexpr auto max(T (&array)[size]) {
+template <class T, umm count>
+forceinline constexpr auto max(T (&array)[count]) {
 	T result = array[0];
-	for (umm i = 1; i < size; ++i) {
+	for (umm i = 1; i < count; ++i) {
 		result = max(result, array[i]);
 	}
 	return result;
@@ -628,23 +632,23 @@ inline constexpr auto toInt(Enum e) {
 	return static_cast<std::underlying_type_t<Enum>>(e);
 }
 
-template <class T, umm size>
-constexpr umm count_of(T const (&arr)[size]) { (void)arr; return size; }
+template <class T, umm count>
+constexpr umm count_of(T const (&arr)[count]) { (void)arr; return count; }
 
-template <class T, umm size>
-constexpr T &back(T (&arr)[size]) { return arr[size - 1]; }
-template <class T, umm size>
-constexpr T const &back(T const (&arr)[size]) { return arr[size - 1]; }
+template <class T, umm count>
+constexpr T &back(T (&arr)[count]) { return arr[count - 1]; }
+template <class T, umm count>
+constexpr T const &back(T const (&arr)[count]) { return arr[count - 1]; }
 
-template <class T, umm size>
-constexpr T &front(T (&arr)[size]) { return arr[0]; }
-template <class T, umm size>
-constexpr T const &front(T const (&arr)[size]) { return arr[0]; }
+template <class T, umm count>
+constexpr T &front(T (&arr)[count]) { return arr[0]; }
+template <class T, umm count>
+constexpr T const &front(T const (&arr)[count]) { return arr[0]; }
 
-inline void copyMemory(void *_dst, void const *_src, umm size) {
+inline void copyMemory(void *_dst, void const *_src, umm count) {
 	u8 *dst = (u8 *)_dst;
 	u8 const *src = (u8 const *)_src;
-	while (size--) {
+	while (count--) {
 		*dst++ = *src++;
 	}
 }
@@ -776,10 +780,10 @@ constexpr Iterator find(Iterator begin, Iterator end, T const &value, Compare &&
 }
 template <class Iterator, class CmpIterator>
 constexpr Iterator find(Iterator src_begin, Iterator src_end, CmpIterator cmp_begin, CmpIterator cmp_end) {
-	umm src_size = (umm)(src_end - src_begin);
-	umm cmp_size = (umm)(cmp_end - cmp_begin);
-	for (umm i = 0; i < src_size - cmp_size + 1; ++i) {
-		for (umm j = 0; j < cmp_size; ++j) {
+	umm src_count = (umm)(src_end - src_begin);
+	umm cmp_count = (umm)(cmp_end - cmp_begin);
+	for (umm i = 0; i < src_count - cmp_count + 1; ++i) {
+		for (umm j = 0; j < cmp_count; ++j) {
 			if (cmp_begin[j] != src_begin[i + j]) {
 				goto continue_first;
 			}
@@ -821,52 +825,72 @@ auto reverse(T &x) {
 	return r;
 }
 
+template <class Iterator>
+struct ReverseIterator {
+	using ValueType = decltype(*Iterator{});
+
+	Iterator it;
+	ReverseIterator(Iterator it) : it(it) {}
+	ReverseIterator &operator++() { return --it, *this; }
+	ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
+	bool operator==(ReverseIterator that) const { return it == that.it; }
+	bool operator!=(ReverseIterator that) const { return it != that.it; }
+	ValueType &operator*() { return *it; }
+	Iterator operator->() { return it; }
+};
+
 template <class T>
 struct Span {
 	using ValueType = T;
-	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), size(list.size()) {}
+	using ReverseIterator = ReverseIterator<T *>;
+
+	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
-	constexpr Span(ValueType &value) : data(std::addressof(value)), size(1) {}
+	constexpr Span(ValueType &value) : data(std::addressof(value)), count(1) {}
 	template <umm count>
-	constexpr Span(ValueType (&array)[count]) : data(array), size(count) {}
-	constexpr Span(ValueType *begin, ValueType *end) : data(begin), size(end - begin) {}
-	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), size(end - begin) {}
-	constexpr Span(ValueType *begin, umm size) : data(begin), size(size) {}
+	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
+	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {}
+	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
+	constexpr Span(ValueType *begin, umm count) : data(begin), count(count) {}
 	constexpr ValueType *begin() const { return data; }
-	constexpr ValueType *end() const { return data + size; }
+	constexpr ValueType *end() const { return data + count; }
+
+	constexpr ReverseIterator rbegin() const { return data + count - 1; }
+	constexpr ReverseIterator rend() const { return data - 1; }
+
 	constexpr ValueType &front() const {
-		bounds_check(size);
+		bounds_check(count);
 		return *data;
 	}
 	constexpr ValueType &back() const {
-		bounds_check(size);
-		return data[size - 1];
+		bounds_check(count);
+		return data[count - 1];
 	}
 	constexpr ValueType &operator[](umm i) const {
-		bounds_check(i < size);
+		bounds_check(i < count);
 		return data[i];
 	}
 	constexpr ValueType &at(umm i) const {
-		bounds_check(i < size);
+		bounds_check(i < count);
 		return data[i];
 	}
-	constexpr bool empty() const { return size == 0; }
+	constexpr bool empty() const { return count == 0; }
 
 	template <class U>
 	constexpr explicit operator Span<U>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		return {(U *)data, size};
+		return {(U *)data, count};
 	}
 
 	//constexpr operator Span<utf8>() const { // Really this cast should be defined only in Span<char>, but this is impossible to do in this language without copypasta
 	//	static_assert(is_same<T, ascii>);
-	//	return {(utf8 *)data, size * sizeof(ValueType)};
+	//	return {(utf8 *)data, count * sizeof(ValueType)};
 	//}
 
 	constexpr bool operator==(Span<ValueType> that) const {
-		if (size != that.size)
+		if (count != that.count)
 			return false;
-		for (umm i = 0; i < size; ++i) {
+		for (umm i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
 		}
@@ -879,7 +903,7 @@ struct Span {
 	}
 
 	ValueType *data = 0;
-	umm size = 0;
+	umm count = 0;
 };
 
 template <ForEachFlags flags, class T, class Fn>
@@ -890,12 +914,12 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 	T *end = 0;
 	umm step = 0;
 	if constexpr (flags & ForEach_reverse) {
-		start = span.data + span.size - 1;
+		start = span.data + span.count - 1;
 		end = span.data - 1;
 		step = -1;
 	} else {
 		start = span.data;
-		end = span.data + span.size;
+		end = span.data + span.count;
 		step = 1;
 	}
 
@@ -912,18 +936,18 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 	}
 }
 
-forceinline constexpr Span<char > operator""s(char  const *string, umm size) { return Span((char  *)string, size); }
-forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm size) { return Span((utf8  *)string, size); }
-forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm size) { return Span((utf16 *)string, size); }
-forceinline constexpr Span<wchar> operator""s(wchar const *string, umm size) { return Span((wchar *)string, size); }
-forceinline constexpr Span<char > operator""ts(char  const *string, umm size) { return Span((char  *)string, size + 1); }
-forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm size) { return Span((utf8  *)string, size + 1); }
-forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm size) { return Span((utf16 *)string, size + 1); }
-forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm size) { return Span((wchar *)string, size + 1); }
-forceinline Span<u8> operator""b(char const *string, umm size) { return Span((u8 *)string, size); }
+forceinline constexpr Span<char > operator""s(char  const *string, umm count) { return Span((char  *)string, count); }
+forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm count) { return Span((utf8  *)string, count); }
+forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm count) { return Span((utf16 *)string, count); }
+forceinline constexpr Span<wchar> operator""s(wchar const *string, umm count) { return Span((wchar *)string, count); }
+forceinline constexpr Span<char > operator""ts(char  const *string, umm count) { return Span((char  *)string, count + 1); }
+forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm count) { return Span((utf8  *)string, count + 1); }
+forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) { return Span((utf16 *)string, count + 1); }
+forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm count) { return Span((wchar *)string, count + 1); }
+forceinline Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
-template <class T, umm size>
-inline constexpr Span<T> array_as_span(T const (&arr)[size]) { return Span((T *)arr, size); }
+template <class T, umm count>
+inline constexpr Span<T> array_as_span(T const (&arr)[count]) { return Span((T *)arr, count); }
 
 template <class T>
 inline constexpr Span<T> as_span(std::initializer_list<T> list) { return Span((T *)list.begin(), list.size()); }
@@ -941,7 +965,7 @@ inline constexpr Span<T> as_span(Span<T> span) {
 
 template <class T>
 constexpr Span<utf8> as_utf8(Span<T> span) {
-	return {(utf8 *)span.begin(), span.size * sizeof(T)};
+	return {(utf8 *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
 constexpr Span<utf8> as_utf8(T span_like) {
@@ -956,12 +980,12 @@ constexpr Span<u8> as_bytes(T span_like) {
 
 template <class T>
 constexpr Span<u8> as_bytes(Span<T> span) {
-	return {(u8 *)span.begin(), span.size * sizeof(T)};
+	return {(u8 *)span.begin(), span.count * sizeof(T)};
 }
 
 template <class T>
 constexpr Span<char> as_chars(Span<T> span) {
-	return {(char *)span.begin(), span.size * sizeof(T)};
+	return {(char *)span.begin(), span.count * sizeof(T)};
 }
 
 template <class T>
@@ -969,20 +993,20 @@ constexpr Span<u8> value_as_bytes(T const &value) {
 	return {(u8 *)&value, sizeof(T)};
 }
 
-template <class T> constexpr umm count_of(Span<T> span) { return span.size; }
+template <class T> constexpr umm count_of(Span<T> span) { return span.count; }
 
 template <class T>
 constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0) {
-	for (umm i = 0; i < source.size; ++i) {
+	for (umm i = 0; i < source.count; ++i) {
 		destination[start_index + i] = source[i];
 	}
 }
 
 template <class T, class U>
 inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
-	if (sub_str.size > str.size)
+	if (sub_str.count > str.count)
 		return false;
-	for (umm i = 0; i < sub_str.size; ++i) {
+	for (umm i = 0; i < sub_str.count; ++i) {
 		if (str.data[i] != sub_str.data[i]) {
 			return false;
 		}
@@ -992,10 +1016,10 @@ inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
 
 template <class T, class U>
 inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
-	if (sub_str.size > str.size)
+	if (sub_str.count > str.count)
 		return false;
-	umm base_offset = str.size - sub_str.size;
-	for (umm i = 0; i < sub_str.size; ++i) {
+	umm base_offset = str.count - sub_str.count;
+	for (umm i = 0; i < sub_str.count; ++i) {
 		if (str.data[i + base_offset] != sub_str.data[i]) {
 			return false;
 		}
@@ -1003,26 +1027,26 @@ inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
 	return true;
 }
 
-template <class T, umm size> constexpr T *find(T (&arr)[size], T const &value) { return find(arr, arr + size, value); }
+template <class T, umm count> constexpr T *find(T (&arr)[count], T const &value) { return find(arr, arr + count, value); }
 template <class T> constexpr T *find(Span<T> span, T const &value) { return find(span.begin(), span.end(), value); }
 template <class T> constexpr T *find(Span<T> span, Span<T> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
 
 template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
-	while (where.size) {
+	while (where.count) {
 		for (auto what : whats) {
 			if (starts_with(where, what)) {
 				return where.data;
 			}
 		}
 		where.data += 1;
-		where.size -= 1;
+		where.count -= 1;
 	}
 	return 0;
 }
 
 template <class T>
 constexpr T *find_last(Span<T> span, T const &value) {
-	if (span.size == 0)
+	if (span.count == 0)
 		return 0;
 
 	for (auto it = span.end() - 1; it >= span.begin(); --it) {
@@ -1030,6 +1054,18 @@ constexpr T *find_last(Span<T> span, T const &value) {
 			return it;
 	}
 	return 0;
+}
+
+template <class T>
+constexpr Span<T> find_last(Span<T> span, Span<T> sub) {
+	Span<T> dest = {span.end() - sub.count, sub.count};
+	while (dest.data >= span.data) {
+		if (dest == sub)
+			return dest;
+
+		dest.data--;
+	}
+	return {};
 }
 
 template <class T, class Predicate>
@@ -1116,7 +1152,7 @@ inline constexpr utf32 to_upper(utf32 c) {
 
 template <class T, class U>
 inline constexpr bool equals(Span<T> a, Span<U> b) {
-	if (a.size != b.size)
+	if (a.count != b.count)
 		return false;
 	auto ap = a.begin();
 	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)
@@ -1130,10 +1166,10 @@ inline bool equals_case_insensitive(utf32 a, utf32 b) { return to_lower(a) == to
 
 template <class T, class Predicate, class = EnableIf<is_invocable<Predicate, T, T>>>
 inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {
-	if (sub_str.size > str.size)
+	if (sub_str.count > str.count)
 		return false;
-	umm base_offset = str.size - sub_str.size;
-	for (umm i = 0; i < sub_str.size; ++i) {
+	umm base_offset = str.count - sub_str.count;
+	for (umm i = 0; i < sub_str.count; ++i) {
 		if (!predicate(str.data[i + base_offset], sub_str.data[i])) {
 			return false;
 		}
@@ -1167,13 +1203,13 @@ inline constexpr bool is_any_of(T &value, Span<T> span) {
 }
 
 inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip) {
-	if (span.size == 0) {
+	if (span.count == 0) {
 		return span;
 	}
 	while (is_any_of(span.front(), chars_to_skip)) {
 		++span.data;
-		--span.size;
-		if (span.size == 0) {
+		--span.count;
+		if (span.count == 0) {
 			break;
 		}
 	}
@@ -1210,16 +1246,16 @@ struct StaticList {
 
 	template <umm that_capacity>
 	constexpr StaticList(StaticList<T, that_capacity> const &that) {
-		size = that.size;
-		memcpy(data, that.data, size * sizeof(T));
+		count = that.count;
+		memcpy(data, that.data, count * sizeof(T));
 	}
 
 	template <umm that_capacity>
 	constexpr StaticList(StaticList<T, that_capacity> &&that) = delete;
 
 	constexpr StaticList(std::initializer_list<T> that) {
-		size = that.size();
-		memcpy(data, that.begin(), size * sizeof(T));
+		count = that.size();
+		memcpy(data, that.begin(), count * sizeof(T));
 	}
 
 	template <umm that_capacity>
@@ -1235,50 +1271,50 @@ struct StaticList {
 	}
 
 	forceinline constexpr T const *begin() const { return data; }
-	forceinline constexpr T const *end() const { return data + size; }
+	forceinline constexpr T const *end() const { return data + count; }
 
 	forceinline constexpr T *begin() { return data; }
-	forceinline constexpr T *end() { return data + size; }
+	forceinline constexpr T *end() { return data + count; }
 
-	forceinline constexpr bool empty() const { return size == 0; }
-	forceinline constexpr bool full() const { return size == capacity; }
+	forceinline constexpr bool empty() const { return count == 0; }
+	forceinline constexpr bool full() const { return count == capacity; }
 
-	forceinline constexpr T &front() { bounds_check(size); return data[0]; }
-	forceinline constexpr T &back() { bounds_check(size); return data[size - 1]; }
-	forceinline constexpr T &operator[](umm i) { bounds_check(size); return data[i]; }
+	forceinline constexpr T &front() { bounds_check(count); return data[0]; }
+	forceinline constexpr T &back() { bounds_check(count); return data[count - 1]; }
+	forceinline constexpr T &operator[](umm i) { bounds_check(count); return data[i]; }
 
-	forceinline constexpr T const &front() const { bounds_check(size); return data[0]; }
-	forceinline constexpr T const &back() const { bounds_check(size); return data[size - 1]; }
-	forceinline constexpr T const &operator[](umm i) const { bounds_check(size); return data[i]; }
+	forceinline constexpr T const &front() const { bounds_check(count); return data[0]; }
+	forceinline constexpr T const &back() const { bounds_check(count); return data[count - 1]; }
+	forceinline constexpr T const &operator[](umm i) const { bounds_check(count); return data[i]; }
 
-	constexpr void resize(umm new_size) {
-		bounds_check(new_size <= capacity);
-		if (new_size > size) {
-			for (umm i = size; i < new_size; ++i) {
+	constexpr void resize(umm new_count) {
+		bounds_check(new_count <= capacity);
+		if (new_count > count) {
+			for (umm i = count; i < new_count; ++i) {
 				new (data + i) T();
 			}
 		}
-		size = new_size;
+		count = new_count;
 	}
 	constexpr T &insert_at(T value, umm where) {
-		bounds_check(where <= size);
-		bounds_check(size < capacity);
+		bounds_check(where <= count);
+		bounds_check(count < capacity);
 
-		memmove(data + where + 1, data + where, (size - where) * sizeof(T));
+		memmove(data + where + 1, data + where, (count - where) * sizeof(T));
 		memcpy(data + where, &value, sizeof(T));
 
-		++size;
+		++count;
 		return data[where];
 	}
 	constexpr Span<T> insert_at(Span<T> span, umm where) {
-		bounds_check(where <= size);
-		bounds_check(size + span.size <= capacity);
+		bounds_check(where <= count);
+		bounds_check(count + span.count <= capacity);
 
-		memmove(data + where + span.size, data + where, (size - where) * sizeof(T));
-		memcpy(data + where, span.data, span.size * sizeof(T));
+		memmove(data + where + span.count, data + where, (count - where) * sizeof(T));
+		memcpy(data + where, span.data, span.count * sizeof(T));
 
-		size += span.size;
-		return {data + where, span.size};
+		count += span.count;
+		return {data + where, span.count};
 	}
 	constexpr Span<T> insert(Span<T> span, T *where) {
 		return insert_at(span, where - data);
@@ -1291,63 +1327,63 @@ struct StaticList {
 	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { add(as_span(that)); return *this; }
 	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span((T *)that.begin(), (T *)that.end())); return *this; }
 
-	forceinline constexpr operator Span<T>() { return {data, size}; }
+	forceinline constexpr operator Span<T>() { return {data, count}; }
 
 	forceinline constexpr T &add() {
 		bounds_check(!full());
-		return *new(data + size++) T();
+		return *new(data + count++) T();
 	}
 
 	forceinline constexpr T &add(T const &value) {
 		bounds_check(!full());
-		memcpy(data + size, &value, sizeof(T));
-		return data[size++];
+		memcpy(data + count, &value, sizeof(T));
+		return data[count++];
 	}
 
 	forceinline constexpr Span<T> add(Span<T> span) {
-		bounds_check(size + span.size <= capacity);
-		memcpy(data + size, span.data, span.size * sizeof(T));
-		defer { size += span.size; };
-		return {data + size, span.size};
+		bounds_check(count + span.count <= capacity);
+		memcpy(data + count, span.data, span.count * sizeof(T));
+		defer { count += span.count; };
+		return {data + count, span.count};
 	}
 
 	constexpr T pop_back() {
-		bounds_check(size);
-		return data[--size];
+		bounds_check(count);
+		return data[--count];
 	}
 	constexpr T pop_front() {
-		bounds_check(size);
+		bounds_check(count);
 		T popped = *data;
-		memmove(data, data + 1, --size * sizeof(T));
+		memmove(data, data + 1, --count * sizeof(T));
 		return popped;
 	}
 	forceinline constexpr void pop_back_unordered() { erase_unordered(&back()); }
 	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
 
 	T erase_at(umm where) {
-		bounds_check(where < size);
+		bounds_check(where < count);
 		T erased = data[where];
-		memmove(data + where, data + where + 1, (--size - where) * sizeof(T));
+		memmove(data + where, data + where + 1, (--count - where) * sizeof(T));
 		return erased;
 	}
 	forceinline T erase(T *where) { return erase_at(where - data); }
 
 	T erase_at_unordered(umm where) {
-		bounds_check(where < size);
+		bounds_check(where < count);
 		T erased = data[where];
-		--size;
-		if (size != where) {
-			data[where] = data[size];
+		--count;
+		if (count != where) {
+			data[where] = data[count];
 		}
 		return erased;
 	}
 	forceinline T erase_unordered(T *where) { return erase_at_unordered(where - data); }
 
 	constexpr void clear() {
-		size = 0;
+		count = 0;
 	}
 
-	umm size = 0;
+	umm count = 0;
 	union {
 		T data[capacity];
 	};
@@ -1358,7 +1394,7 @@ umm index_of(StaticList<T, capacity> const &list, T const *value) {
 	return value - list.data;
 }
 
-template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> const &list) { return {(T *)list.data, list.size}; }
+template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> const &list) { return {(T *)list.data, list.count}; }
 
 template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, T const &value) { return find(as_span(list), value); }
 template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, Span<T> cmp) { return find(as_span(list), cmp); }
@@ -1532,7 +1568,7 @@ struct AllocatorPusher {
 template <class T>
 void rotate(Span<T> span, T *to_be_first) {
 	umm left_count = to_be_first - span.data;
-	umm right_count = span.size - left_count;
+	umm right_count = span.count - left_count;
 
 	if (right_count < left_count) {
 		T *temp = temporary_allocator.allocate_uninitialized<T>(right_count);

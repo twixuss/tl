@@ -149,7 +149,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 #if 1
 			char name_buffer[256];
 			name.data = name_buffer;
-			name.size = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
+			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
 #else
 			name = with(temporary_allocator, demangle(symbol->Name));
 #endif
@@ -164,12 +164,12 @@ StringizedCallStack to_string(CallStack &call_stack) {
 			}
 		}
 
-		entry.name.data = (char *)result.string_buffer.size;
-		entry.name.size = name.size;
+		entry.name.data = (char *)result.string_buffer.count;
+		entry.name.count = name.count;
 		result.string_buffer.add(name);
 
-		entry.file.data = (char *)result.string_buffer.size;
-		entry.file.size = file.size;
+		entry.file.data = (char *)result.string_buffer.count;
+		entry.file.count = file.count;
 		result.string_buffer.add(file);
 
 		result.call_stack.add(entry);

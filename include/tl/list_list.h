@@ -6,7 +6,7 @@ namespace tl {
 //
 // Each list is allocated in the same buffer
 //
-// Note: To start using 'lists' member ensure that list is in 'absolute mode',
+// Note: To start iterating ensure that list is in 'absolute mode',
 // so 'data' member of lists' elements represent a pointer to the beginning of a list
 // stored in 'buffer'
 //
@@ -27,11 +27,11 @@ struct ListList : List<Span<T>> {
 #endif
 
 		Span<T> dest;
-		dest.size = string.size;
-		dest.data = (T *)buffer.size;
+		dest.count = string.count;
+		dest.data = (T *)buffer.count;
 		Base::add(dest);
 
-		buffer += string;
+		buffer.add(string);
 	}
 
 	void make_absolute() {

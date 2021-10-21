@@ -15,7 +15,7 @@ static void read_write_test(Stream *stream) {
 	stream->write(dest);
 }
 static void result_test(Span<u8> result) {
-	assert(result.size == 8);
+	assert(result.count == 8);
 	assert(result[0] == '0');
 	assert(result[1] == '1');
 	assert(result[2] == '2');

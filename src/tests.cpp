@@ -208,7 +208,7 @@ template <template <class T, class ...Args> class List, class T, class ...Args> 
 
 void radixSort(Span<u32> span) {
 	List<u32> temp;
-	temp.resize(span.size);
+	temp.resize(span.count);
 
 	Span<u32> src = span;
 	Span<u32> dst = temp;
@@ -218,7 +218,7 @@ void radixSort(Span<u32> span) {
 
 	for (u32 r = 0; r < 4; ++r) {
 		u32 counters[256]{};
-		for (umm i = 0; i < src.size; ++i) {
+		for (umm i = 0; i < src.count; ++i) {
 			++counters[(src[i] & mask) >> shift];
 		}
 		for (u32 i = 1; i < 256; ++i) {
@@ -562,7 +562,7 @@ struct BigUInt {
 	BigUInt &operator=(BigUInt &&that) { free(parts); parts = that.parts; that.parts = {}; return *this; }
 
 	u64 try_get_part(umm index) const {
-		return index < parts.size ? parts[index] : (u64)0;
+		return index < parts.count ? parts[index] : (u64)0;
 	}
 	bool get_bit(umm index) const {
 		umm part_index = index / (sizeof(parts[0]) * 8);
@@ -578,7 +578,7 @@ struct BigUInt {
 
 	BigUInt operator~() const {
 		BigUInt result;
-		result.parts.reserve(parts.size);
+		result.parts.reserve(parts.count);
 		for (auto &part : parts) {
 			result.parts.add(~part);
 		}
@@ -603,9 +603,9 @@ struct BigUInt {
 				result.parts.add(part);
 			}
 		} else {
-			if (parts.size) {
+			if (parts.count) {
 				result.parts.add(parts[0] << b);
-				for (umm part_index = 1; part_index != parts.size; ++part_index) {
+				for (umm part_index = 1; part_index != parts.count; ++part_index) {
 					result.parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
 				}
 			}
@@ -616,19 +616,19 @@ struct BigUInt {
 
 	BigUInt operator+(BigUInt b) const {
 		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.size > max_int.parts.size) {
+		if (min_int.parts.count > max_int.parts.count) {
 			swap(min_int, max_int);
 		}
 
 		BigUInt result;
-		result.parts.resize(max_int.parts.size);
+		result.parts.resize(max_int.parts.count);
 
 		bool carry = false;
 
-		for (u32 part_index = 0; part_index < min_int.parts.size; ++part_index) {
+		for (u32 part_index = 0; part_index < min_int.parts.count; ++part_index) {
 			add_carry(min_int.parts[part_index], max_int.parts[part_index], carry, &result.parts[part_index], &carry);
 		}
-		for (u32 part_index = min_int.parts.size; part_index < max_int.parts.size; ++part_index) {
+		for (u32 part_index = min_int.parts.count; part_index < max_int.parts.count; ++part_index) {
 			add_carry(max_int.parts[part_index], 0, carry, &result.parts[part_index], &carry);
 		}
 
@@ -640,12 +640,12 @@ struct BigUInt {
 	}
 	BigUInt operator-(BigUInt const &b) const {
 		assert(*this >= b);
-		if (parts.size == 0)
+		if (parts.count == 0)
 			return 0;
 
 		BigUInt result = *this;
 		if (result.parts[0] < b.parts[0]) {
-			for (umm part_index = 1; part_index != result.parts.size; part_index += 1) {
+			for (umm part_index = 1; part_index != result.parts.count; part_index += 1) {
 				result.parts[part_index]--;
 				if (result.parts[part_index] != -1) {
 					break;
@@ -657,7 +657,7 @@ struct BigUInt {
 	}
 	BigUInt operator*(BigUInt b) const {
 		BigUInt result = {};
-		for (u32 bit_index = 0; bit_index < b.parts.size * (sizeof(b.parts[0]) * 8); ++bit_index) {
+		for (u32 bit_index = 0; bit_index < b.parts.count * (sizeof(b.parts[0]) * 8); ++bit_index) {
 			if (b.get_bit(bit_index)) {
 				result += *this << bit_index;
 			}
@@ -666,7 +666,7 @@ struct BigUInt {
 	}
 	BigUInt operator/(BigUInt b) const {
 		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.size > max_int.parts.size) {
+		if (min_int.parts.count > max_int.parts.count) {
 			swap(min_int, max_int);
 		}
 
@@ -674,11 +674,11 @@ struct BigUInt {
 		BigUInt quotient;
 		BigUInt remainder;
 
-		N.parts.resize(max_int.parts.size);
-		quotient.parts.resize(max_int.parts.size);
-		remainder.parts.resize(max_int.parts.size);
+		N.parts.resize(max_int.parts.count);
+		quotient.parts.resize(max_int.parts.count);
+		remainder.parts.resize(max_int.parts.count);
 
-		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
+		for (u32 bit_index = max_int.parts.count * 64 - 1; bit_index != ~(u32)0; --bit_index) {
 			remainder <<= 1;
 			remainder.set_bit(0, N.get_bit(bit_index));
 			if (remainder >= b) {
@@ -690,7 +690,7 @@ struct BigUInt {
 	}
 	BigUInt operator%(BigUInt b) const {
 		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.size > max_int.parts.size) {
+		if (min_int.parts.count > max_int.parts.count) {
 			swap(min_int, max_int);
 		}
 
@@ -698,11 +698,11 @@ struct BigUInt {
 		BigUInt quotient;
 		BigUInt remainder;
 
-		N.parts.resize(max_int.parts.size);
-		quotient.parts.resize(max_int.parts.size);
-		remainder.parts.resize(max_int.parts.size);
+		N.parts.resize(max_int.parts.count);
+		quotient.parts.resize(max_int.parts.count);
+		remainder.parts.resize(max_int.parts.count);
 
-		for (u32 bit_index = max_int.parts.size * 64 - 1; bit_index != ~(u32)0; --bit_index) {
+		for (u32 bit_index = max_int.parts.count * 64 - 1; bit_index != ~(u32)0; --bit_index) {
 			remainder <<= 1;
 			remainder.set_bit(0, N.get_bit(bit_index));
 			if (remainder >= b) {
@@ -714,15 +714,15 @@ struct BigUInt {
 	}
 	bool operator==(BigUInt b) const {
 		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.size > max_int.parts.size) {
+		if (min_int.parts.count > max_int.parts.count) {
 			swap(min_int, max_int);
 		}
-		for (umm index = max_int.parts.size - 1; index != min_int.parts.size - 1; --index) {
+		for (umm index = max_int.parts.count - 1; index != min_int.parts.count - 1; --index) {
 			if (max_int.parts[index] != 0) {
 				return false;
 			}
 		}
-		for (umm index = min_int.parts.size - 1; index != (umm)-1; --index) {
+		for (umm index = min_int.parts.count - 1; index != (umm)-1; --index) {
 			if (min_int.parts[index] != max_int.parts[index]) {
 				return false;
 			}
@@ -735,7 +735,7 @@ struct BigUInt {
 	}
 
 	bool operator>(BigUInt b) const {
-		umm max_part_count = max(parts.size, b.parts.size);
+		umm max_part_count = max(parts.count, b.parts.count);
 		if (max_part_count == 0)
 			return false;
 
@@ -748,7 +748,7 @@ struct BigUInt {
 		return parts[0] > b.parts[0];
 	}
 	bool operator<(BigUInt b) const {
-		umm max_part_count = max(parts.size, b.parts.size);
+		umm max_part_count = max(parts.count, b.parts.count);
 		if (max_part_count == 0)
 			return false;
 
@@ -761,7 +761,7 @@ struct BigUInt {
 		return parts[0] < b.parts[0];
 	}
 	bool operator>=(BigUInt b) const {
-		umm max_part_count = max(parts.size, b.parts.size);
+		umm max_part_count = max(parts.count, b.parts.count);
 		if (max_part_count == 0)
 			return false;
 
@@ -774,7 +774,7 @@ struct BigUInt {
 		return parts[0] >= b.parts[0];
 	}
 	bool operator<=(BigUInt b) const {
-		umm max_part_count = max(parts.size, b.parts.size);
+		umm max_part_count = max(parts.count, b.parts.count);
 		if (max_part_count == 0)
 			return false;
 
@@ -793,10 +793,10 @@ struct BigUInt {
 	BigUInt &operator/=(BigUInt b) { return *this = *this / b; }
 	BigUInt &operator<<=(u64 b) { return *this = *this << b; }
 
-	explicit operator u8 () { return parts.size ? parts[0] : 0; }
-	explicit operator u16() { return parts.size ? parts[0] : 0; }
-	explicit operator u32() { return parts.size ? parts[0] : 0; }
-	explicit operator u64() { return parts.size ? parts[0] : 0; }
+	explicit operator u8 () { return parts.count ? parts[0] : 0; }
+	explicit operator u16() { return parts.count ? parts[0] : 0; }
+	explicit operator u32() { return parts.count ? parts[0] : 0; }
+	explicit operator u64() { return parts.count ? parts[0] : 0; }
 };
 
 
@@ -809,7 +809,7 @@ BigUInt operator""bu(u64 val) {
 }
 
 #if 1
-void append(StringBuilder &builder, F32 f) {
+umm append(StringBuilder &builder, F32 f) {
 	s8 actual_exponent = f.exponent - 127;
 	StringBuilder temp_builder;
 
@@ -846,6 +846,8 @@ void append(StringBuilder &builder, F32 f) {
 			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
 		}
 	}
+
+	return 0;
 }
 #else
 void append(StringBuilder &builder, F32 f) {

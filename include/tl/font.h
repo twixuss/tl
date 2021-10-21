@@ -103,7 +103,7 @@ void init_face(FontFace &face) {
 	};
 
 	{
-		auto error = FT_New_Memory_Face(ft_library, face.file.data, face.file.size, 0, &face.ft);
+		auto error = FT_New_Memory_Face(ft_library, face.file.data, face.file.count, 0, &face.ft);
 		if (error) {
 			invalid_code_path("FT_New_Face failed: %", FT_Error_String(error));
 		}
@@ -152,7 +152,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 		}
 	}
 
-	if (new_chars.size) {
+	if (new_chars.count) {
 
 	redo_all:
 		for (auto &[new_char_code_point, new_char] : new_chars) {

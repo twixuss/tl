@@ -622,10 +622,10 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 		source.data
 	};
 	int const lengths[] {
-		(int)version_string.size,
-		(int)stage_string.size,
-		(int)line_string.size,
-		(int)source.size
+		(int)version_string.count,
+		(int)stage_string.count,
+		(int)line_string.count,
+		(int)source.count
 	};
 
 	auto shader = glCreateShader(shaderType);
@@ -635,7 +635,7 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 GLuint create_shader(GLenum shaderType, Span<char> source) {
 	auto shader = glCreateShader(shaderType);
 
-	GLint length = (GLint)source.size;
+	GLint length = (GLint)source.count;
 	glShaderSource(shader, 1, &source.data, &length);
 
 	return compile_shader(shader);

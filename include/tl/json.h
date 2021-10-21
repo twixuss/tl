@@ -171,7 +171,7 @@ inline void append(StringBuilder &b, Json::Object obj) {
 		case Json::Type_object: {
 			append(b, '{');
 			bool comma = false;
-			for (u32 i = 0; i < obj._members.names.size; ++i) {
+			for (u32 i = 0; i < obj._members.names.count; ++i) {
 				auto name = obj._members.names[i];
 				auto value = obj._members.values[i];
 				if (comma) {
@@ -219,18 +219,18 @@ List<Token> lex(Span<utf8> json) {
 				token.type = '"';
 				token.view.data = c;
 				while (*c++ != '"') {}
-				token.view.size = c - token.view.data - 1;
+				token.view.count = c - token.view.data - 1;
 				result.add(token);
 				continue;
 			}
 		}
 
 		auto check_keyword = [&] (Span<utf8> keyword, TokenType token_type) {
-			if (Span(c, min(c + keyword.size, json.end())) == keyword) {
+			if (Span(c, min(c + keyword.count, json.end())) == keyword) {
 				Token token;
 				token.type = token_type;
-				token.view = {c, keyword.size};
-				c += keyword.size;
+				token.view = {c, keyword.count};
+				c += keyword.count;
 				result.add(token);
 				return true;
 			}
@@ -258,7 +258,7 @@ List<Token> lex(Span<utf8> json) {
 					break;
 				}
 			}
-			token.view.size = c - token.view.data;
+			token.view.count = c - token.view.data;
 			result.add(token);
 			continue;
 		}
@@ -303,8 +303,8 @@ Object parse(Token *&t) {
 	} else if (t->type == Token_number) {
 		Object result = {Type_number};
 		utf8 temp[256];
-		memcpy(temp, t->view.data, t->view.size);
-		temp[t->view.size] = 0;
+		memcpy(temp, t->view.data, t->view.count);
+		temp[t->view.count] = 0;
 		result._number = atof((char *)temp);
 		++t;
 		return result;

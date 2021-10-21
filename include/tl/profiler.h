@@ -174,7 +174,7 @@ List<u8> output_for_timed() {
 			append_bytes(builder, (s64)(span.begin * 1000000000 / performance_frequency));
 			append_bytes(builder, (s64)(span.end   * 1000000000 / performance_frequency));
 			append_bytes(builder, (u32)span.thread_id);
-			append_bytes(builder, (u16)span.name.size);
+			append_bytes(builder, (u16)span.name.count);
 			append_bytes(builder, span.name);
 		}
 	}
