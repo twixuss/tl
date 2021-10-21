@@ -527,9 +527,9 @@ bool update(Window *window) {
 
 					window->mouse_delta += V2f(mouse.lLastX, mouse.lLastY) * window->mouse_sensitivity;
 
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(0); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(1); continue; }
-					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(2); continue; }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(0); }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(1); }
+					if (mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) { mouse_went_up = true; if (window->on_mouse_up) window->on_mouse_up(2); }
 				}
 				continue;
 			}
@@ -627,7 +627,7 @@ bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data) {
 
 	EmptyClipboard();
 
-    auto global_memory = GlobalAlloc(GMEM_MOVEABLE, data.size + 1);
+    auto global_memory = GlobalAlloc(GMEM_MOVEABLE, data.count + 1);
     if (!global_memory) {
         return false;
     }
@@ -637,8 +637,8 @@ bool set_clipboard(Window *window, ClipboardKind kind, Span<u8> data) {
 		return false;
 	defer { GlobalUnlock(global_memory); };
 
-    memcpy(global_memory_pointer, data.data, data.size);
-	((char *)global_memory_pointer)[data.size] = 0;
+    memcpy(global_memory_pointer, data.data, data.count);
+	((char *)global_memory_pointer)[data.count] = 0;
 
     SetClipboardData(CF_TEXT, global_memory);
 	return true;

@@ -268,7 +268,7 @@ struct MutexQueue {
 	Optional<T> try_pop() {
 		Optional<T> result;
 		scoped_lock(mutex);
-		if (base.size) {
+		if (base.count) {
 			result = base.front();
 			base.pop();
 		}
@@ -278,7 +278,7 @@ struct MutexQueue {
 	Optional<T> try_pop_and(Fn &&fn) {
 		Optional<T> result;
 		scoped_lock(mutex);
-		if (base.size) {
+		if (base.count) {
 			result = base.front();
 			base.pop();
 			fn(result.get());
@@ -312,16 +312,16 @@ struct MutexQueue {
 		scoped_lock(mutex);
 		pop_all_nolock(std::forward<Fn>(fn));
 	}
-	umm size() { return base.size; }
+	umm count() { return base.count; }
 
-	void append_no_lock(T const &v)                 { base += v; }
-	void append_no_lock(T &&v)                      { base += v; }
-	void append_no_lock(Span<T const> v)            { base += v; }
-	void append_no_lock(std::initializer_list<T> v) { base += v; }
-	void append(T const &v)                 { scoped_lock(mutex); base += v; }
-	void append(T &&v)                      { scoped_lock(mutex); base += v; }
-	void append(Span<T const> v)            { scoped_lock(mutex); base += v; }
-	void append(std::initializer_list<T> v) { scoped_lock(mutex); base += v; }
+	void add_no_lock(T const &v)                 { base.add(v); }
+	void add_no_lock(T &&v)                      { base.add(v); }
+	void add_no_lock(Span<T const> v)            { base.add(v); }
+	void add_no_lock(std::initializer_list<T> v) { base.add(v); }
+	void add(T const &v)                 { scoped_lock(mutex); base.add(v); }
+	void add(T &&v)                      { scoped_lock(mutex); base.add(v); }
+	void add(Span<T const> v)            { scoped_lock(mutex); base.add(v); }
+	void add(std::initializer_list<T> v) { scoped_lock(mutex); base.add(v); }
 };
 
 template <class T, class Mutex>

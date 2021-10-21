@@ -241,7 +241,7 @@ CpuInfo get_cpu_info() {
 	for (s32 i = 0; i <= highestId; ++i) {
 		data.add(cpuid(i, 0));
 	}
-	if (data.size > 0) {
+	if (data.count > 0) {
 		char vendorName[24];
 		((s32 *)vendorName)[0] = data[0].ebx;
 		((s32 *)vendorName)[1] = data[0].edx;
@@ -252,11 +252,11 @@ CpuInfo get_cpu_info() {
 			result.vendor = CpuVendor_amd;
 		}
 	}
-	if (data.size > 1) {
+	if (data.count > 1) {
 		ecx1 = data[1].ecx;
 		edx1 = data[1].edx;
 	}
-	if (data.size > 7) {
+	if (data.count > 7) {
 		ebx7 = data[7].ebx;
 		ecx7 = data[7].ecx;
 	}
@@ -265,11 +265,11 @@ CpuInfo get_cpu_info() {
 	for (s32 i = 0x80000000; i <= highestExId; ++i) {
 		data_ex.add(cpuid(i, 0));
 	}
-	if (data_ex.size > 1) {
+	if (data_ex.count > 1) {
 		ecx1ex = data_ex[1].ecx;
 		edx1ex = data_ex[1].edx;
 	}
-	if (data_ex.size > 4) {
+	if (data_ex.count > 4) {
 		result.brand[48] = 0;
 		memcpy(result.brand + sizeof(CpuidRegisters) * 0, &data_ex[2], sizeof(CpuidRegisters));
 		memcpy(result.brand + sizeof(CpuidRegisters) * 1, &data_ex[3], sizeof(CpuidRegisters));
