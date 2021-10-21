@@ -1032,6 +1032,18 @@ constexpr T *find_last(Span<T> span, T const &value) {
 	return 0;
 }
 
+template <class T>
+constexpr Span<T> find_last(Span<T> span, Span<T> sub) {
+	Span<T> dest = {span.end() - sub.size, sub.size};
+	while (dest.data >= span.data) {
+		if (dest == sub)
+			return dest;
+
+		dest.data--;
+	}
+	return {};
+}
+
 template <class T, class Predicate>
 constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 	for (auto &v : span) {
