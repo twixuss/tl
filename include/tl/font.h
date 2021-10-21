@@ -5,6 +5,7 @@
 #include "buffer.h"
 #include "file.h"
 #include "hash_map.h"
+#include "math.h"
 
 #ifndef TL_FONT_TEXTURE_HANDLE
 #define TL_FONT_TEXTURE_HANDLE void *
