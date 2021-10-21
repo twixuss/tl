@@ -1058,7 +1058,7 @@ constexpr T *find_last(Span<T> span, T const &value) {
 
 template <class T>
 constexpr Span<T> find_last(Span<T> span, Span<T> sub) {
-	Span<T> dest = {span.end() - sub.size, sub.size};
+	Span<T> dest = {span.end() - sub.count, sub.count};
 	while (dest.data >= span.data) {
 		if (dest == sub)
 			return dest;
