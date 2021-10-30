@@ -477,12 +477,16 @@ constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S
 forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
 forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
 forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+#if ARCH_X64
 forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (_BitScanReverse64(&r, v), r)); }
+#endif
 
 forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
 forceinline constexpr u32 log2(s16 v) { return log2((u16)v); }
 forceinline constexpr u32 log2(s32 v) { return log2((u32)v); }
+#if ARCH_X64
 forceinline constexpr u32 log2(s64 v) { return log2((u64)v); }
+#endif
 
 
 forceinline constexpr u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )1 << (u8 )log2(v); }
