@@ -172,13 +172,13 @@ struct List {
 		size += span.size;
 		return {data + where, span.size};
 	}
-	T &insert(T &value, T *where) { return insert(value, where - data); }
-	Span<T> insert(Span<T> span, T *where) { return insert(span, where - data); }
+	T &insert(T value, T *where) { return insert_at(value, where - data); }
+	Span<T> insert(Span<T> span, T *where) { return insert_at(span, where - data); }
 
 	void erase(Span<T> where) {
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 
@@ -192,11 +192,11 @@ struct List {
 			data[i] = data[i + 1];
 		}
 	}
-	
+
 	void replace(Span<T> where, T with_what) {
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 
@@ -209,8 +209,8 @@ struct List {
 	void replace(Span<T> where, Span<T> with_what) {
 		assert(begin() <= where.begin());
 		bounds_check(
-			where.size <= size && 
-			begin() <= where.begin() && where.begin() < end() && 
+			where.size <= size &&
+			begin() <= where.begin() && where.begin() < end() &&
 			where.end() <= end()
 		);
 

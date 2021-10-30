@@ -38,6 +38,18 @@ forceinline s32 atomic_increment(s32 volatile *a) { return (s32)atomic_increment
 forceinline s64 atomic_increment(s64 volatile *a) { return (s64)atomic_increment((u64 *)a); }
 #endif
 
+forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)_InterlockedDecrement16((SHORT *)a); }
+forceinline u32 atomic_decrement(u32 volatile *a) { return _InterlockedDecrement(a); }
+#if ARCH_X64
+forceinline u64 atomic_decrement(u64 volatile *a) { return _InterlockedDecrement(a); }
+#endif
+
+forceinline s16 atomic_decrement(s16 volatile *a) { return (s16)atomic_decrement((u16 *)a); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return (s32)atomic_decrement((u32 *)a); }
+#if ARCH_X64
+forceinline s64 atomic_decrement(s64 volatile *a) { return (s64)atomic_decrement((u64 *)a); }
+#endif
+
 template <class T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
@@ -131,11 +143,11 @@ Thread create_thread(Function function) {
 		Data *pData = (Data *)param;
 		Data data = *pData;
 		pData->acquired = true;
-		
+
 		init_allocator();
 		defer {deinit_allocator();};
 		current_printer = console_printer;
-		
+
 		data.function();
 		return 0;
 	}, &data, 0, 0);
