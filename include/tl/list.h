@@ -146,8 +146,8 @@ struct List : Span<T> {
 		count += span.count;
 		return {data + where, span.count};
 	}
-	T &insert(T &value, T *where) { return insert(value, where - data); }
-	Span<T> insert(Span<T> span, T *where) { return insert(span, where - data); }
+	T &insert(T value, T *where) { return insert_at(value, where - data); }
+	Span<T> insert(Span<T> span, T *where) { return insert_at(span, where - data); }
 
 	void erase(Span<T> where) {
 		bounds_check(
