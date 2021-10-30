@@ -33,6 +33,9 @@
     <ClCompile Include="src\tests\stream.cpp" />
     <ClCompile Include="src\tests\string.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\compile_speed_test.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

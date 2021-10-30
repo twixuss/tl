@@ -9,14 +9,14 @@ template <class T, umm _values_per_block>
 struct MaskedBlockList {
 	using ValueType = T;
 
-	static constexpr u32 values_per_block = _values_per_block;
+	static constexpr umm values_per_block = _values_per_block;
 
 	using Mask = umm;
-	static constexpr u32 bits_in_mask = sizeof(Mask) * 8;
+	static constexpr umm bits_in_mask = sizeof(Mask) * 8;
 
 	struct Block {
 		Block *next = 0;
-		u32 free_mask_count = count_of(masks);
+		umm free_mask_count = count_of(masks);
 		Mask masks[values_per_block / bits_in_mask] = {};
 		union {
 			T values[values_per_block];
@@ -31,8 +31,17 @@ struct MaskedBlockList {
 	MaskedBlockList &operator=(MaskedBlockList const &that) = delete;
 	MaskedBlockList &operator=(MaskedBlockList &&that) = delete;
 
-	T &add(T that) {
+	struct Added {
+		T *pointer;
+		umm index;
+	};
+
+	Added add(T that) {
+		Added result;
+
 		auto block = last;
+
+		umm block_index = 0;
 
 		while (1) {
 			if (!block) {
@@ -43,7 +52,7 @@ struct MaskedBlockList {
 
 			if (block->free_mask_count != 0) {
 				// Search for free space in current block
-				for (u32 mask_index = 0; mask_index < count_of(block->masks); mask_index += 1) {
+				for (umm mask_index = 0; mask_index < count_of(block->masks); mask_index += 1) {
 					auto mask = block->masks[mask_index];
 
 					if (mask == ~0)
@@ -58,16 +67,22 @@ struct MaskedBlockList {
 					if (mask == ~0)
 						block->free_mask_count -= 1;
 
-					return block->values[value_index] = that;
+					block->values[value_index] = that;
+					result.pointer = &block->values[value_index];
+					result.index = block_index * values_per_block + value_index;
+					goto _return;
 				}
 			}
 
 			// No space here, go to next block
 			block = block->next;
+			block_index += 1;
 		}
+	_return:
+		return result;
 	}
 
-	T &add() {
+	Added add() {
 		return add(T{});
 	}
 
@@ -87,11 +102,8 @@ struct MaskedBlockList {
 		}
 		bounds_check(false, "attempt to remove non-existant value from MaskedBlockList");
 	}
-	void remove(T &value) {
-		remove(&value);
-	}
 
-	T &operator[](umm index) {
+	T &at(umm index) {
 		umm block_index = index / values_per_block;
 		umm value_index = index % values_per_block;
 
@@ -104,6 +116,9 @@ struct MaskedBlockList {
 		bounds_check(block->masks[value_index / bits_in_mask] & (1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in MaskedBlockList");
 
 		return block->values[value_index];
+	}
+	T &operator[](umm index) {
+		return at(index);
 	}
 };
 

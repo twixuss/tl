@@ -3,18 +3,6 @@
 
 namespace tl {
 
-
-struct Function {
-	Allocator allocator;
-
-	void (*function)(void *param);
-	void *param;
-
-	void operator()() {
-		return function(param);
-	}
-};
-
 namespace Detail {
 template <class Tuple, umm... indices>
 static void invoke(void *raw_vals) noexcept {
@@ -28,6 +16,47 @@ static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
 }
 
 } // namespace Detail
+
+
+struct Function {
+	Allocator allocator;
+
+	void (*function)(void *param);
+	void *param;
+
+	void operator()() {
+		return function(param);
+	}
+
+	struct Maker {
+		inline Function operator>(void (*func)()) const {
+			Function result = {};
+			result.function = (void (*)(void *))func;
+			return result;
+		}
+		template <class Fn>
+		inline Function operator>(Fn &&fn) const {
+			if constexpr (std::is_convertible_v<Fn, void(*)()>) {
+				return operator>((void(*)())fn);
+			} else {
+				auto allocator = current_allocator;
+
+				auto params = allocator.allocate_uninitialized<Fn>();
+				new(params) Fn(std::forward<Fn>(fn));
+
+				Function result = {};
+				result.allocator = allocator;
+				result.function = [](void *param) {
+					(*(Fn *)param)();
+				};
+				result.param = params;
+				return result;
+			}
+		}
+	};
+
+	inline static constexpr Maker make = {};
+};
 
 inline Function create_function(void (*func)(void *param), void *param) {
 	Function result = {};

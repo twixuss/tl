@@ -26,10 +26,10 @@ forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExc
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
 #endif
 
-forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((SHORT *)a); }
-forceinline u32 atomic_increment(u32 volatile *a) { return _InterlockedIncrement(a); }
+forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((short *)a); }
+forceinline u32 atomic_increment(u32 volatile *a) { return (u32)_InterlockedIncrement((long *)a); }
 #if ARCH_X64
-forceinline u64 atomic_increment(u64 volatile *a) { return _InterlockedIncrement(a); }
+forceinline u64 atomic_increment(u64 volatile *a) { return (u64)_InterlockedIncrement64((long long *)a); }
 #endif
 
 forceinline s16 atomic_increment(s16 volatile *a) { return (s16)atomic_increment((u16 *)a); }
@@ -280,7 +280,7 @@ struct MutexQueue {
 	Optional<T> try_pop() {
 		Optional<T> result;
 		scoped_lock(mutex);
-		if (base.size) {
+		if (base.count) {
 			result = base.front();
 			base.pop();
 		}
@@ -290,10 +290,10 @@ struct MutexQueue {
 	Optional<T> try_pop_and(Fn &&fn) {
 		Optional<T> result;
 		scoped_lock(mutex);
-		if (base.size) {
+		if (base.count) {
 			result = base.front();
 			base.pop();
-			fn(result.value);
+			fn(result.get());
 		}
 		return result;
 	}
@@ -303,7 +303,7 @@ struct MutexQueue {
 			opt = try_pop();
 			return opt.has_value();
 		});
-		return opt.value();
+		return opt.get();
 	}
 	void clear() {
 		scoped_lock(mutex);
@@ -324,16 +324,16 @@ struct MutexQueue {
 		scoped_lock(mutex);
 		pop_all_nolock(std::forward<Fn>(fn));
 	}
-	umm size() { return base.size; }
+	umm count() { return base.count; }
 
-	void append_no_lock(T const &v)                 { base += v; }
-	void append_no_lock(T &&v)                      { base += v; }
-	void append_no_lock(Span<T const> v)            { base += v; }
-	void append_no_lock(std::initializer_list<T> v) { base += v; }
-	void append(T const &v)                 { scoped_lock(mutex); base += v; }
-	void append(T &&v)                      { scoped_lock(mutex); base += v; }
-	void append(Span<T const> v)            { scoped_lock(mutex); base += v; }
-	void append(std::initializer_list<T> v) { scoped_lock(mutex); base += v; }
+	void add_no_lock(T const &v)                 { base.add(v); }
+	void add_no_lock(T &&v)                      { base.add(v); }
+	void add_no_lock(Span<T const> v)            { base.add(v); }
+	void add_no_lock(std::initializer_list<T> v) { base.add(v); }
+	void add(T const &v)                 { scoped_lock(mutex); base.add(v); }
+	void add(T &&v)                      { scoped_lock(mutex); base.add(v); }
+	void add(Span<T const> v)            { scoped_lock(mutex); base.add(v); }
+	void add(std::initializer_list<T> v) { scoped_lock(mutex); base.add(v); }
 };
 
 template <class T, class Mutex>
@@ -364,7 +364,7 @@ struct StaticMutexCircularQueue {
 			opt = try_pop();
 			return opt.has_value();
 		});
-		return opt.value();
+		return opt.get();
 	}
 	void clear() {
 		scoped_lock(mutex);
@@ -458,7 +458,7 @@ inline void do_work(ThreadWork work) {
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
-		do_work(popped.value);
+		do_work(popped.value_unchecked());
 		return true;
 	}
 	return false;
@@ -470,7 +470,7 @@ inline bool do_work(ThreadPool *pool) {
 			return true;
 		}
 		if (auto popped = pool->all_work.try_pop()) {
-			work = popped.value;
+			work = popped.value_unchecked();
 			return true;
 		}
 		return false;

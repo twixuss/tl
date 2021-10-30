@@ -50,8 +50,8 @@ bool init_rawinput(RawInputDevice deviceFlags) {
 		mouse.usUsage = 0x02;
 		devices.add(mouse);
 	}
-	if (devices.size) {
-		if (!RegisterRawInputDevices(devices.data, (UINT)devices.size, sizeof(devices[0]))) {
+	if (devices.count) {
+		if (!RegisterRawInputDevices(devices.data, (UINT)devices.count, sizeof(devices[0]))) {
 			return false;
 		}
 	}
@@ -266,8 +266,8 @@ FormattedLastError last_error() {
 	return {GetLastError()};
 }
 
-inline void append(StringBuilder &b, FormattedLastError e) {
-	append_format(b, "0x% (%)", FormatInt{.value = e.value, .radix = 16}, e.value);
+inline umm append(StringBuilder &b, FormattedLastError e) {
+	return append_format(b, "0x% (%)", FormatInt{.value = e.value, .radix = 16}, e.value);
 }
 
 #endif

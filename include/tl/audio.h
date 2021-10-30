@@ -64,8 +64,6 @@ WavChunk *get_samples_chunk(WavHeader *header, u8 *end_of_buffer) {
 }
 
 Sound load_wav_from_memory(Span<u8> data) {
-	timed_function();
-
 	if (data.size < sizeof(WavHeader)) {
 		return {};
 	}
@@ -91,8 +89,6 @@ Sound load_wav_from_memory(Span<u8> data) {
 }
 
 Sound load_wav_from_file(Span<pathchar> path) {
-	timed_function();
-
 	auto file = read_entire_file(path);
 	if (!file.data) return {};
 

@@ -108,8 +108,6 @@ u32 texture_stretched_shader;
 //UniformBlock<TextureUniforms> texture_uniforms;
 
 void init(Window *window, FontCollection *font_collection) {
-	timed_function();
-
 	using namespace ::tl::OpenGL;
 	init_base(window);
 	::tl::Imgui::font_collection = font_collection;
@@ -375,8 +373,6 @@ void _set_scissor_impl(aabb<v2s> region) {
 }
 
 void _draw_and_free_elements(Span<UIElement> elements) {
-	timed_function();
-
 	using namespace OpenGL;
 
 	auto element = elements.data;

@@ -6,7 +6,7 @@ namespace tl {
 //
 // Each list is allocated in the same buffer
 //
-// Note: To start using 'lists' member ensure that list is in 'absolute mode',
+// Note: To start iterating ensure that list is in 'absolute mode',
 // so 'data' member of lists' elements represent a pointer to the beginning of a list
 // stored in 'buffer'
 //
@@ -17,25 +17,25 @@ template <class T>
 struct ListList : List<Span<T>> {
 	using Base = List<Span<T>>;
 	List<T> buffer;
-#ifdef TL_DEBUG
+#if TL_DEBUG
 	bool is_absolute = false;
 #endif
 
 	void add(Span<T> string) {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		assert(is_absolute == false);
 #endif
 
 		Span<T> dest;
-		dest.size = string.size;
-		dest.data = (T *)buffer.size;
+		dest.count = string.count;
+		dest.data = (T *)buffer.count;
 		Base::add(dest);
 
-		buffer += string;
+		buffer.add(string);
 	}
 
 	void make_absolute() {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		is_absolute = true;
 #endif
 		for (auto &string : *this) {
@@ -43,12 +43,16 @@ struct ListList : List<Span<T>> {
 		}
 	}
 	void make_relative() {
-#ifdef TL_DEBUG
+#if TL_DEBUG
 		is_absolute = false;
 #endif
 		for (auto &string : *this) {
 			string.data = (T *)(string.data - buffer.data);
 		}
+	}
+	void clear() {
+		Base::clear();
+		buffer.clear();
 	}
 
 	Base &base() { return *this; }
@@ -58,7 +62,7 @@ template <class T>
 void free(ListList<T> &list) {
 	free(list.base());
 	free(list.buffer);
-#ifdef TL_DEBUG
+#if TL_DEBUG
 	list.is_absolute = false;
 #endif
 }

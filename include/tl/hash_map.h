@@ -1,25 +1,29 @@
 #pragma once
 #include "linked_list.h"
 #include "array.h"
-#include <typeinfo>
+#include "optional.h"
+#include "pointer.h"
 
 template <class T>
-tl::umm get_hash(T value);
+inline tl::umm get_hash(T value);
 
-template <class T> tl::umm get_hash(T *value) { return (tl::umm)value / alignof(T); }
+template <class T>
+inline tl::umm get_hash(T *value) { return (tl::umm)value / alignof(T); }
 
-template <> tl::umm get_hash(tl::u8    value) { return value; }
-template <> tl::umm get_hash(tl::u16   value) { return value; }
-template <> tl::umm get_hash(tl::u32   value) { return value; }
-template <> tl::umm get_hash(tl::u64   value) { return value; }
-template <> tl::umm get_hash(tl::s8    value) { return value; }
-template <> tl::umm get_hash(tl::s16   value) { return value; }
-template <> tl::umm get_hash(tl::s32   value) { return value; }
-template <> tl::umm get_hash(tl::s64   value) { return value; }
-template <> tl::umm get_hash(tl::ascii value) { return value; }
-template <> tl::umm get_hash(tl::utf8  value) { return value; }
-template <> tl::umm get_hash(tl::utf16 value) { return value; }
-template <> tl::umm get_hash(tl::utf32 value) { return value; }
+inline tl::umm get_hash(void *value) { return (tl::umm)value / sizeof(tl::umm); }
+
+template <> inline tl::umm get_hash(tl::u8    value) { return value; }
+template <> inline tl::umm get_hash(tl::u16   value) { return value; }
+template <> inline tl::umm get_hash(tl::u32   value) { return value; }
+template <> inline tl::umm get_hash(tl::u64   value) { return value; }
+template <> inline tl::umm get_hash(tl::s8    value) { return value; }
+template <> inline tl::umm get_hash(tl::s16   value) { return value; }
+template <> inline tl::umm get_hash(tl::s32   value) { return value; }
+template <> inline tl::umm get_hash(tl::s64   value) { return value; }
+template <> inline tl::umm get_hash(tl::ascii value) { return value; }
+template <> inline tl::umm get_hash(tl::utf8  value) { return value; }
+template <> inline tl::umm get_hash(tl::utf16 value) { return value; }
+template <> inline tl::umm get_hash(tl::utf32 value) { return value; }
 
 template <class T> tl::umm get_hash(tl::Span<T> value) {
 	tl::umm result = 0xdeadc0de;
@@ -32,7 +36,6 @@ template <class T> tl::umm get_hash(tl::Span<T> value) {
 namespace tl {
 
 template <class T> struct DefaultHasher { static umm get_hash(T value) { return ::get_hash(value); } };
-
 
 template <class Key, class Value, umm _capacity, class Hasher = DefaultHasher<Key>>
 struct StaticHashMap {
@@ -122,6 +125,8 @@ void free(StaticHashMap<Key, Value, capacity, Hasher> &map) {
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>>
 struct HashMap {
+	using ValueType = Value;
+
 	struct KeyValue {
 		Key key;
 		Value value;
@@ -134,6 +139,8 @@ struct HashMap {
 	umm total_value_count = 0;
 
 	Value &get_or_insert(Key const &key) {
+		scoped_allocator(allocator);
+
 		if (!bucket_count) {
 			rehash(256);
 		}
@@ -154,7 +161,7 @@ struct HashMap {
 		it.key = key;
 		return it.value;
 	}
-	Value *find(Key const &key) {
+	Pointer<Value> find(Key const &key) {
 		if (bucket_count == 0)
 			return 0;
 
@@ -167,8 +174,26 @@ struct HashMap {
 		}
 		return 0;
 	}
+	Optional<Value> erase(Key const &key) {
+		if (bucket_count == 0)
+			return {};
+
+		umm hash = Hasher::get_hash(key);
+		auto &bucket = buckets[hash & (bucket_count - 1)];
+		for (auto &it : bucket) {
+			if (it.key == key) {
+				auto result = it.value;
+				tl::erase(bucket, &it);
+				return result;
+			}
+		}
+
+		return {};
+	}
 
 	void rehash(umm new_bucket_count) {
+		scoped_allocator(allocator);
+
 		Bucket *old_buckets = buckets;
 
 		buckets = allocator.allocate<Bucket>(new_bucket_count);
@@ -186,15 +211,40 @@ struct HashMap {
 		}
 		bucket_count = new_bucket_count;
 	}
+
+	void clear() {
+		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+			buckets[bucket_index].clear();
+		}
+	}
 };
 
-template <class Key, class Value, class Fn>
-void for_each(HashMap<Key, Value> &map, Fn &&fn) {
+template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
+void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+	static_assert(flags == 0, "Only default flags supported");
+
 	for (u32 i = 0; i < map.bucket_count; ++i) {
 		for (auto &it : map.buckets[i]) {
 			fn(it.key, it.value);
 		}
 	}
+}
+
+template <class Key, class Value, class Hasher>
+HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source) {
+	HashMap<Key, Value, Hasher> result;
+	for_each(source, [&](Key const &key, Value const &value) {
+		result.get_or_insert(key) = value;
+	});
+	return result;
+}
+
+template <class Key, class Value, class Hasher>
+void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source) {
+	destination.clear();
+	for_each(source, [&](Key const &key, Value const &value) {
+		destination.get_or_insert(key) = value;
+	});
 }
 
 }

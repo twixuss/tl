@@ -93,6 +93,7 @@ D(void *, glMapBuffer, (GLenum target, GLenum access), (target, access))\
 D(void *, glMapNamedBuffer, (GLuint buffer, GLenum access), (buffer, access))\
 D(GLboolean, glUnmapBuffer, (GLenum target), (target))\
 D(GLboolean, glUnmapNamedBuffer, (GLuint buffer), (buffer))\
+D(void, glBlitFramebuffer, (GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter), (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter))\
 
 #define WINDOWS_FUNCS \
 D(BOOL, wglSwapIntervalEXT, (int interval), (interval))\

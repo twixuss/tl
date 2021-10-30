@@ -1,7 +1,7 @@
 #pragma once
 #include "thread.h"
 #include "debug.h"
-#include <unordered_map>
+#include "hash_map.h"
 
 namespace tl {
 
@@ -13,51 +13,55 @@ struct AllocationInfo {
 	CallStack call_stack;
 };
 
-TL_API std::unordered_map<void *, AllocationInfo> get_tracked_allocations();
+//
+// Before accessing `tracked_allocations`, make sure that you lock `tracked_allocations_mutex`
+//
+
+extern TL_API HashMap<void *, AllocationInfo> tracked_allocations;
+extern TL_API Mutex tracked_allocations_mutex;
 
 #ifdef TL_IMPL
 
-std::unordered_map<void *, AllocationInfo> allocations;
-Mutex allocations_mutex;
-std::unordered_map<void *, AllocationInfo> get_tracked_allocations() {
-	scoped_lock(allocations_mutex);
-	return allocations;
-}
+HashMap<void *, AllocationInfo> tracked_allocations;
+Mutex tracked_allocations_mutex;
+
 forceinline void track_allocation(void *pointer, umm size, std::source_location location) {
 	scoped_allocator(default_allocator);
 
-	scoped_lock(allocations_mutex);
 	AllocationInfo a;
 	a.size = size;
 	a.location = location;
 	a.call_stack = get_call_stack();
-	allocations[pointer] = a;
+
+	scoped_lock(tracked_allocations_mutex);
+	tracked_allocations.get_or_insert(pointer) = a;
 }
 forceinline void untrack_allocation(void *pointer) {
-	scoped_lock(allocations_mutex);
-	allocations.erase(pointer);
+	scoped_lock(tracked_allocations_mutex);
+	tracked_allocations.erase(pointer);
 }
 forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm size, std::source_location location) {
 	scoped_allocator(default_allocator);
 
-	scoped_lock(allocations_mutex);
 	AllocationInfo a;
 	a.size = size;
 	a.location = location;
 	a.call_stack = get_call_stack();
-	allocations[new_pointer] = a;
-	allocations.erase(old_pointer);
+
+	scoped_lock(tracked_allocations_mutex);
+	tracked_allocations.get_or_insert(new_pointer) = a;
+	tracked_allocations.erase(old_pointer);
 }
 Allocator tracking_allocator = {
-	[](AllocatorMode mode, AllocateFlags flags, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate: {
-				auto result = default_allocator.allocate(flags, new_size, align, location);
+				auto result = default_allocator.allocate(new_size, align, location);
 				track_allocation(result, new_size, location);
 				return result;
 			}
 			case Allocator_reallocate: {
-				auto result = default_allocator.reallocate(flags, data, old_size, new_size, align, location);
+				auto result = default_allocator.reallocate(data, old_size, new_size, align, location);
 				retrack_allocation(data, result, new_size, location);
 				return result;
 			}

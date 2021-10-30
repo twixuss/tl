@@ -238,7 +238,7 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 
 }
 
-#ifdef TL_DEBUG
+#if TL_DEBUG
 #if TL_DEBUG != 0 && TL_DEBUG != 1
 #error TL_DEBUG defined to wrong value
 #endif

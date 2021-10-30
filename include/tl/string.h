@@ -11,11 +11,11 @@ namespace tl {
 template <class T>
 List<T> null_terminate(Span<T> span) {
 	List<T> result;
-	result.size = span.size + 1;
-	result.data = result.allocator.allocate<T>(result.size);
-	result.capacity = result.size;
-	memcpy(result.data, span.data, span.size * sizeof(T));
-	result.data[result.size - 1] = {};
+	result.count = span.count + 1;
+	result.data = result.allocator.allocate<T>(result.count);
+	result.capacity = result.count;
+	memcpy(result.data, span.data, span.count * sizeof(T));
+	result.data[result.count - 1] = {};
 	return result;
 }
 
@@ -49,7 +49,7 @@ inline Optional<u64> parse_u64(Span<utf8> string, u32 base) {
 }
 
 inline Optional<u64> parse_u64(Span<utf8> string) {
-	if (string.size > 1) {
+	if (string.count > 1) {
 		if (string[1] == 'x') {
 			string.data += 2;
 			return parse_u64(string, 16);
@@ -132,7 +132,7 @@ template <class Int>
 struct FormatInt {
 	Int value;
 	u32 radix = 10;
-	u32 leading_zeros = 0;
+	u32 leading_zero_count = 0;
 	u32 skip_digits = 0;
 };
 
@@ -245,7 +245,7 @@ inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 // NOTE: TODO: surrogate pairs ate not supported
 inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
 	List<ascii> result;
-	result.reserve(span.size);
+	result.reserve(span.count);
 	for (auto u16 : span) {
 		result.add(u16 > 0xFF ? unfound : (ascii)u16);
 	}
@@ -256,12 +256,12 @@ inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfo
 }
 
 inline Span<utf8> to_utf8(Span<ascii> span) {
-	return Span((utf8 *)span.data, span.size);
+	return Span((utf8 *)span.data, span.count);
 }
 
 inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 	List<utf16> result;
-	result.reserve(span.size);
+	result.reserve(span.count);
 	for (auto ch : span) {
 		result.add((utf16)ch);
 	}
@@ -283,7 +283,7 @@ struct StringBuilder {
 	struct Block {
 		StaticList<utf8, block_size> buffer;
 		Block *next = 0;
-		umm available_space() { return block_size - buffer.size; }
+		umm available_space() { return block_size - buffer.count; }
 	};
 
 	Allocator allocator = {};
@@ -327,26 +327,26 @@ struct StringBuilder {
 			}
 		}
 	}
-	umm size() {
-		umm total_size = 0;
+	umm count() {
+		umm total_count = 0;
 		for (Block *block = &first; block != 0; block = block->next) {
-			total_size += block->buffer.size;
+			total_count += block->buffer.count;
 		}
-		return total_size;
+		return total_count;
 	}
 	Span<char> fill(Span<char> dst_string) {
 		char *dst_char = dst_string.data;
 		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dst_char, block->buffer.data, block->buffer.size * sizeof(char));
-			dst_char += block->buffer.size;
+			memcpy(dst_char, block->buffer.data, block->buffer.count * sizeof(char));
+			dst_char += block->buffer.count;
 		}
 		return Span<char>(dst_string.begin(), dst_char);
 	}
 	List<char> getNullTerminated() {
 		List<char> result;
-		result.reserve(size() + 1);
+		result.reserve(count() + 1);
 		fill(result);
-		result.size = result.capacity;
+		result.count = result.capacity;
 		result.back() = '\0';
 		return result;
 	}
@@ -355,7 +355,7 @@ struct StringBuilder {
 	void for_each_block(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto block_size = block->buffer.size;
+			auto block_size = block->buffer.count;
 			if (block_size) {
 				fn(block->buffer);
 			}
@@ -365,7 +365,7 @@ struct StringBuilder {
 	void clear() {
 		Block *block = &first;
 		do {
-			block->buffer.size = 0;
+			block->buffer.count = 0;
 			block = block->next;
 		} while (block);
 		last = &first;
@@ -392,7 +392,7 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 		umm space_in_block = b.last->available_space();
 		memcpy(b.last->buffer.end(), data, space_in_block);
 		chars_to_write -= space_in_block;
-		b.last->buffer.size += space_in_block;
+		b.last->buffer.count += space_in_block;
 		data += space_in_block;
 		if (!b.last->next) {
 			b.last->next = b.alloc_last = b.allocate_block();
@@ -400,7 +400,7 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 		}
 	}
 	memcpy(b.last->buffer.end(), data, chars_to_write);
-	b.last->buffer.size += chars_to_write;
+	b.last->buffer.count += chars_to_write;
 }
 
 template <class T>
@@ -410,12 +410,12 @@ forceinline void append_bytes(StringBuilder &b, T const &value) {
 
 template <class T>
 forceinline void append_bytes(StringBuilder &b, Span<T> span) {
-	append_bytes(b, span.data, span.size * sizeof(T));
+	append_bytes(b, span.data, span.count * sizeof(T));
 }
 
 template <class T>
 forceinline void append_bytes(StringBuilder &b, List<T> list) {
-	append_bytes(b, list.data, list.size * sizeof(T));
+	append_bytes(b, list.data, list.count * sizeof(T));
 }
 
 inline umm append(StringBuilder &b, ascii ch) {
@@ -478,26 +478,54 @@ inline umm append(StringBuilder &b, utf16 ch) {
 	}
 	return 1;
 }
+inline umm append(StringBuilder &b, utf32 ch) {
+	switch (b.encoding) {
+		case Encoding_ascii:
+			if (ch >= 256) {
+				append_bytes(b, b.unfound_ascii);
+			} else {
+				append_bytes(b, (ascii)ch);
+			}
+			break;
+		case Encoding_utf8:
+			if (ch >= 256) {
+				invalid_code_path("not implemented");
+			} else {
+				append_bytes(b, (ascii)ch);
+			}
+			break;
+		case Encoding_utf16:
+			invalid_code_path("not implemented");
+			break;
+		case Encoding_utf32:
+			append_bytes(b, ch);
+			break;
+		default:
+			invalid_code_path("StringBuilder.encoding was invalid");
+			break;
+	}
+	return 1;
+}
 
 inline umm append(StringBuilder &b, Span<ascii> string) {
-	umm appended_char_count = string.size;
+	umm appended_char_count = string.count;
 	switch (b.encoding) {
 		case Encoding_ascii:
 		case Encoding_utf8:
 			append_bytes(b, string);
 			break;
 		case Encoding_utf16:
-			while (string.size) {
+			while (string.count) {
 				append_bytes(b, (utf16)*string.data);
 				++string.data;
-				--string.size;
+				--string.count;
 			}
 			break;
 		case Encoding_utf32:
-			while (string.size) {
+			while (string.count) {
 				append_bytes(b, (utf32)*string.data);
 				++string.data;
-				--string.size;
+				--string.count;
 			}
 			break;
 		default:
@@ -542,7 +570,7 @@ inline umm append(StringBuilder &b, Span<utf8> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
-	return string.size;
+	return string.count;
 }
 
 inline umm append(StringBuilder &b, Span<utf16> string) {
@@ -573,11 +601,11 @@ inline umm append(StringBuilder &b, Span<utf16> string) {
 			invalid_code_path("StringBuilder.encoding was invalid");
 			break;
 	}
-	return string.size;
+	return string.count;
 }
 inline umm append(StringBuilder &b, Span<utf32> string) {
 	invalid_code_path("not implemented");
-	return string.size;
+	return string.count;
 }
 inline umm append(StringBuilder &b, Span<wchar> string) {
 	return append(b, (Span<wchar_s>)string);
@@ -595,20 +623,53 @@ forceinline umm append(StringBuilder &b, wchar const *string) {
 	}
 }
 
+template <class T>
+struct FormatList {
+	Span<ascii> before = "{"s;
+	Span<ascii> separator = ", "s;
+	Span<ascii> after = "}"s;
+	List<T> list;
+};
+
+template <class T>
+forceinline umm append(StringBuilder &b, FormatList<T> format) {
+	umm count = 0;
+	count += append(b, format.before);
+	for (auto &val : format.list) {
+		if (&val != format.list.data) {
+			count += append(b, format.separator);
+		}
+		count += append(b, val);
+	}
+	count += append(b, format.after);
+	return count;
+}
+
+template <class T>
+forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatList{.list = list}); }
+
+template <>
 forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
+template <>
 forceinline umm append(StringBuilder &b, List<wchar> list) { return append(b, (Span<utf16>)as_span(list)); }
 
 template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
 
 template <class Char, class = EnableIf<is_char<Char>>>
-inline void append_format(StringBuilder &b, Span<Char> format_string) {
+inline umm append_format(StringBuilder &b, Span<Char> format_string) {
 	bool previous_is_percent = false;
 	auto c = format_string.data;
 	auto end = format_string.end();
+
+	umm appended_char_count = 0;
+
 	for (;c != end; ++c) {
 		if (*c == '%') {
 			previous_is_percent = true;
@@ -616,51 +677,54 @@ inline void append_format(StringBuilder &b, Span<Char> format_string) {
 		}
 		if (previous_is_percent) {
 			if (*c == '`') {
-				append(b, '%');
+				appended_char_count += append(b, '%');
 				continue;
 			} else {
 				invalid_code_path("not enough arguments were provided for 'append_format'");
-				return;
+				return appended_char_count;
 			}
 		}
-		append(b, *c);
+		appended_char_count += append(b, *c);
 		previous_is_percent = false;
 	}
+	return appended_char_count;
 }
 
 template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
-void append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
+umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
 	bool previous_is_percent = false;
 	auto c = format_string.data;
 	auto end = format_string.end();
+	umm appended_char_count = 0;
 	for (;c != end; ++c) {
 		if (previous_is_percent) {
 			if (*c == '`') {
-				append(b, '%');
+				appended_char_count += append(b, '%');
 				continue;
 			} else {
-				append(b, arg);
-				append_format(b, Span(c, end), args...);
-				return;
+				appended_char_count += append(b, arg);
+				appended_char_count += append_format(b, Span(c, end), args...);
+				return appended_char_count;
 			}
 		}
 		if (*c == '%') {
 			previous_is_percent = true;
 			continue;
 		}
-		append(b, *c);
+		appended_char_count += append(b, *c);
 		previous_is_percent = false;
 	}
 	if (previous_is_percent) {
-		append(b, arg);
-		append_format(b, Span(c, end), args...);
+		appended_char_count += append(b, arg);
+		appended_char_count += append_format(b, Span(c, end), args...);
 	} else {
 		invalid_code_path("too many arguments were provided for 'append_format'");
 	}
+	return appended_char_count;
 }
 template <class ...Args, class Char, class = EnableIf<is_char<Char>>>
-void append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
-	append_format(b, as_span(format_string), args...);
+umm append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
+	return append_format(b, as_span(format_string), args...);
 }
 
 inline umm append(StringBuilder &builder, bool value) {
@@ -684,8 +748,8 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 		return append(builder, format.value);
 	}
 }
-template <class Int>
-umm append(StringBuilder &builder, FormatInt<Int> f) {
+template <class Int, umm capacity>
+umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	Int v = f.value;
 	auto radix = convert<Int>(f.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
@@ -724,14 +788,26 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 	} else {
 		(void)negative;
 	}
-	if (f.leading_zeros) {
-		for (u32 i = charsWritten; i < f.leading_zeros; ++i) {
+	if (f.leading_zero_count) {
+		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
 			*lsc-- = '0';
 		}
-		if (f.leading_zeros > charsWritten)
-			charsWritten = f.leading_zeros;
+		if (f.leading_zero_count > charsWritten)
+			charsWritten = f.leading_zero_count;
 	}
-	return append(builder, Span(lsc + 1, charsWritten));
+	buffer.add(Span(lsc + 1, charsWritten));
+	return charsWritten;
+}
+template <class Int, umm capacity, class = EnableIf<is_integer<Int>>>
+umm write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
+	return write_as_string(buffer, FormatInt{.value = v});
+}
+
+template <class Int>
+umm append(StringBuilder &builder, FormatInt<Int> f) {
+	StaticList<ascii, _intToStringSize<Int>> buffer;
+	umm chars_written = write_as_string(buffer, f);
+	return append(builder, buffer);
 }
 
 template <class Int, class = EnableIf<is_integer<Int>>>
@@ -740,41 +816,78 @@ umm append(StringBuilder &builder, Int v) {
 }
 
 forceinline umm append(StringBuilder &builder, void const *p) {
-	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zeros = true});
+	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zero_count = sizeof(void *) * 2});
 }
 
-inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
-	umm chars_appended = 0;
-
-	auto append = [&](StringBuilder &builder, auto const &value) {
-		chars_appended += ::tl::append(builder, value);
-	};
+template <class Float>
+inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
+	scoped_allocator(temporary_allocator);
 
 	auto value = format.value;
+
+	if (is_nan(value)) {
+		return append(builder, "NaN");
+	}
+
 	auto precision = format.precision;
+
+	StaticList<ascii, 128> buffer;
+
 	if (is_negative(value)) {
-		append(builder, "-");
+		buffer.add('-');
 		value = -value;
 	}
 
-	auto append_float = [&](f64 f) {
-		append(builder, (u64)f);
-		u64 fract_part = 1;
-		for (u32 i = 0; i < precision; ++i) {
-			f = frac(f) * 10;
-			fract_part *= 10;
-			fract_part += (u32)f;
-		}
+	if (value == infinity<Float>) {
+		return append(builder, "inf");
+	}
 
-		if (!format.trailing_zeros) {
-			while ((fract_part % 10) == 0) {
-				fract_part /= 10;
+	auto append_float = [&](Float f) {
+		write_as_string(buffer, (u64)f);
+
+		auto round_and_trim = [&] {
+			f = frac(f);
+			if (f != 0) {
+				if (f >= 0.5f) {
+					auto it = buffer.end() - 1;
+					while (1) {
+						*it += 1;
+						if (*it == (char)('9' + 1)) {
+							buffer.pop_back();
+							--it;
+							if (*it == '.')
+								break;
+							else
+								continue;
+						}
+						break;
+					}
+				}
 			}
-		}
+			while (buffer.back() == '0')
+				buffer.pop_back();
+			if (buffer.back() == '.')
+				buffer.pop_back();
+		};
 
-		if (fract_part != 1) {
-			append(builder, '.');
-			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+		if (format.trailing_zeros) {
+			if (precision) {
+				buffer.add('.');
+				for (u32 i = 0; i < precision; ++i) {
+					f = frac(f) * 10;
+					buffer.add((ascii)((u32)f + '0'));
+				}
+				round_and_trim();
+			}
+		} else {
+			if (frac(f) != 0) {
+				buffer.add('.');
+				for (u32 i = 0; i < precision && f != 0; ++i) {
+					f = frac(f) * 10;
+					buffer.add((ascii)((u32)f + '0'));
+				}
+				round_and_trim();
+			}
 		}
 	};
 
@@ -784,7 +897,7 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			break;
 		}
 		case FloatFormat_exponential: {
-			f64 mantissa = value;
+			Float mantissa = value;
 			s32 exponent = 0;
 			while (mantissa >= 10) {
 				mantissa /= 10;
@@ -796,13 +909,13 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			}
 			append_float(mantissa);
 
-			append(builder, "*10^"s);
-			append(builder, exponent);
+			buffer.add("*10^"s);
+			write_as_string(buffer, exponent);
 
 			break;
 		}
 		case FloatFormat_exponential_e: {
-			f64 mantissa = value;
+			Float mantissa = value;
 			s32 exponent = 0;
 			while (mantissa >= 10) {
 				mantissa /= 10;
@@ -814,41 +927,34 @@ inline umm append(StringBuilder &builder, FormatFloat<f64> format) {
 			}
 			append_float(mantissa);
 
-			append(builder, "e");
+			buffer.add('e');
 
-			if (exponent >= 0) append(builder, "+");
+			if (exponent >= 0) buffer.add('+');
 
-			append(builder, exponent);
+			write_as_string(buffer, exponent);
 
 			break;
 		}
 	}
-	return chars_appended;
+	return append(builder, buffer);
 }
-inline umm append(StringBuilder &builder, FormatFloat<f32> f) {
-	return append(builder, FormatFloat{.value = (f64)f.value, .precision = f.precision, .format = f.format});
-}
+inline umm append(StringBuilder &builder, FormatFloat<f32> f) { return append_float(builder, f); }
+inline umm append(StringBuilder &builder, FormatFloat<f64> f) { return append_float(builder, f); }
 
 forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, FormatFloat{.value = v}); }
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
-inline void append(StringBuilder &builder, std::source_location location) {
-	append(builder, location.file_name());
-	append(builder, '(');
-	append(builder, location.line());
-	append(builder, ":");
-	append(builder, location.column());
-	append(builder, "):");
-	append(builder, location.function_name());
+inline umm append(StringBuilder &builder, std::source_location location) {
+	return append_format(builder, "%(%:%):%", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
 // Always allocates memory for the string
 inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
 	List<char> result;
 	result.allocator = allocator;
-	result.reserve(builder.size());
+	result.reserve(builder.count());
 	builder.fill(result);
-	result.size = result.capacity;
+	result.count = result.capacity;
 	return result;
 }
 inline List<char> to_string(StringBuilder &builder) {
@@ -951,9 +1057,7 @@ inline FormattedBytes format_bytes(umm _count, FormatBytesParams params = {}) {
 	return result;
 }
 
-inline void append(StringBuilder &builder, FormattedBytes bytes) {
-	append(builder, FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false});
-	append(builder, ' ');
+inline umm append(StringBuilder &builder, FormattedBytes bytes) {
 	static constexpr Span<char> unit_strings[2][7] = {
 		{
 			"B"s,
@@ -973,7 +1077,7 @@ inline void append(StringBuilder &builder, FormattedBytes bytes) {
 			"EiB"s,
 		}
 	};
-	append(builder, unit_strings[bytes.kilo_is_1024][bytes.unit]);
+	return append_format(builder, "% %", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
 }
 
 #if 0
@@ -996,17 +1100,17 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 	List<utf8> result;
 
-	if (utf16.size > max_value<int>)
+	if (utf16.count > max_value<int>)
 		return {};
 
-	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, 0, 0, 0, 0);
+	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, 0, 0, 0, 0);
 	if (!bytes_required)
 		return {};
 
 	result.reserve(bytes_required + terminate);
-	result.size = bytes_required + terminate;
+	result.count = bytes_required + terminate;
 
-	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.size, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
+	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
 		return {};
 	}
 
@@ -1019,17 +1123,17 @@ List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 List<utf16> to_utf16(Span<utf8> utf8, bool terminate) {
 	List<utf16> result;
 
-	if (utf8.size > max_value<int>)
+	if (utf8.count > max_value<int>)
 		return {};
 
-	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, 0, 0);
+	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, 0, 0);
 	if (!chars_required)
 		return {};
 
 	result.reserve(chars_required + terminate);
-	result.size = chars_required + terminate;
+	result.count = chars_required + terminate;
 
-	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.size, (wchar *)result.data, chars_required) != chars_required) {
+	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, chars_required) != chars_required) {
 		return {};
 	}
 

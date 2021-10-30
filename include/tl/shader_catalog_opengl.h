@@ -44,7 +44,6 @@ TL_API void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<pathchar> di
 #ifdef TL_IMPL
 
 bool parse_shader(Shader &shader, Span<char> source) {
-	timed_function();
 	shader.cull = 0;
 	shader.depth_write = true;
 	shader.enable_blend = false;
@@ -161,8 +160,6 @@ bool parse_shader(Shader &shader, Span<char> source) {
 }
 
 Buffer load_shader_file(Span<pathchar> terminated_full_path) {
-	timed_function();
-
 	scoped_allocator(temporary_allocator);
 
 	auto full_path = terminated_full_path;

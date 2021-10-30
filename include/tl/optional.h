@@ -6,24 +6,28 @@ namespace tl {
 template <class T>
 struct Optional {
 	Optional() {
-		has_value = false;
+		_has_value = false;
 	}
 	Optional(T that) {
-		value = that;
-		has_value = true;
+		_value = that;
+		_has_value = true;
 	}
 	Optional &operator=(T that) {
 		return *new(this) Optional(that);
 	}
-	explicit operator bool() const { return has_value; }
-	union {
-		T value;
-	};
-	bool has_value;
+	explicit operator bool() const { return _has_value; }
 
-	T get() const {
-		return value;
-	}
+	bool has_value() const { return _has_value; }
+	T const &value() const { assert(_has_value); return _value; }
+	T       &value()       { assert(_has_value); return _value; }
+	T const &value_unchecked() const { return _value; }
+	T       &value_unchecked()       { return _value; }
+
+private:
+	union {
+		T _value;
+	};
+	bool _has_value;
 #pragma warning(suppress: 4820)
 };
 

@@ -1283,7 +1283,7 @@ inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 		aabb_min_max(v2s{a.min.x, b.min.y}, v2s{b.min.x, b.max.y}),
 		aabb_min_max(v2s{b.max.x, b.min.y}, v2s{a.max.x, b.max.y}),
 	};
-	for (u32 i = 0; i < boxes.size; ++i) {
+	for (u32 i = 0; i < boxes.count; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
@@ -1326,7 +1326,7 @@ inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
 		aabb_min_max(v3s{b.min.x, b.max.y, b.min.z}, v3s{b.max.x, a.max.y, b.max.z}), // top
 		aabb_min_max(v3s{b.min.x, a.min.y, b.min.z}, v3s{b.max.x, b.min.y, b.max.z}), // bottom
 	};
-	for (u32 i = 0; i < boxes.size; ++i) {
+	for (u32 i = 0; i < boxes.count; ++i) {
 		if (volume(boxes[i]) <= 0) {
 			boxes.erase_at_unordered(i--);
 		}
@@ -1951,20 +1951,16 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace ce
 
-inline void append(StringBuilder &builder, FormatFloat<v2f> f) {
-	append_format(builder, "{%, %}",
+inline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
+	return append_format(builder, "{%, %}",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
 }
 
-#define TO_STRING_V2(v2f)                           \
-inline void append(StringBuilder &builder, v2f v) { \
-	append(builder, "{"s);                          \
-	append(builder, v.x);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.y);                           \
-	append(builder, "}"s);                          \
+#define TO_STRING_V2(v2f)                               \
+inline umm append(StringBuilder &builder, v2f v) {      \
+	return append_format(builder, "{%, %}"s, v.x, v.y); \
 }
 
 TO_STRING_V2(v2f)
@@ -1973,15 +1969,9 @@ TO_STRING_V2(v2s)
 
 #undef TO_STRING_V2
 
-#define TO_STRING_V3(v3f)                           \
-inline void append(StringBuilder &builder, v3f v) { \
-	append(builder, "{"s);                          \
-	append(builder, v.x);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.y);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.z);                           \
-	append(builder, "}"s);                          \
+#define TO_STRING_V3(v3f)                                       \
+inline umm append(StringBuilder &builder, v3f v) {              \
+	return append_format(builder, "{%, %, %}"s, v.x, v.y, v.z); \
 }
 
 TO_STRING_V3(v3f)
@@ -1990,17 +1980,9 @@ TO_STRING_V3(v3s)
 
 #undef TO_STRING_V3
 
-#define TO_STRING_V4(v4f)                           \
-inline void append(StringBuilder &builder, v4f v) { \
-	append(builder, "{"s);                          \
-	append(builder, v.x);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.y);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.z);                           \
-	append(builder, ", "s);                         \
-	append(builder, v.w);                           \
-	append(builder, "}"s);                          \
+#define TO_STRING_V4(v4f)                                               \
+inline umm append(StringBuilder &builder, v4f v) {                      \
+	return append_format(builder, "{%, %, %, %}"s, v.x, v.y, v.z, v.w); \
 }
 
 TO_STRING_V4(v4f)
@@ -2009,22 +1991,18 @@ TO_STRING_V4(v4s)
 
 #undef TO_STRING_V3
 
-inline void append(StringBuilder &builder, m4 m) {
-	append_format(builder, "{%, %, %, %}", m.i, m.j, m.k, m.l);
+inline umm append(StringBuilder &builder, m4 m) {
+	return append_format(builder, "{%, %, %, %}", m.i, m.j, m.k, m.l);
 }
 
 template <class T>
-void append(StringBuilder &builder, aabb<T> v) {
-	append(builder, "{ min: "s);
-	append(builder, v.min);
-	append(builder, ", max: "s);
-	append(builder, v.max);
-	append(builder, " }"s);
+umm append(StringBuilder &builder, aabb<T> v) {
+	return append_format(builder, "{min=%, max=%}"s, v.min, v.max);
 }
 
 template <class T>
-void append(StringBuilder &builder, ray<T> r) {
-	append_format(builder, "ray{origin=%, direction=%}", r.origin, r.direction);
+umm append(StringBuilder &builder, ray<T> r) {
+	return append_format(builder, "{origin=%, direction=%}", r.origin, r.direction);
 }
 
 template <> forceinline constexpr v2f convert(f32 v) { return V2f(v); }

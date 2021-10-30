@@ -121,6 +121,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z           0x851A
 #define GL_PROXY_TEXTURE_CUBE_MAP                0x851B
 #define GL_MAX_CUBE_MAP_TEXTURE_SIZE             0x851C
+#define GL_DEPTH_CLAMP                           0x864F
 #define GL_RGBA32F                               0x8814
 #define GL_RGB32F                                0x8815
 #define GL_RGBA16F                               0x881A
@@ -491,10 +492,10 @@ extern TL_API Functions functions;
 #ifdef TL_IMPL
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
-#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return ::name params;}
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return ::name params;}
 BASE_FUNCS
 #undef D
-#define D(ret, name, args, params) ret _##name args{defer{assert(glGetError()==GL_NO_ERROR);};return functions._##name params;}
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return functions._##name params;}
 EXT_AND_OS_FUNCS
 #undef D
 #endif
@@ -570,7 +571,6 @@ TL_API GLuint create_program(ProgramStages stages);
 #endif
 
 static GLuint compile_shader(GLuint shader) {
-	timed_function();
 	glCompileShader(shader);
 
 	GLint status;
@@ -592,7 +592,6 @@ static GLuint compile_shader(GLuint shader) {
 }
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
-	timed_function();
 	StringBuilder version_builder;
 	version_builder.allocator = temporary_allocator;
 	append(version_builder, "#version "s);
@@ -623,10 +622,10 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 		source.data
 	};
 	int const lengths[] {
-		(int)version_string.size,
-		(int)stage_string.size,
-		(int)line_string.size,
-		(int)source.size
+		(int)version_string.count,
+		(int)stage_string.count,
+		(int)line_string.count,
+		(int)source.count
 	};
 
 	auto shader = glCreateShader(shaderType);
@@ -636,14 +635,13 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 GLuint create_shader(GLenum shaderType, Span<char> source) {
 	auto shader = glCreateShader(shaderType);
 
-	GLint length = (GLint)source.size;
+	GLint length = (GLint)source.count;
 	glShaderSource(shader, 1, &source.data, &length);
 
 	return compile_shader(shader);
 }
 
 GLuint create_program(ProgramStages stages) {
-	timed_function();
 	GLuint result = glCreateProgram();
 	if (stages.vertex)   glAttachShader(result, stages.vertex);
 	if (stages.fragment) glAttachShader(result, stages.fragment);

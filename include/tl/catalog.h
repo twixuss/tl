@@ -114,7 +114,6 @@ void init_catalog(Catalog<T> &catalog, Span<pathchar> directory) {
 //
 template <class T>
 bool update(Catalog<T> &catalog) {
-	timed_function();
 	bool any_updated = false;
 	for (auto &[name, entry] : catalog.entries) {
 		any_updated |= update(entry.tracker);

@@ -1,27 +1,39 @@
 #pragma once
 #include "file.h"
+#include "stream.h"
 
 namespace tl {
 
-TL_DECLARE_HANDLE(Process);
+struct Process {
+	void *handle;
+	Stream *standard_out;
+};
+
+inline bool is_valid(Process process) {
+	return process.handle != 0;
+}
 
 struct ExecuteParams {
 	bool visible = true;
 };
 
-TL_API Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params = {});
-inline Process execute(pathchar const *path, ExecuteParams params = {}) {
+TL_API Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params = {});
+inline Process execute(utf16 const *path, ExecuteParams params = {}) {
 	return execute(path, 0, params);
 }
 
-inline Process execute(Span<pathchar> path, Span<pathchar> arguments, ExecuteParams params = {}) {
+inline Process execute(Span<utf16> path, Span<utf16> arguments, ExecuteParams params = {}) {
 	return execute(temporary_null_terminate(path).data, temporary_null_terminate(arguments).data, params);
 }
-inline Process execute(Span<pathchar> path, ExecuteParams params = {}) {
+inline Process execute(Span<utf16> path, ExecuteParams params = {}) {
 	return execute(temporary_null_terminate(path).data, 0, params);
+}
+inline Process execute(Span<utf8> path, ExecuteParams params = {}) {
+	return execute(to_utf16(path, true).data, 0, params);
 }
 
 TL_API bool wait(Process process, u32 timeout = -1);
+TL_API bool is_running(Process process);
 TL_API u32 get_exit_code(Process process);
 TL_API void terminate(Process process);
 //
@@ -30,13 +42,17 @@ TL_API void terminate(Process process);
 //
 void free(Process &process);
 
+TL_API Process start_process(utf16 const *command_line);
+inline Process start_process(Span<utf16> command_line) { return start_process(temporary_null_terminate(command_line).data); }
+inline Process start_process(Span<utf8>  command_line) { return start_process(to_utf16(command_line, true).data); }
+
 #ifdef TL_IMPL
 
 #if OS_WINDOWS
 
 #pragma comment(lib, "Shell32.lib")
 
-Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams params) {
+Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
@@ -50,29 +66,105 @@ Process execute(pathchar const *path, pathchar const *arguments, ExecuteParams p
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
 		print(Print_error, "ShellExecuteExA failed with error code 0x% (%)\n", FormatInt{.value = error, .radix = 16}, error);
-		return 0;
+		return {};
 	}
 
-	return (Process)ShExecInfo.hProcess;
+	return {.handle = ShExecInfo.hProcess};
 }
 
 bool wait(Process process, u32 timeout) {
-	return WaitForSingleObject((HANDLE)process, timeout) == WAIT_OBJECT_0;
+	return WaitForSingleObject((HANDLE)process.handle, timeout) == WAIT_OBJECT_0;
+}
+
+bool is_running(Process process) {
+	DWORD exit_code;
+	GetExitCodeProcess((HANDLE)process.handle, &exit_code);
+	return exit_code == STILL_ACTIVE;
 }
 
 u32 get_exit_code(Process process) {
 	DWORD exit_code;
-	GetExitCodeProcess((HANDLE)process, &exit_code);
+	GetExitCodeProcess((HANDLE)process.handle, &exit_code);
 	return (u32)exit_code;
 }
 
 void terminate(Process process) {
-	TerminateProcess(process, 1);
+	TerminateProcess(process.handle, 1);
 }
 
 void free(Process &process) {
-	CloseHandle((HANDLE)process);
-	process = 0;
+	CloseHandle((HANDLE)process.handle);
+	process = {};
+}
+
+struct StdoutStream : Stream {
+	void *handle;
+	umm read(Span<u8> destination) {
+		DWORD bytes_read;
+		ReadFile(handle, destination.data, destination.size, &bytes_read, 0);
+		return bytes_read;
+	}
+	umm write(Span<u8> source) { invalid_code_path("unavailable"); return {}; }
+	umm remaining_bytes() { invalid_code_path("unavailable"); return {}; }
+	void free() {
+		CloseHandle(handle);
+	}
+};
+
+Process start_process(utf16 const *command_line) {
+
+
+	SECURITY_ATTRIBUTES saAttr;
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = NULL;
+
+	// Create a pipe for the child process's STDOUT.
+	HANDLE child_stdout_read;
+	HANDLE child_stdout_write;
+	if (!CreatePipe(&child_stdout_read, &child_stdout_write, &saAttr, 0)) {
+		return {};
+	}
+
+	// Ensure the read handle to the pipe for STDOUT is not inherited.
+	if (!SetHandleInformation(child_stdout_read, HANDLE_FLAG_INHERIT, 0)) {
+		return {};
+	}
+
+	auto child_stdout_stream = create_stream<StdoutStream>();
+	child_stdout_stream->handle = child_stdout_read;
+
+
+	PROCESS_INFORMATION piProcInfo = {};
+
+	STARTUPINFOW siStartInfo = {};
+	siStartInfo.cb = sizeof(STARTUPINFO);
+	siStartInfo.hStdError = child_stdout_write;
+	siStartInfo.hStdOutput = child_stdout_write;
+	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+	if (!CreateProcessW(NULL,
+		(wchar *)command_line,
+		NULL,          // process security attributes
+		NULL,          // primary thread security attributes
+		TRUE,          // handles are inherited
+		0,             // creation flags
+		NULL,          // use parent's environment
+		NULL,          // use parent's current directory
+		&siStartInfo,  // STARTUPINFO pointer
+		&piProcInfo)  // receives PROCESS_INFORMATION
+	) {
+		free(child_stdout_stream);
+		return {};
+	}
+
+	CloseHandle(piProcInfo.hThread);
+	CloseHandle(child_stdout_write);
+
+	Process result;
+	result.handle = piProcInfo.hProcess;
+	result.standard_out = child_stdout_stream;
+	return result;
 }
 
 #endif

@@ -91,6 +91,7 @@
 #define glMapNamedBuffer tl::gl::_glMapNamedBuffer
 #define glUnmapBuffer tl::gl::_glUnmapBuffer
 #define glUnmapNamedBuffer tl::gl::_glUnmapNamedBuffer
+#define glBlitFramebuffer tl::gl::_glBlitFramebuffer
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::_wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::_wglCreateContextAttribsARB
@@ -185,6 +186,7 @@
 #define glMapNamedBuffer tl::gl::functions._glMapNamedBuffer
 #define glUnmapBuffer tl::gl::functions._glUnmapBuffer
 #define glUnmapNamedBuffer tl::gl::functions._glUnmapNamedBuffer
+#define glBlitFramebuffer tl::gl::functions._glBlitFramebuffer
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::functions._wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::functions._wglCreateContextAttribsARB
