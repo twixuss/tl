@@ -38,10 +38,10 @@ forceinline s32 atomic_increment(s32 volatile *a) { return (s32)atomic_increment
 forceinline s64 atomic_increment(s64 volatile *a) { return (s64)atomic_increment((u64 *)a); }
 #endif
 
-forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)_InterlockedDecrement16((SHORT *)a); }
-forceinline u32 atomic_decrement(u32 volatile *a) { return _InterlockedDecrement(a); }
+forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)_InterlockedDecrement16((short *)a); }
+forceinline u32 atomic_decrement(u32 volatile *a) { return (u32)_InterlockedDecrement((long *)a); }
 #if ARCH_X64
-forceinline u64 atomic_decrement(u64 volatile *a) { return _InterlockedDecrement(a); }
+forceinline u64 atomic_decrement(u64 volatile *a) { return (u64)_InterlockedDecrement64((long long *)a); }
 #endif
 
 forceinline s16 atomic_decrement(s16 volatile *a) { return (s16)atomic_decrement((u16 *)a); }
@@ -76,17 +76,108 @@ forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 
 struct Thread {
 	void *handle = 0;
-	Function function;
 };
 
+template <class Ret>
+struct ThreadRet : Thread {
+	Ret *return_value = 0;
+};
 
-TL_API Thread create_thread(Function function);
-template <class Fn, class ...Args>
-Thread create_thread(Fn &&fn, Args &&...args) {
-	return create_thread(create_function(fn, args...));
+struct ThreadContext {
+	bool parent_thread_can_continue = false;
+	void *param = 0;
+};
+
+TL_API Thread create_thread(void (*function)(ThreadContext *context), void *param);
+
+template <class ...Types>
+struct Tuple;
+
+template <>
+struct Tuple<> {
+};
+
+template <class First, class ...Rest>
+struct Tuple<First, Rest...> {
+	First first;
+	Tuple<Rest...> rest;
+};
+
+template <umm index, class ...Args>
+auto get(Tuple<Args...> tuple) {
+	if constexpr (index == 0) {
+		return tuple.first;
+	} else {
+		return get<index - 1>(tuple.rest);
+	}
 }
 
+template <class Ret>
+inline ThreadRet<Ret> create_thread(Ret (*function)()) {
+	struct Data {
+		ThreadRet<Ret> result;
+		Ret (*function)();
+	};
+
+	Data data;
+	data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
+	data.function = function;
+
+	(Thread &)data.result = create_thread([](ThreadContext *context) {
+		auto data = *(Data *)context->param;
+
+		context->parent_thread_can_continue = true;
+
+		*data.result.return_value = data.function();
+
+	}, &data);
+
+	return data.result;
+}
+
+namespace td {
+template <class Fn, class Tuple, umm... indices>
+inline static decltype(auto) invoke(Fn &&fn, Tuple &tuple, std::index_sequence<indices...>) noexcept {
+	return fn(get<indices>(tuple)...);
+}
+}
+
+template <class Ret, class First, class ...Rest>
+inline ThreadRet<Ret> create_thread(Ret (*function)(First first, Rest ...rest), First first, Rest ...rest) {
+	struct Data {
+		ThreadRet<Ret> result;
+		Ret (*function)(First first, Rest ...rest);
+		Tuple<First, Rest...> args;
+	};
+
+	Data data;
+	data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
+	data.function = function;
+	data.args = {first, rest...};
+
+	(Thread &)data.result = create_thread([](ThreadContext *context) {
+		auto data = *(Data *)context->param;
+
+		context->parent_thread_can_continue = true;
+		*data.result.return_value = td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+
+	}, &data);
+
+	return data.result;
+}
+
+//template <class Fn, class ...Args>
+//Thread create_thread(Fn &&fn, Args &&...args) {
+//	return create_thread(create_function(fn, args...));
+//}
+
 TL_API void join(Thread thread);
+template <class Ret>
+inline Ret join(ThreadRet<Ret> &thread) {
+	join((Thread &)thread);
+	return *thread.return_value;
+}
+
 TL_API bool finished(Thread thread);
 TL_API void free(Thread &thread);
 
@@ -127,31 +218,29 @@ void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
 
-Thread create_thread(Function function) {
+Thread create_thread(void (*function)(ThreadContext *context), void *param) {
 	struct Data {
-		Function function;
-		bool volatile acquired;
+		void (*function)(ThreadContext *context) = 0;
+		ThreadContext context = {};
 	};
 	Thread result;
-	result.function = function;
 
 	Data data = {};
-	data.function = result.function;
-	data.acquired = false;
+	data.function = function;
+	data.context.param = param;
 
 	result.handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
-		Data *pData = (Data *)param;
-		Data data = *pData;
-		pData->acquired = true;
+		Data *data = (Data *)param;
 
 		init_allocator();
 		defer {deinit_allocator();};
+
 		current_printer = console_printer;
 
-		data.function();
+		data->function(&data->context);
 		return 0;
 	}, &data, 0, 0);
-	while (!data.acquired);
+	while (!data.context.parent_thread_can_continue);
 	return (Thread)result;
 }
 void join(Thread thread) {
@@ -163,7 +252,6 @@ bool finished(Thread thread) {
 void free(Thread &thread) {
 	CloseHandle((HANDLE)thread.handle);
 	thread.handle = 0;
-	free(thread.function);
 }
 
 u32 get_current_thread_id() {

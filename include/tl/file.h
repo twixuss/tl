@@ -310,6 +310,10 @@ struct ParsedPath {
 	Span<utf8> directory;
 	Span<utf8> name;
 	Span<utf8> extension;
+
+	Span<utf8> path_without_extension() {
+		return {directory.begin(), name.end()};
+	}
 };
 
 inline ParsedPath parse_path(Span<utf8> path) {

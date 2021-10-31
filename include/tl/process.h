@@ -101,7 +101,7 @@ struct StdoutStream : Stream {
 	void *handle;
 	umm read(Span<u8> destination) {
 		DWORD bytes_read;
-		ReadFile(handle, destination.data, destination.size, &bytes_read, 0);
+		ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0);
 		return bytes_read;
 	}
 	umm write(Span<u8> source) { invalid_code_path("unavailable"); return {}; }
