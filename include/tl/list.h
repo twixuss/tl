@@ -247,7 +247,7 @@ List<T> copy(List<T> that) {
 }
 
 template <class T>
-List<T> as_list(Span<T> that) {
+List<T> to_list(Span<T> that) {
 	List<T> result;
 	result.count = that.count;
 	result.capacity = result.count;
@@ -257,7 +257,7 @@ List<T> as_list(Span<T> that) {
 }
 
 //template <class T>
-//List<T> as_list(Span<T> span) {
+//List<T> to_list(Span<T> span) {
 //	List<T> result;
 //	result.reserve(span.count);
 //	result.count = span.count;

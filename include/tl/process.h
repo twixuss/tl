@@ -4,9 +4,16 @@
 
 namespace tl {
 
+struct MemoryInfo {
+	u64 current_usage = 0;
+	u64 peak_usage = 0;
+};
+
+MemoryInfo get_memory_info();
+
 struct Process {
-	void *handle;
-	Stream *standard_out;
+	void *handle = 0;
+	Stream *standard_out = 0;
 };
 
 inline bool is_valid(Process process) {
@@ -46,12 +53,30 @@ TL_API Process start_process(utf16 const *command_line);
 inline Process start_process(Span<utf16> command_line) { return start_process(temporary_null_terminate(command_line).data); }
 inline Process start_process(Span<utf8>  command_line) { return start_process(to_utf16(command_line, true).data); }
 
+}
+
 #ifdef TL_IMPL
+
+#if OS_WINDOWS
+#define NOMINMAX
+#include <Psapi.h>
+#endif
+
+namespace tl {
 
 #if OS_WINDOWS
 
 #pragma comment(lib, "Shell32.lib")
 
+MemoryInfo get_memory_info() {
+	MemoryInfo result;
+	PROCESS_MEMORY_COUNTERS counters;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
+		result.current_usage = counters.PagefileUsage;
+		result.peak_usage = counters.PeakPagefileUsage;
+	}
+	return result;
+}
 Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params) {
 	SHELLEXECUTEINFOW ShExecInfo = {};
 	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
@@ -169,5 +194,6 @@ Process start_process(utf16 const *command_line) {
 
 #endif
 
-#endif
 }
+
+#endif

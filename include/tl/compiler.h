@@ -155,7 +155,7 @@ static void parse_arguments(DemangleState &state, StringBuilder &builder, char c
 						//	while (*c != '@') {
 						//		++c;
 						//	}
-						//	identifiers.add(as_list(Span(name_space_start, c)));
+						//	identifiers.add(to_list(Span(name_space_start, c)));
 						//	++c;
 						//	goto check_for_another_identifier;
 						//}
@@ -204,7 +204,7 @@ static void parse_arguments(DemangleState &state, StringBuilder &builder, char c
 			assert(*c++ == '$');
 			assert(*c++ == 'T');
 			append(builder, "nullptr_t"s);
-			state.last_argument = as_list("nullptr_t"s);
+			state.last_argument = to_list("nullptr_t"s);
 			break;
 		case '@': return;
 		default: {

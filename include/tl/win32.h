@@ -37,7 +37,6 @@ inline void set_cursor_position(v2s position) {
 	set_cursor_position(position.x, position.y);
 }
 TL_API v2s get_cursor_position();
-TL_API u64 get_memory_usage();
 
 TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
 
@@ -229,14 +228,6 @@ v2s get_cursor_position() {
 	POINT p;
 	GetCursorPos(&p);
 	return {p.x, p.y};
-}
-u64 get_memory_usage() {
-	u64 result = 0;
-	PROCESS_MEMORY_COUNTERS memoryCounters;
-	if (GetProcessMemoryInfo(GetCurrentProcess(), &memoryCounters, sizeof(memoryCounters))) {
-		result = memoryCounters.PagefileUsage;
-	}
-	return result;
 }
 
 bool set_fullscreen(HWND window, bool fullscreen, DWORD window_style, WINDOWPLACEMENT &placement) {

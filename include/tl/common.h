@@ -696,7 +696,7 @@ enum : ForEachFlags {
 };
 
 template <class Container, class Fn>
-constexpr void for_each(Container container, Fn &&fn) {
+constexpr void for_each(Container &container, Fn &&fn) {
 	return for_each<(ForEachFlags)0>(container, fn);
 }
 
@@ -736,7 +736,7 @@ struct ValueTypeOfT {
 
 template <class T, umm count>
 struct ValueTypeOfT<T[count]> {
-	using Type = T *;
+	using Type = T;
 };
 
 template <class T>
@@ -1109,6 +1109,11 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 	return result;
 }
 
+template <class Collection, class T>
+umm find_index_of(Collection &collection, T value) {
+	return index_of(collection, find(collection, value));
+}
+
 inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
 }
@@ -1130,6 +1135,10 @@ inline constexpr bool is_digit(ascii c) {
 }
 inline constexpr bool is_digit(utf32 c) {
 	return c >= '0' && c <= '9';
+}
+
+inline constexpr bool is_hex_digit(utf32 c) {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
 inline constexpr ascii to_lower(ascii c) {

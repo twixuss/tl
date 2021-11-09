@@ -151,7 +151,9 @@ inline ThreadRet<Ret> create_thread(Ret (*function)(First first, Rest ...rest), 
 	};
 
 	Data data;
-	data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
+	if constexpr (!is_same<Ret, void>) {
+		data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
+	}
 	data.function = function;
 	data.args = {first, rest...};
 
@@ -159,7 +161,11 @@ inline ThreadRet<Ret> create_thread(Ret (*function)(First first, Rest ...rest), 
 		auto data = *(Data *)context->param;
 
 		context->parent_thread_can_continue = true;
-		*data.result.return_value = td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+		if constexpr (is_same<Ret, void>) {
+			td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+		} else {
+			*data.result.return_value = td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+		}
 
 	}, &data);
 
@@ -283,20 +289,20 @@ void loop_until(Predicate &&predicate) {
 }
 
 struct SyncPoint {
-	u32 target_counter;
-	u32 volatile current_counter;
+	u32 target_thread_count;
+	u32 volatile synced_thread_count;
 };
 
-inline SyncPoint create_sync_point(u32 target_counter) {
-	SyncPoint result;
-	result.target_counter = target_counter;
-	result.current_counter = 0;
-	return result;
+inline SyncPoint create_sync_point(u32 thread_count) {
+	return {
+		.target_thread_count = thread_count,
+		.synced_thread_count = 0,
+	};
 }
 
 inline void sync(SyncPoint &point) {
-	atomic_add(&point.current_counter, 1);
-	loop_until([&] { return point.current_counter == point.target_counter; });
+	atomic_add(&point.synced_thread_count, 1);
+	loop_until([&] { return point.synced_thread_count == point.target_thread_count; });
 }
 
 struct Mutex {
@@ -339,8 +345,8 @@ inline void lock(RecursiveMutex &m) {
 	if (thread_id == m.thread_id) {
 		++m.counter;
 	} else {
-		loop_until([&] {
-			return !atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
+		loop_while([&] {
+			return atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
 		});
 	}
 }
@@ -507,7 +513,7 @@ struct WorkQueue {
 	void push(Fn &&fn, Args &&...args) {
 		if (pool->thread_count) {
 			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-			auto fnParams = ALLOCATE(Tuple, pool->allocator);
+			auto fnParams = pool->allocator.allocate_uninitialized<Tuple>();
 			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
 			atomic_add(&work_to_do, 1);
@@ -587,6 +593,7 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 	pool.running = false;
 	pool.stopping = false;
 	pool.thread_count = thread_count;
+	construct(pool.threads);
 	if (thread_count) {
 		pool.threads.reserve(thread_count);
 
@@ -604,8 +611,8 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 		};
 
 		for (u32 i = 0; i < thread_count; ++i) {
-			auto thread = create_thread(start_proc, &params);
-			if (!thread) {
+			auto thread = create_thread(+start_proc, (void *)&params);
+			if (!valid(thread)) {
 				pool.stopping = true;
 				for (auto t : pool.threads) {
 					free(t);

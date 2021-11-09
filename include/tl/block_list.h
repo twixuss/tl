@@ -16,11 +16,55 @@ struct BlockList {
 		Block *next = 0;
 		Block *previous = 0;
 
-		umm available_space() const { return block_capacity - this->size; }
+		umm available_space() const { return block_capacity - this->count; }
 	};
 	struct Index {
 		Block *block;
 		umm value_index;
+	};
+
+	struct Iterator {
+		Block *block;
+		umm value_index;
+
+		Iterator &operator++() {
+			++value_index;
+			if (value_index >= block->count) {
+				block = block->next;
+				value_index = 0;
+			}
+			return *this;
+		}
+		Iterator operator++(int) {
+			auto copy = *this;
+			++*this;
+			return copy;
+		}
+
+		Iterator &operator--() {
+			if (value_index == 0) {
+				block = block->previous;
+				value_index = block->count - 1;
+			} else {
+				--value_index;
+			}
+			return *this;
+		}
+		Iterator operator--(int) {
+			auto copy = *this;
+			--*this;
+			return copy;
+		}
+
+		bool operator==(Iterator that) {
+			return block == that.block && value_index == that.value_index;
+		}
+		bool operator!=(Iterator that) {
+			return !(*this == that);
+		}
+
+		T *operator->() { return block->data + value_index; }
+		T &operator*() { return block->data[value_index]; }
 	};
 
 	Allocator allocator = current_allocator;
@@ -43,19 +87,25 @@ struct BlockList {
 
 	template <class ...Args>
 	T &add_in_place(Args &&...args) {
-		auto dstBlock = last;
-		while (dstBlock && (dstBlock->available_space() == 0)) {
-			dstBlock = dstBlock->next;
+		auto dest_block = last;
+		while (dest_block && (dest_block->available_space() == 0)) {
+			assert(dest_block != dest_block->next);
+			dest_block = dest_block->next;
 		}
 
-		if (!dstBlock) {
-			dstBlock = allocator.allocate<Block>(1);
-			dstBlock->next = 0;
-			dstBlock->previous = alloc_last;
-			alloc_last->next = dstBlock;
-			last = alloc_last = dstBlock;
+		if (!dest_block) {
+			dest_block = allocator.allocate<Block>(1);
+			dest_block->next = 0;
+			dest_block->previous = alloc_last;
+			alloc_last->next = dest_block;
+			last = alloc_last = dest_block;
 		}
-		return dstBlock->add(std::forward<Args>(args)...);
+		auto &result = dest_block->add(std::forward<Args>(args)...);
+		if (dest_block->next == 0) {
+			alloc_last->next = dest_block;
+			last = alloc_last = dest_block;
+		}
+		return result;
 	}
 
 	T &add(T const &value) { return add_in_place(value); }
@@ -138,6 +188,14 @@ struct BlockList {
 	BlockList &operator+=(Span<T const> v) { this->insert(v, this->end()); return *this; }
 	BlockList &operator+=(BlockList const &v) { this->insert(as_span(v), this->end()); return *this; }
 	BlockList &operator+=(std::initializer_list<T> v) { this->insert(Span(v.begin(), v.end()), this->end()); return *this; }
+
+
+	Iterator begin() {
+		return {&first, 0};
+	}
+	Iterator end() {
+		return {last, last->count};
+	}
 };
 
 template <class T, umm block_size>
