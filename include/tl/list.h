@@ -16,12 +16,14 @@ struct List : Span<T> {
 	umm capacity = 0;
 	[[no_unique_address]] Allocator allocator = get_current_allocator<Allocator>();
 
+	/*
 	List() = default;
 	List(std::initializer_list<T> list) {
 		reserve(list.size());
 		count = list.size();
 		memcpy(data, list.begin(), list.size() * sizeof(T));
 	}
+	*/
 	void set(Span<T> span) {
 		reserve(span.count);
 		count = span.count;
@@ -247,23 +249,15 @@ List<T> copy(List<T> that) {
 }
 
 template <class T>
-List<T> to_list(Span<T> that) {
+List<T> to_list(Span<T> that, Allocator allocator = current_allocator) {
 	List<T> result;
+	result.data = allocator.allocate<T>(that.count);
 	result.count = that.count;
 	result.capacity = result.count;
-	result.data = result.allocator.allocate<T>(result.count);
+	result.allocator = allocator;
 	memcpy(result.data, that.data, result.count * sizeof(T));
 	return result;
 }
-
-//template <class T>
-//List<T> to_list(Span<T> span) {
-//	List<T> result;
-//	result.reserve(span.count);
-//	result.count = span.count;
-//	memcpy(result.data, span.data, result.count * sizeof(T));
-//	return result;
-//}
 
 template <class T>
 T *next(List<T> list, T *value) {
@@ -838,6 +832,7 @@ struct LinearSet : private List<T> {
 	using Base::begin;
 	using Base::end;
 	using Base::clear;
+	using Base::allocator;
 
 	T &insert(T const &value) {
 		for (auto &it : *this) {

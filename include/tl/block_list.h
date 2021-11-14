@@ -63,8 +63,8 @@ struct BlockList {
 			return !(*this == that);
 		}
 
-		T *operator->() { return block->data + value_index; }
-		T &operator*() { return block->data[value_index]; }
+		T *operator->() { return &(*block)[value_index]; }
+		T &operator*() { return (*block)[value_index]; }
 	};
 
 	Allocator allocator = current_allocator;
@@ -85,32 +85,22 @@ struct BlockList {
 		last = &first;
 	}
 
-	template <class ...Args>
-	T &add_in_place(Args &&...args) {
+	T &add(T value) {
 		auto dest_block = last;
 		while (dest_block && (dest_block->available_space() == 0)) {
 			assert(dest_block != dest_block->next);
 			dest_block = dest_block->next;
 		}
-
 		if (!dest_block) {
-			dest_block = allocator.allocate<Block>(1);
+			dest_block = allocator.allocate<Block>();
 			dest_block->next = 0;
 			dest_block->previous = alloc_last;
 			alloc_last->next = dest_block;
 			last = alloc_last = dest_block;
 		}
-		auto &result = dest_block->add(std::forward<Args>(args)...);
-		if (dest_block->next == 0) {
-			alloc_last->next = dest_block;
-			last = alloc_last = dest_block;
-		}
-		return result;
+		return dest_block->add(value);
 	}
-
-	T &add(T const &value) { return add_in_place(value); }
-	T &add(T &&value) { return add_in_place(std::move(value)); }
-	T &add() { return add_in_place(); }
+	T &add() { return add({}); }
 
 	umm size() const {
 		umm totalSize = 0;

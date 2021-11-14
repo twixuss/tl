@@ -1040,7 +1040,7 @@ struct FormatBytesParams {
 	bool kilo_is_1024 = true;
 };
 
-inline FormattedBytes format_bytes(umm _count, FormatBytesParams params = {}) {
+inline FormattedBytes format_bytes(u64 _count, FormatBytesParams params = {}) {
 	FormattedBytes result{};
 
 	result.kilo_is_1024 = params.kilo_is_1024;

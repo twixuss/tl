@@ -75,20 +75,34 @@ forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 }
 
 struct Thread {
+	Allocator allocator;
+	void (*function)(Thread *self) = 0;
+	void *param = 0;
 	void *handle = 0;
 };
 
 template <class Ret>
 struct ThreadRet : Thread {
-	Ret *return_value = 0;
+	void *returning_function = 0;
+
+	ThreadRet() {}
+	~ThreadRet() {}
+	union {
+		Ret return_value;
+	};
 };
 
-struct ThreadContext {
-	bool parent_thread_can_continue = false;
-	void *param = 0;
-};
 
-TL_API Thread create_thread(void (*function)(ThreadContext *context), void *param);
+TL_API void run_thread(Thread *thread);
+inline Thread *create_thread(void (*function)(Thread *self), void *param) {
+	auto allocator = current_allocator;
+	auto thread = allocator.allocate<Thread>();
+	thread->allocator = allocator;
+	thread->function = function;
+	thread->param = param;
+	run_thread(thread);
+	return thread;
+}
 
 template <class ...Types>
 struct Tuple;
@@ -111,28 +125,21 @@ auto get(Tuple<Args...> tuple) {
 		return get<index - 1>(tuple.rest);
 	}
 }
-
 template <class Ret>
-inline ThreadRet<Ret> create_thread(Ret (*function)()) {
-	struct Data {
-		ThreadRet<Ret> result;
-		Ret (*function)();
+inline ThreadRet<Ret> *create_thread(Ret (*function)()) {
+	using Fn = Ret (*)();
+
+	auto allocator = current_allocator;
+	auto thread = allocator.allocate<ThreadRet<Ret>>();
+
+	thread->allocator = allocator;
+	thread->returning_function = function;
+	thread->param = 0;
+	thread->function = [](Thread *thread) {
+		thread->return_value = ((Fn)thread->returning_function)();
 	};
-
-	Data data;
-	data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
-	data.function = function;
-
-	(Thread &)data.result = create_thread([](ThreadContext *context) {
-		auto data = *(Data *)context->param;
-
-		context->parent_thread_can_continue = true;
-
-		*data.result.return_value = data.function();
-
-	}, &data);
-
-	return data.result;
+	run_thread(thread);
+	return thread;
 }
 
 namespace td {
@@ -143,33 +150,29 @@ inline static decltype(auto) invoke(Fn &&fn, Tuple &tuple, std::index_sequence<i
 }
 
 template <class Ret, class First, class ...Rest>
-inline ThreadRet<Ret> create_thread(Ret (*function)(First first, Rest ...rest), First first, Rest ...rest) {
-	struct Data {
-		ThreadRet<Ret> result;
-		Ret (*function)(First first, Rest ...rest);
-		Tuple<First, Rest...> args;
-	};
+inline ThreadRet<Ret> *create_thread(Ret (*function)(First first, Rest ...rest), First first, Rest ...rest) {
+	using Fn = Ret (*)(First, Rest...);
+	using ArgTuple = Tuple<First, Rest...>;
 
-	Data data;
-	if constexpr (!is_same<Ret, void>) {
-		data.result.return_value = current_allocator.allocate_uninitialized<Ret>();
-	}
-	data.function = function;
-	data.args = {first, rest...};
+	auto allocator = current_allocator;
+	auto thread = allocator.allocate<ThreadRet<Ret>>();
 
-	(Thread &)data.result = create_thread([](ThreadContext *context) {
-		auto data = *(Data *)context->param;
+	auto arg_tuple = allocator.allocate<ArgTuple>();
+	*arg_tuple = {first, rest...};
 
-		context->parent_thread_can_continue = true;
+	thread->allocator = allocator;
+	thread->returning_function = function;
+	thread->param = arg_tuple;
+	thread->function = [](Thread *_thread) {
+		auto thread = (ThreadRet<Ret> *)_thread;
 		if constexpr (is_same<Ret, void>) {
-			td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+			td::invoke((Fn)thread->returning_function, *(ArgTuple *)thread->param, std::make_index_sequence<sizeof...(rest) + 1>{});
 		} else {
-			*data.result.return_value = td::invoke(data.function, data.args, std::make_index_sequence<sizeof...(rest) + 1>{});
+			thread->return_value = td::invoke((Fn)thread->returning_function, *(ArgTuple *)thread->param, std::make_index_sequence<sizeof...(rest) + 1>{});
 		}
-
-	}, &data);
-
-	return data.result;
+	};
+	run_thread(thread);
+	return thread;
 }
 
 //template <class Fn, class ...Args>
@@ -177,22 +180,22 @@ inline ThreadRet<Ret> create_thread(Ret (*function)(First first, Rest ...rest), 
 //	return create_thread(create_function(fn, args...));
 //}
 
-TL_API void join(Thread thread);
+TL_API void join(Thread *thread);
 template <class Ret>
-inline Ret join(ThreadRet<Ret> &thread) {
-	join((Thread &)thread);
-	return *thread.return_value;
+inline Ret join(ThreadRet<Ret> *thread) {
+	join((Thread *)thread);
+	return thread->return_value;
 }
 
-TL_API bool finished(Thread thread);
-TL_API void free(Thread &thread);
+TL_API bool finished(Thread *thread);
+TL_API void free(Thread *thread);
 
-inline bool valid(Thread thread) { return thread.handle != 0; }
+inline bool valid(Thread *thread) { return thread->handle != 0; }
 
 TL_API u32 get_current_thread_id();
-TL_API u32 get_thread_id(Thread thread);
+TL_API u32 get_thread_id(Thread *thread);
 
-inline void join_and_free(Thread &thread) {
+inline void join_and_free(Thread *thread) {
 	join(thread);
 	free(thread);
 }
@@ -224,63 +227,55 @@ void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
 
-Thread create_thread(void (*function)(ThreadContext *context), void *param) {
-	struct Data {
-		void (*function)(ThreadContext *context) = 0;
-		ThreadContext context = {};
-	};
-	Thread result;
-
-	Data data = {};
-	data.function = function;
-	data.context.param = param;
-
-	result.handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
-		Data *data = (Data *)param;
-
+void run_thread(Thread *thread) {
+	thread->handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
+		auto thread = (Thread *)param;
 		init_allocator();
 		defer {deinit_allocator();};
-
 		current_printer = console_printer;
-
-		data->function(&data->context);
+		thread->function(thread);
 		return 0;
-	}, &data, 0, 0);
-	while (!data.context.parent_thread_can_continue);
-	return (Thread)result;
+	}, thread, 0, 0);
 }
-void join(Thread thread) {
-	WaitForSingleObjectEx((HANDLE)thread.handle, INFINITE, false);
+void join(Thread *thread) {
+	WaitForSingleObjectEx((HANDLE)thread->handle, INFINITE, false);
 }
-bool finished(Thread thread) {
-	return WaitForSingleObjectEx((HANDLE)thread.handle, 0, false) == WAIT_OBJECT_0;
+bool finished(Thread *thread) {
+	return WaitForSingleObjectEx((HANDLE)thread->handle, 0, false) == WAIT_OBJECT_0;
 }
-void free(Thread &thread) {
-	CloseHandle((HANDLE)thread.handle);
-	thread.handle = 0;
+void free(Thread *thread) {
+	CloseHandle((HANDLE)thread->handle);
+	thread->handle = 0;
 }
 
 u32 get_current_thread_id() {
 	return GetCurrentThreadId();
 }
-u32 get_thread_id(Thread thread) {
-	return GetThreadId((HANDLE)thread.handle);
+u32 get_thread_id(Thread *thread) {
+	return GetThreadId((HANDLE)thread->handle);
 }
 
 #else // ^^^ OS_WINDOWS ^^^ vvvvvv
 #endif
 #endif // TL_IMPL
 
+struct Spinner {
+	u32 try_count = 0;
+};
+inline void iteration(Spinner &spinner) {
+	spin_iteration();
+	if (spinner.try_count >= 64)
+		switch_thread();
+	if (spinner.try_count >= 4096)
+		sleep_milliseconds(1);
+	++spinner.try_count;
+}
+
 template <class Predicate>
 void loop_while(Predicate &&predicate) {
-	u32 try_count = 0;
+	Spinner spinner;
 	while (predicate()) {
-		spin_iteration();
-		if (try_count >= 64)
-			switch_thread();
-		if (try_count >= 4096)
-			sleep_milliseconds(1);
-		++try_count;
+		iteration(spinner);
 	}
 }
 template <class Predicate>
@@ -480,7 +475,7 @@ struct ThreadWork {
 
 struct ThreadPool {
 	Allocator allocator = current_allocator;
-	List<Thread> threads;
+	List<Thread *> threads;
 	u32 thread_count = 0;
 	u32 volatile initialized_thread_count = 0;
 	u32 volatile dead_thread_count = 0;
@@ -593,7 +588,6 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 	pool.running = false;
 	pool.stopping = false;
 	pool.thread_count = thread_count;
-	construct(pool.threads);
 	if (thread_count) {
 		pool.threads.reserve(thread_count);
 

@@ -20,8 +20,18 @@
 #include "common.h"
 
 namespace tl { namespace Profiler {
+
 TL_API void begin(Span<char> name, char const *file, u32 line);
 TL_API void end();
+TL_API void mark(Span<char> name, u32 color);
+
+inline void begin(char const *name, char const *file, u32 line) {
+	return begin(as_span(name), file, line);
+}
+inline void mark(char const *name, u32 color) {
+	return mark(as_span(name), color);
+}
+
 }}
 
 #include "compiler.h"
@@ -59,6 +69,7 @@ TL_API List<u8> output_for_timed();
 #include "win32.h"
 #include "string.h"
 #include "thread.h"
+#include "int128.h"
 #include <unordered_map>
 
 #pragma optimize("g", on)
@@ -66,6 +77,15 @@ TL_API List<u8> output_for_timed();
 #pragma optimize("y", on)
 
 namespace tl { namespace Profiler {
+
+struct Mark {
+	s64 counter;
+	u32 color;
+	u32 thread_id;
+};
+
+List<Mark> marks;
+Mutex marks_mutex;
 
 Allocator name_allocator;
 
@@ -75,11 +95,15 @@ Mutex recorded_time_spans_mutex;
 std::unordered_map<u32, List<TimeSpan>> current_time_spans;
 Mutex current_time_spans_mutex;
 thread_local bool enabled = TL_ENABLE_PROFILER;
-thread_local s64 self_time;
+//thread_local s64 self_time;
+
+s64 start_time;
 
 void init() {
 	name_allocator = default_allocator;
+	marks.allocator = default_allocator;
 	recorded_time_spans.allocator = default_allocator;
+	start_time = get_performance_counter();
 }
 void deinit() {
 	free(recorded_time_spans);
@@ -97,9 +121,7 @@ void begin(Span<char> name, char const *file, u32 line) {
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
-	auto begin_counter = get_performance_counter();
-	self_time += begin_counter - self_begin;
-	span.begin = begin_counter - self_time;
+	span.begin = get_performance_counter();
 }
 void end() {
 	if (!enabled)
@@ -114,12 +136,14 @@ void end() {
 	TimeSpan span = list.back();
 	list.pop();
 
-	span.end = end_counter - self_time;
+	span.end = end_counter;
 
 	scoped_lock(recorded_time_spans_mutex);
 	recorded_time_spans.add(span);
-
-	self_time += get_performance_counter() - end_counter;
+}
+void mark(Span<char> name, u32 color) {
+	scoped_lock(marks_mutex);
+	marks.add({get_performance_counter(), color, get_current_thread_id()});
 }
 void reset() {
 	recorded_time_spans.clear();
@@ -167,16 +191,23 @@ List<u8> output_for_timed() {
 	};
 	*/
 
+	s64 const nanoseconds_in_second = 1'000'000'000;
+
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	if (!recorded_time_spans.empty()) {
-		for (auto span : recorded_time_spans) {
-			append_bytes(builder, (s64)(span.begin * 1000000000 / performance_frequency));
-			append_bytes(builder, (s64)(span.end   * 1000000000 / performance_frequency));
-			append_bytes(builder, (u32)span.thread_id);
-			append_bytes(builder, (u16)span.name.count);
-			append_bytes(builder, span.name);
-		}
+	append_bytes(builder, (u32)recorded_time_spans.count);
+	for (auto span : recorded_time_spans) {
+		append_bytes(builder, (s64)(divide(multiply(span.begin - start_time, nanoseconds_in_second), performance_frequency)));
+		append_bytes(builder, (s64)(divide(multiply(span.end   - start_time, nanoseconds_in_second), performance_frequency)));
+		append_bytes(builder, (u32)span.thread_id);
+		append_bytes(builder, (u16)span.name.count);
+		append_bytes(builder, span.name);
+	}
+	append_bytes(builder, (u32)marks.count);
+	for (auto mark : marks) {
+		append_bytes(builder, (s64)(divide(multiply(mark.counter - start_time, nanoseconds_in_second), performance_frequency)));
+		append_bytes(builder, (u32)mark.thread_id);
+		append_bytes(builder, (u32)mark.color);
 	}
 	return (List<u8>)to_string(builder);
 }
@@ -188,5 +219,11 @@ List<u8> output_for_timed() {
 #endif
 
 #endif
+#else
+namespace tl {
+namespace Profiler {
+void begin(Span<char> name, char const *file, u32 line) {}
+void end() {}
+}}
 #endif
 #endif

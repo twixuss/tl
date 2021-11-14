@@ -1127,7 +1127,22 @@ inline constexpr bool is_alpha(ascii c) {
 }
 
 inline constexpr bool is_alpha(utf32 c) {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+	constexpr utf32 ranges[][2] {
+		{0x41, 0x5a},
+		{0x61, 0x7a},
+		{0xc0, 0xd6},
+		{0xd8, 0xf6},
+		{0xf8, 0x148},
+		{0x14a, 0x24f},
+		{0x400, 0x482},
+		{0x1e02, 0x1ef3},
+	};
+	for (auto range : ranges) {
+		if (range[0] <= c && c <= range[1]) {
+			return true;
+		}
+	}
+	return false;
 }
 
 inline constexpr bool is_digit(ascii c) {
@@ -1523,11 +1538,12 @@ struct Allocator {
 #define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
 
+extern TL_API Allocator os_allocator;
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
 extern TL_API thread_local Allocator current_allocator;
 
-extern TL_API void init_allocator(Allocator tempory_allocator_backup = default_allocator);
+extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
 extern TL_API void clear_temporary_storage();
 
@@ -1625,7 +1641,7 @@ umm allocations_count = 0;
 umm allocations_size = 0;
 #endif
 
-Allocator default_allocator = {
+Allocator os_allocator = {
 	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
 		switch (mode) {
 			case Allocator_allocate: {
@@ -1653,6 +1669,7 @@ Allocator default_allocator = {
 	},
 	0
 };
+Allocator default_allocator = os_allocator;
 
 struct TemporaryAllocatorState {
 	struct Block {
@@ -1736,9 +1753,9 @@ void clear_temporary_storage() {
 
 thread_local Allocator current_allocator;
 
-void init_allocator(Allocator tempory_allocator_backup) {
+void init_allocator(Allocator temporary_allocator_backup) {
 	current_allocator = default_allocator;
-	temporary_allocator_state.allocator = tempory_allocator_backup;
+	temporary_allocator_state.allocator = temporary_allocator_backup;
 }
 
 void deinit_allocator() {

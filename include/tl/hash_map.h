@@ -134,39 +134,39 @@ struct HashMap {
 	using Bucket = LinkedList<KeyValue>;
 
 	Allocator allocator = current_allocator;
-	Bucket *buckets = 0;
-	umm bucket_count = 0;
+	Span<Bucket> buckets;
 	umm total_value_count = 0;
 
 	Value &get_or_insert(Key const &key) {
 		scoped_allocator(allocator);
 
-		if (!bucket_count) {
-			rehash(256);
+		if (!buckets.count) {
+			rehash(16);
 		}
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
-		for (auto &it : bucket) {
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
 			if (it.key == key) {
 				return it.value;
 			}
 		}
 
-		if (total_value_count == bucket_count) {
-			rehash(bucket_count * 2);
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2);
+			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
-		auto &it = bucket.add();
+		auto &it = bucket->add();
 		it.key = key;
 		return it.value;
 	}
 	Pointer<Value> find(Key const &key) {
-		if (bucket_count == 0)
+		if (buckets.count == 0)
 			return 0;
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
+		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.key == key) {
 				return &it.value;
@@ -175,11 +175,11 @@ struct HashMap {
 		return 0;
 	}
 	Optional<Value> erase(Key const &key) {
-		if (bucket_count == 0)
+		if (buckets.count == 0)
 			return {};
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
+		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.key == key) {
 				auto result = it.value;
@@ -191,29 +191,29 @@ struct HashMap {
 		return {};
 	}
 
-	void rehash(umm new_bucket_count) {
+	void rehash(umm new_buckets_count) {
 		scoped_allocator(allocator);
 
-		Bucket *old_buckets = buckets;
+		auto old_buckets = buckets;
 
-		buckets = allocator.allocate<Bucket>(new_bucket_count);
+		buckets.data = allocator.allocate<Bucket>(new_buckets_count);
+		buckets.count = new_buckets_count;
 
-		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
 			for (KeyValue &key_value : old_buckets[bucket_index]) {
 				auto hash = Hasher::get_hash(key_value.key);
-				auto &new_bucket = buckets[hash & (new_bucket_count - 1)];
+				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
 				new_bucket.add(key_value);
 			}
 		}
 
-		if (old_buckets) {
-			allocator.free(old_buckets);
+		if (old_buckets.data) {
+			allocator.free(old_buckets.data);
 		}
-		bucket_count = new_bucket_count;
 	}
 
 	void clear() {
-		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+		for (umm bucket_index = 0; bucket_index < buckets.count; ++bucket_index) {
 			buckets[bucket_index].clear();
 		}
 	}
@@ -223,7 +223,7 @@ template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
 void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 	static_assert(flags == 0, "Only default flags supported");
 
-	for (u32 i = 0; i < map.bucket_count; ++i) {
+	for (u32 i = 0; i < map.buckets.count; ++i) {
 		for (auto &it : map.buckets[i]) {
 			fn(it.key, it.value);
 		}
@@ -245,6 +245,26 @@ void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> c
 	for_each(source, [&](Key const &key, Value const &value) {
 		destination.get_or_insert(key) = value;
 	});
+}
+
+template <class Key, class Value, class Hasher>
+umm count_of(HashMap<Key, Value, Hasher> &map) {
+	umm result = 0;
+	for (auto &bucket : map.buckets) {
+		result += bucket.size();
+	}
+	return result;
+}
+
+template <class Key, class Value, class Hasher, class Fn>
+umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+	umm result = 0;
+	for_each(map, [&](Key &key, Value &value) {
+		if (fn(key, value)) {
+			result += 1;
+		}
+	});
+	return result;
 }
 
 }
