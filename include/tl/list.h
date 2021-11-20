@@ -219,6 +219,15 @@ struct List : Span<T> {
 };
 
 template <class T>
+List<T> make_list(std::initializer_list<T> list) {
+	List<T> result;
+	result.reserve(list.size());
+	result.count = list.size();
+	memcpy(result.data, list.begin(), list.size() * sizeof(T));
+	return result;
+}
+
+template <class T>
 void erase(List<T> &list, T *value) { list.erase_at(value - list.data); }
 
 template <class T>

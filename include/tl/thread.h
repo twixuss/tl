@@ -92,6 +92,14 @@ struct ThreadRet : Thread {
 	};
 };
 
+template <>
+struct ThreadRet<void> : Thread {
+	void *returning_function = 0;
+
+	ThreadRet() {}
+	~ThreadRet() {}
+};
+
 
 TL_API void run_thread(Thread *thread);
 inline Thread *create_thread(void (*function)(Thread *self), void *param) {
@@ -136,7 +144,11 @@ inline ThreadRet<Ret> *create_thread(Ret (*function)()) {
 	thread->returning_function = function;
 	thread->param = 0;
 	thread->function = [](Thread *thread) {
-		thread->return_value = ((Fn)thread->returning_function)();
+		if constexpr (is_same<Ret, void>) {
+			((Fn)((ThreadRet<Ret> *)thread)->returning_function)();
+		} else {
+			thread->return_value = ((Fn)thread->returning_function)();
+		}
 	};
 	run_thread(thread);
 	return thread;
@@ -482,24 +494,23 @@ struct ThreadPool {
 	bool volatile running = false;
 	bool volatile stopping = false;
 	MutexQueue<ThreadWork> all_work;
+
+	u32 started_work_count;
+	u32 finished_work_count;
 };
 bool try_do_work(ThreadPool *pool);
 
 struct WorkQueue {
 	ThreadPool *pool = 0;
 	u32 volatile work_to_do = 0;
-	bool important = false;
 	inline void push(void (*fn)(void *param), void *param) {
+		atomic_increment(&pool->started_work_count);
 		if (pool->thread_count) {
 			ThreadWork work;
 			work.fn = fn;
 			work.param = param;
 			work.queue = this;
-			if (important) {
-				pool->all_work.push_front_unordered(work);
-			} else {
-				pool->all_work.push(work);
-			}
+			pool->all_work.push(work);
 		} else {
 			fn(param);
 		}
@@ -533,10 +544,9 @@ struct WorkQueue {
 
 };
 
-inline WorkQueue make_work_queue(ThreadPool &pool, bool important = false) {
+inline WorkQueue make_work_queue(ThreadPool &pool) {
 	WorkQueue result = {};
 	result.pool = &pool;
-	result.important = important;
 	return result;
 }
 
@@ -544,6 +554,7 @@ inline void do_work(ThreadWork work) {
 	work.fn(work.param);
 	work.queue->pool->allocator.free(work.param);
 	atomic_add(&work.queue->work_to_do, (u32)-1);
+	atomic_increment(&work.queue->pool->finished_work_count);
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {
@@ -633,6 +644,10 @@ inline void deinit_thread_pool(ThreadPool *pool, bool waitForThreads = true) {
 		loop_until([&] { return pool->dead_thread_count == pool->thread_count; });
 	}
 	pool->threads.clear();
+}
+
+inline void wait_for_completion(ThreadPool &pool) {
+	loop_while([&]{ return pool.started_work_count != pool.finished_work_count; });
 }
 
 } // namespace tl

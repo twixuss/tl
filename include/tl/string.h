@@ -134,6 +134,7 @@ struct FormatInt {
 	u32 radix = 10;
 	u32 leading_zero_count = 0;
 	u32 skip_digits = 0;
+	char const *char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 };
 
 enum FloatFormat {
@@ -754,7 +755,7 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	auto radix = convert<Int>(f.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	char buf[maxDigits];
-	constexpr char charMap[] = "0123456789ABCDEF";
+	auto charMap = f.char_set;
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
 

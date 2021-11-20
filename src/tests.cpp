@@ -24,6 +24,7 @@
 #include <tl/thread.h>
 #include <tl/time.h>
 #include <tl/u256.h>
+#include <tl/big_int.h>
 
 #if OS_WINDOWS
 #include <tl/win32.h>
@@ -550,264 +551,6 @@ u128 operator""su(u64 val) {
 
 
 
-struct BigUInt {
-	List<u64> parts;
-	BigUInt() = default;
-	BigUInt(u64 value) : parts({value}) {}
-	BigUInt(BigUInt const &that) : parts(copy(that.parts)) {}
-	BigUInt(BigUInt &&that) : parts(that.parts) { that.parts = {}; }
-	~BigUInt() { free(parts); }
-
-	BigUInt &operator=(BigUInt const &that) { free(parts); parts = copy(that.parts); return *this; }
-	BigUInt &operator=(BigUInt &&that) { free(parts); parts = that.parts; that.parts = {}; return *this; }
-
-	u64 try_get_part(umm index) const {
-		return index < parts.count ? parts[index] : (u64)0;
-	}
-	bool get_bit(umm index) const {
-		umm part_index = index / (sizeof(parts[0]) * 8);
-		umm bit_index  = index % (sizeof(parts[0]) * 8);
-		return parts[part_index] & ((u64)1 << bit_index);
-	}
-	void set_bit(umm index, bool value) {
-		umm part_index = index / (sizeof(parts[0]) * 8);
-		umm bit_index  = index % (sizeof(parts[0]) * 8);
-		if (value) parts[part_index] |=  ((u64)1 << bit_index);
-		else       parts[part_index] &= ~((u64)1 << bit_index);
-	}
-
-	BigUInt operator~() const {
-		BigUInt result;
-		result.parts.reserve(parts.count);
-		for (auto &part : parts) {
-			result.parts.add(~part);
-		}
-		return result;
-	}
-	BigUInt operator-() const {
-		BigUInt result = ~*this;
-		return ++result;
-	}
-
-	BigUInt &operator++() { return *this += 1; }
-	BigUInt operator++(int) { BigUInt copy = *this; ++*this; return copy; }
-
-	BigUInt operator<<(u64 b) const {
-		BigUInt result;
-
-		u64 zero_part_count = b >> 6;
-		result.parts.resize(zero_part_count);
-
-		if ((b & 63) == 0) {
-			for (auto &part : parts) {
-				result.parts.add(part);
-			}
-		} else {
-			if (parts.count) {
-				result.parts.add(parts[0] << b);
-				for (umm part_index = 1; part_index != parts.count; ++part_index) {
-					result.parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
-				}
-			}
-		}
-
-		return result;
-	}
-
-	BigUInt operator+(BigUInt b) const {
-		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-
-		BigUInt result;
-		result.parts.resize(max_int.parts.count);
-
-		bool carry = false;
-
-		for (u32 part_index = 0; part_index < min_int.parts.count; ++part_index) {
-			add_carry(min_int.parts[part_index], max_int.parts[part_index], carry, &result.parts[part_index], &carry);
-		}
-		for (u32 part_index = min_int.parts.count; part_index < max_int.parts.count; ++part_index) {
-			add_carry(max_int.parts[part_index], 0, carry, &result.parts[part_index], &carry);
-		}
-
-		if (carry) {
-			result.parts.add(1);
-		}
-
-		return result;
-	}
-	BigUInt operator-(BigUInt const &b) const {
-		assert(*this >= b);
-		if (parts.count == 0)
-			return 0;
-
-		BigUInt result = *this;
-		if (result.parts[0] < b.parts[0]) {
-			for (umm part_index = 1; part_index != result.parts.count; part_index += 1) {
-				result.parts[part_index]--;
-				if (result.parts[part_index] != -1) {
-					break;
-				}
-			}
-		}
-		result.parts[0] -= b.parts[0];
-		return result;
-	}
-	BigUInt operator*(BigUInt b) const {
-		BigUInt result = {};
-		for (u32 bit_index = 0; bit_index < b.parts.count * (sizeof(b.parts[0]) * 8); ++bit_index) {
-			if (b.get_bit(bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	BigUInt operator/(BigUInt b) const {
-		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-
-		BigUInt N = *this;
-		BigUInt quotient;
-		BigUInt remainder;
-
-		N.parts.resize(max_int.parts.count);
-		quotient.parts.resize(max_int.parts.count);
-		remainder.parts.resize(max_int.parts.count);
-
-		for (u32 bit_index = max_int.parts.count * 64 - 1; bit_index != ~(u32)0; --bit_index) {
-			remainder <<= 1;
-			remainder.set_bit(0, N.get_bit(bit_index));
-			if (remainder >= b) {
-				remainder -= b;
-				quotient.set_bit(bit_index, 1);
-			}
-		}
-		return quotient;
-	}
-	BigUInt operator%(BigUInt b) const {
-		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-
-		BigUInt N = *this;
-		BigUInt quotient;
-		BigUInt remainder;
-
-		N.parts.resize(max_int.parts.count);
-		quotient.parts.resize(max_int.parts.count);
-		remainder.parts.resize(max_int.parts.count);
-
-		for (u32 bit_index = max_int.parts.count * 64 - 1; bit_index != ~(u32)0; --bit_index) {
-			remainder <<= 1;
-			remainder.set_bit(0, N.get_bit(bit_index));
-			if (remainder >= b) {
-				remainder -= b;
-				quotient.set_bit(bit_index, 1);
-			}
-		}
-		return remainder;
-	}
-	bool operator==(BigUInt b) const {
-		BigUInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-		for (umm index = max_int.parts.count - 1; index != min_int.parts.count - 1; --index) {
-			if (max_int.parts[index] != 0) {
-				return false;
-			}
-		}
-		for (umm index = min_int.parts.count - 1; index != (umm)-1; --index) {
-			if (min_int.parts[index] != max_int.parts[index]) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	bool operator!=(BigUInt b) const {
-		return !operator==(b);
-	}
-
-	bool operator>(BigUInt b) const {
-		umm max_part_count = max(parts.count, b.parts.count);
-		if (max_part_count == 0)
-			return false;
-
-		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
-			if (parts[part_index] != b.parts[part_index]) {
-				return parts[part_index] > b.parts[part_index];
-			}
-		}
-
-		return parts[0] > b.parts[0];
-	}
-	bool operator<(BigUInt b) const {
-		umm max_part_count = max(parts.count, b.parts.count);
-		if (max_part_count == 0)
-			return false;
-
-		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
-			if (parts[part_index] != b.parts[part_index]) {
-				return parts[part_index] < b.parts[part_index];
-			}
-		}
-
-		return parts[0] < b.parts[0];
-	}
-	bool operator>=(BigUInt b) const {
-		umm max_part_count = max(parts.count, b.parts.count);
-		if (max_part_count == 0)
-			return false;
-
-		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
-			if (try_get_part(part_index) != b.try_get_part(part_index)) {
-				return try_get_part(part_index) >= b.try_get_part(part_index);
-			}
-		}
-
-		return parts[0] >= b.parts[0];
-	}
-	bool operator<=(BigUInt b) const {
-		umm max_part_count = max(parts.count, b.parts.count);
-		if (max_part_count == 0)
-			return false;
-
-		for (umm part_index = max_part_count - 1; part_index != 0; part_index -= 1) {
-			if (parts[part_index] != b.parts[part_index]) {
-				return parts[part_index] <= b.parts[part_index];
-			}
-		}
-
-		return parts[0] <= b.parts[0];
-	}
-
-	BigUInt &operator+=(BigUInt b) { return *this = *this + b; }
-	BigUInt &operator-=(BigUInt b) { return *this = *this - b; }
-	BigUInt &operator*=(BigUInt b) { return *this = *this * b; }
-	BigUInt &operator/=(BigUInt b) { return *this = *this / b; }
-	BigUInt &operator<<=(u64 b) { return *this = *this << b; }
-
-	explicit operator u8 () { return parts.count ? parts[0] : 0; }
-	explicit operator u16() { return parts.count ? parts[0] : 0; }
-	explicit operator u32() { return parts.count ? parts[0] : 0; }
-	explicit operator u64() { return parts.count ? parts[0] : 0; }
-};
-
-
-template <> inline static constexpr bool is_integer<BigUInt> = true;
-template <> inline static constexpr bool is_integer_like<BigUInt> = true;
-template <> inline static constexpr bool is_signed<BigUInt> = false;
-
-BigUInt operator""bu(u64 val) {
-	return val;
-}
-
 #if 1
 umm append(StringBuilder &builder, F32 f) {
 	s8 actual_exponent = f.exponent - 127;
@@ -905,6 +648,200 @@ float pow2(float a) {
 }
 
 int main() {
+	assert(1ib == 1ib);
+	assert(1ib + 2ib == 3ib);
+	assert(1ib - 2ib == -1ib);
+	assert(1ib << 4 == 16ib);
+	assert(3ib * 4ib == 12ib);
+	assert((0xfaib & 0xfib) == 0xaib);
+	assert(( 5421ib &  6748ib) == 4108ib);
+	assert((-5421ib & -6748ib) == -8064ib);
+	assert((-5421ib &  6748ib) == 2640ib);
+	assert(( 5421ib & -6748ib) == 1316ib);
+	assert(( 5421ib |  6748ib) == 8061ib);
+	assert((-5421ib | -6748ib) == -4105ib);
+	assert((-5421ib |  6748ib) == -1313ib);
+	assert(( 5421ib | -6748ib) == -2643ib);
+	assert(0x8000000000000000ib * 2ib == make_big_int(1, 0));
+
+
+	// fffffffffff0f0
+	// ffffffffffff0f
+
+	BigInt a = 0x04aa8a77af273627ib * 0x0c1977bf353eaa48ib;
+	BigInt b = 0x62049fd081f10577ib * 0x47566041d43542a3ib;
+	assert(a == make_big_int(0x387553E4795627, 0xE6667DC77D6F20F8));
+	assert(b == make_big_int(0x1B505ABB74707CF8, 0x932505E68D8228C5));
+	//BigInt a = 3ib;
+	//BigInt b = 4ib;
+	//auto c = a * b;
+
+	// REMEMBER:
+	// LEAST SIGNIFICANT PART GOES FIRST!
+	{
+		// &
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full})}));
+
+
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full      })}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full      })}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full, 1ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full, 1ull})}));
+
+
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full,     })}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} &
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full, 1ull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full      })}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} &
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x00000000000000f0ull, 0x000000f00000000full, 1ull})}));
+	}
+	{
+		// |
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull})}));
+
+
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull, 1ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull, 1ull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull      })}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull,     })}));
+
+
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull, 1ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} |
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull,     })}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true , .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull, 1ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} |
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f0000ffull, 0x000f00f0f0f000ffull,     })}));
+	}
+	{
+		// ^
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 1ull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 1ull})}));
+
+
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 0xfffffffffffffffeull})}));
+
+		assert(((BigInt{.msb=false, .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true , .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 1ull})}));
+
+
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 1ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} ^
+					BigInt{.msb=false, .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=true,  .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 0xfffffffffffffffeull})}));
+
+
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full})} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full, 1ull})} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull      })}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 0xfffffffffffffffeull})}));
+
+		assert(((BigInt{.msb=true,  .parts=make_list({0x000000f0000000ffull, 0x000f00f0f000000full      })} ^
+					BigInt{.msb=true,  .parts=make_list({0x000000000f0000f0ull, 0x000000f000f000ffull, 1ull})}) ==
+					BigInt{.msb=false, .parts=make_list({0x000000f00f00000full, 0x000f0000f0f000f0ull, 0xfffffffffffffffeull})}));
+	}
 	powf(1, 2);
 	::pow2(2);
 

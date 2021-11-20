@@ -161,6 +161,40 @@ struct HashMap {
 		it.key = key;
 		return it.value;
 	}
+
+	//
+	// If value is not present returns true
+	//
+	// If value is already present calls a callback with stored key and value and returns false
+	//
+	template <class Callback>
+	bool insert_or(Key const &key, Value value, Callback &&callback) {
+		scoped_allocator(allocator);
+
+		if (!buckets.count) {
+			rehash(16);
+		}
+
+		umm hash = Hasher::get_hash(key);
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
+			if (it.key == key) {
+				callback(it.key, it.value);
+				return false;
+			}
+		}
+
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2);
+			bucket = &buckets[hash & (buckets.count - 1)];
+		}
+		++total_value_count;
+		auto &it = bucket->add();
+		it.key = key;
+		it.value = value;
+		return true;
+	}
+
 	Pointer<Value> find(Key const &key) {
 		if (buckets.count == 0)
 			return 0;

@@ -102,24 +102,17 @@ struct BlockList {
 	}
 	T &add() { return add({}); }
 
-	umm size() const {
-		umm totalSize = 0;
-		for (auto block = &first; block != 0; block = block->next) {
-			totalSize += block->size();
-		}
-		return totalSize;
-	}
-	bool empty() const { return (last == &first) && (first.size() == 0); }
+	bool empty() const { return (last == &first) && (first.count == 0); }
 
-	T &back() { return last->end[-1].value; }
-	T const &back() const { return last->end[-1].value; }
+	T &back() { return last->back(); }
+	T const &back() const { return last->back(); }
 
 	void pop_back() {
 		if (last == &first)
-			bounds_check(first.size());
+			bounds_check(first.count);
 
-		(last->end--)[-1].value.~T();
-		if (last->end == last->buffer && last != &first) {
+		last->count--;
+		if (last->count == 0 && last != &first) {
 			last = last->previous;
 		}
 	}
@@ -128,7 +121,7 @@ struct BlockList {
 	void for_each_block(Fn &&fn) const {
 		auto block = &first;
 		do {
-			auto block_capacity = block->size();
+			auto block_capacity = block->count;
 			if (block_capacity) {
 				fn(block->buffer, block_capacity);
 			}
@@ -149,7 +142,7 @@ struct BlockList {
 			bounds_check(false);
 		check_value_index:
 
-			bounds_check(index.value_index < block->size());
+			bounds_check(index.value_index < block->count);
 		}
 #endif
 		return index.block->buffer[index.value_index].value;
@@ -160,13 +153,13 @@ struct BlockList {
 			block = block->next;
 			bounds_check(block);
 		}
-		bounds_check(index.value_index < block->size());
+		bounds_check(index.value_index < block->count);
 		return block->data[index.value_index];
 	}
 	T &operator[](umm index) {
 		auto block = &first;
-		while (index >= block->size) {
-			index -= block->size;
+		while (index >= block->count) {
+			index -= block->count;
 			block = block->next;
 			bounds_check(block);
 		}
@@ -187,6 +180,15 @@ struct BlockList {
 		return {last, last->count};
 	}
 };
+
+template <class T, umm block_size>
+umm count_of(BlockList<T, block_size> const &list) {
+	umm total_count = 0;
+	for (auto block = &list.first; block != 0; block = block->next) {
+		total_count += block->count;
+	}
+	return total_count;
+}
 
 template <class T, umm block_size>
 T *next(BlockList<T, block_size> &list, T *source) {
@@ -335,6 +337,23 @@ T *find_if(BlockList<T, block_size> &list, Predicate &&predicate) {
 	} while (block);
 
 	return 0;
+}
+
+template <class T, umm destination_block_size, umm source_block_size>
+void add(BlockList<T, destination_block_size> *destination, BlockList<T, source_block_size> source) {
+	for_each(source, [&](T const &value) {
+		destination->add(value);
+	});
+}
+
+
+template <class T, umm block_size>
+List<T> to_list(BlockList<T, block_size> list) {
+	List<T> result;
+	for_each(list, [&](T const &value) {
+		result.add(value);
+	});
+	return result;
 }
 
 }

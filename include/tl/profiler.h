@@ -95,7 +95,7 @@ Mutex recorded_time_spans_mutex;
 std::unordered_map<u32, List<TimeSpan>> current_time_spans;
 Mutex current_time_spans_mutex;
 thread_local bool enabled = TL_ENABLE_PROFILER;
-//thread_local s64 self_time;
+thread_local s64 self_time;
 
 s64 start_time;
 
@@ -121,7 +121,9 @@ void begin(Span<char> name, char const *file, u32 line) {
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
-	span.begin = get_performance_counter();
+	auto begin_counter = get_performance_counter();
+	self_time += begin_counter - self_begin;
+	span.begin = begin_counter - self_time;
 }
 void end() {
 	if (!enabled)
@@ -136,14 +138,16 @@ void end() {
 	TimeSpan span = list.back();
 	list.pop();
 
-	span.end = end_counter;
+	span.end = end_counter - self_time;
 
 	scoped_lock(recorded_time_spans_mutex);
 	recorded_time_spans.add(span);
+
+	self_time += get_performance_counter() - end_counter;
 }
 void mark(Span<char> name, u32 color) {
 	scoped_lock(marks_mutex);
-	marks.add({get_performance_counter(), color, get_current_thread_id()});
+	marks.add({get_performance_counter() - self_time, color, get_current_thread_id()});
 }
 void reset() {
 	recorded_time_spans.clear();
