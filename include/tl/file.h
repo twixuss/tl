@@ -176,7 +176,10 @@ inline void free(FileItemList &list) {
 	free(list.base());
 }
 
-TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
+TL_API FileItemList get_items_in_directory(Span<utf16> directory);
+inline FileItemList get_items_in_directory(Span<utf8> directory) {
+	return get_items_in_directory(with(temporary_allocator, to_utf16(directory)));
+}
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {

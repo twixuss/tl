@@ -495,8 +495,8 @@ struct ThreadPool {
 	bool volatile stopping = false;
 	MutexQueue<ThreadWork> all_work;
 
-	u32 started_work_count;
-	u32 finished_work_count;
+	u32 started_work_count = 0;
+	u32 finished_work_count = 0;
 };
 bool try_do_work(ThreadPool *pool);
 

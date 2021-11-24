@@ -6,7 +6,7 @@
 
 namespace tl {
 
-template <class T, class Allocator = Allocator>
+template <class T>
 struct List : Span<T> {
 	using Span<T>::data;
 	using Span<T>::count;
@@ -14,16 +14,8 @@ struct List : Span<T> {
 	using Span<T>::end;
 
 	umm capacity = 0;
-	[[no_unique_address]] Allocator allocator = get_current_allocator<Allocator>();
+	Allocator allocator = current_allocator;
 
-	/*
-	List() = default;
-	List(std::initializer_list<T> list) {
-		reserve(list.size());
-		count = list.size();
-		memcpy(data, list.begin(), list.size() * sizeof(T));
-	}
-	*/
 	void set(Span<T> span) {
 		reserve(span.count);
 		count = span.count;
@@ -836,12 +828,14 @@ struct StaticCircularQueue : private StaticCircularBuffer<T, _capacity> {
 };
 
 template <class T>
-struct LinearSet : private List<T> {
-	using Base = List<T>;
-	using Base::begin;
-	using Base::end;
-	using Base::clear;
-	using Base::allocator;
+struct LinearSet : Span<T> {
+	using Span<T>::data;
+	using Span<T>::count;
+	using Span<T>::begin;
+	using Span<T>::end;
+
+	umm capacity = 0;
+	Allocator allocator = current_allocator;
 
 	T &insert(T const &value) {
 		for (auto &it : *this) {
@@ -849,7 +843,107 @@ struct LinearSet : private List<T> {
 				return it;
 			}
 		}
-		return this->add(value);
+		reserve_exponential(count + 1);
+		return data[count++] = value;
+	}
+
+	void reallocate(umm desired_capacity) {
+		T *new_data;
+		if (data) {
+			new_data = allocator.reallocate_uninitialized<T>(data, count, desired_capacity);
+		} else {
+			new_data = allocator.allocate_uninitialized<T>(desired_capacity);
+		}
+		data = new_data;
+		capacity = desired_capacity;
+	}
+
+	void reserve(umm desired_capacity) {
+		if (capacity >= desired_capacity) return;
+
+		reallocate(desired_capacity);
+	}
+	void reserve_exponential(umm desired_capacity) {
+		if (capacity >= desired_capacity) return;
+
+		umm new_capacity = max(1u, capacity);
+		while (new_capacity < desired_capacity) new_capacity *= 2;
+
+		reallocate(new_capacity);
+	}
+
+	void clear() {
+		count = 0;
+	}
+
+	T pop() {
+		--count;
+		return data[count];
+	}
+
+	template <class U>
+	explicit operator LinearSet<U>() const {
+		LinearSet<U> result;
+		result.allocator = allocator;
+		result.data = (U *)data;
+		if constexpr (sizeof(T) == sizeof(U)) {
+			result.count      = count;
+			result.capacity  = capacity;
+		} else {
+			if constexpr (sizeof(T) > sizeof(U)) {
+				static_assert(sizeof(T) % sizeof(U) == 0);
+			} else {
+				static_assert(sizeof(U) % sizeof(T) == 0);
+			}
+			result.count      = count     * sizeof(T) / sizeof(U);
+			result.capacity  = capacity * sizeof(T) / sizeof(U);
+		}
+		return result;
+	}
+
+	void erase(Span<T> where) {
+		bounds_check(
+			where.count <= count &&
+			begin() <= where.begin() && where.begin() < end() &&
+			where.end() <= end()
+		);
+
+		memmove(where.data, where.data + where.count, count - where.count + data - where.data);
+		count -= where.count;
+	}
+	void erase_at(umm where) {
+		bounds_check(where < count);
+		--count;
+		for (umm i = where; i < count; ++i) {
+			data[i] = data[i + 1];
+		}
+	}
+
+	void move(T *from, T *to) {
+		T temp = *from;
+		if (to < from) {
+			memmove(to + 1, to, sizeof(T) * (from - to));
+		} else {
+			memmove(from, from + 1, sizeof(T) * (to - from));
+		}
+		*to = temp;
+	}
+	void move_at(T *from, umm destination_index) {
+		move(from, data + destination_index);
+	}
+
+private:
+	Span<T> add(Span<T> span) {
+		reserve_exponential(count + span.count);
+		memcpy(data + count, span.data, span.count * sizeof(T));
+		count += span.count;
+		return {data + count - span.count, span.count};
+	}
+	Span<T> add(std::initializer_list<T> list) {
+		reserve_exponential(count + list.size());
+		memcpy(data + count, list.begin(), list.size() * sizeof(T));
+		count += list.size();
+		return {data + count - list.size(), list.size()};
 	}
 };
 

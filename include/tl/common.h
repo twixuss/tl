@@ -162,6 +162,10 @@ template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
 	return *new(std::addressof(val)) T(std::forward<Args>(args)...);
 }
+template <class T>
+constexpr void destruct(T &val) {
+	val.~T();
+}
 
 //template <class T>
 //void swap(T &a, T &b) {
@@ -328,6 +332,10 @@ forceinline constexpr bool is_power_of_2(u8  v) { return count_bits(v) == 1; }
 forceinline constexpr bool is_power_of_2(u16 v) { return count_bits(v) == 1; }
 forceinline constexpr bool is_power_of_2(u32 v) { return count_bits(v) == 1; }
 forceinline constexpr bool is_power_of_2(u64 v) { return count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(s8  v) { return v > 0 && count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(s16 v) { return v > 0 && count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(s32 v) { return v > 0 && count_bits(v) == 1; }
+forceinline constexpr bool is_power_of_2(s64 v) { return v > 0 && count_bits(v) == 1; }
 
 template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
 template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
