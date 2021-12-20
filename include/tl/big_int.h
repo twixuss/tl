@@ -495,70 +495,45 @@ struct BigInt {
 		return !operator==(b);
 	}
 
-	bool operator>(BigInt b) const {
-		assert(!msb);
-		assert(!b.msb);
-
-		for (umm part_index = max(parts.count, b.parts.count) - 1; part_index != 0; part_index -= 1) {
-			auto ap = part_index <   parts.count ?   parts[part_index] : 0;
-			auto bp = part_index < b.parts.count ? b.parts[part_index] : 0;
-
-			if (ap != bp) {
-				return ap > bp;
-			}
-		}
-
-		return parts[0] > b.parts[0];
-	}
 	bool operator<(BigInt b) const {
 		if (msb != b.msb) {
 			return msb;
 		}
 
-		assert(!msb);
-		assert(!b.msb);
+		/*
+		3 2	false   1
+		3 3 false   0
+		3 4 true   -1
+		*/
 
-		for (umm part_index = max(parts.count, b.parts.count) - 1; part_index != 0; part_index -= 1) {
-			auto ap = part_index <   parts.count ?   parts[part_index] : 0;
-			auto bp = part_index < b.parts.count ? b.parts[part_index] : 0;
-
-			if (ap != bp) {
-				return ap < bp;
-			}
+		auto diff = *this - b;
+		defer { free(diff); };
+		return diff.msb;
+	}
+	bool operator>(BigInt b) const {
+		if (msb != b.msb) {
+			return b.msb;
 		}
 
-		return parts[0] < b.parts[0];
-	}
-	bool operator>=(BigInt b) const {
-		assert(!msb);
-		assert(!b.msb);
+		/*
+		3 2	true    1
+		3 3 false   0
+		3 4 false  -1
+		*/
 
-		for (umm part_index = max(parts.count, b.parts.count) - 1; part_index != 0; part_index -= 1) {
-			auto ap = part_index <   parts.count ?   parts[part_index] : 0;
-			auto bp = part_index < b.parts.count ? b.parts[part_index] : 0;
-
-			if (ap != bp) {
-				return ap > bp;
+		auto diff = *this - b;
+		defer { free(diff); };
+		if (diff.msb) {
+			return false;
+		} else {
+			if (diff == BigInt{}) {
+				return false;
 			}
+			return true;
 		}
-
-		return parts[0] >= b.parts[0];
 	}
-	bool operator<=(BigInt b) const {
-		assert(!msb);
-		assert(!b.msb);
-
-		for (umm part_index = max(parts.count, b.parts.count) - 1; part_index != 0; part_index -= 1) {
-			auto ap = part_index <   parts.count ?   parts[part_index] : 0;
-			auto bp = part_index < b.parts.count ? b.parts[part_index] : 0;
-
-			if (ap != bp) {
-				return ap < bp;
-			}
-		}
-
-		return parts[0] <= b.parts[0];
-	}
+	bool operator>=(BigInt b) const { return !(*this < b); }
+	bool operator<=(BigInt b) const { return !(*this > b); }
 
 	BigInt &operator-=(BigInt const &b) { return *this += -b; }
 	BigInt operator&(BigInt const &b) const { auto a = copy(*this); a &= b; return a; }

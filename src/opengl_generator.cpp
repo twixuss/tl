@@ -22,7 +22,6 @@ void append(StringBuilder &builder, Token token) {
 }
 
 s32 tl_main(Span<Span<utf8>> args) {
-	current_printer = console_printer;
 	current_allocator = temporary_allocator;
 
 	auto signature_path = tl_file_string("../data/opengl.h"ts);

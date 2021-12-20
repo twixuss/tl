@@ -1372,8 +1372,7 @@ struct StaticList {
 
 	forceinline constexpr T &add(T const &value) {
 		bounds_check(!full());
-		memcpy(data + count, &value, sizeof(T));
-		return data[count++];
+		return data[count++] = value;
 	}
 
 	forceinline constexpr Span<T> add(Span<T> span) {

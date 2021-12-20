@@ -322,6 +322,17 @@ constexpr void for_each(List<T> list, Fn &&fn) {
 	}
 }
 
+template <class T, class Fn>
+umm count(List<T> list, Fn &&fn) {
+	umm result = 0;
+	for (auto &v : list) {
+		if (fn(v)) {
+			result += 1;
+		}
+	}
+	return result;
+}
+
 template <class T>
 List<Span<T>> split(Span<T> what, Span<T> by) {
 	List<Span<T>> result;
@@ -371,6 +382,19 @@ List<T> replace(Span<T> where, T what, T with) {
 	for (auto &v : where) {
 		result.add(v == what ? with : v);
 	}
+	return result;
+}
+
+template <class T, class Fn>
+auto map(List<T> list, Fn &&fn) {
+	using U = decltype(fn(*(T*)0));
+	List<U> result;
+	result.reserve(list.count);
+
+	for (auto &x : list) {
+		result.add(fn(x));
+	}
+
 	return result;
 }
 

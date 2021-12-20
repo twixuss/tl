@@ -30,8 +30,10 @@ struct BlockList {
 		Iterator &operator++() {
 			++value_index;
 			if (value_index >= block->count) {
-				block = block->next;
-				value_index = 0;
+				if (block->next) {
+					block = block->next;
+					value_index = 0;
+				}
 			}
 			return *this;
 		}

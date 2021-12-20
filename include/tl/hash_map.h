@@ -194,6 +194,35 @@ struct HashMap {
 		it.value = value;
 		return true;
 	}
+	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0) {
+		scoped_allocator(allocator);
+
+		if (!buckets.count) {
+			rehash(16);
+		}
+
+		umm hash = Hasher::get_hash(key);
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
+			if (it.key == key) {
+				if (existing)
+					*existing = &it.value;
+				if (existing_key)
+					*existing_key = &it.key;
+				return false;
+			}
+		}
+
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2);
+			bucket = &buckets[hash & (buckets.count - 1)];
+		}
+		++total_value_count;
+		auto &it = bucket->add();
+		it.key = key;
+		it.value = value;
+		return true;
+	}
 
 	Pointer<Value> find(Key const &key) {
 		if (buckets.count == 0)

@@ -30,6 +30,7 @@ struct Printer {
 };
 
 extern TL_API Printer console_printer;
+extern TL_API Printer standard_output_printer;
 extern TL_API thread_local Printer current_printer;
 
 TL_API void init_printer();
@@ -88,7 +89,7 @@ TL_API void toggle_console_window();
 thread_local Printer current_printer = {[](PrintKind, Span<utf8>, void *) {}};
 
 void init_printer() {
-	current_printer = console_printer;
+	current_printer = standard_output_printer;
 }
 void deinit_printer() {
 
@@ -96,33 +97,46 @@ void deinit_printer() {
 
 #if OS_WINDOWS
 
-static HANDLE console_output = GetStdHandle(STD_OUTPUT_HANDLE);
+static HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);
 static HWND console_window = GetConsoleWindow();
 
 Printer console_printer = {
 	[](PrintKind kind, Span<utf8> span, void *) {
 		switch (kind) {
-			case Print_default: SetConsoleTextAttribute(console_output, 7); break;
-			case Print_info:    SetConsoleTextAttribute(console_output, 7); break;
-			case Print_warning: SetConsoleTextAttribute(console_output, 14); break;
-			case Print_error:   SetConsoleTextAttribute(console_output, 12); break;
+			case Print_default: SetConsoleTextAttribute(std_out, 7); break;
+			case Print_info:    SetConsoleTextAttribute(std_out, 7); break;
+			case Print_warning: SetConsoleTextAttribute(std_out, 14); break;
+			case Print_error:   SetConsoleTextAttribute(std_out, 12); break;
 		}
 		print_to_console(span);
 	},
 	0
 };
 
+Printer standard_output_printer = {
+	[](PrintKind kind, Span<utf8> span, void *) {
+		switch (kind) {
+			case Print_default: SetConsoleTextAttribute(std_out, 7); break;
+			case Print_info:    SetConsoleTextAttribute(std_out, 7); break;
+			case Print_warning: SetConsoleTextAttribute(std_out, 14); break;
+			case Print_error:   SetConsoleTextAttribute(std_out, 12); break;
+		}
+		WriteFile(std_out, span.data, (DWORD)span.count, 0, 0);
+	},
+	0
+};
+
 void print_to_console(Span<ascii> span) {
 	DWORD charsWritten;
-	WriteConsoleA(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
+	WriteConsoleA(std_out, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 void print_to_console(Span<utf8> span) {
 	DWORD charsWritten;
-	WriteConsoleA(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
+	WriteConsoleA(std_out, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 void print_to_console(Span<utf16> span) {
 	DWORD charsWritten;
-	WriteConsoleW(console_output, span.data, (DWORD)span.count, &charsWritten, 0);
+	WriteConsoleW(std_out, span.data, (DWORD)span.count, &charsWritten, 0);
 }
 
 void clear_console() {
@@ -132,7 +146,7 @@ void clear_console() {
 	CHAR_INFO fill;
 
 	// Get the number of character cells in the current buffer.
-	if (!GetConsoleScreenBufferInfo(console_output, &csbi))
+	if (!GetConsoleScreenBufferInfo(std_out, &csbi))
 	{
 		return;
 	}
@@ -152,13 +166,13 @@ void clear_console() {
 	fill.Attributes = csbi.wAttributes;
 
 	// Do the scroll
-	ScrollConsoleScreenBufferA(console_output, &sr, NULL, st, &fill);
+	ScrollConsoleScreenBufferA(std_out, &sr, NULL, st, &fill);
 
 	// Move the cursor to the top left corner too.
 	csbi.dwCursorPosition.X = 0;
 	csbi.dwCursorPosition.Y = 0;
 
-	SetConsoleCursorPosition(console_output, csbi.dwCursorPosition);
+	SetConsoleCursorPosition(std_out, csbi.dwCursorPosition);
 }
 
 DWORD get_code_page(Encoding encoding) {
@@ -184,7 +198,7 @@ void show_console_window() {
 	if (!console_window) {
 		AllocConsole();
 		console_window = GetConsoleWindow();
-		console_output = GetStdHandle(STD_OUTPUT_HANDLE);
+		std_out = GetStdHandle(STD_OUTPUT_HANDLE);
 	}
 	ShowWindow(console_window, SW_SHOW);
 }

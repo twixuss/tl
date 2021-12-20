@@ -244,7 +244,7 @@ void run_thread(Thread *thread) {
 		auto thread = (Thread *)param;
 		init_allocator();
 		defer {deinit_allocator();};
-		current_printer = console_printer;
+		current_printer = standard_output_printer;
 		thread->function(thread);
 		return 0;
 	}, thread, 0, 0);
