@@ -5,7 +5,7 @@
 namespace tl {
 
 struct BigInt;
-inline BigInt copy(BigInt const &a);
+inline BigInt copy(BigInt const &a TL_LP);
 inline void free(BigInt &a);
 
 struct BigInt {
@@ -691,20 +691,20 @@ template <> inline static constexpr bool is_integer_like<BigInt> = true;
 template <> inline static constexpr bool is_signed<BigInt> = false;
 
 
-inline BigInt make_big_int(u64 value) {
-	return {.msb = false, .parts = make_list({value})};
+inline BigInt make_big_int(u64 value TL_LP) {
+	return {.msb = false, .parts = make_list({value} TL_LA)};
 }
-inline BigInt make_big_int(u64 high, u64 low) {
-	return {.msb = false, .parts = make_list({low, high})};
+inline BigInt make_big_int(u64 high, u64 low TL_LP) {
+	return {.msb = false, .parts = make_list({low, high} TL_LA)};
 }
-inline BigInt make_big_int(u64 high, u64 mid, u64 low) {
-	return {.msb = false, .parts = make_list({low, mid, high})};
+inline BigInt make_big_int(u64 high, u64 mid, u64 low TL_LP) {
+	return {.msb = false, .parts = make_list({low, mid, high} TL_LA)};
 }
 inline BigInt operator""ib(u64 value) {
 	return {.msb = false, .parts = make_list({value})};
 }
-BigInt copy(BigInt const &that) {
-	return {.msb = that.msb, .parts = copy(that.parts)};
+BigInt copy(BigInt const &that TL_LPD) {
+	return {.msb = that.msb, .parts = copy(that.parts TL_LA)};
 }
 void free(BigInt &a) {
 	free(a.parts);

@@ -272,8 +272,8 @@ inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 	return result;
 }
 
-TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false);
-TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false);
+TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP);
+TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP);
 
 #ifndef TL_STRING_BUILDER_BLOCK_SIZE
 #define TL_STRING_BUILDER_BLOCK_SIZE 0x4000
@@ -308,22 +308,22 @@ struct StringBuilder {
 		}
 		return space;
 	}
-	void ensureSpace(umm amount) {
+	void ensureSpace(umm amount TL_LP) {
 		umm space = available_space();
 		while (space < amount) {
-			Block *new_block = allocate_block();
+			Block *new_block = allocate_block(TL_LAC);
 			alloc_last->next = new_block;
 			alloc_last = new_block;
 			space += block_size;
 		}
 	}
-	void ensure_consecutive_space(umm amount) {
+	void ensure_consecutive_space(umm amount TL_LP) {
 		assert(amount <= block_size);
 		if (last->available_space() < amount) {
 			if (last->next) {
 				last = last->next;
 			} else {
-				last->next = allocate_block();
+				last->next = allocate_block(TL_LAC);
 				last = alloc_last = last->next;
 			}
 		}
@@ -372,8 +372,8 @@ struct StringBuilder {
 		last = &first;
 	}
 
-	Block *allocate_block() {
-		return new (allocator.allocate<Block>()) Block;
+	Block *allocate_block(TL_LPC) {
+		return new (allocator.allocate<Block>(TL_LAC)) Block;
 	}
 };
 
@@ -386,7 +386,7 @@ inline void free(StringBuilder &builder) {
 	builder.allocator = {};
 }
 
-forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
+forceinline void append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
 	umm chars_to_write = size;
 	u8 *data = (u8 *)_data;
 	while (b.last->available_space() < chars_to_write) {
@@ -396,7 +396,7 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 		b.last->buffer.count += space_in_block;
 		data += space_in_block;
 		if (!b.last->next) {
-			b.last->next = b.alloc_last = b.allocate_block();
+			b.last->next = b.alloc_last = b.allocate_block(TL_LAC);
 			b.last = b.last->next;
 		}
 	}
@@ -405,18 +405,18 @@ forceinline void append_bytes(StringBuilder &b, void const *_data, umm size) {
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, T const &value) {
-	append_bytes(b, &value, sizeof(value));
+forceinline void append_bytes(StringBuilder &b, T const &value TL_LP) {
+	append_bytes(b, &value, sizeof(value) TL_LA);
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, Span<T> span) {
-	append_bytes(b, span.data, span.count * sizeof(T));
+forceinline void append_bytes(StringBuilder &b, Span<T> span TL_LP) {
+	append_bytes(b, span.data, span.count * sizeof(T) TL_LA);
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, List<T> list) {
-	append_bytes(b, list.data, list.count * sizeof(T));
+forceinline void append_bytes(StringBuilder &b, List<T> list TL_LP) {
+	append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
 inline umm append(StringBuilder &b, ascii ch) {
@@ -946,20 +946,20 @@ forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, F
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
 inline umm append(StringBuilder &builder, std::source_location location) {
-	return append_format(builder, "%(%:%):%", location.file_name(), location.line(), location.column(), location.function_name());
+	return append_format(builder, "%:%:%:%", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
 // Always allocates memory for the string
-inline List<char> to_string(StringBuilder &builder, Allocator allocator) {
+inline List<char> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
 	List<char> result;
 	result.allocator = allocator;
-	result.reserve(builder.count());
+	result.reserve(builder.count() TL_LA);
 	builder.fill(result);
 	result.count = result.capacity;
 	return result;
 }
-inline List<char> to_string(StringBuilder &builder) {
-	return to_string(builder, current_allocator);
+inline List<char> to_string(StringBuilder &builder TL_LP) {
+	return to_string(builder, current_allocator TL_LA);
 }
 
 template <class Char, class ...Args>
@@ -1098,7 +1098,7 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 
 #ifdef TL_IMPL
 
-List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
+List<utf8> to_utf8(Span<utf16> utf16, bool terminate TL_LPD) {
 	List<utf8> result;
 
 	if (utf16.count > max_value<int>)
@@ -1108,7 +1108,7 @@ List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 	if (!bytes_required)
 		return {};
 
-	result.reserve(bytes_required + terminate);
+	result.reserve(bytes_required + terminate TL_LA);
 	result.count = bytes_required + terminate;
 
 	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
@@ -1121,7 +1121,7 @@ List<utf8> to_utf8(Span<utf16> utf16, bool terminate) {
 	return result;
 }
 
-List<utf16> to_utf16(Span<utf8> utf8, bool terminate) {
+List<utf16> to_utf16(Span<utf8> utf8, bool terminate TL_LPD) {
 	List<utf16> result;
 
 	if (utf8.count > max_value<int>)
@@ -1131,7 +1131,7 @@ List<utf16> to_utf16(Span<utf8> utf8, bool terminate) {
 	if (!chars_required)
 		return {};
 
-	result.reserve(chars_required + terminate);
+	result.reserve(chars_required + terminate TL_LA);
 	result.count = chars_required + terminate;
 
 	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, chars_required) != chars_required) {

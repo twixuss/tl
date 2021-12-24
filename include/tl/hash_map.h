@@ -137,11 +137,11 @@ struct HashMap {
 	Span<Bucket> buckets;
 	umm total_value_count = 0;
 
-	Value &get_or_insert(Key const &key) {
+	Value &get_or_insert(Key const &key TL_LP) {
 		scoped_allocator(allocator);
 
 		if (!buckets.count) {
-			rehash(16);
+			rehash(16 TL_LA);
 		}
 
 		umm hash = Hasher::get_hash(key);
@@ -157,7 +157,7 @@ struct HashMap {
 			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
-		auto &it = bucket->add();
+		auto &it = bucket->add(TL_LAC);
 		it.key = key;
 		return it.value;
 	}
@@ -168,11 +168,11 @@ struct HashMap {
 	// If value is already present calls a callback with stored key and value and returns false
 	//
 	template <class Callback>
-	bool insert_or(Key const &key, Value value, Callback &&callback) {
+	bool insert_or(Key const &key, Value value, Callback &&callback TL_LP) {
 		scoped_allocator(allocator);
 
 		if (!buckets.count) {
-			rehash(16);
+			rehash(16 TL_LA);
 		}
 
 		umm hash = Hasher::get_hash(key);
@@ -185,20 +185,20 @@ struct HashMap {
 		}
 
 		if (total_value_count == buckets.count) {
-			rehash(buckets.count * 2);
+			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
-		auto &it = bucket->add();
+		auto &it = bucket->add(TL_LAC);
 		it.key = key;
 		it.value = value;
 		return true;
 	}
-	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0) {
+	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0 TL_LP) {
 		scoped_allocator(allocator);
 
 		if (!buckets.count) {
-			rehash(16);
+			rehash(16 TL_LA);
 		}
 
 		umm hash = Hasher::get_hash(key);
@@ -214,11 +214,11 @@ struct HashMap {
 		}
 
 		if (total_value_count == buckets.count) {
-			rehash(buckets.count * 2);
+			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
-		auto &it = bucket->add();
+		auto &it = bucket->add(TL_LAC);
 		it.key = key;
 		it.value = value;
 		return true;
@@ -254,19 +254,19 @@ struct HashMap {
 		return {};
 	}
 
-	void rehash(umm new_buckets_count) {
+	void rehash(umm new_buckets_count TL_LP) {
 		scoped_allocator(allocator);
 
 		auto old_buckets = buckets;
 
-		buckets.data = allocator.allocate<Bucket>(new_buckets_count);
+		buckets.data = allocator.allocate<Bucket>(new_buckets_count TL_LA);
 		buckets.count = new_buckets_count;
 
 		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
 			for (KeyValue &key_value : old_buckets[bucket_index]) {
 				auto hash = Hasher::get_hash(key_value.key);
 				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
-				new_bucket.add(key_value);
+				new_bucket.add(key_value TL_LA);
 			}
 		}
 
@@ -294,19 +294,19 @@ void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 }
 
 template <class Key, class Value, class Hasher>
-HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source) {
+HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source TL_LP) {
 	HashMap<Key, Value, Hasher> result;
 	for_each(source, [&](Key const &key, Value const &value) {
-		result.get_or_insert(key) = value;
+		result.get_or_insert(key TL_LA) = value;
 	});
 	return result;
 }
 
 template <class Key, class Value, class Hasher>
-void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source) {
+void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source TL_LP) {
 	destination.clear();
 	for_each(source, [&](Key const &key, Value const &value) {
-		destination.get_or_insert(key) = value;
+		destination.get_or_insert(key TL_LA) = value;
 	});
 }
 

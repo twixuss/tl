@@ -5,7 +5,7 @@
 #endif
 
 #if TL_ENABLE_PROFILER
-#define timed_begin(name) ::tl::Profiler::begin(name, __FILE__, __LINE__)
+#define timed_begin(name) ::tl::Profiler::begin(name, as_span(__FILE__), __LINE__)
 #define timed_end() ::tl::Profiler::end()
 #define timed_block(name) timed_begin(name); defer{ timed_end(); }
 //#define timed_function() timed_block(([](char const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
@@ -21,12 +21,12 @@
 
 namespace tl { namespace Profiler {
 
-TL_API void begin(Span<char> name, char const *file, u32 line);
+TL_API void begin(Span<char> name, Span<char> file, u32 line);
 TL_API void end();
 TL_API void mark(Span<char> name, u32 color);
 
 inline void begin(char const *name, char const *file, u32 line) {
-	return begin(as_span(name), file, line);
+	return begin(as_span(name), as_span(file), line);
 }
 inline void mark(char const *name, u32 color) {
 	return mark(as_span(name), color);
@@ -43,13 +43,12 @@ namespace tl { namespace Profiler {
 struct TimeSpan {
 	s64 begin;
 	s64 end;
-	List<char> name;
-	char const *file;
+	Span<char> name;
+	Span<char> file;
 	u32 line;
 	u32 thread_id;
 };
 
-extern TL_API Allocator name_allocator;
 extern TL_API thread_local bool enabled;
 
 TL_API void init();
@@ -64,7 +63,6 @@ TL_API List<u8> output_for_timed();
 }}
 
 #ifdef TL_IMPL
-#if TL_ENABLE_PROFILER
 #if OS_WINDOWS
 #include "win32.h"
 #include "string.h"
@@ -87,8 +85,6 @@ struct Mark {
 List<Mark> marks;
 Mutex marks_mutex;
 
-Allocator name_allocator;
-
 List<TimeSpan> recorded_time_spans;
 Mutex recorded_time_spans_mutex;
 
@@ -100,15 +96,14 @@ thread_local s64 self_time;
 s64 start_time;
 
 void init() {
-	name_allocator = default_allocator;
-	marks.allocator = default_allocator;
-	recorded_time_spans.allocator = default_allocator;
+	marks.allocator = current_allocator;
+	recorded_time_spans.allocator = current_allocator;
 	start_time = get_performance_counter();
 }
 void deinit() {
 	free(recorded_time_spans);
 }
-void begin(Span<char> name, char const *file, u32 line) {
+void begin(Span<char> name, Span<char> file, u32 line) {
 	auto self_begin = get_performance_counter();
 	if (!enabled)
 		return;
@@ -116,8 +111,7 @@ void begin(Span<char> name, char const *file, u32 line) {
 	scoped_lock(current_time_spans_mutex);
 	auto &span = current_time_spans[thread_id].add();
 
-	span.name.allocator = name_allocator;
-	span.name.set(name);
+	span.name = name;
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
@@ -191,7 +185,7 @@ List<u8> output_for_timed() {
 		s64 end;
 		u32 thread_id;
 		u16 name_size;
-		utf8 name[];
+		char name[];
 	};
 	*/
 
@@ -222,12 +216,5 @@ List<u8> output_for_timed() {
 #pragma optimize("", on)
 #endif
 
-#endif
-#else
-namespace tl {
-namespace Profiler {
-void begin(Span<char> name, char const *file, u32 line) {}
-void end() {}
-}}
 #endif
 #endif

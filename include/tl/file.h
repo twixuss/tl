@@ -8,7 +8,7 @@ namespace tl {
 
 #if OS_WINDOWS
 using pathchar = utf16;
-inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false) { return to_utf16(string, terminate); }
+inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
 #define tl_file_string(x) u ## x
 
 inline static constexpr pathchar path_separator = u'\\';
@@ -79,7 +79,7 @@ struct ReadEntireFileParams {
 	umm extra_space_before = 0;
 	umm extra_space_after = 0;
 };
-inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
+inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
 
@@ -87,22 +87,22 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
 	auto size = (umm)get_cursor(file);
 	set_cursor(file, 0, File_begin);
 
-	auto result = create_buffer(size + params.extra_space_before + params.extra_space_after);
+	auto result = create_buffer_uninitialized(size + params.extra_space_before + params.extra_space_after TL_LA);
 	read(file, {result.data + params.extra_space_before, size});
 
 	return result;
 }
 
 template <class Char>
-inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {}) {
+inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
-	return read_entire_file(file, params);
+	return read_entire_file(file, params TL_LA);
 }
 template <class Path>
-inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {}) {
-	return read_entire_file(as_span(path), params);
+inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {} TL_LP) {
+	return read_entire_file(as_span(path), params TL_LA);
 }
 
 

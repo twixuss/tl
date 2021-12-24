@@ -49,6 +49,24 @@
 #define tl_base __super
 #endif
 
+#ifndef TL_PARENT_SOURCE_LOCATION
+#define TL_PARENT_SOURCE_LOCATION 1
+#endif
+
+#if TL_PARENT_SOURCE_LOCATION
+#define TL_LPC std::source_location location = std::source_location::current()
+#define TL_LPCD std::source_location location
+#define TL_LAC location
+#define TL_LP , TL_LPC
+#define TL_LPD , TL_LPCD
+#define TL_LA , TL_LAC
+#else
+#define TL_LPC
+#define TL_LAC
+#define TL_LP
+#define TL_LA
+#endif
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -1497,6 +1515,11 @@ struct Allocator {
 	}
 
 	template <class T>
+	inline T *allocate_uninitialized(umm count, std::source_location location) {
+		return (T *)func(Allocator_allocate, 0, 0, count * sizeof(T), alignof(T), location, state);
+	}
+
+	template <class T>
 	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		T *result = allocate_uninitialized<T>(count, align, location);
 		if (result) {
@@ -1505,6 +1528,16 @@ struct Allocator {
 			}
 		}
 		return result;
+	}
+
+	template <class T>
+	inline T *allocate(umm count, std::source_location location) {
+		return allocate<T>(count, alignof(T), location);
+	}
+
+	template <class T>
+	inline T *allocate(std::source_location location) {
+		return allocate<T>(1, alignof(T), location);
 	}
 
 
@@ -1524,6 +1557,10 @@ struct Allocator {
 	template <class T>
 	inline T *reallocate_uninitialized(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
 		return (T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
+	}
+	template <class T>
+	inline T *reallocate_uninitialized(T *data, umm old_count, umm new_count, std::source_location location) {
+		return (T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), alignof(T), location, state);
 	}
 
 	template <class T>
