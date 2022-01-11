@@ -295,7 +295,7 @@ enum : FileDialogFlags {
 
 TL_API Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
-TL_API List<pathchar> get_current_directory();
+TL_API List<utf8> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
 inline void set_current_directory(Span<pathchar> path) {
 	return set_current_directory(temporary_null_terminate(path).data);
@@ -396,7 +396,7 @@ inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = fal
 }
 
 inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
-	return concatenate(with(temporary_allocator, to_utf8(get_current_directory())), path_separator, relative_path);
+	return concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
 }
 
 inline bool is_absolute_path(Span<utf8> path) {
@@ -870,12 +870,13 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 	return result;
 }
 
-List<pathchar> get_current_directory() {
-	List<pathchar> temp;
+List<utf8> get_current_directory() {
+	List<utf16> temp;
+	temp.allocator = temporary_allocator;
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.count, (wchar *)temp.data);
 	temp.count--;
-	return temp;
+	return to_utf8(temp);
 }
 
 void set_current_directory(pathchar const *path) {

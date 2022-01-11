@@ -271,7 +271,7 @@ struct HashMap {
 		}
 
 		if (old_buckets.data) {
-			allocator.free(old_buckets.data);
+			allocator.free_t(old_buckets.data, old_buckets.count);
 		}
 	}
 
@@ -329,5 +329,14 @@ umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 	});
 	return result;
 }
+
+template <class Key, class Value, class Hasher>
+bool is_empty(HashMap<Key, Value, Hasher> map) {
+	bool result = true;
+	for_each(map, [&](Key &key, Value &value) { result = false; for_each_break; });
+	return result;
+}
+
+
 
 }

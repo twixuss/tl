@@ -67,6 +67,11 @@
 #define TL_LA
 #endif
 
+#define KiB ((umm)1024)
+#define MiB ((umm)1024*1024)
+#define GiB ((umm)1024*1024*1024)
+#define TiB ((umm)1024*1024*1024*1024)
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -912,11 +917,6 @@ struct Span {
 		return {(U *)data, count};
 	}
 
-	//constexpr operator Span<utf8>() const { // Really this cast should be defined only in Span<char>, but this is impossible to do in this language without copypasta
-	//	static_assert(is_same<T, ascii>);
-	//	return {(utf8 *)data, count * sizeof(ValueType)};
-	//}
-
 	constexpr bool operator==(Span<ValueType> that) const {
 		if (count != that.count)
 			return false;
@@ -991,6 +991,14 @@ inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)st
 template <class T>
 inline constexpr Span<T> as_span(Span<T> span) {
 	return span;
+}
+
+template <class T>
+inline constexpr Span<T> as_span_of(Span<u8> span) {
+	return {
+		(T *)span.data,
+		span.count / sizeof(T),
+	};
 }
 
 template <class T>
@@ -1187,6 +1195,11 @@ inline constexpr ascii to_lower(ascii c) {
 		return (char)(c + ('a' - 'A'));
 	return c;
 }
+inline constexpr utf8 to_lower(utf8 c) {
+	if (c >= 'A' && c <= 'Z')
+		return (char)(c + ('a' - 'A'));
+	return c;
+}
 inline constexpr utf32 to_lower(utf32 c) {
 	if (c >= 'A' && c <= 'Z')
 		return c + ('a' - 'A');
@@ -1217,6 +1230,16 @@ inline constexpr bool equals(Span<T> a, Span<U> b) {
 
 inline bool equals_case_insensitive(ascii a, ascii b) { return to_lower(a) == to_lower(b); }
 inline bool equals_case_insensitive(utf32 a, utf32 b) { return to_lower(a) == to_lower(b); }
+
+inline bool equals_case_insensitive(Span<utf8> a, Span<utf8> b) {
+	if (a.count != b.count)
+		return false;
+	auto ap = a.begin();
+	for (auto bp = b.begin(); ap != a.end(); ++ap, ++bp)
+		if (to_lower(*ap) != to_lower(*bp))
+			return false;
+	return true;
+}
 
 template <class T, class Predicate, class = EnableIf<is_invocable<Predicate, T, T>>>
 inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {
@@ -1491,17 +1514,29 @@ enum AllocatorMode : u8 {
 	Allocator_free,
 };
 
+#ifndef TL_DEFAULT_ALIGNMENT
+#define TL_DEFAULT_ALIGNMENT ((::tl::umm)16)
+#endif
+
+// TODO:
+// Some allocators may give more memory than requested, so the caller should know about this.
+// I think `allocate` should return `Span<u8>` instead of `void *` when requesting raw bytes.
+// But in case of generic types it's not clear what to do with excess objects.
+// For now allocation of T's will not report extra space.
+
 struct Allocator {
+
+#if 1
 	void *(*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
 	void *state = 0;
 	forceinline operator bool() {
 		return func != 0;
 	}
 
-	inline void *allocate_uninitialized(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+	inline void *allocate_uninitialized(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		return func(Allocator_allocate, 0, 0, size, align, location, state);
 	}
-	inline void *allocate(umm size, umm align = 1, std::source_location location = std::source_location::current()) {
+	inline void *allocate(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		auto result = allocate_uninitialized(size, align, location);
 		if (result) {
 			memset(result, 0, size);
@@ -1521,7 +1556,7 @@ struct Allocator {
 
 	template <class T>
 	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		T *result = allocate_uninitialized<T>(count, align, location);
+		auto result = allocate_uninitialized<T>(count, align, location);
 		if (result) {
 			for (auto it = result; it != result + count; ++it) {
 				new (it) T();
@@ -1543,10 +1578,10 @@ struct Allocator {
 
 
 
-	inline void *reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
+	inline void *reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
 	}
-	inline void *reallocate(void *data, umm old_size, umm new_size, umm align = 1, std::source_location location = std::source_location::current()) {
+	inline void *reallocate(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		auto result = reallocate_uninitialized(data, old_size, new_size, align, location);
 		if (result && (new_size > old_size)) {
 			memset((u8 *)result + old_size, 0, new_size - old_size);
@@ -1565,24 +1600,110 @@ struct Allocator {
 
 	template <class T>
 	inline T *reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		T *result = reallocate_uninitialized(data, old_count, new_count, align, location);
+		auto result = reallocate_uninitialized(data, old_count, new_count, align, location);
 		for (auto it = result + old_count; it != result + new_count; ++it) {
 			new (it) T();
 		}
 		return result;
 	}
-
-
-	void free(void *data, std::source_location location = std::source_location::current()) {
-		func(Allocator_free, data, 0, 0, 0, location, state);
+#else
+	Span<u8> (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
+	void *state = 0;
+	forceinline operator bool() {
+		return func != 0;
 	}
 
+	inline Span<u8> allocate_uninitialized(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		return func(Allocator_allocate, 0, 0, size, align, location, state);
+	}
+	inline Span<u8> allocate(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		auto result = allocate_uninitialized(size, align, location);
+		if (result.data) {
+			memset(result.data, 0, size);
+		}
+		return result;
+	}
+
+	template <class T>
+	inline Span<T> allocate_uninitialized(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		return {(T *)func(Allocator_allocate, 0, 0, count * sizeof(T), align, location, state), count};
+	}
+
+	template <class T>
+	inline Span<T> allocate_uninitialized(umm count, std::source_location location) {
+		return {(T *)func(Allocator_allocate, 0, 0, count * sizeof(T), alignof(T), location, state)};
+	}
+
+	template <class T>
+	inline Span<T> allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		auto result = allocate_uninitialized<T>(count, align, location);
+		if (result.data) {
+			for (auto it = result.data; it != result.data + count; ++it) {
+				new (it) T();
+			}
+		}
+		return result;
+	}
+
+	template <class T>
+	inline Span<T> allocate(umm count, std::source_location location) {
+		return allocate<T>(count, alignof(T), location);
+	}
+
+	template <class T>
+	inline Span<T> allocate(std::source_location location) {
+		return allocate<T>(1, alignof(T), location);
+	}
+
+
+
+
+	inline Span<u8> reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
+	}
+	inline Span<u8> reallocate(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		auto result = reallocate_uninitialized(data, old_size, new_size, align, location);
+		if (result.data && (new_size > old_size)) {
+			memset((u8 *)result.data + old_size, 0, new_size - old_size);
+		}
+		return result;
+	}
+
+	template <class T>
+	inline Span<T> reallocate_uninitialized(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		return {(T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state), new_count};
+	}
+	template <class T>
+	inline Span<T> reallocate_uninitialized(T *data, umm old_count, umm new_count, std::source_location location) {
+		return {(T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), alignof(T), location, state), new_count};
+	}
+
+	template <class T>
+	inline Span<T> reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
+		auto result = reallocate_uninitialized(data, old_count, new_count, align, location);
+		for (auto it = result.data + old_count; it != result.data + new_count; ++it) {
+			new (it) T();
+		}
+		return result;
+	}
+#endif
+
+
+	template <class T>
+	void free_t(T *data, umm count = 0, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
+		func(Allocator_free, data, 0, count * sizeof(T), alignment, location, state);
+	}
+
+	void free(void *data, umm count = 0, umm alignment = 0, std::source_location location = std::source_location::current()) {
+		func(Allocator_free, data, 0, count, alignment, location, state);
+	}
 };
 
 #define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
 
 extern TL_API Allocator os_allocator;
+extern TL_API Allocator page_allocator;
 extern TL_API Allocator default_allocator;
 extern TL_API thread_local Allocator temporary_allocator;
 extern TL_API thread_local Allocator current_allocator;
@@ -1597,6 +1718,18 @@ inline void allocate(T *&val) {
 	val = current_allocator.allocate<T>();
 }
 
+#define MAKE_ALLOCATOR_FROM_TYPE(type, name, ...) \
+type CONCAT(_state, __LINE__) = {__VA_ARGS__}; \
+Allocator name = { \
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm alignment, std::source_location location, void *state) -> void * { \
+		switch (mode) { \
+			case ::tl::Allocator_allocate:   return ((type *)state)->allocate(new_size, alignment, location); \
+			case ::tl::Allocator_reallocate: return ((type *)state)->reallocate(data, old_size, new_size, alignment, location); \
+			case ::tl::Allocator_free:       return ((type *)state)->free(data, new_size, alignment, location), (void *)0; \
+		} \
+	}, \
+	&CONCAT(_state, __LINE__) \
+}
 
 }
 
@@ -1713,6 +1846,38 @@ Allocator os_allocator = {
 	},
 	0
 };
+Allocator page_allocator = {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+		switch (mode) {
+			case Allocator_allocate: {
+				assert(align <= 4096);
+				return VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+			}
+			case Allocator_reallocate: {
+				assert(align <= 4096);
+
+				if (old_size / 4096 == new_size / 4096) {
+					return data;
+				}
+
+				if (VirtualAlloc((u8 *)data + ceil(old_size, (umm)4096), ceil(new_size, (umm)4096) - ceil(old_size, (umm)4096), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
+					return data;
+				}
+
+				auto new_data = VirtualAlloc(0, ceil(new_size, (umm)4096), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+				memcpy(new_data, data, old_size);
+				VirtualFree(data, 0, MEM_RELEASE);
+
+				return new_data;
+			}
+			case Allocator_free:
+				VirtualFree(data, 0, MEM_RELEASE);
+				return 0;
+		}
+		return 0;
+	},
+	0
+};
 Allocator default_allocator = os_allocator;
 
 struct TemporaryAllocatorState {
@@ -1732,7 +1897,7 @@ void free(TemporaryAllocatorState &state) {
 	auto block = state.first;
 	while (block) {
 		auto next = block->next;
-		state.allocator.free(block);
+		state.allocator.free(block, sizeof(TemporaryAllocatorState::Block) + block->capacity);
 		block = next;
 	}
 	state = {};

@@ -233,7 +233,7 @@ template <class T>
 void free(List<T> &list) {
 	if (list.data == 0) return;
 
-	list.allocator.free(list.data);
+	list.allocator.free_t(list.data, list.count);
 	list.data = 0;
 	list.count = 0;
 	list.capacity = 0;

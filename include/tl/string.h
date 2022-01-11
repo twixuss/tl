@@ -380,7 +380,7 @@ struct StringBuilder {
 inline void free(StringBuilder &builder) {
 	for (auto block = builder.first.next; block != 0;) {
 		auto next = block->next;
-		builder.allocator.free(block);
+		builder.allocator.free_t(block);
 		block = next;
 	}
 	builder.allocator = {};
