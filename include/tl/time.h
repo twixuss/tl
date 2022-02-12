@@ -50,7 +50,7 @@ inline Span<utf8> month_string(u8 month) {
 
 inline umm append(StringBuilder &b, Date d) {
 	return append_format(b,
-		"% % % - %:%:%",
+		"{} {} {} - {}:{}:{}",
 		d.day,
 		month_string(d.month),
 		d.year,
@@ -92,7 +92,7 @@ List<char> get_time_string() {
 	SYSTEMTIME t;
 	GetLocalTime(&t);
 
-	return format("%:%:%.%", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+	return format("{}:{}:{}.{}", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 }
 
 void make_os_timing_precise() {

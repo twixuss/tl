@@ -62,10 +62,10 @@ Catalog<T>::Entry *find(Catalog<T> &catalog, Span<utf8> name) {
 		if (catalog.entry_valid(result->second)) {
 			return &result->second;
 		} else {
-			print("% '%' is invalid\n", catalog.entry_string, name);
+			print("{} '{}' is invalid\n", catalog.entry_string, name);
 		}
 	} else {
-		print("% '%' not found\n", catalog.entry_string, name);
+		print("{} '{}' not found\n", catalog.entry_string, name);
 	}
 	return catalog.fallback;
 }
@@ -86,7 +86,7 @@ Catalog<T>::Entry &add_file(Catalog<T> &catalog, Span<pathchar> directory, Span<
 
 	auto &entry = catalog.entries[name];
 	entry.name = name;
-	entry.tracker = create_file_tracker_steal_path(format(tl_file_string("%/%\0"s), directory, full_name), [&](FileTracker &tracker) {
+	entry.tracker = create_file_tracker_steal_path(format(tl_file_string("{}/{}\0"s), directory, full_name), [&](FileTracker &tracker) {
 		if (entry.initialized) {
 			update_entry(catalog, entry);
 		}

@@ -284,30 +284,37 @@ inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP);
 TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP);
 
-#ifndef TL_STRING_BUILDER_BLOCK_SIZE
-#define TL_STRING_BUILDER_BLOCK_SIZE 0x4000
+#ifndef TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY
+#define TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY 0x4000
 #endif
 
 struct StringBuilder {
-	static constexpr umm block_size = TL_STRING_BUILDER_BLOCK_SIZE;
 	struct Block {
-		StaticList<utf8, block_size> buffer;
+		u8 *data = 0;
+		umm count = 0;
+		umm capacity = 0;
 		Block *next = 0;
-		umm available_space() { return block_size - buffer.count; }
+		u8 *begin() { return data; }
+		u8 *end() { return data + count; }
+		umm available_space() { return capacity - count; }
 	};
 
 	Allocator allocator = {};
+	u8 initial_buffer[TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY];
 	Block first = {};
 	Block *last = &first;
 	Block *alloc_last = &first;
-	Encoding encoding = Encoding_utf8;
-	ascii unfound_ascii = '?';
 
-	StringBuilder() { allocator = current_allocator; }
+	StringBuilder() {
+		allocator = current_allocator;
+		first.data = initial_buffer;
+		first.capacity = TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY;
+	}
 	StringBuilder(StringBuilder const &that) = delete;
 	StringBuilder(StringBuilder&& that) = default;
 	StringBuilder &operator=(StringBuilder const &that) = delete;
 	StringBuilder &operator=(StringBuilder &&that) = default;
+	/*
 	umm available_space() {
 		umm space = 0;
 		Block *block = last;
@@ -337,23 +344,28 @@ struct StringBuilder {
 			}
 		}
 	}
+	*/
 	umm count() {
 		umm total_count = 0;
-		for (Block *block = &first; block != 0; block = block->next) {
-			total_count += block->buffer.count;
-		}
+		Block *block = &first;
+		do {
+			total_count += block->count;
+			block = block->next;
+		} while (block);
 		return total_count;
 	}
-	Span<char> fill(Span<char> dst_string) {
-		char *dst_char = dst_string.data;
-		for (Block *block = &first; block != 0; block = block->next) {
-			memcpy(dst_char, block->buffer.data, block->buffer.count * sizeof(char));
-			dst_char += block->buffer.count;
-		}
-		return Span<char>(dst_string.begin(), dst_char);
+	Span<u8> fill(Span<u8> dst_string) {
+		u8 *dst_char = dst_string.data;
+		Block *block = &first;
+		do {
+			memcpy(dst_char, block->data, block->count);
+			dst_char += block->count;
+			block = block->next;
+		} while (block);
+		return Span<u8>(dst_string.begin(), dst_char);
 	}
-	List<char> getNullTerminated() {
-		List<char> result;
+	List<u8> get_null_terminated() {
+		List<u8> result;
 		result.reserve(count() + 1);
 		fill(result);
 		result.count = result.capacity;
@@ -365,24 +377,29 @@ struct StringBuilder {
 	void for_each_block(Fn &&fn) {
 		Block *block = &first;
 		do {
-			auto block_size = block->buffer.count;
-			if (block_size) {
-				fn(block->buffer);
-			}
+			if (block->count)
+				fn(block);
 			block = block->next;
 		} while (block);
 	}
 	void clear() {
 		Block *block = &first;
 		do {
-			block->buffer.count = 0;
+			block->count = 0;
 			block = block->next;
 		} while (block);
 		last = &first;
 	}
 
 	Block *allocate_block(TL_LPC) {
-		return new (allocator.allocate<Block>(TL_LAC)) Block;
+		auto capacity = alloc_last->capacity*2;
+		auto block = (Block *)allocator.allocate_uninitialized(sizeof(Block) + capacity, alignof(Block) TL_LA);
+		block->data = (u8 *)(block + 1);
+		block->count = 0;
+		block->capacity = capacity;
+		block->next = 0;
+		alloc_last = alloc_last->next = block;
+		return block;
 	}
 };
 
@@ -396,354 +413,184 @@ inline void free(StringBuilder &builder) {
 }
 
 // Always allocates memory for the string
-inline List<char> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
-	List<char> result;
+inline List<u8> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
+	List<u8> result;
 	result.allocator = allocator;
 	result.reserve(builder.count() TL_LA);
 	builder.fill(result);
 	result.count = result.capacity;
 	return result;
 }
-inline List<char> to_string(StringBuilder &builder TL_LP) {
+inline List<u8> to_string(StringBuilder &builder TL_LP) {
 	return to_string(builder, current_allocator TL_LA);
 }
 
-forceinline void append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
+forceinline umm append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
 	umm chars_to_write = size;
 	u8 *data = (u8 *)_data;
 	while (b.last->available_space() < chars_to_write) {
 		umm space_in_block = b.last->available_space();
-		memcpy(b.last->buffer.end(), data, space_in_block);
+		memcpy(b.last->end(), data, space_in_block);
 		chars_to_write -= space_in_block;
-		b.last->buffer.count += space_in_block;
+		b.last->count += space_in_block;
 		data += space_in_block;
 		if (!b.last->next) {
-			b.last->next = b.alloc_last = b.allocate_block(TL_LAC);
+			b.allocate_block(TL_LAC);
 			b.last = b.last->next;
 		}
 	}
-	memcpy(b.last->buffer.end(), data, chars_to_write);
-	b.last->buffer.count += chars_to_write;
+	memcpy(b.last->end(), data, chars_to_write);
+	b.last->count += chars_to_write;
+	return size;
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, T const &value TL_LP) {
-	append_bytes(b, &value, sizeof(value) TL_LA);
+forceinline umm append_bytes(StringBuilder &b, T const &value TL_LP) {
+	return append_bytes(b, &value, sizeof(value) TL_LA);
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, Span<T> span TL_LP) {
-	append_bytes(b, span.data, span.count * sizeof(T) TL_LA);
+forceinline umm append_bytes(StringBuilder &b, Span<T> span TL_LP) {
+	return append_bytes(b, span.data, span.count * sizeof(T) TL_LA);
 }
 
 template <class T>
-forceinline void append_bytes(StringBuilder &b, List<T> list TL_LP) {
-	append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
+forceinline umm append_bytes(StringBuilder &b, List<T> list TL_LP) {
+	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
-inline umm append(StringBuilder &b, ascii ch) {
-	switch (b.encoding) {
-		case Encoding_ascii:
-		case Encoding_utf8:
-			append_bytes(b, ch);
-			break;
-		case Encoding_utf16:
-			append_bytes(b, (utf16)ch);
-			break;
-		case Encoding_utf32:
-			append_bytes(b, (utf32)ch);
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return 1;
-}
-inline umm append(StringBuilder &b, utf8 ch) {
-	switch (b.encoding) {
-		case Encoding_ascii:
-		case Encoding_utf8:
-			append_bytes(b, ch);
-			break;
-		case Encoding_utf16:
-			append_bytes(b, (utf16)ch);
-			break;
-		case Encoding_utf32:
-			invalid_code_path("not implemented");
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return 1;
-}
-inline umm append(StringBuilder &b, utf16 ch) {
-	switch (b.encoding) {
-		case Encoding_ascii:
-			if (ch >= 256) {
-				append_bytes(b, b.unfound_ascii);
-			} else {
-				append_bytes(b, (ascii)ch);
-			}
-			break;
-		case Encoding_utf8:
-			append_bytes(b, with(temporary_allocator, to_utf8(Span(&ch, 1))));
-			break;
-		case Encoding_utf16:
-			append_bytes(b, ch);
-			break;
-		case Encoding_utf32:
-			invalid_code_path("not implemented");
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return 1;
-}
-inline umm append(StringBuilder &b, utf32 ch) {
-	switch (b.encoding) {
-		case Encoding_ascii:
-			if (ch >= 256) {
-				append_bytes(b, b.unfound_ascii);
-			} else {
-				append_bytes(b, (ascii)ch);
-			}
-			break;
-		case Encoding_utf8:
-			if (ch >= 256) {
-				invalid_code_path("not implemented");
-			} else {
-				append_bytes(b, (ascii)ch);
-			}
-			break;
-		case Encoding_utf16:
-			invalid_code_path("not implemented");
-			break;
-		case Encoding_utf32:
-			append_bytes(b, ch);
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return 1;
-}
+inline umm append(StringBuilder &b, ascii ch) { return append_bytes(b, ch); }
+inline umm append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
+inline umm append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }
+inline umm append(StringBuilder &b, utf32 ch) { return append_bytes(b, ch); }
 
-inline umm append(StringBuilder &b, Span<ascii> string) {
-	umm appended_char_count = string.count;
-	switch (b.encoding) {
-		case Encoding_ascii:
-		case Encoding_utf8:
-			append_bytes(b, string);
-			break;
-		case Encoding_utf16:
-			while (string.count) {
-				append_bytes(b, (utf16)*string.data);
-				++string.data;
-				--string.count;
-			}
-			break;
-		case Encoding_utf32:
-			while (string.count) {
-				append_bytes(b, (utf32)*string.data);
-				++string.data;
-				--string.count;
-			}
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return appended_char_count;
-}
-
-inline umm append(StringBuilder &b, Span<utf8> string) {
-	switch (b.encoding) {
-		case Encoding_utf8:
-			append_bytes(b, string);
-			break;
-		case Encoding_ascii: {
-			auto string_end = string.end();
-			while (string.data != string_end) {
-				if (*string.data < 0x80) {
-					append_bytes(b, (ascii)*string.data);
-					++string.data;
-				} else {
-					append_bytes(b, b.unfound_ascii);
-					u32 byte_count = char_byte_count(string.data);
-					if (byte_count == ~0u) {
-						// print("string was invalid\n");
-						return 0;
-					}
-					string.data += byte_count;
-				}
-			}
-			break;
-		}
-		case Encoding_utf16: {
-			auto utf16 = with(temporary_allocator, to_utf16(string));
-			append_bytes(b, utf16);
-			break;
-		}
-		case Encoding_utf32:
-			invalid_code_path("case Encoding_utf32 is not implemented");
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return string.count;
-}
-
-inline umm append(StringBuilder &b, Span<utf16> string) {
-	switch (b.encoding) {
-		case Encoding_utf8: {
-			auto utf8 = with(temporary_allocator, to_utf8(string));
-			append_bytes(b, utf8);
-			break;
-		}
-		case Encoding_ascii:
-			while (*string.data) {
-				if (*string.data < 0x80) {
-					append_bytes(b, (ascii)*string.data);
-					++string.data;
-				} else {
-					append_bytes(b, b.unfound_ascii);
-					++string.data; // NOTE: TODO: surrogate pairs
-				}
-			}
-			break;
-		case Encoding_utf16:
-			append_bytes(b, string);
-			break;
-		case Encoding_utf32:
-			invalid_code_path("case Encoding_utf32 is not implemented");
-			break;
-		default:
-			invalid_code_path("StringBuilder.encoding was invalid");
-			break;
-	}
-	return string.count;
-}
-inline umm append(StringBuilder &b, Span<utf32> string) {
-	invalid_code_path("not implemented");
-	return string.count;
-}
-inline umm append(StringBuilder &b, Span<wchar> string) {
-	return append(b, (Span<wchar_s>)string);
-}
+inline umm append(StringBuilder &b, Span<u8   > string) { return append_bytes(b, string); }
+inline umm append(StringBuilder &b, Span<ascii> string) { return append_bytes(b, string); }
+inline umm append(StringBuilder &b, Span<wchar> string) { return append_bytes(b, string); }
+inline umm append(StringBuilder &b, Span<utf8 > string) { return append_bytes(b, string); }
+inline umm append(StringBuilder &b, Span<utf16> string) { return append_bytes(b, string); }
+inline umm append(StringBuilder &b, Span<utf32> string) { return append_bytes(b, string); }
 
 forceinline umm append(StringBuilder &b, ascii const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
-forceinline umm append(StringBuilder &b, wchar const *string) {
-	if constexpr (sizeof(wchar) == sizeof(utf16)) {
-		return append(b, as_span((utf16 *)string));
-	} else {
-		return append(b, as_span((utf32 *)string));
-	}
-}
+forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
 
 template <class T>
 struct FormatList {
-	Span<ascii> before = "{"s;
-	Span<ascii> separator = ", "s;
-	Span<ascii> after = "}"s;
+	Span<u8> before = "{"b;
+	Span<u8> separator = ", "b;
+	Span<u8> after = "}"b;
 	List<T> list;
 };
 
 template <class T>
 forceinline umm append(StringBuilder &b, FormatList<T> format) {
 	umm count = 0;
-	count += append(b, format.before);
-	for (auto &val : format.list) {
-		if (&val != format.list.data) {
-			count += append(b, format.separator);
-		}
+	count += append_bytes(b, format.before);
+	if (format.list.count)
+		count += append(b, *format.list.data);
+	for (auto &val : format.list.skip(1)) {
+		count += append_bytes(b, format.separator);
 		count += append(b, val);
 	}
-	count += append(b, format.after);
+	count += append_bytes(b, format.after);
 	return count;
 }
 
 template <class T>
 forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatList{.list = list}); }
 
-template <>
-forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
-template <>
-forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
-template <>
-forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
-template <>
-forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
-template <>
-forceinline umm append(StringBuilder &b, List<wchar> list) { return append(b, (Span<utf16>)as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<u8   > list) { return append(b, as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<wchar> list) { return append(b, as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
+template <> forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
 
 template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
 
-template <class Char, class = EnableIf<is_char<Char>>>
-inline umm append_format(StringBuilder &b, Span<Char> format_string) {
-	bool previous_is_percent = false;
-	auto c = format_string.data;
+template <class Char>
+inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> format_string) {
+	Char previous = {};
+	auto start = format_string.data;
+	auto c = start;
 	auto end = format_string.end();
 
 	umm appended_char_count = 0;
 
 	for (;c != end; ++c) {
-		if (*c == '%') {
-			previous_is_percent = true;
-			continue;
-		}
-		if (previous_is_percent) {
-			if (*c == '`') {
-				appended_char_count += append(b, '%');
-				continue;
+		auto next_prev = *c;
+		defer { previous = next_prev; };
+		if (previous == '{') {
+			switch (*c) {
+				case '{':
+					appended_char_count += append(b, Span(start, c));
+					start = c + 1;
+					next_prev = 0;
+					break;
+				case '}': invalid_code_path("not enough arguments were provided for 'append_format'"); break;
+				default:  invalid_code_path("bad format string: only '{' or '}' can follow '{'"); break;
+			}
+		} else if (previous == '}') {
+			if (*c == '}') {
+				appended_char_count += append(b, Span(start, c));
+				start = c + 1;
+				next_prev = 0;
 			} else {
-				invalid_code_path("not enough arguments were provided for 'append_format'");
-				return appended_char_count;
+				invalid_code_path("bad format string: only '}' can follow '}'");
 			}
 		}
-		appended_char_count += append(b, *c);
-		previous_is_percent = false;
 	}
+	if (previous == '{' || previous == '}') {
+		invalid_code_path("bad format string: missing brace at the end");
+	}
+	appended_char_count += append(b, Span(start, end));
 	return appended_char_count;
 }
 
 template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
 umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
-	bool previous_is_percent = false;
-	auto c = format_string.data;
+	Char previous = {};
+	auto start = format_string.data;
+	auto c = start;
 	auto end = format_string.end();
 	umm appended_char_count = 0;
 	for (;c != end; ++c) {
-		if (previous_is_percent) {
-			if (*c == '`') {
-				appended_char_count += append(b, '%');
-				continue;
+		auto next_prev = *c;
+		defer { previous = next_prev; };
+		if (previous == '{') {
+			switch (*c) {
+				case '{':
+					appended_char_count += append(b, Span(start, c));
+					start = c + 1;
+					next_prev = 0;
+					break;
+				case '}':
+					appended_char_count += append(b, Span(start, c - 1));
+					appended_char_count += append(b, arg);
+					appended_char_count += append_format(b, Span(c + 1, end), args...);
+					start = end;
+					c = end;
+					return appended_char_count;
+				default:
+					invalid_code_path("bad format string: only '{' or '}' can follow '{'");
+					break;
+			}
+		} else if (previous == '}') {
+			if (*c == '}') {
+				appended_char_count += append(b, Span(start, c));
+				start = c + 1;
+				next_prev = 0;
 			} else {
-				appended_char_count += append(b, arg);
-				appended_char_count += append_format(b, Span(c, end), args...);
-				return appended_char_count;
+				invalid_code_path("bad format string: only '}' can follow '}'");
 			}
 		}
-		if (*c == '%') {
-			previous_is_percent = true;
-			continue;
-		}
-		appended_char_count += append(b, *c);
-		previous_is_percent = false;
 	}
-	if (previous_is_percent) {
-		appended_char_count += append(b, arg);
-		appended_char_count += append_format(b, Span(c, end), args...);
-	} else {
-		invalid_code_path("too many arguments were provided for 'append_format'");
-	}
-	return appended_char_count;
+	invalid_code_path("Too many arguments provided for this format string");
+	return {};
 }
 template <class ...Args, class Char, class = EnableIf<is_char<Char>>>
 umm append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
@@ -975,21 +822,35 @@ forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, F
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
 inline umm append(StringBuilder &builder, std::source_location location) {
-	return append_format(builder, "%:%:%:%", location.file_name(), location.line(), location.column(), location.function_name());
+	return append_format(builder, "{}:{}:{}:{}", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
-template <class Char, class ...Args>
-inline List<Char> concatenate(Span<Char> arg0, Args const &...args) {
+template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
+template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };
+template <> struct is_utf8_t<Span<utf8>> { inline static constexpr bool value = true; };
+template <> struct is_utf8_t<List<utf8>> { inline static constexpr bool value = true; };
+
+template <class First, class ...Rest>
+struct are_utf8_t {
+	inline static constexpr bool value = is_utf8_t<First>::value && are_utf8_t<Rest...>::value;
+};
+template <class First>
+struct are_utf8_t<First> {
+	inline static constexpr bool value = is_utf8_t<First>::value;
+};
+
+template <class ...Args>
+inline static constexpr bool are_utf8 = are_utf8_t<Args...>::value;
+
+template <class ...Args>
+inline auto concatenate(Args const &...args) {
 	StringBuilder builder;
-	builder.encoding = encoding_from_type<Char>;
-	append(builder, arg0);
 	int ___[] = { ((append(builder, args), ...), 0) };
-	return (List<Char>)to_string(builder, current_allocator);
-}
-
-template <class Char, class ...Args>
-inline List<Char> concatenate(List<Char> arg0, Args const &...args) {
-	return concatenate((Span<Char>)arg0, args...);
+	if constexpr (are_utf8<Args...>) {
+		return (List<utf8>)to_string(builder, current_allocator);
+	} else {
+		return (List<u8>)to_string(builder, current_allocator);
+	}
 }
 
 template <class ...Args>
@@ -1001,16 +862,14 @@ template <class ...Args>
 List<ascii> format(Span<ascii> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	builder.encoding = Encoding_ascii;
 	append_format(builder, fmt, args...);
-	return to_string(builder, current_allocator);
+	return (List<ascii>)to_string(builder, current_allocator);
 }
 
 template <class ...Args>
 List<utf8> format(Span<utf8> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	builder.encoding = Encoding_utf8;
 	append_format(builder, fmt, args...);
 	return (List<utf8>)to_string(builder, current_allocator);
 }
@@ -1019,7 +878,6 @@ template <class ...Args>
 List<utf16> format(Span<utf16> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	builder.encoding = Encoding_utf16;
 	append_format(builder, fmt, args...);
 	return (List<utf16>)to_string(builder, current_allocator);
 }
@@ -1039,10 +897,9 @@ template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...arg
 template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 
 template <class T>
-List<char> to_string(T const &value, Encoding encoding = Encoding_utf8) {
+List<char> to_string(T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	builder.encoding = encoding;
 	append(builder, value);
 	return to_string(builder, current_allocator);
 }
@@ -1094,7 +951,7 @@ inline umm append(StringBuilder &builder, FormattedBytes bytes) {
 			"EiB"s,
 		}
 	};
-	return append_format(builder, "% %", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
+	return append_format(builder, "{} {}", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
 }
 
 #if 0

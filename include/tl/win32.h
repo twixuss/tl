@@ -258,7 +258,7 @@ FormattedLastError last_error() {
 }
 
 inline umm append(StringBuilder &b, FormattedLastError e) {
-	return append_format(b, "0x% (%)", FormatInt{.value = e.value, .radix = 16}, e.value);
+	return append_format(b, "0x{} ({})", FormatInt{.value = e.value, .radix = 16}, e.value);
 }
 
 #endif

@@ -933,6 +933,9 @@ struct Span {
 	constexpr Span<T> subspan(umm subspan_start, umm subspan_count) const {
 		return Span(data + subspan_start, subspan_count);
 	}
+	constexpr Span<T> skip(umm amount) const {
+		return {data + amount, count - amount};
+	}
 
 	ValueType *data = 0;
 	umm count = 0;

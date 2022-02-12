@@ -48,7 +48,6 @@ template <class T>
 inline umm print(PrintKind kind, T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
-	builder.encoding = Encoding_utf8;
 	append(builder, value);
 	auto string = as_utf8(to_string(builder, temporary_allocator));
 	current_printer(kind, string);

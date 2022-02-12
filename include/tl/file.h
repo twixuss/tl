@@ -11,7 +11,7 @@ using pathchar = utf16;
 inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
 #define tl_file_string(x) u ## x
 
-inline static constexpr pathchar path_separator = u'\\';
+inline static constexpr utf8 path_separator = u'\\';
 
 #endif
 
@@ -396,7 +396,7 @@ inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = fal
 }
 
 inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
-	return concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
+	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
 }
 
 inline bool is_absolute_path(Span<utf8> path) {
@@ -815,12 +815,12 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 			StringBuilder builder;
 			for (auto &ext : allowed_extensions) {
 				if (&ext == &allowed_extensions.back()) {
-					append_format(builder, "*.%", ext);
+					append_format(builder, "*.{}", ext);
 				} else {
-					append_format(builder, "*.%;", ext);
+					append_format(builder, "*.{};", ext);
 				}
 			}
-			file_type = {L"Files", (wchar *)to_utf16(to_string(builder), true).data};
+			file_type = {L"Files", (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
