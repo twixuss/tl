@@ -901,6 +901,7 @@ struct LinearSet : Span<T> {
 	}
 
 	T pop() {
+		bounds_check(count);
 		--count;
 		return data[count];
 	}

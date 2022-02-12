@@ -118,6 +118,15 @@ FormatAlign<Char> align_left(u16 count, Char fill) {
 	return result;
 }
 
+template <class Char>
+FormatAlign<Char> align_right(u16 count, Char fill) {
+	FormatAlign<Char> result;
+	result.count = count;
+	result.fill = fill;
+	result.kind = FormatAlign_right;
+	return result;
+}
+
 template <class T, class Char>
 struct Format {
 	T value;
@@ -384,6 +393,19 @@ inline void free(StringBuilder &builder) {
 		block = next;
 	}
 	builder.allocator = {};
+}
+
+// Always allocates memory for the string
+inline List<char> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
+	List<char> result;
+	result.allocator = allocator;
+	result.reserve(builder.count() TL_LA);
+	builder.fill(result);
+	result.count = result.capacity;
+	return result;
+}
+inline List<char> to_string(StringBuilder &builder TL_LP) {
+	return to_string(builder, current_allocator TL_LA);
 }
 
 forceinline void append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
@@ -737,12 +759,19 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 	if (format.align.count) {
 		if (format.align.kind == FormatAlign_left) {
 			auto appended_char_count = append(builder, format.value);
-			for (; appended_char_count < format.align.count; ++appended_char_count) {
-				append(builder, format.align.fill);
+			while (appended_char_count < format.align.count) {
+				appended_char_count += append(builder, format.align.fill);
 			}
 			return appended_char_count;
 		} else {
-			invalid_code_path("not implemented");
+			StringBuilder temp;
+			temp.allocator = temporary_allocator;
+
+			umm appended_char_count = append(temp, format.value);
+			while (appended_char_count < format.align.count) {
+				appended_char_count += append(builder, format.align.fill);
+			}
+			append(builder, to_string(temp, temporary_allocator));
 			return 0;
 		}
 	} else {
@@ -947,19 +976,6 @@ forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, F
 
 inline umm append(StringBuilder &builder, std::source_location location) {
 	return append_format(builder, "%:%:%:%", location.file_name(), location.line(), location.column(), location.function_name());
-}
-
-// Always allocates memory for the string
-inline List<char> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
-	List<char> result;
-	result.allocator = allocator;
-	result.reserve(builder.count() TL_LA);
-	builder.fill(result);
-	result.count = result.capacity;
-	return result;
-}
-inline List<char> to_string(StringBuilder &builder TL_LP) {
-	return to_string(builder, current_allocator TL_LA);
 }
 
 template <class Char, class ...Args>

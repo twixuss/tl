@@ -62,8 +62,10 @@
 #define TL_LA , TL_LAC
 #else
 #define TL_LPC
+#define TL_LPCD
 #define TL_LAC
 #define TL_LP
+#define TL_LPD
 #define TL_LA
 #endif
 
