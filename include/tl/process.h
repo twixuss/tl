@@ -72,8 +72,8 @@ MemoryInfo get_memory_info() {
 	MemoryInfo result;
 	PROCESS_MEMORY_COUNTERS counters;
 	if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
-		result.current_usage = counters.PagefileUsage;
-		result.peak_usage = counters.PeakPagefileUsage;
+		result.current_usage = counters.WorkingSetSize;
+		result.peak_usage = counters.PeakWorkingSetSize;
 	}
 	return result;
 }
