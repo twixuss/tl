@@ -599,6 +599,10 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 	pool.running = false;
 	pool.stopping = false;
 	pool.thread_count = thread_count;
+	pool.allocator =
+	pool.threads.allocator =
+	pool.all_work.base.allocator =
+	current_allocator;
 	if (thread_count) {
 		pool.threads.reserve(thread_count);
 
