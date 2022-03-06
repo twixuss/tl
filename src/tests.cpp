@@ -388,7 +388,7 @@ void rand_test() {
 
 	std::sort(std::begin(counts), std::end(counts));
 
-	print("Median: %, Max: %, Min: %\n", counts[count_of(counts) / 2], *std::max_element(std::begin(counts), std::end(counts)), *std::min_element(std::begin(counts), std::end(counts)));
+	print("Median: {}, Max: {}, Min: {}\n", counts[count_of(counts) / 2], *std::max_element(std::begin(counts), std::end(counts)), *std::min_element(std::begin(counts), std::end(counts)));
 }
 #endif
 
@@ -636,11 +636,11 @@ void append(StringBuilder &builder, F32 f) {
 
 template <class T>
 void print_floats(T x) {
-	print("%\n", x);
-	print("%\n", FormatFloat{.value = x, .precision = 6});
-	print("%\n", FormatFloat{.value = x, .precision = 6, .trailing_zeros = true});
-	print("%\n", FormatFloat{.value = x, .precision = 30});
-	print("%\n", FormatFloat{.value = x, .precision = 30, .trailing_zeros = true});
+	print("{}\n", x);
+	print("{}\n", FormatFloat{.value = x, .precision = 6});
+	print("{}\n", FormatFloat{.value = x, .precision = 6, .trailing_zeros = true});
+	print("{}\n", FormatFloat{.value = x, .precision = 30});
+	print("{}\n", FormatFloat{.value = x, .precision = 30, .trailing_zeros = true});
 }
 
 float pow2(float a) {
@@ -903,11 +903,11 @@ int main() {
 	assert(27bu / 10bu == 2bu);
 	assert(27bu % 10bu == 7bu);
 
-	print("%\n", F32{.value = 7.6251f});
-	print("%\n", F32{.value = nextafterf(1, 2)});
+	print("{}\n", F32{.value = 7.6251f});
+	print("{}\n", F32{.value = nextafterf(1, 2)});
 
 
-#define TEST(name) print("% ... ", #name); void name(); name(); print("ok\n")
+#define TEST(name) print("{} ... ", #name); void name(); name(); print("ok\n")
 	TEST(string_test);
 	TEST(file_test);
 	TEST(math_test);

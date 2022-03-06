@@ -13,7 +13,7 @@ u32 too_long;
 template <class T>
 void test_container() {
 
-	print("%\n", typeid(T).name());
+	print("{}\n", typeid(T).name());
 
 	memset(table, 0, table_size * sizeof(table[0]));
 	too_long = 0;
@@ -35,11 +35,11 @@ void test_container() {
 	}
 	for (u32 i = 0; i < table_size; ++i) {
 		if (table[i] >= too_small) {
-			print("% x % cy\n", table[i], i);
+			print("{} x {} cy\n", table[i], i);
 		}
 	}
 	if (too_long) {
-		print("more: %x\n", too_long);
+		print("more: {}x\n", too_long);
 	}
 }
 

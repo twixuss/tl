@@ -245,7 +245,7 @@ List<ascii> demangle(ascii const *function_name) {
 		append(builder, "("s);
 		++c;
 		if (*c++ != '@') goto end;
-		print("%\n", parse_one_type(c)); // return value. why???
+		print("{}\n", parse_one_type(c)); // return value. why???
 
 		bool comma = false;
 		while (*c != 'Z') {

@@ -46,7 +46,7 @@
             </ArrayItems>
         </Expand>
     </Type>
-    <Type Name="tl::BlockList&lt;*&gt;::Block">
+    <Type Name="tl::StaticBlockList&lt;*&gt;::Block">
         <Intrinsic Name="size" Expression="end - buffer" />
         <DisplayString>{{ size={size()} }}</DisplayString>
         <Expand>
@@ -57,7 +57,7 @@
             <Item Name="next" Condition="next!=0">next</Item>
         </Expand>
     </Type>
-    <Type Name="tl::BlockList&lt;*&gt;::Iterator">
+    <Type Name="tl::StaticBlockList&lt;*&gt;::Iterator">
         <DisplayString>{block->data[value_index]}</DisplayString>
     </Type>
     <Type Name="tl::v2&lt;*&gt;">

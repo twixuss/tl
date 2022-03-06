@@ -1952,7 +1952,7 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 } // namespace ce
 
 inline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
-	return append_format(builder, "{%, %}",
+	return append_format(builder, "({}, {})",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
@@ -1960,7 +1960,7 @@ inline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
 
 #define TO_STRING_V2(v2f)                               \
 inline umm append(StringBuilder &builder, v2f v) {      \
-	return append_format(builder, "{%, %}"s, v.x, v.y); \
+	return append_format(builder, "({}, {})"s, v.x, v.y); \
 }
 
 TO_STRING_V2(v2f)
@@ -1971,7 +1971,7 @@ TO_STRING_V2(v2s)
 
 #define TO_STRING_V3(v3f)                                       \
 inline umm append(StringBuilder &builder, v3f v) {              \
-	return append_format(builder, "{%, %, %}"s, v.x, v.y, v.z); \
+	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z); \
 }
 
 TO_STRING_V3(v3f)
@@ -1982,7 +1982,7 @@ TO_STRING_V3(v3s)
 
 #define TO_STRING_V4(v4f)                                               \
 inline umm append(StringBuilder &builder, v4f v) {                      \
-	return append_format(builder, "{%, %, %, %}"s, v.x, v.y, v.z, v.w); \
+	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w); \
 }
 
 TO_STRING_V4(v4f)
@@ -1992,17 +1992,17 @@ TO_STRING_V4(v4s)
 #undef TO_STRING_V3
 
 inline umm append(StringBuilder &builder, m4 m) {
-	return append_format(builder, "{%, %, %, %}", m.i, m.j, m.k, m.l);
+	return append_format(builder, "({}, {}, {}, {})", m.i, m.j, m.k, m.l);
 }
 
 template <class T>
 umm append(StringBuilder &builder, aabb<T> v) {
-	return append_format(builder, "{min=%, max=%}"s, v.min, v.max);
+	return append_format(builder, "(min={}, max={})"s, v.min, v.max);
 }
 
 template <class T>
 umm append(StringBuilder &builder, ray<T> r) {
-	return append_format(builder, "{origin=%, direction=%}", r.origin, r.direction);
+	return append_format(builder, "(origin={}, direction={})", r.origin, r.direction);
 }
 
 template <> forceinline constexpr v2f convert(f32 v) { return V2f(v); }

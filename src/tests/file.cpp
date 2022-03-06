@@ -32,7 +32,7 @@ void file_test() {
 			parsed.name      != test.expected.name ||
 			parsed.extension != test.expected.extension)
 		{
-			print("Failed: path: '%', directory: '%', name: '%', extension: '%'\n", test.path, parsed.directory, parsed.name, parsed.extension);
+			print("Failed: path: '{}', directory: '{}', name: '{}', extension: '{}'\n", test.path, parsed.directory, parsed.name, parsed.extension);
 		}
 	}
 

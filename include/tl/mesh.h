@@ -45,7 +45,7 @@ struct CommonVertex {
 };
 
 inline void append(StringBuilder &builder, CommonVertex v) {
-	append_format(builder, "{%, %, %}", v.position, v.normal, v.color);
+	append_format(builder, "({}, {}, {})", v.position, v.normal, v.color);
 }
 
 struct CommonMesh {
@@ -271,7 +271,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 				}
 			}
 			if (!colors) {
-				print(Print_error, "Color has unsupported component_type=% and type=%\n", (s64)color_component_type, color_type);
+				print(Print_error, "Color has unsupported component_type={} and type={}\n", (s64)color_component_type, color_type);
 			}
 		}
 

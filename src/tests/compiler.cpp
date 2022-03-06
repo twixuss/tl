@@ -136,7 +136,7 @@ void compiler_test() {
 	{\
 		func;\
 		auto demangled = demangle(mangled_name);\
-		print("Result of demangling % is %. Expected %\n", Format(mangled_name, align_left(20, ' ')), Format(demangled, align_left(20, ' ')), expected);\
+		print("Result of demangling {} is {}. Expected {}\n", Format(mangled_name, align_left(20, ' ')), Format(demangled, align_left(20, ' ')), expected);\
 		if (demangled != expected) {\
 			failed = true;\
 		}\

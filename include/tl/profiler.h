@@ -34,7 +34,7 @@ inline void mark(char const *name, u32 color) {
 
 }}
 
-#include "compiler.h"
+// #include "compiler.h"
 #include "list.h"
 #include "file.h"
 
@@ -165,7 +165,7 @@ List<ascii> output_for_chrome() {
 			if (needComma) {
 				append(builder, ",\n"s);
 			}
-			append_format(builder, R"({"cat":"function","dur":%,"name":"%","ph":"X","pid":0,"tid":%,"ts":%})",
+			append_format(builder, R"({{"cat":"function","dur":{},"name":"{}","ph":"X","pid":0,"tid":{},"ts":{}}})",
 				FormatFloat{.value = (span.end - span.begin) * 1000000. / performance_frequency, .precision = 6},
 				span.name,
 				span.thread_id,
@@ -175,7 +175,7 @@ List<ascii> output_for_chrome() {
 		}
 	}
 	append(builder, "\n]}"s);
-	return to_string(builder);
+	return (List<ascii>)to_string(builder);
 }
 
 List<u8> output_for_timed() {

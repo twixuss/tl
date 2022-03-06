@@ -98,14 +98,14 @@ struct FontCollectionFT : FontCollection {
 void init_face(FontFace &face) {
 	face.file = read_entire_file(face.path);
 	defer {
-		print("Loaded font '%'\n", face.path);
+		print("Loaded font '{}'\n", face.path);
 		free(face.path);
 	};
 
 	{
 		auto error = FT_New_Memory_Face(ft_library, face.file.data, face.file.count, 0, &face.ft);
 		if (error) {
-			invalid_code_path("FT_New_Face failed: %", FT_Error_String(error));
+			invalid_code_path("FT_New_Face failed: {}", FT_Error_String(error));
 		}
 	}
 
@@ -178,7 +178,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *font) {
 			auto error = FT_Load_Glyph(current_face->ft, glyph_index, 0);
 
 			if (error || glyph_index == 0) {
-				//if (error) print("%\n", FT_Error_String(error));
+				//if (error) print("{}\n", FT_Error_String(error));
 				++current_face;
 				if (current_face == collection->faces.end()) {
 					//
@@ -291,7 +291,7 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 FontCollection *create_font_collection(Span<Span<pathchar>> font_paths) {
 	if (!ft_library) {
 		auto error = FT_Init_FreeType(&ft_library);
-		assert(!error, "FT_Init_FreeType Error %", FT_Error_String(error));
+		assert(!error, "FT_Init_FreeType Error {}", FT_Error_String(error));
 	}
 
 	auto allocator = current_allocator;
@@ -327,7 +327,7 @@ namespace tl {
 
 FontChar get_char_info(u32 ch, SizedFont *font) {
 	auto found = font->chars.find(ch);
-	assert(found, "get_char_info: character '%' is not present. Call ensure_all_chars_present before", ch);
+	assert(found, "get_char_info: character '{}' is not present. Call ensure_all_chars_present before", ch);
 	return *found;
 }
 

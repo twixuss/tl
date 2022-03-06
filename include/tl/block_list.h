@@ -417,6 +417,28 @@ struct BlockList {
 			return copy;
 		}
 
+		Iterator &operator+=(smm i) {
+			if (i >= 0) {
+				value_index += i;
+				while (value_index >= block->count) {
+					if (block->next) {
+						value_index -= block->count;
+						block = block->next;
+					}
+				}
+			} else {
+				smm new_index = (smm)value_index + i;
+				while (new_index < 0) {
+					new_index += value_index;
+					block = block->previous;
+					value_index = block->count;
+				}
+				value_index = new_index;
+				assert(value_index < block->count);
+			}
+			return *this;
+		}
+
 		bool operator==(Iterator that) {
 			return block == that.block && value_index == that.value_index;
 		}
@@ -426,6 +448,12 @@ struct BlockList {
 
 		T *operator->() { return &(*block)[value_index]; }
 		T &operator*() { return (*block)[value_index]; }
+
+		T &operator[](smm i) {
+			Iterator it = *this;
+			it += i;
+			return *it;
+		}
 	};
 
 	Allocator allocator = current_allocator;
@@ -483,11 +511,11 @@ struct BlockList {
 	T const &back() const { return last->back(); }
 
 	void pop_back() {
-		if (last == &first)
-			bounds_check(first.count);
+		if (last == first)
+			bounds_check(first->count);
 
 		last->count--;
-		if (last->count == 0 && last != &first) {
+		if (last->count == 0 && last != first) {
 			last = last->previous;
 		}
 	}

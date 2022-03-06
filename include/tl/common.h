@@ -62,8 +62,10 @@
 #define TL_LA , TL_LAC
 #else
 #define TL_LPC
+#define TL_LPCD
 #define TL_LAC
 #define TL_LP
+#define TL_LPD
 #define TL_LA
 #endif
 
@@ -930,6 +932,9 @@ struct Span {
 
 	constexpr Span<T> subspan(umm subspan_start, umm subspan_count) const {
 		return Span(data + subspan_start, subspan_count);
+	}
+	constexpr Span<T> skip(umm amount) const {
+		return {data + amount, count - amount};
 	}
 
 	ValueType *data = 0;
