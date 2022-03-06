@@ -194,7 +194,7 @@ CpuInfo get_cpu_info() {
 	defer { free(buffer); };
 
 	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
-		invalid_code_path("GetLogicalProcessorInformation: %u", GetLastError());
+		invalid_code_path("GetLogicalProcessorInformation: {}", GetLastError());
 
 	assert(processorInfoLength % sizeof(buffer[0]) == 0);
 

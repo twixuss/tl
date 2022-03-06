@@ -110,7 +110,7 @@ inline v3f to_euler_angles(quaternion q) {
 }
 
 inline void append(StringBuilder &builder, quaternion q) {
-	append_format(builder, "{%, %, %, %}", q.x, q.y, q.z, q.w);
+	append_format(builder, "({}, {}, {}, {})", q.x, q.y, q.z, q.w);
 }
 
 }

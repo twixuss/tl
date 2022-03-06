@@ -3,39 +3,9 @@
 #include "array.h"
 #include "optional.h"
 #include "pointer.h"
-
-template <class T>
-inline tl::umm get_hash(T value);
-
-template <class T>
-inline tl::umm get_hash(T *value) { return (tl::umm)value / alignof(T); }
-
-inline tl::umm get_hash(void *value) { return (tl::umm)value / sizeof(tl::umm); }
-
-template <> inline tl::umm get_hash(tl::u8    value) { return value; }
-template <> inline tl::umm get_hash(tl::u16   value) { return value; }
-template <> inline tl::umm get_hash(tl::u32   value) { return value; }
-template <> inline tl::umm get_hash(tl::u64   value) { return value; }
-template <> inline tl::umm get_hash(tl::s8    value) { return value; }
-template <> inline tl::umm get_hash(tl::s16   value) { return value; }
-template <> inline tl::umm get_hash(tl::s32   value) { return value; }
-template <> inline tl::umm get_hash(tl::s64   value) { return value; }
-template <> inline tl::umm get_hash(tl::ascii value) { return value; }
-template <> inline tl::umm get_hash(tl::utf8  value) { return value; }
-template <> inline tl::umm get_hash(tl::utf16 value) { return value; }
-template <> inline tl::umm get_hash(tl::utf32 value) { return value; }
-
-template <class T> tl::umm get_hash(tl::Span<T> value) {
-	tl::umm result = 0xdeadc0de;
-	for (auto const &it : value) {
-		result = tl::rotate_left(result, 1) ^ get_hash(it);
-	}
-	return result;
-}
+#include "hash.h"
 
 namespace tl {
-
-template <class T> struct DefaultHasher { static umm get_hash(T value) { return ::get_hash(value); } };
 
 template <class Key, class Value, umm _capacity, class Hasher = DefaultHasher<Key>>
 struct StaticHashMap {
@@ -134,39 +104,102 @@ struct HashMap {
 	using Bucket = LinkedList<KeyValue>;
 
 	Allocator allocator = current_allocator;
-	Bucket *buckets = 0;
-	umm bucket_count = 0;
+	Span<Bucket> buckets;
 	umm total_value_count = 0;
 
-	Value &get_or_insert(Key const &key) {
+	Value &get_or_insert(Key const &key TL_LP) {
 		scoped_allocator(allocator);
 
-		if (!bucket_count) {
-			rehash(256);
+		if (!buckets.count) {
+			rehash(4 TL_LA);
 		}
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
-		for (auto &it : bucket) {
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
 			if (it.key == key) {
 				return it.value;
 			}
 		}
 
-		if (total_value_count == bucket_count) {
-			rehash(bucket_count * 2);
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2);
+			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
-		auto &it = bucket.add();
+		auto &it = bucket->add(TL_LAC);
 		it.key = key;
 		return it.value;
 	}
+
+	//
+	// If value is not present returns true
+	//
+	// If value is already present calls a callback with stored key and value and returns false
+	//
+	template <class Callback>
+	bool insert_or(Key const &key, Value value, Callback &&callback TL_LP) {
+		scoped_allocator(allocator);
+
+		if (!buckets.count) {
+			rehash(16 TL_LA);
+		}
+
+		umm hash = Hasher::get_hash(key);
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
+			if (it.key == key) {
+				callback(it.key, it.value);
+				return false;
+			}
+		}
+
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2 TL_LA);
+			bucket = &buckets[hash & (buckets.count - 1)];
+		}
+		++total_value_count;
+		auto &it = bucket->add(TL_LAC);
+		it.key = key;
+		it.value = value;
+		return true;
+	}
+	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0 TL_LP) {
+		scoped_allocator(allocator);
+
+		if (!buckets.count) {
+			rehash(16 TL_LA);
+		}
+
+		umm hash = Hasher::get_hash(key);
+		auto bucket = &buckets[hash & (buckets.count - 1)];
+		for (auto &it : *bucket) {
+			if (it.key == key) {
+				if (existing)
+					*existing = &it.value;
+				if (existing_key)
+					*existing_key = &it.key;
+				return false;
+			}
+		}
+
+		if (total_value_count == buckets.count) {
+			rehash(buckets.count * 2 TL_LA);
+			bucket = &buckets[hash & (buckets.count - 1)];
+		}
+		++total_value_count;
+		auto &it = bucket->add(TL_LAC);
+		it.key = key;
+		it.value = value;
+		return true;
+	}
+
 	Pointer<Value> find(Key const &key) {
-		if (bucket_count == 0)
+		if (buckets.count == 0)
 			return 0;
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
+		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.key == key) {
 				return &it.value;
@@ -175,11 +208,11 @@ struct HashMap {
 		return 0;
 	}
 	Optional<Value> erase(Key const &key) {
-		if (bucket_count == 0)
+		if (buckets.count == 0)
 			return {};
 
 		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (bucket_count - 1)];
+		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.key == key) {
 				auto result = it.value;
@@ -191,29 +224,29 @@ struct HashMap {
 		return {};
 	}
 
-	void rehash(umm new_bucket_count) {
+	void rehash(umm new_buckets_count TL_LP) {
 		scoped_allocator(allocator);
 
-		Bucket *old_buckets = buckets;
+		auto old_buckets = buckets;
 
-		buckets = allocator.allocate<Bucket>(new_bucket_count);
+		buckets.data = allocator.allocate<Bucket>(new_buckets_count TL_LA);
+		buckets.count = new_buckets_count;
 
-		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
 			for (KeyValue &key_value : old_buckets[bucket_index]) {
 				auto hash = Hasher::get_hash(key_value.key);
-				auto &new_bucket = buckets[hash & (new_bucket_count - 1)];
-				new_bucket.add(key_value);
+				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
+				new_bucket.add(key_value TL_LA);
 			}
 		}
 
-		if (old_buckets) {
-			allocator.free(old_buckets);
+		if (old_buckets.data) {
+			allocator.free_t(old_buckets.data, old_buckets.count);
 		}
-		bucket_count = new_bucket_count;
 	}
 
 	void clear() {
-		for (umm bucket_index = 0; bucket_index < bucket_count; ++bucket_index) {
+		for (umm bucket_index = 0; bucket_index < buckets.count; ++bucket_index) {
 			buckets[bucket_index].clear();
 		}
 	}
@@ -223,7 +256,7 @@ template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
 void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 	static_assert(flags == 0, "Only default flags supported");
 
-	for (u32 i = 0; i < map.bucket_count; ++i) {
+	for (u32 i = 0; i < map.buckets.count; ++i) {
 		for (auto &it : map.buckets[i]) {
 			fn(it.key, it.value);
 		}
@@ -231,20 +264,49 @@ void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 }
 
 template <class Key, class Value, class Hasher>
-HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source) {
+HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source TL_LP) {
 	HashMap<Key, Value, Hasher> result;
 	for_each(source, [&](Key const &key, Value const &value) {
-		result.get_or_insert(key) = value;
+		result.get_or_insert(key TL_LA) = value;
 	});
 	return result;
 }
 
 template <class Key, class Value, class Hasher>
-void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source) {
+void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source TL_LP) {
 	destination.clear();
 	for_each(source, [&](Key const &key, Value const &value) {
-		destination.get_or_insert(key) = value;
+		destination.get_or_insert(key TL_LA) = value;
 	});
 }
+
+template <class Key, class Value, class Hasher>
+umm count_of(HashMap<Key, Value, Hasher> &map) {
+	umm result = 0;
+	for (auto &bucket : map.buckets) {
+		result += bucket.size();
+	}
+	return result;
+}
+
+template <class Key, class Value, class Hasher, class Fn>
+umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+	umm result = 0;
+	for_each(map, [&](Key &key, Value &value) {
+		if (fn(key, value)) {
+			result += 1;
+		}
+	});
+	return result;
+}
+
+template <class Key, class Value, class Hasher>
+bool is_empty(HashMap<Key, Value, Hasher> map) {
+	bool result = true;
+	for_each(map, [&](Key &key, Value &value) { (void)key; (void)value; result = false; for_each_break; });
+	return result;
+}
+
+
 
 }

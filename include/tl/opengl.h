@@ -733,7 +733,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 	int index = ChoosePixelFormat(client_dc, &dp);
 	if (!index) {
 		auto error = GetLastError();
-		print("ChoosePixelFormat failed with code 0x% (%)\n", FormatInt{.value = error, .radix = 16}, error);
+		print("ChoosePixelFormat failed with code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
 		return false;
 	}
 
@@ -756,7 +756,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 		char const *name = function_names[function_index];
 		void *function = wglGetProcAddress(name);
 		if (!function) {
-			print("Failed to query '%'\n", name);
+			print("Failed to query '{}'\n", name);
 		}
 		functions.data[function_index] = function;
 	}
@@ -887,9 +887,9 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 					if (!wglGetPixelFormatAttribivARB(client_dc, format_index, 0, count_of(attribs), attribs, attrib_values))
 						break;
 
-					print("Format #%:\n", format_index);
+					print("Format #{}:\n", format_index);
 					for (u32 attrib_index = 0; attrib_index < count_of(attribs); ++attrib_index) {
-						print("%: %\n", to_string(attribs[attrib_index]), attrib_values[attrib_index]);
+						print("{}: {}\n", to_string(attribs[attrib_index]), attrib_values[attrib_index]);
 					}
 					print('\n');
 				}
@@ -953,7 +953,7 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 
 	if (do_print) {
 		auto time = with(temporary_allocator, get_time_string());
-		print("% ---------------\nDebug message (%): %\nSource: ", time, id, message);
+		print("{} ---------------\nDebug message ({}): {}\nSource: ", time, id, message);
 		switch (source) {
 			case GL_DEBUG_SOURCE_API:             print("API");             break;
 			case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   print("Window System");   break;

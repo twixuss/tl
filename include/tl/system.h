@@ -238,7 +238,7 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 
 }
 
-#if TL_DEBUG
+#ifdef TL_DEBUG
 #if TL_DEBUG != 0 && TL_DEBUG != 1
 #error TL_DEBUG defined to wrong value
 #endif
@@ -251,7 +251,10 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 		#pragma push_macro("OS_WINDOWS")
 		#undef OS_WINDOWS
 		#define NOMINMAX
-		#include <Windows.h>
+			#pragma warning(push, 0)
+				#pragma warning(disable: 5039 4668)
+				#include <Windows.h>
+			#pragma warning(pop)
 		#pragma pop_macro("OS_WINDOWS")
 	#else
 		#include <pthread.h>

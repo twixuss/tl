@@ -62,6 +62,8 @@ inline Process start_process(Span<utf8>  command_line) { return start_process(to
 #include <Psapi.h>
 #endif
 
+#include "console.h"
+
 namespace tl {
 
 #if OS_WINDOWS
@@ -72,8 +74,8 @@ MemoryInfo get_memory_info() {
 	MemoryInfo result;
 	PROCESS_MEMORY_COUNTERS counters;
 	if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
-		result.current_usage = counters.PagefileUsage;
-		result.peak_usage = counters.PeakPagefileUsage;
+		result.current_usage = counters.WorkingSetSize;
+		result.peak_usage = counters.PeakWorkingSetSize;
 	}
 	return result;
 }
@@ -90,7 +92,7 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.hInstApp = NULL;
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
-		print(Print_error, "ShellExecuteExA failed with error code 0x% (%)\n", FormatInt{.value = error, .radix = 16}, error);
+		print(Print_error, "ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
 		return {};
 	}
 
@@ -122,6 +124,7 @@ void free(Process &process) {
 	process = {};
 }
 
+// TODO: confusing name, this is another process' stdout
 struct StdoutStream : Stream {
 	void *handle;
 	umm read(Span<u8> destination) {
@@ -129,7 +132,7 @@ struct StdoutStream : Stream {
 		ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0);
 		return bytes_read;
 	}
-	umm write(Span<u8> source) { invalid_code_path("unavailable"); return {}; }
+	umm write(Span<u8> source) { (void)source; invalid_code_path("unavailable"); return {}; }
 	umm remaining_bytes() { invalid_code_path("unavailable"); return {}; }
 	void free() {
 		CloseHandle(handle);

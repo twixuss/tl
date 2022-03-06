@@ -8,10 +8,10 @@ namespace tl {
 
 #if OS_WINDOWS
 using pathchar = utf16;
-inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false) { return to_utf16(string, terminate); }
+inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
 #define tl_file_string(x) u ## x
 
-inline static constexpr pathchar path_separator = u'\\';
+inline static constexpr utf8 path_separator = u'\\';
 
 #endif
 
@@ -72,14 +72,15 @@ inline bool directory_exists(Span<utf16> path) {
 inline bool directory_exists(Span<utf8> path) {
 	return directory_exists(to_utf16(path, true).data);
 }
-inline bool directory_exists(Span<ascii> path) {
+forceinline bool directory_exists(Span<ascii> path) {
+	return directory_exists((Span<utf8>)path);
 }
 
 struct ReadEntireFileParams {
 	umm extra_space_before = 0;
 	umm extra_space_after = 0;
 };
-inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
+inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
 
@@ -87,53 +88,53 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {}) {
 	auto size = (umm)get_cursor(file);
 	set_cursor(file, 0, File_begin);
 
-	auto result = create_buffer(size + params.extra_space_before + params.extra_space_after);
+	auto result = create_buffer_uninitialized(size + params.extra_space_before + params.extra_space_after TL_LA);
 	read(file, {result.data + params.extra_space_before, size});
 
 	return result;
 }
 
 template <class Char>
-inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {}) {
+inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
-	return read_entire_file(file, params);
+	return read_entire_file(file, params TL_LA);
 }
 template <class Path>
-inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {}) {
-	return read_entire_file(as_span(path), params);
+inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {} TL_LP) {
+	return read_entire_file(as_span(path), params TL_LA);
 }
 
 
 inline bool write_entire_file(File file, Span<u8> span) {
 	set_cursor(file, 0, File_begin);
 	defer { truncate_to_cursor(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(pathchar const *path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<ascii> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<utf8> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<utf16> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 
 
@@ -176,7 +177,10 @@ inline void free(FileItemList &list) {
 	free(list.base());
 }
 
-TL_API FileItemList get_items_in_directory(Span<pathchar> directory);
+TL_API FileItemList get_items_in_directory(Span<utf16> directory);
+inline FileItemList get_items_in_directory(Span<utf8> directory) {
+	return get_items_in_directory(with(temporary_allocator, to_utf16(directory)));
+}
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
@@ -214,7 +218,7 @@ inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker 
 	return create_file_tracker(file, (void(*)(FileTracker &, void *))on_update, 0);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, 0);
+	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, state);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker)) {
 	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
@@ -292,7 +296,7 @@ enum : FileDialogFlags {
 
 TL_API Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
 
-TL_API List<pathchar> get_current_directory();
+TL_API List<utf8> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
 inline void set_current_directory(Span<pathchar> path) {
 	return set_current_directory(temporary_null_terminate(path).data);
@@ -393,7 +397,7 @@ inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = fal
 }
 
 inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
-	return concatenate(with(temporary_allocator, to_utf8(get_current_directory())), path_separator, relative_path);
+	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
 }
 
 inline bool is_absolute_path(Span<utf8> path) {
@@ -750,11 +754,11 @@ public:
 	IFACEMETHODIMP OnHelp(IFileDialog *) { return S_OK; };
 	IFACEMETHODIMP OnSelectionChange(IFileDialog *) { return S_OK; };
 	IFACEMETHODIMP OnShareViolation(IFileDialog *, IShellItem *, FDE_SHAREVIOLATION_RESPONSE *) { return S_OK; };
-	IFACEMETHODIMP OnTypeChange(IFileDialog *pfd) { return S_OK; }
+	IFACEMETHODIMP OnTypeChange(IFileDialog *) { return S_OK; }
 	IFACEMETHODIMP OnOverwrite(IFileDialog *, IShellItem *, FDE_OVERWRITE_RESPONSE *) { return S_OK; };
 
 	// IFileDialogControlEvents methods
-	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *pfdc, DWORD dwIDCtl, DWORD dwIDItem) { return S_OK; }
+	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *, DWORD, DWORD) { return S_OK; }
 	IFACEMETHODIMP OnButtonClicked(IFileDialogCustomize *, DWORD) { return S_OK; };
 	IFACEMETHODIMP OnCheckButtonToggled(IFileDialogCustomize *, DWORD, BOOL) { return S_OK; };
 	IFACEMETHODIMP OnControlActivating(IFileDialogCustomize *, DWORD) { return S_OK; };
@@ -812,12 +816,12 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 			StringBuilder builder;
 			for (auto &ext : allowed_extensions) {
 				if (&ext == &allowed_extensions.back()) {
-					append_format(builder, "*.%", ext);
+					append_format(builder, "*.{}", ext);
 				} else {
-					append_format(builder, "*.%;", ext);
+					append_format(builder, "*.{};", ext);
 				}
 			}
-			file_type = {L"Files", (wchar *)to_utf16(to_string(builder), true).data};
+			file_type = {L"Files", (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
@@ -867,12 +871,13 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 	return result;
 }
 
-List<pathchar> get_current_directory() {
-	List<pathchar> temp;
+List<utf8> get_current_directory() {
+	List<utf16> temp;
+	temp.allocator = temporary_allocator;
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.count, (wchar *)temp.data);
 	temp.count--;
-	return temp;
+	return to_utf8(temp);
 }
 
 void set_current_directory(pathchar const *path) {

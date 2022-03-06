@@ -150,7 +150,7 @@ bool parse_shader(Shader &shader, Span<char> source) {
 					success = false;
 				}
 			} else {
-				print("bad token: %\n", *token);
+				print("bad token: {}\n", *token);
 				success = false;
 			}
 			++token;
@@ -165,11 +165,11 @@ Buffer load_shader_file(Span<pathchar> terminated_full_path) {
 	auto full_path = terminated_full_path;
 	full_path.size -= 1;
 
-	auto pre_include_line_directive = format("#line 0 \"%\"\n", full_path);
+	auto pre_include_line_directive = format("#line 0 \"{}\"\n", full_path);
 
 	auto buffer = read_entire_file(terminated_full_path, pre_include_line_directive.size, 1);
 	if (!buffer.data) {
-		print("#included file '%' does not exist\n", full_path);
+		print("#included file '{}' does not exist\n", full_path);
 	}
 
 	memcpy(buffer.data, pre_include_line_directive.data, pre_include_line_directive.size);
@@ -203,11 +203,11 @@ Buffer load_shader_file(Span<pathchar> terminated_full_path) {
 		if (quote_first && quote_last && quote_first != quote_last) {
 			Span<utf8> file_name = {(utf8 *)quote_first + 1, (utf8 *)quote_last};
 
-			auto file_path = format(tl_file_string("%%\0"s), directory, file_name);
+			auto file_path = format(tl_file_string("{}{}\0"s), directory, file_name);
 			auto included_file_buffer = load_shader_file(file_path);
 			auto included_file_source = as_chars(included_file_buffer);
 
-			auto post_include_line_directive = format("#line 1 \"%\"\n", full_path);
+			auto post_include_line_directive = format("#line 1 \"{}\"\n", full_path);
 
 			auto new_source_size =
 				  source.size
@@ -233,7 +233,7 @@ Buffer load_shader_file(Span<pathchar> terminated_full_path) {
 			source = new_source;
 			buffer = new_buffer;
 		} else {
-			print("Bad #include directive in file '%'\n", full_path);
+			print("Bad #include directive in file '{}'\n", full_path);
 			return {};
 		}
 	}
@@ -294,7 +294,7 @@ void init_opengl_shader_catalog(ShaderCatalog &catalog, Span<pathchar> directory
 	catalog.update_entry = [](ShaderCatalog::Entry &entry) {
 		timed_block("ShaderCatalog::update_entry"s);
 
-		print("Compiling %\n", Span(entry.tracker.path.data, entry.tracker.path.size - 1));
+		print("Compiling {}\n", Span(entry.tracker.path.data, entry.tracker.path.size - 1));
 
 		auto source = load_shader_file(entry.tracker.path);
 

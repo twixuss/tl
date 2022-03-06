@@ -17,18 +17,17 @@ struct Token {
 	u32 column;
 };
 
-umm append(StringBuilder &builder, Token token) {
-	return append_format(builder, "'%:%:%'", token.view, token.line, token.column);
+void append(StringBuilder &builder, Token token) {
+	append_format(builder, "'{}:{}:{}'", token.view, token.line, token.column);
 }
 
 s32 tl_main(Span<Span<utf8>> args) {
-	current_printer = console_printer;
 	current_allocator = temporary_allocator;
 
 	auto signature_path = tl_file_string("../data/opengl.h"ts);
 	auto signature_file = read_entire_file(signature_path);
 	if (!signature_file.data) {
-		print("Failed to open %\n", signature_path);
+		print("Failed to open {}\n", signature_path);
 		return 1;
 	}
 
@@ -80,7 +79,7 @@ s32 tl_main(Span<Span<utf8>> args) {
 				case ';':
 				case '*': break;
 				default:
-					print("Failed to parse input file: character `%` is not part of the syntax\n", *c);
+					print("Failed to parse input file: character `{}` is not part of the syntax\n", *c);
 					return 2;
 			}
 			++c;
@@ -124,7 +123,7 @@ begin_parse:
 		++t;
 
 		if (pre_aruments.count < 2) {
-			print("Bad syntax before token %\n", *t);
+			print("Bad syntax before token {}\n", *t);
 			return 3;
 		}
 
@@ -147,7 +146,7 @@ begin_parse:
 		}
 		++t;
 		if (t->kind != ';') {
-			print("Expected ';' after declaration: %\n", *t);
+			print("Expected ';' after declaration: {}\n", *t);
 			return 3;
 		}
 		++t;
@@ -162,7 +161,7 @@ begin_parse:
 	{
 		auto append_redefines = [&](List<Func> &funcs) {
 			for (auto &f : funcs) {
-				append_format(builder, "#define % tl::gl::_%\n", f.name, f.name);
+				append_format(builder, "#define {} tl::gl::_{}\n", f.name, f.name);
 			}
 		};
 
@@ -177,7 +176,7 @@ begin_parse:
 	append(builder, "#else\n");
 	{
 		auto append_redefines = [&](List<Func> &funcs) {
-			for (auto &f : funcs) append_format(builder, "#define % tl::gl::functions._%\n", f.name, f.name);
+			for (auto &f : funcs) append_format(builder, "#define {} tl::gl::functions._{}\n", f.name, f.name);
 		};
 
 
@@ -193,23 +192,23 @@ begin_parse:
 
 	auto append_ds = [&](List<Func> &funcs) {
 		for (auto &f : funcs) {
-			append_format(builder, "D(%, %, (", f.ret, f.name);
+			append_format(builder, "D({}, {}, (", f.ret, f.name);
 			for (auto &arg : f.args) {
-				append_format(builder, "% %", arg.type, arg.name);
+				append_format(builder, "{} {}", arg.type, arg.name);
 				if (&arg != &f.args.back()) {
 					append(builder, ", ");
 				}
 			}
 			append_format(builder, "), (");
 			for (auto &arg : f.args) {
-				append_format(builder, "%", arg.name);
+				append_format(builder, "{}", arg.name);
 				if (&arg != &f.args.back()) {
 					append(builder, ", ");
 				}
 			}
 			append_format(builder, "))\\\n");
 
-			print("%\n", f.name);
+			print("{}\n", f.name);
 		}
 	};
 

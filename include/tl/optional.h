@@ -3,6 +3,8 @@
 
 namespace tl {
 
+inline static constexpr struct null_opt_t {} null_opt;
+
 template <class T>
 struct Optional {
 	Optional() {
@@ -12,9 +14,20 @@ struct Optional {
 		_value = that;
 		_has_value = true;
 	}
+	Optional(null_opt_t) {
+		_has_value = false;
+	}
 	Optional &operator=(T that) {
 		return *new(this) Optional(that);
 	}
+	Optional &operator=(null_opt_t) {
+		return *new(this) Optional();
+	}
+
+	void reset() {
+		_has_value = false;
+	}
+
 	explicit operator bool() const { return _has_value; }
 
 	bool has_value() const { return _has_value; }
@@ -30,5 +43,16 @@ private:
 	bool _has_value;
 #pragma warning(suppress: 4820)
 };
+
+template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator*(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() * b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator/(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() / b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator%(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() % b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator^(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() ^ b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator&(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() & b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator|(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() | b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator<<(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() << b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator>>(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() >> b.value_unchecked()} : Optional<T>{}; }
 
 }

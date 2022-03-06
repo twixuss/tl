@@ -2,6 +2,9 @@
 
 #include "common.h"
 
+#pragma warning(push)
+#pragma warning(disable: 4201) // anonymous struct
+
 namespace tl {
 
 #define DEFN_2 \
@@ -301,3 +304,5 @@ forceinline constexpr bool any_false(v3b v) { return !all_true(v); }
 forceinline constexpr bool any_false(v4b v) { return !all_true(v); }
 
 }
+
+#pragma warning(pop)

@@ -6,7 +6,7 @@
 namespace tl {
 
 template <class T, umm _values_per_block>
-struct MaskedBlockList {
+struct StaticMaskedBlockList {
 	using ValueType = T;
 
 	static constexpr umm values_per_block = _values_per_block;
@@ -28,18 +28,18 @@ struct MaskedBlockList {
 	Block first;
 	Block *last = &first;
 
-	MaskedBlockList &operator=(MaskedBlockList const &that) = delete;
-	MaskedBlockList &operator=(MaskedBlockList &&that) = delete;
+	StaticMaskedBlockList &operator=(StaticMaskedBlockList const &that) = delete;
+	StaticMaskedBlockList &operator=(StaticMaskedBlockList &&that) = delete;
 
 	struct Added {
 		T *pointer;
 		umm index;
 	};
 
-	Added add(T that) {
+	Added add(T const &that) {
 		Added result;
 
-		auto block = last;
+		auto block = &first;
 
 		umm block_index = 0;
 
@@ -94,13 +94,15 @@ struct MaskedBlockList {
 				u32 mask_index = value_index / bits_in_mask;
 				u32 bit_index  = value_index % bits_in_mask;
 
+				bounds_check(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList");
+
 				block->masks[mask_index] &= ~((Mask)1 << bit_index);
 
 				return;
 			}
 			block = block->next;
 		}
-		bounds_check(false, "attempt to remove non-existant value from MaskedBlockList");
+		bounds_check(false, "attempt to remove non-existant value from StaticMaskedBlockList");
 	}
 
 	T &at(umm index) {
@@ -113,7 +115,7 @@ struct MaskedBlockList {
 			--block_index;
 		}
 
-		bounds_check(block->masks[value_index / bits_in_mask] & (1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in MaskedBlockList");
+		bounds_check(block->masks[value_index / bits_in_mask] & (1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in StaticMaskedBlockList");
 
 		return block->values[value_index];
 	}
@@ -123,7 +125,7 @@ struct MaskedBlockList {
 };
 
 template <class T, umm values_per_block>
-void free(MaskedBlockList<T, values_per_block> &list) {
+void free(StaticMaskedBlockList<T, values_per_block> &list) {
 	auto block = list.first.next;
 	while (block) {
 		list.allocator.free(block);
@@ -132,7 +134,7 @@ void free(MaskedBlockList<T, values_per_block> &list) {
 }
 
 template <class T, umm values_per_block>
-Optional<umm> index_of(MaskedBlockList<T, values_per_block> const &list, T const *value) {
+Optional<umm> index_of(StaticMaskedBlockList<T, values_per_block> const &list, T const *value) {
 	auto block = &list.first;
 	while (block) {
 		if (block->values <= value && value < block->values + values_per_block) {
@@ -145,10 +147,10 @@ Optional<umm> index_of(MaskedBlockList<T, values_per_block> const &list, T const
 
 
 template <class T, umm values_per_block, class Fn>
-void for_each(MaskedBlockList<T, values_per_block> &list, Fn &&fn) {
-	using MaskedBlockList = MaskedBlockList<T, values_per_block>;
-	using Mask = MaskedBlockList::Mask;
-	constexpr u32 bits_in_mask = MaskedBlockList::bits_in_mask;
+void for_each(StaticMaskedBlockList<T, values_per_block> &list, Fn &&fn) {
+	using StaticMaskedBlockList = StaticMaskedBlockList<T, values_per_block>;
+	using Mask = StaticMaskedBlockList::Mask;
+	constexpr u32 bits_in_mask = StaticMaskedBlockList::bits_in_mask;
 	auto block = &list.first;
 	while (block) {
 		for (u32 value_index = 0; value_index < values_per_block; ++value_index) {

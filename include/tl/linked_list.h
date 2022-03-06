@@ -34,18 +34,7 @@ struct LinkedList {
 	};
 
 	LinkedList() = default;
-	/*
-	void clear() {
-		Node *node = head;
-		for (;;) {
-			if (node == 0)
-				break;
-			defer { DEALLOCATE(Allocator, node); };
-			node = node->next;
-		}
-		head = tail = 0;
-	}
-	*/
+
 	umm size() const {
 		umm result = 0;
 		Node *node = head;
@@ -66,12 +55,12 @@ struct LinkedList {
 		return node->value;
 	}
 
-	T &add(T value = {}) {
+	T &add(T value TL_LP) {
 		if (head == 0) {
-			head = tail = allocator.allocate<Node>();
+			head = tail = allocator.allocate<Node>(TL_LAC);
 		} else {
 			if (!tail->next) {
-				tail->next = allocator.allocate<Node>();
+				tail->next = allocator.allocate<Node>(TL_LAC);
 			}
 			tail = tail->next;
 		}
@@ -79,6 +68,9 @@ struct LinkedList {
 		memcpy(&tail->value, &value, sizeof(value));
 
 		return tail->value;
+	}
+	T &add(TL_LPC) {
+		return add({} TL_LA);
 	}
 
 	void clear() {
