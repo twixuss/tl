@@ -978,6 +978,8 @@ int main() {
 	//TEST(compiler_test);
 	TEST(stream_test);
 	TEST(list_test);
+	TEST(function_test);
+	TEST(coroutine_test);
 	//TEST(allocation_test);
 #undef TEST;
 

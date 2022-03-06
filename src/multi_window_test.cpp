@@ -1,7 +1,7 @@
-#define TL_MAIN
 #define TL_IMPL
 #include <tl/common.h>
 #include <tl/window.h>
+#include <tl/main.h>
 
 using namespace tl;
 
@@ -15,7 +15,7 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		.title = u8"Child window"s,
 		.style_flags = WindowStyle_no_frame,
 		.parent = main_window,
-		.on_draw = [](Window &window) {
+		.on_update = [](Window &window) {
 			draw_rect(window, 8, 8, 16, 16);
 		},
 		.hit_test = [](Window &window) -> WindowHitResult {
