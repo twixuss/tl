@@ -46,13 +46,12 @@ inline constexpr Span<T> as_span(Array<T, size> &arr) {
 	return {arr.data, arr.size};
 }
 
-template <class T, class _IndexType, _IndexType _size_x, _IndexType _size_y>
+template <class T, umm _size_x, umm _size_y>
 struct Array2 {
-	using IndexType = _IndexType;
-	inline static constexpr IndexType size_x = _size_x;
-	inline static constexpr IndexType size_y = _size_y;
+	inline static constexpr umm size_x = _size_x;
+	inline static constexpr umm size_y = _size_y;
 
-	constexpr T& at(IndexType x, IndexType y) {
+	constexpr T& at(umm x, umm y) {
 		bounds_check(&data[y][x] < end());
 		return data[y][x];
 	}

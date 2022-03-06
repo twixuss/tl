@@ -19,6 +19,9 @@ static constexpr u32 simd_width = 32;
 static constexpr u32 simd_width = 16;
 #endif
 
+template <class T>
+static constexpr u32 simd_count = simd_width / sizeof(T);
+
 #define f2i16 _mm_castps_si128
 #define f2d16 _mm_castps_pd
 #define i2f16 _mm_castsi128_ps
@@ -144,7 +147,8 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 
 #define f32x4_set(a,b,c,d) _mm_setr_ps(a,b,c,d)
 #define f32x4_set1(a) _mm_set1_ps(a)
-#define f32x4_load(address) _mm_load_ps((f32*)(address))
+#define f32x4_load(address) _mm_loadu_ps((f32*)(address))
+#define f32x4_store(address, v) _mm_storeu_ps((f32*)(address), v)
 #define f32x4_get(a,b) ([&]{int _wtf_=_mm_extract_ps(a,b);return*(f32*)&_wtf_;}())
 #if ARCH_AVX
 #define f32x4_lt(a,b) _mm_cmp_ps(a,b,_CMP_LT_OQ)
@@ -308,9 +312,14 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 //
 
 #if ARCH_AVX
+#if ARCH_AVX2
+#define s32x8_sari(a, b) i2f32(_mm256_srai_epi32(f2i32(a), b))
+#endif
 
 #define f32x8_set(a,b,c,d,e,f,g,h) _mm256_setr_ps(a,b,c,d,e,f,g,h)
 #define f32x8_set1(a) _mm256_set1_ps(a)
+#define f32x8_load(address) _mm256_loadu_ps((f32*)(address))
+#define f32x8_store(address, v) _mm256_storeu_ps((f32*)(address), v)
 #define f32x8_lt(a,b) _mm256_cmp_ps(a,b,_CMP_LT_OQ)
 #define f32x8_gt(a,b) _mm256_cmp_ps(a,b,_CMP_GT_OQ)
 #define f32x8_le(a,b) _mm256_cmp_ps(a,b,_CMP_LE_OQ)
@@ -330,6 +339,11 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define f32x8_min(a,b) _mm256_min_ps(a,b)
 #define f32x8_max(a,b) _mm256_max_ps(a,b)
 #define f32x8_clamp(a,min,max) f32x8_min(f32x8_max(a,min),max)
+#if ARCH_AVX2
+#define f32x8_sign(a) select32x8(s32x8_sari(a, 31),f32x8_set1(1),f32x8_set1(-1))
+#else
+#define f32x8_sign(a) select32x8(f32x8_gt(a, f32x8_set1(0)),f32x8_set1(1),f32x8_set1(-1))
+#endif
 #if ARCH_FMA
 #define f32x8_muladd(a,b,c) _mm256_fmadd_ps(a,b,c)
 #else
@@ -360,7 +374,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #if ARCH_AVX2
 #define u32x8_eq(a,b) s32x8_eq(a,b)
 #define u32x8_ne(a,b) s32x8_ne(a,b)
-#define u32x8_gt(a,b) s32x8_gt(_mm256_xor_si256(f2i32(a),_mm256_set1_epi32(0x80000000)),_mm256_xor_si256(f2i32(b),_mm256_set1_epi32(0x80000000)))
+#define u32x8_gt(a,b) i2f32(_mm256_cmpgt_epi32(_mm256_xor_si256(f2i32(a),_mm256_set1_epi32(0x80000000)),_mm256_xor_si256(f2i32(b),_mm256_set1_epi32(0x80000000))))
 #define u32x8_lt(a,b) u32x8_gt(b,a)
 #define u32x8_le(a,b) vec32_not(u32x8_gt(a,b))
 #define u32x8_ge(a,b) vec32_not(u32x8_lt(a,b))
@@ -381,9 +395,13 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #endif
 
 #if ARCH_AVX2
+#define f32x8_to_s32x8(a) i2f32(_mm256_cvtps_epi32(a))
 #define s32x8_to_f32x8(a) _mm256_cvtepi32_ps(f2i32(a))
 #define u32x8_to_f32x8(a) _mm256_cvtepi32_ps(f2i32(a))
 #endif
 
+#define b32x8_get_mask(a) _mm256_movemask_ps(a)
+#define b32x8_any_true(a) (b32x8_get_mask(a) != 0)
+#define b32x8_all_true(a) (b32x8_get_mask(a) == 255)
 
 }
