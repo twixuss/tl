@@ -977,6 +977,9 @@ void free(LinearSet<T> &set) {
 	free((List<T> &)set);
 }
 
+template <class T>
+void erase(LinearSet<T> &set, T *value) { return erase((List<T> &)set, value); }
+
 // Returns an index of the value
 // If value is not in the list, this function will return index >= list.size
 template <class T>

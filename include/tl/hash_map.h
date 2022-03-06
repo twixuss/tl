@@ -303,7 +303,7 @@ umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 template <class Key, class Value, class Hasher>
 bool is_empty(HashMap<Key, Value, Hasher> map) {
 	bool result = true;
-	for_each(map, [&](Key &key, Value &value) { result = false; for_each_break; });
+	for_each(map, [&](Key &key, Value &value) { (void)key; (void)value; result = false; for_each_break; });
 	return result;
 }
 

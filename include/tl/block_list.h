@@ -551,22 +551,22 @@ struct BlockList {
 		return index.block->buffer[index.value_index].value;
 	}
 	T &operator[](BlockListIndex index) {
-		auto block = &first;
+		auto block = first;
 		while (index.block_index--) {
 			block = block->next;
 			bounds_check(block);
 		}
 		bounds_check(index.value_index < block->count);
-		return block->data[index.value_index];
+		return block->data()[index.value_index];
 	}
 	T &operator[](umm index) {
-		auto block = &first;
+		auto block = first;
 		while (index >= block->count) {
 			index -= block->count;
 			block = block->next;
 			bounds_check(block);
 		}
-		return block->data[index];
+		return block->data()[index];
 	}
 
 	Iterator begin() {

@@ -5,6 +5,7 @@
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
+#pragma warning(disable: 4702) // unreachable code
 
 namespace tl {
 
@@ -169,11 +170,11 @@ enum Encoding {
 };
 
 template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_unknown;
-template <> inline static constexpr Encoding encoding_from_type<char > = Encoding_ascii;
-template <> inline static constexpr Encoding encoding_from_type<utf8 > = Encoding_utf8;
-template <> inline static constexpr Encoding encoding_from_type<utf16> = Encoding_utf16;
-template <> inline static constexpr Encoding encoding_from_type<utf32> = Encoding_utf32;
-template <> inline static constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding_utf16 : Encoding_utf32;
+template <> inline constexpr Encoding encoding_from_type<char > = Encoding_ascii;
+template <> inline constexpr Encoding encoding_from_type<utf8 > = Encoding_utf8;
+template <> inline constexpr Encoding encoding_from_type<utf16> = Encoding_utf16;
+template <> inline constexpr Encoding encoding_from_type<utf32> = Encoding_utf32;
+template <> inline constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding_utf16 : Encoding_utf32;
 
 inline u32 char_byte_count(utf8 const *ch) {
 	auto byte_count = count_leading_ones((u8)*ch);
@@ -235,7 +236,7 @@ inline Optional<utf32> get_char_and_advance_utf8(utf8 **ptr) {
 inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 	StaticList<utf8, 4> result;
 	if (ch <= 0x80) {
-		result.add(ch);
+		result.add((utf8)ch);
 	} else if (ch <= 0x800) {
 		result.add(0xC0 | ((ch >> 6) & 0x1f));
 		result.add(0x80 | (ch & 0x3f));
@@ -683,7 +684,7 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
 template <class Int>
 umm append(StringBuilder &builder, FormatInt<Int> f) {
 	StaticList<ascii, _intToStringSize<Int>> buffer;
-	umm chars_written = write_as_string(buffer, f);
+	write_as_string(buffer, f);
 	return append(builder, buffer);
 }
 
@@ -845,7 +846,8 @@ inline static constexpr bool are_utf8 = are_utf8_t<Args...>::value;
 template <class ...Args>
 inline auto concatenate(Args const &...args) {
 	StringBuilder builder;
-	int ___[] = { ((append(builder, args), ...), 0) };
+	int _ = ((append(builder, args), ...), 0);
+	(void)_;
 	if constexpr (are_utf8<Args...>) {
 		return (List<utf8>)to_string(builder, current_allocator);
 	} else {
@@ -977,14 +979,14 @@ List<utf8> to_utf8(Span<utf16> utf16, bool terminate TL_LPD) {
 	if (utf16.count > max_value<int>)
 		return {};
 
-	auto bytes_required = WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, 0, 0, 0, 0);
+	auto bytes_required = (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, 0, 0, 0, 0);
 	if (!bytes_required)
 		return {};
 
 	result.reserve(bytes_required + terminate TL_LA);
 	result.count = bytes_required + terminate;
 
-	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, bytes_required, 0, 0) != bytes_required) {
+	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, (int)bytes_required, 0, 0) != (int)bytes_required) {
 		return {};
 	}
 
@@ -1000,14 +1002,14 @@ List<utf16> to_utf16(Span<utf8> utf8, bool terminate TL_LPD) {
 	if (utf8.count > max_value<int>)
 		return {};
 
-	auto chars_required = MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, 0, 0);
+	auto chars_required = (umm)MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, 0, 0);
 	if (!chars_required)
 		return {};
 
 	result.reserve(chars_required + terminate TL_LA);
 	result.count = chars_required + terminate;
 
-	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, chars_required) != chars_required) {
+	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, (int)chars_required) != (int)chars_required) {
 		return {};
 	}
 

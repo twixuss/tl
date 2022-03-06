@@ -72,7 +72,8 @@ inline bool directory_exists(Span<utf16> path) {
 inline bool directory_exists(Span<utf8> path) {
 	return directory_exists(to_utf16(path, true).data);
 }
-inline bool directory_exists(Span<ascii> path) {
+forceinline bool directory_exists(Span<ascii> path) {
+	return directory_exists((Span<utf8>)path);
 }
 
 struct ReadEntireFileParams {
@@ -109,31 +110,31 @@ inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {} TL_LP
 inline bool write_entire_file(File file, Span<u8> span) {
 	set_cursor(file, 0, File_begin);
 	defer { truncate_to_cursor(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(pathchar const *path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<ascii> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<utf8> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 inline bool write_entire_file(Span<utf16> path, Span<u8> span) {
 	File file = open_file(path, {.write = true});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span);
+	return write(file, span) != 0;
 }
 
 
@@ -217,7 +218,7 @@ inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker 
 	return create_file_tracker(file, (void(*)(FileTracker &, void *))on_update, 0);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, 0);
+	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, state);
 }
 inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker)) {
 	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
@@ -753,11 +754,11 @@ public:
 	IFACEMETHODIMP OnHelp(IFileDialog *) { return S_OK; };
 	IFACEMETHODIMP OnSelectionChange(IFileDialog *) { return S_OK; };
 	IFACEMETHODIMP OnShareViolation(IFileDialog *, IShellItem *, FDE_SHAREVIOLATION_RESPONSE *) { return S_OK; };
-	IFACEMETHODIMP OnTypeChange(IFileDialog *pfd) { return S_OK; }
+	IFACEMETHODIMP OnTypeChange(IFileDialog *) { return S_OK; }
 	IFACEMETHODIMP OnOverwrite(IFileDialog *, IShellItem *, FDE_OVERWRITE_RESPONSE *) { return S_OK; };
 
 	// IFileDialogControlEvents methods
-	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *pfdc, DWORD dwIDCtl, DWORD dwIDItem) { return S_OK; }
+	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *, DWORD, DWORD) { return S_OK; }
 	IFACEMETHODIMP OnButtonClicked(IFileDialogCustomize *, DWORD) { return S_OK; };
 	IFACEMETHODIMP OnCheckButtonToggled(IFileDialogCustomize *, DWORD, BOOL) { return S_OK; };
 	IFACEMETHODIMP OnControlActivating(IFileDialogCustomize *, DWORD) { return S_OK; };

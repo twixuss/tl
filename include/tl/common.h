@@ -29,6 +29,7 @@
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
+//#define invalid_code_path(...) ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__)
 
 #ifndef bounds_check
 #define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
@@ -208,49 +209,49 @@ template <class T> inline static constexpr T max_value = {};
 template <class T> inline static constexpr T min_value<T &> = min_value<T>;
 template <class T> inline static constexpr T max_value<T &> = max_value<T>;
 
-template<> inline static constexpr u8  min_value<u8 > = 0;
-template<> inline static constexpr u8  max_value<u8 > = 0xFF;
+template<> inline constexpr u8  min_value<u8 > = 0;
+template<> inline constexpr u8  max_value<u8 > = 0xFF;
 
-template<> inline static constexpr u16 min_value<u16> = 0;
-template<> inline static constexpr u16 max_value<u16> = 0xFFFF;
+template<> inline constexpr u16 min_value<u16> = 0;
+template<> inline constexpr u16 max_value<u16> = 0xFFFF;
 
-template<> inline static constexpr u32 min_value<u32> = 0;
-template<> inline static constexpr u32 max_value<u32> = 0xFFFFFFFF;
+template<> inline constexpr u32 min_value<u32> = 0;
+template<> inline constexpr u32 max_value<u32> = 0xFFFFFFFF;
 
-template<> inline static constexpr u64 min_value<u64> = 0;
-template<> inline static constexpr u64 max_value<u64> = 0xFFFFFFFFFFFFFFFF;
+template<> inline constexpr u64 min_value<u64> = 0;
+template<> inline constexpr u64 max_value<u64> = 0xFFFFFFFFFFFFFFFF;
 
-template<> inline static constexpr s8  min_value<s8 > = 0x80;
-template<> inline static constexpr s8  max_value<s8 > = 0x7F;
+template<> inline constexpr s8  min_value<s8 > = 0x80;
+template<> inline constexpr s8  max_value<s8 > = 0x7F;
 
-template<> inline static constexpr s16 min_value<s16> = 0x8000;
-template<> inline static constexpr s16 max_value<s16> = 0x7FFF;
+template<> inline constexpr s16 min_value<s16> = 0x8000;
+template<> inline constexpr s16 max_value<s16> = 0x7FFF;
 
-template<> inline static constexpr s32 min_value<s32> = 0x80000000;
-template<> inline static constexpr s32 max_value<s32> = 0x7FFFFFFF;
+template<> inline constexpr s32 min_value<s32> = 0x80000000;
+template<> inline constexpr s32 max_value<s32> = 0x7FFFFFFF;
 
-template<> inline static constexpr s64 min_value<s64> = 0x8000000000000000;
-template<> inline static constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
+template<> inline constexpr s64 min_value<s64> = 0x8000000000000000;
+template<> inline constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
 
-template<> inline static constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
-template<> inline static constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
+template<> inline constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
+template<> inline constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
 
-template<> inline static constexpr slong min_value<slong> = (slong)min_value<slong_s>;
-template<> inline static constexpr slong max_value<slong> = (slong)max_value<slong_s>;
+template<> inline constexpr slong min_value<slong> = (slong)min_value<slong_s>;
+template<> inline constexpr slong max_value<slong> = (slong)max_value<slong_s>;
 
-template<> inline static constexpr f32 min_value<f32> = -3.402823466e+38f;
-template<> inline static constexpr f32 max_value<f32> = +3.402823466e+38f;
+template<> inline constexpr f32 min_value<f32> = -3.402823466e+38f;
+template<> inline constexpr f32 max_value<f32> = +3.402823466e+38f;
 
-template<> inline static constexpr f64 min_value<f64> = -1.7976931348623158e+308;
-template<> inline static constexpr f64 max_value<f64> = +1.7976931348623158e+308;
+template<> inline constexpr f64 min_value<f64> = -1.7976931348623158e+308;
+template<> inline constexpr f64 max_value<f64> = +1.7976931348623158e+308;
 
 template <class T> inline static constexpr T epsilon = {};
-template<> inline static constexpr f32 epsilon<f32> = 1.175494351e-38f;
-template<> inline static constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
+template<> inline constexpr f32 epsilon<f32> = 1.175494351e-38f;
+template<> inline constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
 template <class T> inline static constexpr T infinity = {};
-template<> inline static constexpr f32 infinity<f32> = 1e300 * 1e300;
-template<> inline static constexpr f64 infinity<f64> = 1e300 * 1e300;
+template<> inline constexpr f32 infinity<f32> = 1e300 * 1e300;
+template<> inline constexpr f64 infinity<f64> = 1e300 * 1e300;
 
 template <class T> inline static constexpr T nan = infinity<T> * 0;
 
@@ -273,18 +274,18 @@ constexpr To convert(From from) {
 } // namespace ce
 
 
-forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = _addcarry_u8 (0, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = _addcarry_u16(0, a, b, result); }
-forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { *carry_out = _addcarry_u32(0, a, b, result); }
+forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (0, a, b, result); }
+forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(0, a, b, result); }
+forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(0, a, b, result); }
 #if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { *carry_out = _addcarry_u64(0, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(0, a, b, result); }
 #endif
 
-forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = _addcarry_u8 (carry_in, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = _addcarry_u16(carry_in, a, b, result); }
-forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = _addcarry_u32(carry_in, a, b, result); }
+forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (carry_in, a, b, result); }
+forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(carry_in, a, b, result); }
+forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(carry_in, a, b, result); }
 #if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = _addcarry_u64(carry_in, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, result); }
 #endif
 
 forceinline constexpr bool is_nan(f32 v) {
@@ -522,43 +523,46 @@ forceinline constexpr u32 log2(s64 v) { return log2((u64)v); }
 #endif
 
 
-forceinline constexpr u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )1 << (u8 )log2(v); }
-forceinline constexpr u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)1 << (u16)log2(v); }
-forceinline constexpr u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)1 << (u32)log2(v); }
+forceinline constexpr u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )((u8 )1 << (u8 )log2(v)); }
+forceinline constexpr u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)((u16)1 << (u16)log2(v)); }
+forceinline constexpr u32 floor_to_power_of_2(u32 v) { return v == 0 ? (u32)0 : (u32)((u32)1 << (u32)log2(v)); }
 #if ARCH_X64
-forceinline constexpr u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)1 << (u64)log2(v); }
+forceinline constexpr u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : (u64)((u64)1 << (u64)log2(v)); }
 #endif
 
 namespace ce {
+
+// is this readable? don't answer
+
 inline constexpr u8 floor_to_power_of_2(u8 x) {
-    x = x | (x >> 1);
-    x = x | (x >> 2);
-    x = x | (x >> 4);
-    return x - (x >> 1);
+    x = (u8)(x | (u8)(x >> 1));
+    x = (u8)(x | (u8)(x >> 2));
+    x = (u8)(x | (u8)(x >> 4));
+    return (u8)(x - (u8)(x >> 1));
 }
 inline constexpr u16 floor_to_power_of_2(u16 x) {
-    x = x | (x >> 1);
-    x = x | (x >> 2);
-    x = x | (x >> 4);
-    x = x | (x >> 8);
-    return x - (x >> 1);
+    x = (u16)(x | (u16)(x >> 1));
+    x = (u16)(x | (u16)(x >> 2));
+    x = (u16)(x | (u16)(x >> 4));
+    x = (u16)(x | (u16)(x >> 8));
+    return (u16)(x - (u16)(x >> 1));
 }
 inline constexpr u32 floor_to_power_of_2(u32 x) {
-    x = x | (x >> 1);
-    x = x | (x >> 2);
-    x = x | (x >> 4);
-    x = x | (x >> 8);
-    x = x | (x >> 16);
-    return x - (x >> 1);
+    x = (u32)(x | (u32)(x >> 1));
+    x = (u32)(x | (u32)(x >> 2));
+    x = (u32)(x | (u32)(x >> 4));
+    x = (u32)(x | (u32)(x >> 8));
+    x = (u32)(x | (u32)(x >> 16));
+    return (u32)(x - (u32)(x >> 1));
 }
 inline constexpr u64 floor_to_power_of_2(u64 x) {
-    x = x | (x >> 1);
-    x = x | (x >> 2);
-    x = x | (x >> 4);
-    x = x | (x >> 8);
-    x = x | (x >> 16);
-    x = x | (x >> 32);
-    return x - (x >> 1);
+    x = (u64)(x | (u64)(x >> 1));
+    x = (u64)(x | (u64)(x >> 2));
+    x = (u64)(x | (u64)(x >> 4));
+    x = (u64)(x | (u64)(x >> 8));
+    x = (u64)(x | (u64)(x >> 16));
+    x = (u64)(x | (u64)(x >> 32));
+    return (u64)(x - (u64)(x >> 1));
 }
 }
 
@@ -665,7 +669,7 @@ struct Combine : public Callables... {
 };
 
 template <class Enum, class = EnableIf<std::is_enum_v<Enum>>>
-inline constexpr auto toInt(Enum e) {
+inline constexpr auto to_int(Enum e) {
 	return static_cast<std::underlying_type_t<Enum>>(e);
 }
 
@@ -682,7 +686,7 @@ constexpr T &front(T (&arr)[count]) { return arr[0]; }
 template <class T, umm count>
 constexpr T const &front(T const (&arr)[count]) { return arr[0]; }
 
-inline void copyMemory(void *_dst, void const *_src, umm count) {
+inline void copy_memory(void *_dst, void const *_src, umm count) {
 	u8 *dst = (u8 *)_dst;
 	u8 const *src = (u8 const *)_src;
 	while (count--) {
@@ -845,7 +849,7 @@ private:
 };
 #endif
 
-#define defer ::tl::Deferrer CONCAT(_deferrer, __LINE__) = [&]
+#define defer ::tl::Deferrer CONCAT(_deferrer, __COUNTER__) = [&]
 
 template <class T>
 auto reverse(T &x) {
@@ -951,11 +955,11 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 	if constexpr (flags & ForEach_reverse) {
 		start = span.data + span.count - 1;
 		end = span.data - 1;
-		step = -1;
+		step = (umm)-1;
 	} else {
 		start = span.data;
 		end = span.data + span.count;
-		step = 1;
+		step = (umm)1;
 	}
 
 	for (auto it = start; it != end; it += step) {
@@ -1030,6 +1034,11 @@ template <class T>
 constexpr Span<char> as_chars(Span<T> span) {
 	return {(char *)span.begin(), span.count * sizeof(T)};
 }
+template <class T>
+constexpr Span<char> as_chars(T span_like) {
+	return as_chars(as_span(span_like));
+}
+
 
 template <class T>
 constexpr Span<u8> value_as_bytes(T const &value) {
@@ -1197,12 +1206,12 @@ inline constexpr bool is_hex_digit(utf32 c) {
 
 inline constexpr ascii to_lower(ascii c) {
 	if (c >= 'A' && c <= 'Z')
-		return (char)(c + ('a' - 'A'));
+		return (ascii)(c + ('a' - 'A'));
 	return c;
 }
 inline constexpr utf8 to_lower(utf8 c) {
 	if (c >= 'A' && c <= 'Z')
-		return (char)(c + ('a' - 'A'));
+		return (utf8)(c + ('a' - 'A'));
 	return c;
 }
 inline constexpr utf32 to_lower(utf32 c) {
@@ -1753,12 +1762,6 @@ inline tl::Allocator get_current_allocator<tl::Allocator>() {
 
 namespace tl {
 
-#if TL_COUNT_ALLOCATIONS
-extern umm frees_count;
-extern umm allocations_count;
-extern umm allocations_size;
-#endif
-
 struct AllocatorPusher {
 	Allocator old_allocator;
 	forceinline AllocatorPusher(Allocator new_allocator) {
@@ -1817,33 +1820,19 @@ void rotate(Span<T> span, smm to_be_first_index) {
 #endif
 #endif
 
-#if TL_COUNT_ALLOCATIONS
-umm frees_count = 0;
-umm allocations_count = 0;
-umm allocations_size = 0;
-#endif
-
 Allocator os_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void * state) -> void * {
+		(void)old_size;
+		(void)location;
+		(void)state;
 		switch (mode) {
 			case Allocator_allocate: {
-#if TL_COUNT_ALLOCATIONS
-				++allocations_count;
-				allocations_size += size;
-#endif
 				return tl_allocate(new_size, align);
 			}
 			case Allocator_reallocate: {
-#if TL_COUNT_ALLOCATIONS
-				++allocations_count;
-				allocations_size += size;
-#endif
 				return tl_reallocate(data, new_size, align);
 			}
 			case Allocator_free:
-#if TL_COUNT_ALLOCATIONS
-				++frees_count;
-#endif
 				tl_free(data);
 				return 0;
 		}
@@ -1852,7 +1841,9 @@ Allocator os_allocator = {
 	0
 };
 Allocator page_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) -> void * {
+		(void)location;
+		(void)state;
 		switch (mode) {
 			case Allocator_allocate: {
 				assert(align <= 4096);
@@ -1910,7 +1901,10 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> void * {
+		(void)location;
+		(void)_state;
+
 		auto &state = temporary_allocator_state;
 		switch (mode) {
 			case tl::Allocator_allocate: {

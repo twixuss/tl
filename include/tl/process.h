@@ -62,6 +62,8 @@ inline Process start_process(Span<utf8>  command_line) { return start_process(to
 #include <Psapi.h>
 #endif
 
+#include "console.h"
+
 namespace tl {
 
 #if OS_WINDOWS
@@ -122,6 +124,7 @@ void free(Process &process) {
 	process = {};
 }
 
+// TODO: confusing name, this is another process' stdout
 struct StdoutStream : Stream {
 	void *handle;
 	umm read(Span<u8> destination) {
@@ -129,7 +132,7 @@ struct StdoutStream : Stream {
 		ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0);
 		return bytes_read;
 	}
-	umm write(Span<u8> source) { invalid_code_path("unavailable"); return {}; }
+	umm write(Span<u8> source) { (void)source; invalid_code_path("unavailable"); return {}; }
 	umm remaining_bytes() { invalid_code_path("unavailable"); return {}; }
 	void free() {
 		CloseHandle(handle);

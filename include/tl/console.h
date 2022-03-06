@@ -31,7 +31,7 @@ struct Printer {
 
 extern TL_API Printer console_printer;
 extern TL_API Printer standard_output_printer;
-extern TL_API thread_local Printer current_printer;
+extern thread_local Printer current_printer;
 
 TL_API void init_printer();
 TL_API void deinit_printer();
@@ -75,8 +75,13 @@ inline umm print(PrintKind kind, char const *string) {
 }
 
 template <class ...T>
-inline umm print(T const &...values) {
-	return print(Print_default, values...);
+inline umm print(char const *fmt, T const &...values) {
+	return print(Print_default, fmt, values...);
+}
+
+template <class T>
+inline umm print(T const &value) {
+	return print(Print_default, value);
 }
 
 TL_API void hide_console_window();
@@ -176,12 +181,14 @@ void clear_console() {
 
 DWORD get_code_page(Encoding encoding) {
 	switch (encoding) {
+		case Encoding_unknown: break;
 		case Encoding_ascii: return 1251;
 		case Encoding_utf8: return 65001;
 		case Encoding_utf16: return 1200;
+		case Encoding_utf32: invalid_code_path("not implemented");
 	}
 	invalid_code_path();
-	return -1;
+	return (DWORD)-1;
 }
 
 void set_console_encoding(Encoding encoding) {
