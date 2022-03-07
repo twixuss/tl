@@ -1,4 +1,5 @@
 #pragma once
+#include "list.h"
 #include "linked_list.h"
 #include "array.h"
 #include "optional.h"
@@ -8,7 +9,7 @@
 namespace tl {
 
 template <class Key, class Value, umm _capacity, class Hasher = DefaultHasher<Key>>
-struct StaticHashMap {
+struct StaticBucketHashMap {
 	inline static constexpr umm capacity = _capacity;
 
 	struct Entry {
@@ -44,7 +45,7 @@ struct StaticHashMap {
 	}
 
 	struct Iterator {
-		StaticHashMap *map;
+		StaticBucketHashMap *map;
 		Block *block;
 		typename Block::Iterator value;
 
@@ -87,14 +88,14 @@ struct StaticHashMap {
 };
 
 template <class Key, class Value, umm capacity, class Hasher>
-void free(StaticHashMap<Key, Value, capacity, Hasher> &map) {
+void free(StaticBucketHashMap<Key, Value, capacity, Hasher> &map) {
 	for (auto &block : map.blocks) {
 		free(block);
 	}
 }
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>>
-struct HashMap {
+struct BucketHashMap {
 	using ValueType = Value;
 
 	struct KeyValue {
@@ -253,7 +254,7 @@ struct HashMap {
 };
 
 template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
-void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+void for_each(BucketHashMap<Key, Value, Hasher> map, Fn &&fn) {
 	static_assert(flags == 0, "Only default flags supported");
 
 	for (u32 i = 0; i < map.buckets.count; ++i) {
@@ -264,8 +265,8 @@ void for_each(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 }
 
 template <class Key, class Value, class Hasher>
-HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source TL_LP) {
-	HashMap<Key, Value, Hasher> result;
+BucketHashMap<Key, Value, Hasher> copy(BucketHashMap<Key, Value, Hasher> const &source TL_LP) {
+	BucketHashMap<Key, Value, Hasher> result;
 	for_each(source, [&](Key const &key, Value const &value) {
 		result.get_or_insert(key TL_LA) = value;
 	});
@@ -273,7 +274,7 @@ HashMap<Key, Value, Hasher> copy(HashMap<Key, Value, Hasher> const &source TL_LP
 }
 
 template <class Key, class Value, class Hasher>
-void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> const &source TL_LP) {
+void set(BucketHashMap<Key, Value, Hasher> &destination, BucketHashMap<Key, Value, Hasher> const &source TL_LP) {
 	destination.clear();
 	for_each(source, [&](Key const &key, Value const &value) {
 		destination.get_or_insert(key TL_LA) = value;
@@ -281,7 +282,7 @@ void set(HashMap<Key, Value, Hasher> &destination, HashMap<Key, Value, Hasher> c
 }
 
 template <class Key, class Value, class Hasher>
-umm count_of(HashMap<Key, Value, Hasher> &map) {
+umm count_of(BucketHashMap<Key, Value, Hasher> &map) {
 	umm result = 0;
 	for (auto &bucket : map.buckets) {
 		result += bucket.size();
@@ -290,7 +291,7 @@ umm count_of(HashMap<Key, Value, Hasher> &map) {
 }
 
 template <class Key, class Value, class Hasher, class Fn>
-umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
+umm count(BucketHashMap<Key, Value, Hasher> map, Fn &&fn) {
 	umm result = 0;
 	for_each(map, [&](Key &key, Value &value) {
 		if (fn(key, value)) {
@@ -301,12 +302,131 @@ umm count(HashMap<Key, Value, Hasher> map, Fn &&fn) {
 }
 
 template <class Key, class Value, class Hasher>
-bool is_empty(HashMap<Key, Value, Hasher> map) {
+bool is_empty(BucketHashMap<Key, Value, Hasher> map) {
 	bool result = true;
 	for_each(map, [&](Key &key, Value &value) { (void)key; (void)value; result = false; for_each_break; });
 	return result;
 }
 
 
+
+inline static constexpr u64 map_cell_state_empty     = 0;
+inline static constexpr u64 map_cell_state_full      = 1;
+inline static constexpr u64 map_cell_state_tombstone = 2;
+
+template <class Key, class Value, class Hasher = DefaultHasher<Key>>
+struct ContiguousHashMap {
+    struct Cell {
+        u64 state : 2;
+        u64 hash : 62;
+        Key key;
+        Value value;
+    };
+
+    Allocator allocator = current_allocator;
+    Span<Cell> cells;
+    umm count = 0;
+
+
+    Value &get_or_insert(Key key) {
+        reserve(count + 1);
+        count += 1;
+        return insert_into(cells, key, {});
+    }
+
+    bool reserve(umm desired) {
+        if (desired <= cells.count)
+            return false;
+
+        Span<Cell> new_cells;
+        new_cells.count = max(1, cells.count * 2);
+        new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count);
+        for (auto &new_cell : new_cells) {
+            new_cell.state = map_cell_state_empty;
+        }
+
+        for (auto &old_cell : cells) {
+            insert_into(new_cells, old_cell.key, old_cell.value);
+        }
+
+        allocator.free_t(cells.data, cells.count);
+        cells = new_cells;
+
+		return true;
+    }
+
+    void step(umm *index) {
+        *index = (*index + 1) % cells.count;
+    }
+
+    Value &insert_into(Span<Cell> cells, Key key, Value value) {
+        auto hash = get_the_hash(key);
+        auto index = hash % cells.count;
+
+        while (cells.data[index].state == map_cell_state_full) {
+            step(&index);
+        }
+
+        auto &cell = cells.data[index];
+
+        cell.state = map_cell_state_full;
+        cell.hash = hash;
+        cell.key = key;
+        return cell.value = value;
+    }
+
+    Value *find(Key key) {
+        auto hash = get_the_hash(key);
+        auto index = hash % cells.count;
+        auto steps = cells.count; // TODO: i don't know if there is a good way to handle absence of a value
+        while (steps--) {
+            auto &cell = cells.data[index];
+            if (cell.state == map_cell_state_full) {
+                if (cell.hash == hash) {
+                    if (cell.key == key) {
+                        return &cell.value;
+                    }
+                }
+            }
+            step(&index);
+        }
+
+        return 0;
+    }
+
+    u64 get_the_hash(Key key) {
+        return Hasher::get_hash(key) & 0x3FFF'FFFF'FFFF'FFFF; // get rid of 2 bits reserved for `state`
+    }
+
+	void clear() {
+		for (auto &cell : cells) {
+			cell.state = map_cell_state_empty;
+		}
+		count = 0;
+	}
+};
+
+
+template <class Key, class Value>
+umm count_of(ContiguousHashMap<Key, Value> map) {
+    return map.count;
+}
+
+
+template <class Key, class Value, class Fn>
+void for_each(ContiguousHashMap<Key, Value> map, Fn &&fn) {
+    for (auto &cell : map.cells) {
+        if (cell.state == map_cell_state_full) {
+            fn(cell.key, cell.value);
+        }
+    }
+}
+
+#ifndef TL_DEFAULT_HASH_MAP
+#define TL_DEFAULT_HASH_MAP(Key, Value, Hasher) ContiguousHashMap<Key, Value, Hasher>
+#endif
+
+template <class Key, class Value, class Hasher = DefaultHasher<Key>>
+using HashMap = TL_DEFAULT_HASH_MAP(Key, Value, Hasher);
 
 }

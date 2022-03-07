@@ -60,7 +60,7 @@ static void append_one_type(StringBuilder &builder, char const *&c) {
 static List<char> parse_one_type(char const *&c) {
 	StringBuilder builder;
 	append_one_type(builder, c);
-	return to_string(builder);
+	return (List<char>)to_string(builder);
 }
 
 static void parse_arguments(DemangleState &state, StringBuilder &builder, char const *&c, bool add_comma = false) {
@@ -117,7 +117,7 @@ static void parse_arguments(DemangleState &state, StringBuilder &builder, char c
 						if (templated) {
 							StringBuilder template_builder;
 							parse_arguments(state, template_builder, c, false);
-							template_parameter = to_string(template_builder);
+							template_parameter = (List<char>)to_string(template_builder);
 							goto check_next;
 						} else {
 							char const *namespace_start = c;
@@ -169,7 +169,7 @@ static void parse_arguments(DemangleState &state, StringBuilder &builder, char c
 				}
 				auto identifier = to_string(identifier_builder);
 				append(builder, identifier);
-				state.last_argument = identifier;
+				state.last_argument = (List<char>)identifier;
 
 			//	StringBuilder argument_builder;
 			//
@@ -260,7 +260,7 @@ List<ascii> demangle(ascii const *function_name) {
 	}
 end:
 	current_allocator = old_allocator;
-	return to_string(builder, current_allocator);
+	return (List<char>)to_string(builder, current_allocator);
 }
 
 

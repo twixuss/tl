@@ -571,6 +571,7 @@ umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Ar
 					break;
 				case '}':
 					appended_char_count += append(b, Span(start, c - 1));
+					static_assert(is_same<decltype(append(b, arg)), tl::umm>, "`append` must return `umm`");
 					appended_char_count += append(b, arg);
 					appended_char_count += append_format(b, Span(c + 1, end), args...);
 					start = end;

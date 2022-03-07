@@ -18,7 +18,7 @@ static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
 } // namespace Detail
 
 
-struct Function {
+struct FunctionStorage {
 	Allocator allocator;
 
 	void (*function)(void *param);
@@ -29,13 +29,13 @@ struct Function {
 	}
 
 	struct Maker {
-		inline Function operator>(void (*func)()) const {
-			Function result = {};
+		inline FunctionStorage operator>(void (*func)()) const {
+			FunctionStorage result = {};
 			result.function = (void (*)(void *))func;
 			return result;
 		}
 		template <class Fn>
-		inline Function operator>(Fn &&fn) const {
+		inline FunctionStorage operator>(Fn &&fn) const {
 			if constexpr (std::is_convertible_v<Fn, void(*)()>) {
 				return operator>((void(*)())fn);
 			} else {
@@ -44,7 +44,7 @@ struct Function {
 				auto params = allocator.allocate_uninitialized<Fn>();
 				new(params) Fn(std::forward<Fn>(fn));
 
-				Function result = {};
+				FunctionStorage result = {};
 				result.allocator = allocator;
 				result.function = [](void *param) {
 					(*(Fn *)param)();
@@ -58,21 +58,21 @@ struct Function {
 	inline static constexpr Maker make = {};
 };
 
-inline Function create_function(void (*func)(void *param), void *param) {
-	Function result = {};
+inline FunctionStorage create_function_storage(void (*func)(void *param), void *param) {
+	FunctionStorage result = {};
 	result.function = func;
 	result.param = param;
 	return result;
 }
-inline Function create_function(void (*func)()) {
-	Function result = {};
+inline FunctionStorage create_function_storage(void (*func)()) {
+	FunctionStorage result = {};
 	result.function = (void (*)(void *))func;
 	return result;
 }
 template <class Fn, class ...Args>
-Function create_function(Fn &&fn, Args &&...args) {
+FunctionStorage create_function_storage(Fn &&fn, Args &&...args) {
 	if constexpr (std::is_convertible_v<Fn, void(*)()>) {
-		return create_function((void(*)())fn);
+		return create_function_storage((void(*)())fn);
 	} else {
 		auto allocator = current_allocator;
 
@@ -80,18 +80,32 @@ Function create_function(Fn &&fn, Args &&...args) {
 		auto params = allocator.allocate_uninitialized<Tuple>();
 		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 
-		Function result = {};
+		FunctionStorage result = {};
 		result.allocator = allocator;
 		result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
 		result.param = params;
 		return result;
 	}
 }
-inline void free(Function &function) {
+inline void free(FunctionStorage &function) {
 	if (function.allocator)
 		function.allocator.free(function.param);
 	function = {};
 }
 
+
+template <class Ret, class ...Args>
+struct Function {
+	Ret (*fn)(Args ...args);
+
+	Ret operator()(Args ...args) {
+		return fn(args...);
+	}
+};
+
+template <class Ret, class ...Args>
+Function<Ret, Args...> create_function(Ret (*fn)(Args ...args)) {
+	return {fn};
+}
 
 }
