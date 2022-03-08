@@ -827,6 +827,7 @@ inline umm append(StringBuilder &builder, std::source_location location) {
 	return append_format(builder, "{}:{}:{}:{}", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
+
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };
 template <> struct is_utf8_t<Span<utf8>> { inline static constexpr bool value = true; };
@@ -844,6 +845,25 @@ struct are_utf8_t<First> {
 template <class ...Args>
 inline static constexpr bool are_utf8 = are_utf8_t<Args...>::value;
 
+
+template <class T> struct is_utf16_t { inline static constexpr bool value = false; };
+template <> struct is_utf16_t<utf16>       { inline static constexpr bool value = true; };
+template <> struct is_utf16_t<Span<utf16>> { inline static constexpr bool value = true; };
+template <> struct is_utf16_t<List<utf16>> { inline static constexpr bool value = true; };
+
+template <class First, class ...Rest>
+struct are_utf16_t {
+	inline static constexpr bool value = is_utf16_t<First>::value && are_utf16_t<Rest...>::value;
+};
+template <class First>
+struct are_utf16_t<First> {
+	inline static constexpr bool value = is_utf16_t<First>::value;
+};
+
+template <class ...Args>
+inline static constexpr bool are_utf16 = are_utf16_t<Args...>::value;
+
+
 template <class ...Args>
 inline auto concatenate(Args const &...args) {
 	StringBuilder builder;
@@ -851,6 +871,8 @@ inline auto concatenate(Args const &...args) {
 	(void)_;
 	if constexpr (are_utf8<Args...>) {
 		return (List<utf8>)to_string(builder, current_allocator);
+	} else if constexpr (are_utf16<Args...>) {
+		return (List<utf16>)to_string(builder, current_allocator);
 	} else {
 		return (List<u8>)to_string(builder, current_allocator);
 	}
@@ -900,11 +922,11 @@ template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...arg
 template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 
 template <class T>
-List<char> to_string(T const &value) {
+List<utf8> to_string(T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append(builder, value);
-	return to_string(builder, current_allocator);
+	return (List<utf8>)to_string(builder, current_allocator);
 }
 
 struct FormattedBytes {

@@ -234,10 +234,15 @@ struct BucketHashMap {
 		buckets.count = new_buckets_count;
 
 		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
-			for (KeyValue &key_value : old_buckets[bucket_index]) {
-				auto hash = Hasher::get_hash(key_value.key);
+			auto next_node = old_buckets[bucket_index].head;
+			while (next_node) {
+				auto node = next_node;
+				next_node = next_node->next;
+				node->next = 0;
+
+				auto hash = Hasher::get_hash(node->value.key);
 				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
-				new_bucket.add(key_value TL_LA);
+				new_bucket.add_steal(node TL_LA);
 			}
 		}
 
@@ -423,7 +428,7 @@ void for_each(ContiguousHashMap<Key, Value> map, Fn &&fn) {
 }
 
 #ifndef TL_DEFAULT_HASH_MAP
-#define TL_DEFAULT_HASH_MAP(Key, Value, Hasher) ContiguousHashMap<Key, Value, Hasher>
+#define TL_DEFAULT_HASH_MAP(Key, Value, Hasher) BucketHashMap<Key, Value, Hasher>
 #endif
 
 template <class Key, class Value, class Hasher = DefaultHasher<Key>>

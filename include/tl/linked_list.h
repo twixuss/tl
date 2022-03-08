@@ -55,19 +55,21 @@ struct LinkedList {
 		return node->value;
 	}
 
-	T &add(T value TL_LP) {
+	T &add_steal(Node *node TL_LP) {
+		assert(node->next == 0);
 		if (head == 0) {
-			head = tail = allocator.allocate<Node>(TL_LAC);
+			head = tail = node;
 		} else {
-			if (!tail->next) {
-				tail->next = allocator.allocate<Node>(TL_LAC);
-			}
-			tail = tail->next;
+			assert(!tail->next);
+			tail = tail->next = node;
 		}
+		return node->value;
+	}
 
-		memcpy(&tail->value, &value, sizeof(value));
-
-		return tail->value;
+	T &add(T value TL_LP) {
+		auto &result = add_steal(allocator.allocate<Node>(TL_LAC) TL_LA);
+		memcpy(&result, &value, sizeof(value));
+		return result;
 	}
 	T &add(TL_LPC) {
 		return add({} TL_LA);
