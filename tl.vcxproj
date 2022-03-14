@@ -26,8 +26,11 @@
     <ClCompile Include="src\tests\allocation.cpp" />
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
+    <ClCompile Include="src\tests\coroutine.cpp" />
     <ClCompile Include="src\tests\definitions.cpp" />
     <ClCompile Include="src\tests\file.cpp" />
+    <ClCompile Include="src\tests\function.cpp" />
+    <ClCompile Include="src\tests\hash_map.cpp" />
     <ClCompile Include="src\tests\list.cpp" />
     <ClCompile Include="src\tests\math.cpp" />
     <ClCompile Include="src\tests\stream.cpp" />
@@ -35,6 +38,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\tests\coroutine.asm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -128,7 +134,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -149,6 +160,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -162,7 +177,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -183,6 +203,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

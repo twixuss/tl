@@ -22,10 +22,10 @@ inline Buffer create_buffer(umm size, umm alignment TL_LP) {
 }
 
 inline Buffer create_buffer_uninitialized(umm size TL_LP) {
-	return create_buffer_uninitialized(ceil(size, TL_DEFAULT_ALIGNMENT), TL_DEFAULT_ALIGNMENT TL_LA);
+	return create_buffer_uninitialized(size, TL_DEFAULT_ALIGNMENT TL_LA);
 }
 inline Buffer create_buffer(umm size TL_LP) {
-	return create_buffer(ceil(size, TL_DEFAULT_ALIGNMENT), TL_DEFAULT_ALIGNMENT TL_LA);
+	return create_buffer(size, TL_DEFAULT_ALIGNMENT TL_LA);
 }
 
 inline void free(Buffer buffer) {

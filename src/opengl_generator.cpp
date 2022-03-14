@@ -1,8 +1,8 @@
 #define TL_IMPL
-#define TL_MAIN
 #include <tl/common.h>
 #include <tl/file.h>
 #include <tl/console.h>
+#include <tl/main.h>
 
 using namespace tl;
 
@@ -17,8 +17,8 @@ struct Token {
 	u32 column;
 };
 
-void append(StringBuilder &builder, Token token) {
-	append_format(builder, "'{}:{}:{}'", token.view, token.line, token.column);
+umm append(StringBuilder &builder, Token token) {
+	return append_format(builder, "'{}:{}:{}'", token.view, token.line, token.column);
 }
 
 s32 tl_main(Span<Span<utf8>> args) {
@@ -40,7 +40,7 @@ s32 tl_main(Span<Span<utf8>> args) {
 
 	auto push_token = [&](Token t) {
 		t.line = line;
-		t.column = t.view.data - start_of_line;
+		t.column = (u32)(t.view.data - start_of_line);
 		tokens.add(t);
 	};
 
@@ -65,12 +65,12 @@ s32 tl_main(Span<Span<utf8>> args) {
 					++c;
 				}
 			}
-			t.view.size = c - t.view.data;
+			t.view.count = c - t.view.data;
 			push_token(t);
 		} else {
 			Token t = {};
 			t.view.data = c;
-			t.view.size = 1;
+			t.view.count = 1;
 			t.kind = *c;
 			switch (*c) {
 				case '(':
@@ -122,7 +122,7 @@ begin_parse:
 		}
 		++t;
 
-		if (pre_aruments.size < 2) {
+		if (pre_aruments.count < 2) {
 			print("Bad syntax before token {}\n", *t);
 			return 3;
 		}

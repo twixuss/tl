@@ -601,7 +601,7 @@ GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> sourc
 		append(version_builder, " core"s);
 	}
 	append(version_builder, "\n"s);
-	auto version_string = to_string(version_builder);
+	auto version_string = (List<char>)to_string(version_builder);
 
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;

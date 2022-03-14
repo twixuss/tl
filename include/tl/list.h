@@ -70,13 +70,16 @@ struct List : Span<T> {
 
 		reallocate(desired_capacity TL_LA);
 	}
-	void reserve_exponential(umm desired_capacity TL_LP) {
-		if (capacity >= desired_capacity) return;
+	// returns true if the list was relocated
+	bool reserve_exponential(umm desired_capacity TL_LP) {
+		if (capacity >= desired_capacity) return false;
 
 		umm new_capacity = max(1u, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity TL_LA);
+
+		return true;
 	}
 	void resize(umm new_count TL_LP) {
 		reserve(new_count TL_LA);

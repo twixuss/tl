@@ -44,5 +44,5 @@ void test_container() {
 }
 
 void allocation_test() {
-	test_container<MaskedBlockList<u32, 256>>();
+	test_container<StaticMaskedBlockList<u32, 256>>();
 }

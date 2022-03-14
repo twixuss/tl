@@ -434,9 +434,9 @@ template <class Fn>
 void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
 	auto items = get_items_in_directory(with(temporary_allocator, to_pathchars(directory)));
 	for (auto &item : items) {
-		auto item_path = with(temporary_allocator, concatenate(directory, '/', item.name));
+		auto item_path = with(temporary_allocator, concatenate(directory, u8'/', with(temporary_allocator, to_utf8(item.name))));
 		if (item.kind == FileItem_directory) {
-			for_each_file_recursive<Fn>(item_path, std::forward<Fn>(fn));
+			for_each_file_recursive(item_path, std::forward<Fn>(fn));
 		} else {
 			fn(item_path);
 		}
