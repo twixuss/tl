@@ -8,13 +8,22 @@ struct BigInt;
 inline BigInt copy(BigInt const &a TL_LP);
 inline void free(BigInt &a);
 
+// Arbitrarily long, signed, two's complement integer.
+// parts[0]               is the least significant part
+// parts[parts.count - 1] is the most  significant part
+// Note that `BigInt` must be normalized (some algorithms rely on this), i.e. most significant part should be removed if it is 'equal' to `msb` (most significant bit)
+// For example, while last part is 0 and msb is false, remove last part.
+// `parts` can be empty, meaning that the number is equal to 0 if msb is false, or -1 otherwise.
 struct BigInt {
+	using Part = u64;
+	inline static constexpr umm bits_in_part = sizeof(Part) * 8;
+
 	bool msb = false;
-	List<u64> parts;
+	List<Part> parts;
 
 	void normalize() {
 		for (umm i = parts.count - 1; i != 0; --i) {
-			if (parts[i] == (msb ? (u64)-1 : (u64)0)) {
+			if (parts[i] == (msb ? (Part)-1 : (Part)0)) {
 				parts.pop();
 			} else {
 				break;
@@ -22,21 +31,18 @@ struct BigInt {
 		}
 	}
 
-	BigInt operator~() const {
-		BigInt result;
-		result.msb = !msb;
-		result.parts.reserve(parts.count);
-		for (auto &part : parts) {
-			result.parts.add(~part);
-		}
-		return result;
+	BigInt &invert() {
+		msb = !msb;
+		for (auto &part : parts)
+			part = ~part;
+		return *this;
 	}
 
-	BigInt operator-() const {
-		BigInt result = ~*this;
-		result += 1;
-		return result;
-	}
+	BigInt operator~() const { return copy(*this).invert(); }
+
+	BigInt &negate() { return invert() += (u64)1; }
+	BigInt operator-() const { return copy(*this).negate(); }
+
 	/*
 	BigInt &operator&=(BigInt const &b) {
 		if (!msb) {
@@ -295,6 +301,7 @@ struct BigInt {
 		return *this;
 	}
 	*/
+
 	BigInt &operator^=(BigInt const &b) {
 		for (umm i = 0; i < min(parts.count, b.parts.count); ++i) {
 			parts[i] ^= b.parts[i];
@@ -372,21 +379,32 @@ struct BigInt {
 		while (zero_part_count--)
 			parts.insert_at(0, 0);
 
-		b &= 63;
+		b &= bits_in_part - 1;
 		if (b) {
 			if (parts.count) {
-				List<u64> new_parts;
+				List<Part> new_parts;
 				new_parts.add(parts[0] << b);
 				for (umm part_index = 1; part_index != parts.count; ++part_index) {
 					new_parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
 				}
-				new_parts.add(((msb ? (u64)-1 : (u64)0) << b) | (parts[parts.count - 1] >> (64 - b)));
+				new_parts.add(((msb ? (Part)-1 : (Part)0) << b) | (parts[parts.count - 1] >> (64 - b)));
 				free(parts);
 				parts = new_parts;
 			}
 		}
 
 		normalize();
+		return *this;
+	}
+	BigInt &operator<<=(BigInt const &b) {
+		BigInt zero_part_count_big, shift_amount;
+		b.divmod(bits_in_part, zero_part_count_big, shift_amount);
+		assert(!zero_part_count_big.msb && zero_part_count_big.parts.count <= 1, "Dude, do you have enough ram for this?");
+
+		*this <<= (u64)shift_amount;
+
+		parts.insert_n_at(0, 0, (u64)zero_part_count_big);
+
 		return *this;
 	}
 
@@ -407,6 +425,31 @@ struct BigInt {
 			} else {
 				parts.add(1);
 			}
+		}
+
+		normalize();
+		return *this;
+	}
+	BigInt &operator+=(s64 b) {
+		if (parts.count == 0)
+			parts.add(0);
+
+		bool carry = false;
+
+		add_carry(b, parts[0], false, &parts[0], &carry);
+		for (umm part_index = 1; part_index < parts.count; ++part_index) {
+			add_carry(parts[part_index], 0, carry, &parts[part_index], &carry);
+		}
+
+		if (carry) {
+			if (msb) {
+				msb = false;
+			} else {
+				parts.add(1);
+			}
+		} else {
+			if (b < 0)
+				msb = true;
 		}
 
 		normalize();
@@ -464,6 +507,63 @@ struct BigInt {
 		return *this;
 	}
 
+	void divmod(u64 b, BigInt &quotient, BigInt &remainder) const {
+		umm max_parts_count = max(parts.count, 1);
+
+		quotient.parts.resize(max_parts_count);
+		remainder.parts.resize(max_parts_count);
+
+		for (umm bit_index = max_parts_count * bits_in_part - 1; bit_index != ~(umm)0; --bit_index) {
+			remainder <<= 1;
+			remainder.set_bit(0, get_bit(bit_index));
+			if (remainder >= b) {
+				remainder -= b;
+				quotient.set_bit(bit_index, 1);
+			}
+		}
+
+		remainder.normalize();
+		quotient.normalize();
+	}
+	void divmod(BigInt const &b, BigInt &quotient, BigInt &remainder) const {
+		umm max_parts_count = max(parts.count, b.parts.count);
+
+		quotient.parts.resize(max_parts_count);
+		remainder.parts.resize(max_parts_count);
+
+		for (umm bit_index = max_parts_count * bits_in_part - 1; bit_index != ~(umm)0; --bit_index) {
+			remainder <<= 1;
+			remainder.set_bit(0, get_bit(bit_index));
+			if (remainder >= b) {
+				remainder -= b;
+				quotient.set_bit(bit_index, 1);
+			}
+		}
+
+		remainder.normalize();
+		quotient.normalize();
+	}
+
+	BigInt &operator/=(BigInt const &b) {
+		BigInt result, dummy;
+		divmod(b, result, dummy);
+		free(dummy);
+		return *this = result;
+	}
+	BigInt &operator%=(BigInt const &b) {
+		BigInt result, dummy;
+		divmod(b, dummy, result);
+		free(dummy);
+		return *this = result;
+	}
+
+	bool operator==(s64 b) const {
+		if (parts.count == 1)
+			return (s64)parts[0] == b;
+		if (parts.count == 0)
+			return (msb ? -1 : 0) == b;
+		return false;
+	}
 	bool operator==(BigInt b) const {
 		if (msb != b.msb)
 			return false;
@@ -491,10 +591,16 @@ struct BigInt {
 		return true;
 	}
 
-	bool operator!=(BigInt b) const {
-		return !operator==(b);
-	}
+	bool operator!=(u64    b) const { return !operator==(b); }
+	bool operator!=(BigInt b) const { return !operator==(b); }
 
+	bool operator<(s64 b) const {
+		if (parts.count == 1)
+			return (s64)parts[0] < b;
+		if (parts.count == 0)
+			return (msb ? -1 : 0) < b;
+		return msb;
+	}
 	bool operator<(BigInt b) const {
 		if (msb != b.msb) {
 			return msb;
@@ -509,6 +615,14 @@ struct BigInt {
 		auto diff = *this - b;
 		defer { free(diff); };
 		return diff.msb;
+	}
+
+	bool operator>(s64 b) const {
+		if (parts.count == 1)
+			return (s64)parts[0] > b;
+		if (parts.count == 0)
+			return (msb ? -1 : 0) < b;
+		return !msb;
 	}
 	bool operator>(BigInt b) const {
 		if (msb != b.msb) {
@@ -532,22 +646,35 @@ struct BigInt {
 			return true;
 		}
 	}
+
+	bool operator>=(s64    b) const { return !(*this < b); }
 	bool operator>=(BigInt b) const { return !(*this < b); }
+
+	bool operator<=(s64    b) const { return !(*this > b); }
 	bool operator<=(BigInt b) const { return !(*this > b); }
 
+	BigInt &operator-=(s64           b) { return *this += -b; }
 	BigInt &operator-=(BigInt const &b) { return *this += -b; }
+
 	BigInt operator&(BigInt const &b) const { auto a = copy(*this); a &= b; return a; }
 	BigInt operator|(BigInt const &b) const { auto a = copy(*this); a |= b; return a; }
 	BigInt operator^(BigInt const &b) const { auto a = copy(*this); a ^= b; return a; }
 	BigInt operator+(BigInt const &b) const { auto a = copy(*this); a += b; return a; }
+
+	BigInt operator-(s64           b) const { auto a = copy(*this); a -= b; return a; }
 	BigInt operator-(BigInt const &b) const { auto a = copy(*this); a -= b; return a; }
+
 	BigInt operator*(BigInt const &b) const { auto a = copy(*this); a *= b; return a; }
 	BigInt operator<<(u64 b) const { auto a = copy(*this); a <<= b; return a; }
+	BigInt operator<<(BigInt const & b) const { auto a = copy(*this); a <<= b; return a; }
 
 	//BigInt operator-(BigInt const &b) const { return *this + -b; }
 
 	bool get_bit(umm index) const {
 		umm part_index = index / (sizeof(parts[0]) * 8);
+		if (part_index >= parts.count)
+			return msb;
+
 		umm bit_index  = index % (sizeof(parts[0]) * 8);
 		return parts[part_index] & ((u64)1 << bit_index);
 	}
@@ -627,54 +754,6 @@ struct BigInt {
 			}
 		}
 		return result;
-	}
-	BigInt operator/(BigInt const &b) const {
-		BigInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-
-		BigInt N = *this;
-		BigInt quotient;
-		BigInt remainder;
-
-		N.parts.resize(max_int.parts.count);
-		quotient.parts.resize(max_int.parts.count);
-		remainder.parts.resize(max_int.parts.count);
-
-		for (umm bit_index = max_int.parts.count * 64 - 1; bit_index != ~(umm)0; --bit_index) {
-			remainder <<= 1;
-			remainder.set_bit(0, N.get_bit(bit_index));
-			if (remainder >= b) {
-				remainder -= b;
-				quotient.set_bit(bit_index, 1);
-			}
-		}
-		return quotient;
-	}
-	BigInt operator%(BigInt const &b) const {
-		BigInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
-		}
-
-		BigInt N = *this;
-		BigInt quotient;
-		BigInt remainder;
-
-		N.parts.resize(max_int.parts.count);
-		quotient.parts.resize(max_int.parts.count);
-		remainder.parts.resize(max_int.parts.count);
-
-		for (umm bit_index = max_int.parts.count * 64 - 1; bit_index != ~(umm)0; --bit_index) {
-			remainder <<= 1;
-			remainder.set_bit(0, N.get_bit(bit_index));
-			if (remainder >= b) {
-				remainder -= b;
-				quotient.set_bit(bit_index, 1);
-			}
-		}
-		return remainder;
 	}
 
 

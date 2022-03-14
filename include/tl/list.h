@@ -143,6 +143,15 @@ struct List : Span<T> {
 	T &insert(T value, T *where TL_LP) { return insert_at(value, where - data TL_LA); }
 	Span<T> insert(Span<T> span, T *where TL_LP) { return insert_at(span, where - data TL_LA); }
 
+	Span<T> insert_n_at(T const &value, umm where, umm n) {
+		reserve(count + n);
+		auto to_move_count = count - where;
+		memmove(data + where + n, data + where, to_move_count * sizeof(T));
+		for (umm i = 0; i != n; ++i)
+			memcpy(data + where + i, &value, sizeof(T));
+		return {data + where, n};
+	}
+
 	void erase(Span<T> where) {
 		bounds_check(
 			where.count <= count &&
