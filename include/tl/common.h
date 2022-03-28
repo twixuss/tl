@@ -765,6 +765,12 @@ constexpr void for_each(T (&array)[count], Fn &&fn) {
 		}
 	}
 }
+/*
+template <ForEachFlags flags, umm count, class Fn, class ...Ts>
+constexpr void for_each(Fn &&fn, Ts ...ts) {
+	(fn(ts), ...);
+}
+*/
 
 template <class Container>
 struct ValueTypeOfT {

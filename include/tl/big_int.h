@@ -767,7 +767,7 @@ struct BigInt {
 
 template <> inline constexpr bool is_integer<BigInt> = true;
 template <> inline constexpr bool is_integer_like<BigInt> = true;
-template <> inline constexpr bool is_signed<BigInt> = false;
+template <> inline constexpr bool is_signed<BigInt> = true;
 
 
 inline BigInt make_big_int(u64 value TL_LP) {
@@ -790,15 +790,24 @@ void free(BigInt &a) {
 }
 
 inline umm append(StringBuilder &builder, BigInt value) {
+
+	// BigInt temp = copy(value);
+	// defer { free(temp); };
+
 	umm chars_appended = 0;
 	auto append = [&] (StringBuilder &builder, auto const &x) {
 		chars_appended += ::tl::append(builder, x);
 	};
 
+	// do {
+	// 	temp.divmod(10, quotient, remainder);
+	// 	append(builder, )
+	// } while (temp != 0);
+
 	append(builder, "0x"s);
-	append(builder, FormatInt{.value=value.parts.back(), .radix=16});
+	append(builder, FormatInt<BigInt::Part>{.value=value.parts.back(), .radix=16});
 	for (smm i = (smm)value.parts.count - 2; i >= 0; --i) {
-		append(builder, FormatInt{.value=value.parts[i], .radix=16, .leading_zero_count=16});
+		append(builder, FormatInt<BigInt::Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
 	}
 
 	return chars_appended;

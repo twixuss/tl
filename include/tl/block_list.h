@@ -109,14 +109,15 @@ struct StaticBlockList {
 	T &back() { return last->back(); }
 	T const &back() const { return last->back(); }
 
-	void pop_back() {
+	T pop_back() {
 		if (last == &first)
 			bounds_check(first.count);
 
-		last->count--;
+		T result = last->data[--last->count];
 		if (last->count == 0 && last != &first) {
 			last = last->previous;
 		}
+		return result;
 	}
 
 	template <class Fn>
@@ -510,14 +511,16 @@ struct BlockList {
 	T &back() { return last->back(); }
 	T const &back() const { return last->back(); }
 
-	void pop_back() {
+	T pop_back() {
 		if (last == first)
 			bounds_check(first->count);
 
+		auto result = last->back();
 		last->count--;
 		if (last->count == 0 && last != first) {
 			last = last->previous;
 		}
+		return result;
 	}
 
 	template <class Fn>
