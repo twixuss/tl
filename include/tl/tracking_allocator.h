@@ -66,7 +66,7 @@ Allocator tracking_allocator = {
 				return result;
 			}
 			case Allocator_free: {
-				default_allocator.free(data, location);
+				default_allocator.free(data, new_size, align, location);
 				untrack_allocation(data);
 				break;
 			}

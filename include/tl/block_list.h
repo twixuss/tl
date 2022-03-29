@@ -371,6 +371,7 @@ struct BlockList {
 
 		umm available_space() const { return capacity - count; }
 		T &add(T value) {
+			defer { assert(count <= capacity); };
 			return data()[count++] = value;
 		}
 		T &front() { return *data(); }
@@ -476,6 +477,16 @@ struct BlockList {
 		last = first;
 	}
 
+	Block *allocate_block(umm capacity TL_LP) {
+		auto result = (Block *)allocator.allocate(
+			sizeof(Block) + sizeof(T) * capacity,
+			max(alignof(T), alignof(Block))
+			TL_LA
+		);
+		result->capacity = capacity;
+		return result;
+	}
+
 	T &add(T value TL_LP) {
 		auto dest_block = last;
 		while (dest_block && !dest_block->available_space()) {
@@ -484,15 +495,7 @@ struct BlockList {
 		if (!dest_block) {
 			umm capacity = first ? alloc_last->capacity * 2 : initial_capacity;
 
-			dest_block = (Block *)allocator.allocate(
-				sizeof(Block) + sizeof(T) * capacity,
-				max(alignof(T), alignof(Block))
-				TL_LA
-			);
-
-			dest_block->next = 0;
-			dest_block->count = 0;
-			dest_block->capacity = capacity;
+			dest_block = allocate_block(capacity TL_LA);
 
 			if (first) {
 				dest_block->previous = alloc_last;
@@ -587,6 +590,21 @@ umm count_of(BlockList<T> const &list) {
 		total_count += block->count;
 	}
 	return total_count;
+}
+
+template <class T>
+umm index_of(BlockList<T> const &list, T *value) {
+	umm index = 0;
+	auto block = list.first;
+	while (block) {
+		if (block->begin() <= value && value < block->end()) {
+			return index + (value - block->begin());
+		}
+		index += block->count;
+		block = block->next;
+	}
+	bounds_check(false);
+	return (umm)~0;
 }
 
 template <class T>
@@ -740,9 +758,78 @@ T *find_if(BlockList<T> &list, Predicate &&predicate) {
 
 template <class T>
 void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
-	for_each(source, [&](T const &value) {
-		destination->add(value TL_LA);
+	for_each(source, [&](T &x) {
+		destination->add(x);
 	});
+	return;
+	// TODO: de-bug this
+
+	auto src_block = source.first;
+	auto src_remaining = src_block->count;
+	auto src_data = src_block->data();
+
+	auto dst_block = destination->last;
+
+	while (dst_block) {
+		auto copy_count = min(src_remaining, dst_block->available_space());
+
+		memcpy(dst_block->end(), src_data, copy_count * sizeof(T));
+
+		dst_block->count += copy_count;
+		src_remaining -= copy_count;
+		src_data += copy_count;
+
+		if (src_remaining == 0) {
+			// Source block has no more data left. Go to the next one.
+			src_block = src_block->next;
+			if (!src_block) {
+				break;
+			}
+		}
+
+		if (dst_block->available_space() == 0) {
+			// Destination block has no more space. Go to the next one.
+			dst_block = dst_block->next;
+		}
+	}
+
+	if (src_block) {
+		// We still have source data an destination ran out of space.
+		// Allocate a big enough block to store everything that is left.
+		umm remaining_count = src_remaining;
+		auto stopped_on_src_block = src_block;
+		src_block = src_block->next;
+		while (src_block) {
+			remaining_count += src_remaining;
+			src_block = src_block->next;
+		}
+
+		if (!remaining_count)
+			return;
+
+		dst_block = destination->allocate_block(max(remaining_count, destination->last ? destination->last->capacity * 2 : destination->initial_capacity) TL_LA);
+
+		memcpy(dst_block->end(), src_data, src_remaining * sizeof(T));
+
+		src_block = stopped_on_src_block->next;
+		while (src_block) {
+			memcpy(dst_block->end(), src_block->data(), src_block->count * sizeof(T));
+			src_block = src_block->next;
+		}
+
+		dst_block->count = remaining_count;
+
+		assert(destination->last == destination->alloc_last);
+		if (destination->first) {
+			destination->last =
+			destination->alloc_last =
+			destination->alloc_last->next = dst_block;
+		} else {
+			destination->first =
+			destination->last =
+			destination->alloc_last = dst_block;
+		}
+	}
 }
 
 

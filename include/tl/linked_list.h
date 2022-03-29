@@ -55,7 +55,7 @@ struct LinkedList {
 		return node->value;
 	}
 
-	T &add_steal(Node *node TL_LP) {
+	T &add_steal(Node *node) {
 		assert(node->next == 0);
 		if (head == 0) {
 			head = tail = node;
@@ -67,7 +67,7 @@ struct LinkedList {
 	}
 
 	T &add(T value TL_LP) {
-		auto &result = add_steal(allocator.allocate<Node>(TL_LAC) TL_LA);
+		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
 		memcpy(&result, &value, sizeof(value));
 		return result;
 	}

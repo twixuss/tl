@@ -124,7 +124,7 @@ struct BucketHashMap {
 		}
 
 		if (total_value_count == buckets.count) {
-			rehash(buckets.count * 2);
+			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[hash & (buckets.count - 1)];
 		}
 		++total_value_count;
@@ -242,7 +242,7 @@ struct BucketHashMap {
 
 				auto hash = Hasher::get_hash(node->value.key);
 				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
-				new_bucket.add_steal(node TL_LA);
+				new_bucket.add_steal(node);
 			}
 		}
 

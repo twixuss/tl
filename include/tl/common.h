@@ -887,6 +887,9 @@ struct ReverseIterator {
 };
 
 template <class T>
+struct Span32;
+
+template <class T>
 struct Span {
 	using ValueType = T;
 	using ReverseIterator = ReverseIterator<T *>;
@@ -929,6 +932,8 @@ struct Span {
 		return {(U *)data, count};
 	}
 
+	constexpr operator Span32<T>() const;
+
 	constexpr bool operator==(Span<ValueType> that) const {
 		if (count != that.count)
 			return false;
@@ -950,6 +955,100 @@ struct Span {
 	ValueType *data = 0;
 	umm count = 0;
 };
+
+#pragma pack(push, 1)
+
+template <class T>
+struct Span32 {
+	using ValueType = T;
+	using Size = u32;
+	using ReverseIterator = ReverseIterator<T *>;
+
+	constexpr Span32(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
+	constexpr Span32() = default;
+	constexpr Span32(ValueType &value) : data(std::addressof(value)), count(1) {}
+	template <Size count>
+	constexpr Span32(ValueType (&array)[count]) : data(array), count(count) {}
+	constexpr Span32(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {}
+	constexpr Span32(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
+	constexpr Span32(ValueType *begin, Size count) : data(begin), count(count) {}
+	constexpr ValueType *begin() const { return data; }
+	constexpr ValueType *end() const { return data + count; }
+
+	constexpr ReverseIterator rbegin() const { return data + count - 1; }
+	constexpr ReverseIterator rend() const { return data - 1; }
+
+	constexpr ValueType &front() const {
+		bounds_check(count);
+		return *data;
+	}
+	constexpr ValueType &back() const {
+		bounds_check(count);
+		return data[count - 1];
+	}
+	constexpr ValueType &operator[](Size i) const {
+		bounds_check(i < count);
+		return data[i];
+	}
+	constexpr ValueType &at(Size i) const {
+		bounds_check(i < count);
+		return data[i];
+	}
+	constexpr bool empty() const { return count == 0; }
+
+	template <class U>
+	constexpr explicit operator Span32<U>() const {
+		static_assert(sizeof(U) == sizeof(T));
+		return {(U *)data, count};
+	}
+	constexpr operator Span<T>() const {
+		return {data, count};
+	}
+
+	constexpr bool operator==(Span32 that) const {
+		if (count != that.count)
+			return false;
+		for (Size i = 0; i < count; ++i) {
+			if (data[i] != that.data[i])
+				return false;
+		}
+		return true;
+	}
+	constexpr bool operator==(Span<T> that) const {
+		if (count != that.count)
+			return false;
+		for (Size i = 0; i < count; ++i) {
+			if (data[i] != that.data[i])
+				return false;
+		}
+		return true;
+	}
+
+	constexpr bool operator!=(Span32 that) const { return !(*this == that); }
+
+	constexpr Span32 subspan(Size subspan_start, Size subspan_count) const {
+		return Span(data + subspan_start, subspan_count);
+	}
+	constexpr Span32 skip(Size amount) const {
+		return {data + amount, count - amount};
+	}
+
+	ValueType *data = 0;
+	Size count = 0;
+};
+
+#pragma pack(pop)
+
+template <class T>
+Span32<T> as_span32(Span<T> span){
+	assert((umm)(u32)span.count == span.count);
+	return {span.data, (u32)span.count};
+}
+
+template <class T>
+constexpr Span<T>::operator Span32<T>() const {
+	return as_span32(*this);
+}
 
 template <ForEachFlags flags, class T, class Fn>
 constexpr void for_each(Span<T> span, Fn &&fn) {

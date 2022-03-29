@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "list.h"
+#include "span32.h"
 #include "optional.h"
 
 #pragma warning(push)
@@ -472,6 +473,9 @@ inline umm append(StringBuilder &b, Span<utf8 > string) { return append_bytes(b,
 inline umm append(StringBuilder &b, Span<utf16> string) { return append_bytes(b, string); }
 inline umm append(StringBuilder &b, Span<utf32> string) { return append_bytes(b, string); }
 
+template <class T>
+inline umm append(StringBuilder &b, Span32<T> span) { return append(b, Span<T>(span.data, span.count)); }
+
 forceinline umm append(StringBuilder &b, ascii const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b, as_span(string)); }
@@ -824,7 +828,7 @@ forceinline umm append(StringBuilder &builder, f64 v) { return append(builder, F
 forceinline umm append(StringBuilder &builder, f32 v) { return append(builder, FormatFloat{.value = v}); }
 
 inline umm append(StringBuilder &builder, std::source_location location) {
-	return append_format(builder, "{}:{}:{}:{}", location.file_name(), location.line(), location.column(), location.function_name());
+	return append_format(builder, "{}:{}:{}: {}", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
 
