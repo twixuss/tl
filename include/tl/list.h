@@ -648,7 +648,7 @@ auto map(List<T> list, Fn &&fn TL_LP) {
 }
 
 template <class T>
-List32<T> make_list(std::initializer_list<T> list TL_LP) {
+List32<T> make_list32(std::initializer_list<T> list TL_LP) {
 	List32<T> result;
 	result.reserve(list.size() TL_LA);
 	result.count = list.size();

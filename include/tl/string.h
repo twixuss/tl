@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 #include "list.h"
-#include "span32.h"
 #include "optional.h"
 
 #pragma warning(push)
