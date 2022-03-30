@@ -8,7 +8,8 @@ namespace tl {
 
 #if OS_WINDOWS
 using pathchar = utf16;
-inline List<pathchar> to_pathchars(Span<utf8> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
+template <class Size>
+inline List<pathchar> to_pathchars(Span<utf8, Size> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
 #define tl_file_string(x) u ## x
 
 inline static constexpr utf8 path_separator = u'\\';
@@ -400,7 +401,8 @@ inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
 	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
 }
 
-inline bool is_absolute_path(Span<utf8> path) {
+template <class Size>
+inline bool is_absolute_path(Span<utf8, Size> path) {
 	if (path.count < 2)
 		return false;
 	return path.data[1] == ':';

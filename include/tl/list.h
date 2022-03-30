@@ -4,238 +4,23 @@
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
 
+
 namespace tl {
 
-template <class T>
-struct List32;
+#pragma pack(push, 1)
+template <class T, class Allocator = Allocator, class Size_ = umm>
+struct List : Span<T, Size_> {
+	using ElementType = T;
+	using Size = Size_;
+	using Span = Span<T, Size_>;
 
-template <class T>
-struct List : Span<T> {
-	using Span<T>::data;
-	using Span<T>::count;
-	using Span<T>::begin;
-	using Span<T>::end;
-
-	umm capacity = 0;
-	Allocator allocator = current_allocator;
-
-	void reallocate(umm desired_capacity TL_LP) {
-		T *new_data;
-		if (data) {
-			new_data = allocator.reallocate_uninitialized<T>(data, count, desired_capacity TL_LA);
-		} else {
-			new_data = allocator.allocate_uninitialized<T>(desired_capacity TL_LA);
-		}
-		data = new_data;
-		capacity = desired_capacity;
-	}
-
-	void set(Span<T> span TL_LP) {
-		reserve(span.count TL_LA);
-		count = span.count;
-		memcpy(data, span.data, span.count * sizeof(T));
-	}
-	T &add(TL_LPC) {
-		reserve_exponential(count + 1 TL_LA);
-		return *new (data + count++) T();
-	}
-	T &add(T value TL_LP) {
-		reserve_exponential(count + 1 TL_LA);
-		auto dest = data + count;
-		assert(dest == (data + count));
-		memcpy(dest, &value, sizeof(T));
-		return data[count++];
-	}
-	Span<T> add(Span<T> span TL_LP) {
-		reserve_exponential(count + span.count TL_LA);
-		memcpy(data + count, span.data, span.count * sizeof(T));
-		count += span.count;
-		return {data + count - span.count, span.count};
-	}
-	Span<T> add(std::initializer_list<T> list TL_LP) {
-		reserve_exponential(count + list.size() TL_LA);
-		memcpy(data + count, list.begin(), list.size() * sizeof(T));
-		count += list.size();
-		return {data + count - list.size(), list.size()};
-	}
-
-	T &add_front(T value TL_LP) {
-		reserve_exponential(count + 1 TL_LA);
-		for (umm i = count; i > 0; --i) {
-			data[i] = data[i - 1];
-		}
-		data[0] = value;
-		return data[0];
-	}
-
-	void reserve(umm desired_capacity TL_LP) {
-		if (capacity >= desired_capacity) return;
-
-		reallocate(desired_capacity TL_LA);
-	}
-	// returns true if the list was relocated
-	bool reserve_exponential(umm desired_capacity TL_LP) {
-		if (capacity >= desired_capacity) return false;
-
-		umm new_capacity = max(1u, capacity);
-		while (new_capacity < desired_capacity) new_capacity *= 2;
-
-		reallocate(new_capacity TL_LA);
-
-		return true;
-	}
-	void resize(umm new_count TL_LP) {
-		reserve(new_count TL_LA);
-
-		if (new_count > count) {
-			for (umm i = count; i < new_count; ++i) {
-				new (data + i) T();
-			}
-		}
-		count = new_count;
-	}
-
-	void clear() {
-		count = 0;
-	}
-
-	T pop() {
-		--count;
-		return data[count];
-	}
-
-	template <class U>
-	explicit operator List<U>() const {
-		List<U> result;
-		result.allocator = allocator;
-		result.data = (U *)data;
-		if constexpr (sizeof(T) == sizeof(U)) {
-			result.count      = count;
-			result.capacity  = capacity;
-		} else {
-			if constexpr (sizeof(T) > sizeof(U)) {
-				static_assert(sizeof(T) % sizeof(U) == 0);
-			} else {
-				static_assert(sizeof(U) % sizeof(T) == 0);
-			}
-			result.count      = count     * sizeof(T) / sizeof(U);
-			result.capacity  = capacity * sizeof(T) / sizeof(U);
-		}
-		return result;
-	}
-	operator List32<T>() const;
-
-	T &insert_at(T value, umm where TL_LP) {
-		bounds_check(where <= count);
-
-		reserve_exponential(count + 1 TL_LA);
-
-		memmove(data + where + 1, data + where, (count - where) * sizeof(T));
-		memcpy(data + where, &value, sizeof(T));
-
-		++count;
-		return data[where];
-	}
-	Span<T> insert_at(Span<T> span, umm where TL_LP) {
-		bounds_check(where <= count);
-
-		reserve_exponential(count + span.count TL_LA);
-
-		memmove(data + where + span.count, data + where, (count - where) * sizeof(T));
-		memcpy(data + where, span.data, span.count * sizeof(T));
-
-		count += span.count;
-		return {data + where, span.count};
-	}
-	T &insert(T value, T *where TL_LP) { return insert_at(value, where - data TL_LA); }
-	Span<T> insert(Span<T> span, T *where TL_LP) { return insert_at(span, where - data TL_LA); }
-
-	Span<T> insert_n_at(T const &value, umm where, umm n) {
-		reserve(count + n);
-		auto to_move_count = count - where;
-		memmove(data + where + n, data + where, to_move_count * sizeof(T));
-		for (umm i = 0; i != n; ++i)
-			memcpy(data + where + i, &value, sizeof(T));
-		return {data + where, n};
-	}
-
-	void erase(Span<T> where) {
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
-
-		memmove(where.data, where.data + where.count, count - where.count + data - where.data);
-		count -= where.count;
-	}
-	void erase_at(umm where) {
-		bounds_check(where < count);
-		--count;
-		for (umm i = where; i < count; ++i) {
-			data[i] = data[i + 1];
-		}
-	}
-
-	void replace(Span<T> where, T with_what) {
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
-
-		memmove(where.data + 1, where.data + where.count, end() - where.end());
-		*where.data = with_what;
-
-		count -= where.count - 1;
-	}
-
-	void replace(Span<T> where, Span<T> with_what) {
-		assert(begin() <= where.begin());
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
-
-		T *old_data = data;
-		reserve_exponential(count - where.count + with_what.count);
-		where.data += data - old_data;
-
-		memmove(
-			where.data + with_what.count,
-			where.data + where.count,
-			(end() - where.end()) * sizeof(T)
-		);
-		memcpy(where.data, with_what.data, with_what.count * sizeof(T));
-
-		count -= where.count - with_what.count;
-	}
-
-	void move(T *from, T *to) {
-		T temp = *from;
-		if (to < from) {
-			memmove(to + 1, to, sizeof(T) * (from - to));
-		} else {
-			memmove(from, from + 1, sizeof(T) * (to - from));
-		}
-		*to = temp;
-	}
-	void move_at(T *from, umm destination_index) {
-		move(from, data + destination_index);
-	}
-};
-
-template <class T>
-struct List32 : Span32<T> {
-	using Size = typename Span32<T>::Size;
-	using Span32<T>::data;
-	using Span32<T>::count;
-	using Span32<T>::begin;
-	using Span32<T>::end;
+	using Span::data;
+	using Span::count;
+	using Span::begin;
+	using Span::end;
 
 	Size capacity = 0;
-	Allocator allocator = current_allocator;
+	Allocator allocator = Allocator::current();
 
 	void reallocate(Size desired_capacity TL_LP) {
 		T *new_data;
@@ -248,7 +33,7 @@ struct List32 : Span32<T> {
 		capacity = desired_capacity;
 	}
 
-	void set(Span32<T> span TL_LP) {
+	void set(Span span TL_LP) {
 		reserve(span.count TL_LA);
 		count = span.count;
 		memcpy(data, span.data, span.count * sizeof(T));
@@ -264,13 +49,13 @@ struct List32 : Span32<T> {
 		memcpy(dest, &value, sizeof(T));
 		return data[count++];
 	}
-	Span32<T> add(Span32<T> span TL_LP) {
+	Span add(Span span TL_LP) {
 		reserve_exponential(count + span.count TL_LA);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		count += span.count;
 		return {data + count - span.count, span.count};
 	}
-	Span32<T> add(std::initializer_list<T> list TL_LP) {
+	Span add(std::initializer_list<T> list TL_LP) {
 		reserve_exponential(count + list.size() TL_LA);
 		memcpy(data + count, list.begin(), list.size() * sizeof(T));
 		count += list.size();
@@ -279,34 +64,34 @@ struct List32 : Span32<T> {
 
 	T &add_front(T value TL_LP) {
 		reserve_exponential(count + 1 TL_LA);
-		for (umm i = count; i > 0; --i) {
+		for (Size i = count; i > 0; --i) {
 			data[i] = data[i - 1];
 		}
 		data[0] = value;
 		return data[0];
 	}
 
-	void reserve(umm desired_capacity TL_LP) {
+	void reserve(Size desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) return;
 
 		reallocate(desired_capacity TL_LA);
 	}
 	// returns true if the list was relocated
-	bool reserve_exponential(umm desired_capacity TL_LP) {
+	bool reserve_exponential(Size desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) return false;
 
-		umm new_capacity = max(1u, capacity);
+		Size new_capacity = max(1u, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity TL_LA);
 
 		return true;
 	}
-	void resize(umm new_count TL_LP) {
+	void resize(Size new_count TL_LP) {
 		reserve(new_count TL_LA);
 
 		if (new_count > count) {
-			for (umm i = count; i < new_count; ++i) {
+			for (Size i = count; i < new_count; ++i) {
 				new (data + i) T();
 			}
 		}
@@ -322,9 +107,11 @@ struct List32 : Span32<T> {
 		return data[count];
 	}
 
-	template <class U>
-	explicit operator List32<U>() const {
-		List32<U> result;
+	template <class U, class ThatSize>
+	explicit operator List<U, Allocator, ThatSize>() const {
+		assert((ThatSize)count == count);
+		assert((ThatSize)capacity == capacity);
+		List<U, Allocator, ThatSize> result;
 		result.allocator = allocator;
 		result.data = (U *)data;
 		if constexpr (sizeof(T) == sizeof(U)) {
@@ -342,11 +129,19 @@ struct List32 : Span32<T> {
 		return result;
 	}
 
-	operator List<T>() const {
-		return {data, count, capacity, allocator};
+	template <class ThatSize>
+	operator List<T, Allocator, ThatSize>() const {
+		assert((ThatSize)count == count);
+		assert((ThatSize)capacity == capacity);
+		List<T, Allocator, ThatSize> result;
+		result.data = data;
+		result.count = (ThatSize)count;
+		result.capacity = (ThatSize)capacity;
+		result.allocator = allocator;
+		return result;
 	}
 
-	T &insert_at(T value, umm where TL_LP) {
+	T &insert_at(T value, Size where TL_LP) {
 		bounds_check(where <= count);
 
 		reserve_exponential(count + 1 TL_LA);
@@ -357,7 +152,7 @@ struct List32 : Span32<T> {
 		++count;
 		return data[where];
 	}
-	Span32<T> insert_at(Span32<T> span, umm where TL_LP) {
+	Span insert_at(Span span, Size where TL_LP) {
 		bounds_check(where <= count);
 
 		reserve_exponential(count + span.count TL_LA);
@@ -369,18 +164,18 @@ struct List32 : Span32<T> {
 		return {data + where, span.count};
 	}
 	T &insert(T value, T *where TL_LP) { return insert_at(value, where - data TL_LA); }
-	Span32<T> insert(Span32<T> span, T *where TL_LP) { return insert_at(span, where - data TL_LA); }
+	Span insert(Span span, T *where TL_LP) { return insert_at(span, where - data TL_LA); }
 
-	Span32<T> insert_n_at(T const &value, umm where, umm n) {
+	Span insert_n_at(T const &value, Size where, Size n) {
 		reserve(count + n);
 		auto to_move_count = count - where;
 		memmove(data + where + n, data + where, to_move_count * sizeof(T));
-		for (umm i = 0; i != n; ++i)
+		for (Size i = 0; i != n; ++i)
 			memcpy(data + where + i, &value, sizeof(T));
 		return {data + where, n};
 	}
 
-	void erase(Span32<T> where) {
+	void erase(Span where) {
 		bounds_check(
 			where.count <= count &&
 			begin() <= where.begin() && where.begin() < end() &&
@@ -390,15 +185,15 @@ struct List32 : Span32<T> {
 		memmove(where.data, where.data + where.count, count - where.count + data - where.data);
 		count -= where.count;
 	}
-	void erase_at(umm where) {
+	void erase_at(Size where) {
 		bounds_check(where < count);
 		--count;
-		for (umm i = where; i < count; ++i) {
+		for (Size i = where; i < count; ++i) {
 			data[i] = data[i + 1];
 		}
 	}
 
-	void replace(Span32<T> where, T with_what) {
+	void replace(Span where, T with_what) {
 		bounds_check(
 			where.count <= count &&
 			begin() <= where.begin() && where.begin() < end() &&
@@ -411,7 +206,7 @@ struct List32 : Span32<T> {
 		count -= where.count - 1;
 	}
 
-	void replace(Span32<T> where, Span32<T> with_what) {
+	void replace(Span where, Span with_what) {
 		assert(begin() <= where.begin());
 		bounds_check(
 			where.count <= count &&
@@ -442,44 +237,24 @@ struct List32 : Span32<T> {
 		}
 		*to = temp;
 	}
-	void move_at(T *from, umm destination_index) {
+	void move_at(T *from, Size destination_index) {
 		move(from, data + destination_index);
 	}
 };
+#pragma pack(pop)
 
-template <class T>
-List<T>::operator List32<T>() const {
-	assert((u32)count == count);
-	assert((u32)capacity == capacity);
-	List32<T> result;
-	result.data = data;
-	result.count = (u32)count;
-	result.capacity = (u32)capacity;
-	result.allocator = allocator;
-	return result;
-}
+template <class T, class Allocator, class Size>
+void erase(List<T, Allocator, Size> &list, T *value) { list.erase_at(value - list.data); }
 
-template <class T>
-List<T> make_list(std::initializer_list<T> list TL_LP) {
-	List<T> result;
-	result.reserve(list.size() TL_LA);
-	result.count = list.size();
-	memcpy(result.data, list.begin(), list.size() * sizeof(T));
-	return result;
-}
-
-template <class T>
-void erase(List<T> &list, T *value) { list.erase_at(value - list.data); }
-
-template <class T>
-void erase_unordered_at(List<T> &list, umm index) {
+template <class T, class Allocator, class Size>
+void erase_unordered_at(List<T, Allocator, Size> &list, umm index) {
 	bounds_check(index < list.count);
 	memcpy(list.data + index, &list.back(), sizeof(T));
 	--list.count;
 }
 
-template <class T>
-void free(List<T> &list) {
+template <class T, class Allocator, class Size>
+void free(List<T, Allocator, Size> &list) {
 	if (list.data == 0) return;
 
 	list.allocator.free_t(list.data, list.count);
@@ -488,9 +263,9 @@ void free(List<T> &list) {
 	list.capacity = 0;
 }
 
-template <class T>
-List<T> copy(List<T> that TL_LP) {
-	List<T> result;
+template <class T, class Allocator, class Size>
+List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
+	List<T, Allocator, Size> result;
 	result.count = that.count;
 	result.capacity = result.count;
 	result.data = result.allocator.allocate<T>(result.count TL_LA);
@@ -498,9 +273,9 @@ List<T> copy(List<T> that TL_LP) {
 	return result;
 }
 
-template <class T>
-List<T> to_list(Span<T> that, Allocator allocator = current_allocator TL_LP) {
-	List<T> result;
+template <class Allocator = Allocator, class Size = umm, class T>
+List<T, Allocator, Size> to_list(Span<T> that, Allocator allocator = Allocator::current() TL_LP) {
+	List<T, Allocator, Size> result;
 	result.data = allocator.allocate<T>(that.count TL_LA);
 	result.count = that.count;
 	result.capacity = result.count;
@@ -509,23 +284,23 @@ List<T> to_list(Span<T> that, Allocator allocator = current_allocator TL_LP) {
 	return result;
 }
 
-template <class T>
-T *next(List<T> list, T *value) {
+template <class T, class Allocator, class Size>
+T *next(List<T, Allocator, Size> list, T *value) {
 	return ++value == list.end() ? 0 : value;
 }
 
-template <class T>
-T *previous(List<T> list, T *value) {
+template <class T, class Allocator, class Size>
+T *previous(List<T, Allocator, Size> list, T *value) {
 	return value-- == list.data ? 0 : value;
 }
 
-template <class T> constexpr T *find(List<T> list, T const &value) { return find(as_span(list), value); }
-template <class T> constexpr T *find(List<T> list, Span<T> cmp) { return find(as_span(list), cmp); }
-template <class T> constexpr T *find_last(List<T> list, T const &value) { return find_last(as_span(list), value); }
+template <class T, class Allocator, class Size> constexpr T *find(List<T, Allocator, Size> list, T const &value) { return find(as_span(list), value); }
+template <class T, class Allocator, class Size> constexpr T *find(List<T, Allocator, Size> list, Span<T> cmp) { return find(as_span(list), cmp); }
+template <class T, class Allocator, class Size> constexpr T *find_last(List<T, Allocator, Size> list, T const &value) { return find_last(as_span(list), value); }
 
-template <class T>
-List<Span<T>> find_all(Span<T> where, Span<T> what) {
-	List<Span<T>> result;
+template <class T, class Allocator = Allocator, class Size = umm>
+List<Span<T>, Allocator, Size> find_all(Span<T> where, Span<T> what) {
+	List<Span<T>, Allocator, Size> result;
 
 	for (umm where_start = 0; where_start != where.count - what.count + 1; ++where_start) {
 		for (umm what_index = 0; what_index < what.count; ++what_index) {
@@ -542,23 +317,23 @@ List<Span<T>> find_all(Span<T> where, Span<T> what) {
 	return result;
 }
 
-template <class T>
-Span<T> as_span(List<T> const &list) {
+template <class T, class Allocator, class Size>
+Span<T> as_span(List<T, Allocator, Size> const &list) {
 	return (Span<T>)list;
 }
 
-template <class T, class Predicate>
-constexpr T *find_if(List<T> &list, Predicate &&predicate) {
+template <class T, class Allocator, class Size, class Predicate>
+constexpr T *find_if(List<T, Allocator, Size> &list, Predicate &&predicate) {
 	return find_if(as_span(list), std::forward<Predicate>(predicate));
 }
 
-template <class T, class Predicate>
-constexpr T const *find_if(List<T> const &list, Predicate &&predicate) {
+template <class T, class Allocator, class Size, class Predicate>
+constexpr T const *find_if(List<T, Allocator, Size> const &list, Predicate &&predicate) {
 	return find_if(as_span(list), std::forward<Predicate>(predicate));
 }
 
-template <class T, class Fn>
-constexpr void for_each(List<T> list, Fn &&fn) {
+template <class T, class Allocator, class Size, class Fn>
+constexpr void for_each(List<T, Allocator, Size> list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
 	constexpr bool breakable = is_same<bool, ReturnType>;
 	for (auto &it : list) {
@@ -571,8 +346,8 @@ constexpr void for_each(List<T> list, Fn &&fn) {
 	}
 }
 
-template <class T, class Fn>
-umm count(List<T> list, Fn &&fn) {
+template <class T, class Allocator, class Size, class Fn>
+umm count(List<T, Allocator, Size> list, Fn &&fn) {
 	umm result = 0;
 	for (auto &v : list) {
 		if (fn(v)) {
@@ -582,9 +357,9 @@ umm count(List<T> list, Fn &&fn) {
 	return result;
 }
 
-template <class T>
-List<Span<T>> split(Span<T> what, Span<T> by TL_LP) {
-	List<Span<T>> result;
+template <class T, class Allocator = Allocator, class Size = umm>
+List<Span<T>, Allocator, Size> split(Span<T> what, Span<T> by TL_LP) {
+	List<Span<T>, Allocator, Size> result;
 
 	umm start = 0;
 	umm what_start = 0;
@@ -604,9 +379,9 @@ List<Span<T>> split(Span<T> what, Span<T> by TL_LP) {
 	return result;
 }
 
-template <class T>
-List<Span<T>> split(Span<T> what, T by TL_LP) {
-	List<Span<T>> result;
+template <class T, class Allocator = Allocator, class Size = umm>
+List<Span<T>, Allocator, Size> split(Span<T> what, T by TL_LP) {
+	List<Span<T>, Allocator, Size> result;
 
 	umm start = 0;
 	umm what_start = 0;
@@ -624,9 +399,9 @@ List<Span<T>> split(Span<T> what, T by TL_LP) {
 	return result;
 }
 
-template <class T>
-List<T> replace(Span<T> where, T what, T with TL_LP) {
-	List<T> result;
+template <class T, class Allocator, class Size>
+List<T, Allocator, Size> replace(Span<T> where, T what, T with TL_LP) {
+	List<T, Allocator, Size> result;
 	result.reserve(where.count TL_LA);
 	for (auto &v : where) {
 		result.add(v == what ? with : v);
@@ -634,8 +409,8 @@ List<T> replace(Span<T> where, T what, T with TL_LP) {
 	return result;
 }
 
-template <class T, class Fn>
-auto map(List<T> list, Fn &&fn TL_LP) {
+template <class T, class Allocator, class Size, class Fn>
+auto map(List<T, Allocator, Size> list, Fn &&fn TL_LP) {
 	using U = decltype(fn(*(T*)0));
 	List<U> result;
 	result.reserve(list.count TL_LA);
@@ -647,208 +422,29 @@ auto map(List<T> list, Fn &&fn TL_LP) {
 	return result;
 }
 
-template <class T>
-List32<T> make_list32(std::initializer_list<T> list TL_LP) {
-	List32<T> result;
+template <class T, class Allocator = Allocator, class Size = umm>
+List<T, Allocator, Size> make_list(std::initializer_list<T> list TL_LP) {
+	List<T, Allocator, Size> result;
 	result.reserve(list.size() TL_LA);
 	result.count = list.size();
 	memcpy(result.data, list.begin(), list.size() * sizeof(T));
 	return result;
 }
 
-template <class T>
-void erase(List32<T> &list, T *value) { list.erase_at(value - list.data); }
-
-template <class T>
-void erase_unordered_at(List32<T> &list, umm index) {
-	bounds_check(index < list.count);
-	memcpy(list.data + index, &list.back(), sizeof(T));
-	--list.count;
-}
-
-template <class T>
-void free(List32<T> &list) {
-	if (list.data == 0) return;
-
-	list.allocator.free_t(list.data, list.count);
-	list.data = 0;
-	list.count = 0;
-	list.capacity = 0;
-}
-
-template <class T>
-List32<T> copy(List32<T> that TL_LP) {
-	List32<T> result;
-	result.count = that.count;
-	result.capacity = result.count;
-	result.data = result.allocator.allocate<T>(result.count TL_LA);
-	memcpy(result.data, that.data, result.count * sizeof(T));
-	return result;
-}
-
-template <class T>
-List32<T> to_list(Span32<T> that, Allocator allocator = current_allocator TL_LP) {
-	List32<T> result;
-	result.data = allocator.allocate<T>(that.count TL_LA);
-	result.count = that.count;
-	result.capacity = result.count;
-	result.allocator = allocator;
-	memcpy(result.data, that.data, result.count * sizeof(T));
-	return result;
-}
-
-template <class T>
-T *next(List32<T> list, T *value) {
-	return ++value == list.end() ? 0 : value;
-}
-
-template <class T>
-T *previous(List32<T> list, T *value) {
-	return value-- == list.data ? 0 : value;
-}
-
-template <class T> constexpr T *find(List32<T> list, T const &value) { return find(as_span(list), value); }
-template <class T> constexpr T *find(List32<T> list, Span32<T> cmp) { return find(as_span(list), cmp); }
-template <class T> constexpr T *find_last(List32<T> list, T const &value) { return find_last(as_span(list), value); }
-
-template <class T>
-List32<Span32<T>> find_all(Span32<T> where, Span32<T> what) {
-	List32<Span32<T>> result;
-
-	for (umm where_start = 0; where_start != where.count - what.count + 1; ++where_start) {
-		for (umm what_index = 0; what_index < what.count; ++what_index) {
-			if (where.data[where_start + what_index] != what.data[what_index]) {
-				goto continue_where;
-			}
-		}
-
-		result.add(Span32<T>(where.data + where_start, what.count));
-
-	continue_where:;
-	}
-
-	return result;
-}
-
-template <class T>
-Span32<T> as_span(List32<T> const &list) {
-	return (Span32<T>)list;
-}
-
-template <class T, class Predicate>
-constexpr T *find_if(List32<T> &list, Predicate &&predicate) {
-	return find_if(as_span(list), std::forward<Predicate>(predicate));
-}
-
-template <class T, class Predicate>
-constexpr T const *find_if(List32<T> const &list, Predicate &&predicate) {
-	return find_if(as_span(list), std::forward<Predicate>(predicate));
-}
-
-template <class T, class Fn>
-constexpr void for_each(List32<T> list, Fn &&fn) {
-	using ReturnType = decltype(fn(*(T*)0));
-	constexpr bool breakable = is_same<bool, ReturnType>;
-	for (auto &it : list) {
-		if constexpr (breakable) {
-			if (fn(it))
-				return;
-		} else {
-			fn(it);
-		}
-	}
-}
-
-template <class T, class Fn>
-umm count(List32<T> list, Fn &&fn) {
-	umm result = 0;
-	for (auto &v : list) {
-		if (fn(v)) {
-			result += 1;
-		}
-	}
-	return result;
-}
-
-template <class T>
-List32<Span32<T>> split(Span32<T> what, Span32<T> by TL_LP) {
-	List32<Span32<T>> result;
-
-	umm start = 0;
-	umm what_start = 0;
-
-	for (; what_start < what.count - by.count + 1;) {
-		if (what.subspan(what_start, by.count) == by) {
-			result.add(what.subspan(start, what_start - start));
-			what_start += by.count;
-			start = what_start;
-		} else {
-			++what_start;
-		}
-	}
-
-	result.add(Span(what.data + start, what.end()) TL_LA);
-
-	return result;
-}
-
-template <class T>
-List32<Span32<T>> split(Span32<T> what, T by TL_LP) {
-	List32<Span32<T>> result;
-
-	umm start = 0;
-	umm what_start = 0;
-
-	for (; what_start < what.count;) {
-		if (what.data[what_start] == by) {
-			result.add(what.subspan(start, what_start - start));
-			start = what_start + 1;
-		}
-		++what_start;
-	}
-
-	result.add(Span(what.data + start, what.end()) TL_LA);
-
-	return result;
-}
-
-template <class T>
-List32<T> replace(Span32<T> where, T what, T with TL_LP) {
-	List32<T> result;
-	result.reserve(where.count TL_LA);
-	for (auto &v : where) {
-		result.add(v == what ? with : v);
-	}
-	return result;
-}
-
-template <class T, class Fn>
-auto map(List32<T> list, Fn &&fn TL_LP) {
-	using U = decltype(fn(*(T*)0));
-	List32<U> result;
-	result.reserve(list.count TL_LA);
-
-	for (auto &x : list) {
-		result.add(fn(x));
-	}
-
-	return result;
-}
-
 // Returns an index of the value
 // If value is not in the list, this function will return index >= list.size
-template <class T>
-umm index_of(List32<T> const &list, T const *value) {
+template <class T, class Allocator, class Size>
+umm index_of(List<T, Allocator, Size> const &list, T const *value) {
 	return value - list.data;
 }
 
-template <class T> umm count_of(List32<T> const &list) { return list.size(); }
+template <class T, class Allocator, class Size> umm count_of(List<T, Allocator, Size> const &list) { return list.size(); }
 
-template <class T> T const &front(List32<T> const &list) { return list.front(); }
-template <class T> T &front(List32<T> &list) { return list.front(); }
+template <class T, class Allocator, class Size> T const &front(List<T, Allocator, Size> const &list) { return list.front(); }
+template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size> &list) { return list.front(); }
 
-template <class T> T const &back(List32<T> const &list) { return list.back(); }
-template <class T> T &back(List32<T> &list) { return list.back(); }
+template <class T, class Allocator, class Size> T const &back(List<T, Allocator, Size> const &list) { return list.back(); }
+template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size> &list) { return list.back(); }
 
 template <class T>
 struct Queue : Span<T> {
@@ -1431,21 +1027,6 @@ void free(LinearSet<T> &set) {
 
 template <class T>
 void erase(LinearSet<T> &set, T *value) { return erase((List<T> &)set, value); }
-
-// Returns an index of the value
-// If value is not in the list, this function will return index >= list.size
-template <class T>
-umm index_of(List<T> const &list, T const *value) {
-	return value - list.data;
-}
-
-template <class T> umm count_of(List<T> const &list) { return list.size(); }
-
-template <class T> T const &front(List<T> const &list) { return list.front(); }
-template <class T> T &front(List<T> &list) { return list.front(); }
-
-template <class T> T const &back(List<T> const &list) { return list.back(); }
-template <class T> T &back(List<T> &list) { return list.back(); }
 
 #pragma warning(pop)
 

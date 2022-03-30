@@ -53,16 +53,16 @@ forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm si
 	tracked_allocations.erase(old_pointer);
 }
 Allocator tracking_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> void * {
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> AllocationResult {
 		switch (mode) {
 			case Allocator_allocate: {
-				auto result = default_allocator.allocate(new_size, align, location);
-				track_allocation(result, new_size, location);
+				auto result = default_allocator.allocate_impl(new_size, align, location);
+				track_allocation(result.data, new_size, location);
 				return result;
 			}
 			case Allocator_reallocate: {
-				auto result = default_allocator.reallocate(data, old_size, new_size, align, location);
-				retrack_allocation(data, result, new_size, location);
+				auto result = default_allocator.reallocate_impl(data, old_size, new_size, align, location);
+				retrack_allocation(data, result.data, new_size, location);
 				return result;
 			}
 			case Allocator_free: {
@@ -71,9 +71,9 @@ Allocator tracking_allocator = {
 				break;
 			}
 		}
-		return 0;
+		return {};
 	},
-	0
+	.state = 0
 };
 
 #endif

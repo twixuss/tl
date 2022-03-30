@@ -377,6 +377,8 @@ struct BlockList {
 		T &front() { return *data(); }
 		T &back() { return data()[count - 1]; }
 
+		Span<T> span() { return {data(), count}; }
+
 		T &operator[](umm i) { bounds_check(i < count); return data()[i]; }
 	};
 	struct Index {
@@ -462,13 +464,8 @@ struct BlockList {
 	Block *first = 0;
 	Block *last = 0;
 	Block *alloc_last = 0;
-	umm initial_capacity = 256;
-
-	BlockList() = default;
-	BlockList(BlockList const &that) = default;
-	BlockList(BlockList &&that) = delete;
-	BlockList &operator=(BlockList const &that) = default;
-	BlockList &operator=(BlockList &&that) = delete;
+	umm count = 0;
+	umm next_capacity = 16;
 
 	void clear() {
 		for (auto block = first; block; block = block->next) {
@@ -488,24 +485,31 @@ struct BlockList {
 	}
 
 	T &add(T value TL_LP) {
-		auto dest_block = last;
-		while (dest_block && !dest_block->available_space()) {
-			dest_block = dest_block->next;
-		}
-		if (!dest_block) {
-			umm capacity = first ? alloc_last->capacity * 2 : initial_capacity;
+		defer { count += 1; };
 
-			dest_block = allocate_block(capacity TL_LA);
+		for (;;) {
+			if (!last)
+				break;
 
-			if (first) {
-				dest_block->previous = alloc_last;
-				alloc_last->next = dest_block;
-				last = alloc_last = dest_block;
-			} else {
-				first = last = alloc_last = dest_block;
-			}
+			if (last->available_space())
+				return last->add(value);
+
+			last = last->next;
 		}
-		return dest_block->add(value);
+
+
+		auto new_block = allocate_block(next_capacity TL_LA);
+		next_capacity *= 2;
+
+		if (first) {
+			new_block->previous = alloc_last;
+			alloc_last->next = new_block;
+			last = alloc_last = new_block;
+		} else {
+			first = last = alloc_last = new_block;
+		}
+
+		return new_block->add(value);
 	}
 	T &add(TL_LPC) { return add({} TL_LA); }
 
@@ -518,6 +522,9 @@ struct BlockList {
 		if (last == first)
 			bounds_check(first->count);
 
+		defer { debug_count_check(); };
+
+		count -= 1;
 		auto result = last->back();
 		last->count--;
 		if (last->count == 0 && last != first) {
@@ -581,15 +588,23 @@ struct BlockList {
 	Iterator end() {
 		return {last, last->count};
 	}
+
+	void debug_count_check() {
+		umm sum = 0;
+		auto block = first;
+		while (block) {
+			sum += block->count;
+			if (block == last)
+				break;
+			block = block->next;
+		}
+		assert(count == sum);
+	}
 };
 
 template <class T>
 umm count_of(BlockList<T> const &list) {
-	umm total_count = 0;
-	for (auto block = list.first; block != 0; block = block->next) {
-		total_count += block->count;
-	}
-	return total_count;
+	return list.count;
 }
 
 template <class T>
@@ -757,9 +772,107 @@ T *find_if(BlockList<T> &list, Predicate &&predicate) {
 }
 
 template <class T>
+void free(BlockList<T> &list) {
+	auto block = list.first;
+	while (block) {
+		auto next = block->next;
+		list.allocator.free(block);
+		block = next;
+	}
+	list.first = list.last = list.alloc_last = 0;
+	list.count = 0;
+}
+
+template <class T>
+BlockList<T> copy(BlockList<T> list) {
+	// TODO: optimize
+	BlockList<T> result;
+	for_each(list, [&](T value) {
+		result.add(value);
+	});
+	return result;
+}
+
+template <class Block>
+void double_join(Block *a, Block *b) {
+	a->next = b;
+	b->previous = a;
+}
+
+template <class T>
+void add_steal(BlockList<T> *destination, BlockList<T> *source) {
+	if (source->last) {
+		if (source->last->next) {
+			assert(source->last->next->count == 0);
+		}
+	}
+
+	assert(destination->allocator == source->allocator, "different allocator are not implemented");
+
+	if (!source->last) {
+		assert(source->count == 0);
+		return;
+	}
+
+	defer {
+		source->first = source->last = source->alloc_last = 0;
+		source->count = 0;
+	};
+
+	if (!destination->last) {
+		*destination = *source;
+		return;
+	}
+
+	auto destination_excess_blocks = destination->last->next;
+	auto source_excess_blocks = source->last->next;
+
+	if (destination_excess_blocks) {
+		if (!source_excess_blocks) {
+			assert(source->last == source->alloc_last);
+		}
+
+		if (source_excess_blocks) {
+			// have: dst <-> dstex     src <-> srcex
+			// need: dst <-> src <-> srcex <-> dstex
+
+			destination->last->next = source->first;
+			source->first->previous = destination->last;
+
+			source->alloc_last->next = destination_excess_blocks;
+			destination_excess_blocks->previous = source->alloc_last;
+		} else {
+			// have: dst <-> dstex     src
+			// need: dst <-> src <-> dstex
+
+			destination->last->next = source->first;
+			source->first->previous = destination->last;
+
+			source->last->next = destination_excess_blocks;
+			destination_excess_blocks->previous = source->last;
+		}
+
+		// double_join(destination->last, source->first);
+		// double_join(source->alloc_last, destination_excess_blocks);
+	} else {
+		// have: dst     src <-> srcex
+		// need: dst <-> src <-> srcex
+		double_join(destination->last, source->first);
+
+		destination->alloc_last = source->alloc_last;
+	}
+
+	destination->last = source->last;
+
+	destination->count += source->count;
+
+	destination->next_capacity = max(destination->next_capacity, destination->count);
+}
+
+template <class T>
 void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
 	for_each(source, [&](T &x) {
-		destination->add(x);
+		destination->add(x TL_LA);
 	});
 	return;
 	// TODO: de-bug this
@@ -807,7 +920,8 @@ void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
 		if (!remaining_count)
 			return;
 
-		dst_block = destination->allocate_block(max(remaining_count, destination->last ? destination->last->capacity * 2 : destination->initial_capacity) TL_LA);
+		dst_block = destination->allocate_block(max(remaining_count, destination->next_capacity) TL_LA);
+		destination->next_capacity *= 2;
 
 		memcpy(dst_block->end(), src_data, src_remaining * sizeof(T));
 

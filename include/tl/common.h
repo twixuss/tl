@@ -886,92 +886,24 @@ struct ReverseIterator {
 	Iterator operator->() { return it; }
 };
 
-template <class T>
-struct Span32;
 
-template <class T>
+#pragma pack(push, 1)
+template <class T, class Size_ = umm>
 struct Span {
 	using ValueType = T;
+	using Size = Size_;
 	using ReverseIterator = ReverseIterator<T *>;
 
 	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
 	constexpr Span(ValueType &value) : data(std::addressof(value)), count(1) {}
-	template <umm count>
-	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
-	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {}
-	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
-	constexpr Span(ValueType *begin, umm count) : data(begin), count(count) {}
-	constexpr ValueType *begin() const { return data; }
-	constexpr ValueType *end() const { return data + count; }
-
-	constexpr ReverseIterator rbegin() const { return data + count - 1; }
-	constexpr ReverseIterator rend() const { return data - 1; }
-
-	constexpr ValueType &front() const {
-		bounds_check(count);
-		return *data;
-	}
-	constexpr ValueType &back() const {
-		bounds_check(count);
-		return data[count - 1];
-	}
-	constexpr ValueType &operator[](umm i) const {
-		bounds_check(i < count);
-		return data[i];
-	}
-	constexpr ValueType &at(umm i) const {
-		bounds_check(i < count);
-		return data[i];
-	}
-	constexpr bool empty() const { return count == 0; }
-
-	template <class U>
-	constexpr explicit operator Span<U>() const {
-		static_assert(sizeof(U) == sizeof(T));
-		return {(U *)data, count};
-	}
-
-	constexpr operator Span32<T>() const;
-
-	constexpr bool operator==(Span<ValueType> that) const {
-		if (count != that.count)
-			return false;
-		for (umm i = 0; i < count; ++i) {
-			if (data[i] != that.data[i])
-				return false;
-		}
-		return true;
-	}
-	constexpr bool operator!=(Span<ValueType> that) const { return !(*this == that); }
-
-	constexpr Span<T> subspan(umm subspan_start, umm subspan_count) const {
-		return Span(data + subspan_start, subspan_count);
-	}
-	constexpr Span<T> skip(umm amount) const {
-		return {data + amount, count - amount};
-	}
-
-	ValueType *data = 0;
-	umm count = 0;
-};
-
-#pragma pack(push, 1)
-
-template <class T>
-struct Span32 {
-	using ValueType = T;
-	using Size = u32;
-	using ReverseIterator = ReverseIterator<T *>;
-
-	constexpr Span32(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
-	constexpr Span32() = default;
-	constexpr Span32(ValueType &value) : data(std::addressof(value)), count(1) {}
 	template <Size count>
-	constexpr Span32(ValueType (&array)[count]) : data(array), count(count) {}
-	constexpr Span32(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {}
-	constexpr Span32(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
-	constexpr Span32(ValueType *begin, Size count) : data(begin), count(count) {}
+	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
+	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {
+		assert(count == (umm)(end - begin));
+	}
+	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
+	constexpr Span(ValueType *begin, Size count) : data(begin), count(count) {}
 	constexpr ValueType *begin() const { return data; }
 	constexpr ValueType *end() const { return data + count; }
 
@@ -996,16 +928,21 @@ struct Span32 {
 	}
 	constexpr bool empty() const { return count == 0; }
 
-	template <class U>
-	constexpr explicit operator Span32<U>() const {
+	template <class U, class ThatSize>
+	constexpr explicit operator Span<U, ThatSize>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		return {(U *)data, count};
-	}
-	constexpr operator Span<T>() const {
-		return {data, count};
+		assert((ThatSize)count == count);
+		return {(U *)data, (ThatSize)count};
 	}
 
-	constexpr bool operator==(Span32 that) const {
+	template <class ThatSize>
+	constexpr operator Span<T, ThatSize>() const {
+		assert((ThatSize)count == count);
+		return {data, (ThatSize)count};
+	}
+
+	template <class ThatSize>
+	constexpr bool operator==(Span<T, ThatSize> that) const {
 		if (count != that.count)
 			return false;
 		for (Size i = 0; i < count; ++i) {
@@ -1014,41 +951,28 @@ struct Span32 {
 		}
 		return true;
 	}
-	constexpr bool operator==(Span<T> that) const {
-		if (count != that.count)
-			return false;
-		for (Size i = 0; i < count; ++i) {
-			if (data[i] != that.data[i])
-				return false;
-		}
-		return true;
-	}
+	constexpr bool operator!=(Span that) const { return !(*this == that); }
 
-	constexpr bool operator!=(Span32 that) const { return !(*this == that); }
-
-	constexpr Span32 subspan(Size subspan_start, Size subspan_count) const {
-		return Span(data + subspan_start, subspan_count);
+	constexpr Span subspan(Size subspan_start, Size subspan_count) const {
+		return {data + subspan_start, subspan_count};
 	}
-	constexpr Span32 skip(Size amount) const {
+	constexpr Span skip(Size amount) const {
 		return {data + amount, count - amount};
 	}
 
 	ValueType *data = 0;
 	Size count = 0;
 };
-
 #pragma pack(pop)
 
 template <class T>
-Span32<T> as_span32(Span<T> span){
-	assert((umm)(u32)span.count == span.count);
-	return {span.data, (u32)span.count};
-}
+inline static constexpr bool is_span = false;
+
+template <class T, class Size>
+inline static constexpr bool is_span<Span<T, Size>> = true;
 
 template <class T>
-constexpr Span<T>::operator Span32<T>() const {
-	return as_span32(*this);
-}
+concept cSpan = is_span<T>;
 
 template <ForEachFlags flags, class T, class Fn>
 constexpr void for_each(Span<T> span, Fn &&fn) {
@@ -1090,6 +1014,8 @@ forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) {
 forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm count) { return Span((wchar *)string, count + 1); }
 forceinline Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
+forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }
+
 template <class T, umm count>
 inline constexpr Span<T> array_as_span(T const (&arr)[count]) { return Span((T *)arr, count); }
 
@@ -1102,8 +1028,8 @@ inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)st
 inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
 inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
 
-template <class T>
-inline constexpr Span<T> as_span(Span<T> span) {
+template <class T, class Size>
+inline constexpr Span<T, Size> as_span(Span<T, Size> span) {
 	return span;
 }
 
@@ -1185,8 +1111,8 @@ inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
 }
 
 template <class T, umm count> constexpr T *find(T (&arr)[count], T const &value) { return find(arr, arr + count, value); }
-template <class T> constexpr T *find(Span<T> span, T const &value) { return find(span.begin(), span.end(), value); }
-template <class T> constexpr T *find(Span<T> span, Span<T> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+template <class T, class Size> constexpr T *find(Span<T, Size> span, T const &value) { return find(span.begin(), span.end(), value); }
+template <class T, class SizeA, class SizeB> constexpr T *find(Span<T, SizeA> span, Span<T, SizeB> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
 
 template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
 	while (where.count) {
@@ -1201,8 +1127,8 @@ template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
 	return 0;
 }
 
-template <class T>
-constexpr T *find_last(Span<T> span, T const &value) {
+template <class T, class Size>
+constexpr T *find_last(Span<T, Size> span, T const &value) {
 	if (span.count == 0)
 		return 0;
 
@@ -1213,9 +1139,9 @@ constexpr T *find_last(Span<T> span, T const &value) {
 	return 0;
 }
 
-template <class T>
-constexpr Span<T> find_last(Span<T> span, Span<T> sub) {
-	Span<T> dest = {span.end() - sub.count, sub.count};
+template <class T, class SizeA, class SizeB>
+constexpr Span<T, SizeA> find_last(Span<T, SizeA> span, Span<T, SizeB> sub) {
+	Span<T, SizeB> dest = {span.end() - sub.count, sub.count};
 	while (dest.data >= span.data) {
 		if (dest == sub)
 			return dest;
@@ -1523,7 +1449,8 @@ struct StaticList {
 	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { add(as_span(that)); return *this; }
 	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span((T *)that.begin(), (T *)that.end())); return *this; }
 
-	forceinline constexpr operator Span<T>() { return {data, count}; }
+	template <class Size = umm>
+	forceinline constexpr Span<T, Size> span() { return {data, count}; }
 
 	forceinline constexpr T &add() {
 		bounds_check(!full());
@@ -1535,7 +1462,8 @@ struct StaticList {
 		return data[count++] = value;
 	}
 
-	forceinline constexpr Span<T> add(Span<T> span) {
+	template <class Size>
+	forceinline constexpr Span<T> add(Span<T, Size> span) {
 		bounds_check(count + span.count <= capacity);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		defer { count += span.count; };
@@ -1637,51 +1565,97 @@ enum AllocatorMode : u8 {
 #define TL_DEFAULT_ALIGNMENT ((::tl::umm)16)
 #endif
 
+struct Allocator;
+
+extern TL_API Allocator os_allocator;
+extern TL_API Allocator page_allocator;
+extern TL_API Allocator default_allocator;
+extern TL_API thread_local Allocator temporary_allocator;
+extern TL_API thread_local Allocator current_allocator;
+
+struct AllocationResult {
+	void *data = 0;
+	umm count = 0;
+	bool is_zeroed : 1 = false;
+};
+
+//////////////////////////////////////////
+// HOW TO IMPLEMENT A STATIC ALLOCATOR? //
+//////////////////////////////////////////
+#if 0
+// Deriving from `AllocatorBase` provides useful function overloads.
+// This is necessary if you want to use this allocator with containers in `tl`.
+struct MyAllocator : AllocatorBase<MyAllocator> {
+
+	// This is an interface you have to implement:
+
+	// Must allocate at least `size` bytes with specified alignment.
+	// The actual allocated byte count should go into `AllocationResult::count`.
+	// Resulting memory is allowed to be not initialized. Overloads from `AllocatorBase` will zero it out for the users.
+	// If allocated memory is zeroed out, set `AllocationResult::is_zeroed` to true, so `AllocatorBase` does no have to do this again.
+	AllocationResult allocate_impl(umm size, umm alignment, std::source_location location = std::source_location::current());
+
+	// Must allocate at least `new_size` bytes with specified alignment.
+	// Old memory `{data, old_size}` must be copied to resulting memory.
+	// Rules for memory contents are the same as for `allocate_impl`.
+	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment, std::source_location location = std::source_location::current());
+
+	// Must free the `data`.
+	// `size` and `alignment` are optional and are equal to 0 if unknown.
+	// Assert that they are not zero if you rely on them.
+	void deallocate_impl(void *data, umm size, umm alignment, std::source_location location = std::source_location::current());
+
+	// `current` will be used for default-initialized structures like `List`, etc.
+	static MyAllocator current();
+
+	// Not much to say here.
+	bool is_valid();
+
+	// Returns true if pointers from this and that can be exchanged.
+	bool operator==(MyAllocator that);
+};
+#endif
+
+
 // TODO:
 // Some allocators may give more memory than requested, so the caller should know about this.
 // I think `allocate` should return `Span<u8>` instead of `void *` when requesting raw bytes.
 // But in case of generic types it's not clear what to do with excess objects.
 // For now allocation of T's will not report extra space.
 
-struct Allocator {
+template <class Allocator>
+struct AllocatorBase {
+	forceinline Allocator *derived() { return (Allocator*)this; }
 
-#if 1
-	void *(*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
-	void *state = 0;
-	forceinline operator bool() {
-		return func != 0;
+	inline void *allocate_uninitialized(umm size, umm alignment = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		return derived()->allocate_impl(size, alignment, location).data;
 	}
-
-	inline void *allocate_uninitialized(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		return func(Allocator_allocate, 0, 0, size, align, location, state);
-	}
-	inline void *allocate(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		auto result = allocate_uninitialized(size, align, location);
-		if (result) {
-			memset(result, 0, size);
+	inline void *allocate(umm size, umm alignment = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
+		auto result = derived()->allocate_impl(size, alignment, location);
+		if (!result.is_zeroed) {
+			memset(result.data, 0, size);
 		}
-		return result;
+		return result.data;
 	}
-
 	template <class T>
-	inline T *allocate_uninitialized(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		return (T *)func(Allocator_allocate, 0, 0, count * sizeof(T), align, location, state);
+	inline T *allocate_uninitialized(umm count = 1, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
+		return (T *)allocate_uninitialized(count * sizeof(T), alignment, location);
 	}
 
 	template <class T>
 	inline T *allocate_uninitialized(umm count, std::source_location location) {
-		return (T *)func(Allocator_allocate, 0, 0, count * sizeof(T), alignof(T), location, state);
+		return (T *)allocate_uninitialized(count * sizeof(T), alignof(T), location);
 	}
 
 	template <class T>
-	inline T *allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		auto result = allocate_uninitialized<T>(count, align, location);
-		if (result) {
-			for (auto it = result; it != result + count; ++it) {
+	inline T *allocate(umm count = 1, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
+		auto result = derived()->allocate_impl(count * sizeof(T), alignment, location);
+		if (result.data) {
+			for (auto it = (T *)result.data; it != (T *)result.data + count; ++it) {
 				new (it) T();
 			}
 		}
-		return result;
+		return (T *)result.data;
 	}
 
 	template <class T>
@@ -1695,37 +1669,52 @@ struct Allocator {
 	}
 
 
-
-
 	inline void *reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
+		return derived()->reallocate_impl(data, old_size, new_size, align, location).data;
 	}
 	inline void *reallocate(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		auto result = reallocate_uninitialized(data, old_size, new_size, align, location);
-		if (result && (new_size > old_size)) {
-			memset((u8 *)result + old_size, 0, new_size - old_size);
+		auto result = derived()->reallocate_impl(data, old_size, new_size, align, location);
+		if (!result.is_zeroed && result.data && (new_size > old_size)) {
+			memset((u8 *)result.data + old_size, 0, new_size - old_size);
 		}
 		return result;
 	}
 
 	template <class T>
 	inline T *reallocate_uninitialized(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		return (T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state);
+		return (T *)reallocate_uninitialized((void *)data, old_count * sizeof(T), new_count * sizeof(T), align, location);
 	}
 	template <class T>
 	inline T *reallocate_uninitialized(T *data, umm old_count, umm new_count, std::source_location location) {
-		return (T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), alignof(T), location, state);
+		return reallocate_uninitialized<T>(data, old_count, new_count, alignof(T), location);
 	}
 
 	template <class T>
 	inline T *reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		auto result = reallocate_uninitialized(data, old_count, new_count, align, location);
-		for (auto it = result + old_count; it != result + new_count; ++it) {
-			new (it) T();
+		auto result = derived()->reallocate_impl(data, old_count * sizeof(T), new_count * sizeof(T), align, location);
+		if (result.data) {
+			for (auto it = (T *)result.data + old_count; it != (T *)result.data + new_count; ++it) {
+				new (it) T();
+			}
 		}
-		return result;
+		return (T *)result.data;
 	}
-#else
+
+
+	template <class T>
+	inline void free_t(T *data, umm count = 0, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
+		derived()->deallocate_impl(data, count * sizeof(T), alignment, location);
+	}
+
+	inline void free(void *data, umm count = 0, umm alignment = 0, std::source_location location = std::source_location::current()) {
+		derived()->deallocate_impl(data, count, alignment, location);
+	}
+
+	forceinline explicit operator bool() {
+		return derived()->is_valid();
+	}
+
+#if 0
 	Span<u8> (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
 	void *state = 0;
 	forceinline operator bool() {
@@ -1806,31 +1795,38 @@ struct Allocator {
 		return result;
 	}
 #endif
-
-
-	template <class T>
-	void free_t(T *data, umm count = 0, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
-		func(Allocator_free, data, 0, count * sizeof(T), alignment, location, state);
-	}
-
-	void free(void *data, umm count = 0, umm alignment = 0, std::source_location location = std::source_location::current()) {
-		func(Allocator_free, data, 0, count, alignment, location, state);
-	}
 };
 
-#define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
-#define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
+struct Allocator : AllocatorBase<Allocator> {
+	// When deallocating size goes into `new_size`
+	AllocationResult (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
+	void *state = 0;
 
-extern TL_API Allocator os_allocator;
-extern TL_API Allocator page_allocator;
-extern TL_API Allocator default_allocator;
-extern TL_API thread_local Allocator temporary_allocator;
-extern TL_API thread_local Allocator current_allocator;
+	inline AllocationResult allocate_impl(umm size, umm alignment, std::source_location location = std::source_location::current()) {
+		return func(Allocator_allocate, 0, 0, size, alignment, location, state);
+	}
+	inline AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment, std::source_location location = std::source_location::current()) {
+		return func(Allocator_reallocate, data, old_size, new_size, alignment, location, state);
+	}
+	inline void deallocate_impl(void *data, umm size, umm alignment, std::source_location location = std::source_location::current()) {
+		func(Allocator_free, data, 0, size, alignment, location, state);
+	}
+
+	inline static Allocator current() { return current_allocator; }
+
+	inline bool is_valid() { return func != 0; }
+
+	inline bool operator==(Allocator that) {
+		return this->func == that.func && this->state == that.state;
+	}
+};
 
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
 extern TL_API void clear_temporary_storage();
 
+#define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
+#define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
 
 template <class T>
 inline void allocate(T *&val) {
@@ -1844,7 +1840,7 @@ Allocator name = { \
 		switch (mode) { \
 			case ::tl::Allocator_allocate:   return ((type *)state)->allocate(new_size, alignment, location); \
 			case ::tl::Allocator_reallocate: return ((type *)state)->reallocate(data, old_size, new_size, alignment, location); \
-			case ::tl::Allocator_free:       return ((type *)state)->free(data, new_size, alignment, location), (void *)0; \
+			case ::tl::Allocator_free:       return ((type *)state)->deallocate(data, new_size, alignment, location), (void *)0; \
 		} \
 	}, \
 	&CONCAT(_state, __LINE__) \
@@ -1926,58 +1922,85 @@ void rotate(Span<T> span, smm to_be_first_index) {
 #endif
 
 Allocator os_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void * state) -> void * {
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void * state) -> AllocationResult {
 		(void)old_size;
 		(void)location;
 		(void)state;
 		switch (mode) {
 			case Allocator_allocate: {
-				return tl_allocate(new_size, align);
+				return {
+					.data = tl_allocate(new_size, align),
+					.count = new_size,
+					.is_zeroed = false,
+				};
 			}
 			case Allocator_reallocate: {
-				return tl_reallocate(data, new_size, align);
+				return {
+					.data = tl_reallocate(data, new_size, align),
+					.count = new_size,
+					.is_zeroed = false,
+				};
 			}
 			case Allocator_free:
 				tl_free(data);
-				return 0;
+				return {};
 		}
-		return 0;
+		return {};
 	},
-	0
+	.state = 0
 };
 Allocator page_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) -> void * {
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) -> AllocationResult {
 		(void)location;
 		(void)state;
 		switch (mode) {
 			case Allocator_allocate: {
 				assert(align <= 4096);
-				return VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+				return {
+					.data = VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
+					.count = new_size / 4096 * 4096,
+					.is_zeroed = true,
+				};
 			}
 			case Allocator_reallocate: {
 				assert(align <= 4096);
 
 				if (old_size / 4096 == new_size / 4096) {
-					return data;
+					return {
+						.data = data,
+						.count = new_size,
+						.is_zeroed = true,
+					};
 				}
 
-				if (VirtualAlloc((u8 *)data + ceil(old_size, (umm)4096), ceil(new_size, (umm)4096) - ceil(old_size, (umm)4096), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
-					return data;
+				auto ceiled_old_size = ceil(old_size, (umm)4096);
+				auto ceiled_new_size = ceil(new_size, (umm)4096);
+
+				if (VirtualAlloc((u8 *)data + ceiled_old_size, ceiled_new_size - ceiled_old_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
+					return {
+						.data = data,
+						.count = new_size,
+						.is_zeroed = true,
+					};
 				}
 
-				auto new_data = VirtualAlloc(0, ceil(new_size, (umm)4096), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+				auto new_data = VirtualAlloc(0, ceiled_new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
 				memcpy(new_data, data, old_size);
 				VirtualFree(data, 0, MEM_RELEASE);
 
-				return new_data;
+				return {
+					.data = new_data,
+					.count = ceiled_new_size,
+					.is_zeroed = true,
+				};
 			}
 			case Allocator_free:
 				VirtualFree(data, 0, MEM_RELEASE);
-				return 0;
+				return {};
 		}
-		return 0;
+		return {};
 	},
-	0
+	.state = 0
 };
 Allocator default_allocator = os_allocator;
 
@@ -2006,7 +2029,7 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> void * {
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
 		(void)location;
 		(void)_state;
 
@@ -2019,7 +2042,11 @@ thread_local Allocator temporary_allocator = {
 					if (candidate + new_size <= block->data() + block->capacity) {
 						block->size = (candidate - block->data()) + new_size;
 						assert(block->size <= block->capacity);
-						return candidate;
+						return {
+							.data = candidate,
+							.count = new_size,
+							.is_zeroed = false,
+						};
 					}
 					block = block->next;
 				}
@@ -2041,19 +2068,27 @@ thread_local Allocator temporary_allocator = {
 				}
 				state.last = block;
 
-				return block->data();
+				return {
+					.data = block->data(),
+					.count = new_size,
+					.is_zeroed = false,
+				};
 			}
 			case tl::Allocator_reallocate: {
 				auto result = temporary_allocator.allocate_uninitialized(new_size);
 				memcpy(result, data, old_size);
-				return result;
+				return {
+					.data = result,
+					.count = new_size,
+					.is_zeroed = false,
+				};
 			}
 			case tl::Allocator_free:
 				break;
 		}
-		return 0;
+		return {};
 	},
-	0
+	.state = 0
 };
 
 void clear_temporary_storage() {

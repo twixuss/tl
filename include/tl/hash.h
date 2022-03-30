@@ -22,8 +22,8 @@ template <> inline tl::u64 get_hash(tl::utf8  value) { return value; }
 template <> inline tl::u64 get_hash(tl::utf16 value) { return value; }
 template <> inline tl::u64 get_hash(tl::utf32 value) { return value; }
 
-template <class T>
-tl::u64 get_hash(tl::Span<T> value) {
+template <class T, class Size>
+tl::u64 get_hash(tl::Span<T, Size> value) {
 	tl::u64 result = 0xdeadc0debabeface;
 	for (auto const &it : value) {
 		result = tl::rotate_left(result, 1) ^ get_hash(it);

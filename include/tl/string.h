@@ -413,15 +413,20 @@ inline void free(StringBuilder &builder) {
 	builder.allocator = {};
 }
 
-// Always allocates memory for the string
-inline List<u8> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
-	List<u8> result;
+template <class Allocator>
+inline List<u8, Allocator> to_string(StringBuilder &builder, Allocator allocator = Allocator::current() TL_LP) {
+	List<u8, Allocator> result;
 	result.allocator = allocator;
 	result.reserve(builder.count() TL_LA);
 	builder.fill(result);
 	result.count = result.capacity;
 	return result;
 }
+
+inline List<u8> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
+	return to_string<Allocator>(builder, allocator);
+}
+
 inline List<u8> to_string(StringBuilder &builder TL_LP) {
 	return to_string(builder, current_allocator TL_LA);
 }
@@ -450,13 +455,13 @@ forceinline umm append_bytes(StringBuilder &b, T const &value TL_LP) {
 	return append_bytes(b, &value, sizeof(value) TL_LA);
 }
 
-template <class T>
-forceinline umm append_bytes(StringBuilder &b, Span<T> span TL_LP) {
+template <class T, class Size>
+forceinline umm append_bytes(StringBuilder &b, Span<T, Size> span TL_LP) {
 	return append_bytes(b, span.data, span.count * sizeof(T) TL_LA);
 }
 
-template <class T>
-forceinline umm append_bytes(StringBuilder &b, List<T> list TL_LP) {
+template <class T, class Allocator, class Size>
+forceinline umm append_bytes(StringBuilder &b, List<T, Allocator, Size> list TL_LP) {
 	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
@@ -465,15 +470,12 @@ inline umm append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
 inline umm append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }
 inline umm append(StringBuilder &b, utf32 ch) { return append_bytes(b, ch); }
 
-inline umm append(StringBuilder &b, Span<u8   > string) { return append_bytes(b, string); }
-inline umm append(StringBuilder &b, Span<ascii> string) { return append_bytes(b, string); }
-inline umm append(StringBuilder &b, Span<wchar> string) { return append_bytes(b, string); }
-inline umm append(StringBuilder &b, Span<utf8 > string) { return append_bytes(b, string); }
-inline umm append(StringBuilder &b, Span<utf16> string) { return append_bytes(b, string); }
-inline umm append(StringBuilder &b, Span<utf32> string) { return append_bytes(b, string); }
-
-template <class T>
-inline umm append(StringBuilder &b, Span32<T> span) { return append(b, Span<T>(span.data, span.count)); }
+template <class Size> inline umm append(StringBuilder &b, Span<u8   , Size> string) { return append_bytes(b, string); }
+template <class Size> inline umm append(StringBuilder &b, Span<ascii, Size> string) { return append_bytes(b, string); }
+template <class Size> inline umm append(StringBuilder &b, Span<wchar, Size> string) { return append_bytes(b, string); }
+template <class Size> inline umm append(StringBuilder &b, Span<utf8 , Size> string) { return append_bytes(b, string); }
+template <class Size> inline umm append(StringBuilder &b, Span<utf16, Size> string) { return append_bytes(b, string); }
+template <class Size> inline umm append(StringBuilder &b, Span<utf32, Size> string) { return append_bytes(b, string); }
 
 forceinline umm append(StringBuilder &b, ascii const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b, as_span(string)); }
@@ -689,7 +691,7 @@ template <class Int>
 umm append(StringBuilder &builder, FormatInt<Int> f) {
 	StaticList<ascii, _intToStringSize<Int>> buffer;
 	write_as_string(buffer, f);
-	return append(builder, buffer);
+	return append(builder, buffer.span());
 }
 
 template <class Int, class = EnableIf<is_integer<Int>>>
@@ -818,7 +820,7 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 			break;
 		}
 	}
-	return append(builder, buffer);
+	return append(builder, buffer.span());
 }
 inline umm append(StringBuilder &builder, FormatFloat<f32> f) { return append_float(builder, f); }
 inline umm append(StringBuilder &builder, FormatFloat<f64> f) { return append_float(builder, f); }
@@ -833,8 +835,8 @@ inline umm append(StringBuilder &builder, std::source_location location) {
 
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };
-template <> struct is_utf8_t<Span<utf8>> { inline static constexpr bool value = true; };
-template <> struct is_utf8_t<List<utf8>> { inline static constexpr bool value = true; };
+template <class Size> struct is_utf8_t<Span<utf8, Size>> { inline static constexpr bool value = true; };
+template <class Allocator, class Size> struct is_utf8_t<List<utf8, Allocator, Size>> { inline static constexpr bool value = true; };
 
 template <class First, class ...Rest>
 struct are_utf8_t {
@@ -851,8 +853,8 @@ inline static constexpr bool are_utf8 = are_utf8_t<Args...>::value;
 
 template <class T> struct is_utf16_t { inline static constexpr bool value = false; };
 template <> struct is_utf16_t<utf16>       { inline static constexpr bool value = true; };
-template <> struct is_utf16_t<Span<utf16>> { inline static constexpr bool value = true; };
-template <> struct is_utf16_t<List<utf16>> { inline static constexpr bool value = true; };
+template <class Size> struct is_utf16_t<Span<utf16, Size>> { inline static constexpr bool value = true; };
+template <class Allocator, class Size> struct is_utf16_t<List<utf16, Allocator, Size>> { inline static constexpr bool value = true; };
 
 template <class First, class ...Rest>
 struct are_utf16_t {
@@ -886,33 +888,52 @@ inline auto tconcatenate(Args &&...args) {
 	return with(temporary_allocator, concatenate(args...));
 }
 
-template <class ...Args>
-List<ascii> format(Span<ascii> fmt, Args const &...args) {
+template <class Allocator = Allocator, class ...Args>
+List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
-	return (List<ascii>)to_string(builder, current_allocator);
+	return (List<ascii, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class ...Args>
-List<utf8> format(Span<utf8> fmt, Args const &...args) {
+template <class Allocator = Allocator, class ...Args>
+List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
-	return (List<utf8>)to_string(builder, current_allocator);
+	return (List<utf8, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class ...Args>
-List<utf16> format(Span<utf16> fmt, Args const &...args) {
+template <class Allocator = Allocator, class ...Args>
+List<utf16, Allocator> aformat(Allocator allocator, Span<utf16> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);
-	return (List<utf16>)to_string(builder, current_allocator);
+	return (List<utf16, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class ...Args> List<ascii> format(ascii const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
-template <class ...Args> List<utf8 > format(utf8  const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
-template <class ...Args> List<utf16> format(utf16 const *fmt, Args const &...args) { return format(as_span(fmt), args...); }
+template <class Allocator = Allocator, class ...Args> List<ascii, Allocator> aformat(Allocator allocator, ascii const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+template <class Allocator = Allocator, class ...Args> List<utf8 , Allocator> aformat(Allocator allocator, utf8  const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+template <class Allocator = Allocator, class ...Args> List<utf16, Allocator> aformat(Allocator allocator, utf16 const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+
+template <class Allocator = Allocator, class ...Args>
+List<ascii, Allocator> format(Span<ascii> fmt, Args const &...args) {
+	return aformat<Allocator>(Allocator::current(), fmt, args...);
+}
+
+template <class Allocator = Allocator, class ...Args>
+List<utf8, Allocator> format(Span<utf8> fmt, Args const &...args) {
+	return aformat<Allocator>(Allocator::current(), fmt, args...);
+}
+
+template <class Allocator = Allocator, class ...Args>
+List<utf16, Allocator> format(Span<utf16> fmt, Args const &...args) {
+	return aformat<Allocator>(Allocator::current(), fmt, args...);
+}
+
+template <class Allocator = Allocator, class ...Args> List<ascii, Allocator> format(ascii const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
+template <class Allocator = Allocator, class ...Args> List<utf8 , Allocator> format(utf8  const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
+template <class Allocator = Allocator, class ...Args> List<utf16, Allocator> format(utf16 const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
 
 template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }

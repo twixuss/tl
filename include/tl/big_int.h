@@ -3,10 +3,16 @@
 #include "string.h"
 
 namespace tl {
+namespace impl {
 
+template <class Part, class List>
 struct BigInt;
-inline BigInt copy(BigInt const &a TL_LP);
-inline void free(BigInt &a);
+
+template <class Part, class List>
+BigInt<Part, List> copy(BigInt<Part, List> that);
+
+template <class Part, class List>
+void free(BigInt<Part, List> &a);
 
 // Arbitrarily long, signed, two's complement integer.
 // parts[0]               is the least significant part
@@ -14,12 +20,18 @@ inline void free(BigInt &a);
 // Note that `BigInt` must be normalized (some algorithms rely on this), i.e. most significant part should be removed if it is 'equal' to `msb` (most significant bit)
 // For example, while last part is 0 and msb is false, remove last part.
 // `parts` can be empty, meaning that the number is equal to 0 if msb is false, or -1 otherwise.
+template <class Part_, class List_>
 struct BigInt {
-	using Part = u64;
+	using Part = Part_;
+	using List = List_;
+	using Size = typename List::Size;
+
+	static_assert(is_same<Part, typename List::ElementType>);
+
 	inline static constexpr umm bits_in_part = sizeof(Part) * 8;
 
 	bool msb = false;
-	List<Part> parts;
+	List parts;
 
 	void normalize() {
 		for (umm i = parts.count - 1; i != 0; --i) {
@@ -42,265 +54,6 @@ struct BigInt {
 
 	BigInt &negate() { return invert() += (u64)1; }
 	BigInt operator-() const { return copy(*this).negate(); }
-
-	/*
-	BigInt &operator&=(BigInt const &b) {
-		if (!msb) {
-
-			if (!b.msb) {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    000000000123
-					parts.resize(b.parts.count);
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-				} else {
-					// this 000000012345
-					// b    000001234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    fffffffff123
-
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-
-				} else {
-					// this 000000012345
-					// b    fffff1234567
-
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-				}
-			}
-
-		} else {
-
-			if (!b.msb) {
-
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    000000000123
-					msb = false;
-					parts.resize(b.parts.count);
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-
-				} else {
-					// this fffffff12345
-					// b    000001234567
-					msb = false;
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    fffffffff123
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-				} else {
-					// this fffffff12345
-					// b    fffff1234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] &= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-			}
-		}
-
-		normalize();
-		return *this;
-	}
-	BigInt &operator|=(BigInt const &b) {
-		if (!msb) {
-
-			if (!b.msb) {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    000000000123
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				} else {
-					// this 000000012345
-					// b    000001234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    fffffffff123
-					msb = true;
-					parts.resize(b.parts.count);
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				} else {
-					// this 000000012345
-					// b    fffff1234567
-					msb = true;
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-			}
-		} else {
-			if (!b.msb) {
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    000000000123
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				} else {
-					// this fffffff12345
-					// b    000001234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    fffffffff123
-					parts.resize(b.parts.count);
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				} else {
-					// this fffffff12345
-					// b    fffff1234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] |= b.parts[i];
-					}
-				}
-			}
-		}
-
-		normalize();
-		return *this;
-	}
-	BigInt &operator^=(BigInt const &b) {
-		if (!msb) {
-			if (!b.msb) {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    000000000123
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-				} else {
-					// this 000000012345
-					// b    000001234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this 000000012345
-					// b    fffffffff123
-					msb = true;
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-					for (umm i = b.parts.count; i < parts.count; ++i) {
-						parts[i] = ~parts[i];
-					}
-				} else {
-					// this 000000012345
-					// b    fffff1234567
-					msb = true;
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(b.parts[i]);
-					}
-				}
-			}
-		} else {
-			if (!b.msb) {
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    000000000123
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-				} else {
-					// this fffffff12345
-					// b    000001234567
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(~b.parts[i]);
-					}
-				}
-
-			} else {
-				if (b.parts.count < parts.count) {
-					// this fffffff12345
-					// b    fffffffff123
-					msb = false;
-					for (umm i = 0; i < b.parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-					for (umm i = b.parts.count; i < parts.count; ++i) {
-						parts[i] = ~parts[i];
-					}
-				} else {
-					// this fffffff12345
-					// b    fffff1234567
-					msb = false;
-					for (umm i = 0; i < parts.count; ++i) {
-						parts[i] ^= b.parts[i];
-					}
-					for (umm i = parts.count; i < b.parts.count; ++i) {
-						parts.add(~b.parts[i]);
-					}
-				}
-			}
-		}
-
-		normalize();
-		return *this;
-	}
-	*/
 
 	BigInt &operator^=(BigInt const &b) {
 		for (umm i = 0; i < min(parts.count, b.parts.count); ++i) {
@@ -382,7 +135,7 @@ struct BigInt {
 		b &= bits_in_part - 1;
 		if (b) {
 			if (parts.count) {
-				List<Part> new_parts;
+				List new_parts;
 				new_parts.add(parts[0] << b);
 				for (umm part_index = 1; part_index != parts.count; ++part_index) {
 					new_parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
@@ -494,6 +247,18 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
+	BigInt &operator*=(Part b) {
+		auto a = *this;
+		defer { free(a); };
+		*this = {};
+		for (u32 bit_index = 0; bit_index < bits_in_part; ++bit_index) {
+			if ((b >> bit_index) & 1) {
+				*this += a << bit_index;
+			}
+		}
+		normalize();
+		return *this;
+	}
 	BigInt &operator*=(BigInt b) {
 		auto a = *this;
 		defer { free(a); };
@@ -573,17 +338,17 @@ struct BigInt {
 			swap(min_int, max_int);
 		}
 
-		for (umm i = 0; i < min_int.parts.count; ++i) {
+		for (Size i = 0; i < min_int.parts.count; ++i) {
 			if (max_int.parts[i] != min_int.parts[i])
 				return false;
 		}
 
-		for (umm index = max_int.parts.count - 1; index != min_int.parts.count - 1; --index) {
+		for (Size index = max_int.parts.count - 1; index != min_int.parts.count - 1; --index) {
 			if (max_int.parts[index] != 0) {
 				return false;
 			}
 		}
-		for (umm index = min_int.parts.count - 1; index != (umm)-1; --index) {
+		for (Size index = min_int.parts.count - 1; index != (Size)-1; --index) {
 			if (min_int.parts[index] != max_int.parts[index]) {
 				return false;
 			}
@@ -664,9 +429,10 @@ struct BigInt {
 	BigInt operator-(s64           b) const { auto a = copy(*this); a -= b; return a; }
 	BigInt operator-(BigInt const &b) const { auto a = copy(*this); a -= b; return a; }
 
-	BigInt operator*(BigInt const &b) const { auto a = copy(*this); a *= b; return a; }
-	BigInt operator<<(u64 b) const { auto a = copy(*this); a <<= b; return a; }
-	BigInt operator<<(BigInt const & b) const { auto a = copy(*this); a <<= b; return a; }
+	BigInt operator*(u64    b) const { auto a = copy(*this); a *= b; return a; }
+	BigInt operator*(BigInt b) const { auto a = copy(*this); a *= b; return a; }
+	BigInt operator<<(u64    b) const { auto a = copy(*this); a <<= b; return a; }
+	BigInt operator<<(BigInt b) const { auto a = copy(*this); a <<= b; return a; }
 
 	//BigInt operator-(BigInt const &b) const { return *this + -b; }
 
@@ -764,32 +530,21 @@ struct BigInt {
 #endif
 };
 
+template <class Part, class List>
+BigInt<Part, List> copy(BigInt<Part, List> that) {
+	BigInt<Part, List> result;
+	result.msb = that.msb;
+	result.parts = copy(that.parts);
+	return result;
+}
 
-template <> inline constexpr bool is_integer<BigInt> = true;
-template <> inline constexpr bool is_integer_like<BigInt> = true;
-template <> inline constexpr bool is_signed<BigInt> = true;
-
-
-inline BigInt make_big_int(u64 value TL_LP) {
-	return {.msb = false, .parts = make_list({value} TL_LA)};
-}
-inline BigInt make_big_int(u64 high, u64 low TL_LP) {
-	return {.msb = false, .parts = make_list({low, high} TL_LA)};
-}
-inline BigInt make_big_int(u64 high, u64 mid, u64 low TL_LP) {
-	return {.msb = false, .parts = make_list({low, mid, high} TL_LA)};
-}
-inline BigInt operator""_ib(u64 value) {
-	return {.msb = false, .parts = make_list({value})};
-}
-BigInt copy(BigInt const &that TL_LPD) {
-	return {.msb = that.msb, .parts = copy(that.parts TL_LA)};
-}
-void free(BigInt &a) {
+template <class Part, class List>
+void free(BigInt<Part, List> &a) {
 	free(a.parts);
 }
 
-inline umm append(StringBuilder &builder, BigInt value) {
+template <class Part, class List>
+inline umm append(StringBuilder &builder, impl::BigInt<Part, List> value) {
 
 	// BigInt temp = copy(value);
 	// defer { free(temp); };
@@ -805,12 +560,47 @@ inline umm append(StringBuilder &builder, BigInt value) {
 	// } while (temp != 0);
 
 	append(builder, "0x"s);
-	append(builder, FormatInt<BigInt::Part>{.value=value.parts.back(), .radix=16});
+	append(builder, FormatInt<Part>{.value=value.parts.back(), .radix=16});
 	for (smm i = (smm)value.parts.count - 2; i >= 0; --i) {
-		append(builder, FormatInt<BigInt::Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
+		append(builder, FormatInt<Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
 	}
 
 	return chars_appended;
+}
+
+}
+
+using BigInt = impl::BigInt<umm, List<umm>>;
+
+template <> inline constexpr bool is_integer<BigInt> = true;
+template <> inline constexpr bool is_integer_like<BigInt> = true;
+template <> inline constexpr bool is_signed<BigInt> = true;
+
+
+template <class BigInt = BigInt, class Allocator = Allocator>
+inline BigInt make_big_int(typename BigInt::Part value TL_LP) {
+	BigInt result;
+	result.msb = false;
+	result.parts.set({value} TL_LA);
+	return result;
+}
+template <class BigInt = BigInt, class Allocator = Allocator>
+inline BigInt make_big_int(typename BigInt::Part high, typename BigInt::Part low TL_LP) {
+	BigInt result;
+	result.msb = false;
+	result.parts.set({low, high} TL_LA);
+	return result;
+}
+template <class BigInt = BigInt, class Allocator = Allocator>
+inline BigInt make_big_int(typename BigInt::Part high, typename BigInt::Part mid, typename BigInt::Part low TL_LP) {
+	BigInt result;
+	result.msb = false;
+	result.parts.set({low, mid, high} TL_LA);
+	return result;
+}
+
+inline BigInt operator""_ib(u64 value) {
+	return make_big_int(value);
 }
 
 }
