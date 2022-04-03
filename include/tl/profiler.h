@@ -71,6 +71,27 @@ struct TL_API Profiler {
 	Span<TimeSpan> get_recorded_time_spans();
 	List<ascii> output_for_chrome();
 	List<u8> output_for_timed();
+
+	struct ScopedTimer {
+		Profiler *profiler = 0;
+		ScopedTimer() = default;
+		ScopedTimer(ScopedTimer const &) = delete;
+		ScopedTimer(ScopedTimer &&that) : profiler(that.profiler) {
+			that.profiler = 0;
+		}
+		~ScopedTimer() {
+			if (profiler) {
+				profiler->end();
+			}
+		}
+	};
+
+	ScopedTimer scoped_timer(char const *name, std::source_location location = std::source_location::current()) {
+		ScopedTimer timer;
+		timer.profiler = this;
+		begin(name, as_span(location.file_name()), location.line());
+		return timer;
+	}
 };
 }
 

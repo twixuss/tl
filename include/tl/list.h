@@ -8,9 +8,10 @@
 namespace tl {
 
 #pragma pack(push, 1)
-template <class T, class Allocator = Allocator, class Size_ = umm>
+template <class T, class Allocator_ = Allocator, class Size_ = umm>
 struct List : Span<T, Size_> {
 	using ElementType = T;
+	using Allocator = Allocator_;
 	using Size = Size_;
 	using Span = Span<T, Size_>;
 
@@ -59,7 +60,7 @@ struct List : Span<T, Size_> {
 		reserve_exponential(count + list.size() TL_LA);
 		memcpy(data + count, list.begin(), list.size() * sizeof(T));
 		count += list.size();
-		return {data + count - list.size(), list.size()};
+		return {data + count - list.size(), (Size)list.size()};
 	}
 
 	T &add_front(T value TL_LP) {
@@ -405,6 +406,17 @@ List<T, Allocator, Size> replace(Span<T> where, T what, T with TL_LP) {
 	result.reserve(where.count TL_LA);
 	for (auto &v : where) {
 		result.add(v == what ? with : v);
+	}
+	return result;
+}
+
+template <class Allocator, class T, class Size>
+List<T, Allocator, Size> erase_all(Span<T, Size> where, T what TL_LP) {
+	List<T, Allocator, Size> result;
+	result.reserve(where.count TL_LA);
+	for (auto &v : where) {
+		if (v != what)
+			result.add(v);
 	}
 	return result;
 }

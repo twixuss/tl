@@ -26,7 +26,10 @@
 #endif
 
 #define assert_always(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+
+#ifndef assert
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
+#endif
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
 //#define invalid_code_path(...) ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__)
@@ -1033,16 +1036,16 @@ inline constexpr Span<T, Size> as_span(Span<T, Size> span) {
 	return span;
 }
 
-template <class T>
-inline constexpr Span<T> as_span_of(Span<u8> span) {
+template <class T, class Size>
+inline constexpr Span<T, Size> as_span_of(Span<u8, Size> span) {
 	return {
 		(T *)span.data,
 		span.count / sizeof(T),
 	};
 }
 
-template <class T>
-constexpr Span<utf8> as_utf8(Span<T> span) {
+template <class T, class Size>
+constexpr Span<utf8, Size> as_utf8(Span<T, Size> span) {
 	return {(utf8 *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
@@ -1056,13 +1059,13 @@ constexpr Span<u8> as_bytes(T span_like) {
 	return as_bytes(as_span(span_like));
 }
 
-template <class T>
-constexpr Span<u8> as_bytes(Span<T> span) {
+template <class T, class Size>
+constexpr Span<u8, Size> as_bytes(Span<T, Size> span) {
 	return {(u8 *)span.begin(), span.count * sizeof(T)};
 }
 
-template <class T>
-constexpr Span<char> as_chars(Span<T> span) {
+template <class T, class Size>
+constexpr Span<char, Size> as_chars(Span<T, Size> span) {
 	return {(char *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
@@ -1085,11 +1088,11 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 	}
 }
 
-template <class T, class U>
-inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
+template <class T, class TSize, class U, class USize>
+inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str) {
 	if (sub_str.count > str.count)
 		return false;
-	for (umm i = 0; i < sub_str.count; ++i) {
+	for (USize i = 0; i < sub_str.count; ++i) {
 		if (str.data[i] != sub_str.data[i]) {
 			return false;
 		}
@@ -1097,12 +1100,12 @@ inline constexpr bool starts_with(Span<T> str, Span<U> sub_str) {
 	return true;
 }
 
-template <class T, class U>
-inline constexpr bool ends_with(Span<T> str, Span<U> sub_str) {
+template <class T, class TSize, class U, class USize>
+inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str) {
 	if (sub_str.count > str.count)
 		return false;
-	umm base_offset = str.count - sub_str.count;
-	for (umm i = 0; i < sub_str.count; ++i) {
+	auto base_offset = str.count - sub_str.count;
+	for (USize i = 0; i < sub_str.count; ++i) {
 		if (str.data[i + base_offset] != sub_str.data[i]) {
 			return false;
 		}
