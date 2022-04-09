@@ -922,7 +922,7 @@ List<utf8> get_executable_path() {
 	List<utf16> temp;
 	temp.allocator = temporary_allocator;
 	temp.reserve(512);
-	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, temp.capacity);
+	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, (DWORD)temp.capacity);
 	return to_utf8(temp);
 }
 #else
