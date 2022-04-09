@@ -189,6 +189,9 @@ TL_API void delete_file(pathchar const *path);
 inline void delete_file(Span<pathchar> path) {
 	return delete_file(temporary_null_terminate(path).data);
 }
+inline void delete_file(Span<utf8> path) {
+	return delete_file(with(temporary_allocator, to_utf16(path, true)).data);
+}
 
 TL_API bool create_directory(ascii const *path);
 TL_API bool create_directory(utf16 const *path);
