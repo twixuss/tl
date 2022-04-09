@@ -1401,6 +1401,9 @@ struct StaticList {
 	forceinline constexpr T *begin() { return data; }
 	forceinline constexpr T *end() { return data + count; }
 
+	forceinline constexpr ReverseIterator<T *> rbegin() { return data + count - 1; }
+	forceinline constexpr ReverseIterator<T *> rend() { return data - 1; }
+
 	forceinline constexpr bool empty() const { return count == 0; }
 	forceinline constexpr bool full() const { return count == capacity; }
 

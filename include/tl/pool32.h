@@ -1,11 +1,9 @@
 #pragma once
 #include "common.h"
+#include "memory.h"
 #include <typeinfo>
 
 namespace tl {
-
-TL_API void *reserve_memory(umm size);
-TL_API bool commit_memory(void *data, umm size);
 
 // Provides strorage, addressable by 32-bit number in constant time.
 template <class Tag>
@@ -103,19 +101,5 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	}
 
 };
-
-#ifdef TL_IMPL
-#if OS_WINDOWS
-void *reserve_memory(umm size) {
-	return VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
-}
-
-bool commit_memory(void *data, umm size) {
-	return VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE);
-}
-#else
-#error pool32.h is not implemeted for this platform
-#endif
-#endif
 
 }

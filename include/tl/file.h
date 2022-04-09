@@ -163,12 +163,12 @@ enum FileItemKind {
 
 struct FileItem {
 	FileItemKind kind;
-	Span<pathchar> name;
+	Span<utf8> name;
 };
 struct FileItemList : List<FileItem> {
 	using Base = List<FileItem>;
 
-	List<pathchar> buffer;
+	List<utf8> buffer;
 
 	Base &base() { return *this; }
 };
@@ -178,10 +178,7 @@ inline void free(FileItemList &list) {
 	free(list.base());
 }
 
-TL_API FileItemList get_items_in_directory(Span<utf16> directory);
-inline FileItemList get_items_in_directory(Span<utf8> directory) {
-	return get_items_in_directory(with(temporary_allocator, to_utf16(directory)));
-}
+TL_API FileItemList get_items_in_directory(Span<utf8> directory);
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
@@ -302,6 +299,9 @@ TL_API void set_current_directory(pathchar const *path);
 inline void set_current_directory(Span<pathchar> path) {
 	return set_current_directory(temporary_null_terminate(path).data);
 }
+inline void set_current_directory(Span<utf8> path) {
+	return set_current_directory(with(temporary_allocator, to_utf16(path, true)).data);
+}
 
 struct MappedFile {
 	Span<u8> data;
@@ -318,6 +318,9 @@ struct ParsedPath {
 
 	Span<utf8> path_without_extension() {
 		return {directory.begin(), name.end()};
+	}
+	Span<utf8> name_and_extension() {
+		return {name.begin(), extension.end()};
 	}
 };
 
@@ -444,6 +447,8 @@ void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
 		}
 	}
 }
+
+TL_API List<utf8> get_executable_path();
 
 }
 
@@ -656,7 +661,8 @@ ListList<pathchar> get_file_names_in_directory(Span<pathchar> directory) {
 	return result;
 }
 
-FileItemList get_items_in_directory(Span<pathchar> directory) {
+FileItemList get_items_in_directory(Span<utf8> directory_) {
+	auto directory = with(temporary_allocator, to_utf16(directory_));
 	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
@@ -683,7 +689,7 @@ FileItemList get_items_in_directory(Span<pathchar> directory) {
 
 		FileItem item;
 		item.name.count = name.count;
-		item.name.data = (pathchar *)result.buffer.count;
+		item.name.data = (utf8 *)result.buffer.count;
 
 		if (item.name.count > 200)
 			debug_break();
@@ -695,7 +701,7 @@ FileItemList get_items_in_directory(Span<pathchar> directory) {
 		}
 
 		result.add(item);
-		result.buffer.add(name);
+		result.buffer.add(with(temporary_allocator, to_utf8(name)));
 
 	} while (FindNextFileW(handle, &find_data));
 	FindClose(handle);
@@ -912,6 +918,13 @@ bool copy_file(pathchar const *source, pathchar const *destination) {
 	return CopyFileW((wchar *)source, (wchar *)destination, false);
 }
 
+List<utf8> get_executable_path() {
+	List<utf16> temp;
+	temp.allocator = temporary_allocator;
+	temp.reserve(512);
+	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, temp.capacity);
+	return to_utf8(temp);
+}
 #else
 	XXX;
 #endif
