@@ -61,6 +61,20 @@ template <> inline umm print(PrintKind kind, List<char> const &list) { current_p
 template <> inline umm print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); return list.count; }
 
 template <class ...Args>
+inline umm print(PrintKind kind, utf8 const *fmt, Args const &...args) {
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	append_format(builder, fmt, args...);
+	auto string = to_string(builder, temporary_allocator);
+	print(kind, string);
+	return string.count;
+}
+
+inline umm print(PrintKind kind, utf8 const *string) {
+	return print(kind, as_span(string));
+}
+
+template <class ...Args>
 inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
@@ -72,6 +86,11 @@ inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
 
 inline umm print(PrintKind kind, char const *string) {
 	return print(kind, as_span(string));
+}
+
+template <class ...T>
+inline umm print(utf8 const *fmt, T const &...values) {
+	return print(Print_default, fmt, values...);
 }
 
 template <class ...T>

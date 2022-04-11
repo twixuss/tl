@@ -69,4 +69,8 @@
     <Type Name="tl::v4&lt;*&gt;">
         <DisplayString>{{x={x} y={y} z={z} w={w}}}</DisplayString>
     </Type>
+    <Type Name ="tl::Optional&lt;*&gt;">
+        <DisplayString Condition="_has_value">{_value}</DisplayString>
+        <DisplayString Condition="!_has_value">{{}}</DisplayString>
+    </Type>
 </AutoVisualizer>

@@ -5,28 +5,34 @@
 namespace tl {
 namespace impl {
 
-template <class Part, class List>
+template <class List>
 struct BigInt;
 
-template <class Part, class List>
-BigInt<Part, List> copy(BigInt<Part, List> that);
+template <class List>
+BigInt<List> copy(BigInt<List> that);
 
-template <class Part, class List>
-void free(BigInt<Part, List> &a);
+template <class List>
+void free(BigInt<List> &a);
 
+//
 // Arbitrarily long, signed, two's complement integer.
 // parts[0]               is the least significant part
 // parts[parts.count - 1] is the most  significant part
+//
 // Note that `BigInt` must be normalized (some algorithms rely on this), i.e. most significant part should be removed if it is 'equal' to `msb` (most significant bit)
 // For example, while last part is 0 and msb is false, remove last part.
 // `parts` can be empty, meaning that the number is equal to 0 if msb is false, or -1 otherwise.
-template <class Part_, class List_>
+//
+// Note that division by zero is not exceptional; you decide what to do in that case.
+//
+template <class List_>
 struct BigInt {
-	using Part = Part_;
 	using List = List_;
+	using Part = typename List::ElementType;
+	using SignedPart = std::make_signed_t<typename List::ElementType>;
 	using Size = typename List::Size;
 
-	static_assert(is_same<Part, typename List::ElementType>);
+	static_assert(is_unsigned<Part>, "BigInt::List::ElementType must be unsigned");
 
 	inline static constexpr umm bits_in_part = sizeof(Part) * 8;
 
@@ -73,6 +79,25 @@ struct BigInt {
 		msb ^= b.msb;
 
 		normalize();
+		return *this;
+	}
+	BigInt &operator|=(SignedPart b) {
+		if (parts.count == 0) {
+			if (msb) {
+				// already all ones, nothing to change
+			} else {
+				parts.add(b);
+				msb = b < 0;
+			}
+		} else {
+			parts.data[0] |= b;
+			if (b < 0) {
+				// parts.resize(1);
+				// that's simpler.
+				parts.count = 1;
+			}
+		}
+		// no need to normalize
 		return *this;
 	}
 	BigInt &operator|=(BigInt const &b) {
@@ -127,20 +152,21 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
-	BigInt &operator<<=(u64 b) {
-		u64 zero_part_count = b >> 6;
+	BigInt &operator<<=(Part b) {
+		auto zero_part_count = b >> 6;
 		while (zero_part_count--)
 			parts.insert_at(0, 0);
 
-		b &= bits_in_part - 1;
-		if (b) {
+		auto inpart_shift = b & (bits_in_part - 1);
+		if (inpart_shift) {
 			if (parts.count) {
 				List new_parts;
-				new_parts.add(parts[0] << b);
+				new_parts.add(parts[0] << inpart_shift);
 				for (umm part_index = 1; part_index != parts.count; ++part_index) {
-					new_parts.add((parts[part_index] << b) | (parts[part_index - 1] >> (64 - b)));
+					// TODO: i think there may be a special intrinsic for 128-bit shift
+					new_parts.add((parts[part_index] << inpart_shift) | (parts[part_index - 1] >> (bits_in_part - inpart_shift)));
 				}
-				new_parts.add(((msb ? (Part)-1 : (Part)0) << b) | (parts[parts.count - 1] >> (64 - b)));
+				new_parts.add(((msb ? (Part)-1 : (Part)0) << inpart_shift) | (parts[parts.count - 1] >> (bits_in_part - inpart_shift)));
 				free(parts);
 				parts = new_parts;
 			}
@@ -161,7 +187,49 @@ struct BigInt {
 		return *this;
 	}
 
-	BigInt &operator+=(u64 b) {
+	inline void shift_right_arithmetic(Part delete_part_count, Part shift_amount) {
+		if (delete_part_count >= parts.count) {
+			parts.clear();
+		} else {
+			//    ____    ____    ____
+			//   1....1001101100000000 >> 6
+			//      ____    ____
+			// 1....111001101100
+
+			parts.erase(parts.subspan(0, delete_part_count));
+
+			if (shift_amount) {
+				for (umm part_index = 1; part_index < parts.count-1; ++part_index) {
+					parts[part_index-1] = (parts[part_index-1] >> shift_amount) | (parts[part_index] << (bits_in_part - shift_amount));
+				}
+				// NOTE: sign bit must be involved
+				parts[parts.count - 1] = (SignedPart)parts[parts.count - 1] >> shift_amount;
+			}
+		}
+	}
+	BigInt &operator>>=(Part b) {
+		if (!parts.count)
+			return *this;
+
+		shift_right_arithmetic(b / bits_in_part, b % bits_in_part);
+		return *this;
+	}
+	BigInt &operator>>=(BigInt const &b) {
+		if (!parts.count)
+			return *this;
+
+		BigInt delete_part_count, shift_amount_big;
+		b.divmod(bits_in_part, delete_part_count, shift_amount_big);
+
+		if (delete_part_count >= parts.count) {
+			parts.clear();
+		} else {
+			shift_right_arithmetic((Part)delete_part_count, (Part)shift_amount_big);
+		}
+		return *this;
+	}
+
+	BigInt &operator+=(Part b) {
 		if (parts.count == 0)
 			parts.add(0);
 
@@ -183,7 +251,7 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
-	BigInt &operator+=(s64 b) {
+	BigInt &operator+=(SignedPart b) {
 		if (parts.count == 0)
 			parts.add(0);
 
@@ -232,12 +300,31 @@ struct BigInt {
 			add_carry(max_int->parts[part_index], 0, carry, &parts[part_index], &carry);
 		}
 
+
+
 		// if needed wrap around zero or grow
 		if (carry) {
 			if (msb) {
-				msb = false;
+				if (b.msb) {
+					// this       b          result
+					// -1(...F) + -1(...F) = -2(...E)     don't need carry bit!
+					// msb = true; // noop
+				} else {
+					// this     b       result
+					// -1(...F) + 1(1) = 10 but need 0! - don't add carry bit!
+					msb = false;
+				}
 			} else {
-				parts.add(1);
+				if (b.msb) {
+					// this     b       result
+					// 1(1) + -1(...F) = 10 but need 0! - don't add carry bit!
+					// msb = false; // noop
+				} else {
+					// this     b       result
+					// 1(1) + 15(F) = 16(10)     DO add carry bit!
+					// msb = false; // noop
+					parts.add(1);
+				}
 			}
 		} else {
 			if (b.msb)
@@ -272,7 +359,7 @@ struct BigInt {
 		return *this;
 	}
 
-	void divmod(u64 b, BigInt &quotient, BigInt &remainder) const {
+	void divmod(Part b, BigInt &quotient, BigInt &remainder) const {
 		umm max_parts_count = max(parts.count, 1);
 
 		quotient.parts.resize(max_parts_count);
@@ -298,7 +385,10 @@ struct BigInt {
 
 		for (umm bit_index = max_parts_count * bits_in_part - 1; bit_index != ~(umm)0; --bit_index) {
 			remainder <<= 1;
-			remainder.set_bit(0, get_bit(bit_index));
+
+			if (get_bit(bit_index))
+				remainder.set_bit(0, true);
+
 			if (remainder >= b) {
 				remainder -= b;
 				quotient.set_bit(bit_index, 1);
@@ -309,9 +399,21 @@ struct BigInt {
 		quotient.normalize();
 	}
 
+	BigInt &operator/=(Part b) {
+		BigInt result, dummy;
+		divmod(b, result, dummy);
+		free(dummy);
+		return *this = result;
+	}
 	BigInt &operator/=(BigInt const &b) {
 		BigInt result, dummy;
 		divmod(b, result, dummy);
+		free(dummy);
+		return *this = result;
+	}
+	BigInt &operator%=(Part b) {
+		BigInt result, dummy;
+		divmod(b, dummy, result);
 		free(dummy);
 		return *this = result;
 	}
@@ -322,9 +424,9 @@ struct BigInt {
 		return *this = result;
 	}
 
-	bool operator==(s64 b) const {
+	bool operator==(SignedPart b) const {
 		if (parts.count == 1)
-			return (s64)parts[0] == b;
+			return (SignedPart)parts[0] == b;
 		if (parts.count == 0)
 			return (msb ? -1 : 0) == b;
 		return false;
@@ -356,12 +458,12 @@ struct BigInt {
 		return true;
 	}
 
-	bool operator!=(u64    b) const { return !operator==(b); }
+	bool operator!=(Part   b) const { return !operator==(b); }
 	bool operator!=(BigInt b) const { return !operator==(b); }
 
-	bool operator<(s64 b) const {
+	bool operator<(SignedPart b) const {
 		if (parts.count == 1)
-			return (s64)parts[0] < b;
+			return (SignedPart)parts[0] < b;
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return msb;
@@ -382,9 +484,9 @@ struct BigInt {
 		return diff.msb;
 	}
 
-	bool operator>(s64 b) const {
+	bool operator>(SignedPart b) const {
 		if (parts.count == 1)
-			return (s64)parts[0] > b;
+			return (SignedPart)parts[0] > b;
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return !msb;
@@ -412,13 +514,13 @@ struct BigInt {
 		}
 	}
 
-	bool operator>=(s64    b) const { return !(*this < b); }
+	bool operator>=(SignedPart b) const { return !(*this < b); }
 	bool operator>=(BigInt b) const { return !(*this < b); }
 
-	bool operator<=(s64    b) const { return !(*this > b); }
+	bool operator<=(SignedPart b) const { return !(*this > b); }
 	bool operator<=(BigInt b) const { return !(*this > b); }
 
-	BigInt &operator-=(s64           b) { return *this += -b; }
+	BigInt &operator-=(SignedPart b) { return *this += -b; }
 	BigInt &operator-=(BigInt const &b) { return *this += -b; }
 
 	BigInt operator&(BigInt const &b) const { auto a = copy(*this); a &= b; return a; }
@@ -426,13 +528,19 @@ struct BigInt {
 	BigInt operator^(BigInt const &b) const { auto a = copy(*this); a ^= b; return a; }
 	BigInt operator+(BigInt const &b) const { auto a = copy(*this); a += b; return a; }
 
-	BigInt operator-(s64           b) const { auto a = copy(*this); a -= b; return a; }
+	BigInt operator-(SignedPart    b) const { auto a = copy(*this); a -= b; return a; }
 	BigInt operator-(BigInt const &b) const { auto a = copy(*this); a -= b; return a; }
 
-	BigInt operator*(u64    b) const { auto a = copy(*this); a *= b; return a; }
+	BigInt operator*(Part   b) const { auto a = copy(*this); a *= b; return a; }
 	BigInt operator*(BigInt b) const { auto a = copy(*this); a *= b; return a; }
-	BigInt operator<<(u64    b) const { auto a = copy(*this); a <<= b; return a; }
+	BigInt operator/(Part   b) const { auto a = copy(*this); a /= b; return a; }
+	BigInt operator/(BigInt b) const { auto a = copy(*this); a /= b; return a; }
+	BigInt operator%(Part   b) const { auto a = copy(*this); a %= b; return a; }
+	BigInt operator%(BigInt b) const { auto a = copy(*this); a %= b; return a; }
+	BigInt operator<<(Part   b) const { auto a = copy(*this); a <<= b; return a; }
 	BigInt operator<<(BigInt b) const { auto a = copy(*this); a <<= b; return a; }
+	BigInt operator>>(Part   b) const { auto a = copy(*this); a >>= b; return a; }
+	BigInt operator>>(BigInt b) const { auto a = copy(*this); a >>= b; return a; }
 
 	//BigInt operator-(BigInt const &b) const { return *this + -b; }
 
@@ -442,23 +550,29 @@ struct BigInt {
 			return msb;
 
 		umm bit_index  = index % (sizeof(parts[0]) * 8);
-		return parts[part_index] & ((u64)1 << bit_index);
+		return parts[part_index] & ((Part)1 << bit_index);
 	}
 	void set_bit(umm index, bool value) {
 		umm part_index = index / (sizeof(parts[0]) * 8);
 		umm bit_index  = index % (sizeof(parts[0]) * 8);
-		if (value) parts[part_index] |=  ((u64)1 << bit_index);
-		else       parts[part_index] &= ~((u64)1 << bit_index);
+		if (value) parts[part_index] |=  ((Part)1 << bit_index);
+		else       parts[part_index] &= ~((Part)1 << bit_index);
 	}
 
 	explicit operator u8 () { return parts.count ? (u8 )parts[0] : 0; }
 	explicit operator u16() { return parts.count ? (u16)parts[0] : 0; }
 	explicit operator u32() { return parts.count ? (u32)parts[0] : 0; }
-	explicit operator u64() { return parts.count ? (u64)parts[0] : 0; }
-	explicit operator s8 () { return parts.count ? (s8 )parts[0] : 0; }
-	explicit operator s16() { return parts.count ? (s16)parts[0] : 0; }
-	explicit operator s32() { return parts.count ? (s32)parts[0] : 0; }
-	explicit operator s64() { return parts.count ? (s64)parts[0] : 0; }
+	explicit operator u64() {
+		if constexpr (bits_in_part == 64) {
+			return parts.count ? (u64)parts[0] : 0;
+		} else {
+			static_assert(false, "not implemented");
+		}
+	}
+	explicit operator s8 () { return (s8 )operator u8 (); }
+	explicit operator s16() { return (s16)operator u16(); }
+	explicit operator s32() { return (s32)operator u32(); }
+	explicit operator s64() { return (s64)operator u64(); }
 
 #if 0
 	BigInt &set(BigInt const &that) { free(parts); parts = copy(that.parts); return *this; }
@@ -530,21 +644,22 @@ struct BigInt {
 #endif
 };
 
-template <class Part, class List>
-BigInt<Part, List> copy(BigInt<Part, List> that) {
-	BigInt<Part, List> result;
+template <class List>
+BigInt<List> copy(BigInt<List> that) {
+	BigInt<List> result;
 	result.msb = that.msb;
 	result.parts = copy(that.parts);
 	return result;
 }
 
-template <class Part, class List>
-void free(BigInt<Part, List> &a) {
+template <class List>
+void free(BigInt<List> &a) {
 	free(a.parts);
 }
 
-template <class Part, class List>
-inline umm append(StringBuilder &builder, impl::BigInt<Part, List> value) {
+template <class List>
+inline umm append(StringBuilder &builder, impl::BigInt<List> value) {
+	using Part = decltype(value)::Part;
 
 	// BigInt temp = copy(value);
 	// defer { free(temp); };
@@ -570,7 +685,7 @@ inline umm append(StringBuilder &builder, impl::BigInt<Part, List> value) {
 
 }
 
-using BigInt = impl::BigInt<umm, List<umm>>;
+using BigInt = impl::BigInt<List<umm>>;
 
 template <> inline constexpr bool is_integer<BigInt> = true;
 template <> inline constexpr bool is_integer_like<BigInt> = true;
