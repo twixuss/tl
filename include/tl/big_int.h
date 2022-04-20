@@ -153,22 +153,19 @@ struct BigInt {
 		return *this;
 	}
 	BigInt &operator<<=(Part b) {
-		auto zero_part_count = b >> 6;
-		while (zero_part_count--)
-			parts.insert_at(0, 0);
+		parts.insert_n_at(0, 0, b >> 6);
 
-		auto inpart_shift = b & (bits_in_part - 1);
-		if (inpart_shift) {
+		auto part_shift = b & (bits_in_part - 1);
+		if (part_shift) {
 			if (parts.count) {
-				List new_parts;
-				new_parts.add(parts[0] << inpart_shift);
-				for (umm part_index = 1; part_index != parts.count; ++part_index) {
-					// TODO: i think there may be a special intrinsic for 128-bit shift
-					new_parts.add((parts[part_index] << inpart_shift) | (parts[part_index - 1] >> (bits_in_part - inpart_shift)));
+				parts.resize(parts.count+1);
+				parts.data[parts.count-1] = ((msb ? (Part)-1 : (Part)0) << part_shift) | (parts.data[parts.count-2] >> (bits_in_part - part_shift));
+				for (umm part_index = parts.count-2; part_index != 0; --part_index) {
+					// NOTE: there is shld instruction, which does 128 bit shift, but i didn't find an intrinsic for it.
+					// And this is sad, because msvc can't optimize this...
+					parts.data[part_index] = (parts.data[part_index] << part_shift) | (parts.data[part_index - 1] >> (bits_in_part - part_shift));
 				}
-				new_parts.add(((msb ? (Part)-1 : (Part)0) << inpart_shift) | (parts[parts.count - 1] >> (bits_in_part - inpart_shift)));
-				free(parts);
-				parts = new_parts;
+				parts.data[0] <<= part_shift;
 			}
 		}
 
@@ -178,7 +175,8 @@ struct BigInt {
 	BigInt &operator<<=(BigInt const &b) {
 		BigInt zero_part_count_big, shift_amount;
 		b.divmod(bits_in_part, zero_part_count_big, shift_amount);
-		assert(!zero_part_count_big.msb && zero_part_count_big.parts.count <= 1, "Dude, do you have enough ram for this?");
+		assert(!zero_part_count_big.msb, "Can't shift by negative amount");
+		assert(zero_part_count_big.parts.count <= 1, "Not enough memory");
 
 		*this <<= (u64)shift_amount;
 
@@ -200,10 +198,10 @@ struct BigInt {
 
 			if (shift_amount) {
 				for (umm part_index = 1; part_index < parts.count-1; ++part_index) {
-					parts[part_index-1] = (parts[part_index-1] >> shift_amount) | (parts[part_index] << (bits_in_part - shift_amount));
+					parts.data[part_index-1] = (parts.data[part_index-1] >> shift_amount) | (parts.data[part_index] << (bits_in_part - shift_amount));
 				}
 				// NOTE: sign bit must be involved
-				parts[parts.count - 1] = (SignedPart)parts[parts.count - 1] >> shift_amount;
+				parts.data[parts.count - 1] = (SignedPart)parts.data[parts.count - 1] >> shift_amount;
 			}
 		}
 	}
@@ -262,14 +260,33 @@ struct BigInt {
 			add_carry(parts[part_index], 0, carry, &parts[part_index], &carry);
 		}
 
+		auto bmsb = b < 0;
+		// if needed wrap around zero or grow
 		if (carry) {
 			if (msb) {
-				msb = false;
+				if (bmsb) {
+					// this       b          result
+					// -1(...F) + -1(...F) = -2(...E)     don't need carry bit!
+					// msb = true; // noop
+				} else {
+					// this     b       result
+					// -1(...F) + 1(1) = 10 but need 0! - don't add carry bit!
+					msb = false;
+				}
 			} else {
-				parts.add(1);
+				if (bmsb) {
+					// this     b       result
+					// 1(1) + -1(...F) = 10 but need 0! - don't add carry bit!
+					// msb = false; // noop
+				} else {
+					// this     b       result
+					// 1(1) + 15(F) = 16(10)     DO add carry bit!
+					// msb = false; // noop
+					parts.add(1);
+				}
 			}
 		} else {
-			if (b < 0)
+			if (bmsb)
 				msb = true;
 		}
 
@@ -657,32 +674,94 @@ void free(BigInt<List> &a) {
 	free(a.parts);
 }
 
-template <class List>
-inline umm append(StringBuilder &builder, impl::BigInt<List> value) {
-	using Part = decltype(value)::Part;
-
-	// BigInt temp = copy(value);
+//template <class List>
+//inline umm append(StringBuilder &builder, impl::BigInt<List> value) {
+//	using Part = decltype(value)::Part;
+//
+//	// BigInt temp = copy(value);
 	// defer { free(temp); };
-
-	umm chars_appended = 0;
-	auto append = [&] (StringBuilder &builder, auto const &x) {
-		chars_appended += ::tl::append(builder, x);
-	};
-
-	// do {
+//
+//	umm chars_appended = 0;
+//	auto append = [&] (StringBuilder &builder, auto const &x) {
+//		chars_appended += ::tl::append(builder, x);
+//	};
+//
+//	// do {
 	// 	temp.divmod(10, quotient, remainder);
 	// 	append(builder, )
 	// } while (temp != 0);
+//
+//	append(builder, "0x"s);
+//	append(builder, FormatInt<Part>{.value=value.parts.back(), .radix=16});
+//	for (smm i = (smm)value.parts.count - 2; i >= 0; --i) {
+//		append(builder, FormatInt<Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
+//	}
+//
+//	return chars_appended;
+//}
 
-	append(builder, "0x"s);
-	append(builder, FormatInt<Part>{.value=value.parts.back(), .radix=16});
-	for (smm i = (smm)value.parts.count - 2; i >= 0; --i) {
-		append(builder, FormatInt<Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
-	}
-
-	return chars_appended;
 }
 
+template <class List>
+inline constexpr bool is_integer<impl::BigInt<List>> = true;
+
+template <class List>
+inline constexpr bool is_signed<impl::BigInt<List>> = true;
+
+template <class List>
+umm append(StringBuilder &builder, FormatInt<impl::BigInt<List>> f) {
+	using Int = impl::BigInt<List>;
+
+	Int v = f.value;
+	auto radix = f.radix;
+	u32 maxDigits = sizeof(Int::Part) * 8 * v.parts.count + 1;
+	char *buf = (char *)alloca(maxDigits);
+
+	auto charMap = f.char_set;
+	char *lsc = buf + maxDigits - 1;
+	u32 charsWritten = 0;
+
+	bool negative = false;
+	if constexpr (is_signed<Int>) {
+		if (v < 0) {
+			negative = true;
+			if constexpr (is_same<Int, s8> || is_same<Int, s16> || is_same<Int, s32> || is_same<Int, s64>) {
+				if (v == min_value<Int>) {
+					*lsc-- = charMap[(u32)-(v % radix)];
+					v /= radix;
+					++charsWritten;
+				}
+			}
+			v = -v;
+		}
+	}
+
+	for (;;) {
+		u32 char_index = (u32)(v % radix);
+		*lsc-- = charMap[char_index];
+		++charsWritten;
+		v /= radix;
+		if (v == Int{})
+			break;
+	}
+	lsc += f.skip_digits;
+	charsWritten -= f.skip_digits;
+	if constexpr (is_signed<Int>) {
+		if (negative) {
+			++charsWritten;
+			*lsc-- = '-';
+		}
+	} else {
+		(void)negative;
+	}
+	if (f.leading_zero_count) {
+		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
+			*lsc-- = '0';
+		}
+		if (f.leading_zero_count > charsWritten)
+			charsWritten = f.leading_zero_count;
+	}
+	return append(builder, Span(lsc + 1, charsWritten));
 }
 
 using BigInt = impl::BigInt<List<umm>>;

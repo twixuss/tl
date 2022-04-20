@@ -24,7 +24,8 @@
         </Expand>
     </Type>
     <Type Name="tl::StaticList&lt;*&gt;">
-        <DisplayString>{data,[count]na}</DisplayString>
+        <DisplayString Condition="count==0">{{}}</DisplayString>
+        <DisplayString Condition="count!=0">{data,[count]na}</DisplayString>
         <StringView>data,[count]na</StringView>
         <Expand>
             <Item Name="[count]" ExcludeView="simple">count</Item>
@@ -72,5 +73,11 @@
     <Type Name ="tl::Optional&lt;*&gt;">
         <DisplayString Condition="_has_value">{_value}</DisplayString>
         <DisplayString Condition="!_has_value">{{}}</DisplayString>
+    </Type>
+    <Type Name = "tl::Pool32&lt;*&gt;::Ptr&lt;*&gt;">
+        <DisplayString>{(ValueType *)(Pool::base + offset)}</DisplayString>
+        <Expand>
+            <Item Name="[value]">(ValueType *)(Pool::base + offset)</Item>
+        </Expand>
     </Type>
 </AutoVisualizer>

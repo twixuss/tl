@@ -1709,11 +1709,22 @@ struct AllocatorBase {
 
 	template <class T>
 	inline void free_t(T *data, umm count = 0, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
+		mark_dead((u8 *)data, count * sizeof(T));
 		derived()->deallocate_impl(data, count * sizeof(T), alignment, location);
 	}
 
 	inline void free(void *data, umm count = 0, umm alignment = 0, std::source_location location = std::source_location::current()) {
+		mark_dead((u8 *)data, count);
 		derived()->deallocate_impl(data, count, alignment, location);
+	}
+
+	void mark_dead(u8 *data, umm size) {
+#if TL_DEBUG
+		u8 mark[] { 0xde, 0xad };
+		for (umm i = 0; i != size; ++i) {
+			data[i] = mark[i&1];
+		}
+#endif
 	}
 
 	forceinline explicit operator bool() {

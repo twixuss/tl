@@ -1,4 +1,26 @@
 #pragma once
+
+// Basic string utilities are here.
+
+//
+//     UTF8 READING
+//
+// If you want to read utf8 text, use get_char_and_advance_utf8.
+//
+// You can get more throughput by using get_char_and_advance_utf8_fast, but there's a few things it assumes about input text:
+// 1) ALL characters are VALID.
+// 2) There is 3 extra bytes available at the end of the text.
+
+
+// Tested on random 640 MiB text.
+// Generating only ascii ...
+// Testing get_char_and_advance_utf8 ... 449.927 ms
+// Testing get_char_and_advance_utf8_fast ... 503.598 ms // Strange. ascii handling is identical in both functions...
+// Generating different sizes ... Octet count was equally likely.
+// Testing get_char_and_advance_utf8 ... 2438.868 ms
+// Testing get_char_and_advance_utf8_fast ... 1488.426 ms
+//
+
 #include "common.h"
 #include "list.h"
 #include "optional.h"
@@ -212,8 +234,7 @@ inline Optional<utf32> get_char_utf8(utf8 const *ptr) {
 inline Optional<utf32> get_char_and_advance_utf8(utf8 const **ptr) {
 	auto &text = *ptr;
 	if (*text < 0x80) {
-		defer { ++text; };
-		return *text;
+		return *text++;
 	}
 
 	u32 byte_count = count_leading_ones((u8)*text);
@@ -229,29 +250,61 @@ inline Optional<utf32> get_char_and_advance_utf8(utf8 const **ptr) {
 	}
 	return {};
 }
+
 inline Optional<utf32> get_char_and_advance_utf8(utf8 **ptr) {
 	return get_char_and_advance_utf8((utf8 const **)ptr);
 }
 
+inline utf32 get_char_and_advance_utf8_fast(utf8 const **ptr) {
+	auto &text = *ptr;
+	if (*text < 0x80) {
+		return *text++;
+	}
+	u32 byte_count = count_leading_ones((u8)*text);
+	utf32 result[3];
+	result[0] = ((text[0] & 0x1Fu) <<  6u) | ((text[1] & 0x3Fu));
+	result[1] = ((text[0] & 0x0Fu) << 12u) | ((text[1] & 0x3Fu) <<  6u) | ((text[2] & 0x3Fu));
+	result[2] = ((text[0] & 0x07u) << 18u) | ((text[1] & 0x3Fu) << 12u) | ((text[2] & 0x3Fu) << 6u) | ((text[3] & 0x3Fu));
+	text += byte_count;
+	return result[byte_count-2];
+}
+
+inline utf32 get_char_and_advance_utf8_fast(utf8 **ptr) {
+	return get_char_and_advance_utf8_fast((utf8 const **)ptr);
+}
+
+inline umm write_utf8(utf8 **dst, u32 ch) {
+	if (ch <= 0x80) {
+		*(*dst)++ = ch;
+		return 1;
+	} else if (ch <= 0x800) {
+		*(*dst)++ = 0xC0 | ((ch >> 6) & 0x1f);
+		*(*dst)++ = 0x80 | (ch & 0x3f);
+		return 2;
+	} else if (ch <= 0x10000) {
+		*(*dst)++ = 0xE0 | ((ch >> 12) & 0x0f);
+		*(*dst)++ = 0x80 | ((ch >>  6) & 0x3f);
+		*(*dst)++ = 0x80 | (ch & 0x3f);
+		return 3;
+	} else {
+		*(*dst)++ = 0xF0 | ((ch >> 18) & 0x07);
+		*(*dst)++ = 0x80 | ((ch >> 12) & 0x3f);
+		*(*dst)++ = 0x80 | ((ch >>  6) & 0x3f);
+		*(*dst)++ = 0x80 | (ch & 0x3f);
+		return 4;
+	}
+}
+
+inline umm write_utf8(utf8 *dst, u32 ch) {
+	return write_utf8(&dst, ch);
+}
+
 inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 	StaticList<utf8, 4> result;
-	if (ch <= 0x80) {
-		result.add((utf8)ch);
-	} else if (ch <= 0x800) {
-		result.add(0xC0 | ((ch >> 6) & 0x1f));
-		result.add(0x80 | (ch & 0x3f));
-	} else if (ch <= 0x10000) {
-		result.add(0xE0 | ((ch >> 12) & 0x0f));
-		result.add(0x80 | ((ch >>  6) & 0x3f));
-		result.add(0x80 | (ch & 0x3f));
-	} else {
-		result.add(0xF0 | ((ch >> 18) & 0x07));
-		result.add(0x80 | ((ch >> 12) & 0x3f));
-		result.add(0x80 | ((ch >>  6) & 0x3f));
-		result.add(0x80 | (ch & 0x3f));
-	}
+	result.count = write_utf8(result.data, ch);
 	return result;
 }
+
 
 // NOTE: TODO: surrogate pairs ate not supported
 inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
@@ -646,10 +699,12 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	if constexpr (is_signed<Int>) {
 		if (v < 0) {
 			negative = true;
-			if (v == min_value<Int>) {
-				*lsc-- = charMap[-(v % radix)];
-				v /= radix;
-				++charsWritten;
+			if constexpr (is_same<Int, s8> || is_same<Int, s16> || is_same<Int, s32> || is_same<Int, s64>) {
+				if (v == min_value<Int>) {
+					*lsc-- = charMap[(u32)-(v % radix)];
+					v /= radix;
+					++charsWritten;
+				}
 			}
 			v = -v;
 		}

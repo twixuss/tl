@@ -21,7 +21,7 @@ struct List : Span<T, Size_> {
 	using Span::end;
 
 	Size capacity = 0;
-	Allocator allocator = Allocator::current();
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 
 	void reallocate(Size desired_capacity TL_LP) {
 		T *new_data;
@@ -173,6 +173,7 @@ struct List : Span<T, Size_> {
 		memmove(data + where + n, data + where, to_move_count * sizeof(T));
 		for (Size i = 0; i != n; ++i)
 			memcpy(data + where + i, &value, sizeof(T));
+		count += n;
 		return {data + where, n};
 	}
 

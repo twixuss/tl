@@ -138,10 +138,11 @@ void Profiler::end() {
 	u32 thread_id = get_current_thread_id();
 
 	lock(thread_infos_mutex);
-	auto info = thread_infos.find(thread_id);
-	assert(info);
+	auto found = thread_infos.find(thread_id);
+	assert(found);
 	unlock(thread_infos_mutex);
 
+	auto info = &found->value;
 	auto &list = info->time_spans;
 
 	TimeSpan span = list.back();
@@ -157,8 +158,9 @@ void Profiler::end() {
 void Profiler::mark(Span<utf8> name, u32 color) {
 	scoped_lock(thread_infos_mutex);
 	scoped_lock(marks_mutex);
-	auto info = thread_infos.find(get_current_thread_id());
-	assert(info);
+	auto found = thread_infos.find(get_current_thread_id());
+	assert(found);
+	auto info = &found->value;
 	marks.add({get_performance_counter() - info->self_time, color, get_current_thread_id()});
 }
 void Profiler::reset() {

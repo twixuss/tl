@@ -2,7 +2,13 @@
 #include "common.h"
 
 template <class T>
-inline tl::u64 get_hash(T value);
+inline tl::u64 get_hash(T value) {
+	if constexpr(std::is_enum_v<T>) {
+		return (std::underlying_type_t<T>)value;
+	} else {
+		static_assert("get_hash was not specialized");
+	}
+}
 
 template <class T>
 inline tl::u64 get_hash(T *value) { return (tl::u64)value / alignof(T); }
@@ -33,7 +39,8 @@ tl::u64 get_hash(tl::Span<T, Size> value) {
 
 namespace tl {
 
-template <class T> struct DefaultHasher {
+template <class T>
+struct DefaultHasher {
 	static u64 get_hash(T value) {
 		return ::get_hash(value);
 	}
