@@ -6,7 +6,7 @@ inline tl::u64 get_hash(T value) {
 	if constexpr(std::is_enum_v<T>) {
 		return (std::underlying_type_t<T>)value;
 	} else {
-		static_assert("get_hash was not specialized");
+		static_assert(false, "get_hash was not specialized");
 	}
 }
 

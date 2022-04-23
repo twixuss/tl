@@ -860,6 +860,11 @@ private:
 
 #define defer ::tl::Deferrer CONCAT(_deferrer, __COUNTER__) = [&]
 
+#define scoped_replace(dst, src) \
+	auto CONCAT(old_, __LINE__) = dst; \
+	dst = src; \
+	defer { dst = CONCAT(old_, __LINE__); };
+
 template <class T>
 auto reverse(T &x) {
 	using Iter = decltype(x.rbegin());
@@ -907,6 +912,7 @@ struct Span {
 	}
 	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
 	constexpr Span(ValueType *begin, Size count) : data(begin), count(count) {}
+	constexpr Span(ValueType const *begin, Size count) : data((ValueType *)begin), count(count) {}
 	constexpr ValueType *begin() const { return data; }
 	constexpr ValueType *end() const { return data + count; }
 
@@ -929,7 +935,10 @@ struct Span {
 		bounds_check(i < count);
 		return data[i];
 	}
+
+	[[deprecated("use is_empty instead")]]
 	constexpr bool empty() const { return count == 0; }
+	constexpr bool is_empty() const { return count == 0; }
 
 	template <class U, class ThatSize>
 	constexpr explicit operator Span<U, ThatSize>() const {
@@ -1079,7 +1088,8 @@ constexpr Span<u8> value_as_bytes(T const &value) {
 	return {(u8 *)&value, sizeof(T)};
 }
 
-template <class T> constexpr umm count_of(Span<T> span) { return span.count; }
+template <class T, class Size>
+constexpr umm count_of(Span<T, Size> span) { return span.count; }
 
 template <class T>
 constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0) {
