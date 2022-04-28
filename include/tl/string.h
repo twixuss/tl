@@ -344,24 +344,24 @@ TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP);
 
 struct StringBuilder {
 	struct Block {
-		u8 *data = 0;
 		umm count = 0;
 		umm capacity = 0;
 		Block *next = 0;
-		u8 *begin() { return data; }
-		u8 *end() { return data + count; }
+		u8 *data() { return (u8 *)(this + 1); }
+		u8 *begin() { return data(); }
+		u8 *end() { return data() + count; }
 		umm available_space() { return capacity - count; }
 	};
 
 	Allocator allocator = {};
-	u8 initial_buffer[TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY];
 	Block first = {};
+	u8 initial_buffer[TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY];
 	Block *last = &first;
 	Block *alloc_last = &first;
 
 	StringBuilder() {
+		static_assert(offsetof(StringBuilder, first) + sizeof(Block) == offsetof(StringBuilder, initial_buffer));
 		allocator = current_allocator;
-		first.data = initial_buffer;
 		first.capacity = TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY;
 	}
 	StringBuilder(StringBuilder const &that) = delete;
@@ -412,7 +412,7 @@ struct StringBuilder {
 		u8 *dst_char = dst_string.data;
 		Block *block = &first;
 		do {
-			memcpy(dst_char, block->data, block->count);
+			memcpy(dst_char, block->data(), block->count);
 			dst_char += block->count;
 			block = block->next;
 		} while (block);
@@ -448,7 +448,6 @@ struct StringBuilder {
 	Block *allocate_block(TL_LPC) {
 		auto capacity = alloc_last->capacity*2;
 		auto block = (Block *)allocator.allocate_uninitialized(sizeof(Block) + capacity, alignof(Block) TL_LA);
-		block->data = (u8 *)(block + 1);
 		block->count = 0;
 		block->capacity = capacity;
 		block->next = 0;

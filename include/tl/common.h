@@ -31,8 +31,10 @@
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 #endif
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "invalid_code_path", __VA_ARGS__), __assume(0))
 //#define invalid_code_path(...) ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__)
+
+#define not_implemented() invalid_code_path("not implemented")
 
 #ifndef bounds_check
 #define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
@@ -904,7 +906,7 @@ struct Span {
 
 	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
-	constexpr Span(ValueType &value) : data(std::addressof(value)), count(1) {}
+	// constexpr Span(ValueType &value) : data(std::addressof(value)), count(1) {}
 	template <Size count>
 	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
 	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {

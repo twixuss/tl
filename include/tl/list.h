@@ -381,22 +381,28 @@ List<Span<T>, Allocator, Size> split(Span<T> what, Span<T> by TL_LP) {
 	return result;
 }
 
-template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> split(Span<T> what, T by TL_LP) {
-	List<Span<T>, Allocator, Size> result;
-
+template <class T, class Size, class Fn>
+void split(Span<T, Size> what, T by, Fn &&callback) {
 	umm start = 0;
 	umm what_start = 0;
 
 	for (; what_start < what.count;) {
 		if (what.data[what_start] == by) {
-			result.add(what.subspan(start, what_start - start));
+			callback(what.subspan(start, what_start - start));
 			start = what_start + 1;
 		}
 		++what_start;
 	}
 
-	result.add(Span(what.data + start, what.end()) TL_LA);
+	callback(Span(what.data + start, what.end()));
+}
+template <class T, class Allocator = Allocator, class Size = umm>
+List<Span<T>, Allocator, Size> split(Span<T> what, T by TL_LP) {
+	List<Span<T>, Allocator, Size> result;
+
+	split(what, by, [&](auto part) {
+		result.add(part TL_LA);
+	});
 
 	return result;
 }
