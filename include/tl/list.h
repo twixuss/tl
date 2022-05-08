@@ -34,6 +34,11 @@ struct List : Span<T, Size_> {
 		capacity = desired_capacity;
 	}
 
+	void set(T value TL_LP) {
+		reserve(1 TL_LA);
+		count = 1;
+		memcpy(data, &value, sizeof(T));
+	}
 	void set(Span span TL_LP) {
 		reserve(span.count TL_LA);
 		count = span.count;
@@ -177,15 +182,15 @@ struct List : Span<T, Size_> {
 		return {data + where, n};
 	}
 
-	void erase(Span where) {
+	void erase(Span where_) {
 		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
+			where_.count <= count &&
+			begin() <= where_.begin() && where_.begin() < end() &&
+			where_.end() <= end()
 		);
 
-		memmove(where.data, where.data + where.count, count - where.count + data - where.data);
-		count -= where.count;
+		memmove(where_.data, where_.data + where_.count, (count - where_.count + data - where_.data) * sizeof(T));
+		count -= where_.count;
 	}
 	void erase_at(Size where) {
 		bounds_check(where < count);
@@ -202,7 +207,7 @@ struct List : Span<T, Size_> {
 			where.end() <= end()
 		);
 
-		memmove(where.data + 1, where.data + where.count, end() - where.end());
+		memmove(where.data + 1, where.data + where.count, (end() - where.end()) * sizeof(T));
 		*where.data = with_what;
 
 		count -= where.count - 1;
@@ -1000,7 +1005,7 @@ struct LinearSet : Span<T> {
 			where.end() <= end()
 		);
 
-		memmove(where.data, where.data + where.count, count - where.count + data - where.data);
+		memmove(where.data, where.data + where.count, (count - where.count + data - where.data) * sizeof(T));
 		count -= where.count;
 	}
 	void erase_at(umm where) {

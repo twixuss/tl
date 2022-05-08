@@ -358,6 +358,7 @@ List<T> to_list(StaticBlockList<T, block_size> list TL_LP) {
 
 template <class T>
 struct BlockList {
+	using Value = T;
 	struct Block {
 		umm count = 0;
 		umm capacity = 0;

@@ -80,4 +80,17 @@
             <Item Name="[value]">(ValueType *)(Pool::base + offset)</Item>
         </Expand>
     </Type>
+    <Type Name ="tl::BlockList&lt;*&gt;::Block">
+        <DisplayString>{{ count={count}, capacity={capacity} }}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>count</Size>
+                <ValuePointer>(Value *)(this + 1)</ValuePointer>
+            </ArrayItems>
+        </Expand>
+        <!--
+        <DisplayString>{(Value *)(this+1)}</DisplayString>
+        <Intrinsic Name="data" Expression="(T*)(this+1)" />
+-->
+    </Type>
 </AutoVisualizer>
