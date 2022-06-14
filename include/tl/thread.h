@@ -503,7 +503,18 @@ bool try_do_work(ThreadPool *pool);
 struct WorkQueue {
 	ThreadPool *pool = 0;
 	u32 volatile work_to_do = 0;
+
+#if TL_DEBUG
+	bool debug_finished = true;
+	~WorkQueue() {
+		assert(debug_finished, "WorkQueue can not be destroyed until all it's work is finished.");
+	}
+#endif
+
 	inline void push(void (*fn)(void *param), void *param) {
+#if TL_DEBUG
+		debug_finished = false;
+#endif
 		atomic_increment(&pool->started_work_count);
 		if (pool->thread_count) {
 			ThreadWork work;
@@ -539,6 +550,9 @@ struct WorkQueue {
 				try_do_work(pool);
 				return work_to_do == 0;
 			});
+#if TL_DEBUG
+			debug_finished = true;
+#endif
 		}
 	}
 
@@ -551,10 +565,17 @@ inline WorkQueue make_work_queue(ThreadPool &pool) {
 }
 
 inline void do_work(ThreadWork work) {
+	assert(work.fn);
+	assert(work.queue);
+	assert(work.queue->pool);
+
 	work.fn(work.param);
 	work.queue->pool->allocator.free(work.param);
-	atomic_add(&work.queue->work_to_do, (u32)-1);
 	atomic_increment(&work.queue->pool->finished_work_count);
+
+	// NOTE: Because the queue may be immediately destroyed after work_to_do reaches 0,
+	// this must happen after incrementing finished_work_count
+	atomic_add(&work.queue->work_to_do, (u32)-1);
 }
 inline bool try_do_work(ThreadPool *pool) {
 	if (auto popped = pool->all_work.try_pop()) {

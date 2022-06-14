@@ -314,6 +314,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #if ARCH_AVX
 #if ARCH_AVX2
 #define s32x8_sari(a, b) i2f32(_mm256_srai_epi32(f2i32(a), b))
+#define s32x8_slri(a, b) i2f32(_mm256_slli_epi32(f2i32(a), b))
 #endif
 
 #define f32x8_set(a,b,c,d,e,f,g,h) _mm256_setr_ps(a,b,c,d,e,f,g,h)
@@ -365,8 +366,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define s32x8_sub(a,b) i2f32(_mm256_sub_epi32(f2i32(a),f2i32(b)))
 #define s32x8_mul(a,b) i2f32(_mm256_mullo_epi32(f2i32(a),f2i32(b)))
 #define s32x8_div(a,b) i2f32(_mm256_div_epi32(f2i32(a),f2i32(b)))
-#define s32x8_div_floor(a,b) select32x8(s32x8_lt(a,s32x8_set1(0)),s32x8_add(s32x8_div(s32x8_add(a,s32x8_set1(1)),b),s32x8_set1(-1)),s32x8_div(a,b))
-#define s32x8_floor(a,b) s32x8_mul(s32x8_div_floor(a,b),b)
+#define s32x8_floor(a,b) s32x8_mul(select32x8(s32x8_lt(a,s32x8_set1(0)),s32x8_sub(s32x8_div(s32x8_add(a, s32x8_set1(1)), b), s32x8_set1(1)),s32x8_div(a, b)),b)
 #endif
 
 #define u32x8_set(a,b,c,d,e,f,g,h) i2f32(_mm256_setr_epi32(a,b,c,d,e,f,g,h))

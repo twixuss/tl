@@ -737,12 +737,7 @@ enum : ForEachFlags {
 	ForEach_reverse = 0x1,
 };
 
-template <class Container, class Fn>
-constexpr void for_each(Container &container, Fn &&fn) {
-	return for_each<(ForEachFlags)0>(container, fn);
-}
-
-template <ForEachFlags flags, class T, umm count, class Fn>
+template <ForEachFlags flags=0, class T, umm count, class Fn>
 constexpr void for_each(T (&array)[count], Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
@@ -988,7 +983,11 @@ inline static constexpr bool is_span<Span<T, Size>> = true;
 template <class T>
 concept cSpan = is_span<T>;
 
-template <ForEachFlags flags, class T, class Fn>
+template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
+template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
+template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
+
+template <ForEachFlags flags=0, class T, class Fn>
 constexpr void for_each(Span<T> span, Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
@@ -1566,6 +1565,15 @@ bool find_and_erase(Collection &collection, T value) {
 	auto found = find(collection, value);
 	if (found) {
 		erase(collection, found);
+		return true;
+	}
+	return false;
+}
+template <class Collection, class T>
+bool find_and_erase_unordered(Collection &collection, T value) {
+	auto found = find(collection, value);
+	if (found) {
+		erase_unordered(collection, found);
 		return true;
 	}
 	return false;
