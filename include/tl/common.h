@@ -75,10 +75,12 @@
 #define TL_LA
 #endif
 
-#define KiB ((umm)1024)
-#define MiB ((umm)1024*1024)
-#define GiB ((umm)1024*1024*1024)
-#define TiB ((umm)1024*1024*1024*1024)
+#define KiB 0x400ull
+#define MiB 0x100000ull
+#define GiB 0x40000000ull
+#define TiB 0x10000000000ull
+
+#define breakable_scope for(bool CONCAT(_, __LINE__)=true;CONCAT(_, __LINE__);CONCAT(_, __LINE__)=false)
 
 namespace tl {
 
@@ -176,6 +178,18 @@ inline constexpr u32 type_index(u32 start) {
 		return type_index<ToFind, Rest...>(start + 1);
 	}
 }
+
+template <u32 index, class ...Rest>
+struct TypeAtT {};
+
+template <class First, class ...Rest>
+struct TypeAtT<0, First, Rest...> { using Type = First; };
+
+template <u32 index, class First, class ...Rest>
+struct TypeAtT<index, First, Rest...> { using Type = typename TypeAtT<index-1, Rest...>::Type; };
+
+template <u32 index, class ...Rest>
+using TypeAt = typename TypeAtT<index, Rest...>::Type;
 
 template <class ...Rest>
 inline constexpr u32 type_count() {
@@ -834,6 +848,9 @@ template <class Iterator, class CmpIterator>
 constexpr Iterator find(Iterator src_begin, Iterator src_end, CmpIterator cmp_begin, CmpIterator cmp_end) {
 	umm src_count = (umm)(src_end - src_begin);
 	umm cmp_count = (umm)(cmp_end - cmp_begin);
+	if ((smm)src_count - (smm)cmp_count + 1 <= 0)
+		return 0;
+
 	for (umm i = 0; i < src_count - cmp_count + 1; ++i) {
 		for (umm j = 0; j < cmp_count; ++j) {
 			if (cmp_begin[j] != src_begin[i + j]) {
@@ -971,7 +988,15 @@ struct Span {
 		return {data + subspan_start, subspan_count};
 	}
 	constexpr Span skip(Size amount) const {
+		amount = min(amount, count);
 		return {data + amount, count - amount};
+	}
+	constexpr void set_begin(T *new_begin) {
+		count = end() - new_begin;
+		data = new_begin;
+	}
+	constexpr void set_end(T *new_end) {
+		count = new_end - data;
 	}
 
 	ValueType *data = 0;
@@ -1088,6 +1113,10 @@ constexpr Span<char> as_chars(T span_like) {
 template <class T>
 constexpr Span<u8> value_as_bytes(T const &value) {
 	return {(u8 *)&value, sizeof(T)};
+}
+template <class T>
+constexpr Span<T> value_as_span(T const &value) {
+	return {&value, 1};
 }
 
 template <class T, class Size>
@@ -1206,6 +1235,11 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 template <class Collection, class T>
 umm find_index_of(Collection &collection, T value) {
 	return index_of(collection, find(collection, value));
+}
+
+template <class Collection, class Predicate>
+umm find_index_of_if(Collection &collection, Predicate predicate) {
+	return index_of(collection, find_if(collection, predicate));
 }
 
 inline constexpr bool is_whitespace(ascii c) {
@@ -1571,6 +1605,29 @@ bool find_and_erase(Collection &collection, T value) {
 	return false;
 }
 
+/*
+template <class ...Types>
+struct Tuple;
+
+template <>
+struct Tuple<> {
+};
+
+template <class First, class ...Rest>
+struct Tuple<First, Rest...> : First, Tuple<Rest...> {
+};
+
+template <umm index, class ...Args>
+auto &get(Tuple<Args...> tuple) {
+	if constexpr (index == 0) {
+		return (TypeAt<0, Args...>&)tuple;
+	} else {
+		return get<index - 1>(tuple.rest);
+	}
+}
+
+*/
+
 using NativeWindowHandle = struct NativeWindow {} *;
 
 enum AllocatorMode : u8 {
@@ -1743,6 +1800,23 @@ struct AllocatorBase {
 		return derived()->is_valid();
 	}
 
+	template <class A, class B>
+	inline std::tuple<A *, B *> allocate_merge(std::source_location location = std::source_location::current()) {
+		auto alignment = max(alignof(A), alignof(B));
+		auto buf = allocate(ceil(sizeof(A) + sizeof(B), alignment), alignment, location);
+
+		auto a = (A *)buf;
+		auto b = (B *)ceil(a + 1, alignof(B));
+
+		new (a) A();
+		new (b) B();
+
+		std::tuple<A *, B *> result;
+		get<0>(result) = a;
+		get<1>(result) = b;
+		return result;
+	}
+
 #if 0
 	Span<u8> (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
 	void *state = 0;
@@ -1907,7 +1981,32 @@ struct AllocatorPusher {
 #define push_allocator(allocator) tl_push(::tl::AllocatorPusher, allocator)
 #define scoped_allocator(allocator) tl_scoped(::tl::current_allocator, allocator)
 
-#define with(allocator, ...) ([&]()->decltype(auto){scoped_allocator(allocator);return __VA_ARGS__;}())
+template <class Thing>
+struct Scoped {
+	Scoped(Thing) {
+		static_assert(false, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
+	}
+};
+template <class Thing>
+Scoped(Thing) -> Scoped<Thing>;
+
+// for use with expressions
+#define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=Scoped(new_thing);return __VA_ARGS__;}())
+
+// for use with statements
+#define withs(new_thing, ...) ([&]{auto replacer=Scoped(new_thing);__VA_ARGS__;}())
+
+template <>
+struct Scoped<Allocator> {
+	Allocator old_allocator;
+	Scoped(Allocator new_allocator) {
+		old_allocator = current_allocator;
+		current_allocator = new_allocator;
+	}
+	~Scoped() {
+		current_allocator = old_allocator;
+	}
+};
 
 template <class T>
 void rotate(Span<T> span, T *to_be_first) {

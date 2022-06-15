@@ -485,6 +485,23 @@ struct BlockList {
 		return result;
 	}
 
+	void ensure_capacity(umm desired_capacity) {
+		while (last && last->available_space() < desired_capacity) {
+			last = last->next;
+		}
+		if (!last) {
+			while (next_capacity < desired_capacity)
+				next_capacity *= 2;
+
+			if (alloc_last)
+				last = alloc_last = alloc_last->next = allocate_block(next_capacity);
+			else
+				first = last = alloc_last = allocate_block(next_capacity);
+
+			next_capacity *= 2;
+		}
+	}
+
 	T &add(T value TL_LP) {
 		defer { count += 1; };
 
@@ -536,11 +553,10 @@ struct BlockList {
 
 	template <class Fn>
 	void for_each_block(Fn &&fn) const {
-		auto block = &first;
+		auto block = first;
 		do {
-			auto block_capacity = block->count;
-			if (block_capacity) {
-				fn(block->buffer, block_capacity);
+			if (block->count) {
+				fn(block->data(), block->count);
 			}
 			block = block->next;
 		} while (block);
@@ -587,7 +603,7 @@ struct BlockList {
 		return {first, 0};
 	}
 	Iterator end() {
-		return {last, last->count};
+		return {last, last ? last->count : 0};
 	}
 
 	void debug_count_check() {
@@ -600,6 +616,26 @@ struct BlockList {
 			block = block->next;
 		}
 		assert(count == sum);
+	}
+
+	void copy_into(T *d) {
+		for_each_block([&] (T *s, umm count) {
+			memcpy(d, s, count);
+			d += count;
+		});
+	}
+
+	Optional<Span<T>> subspan(umm offset, umm count) {
+		auto block = first;
+		while (offset >= block->count) {
+			offset -= block->count;
+			block = block->next;
+		}
+
+		if (offset + count > block->count)
+			return {};
+
+		return Span{block->begin() + offset, count};
 	}
 };
 
@@ -681,7 +717,7 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 
 		BlockListIndex index = {};
 		auto block = list.first;
-		do {
+		while (block) {
 			for (auto &it : *block) {
 				if constexpr (returns_directive) {
 					if (fn(it, index) == ForEach_break)
@@ -694,13 +730,13 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 			block = block->next;
 			++index.block_index;
 			index.value_index = 0;
-		} while (block);
+		}
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
 		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
 
 		auto block = list.first;
-		do {
+		while (block) {
 			for (auto it : *block) {
 				if constexpr (returns_directive) {
 					if (fn(it) == ForEach_break)
@@ -710,7 +746,7 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 				}
 			}
 			block = block->next;
-		} while (block);
+		}
 	}
 }
 

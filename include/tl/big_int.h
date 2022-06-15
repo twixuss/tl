@@ -479,8 +479,14 @@ struct BigInt {
 	bool operator!=(BigInt b) const { return !operator==(b); }
 
 	bool operator<(SignedPart b) const {
-		if (parts.count == 1)
+		if (parts.count == 1) {
+			if (!msb) {
+				// this is positive
+				if (parts[0] > max_value<SignedPart>)
+					return false;
+			}
 			return (SignedPart)parts[0] < b;
+		}
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return msb;
@@ -776,6 +782,13 @@ inline BigInt make_big_int(typename BigInt::Part value TL_LP) {
 	BigInt result;
 	result.msb = false;
 	result.parts.set({value} TL_LA);
+	return result;
+}
+template <class BigInt = BigInt, class Allocator = Allocator>
+inline BigInt make_big_int(typename BigInt::SignedPart value TL_LP) {
+	BigInt result;
+	result.msb = value < 0;
+	result.parts.set({(typename BigInt::Part)value} TL_LA);
 	return result;
 }
 template <class BigInt = BigInt, class Allocator = Allocator>

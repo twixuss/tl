@@ -92,7 +92,7 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.hInstApp = NULL;
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
-		print(Print_error, "ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
+		with(ConsoleColor::red, print("ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error));
 		return {};
 	}
 

@@ -74,7 +74,7 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	static void init() {
 		base = (u8 *)reserve_memory(4 * GiB);
 		if (!base) {
-			print(Print_error, "ERROR :: FAILED TO RESERVE MEMORY FOR {}\n", typeid(Pool32).name());
+			with(ConsoleColor::red, print("ERROR :: FAILED TO RESERVE MEMORY FOR {}\n", typeid(Pool32).name()));
 			exit(-1);
 		}
 		next_free = base + 1; // first byte is reserved for `null` pointer, s+o skip it.
@@ -86,7 +86,7 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 
 		if (next_free + size > next_uncommitted) {
 			if (!commit_memory(next_free, size)) {
-				print(Print_error, "ERROR :: FAILED TO COMMIT MEMORY FOR {}\n", typeid(Pool32).name());
+				with(ConsoleColor::red, print("ERROR :: FAILED TO COMMIT MEMORY FOR {}\n", typeid(Pool32).name()));
 				exit(-1);
 			}
 			next_uncommitted = (u8 *)ceil(next_free + size + 1, 4096);

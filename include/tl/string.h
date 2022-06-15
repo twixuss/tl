@@ -351,6 +351,7 @@ struct StringBuilder {
 		u8 *begin() { return data(); }
 		u8 *end() { return data() + count; }
 		umm available_space() { return capacity - count; }
+		Span<u8> span() { return {data(), count}; }
 	};
 
 	Allocator allocator = {};
@@ -387,18 +388,33 @@ struct StringBuilder {
 			space += block_size;
 		}
 	}
-	void ensure_consecutive_space(umm amount TL_LP) {
-		assert(amount <= block_size);
-		if (last->available_space() < amount) {
-			if (last->next) {
-				last = last->next;
-			} else {
-				last->next = allocate_block(TL_LAC);
-				last = alloc_last = last->next;
-			}
-		}
-	}
 	*/
+	u8 *reserve_contiguous_space(umm amount, bool change_count = true TL_LP) {
+		while (last) {
+			if (last->available_space() >= amount)
+				break;
+			last = last->next;
+		}
+		if (!last) {
+			auto new_capacity = alloc_last->capacity;
+			while (new_capacity < amount)
+				new_capacity *= 2;
+			last = alloc_last = alloc_last->next = allocate_block(new_capacity TL_LA);
+		}
+
+		defer {
+			if (change_count) {
+				memset(last->end(), 0, amount);
+				last->count += amount;
+			}
+		};
+
+		return last->end();
+	}
+	template <class T>
+	T *reserve_contiguous_space(bool change_count = true TL_LP) {
+		return (T *)reserve_contiguous_space(sizeof(T), change_count TL_LA);
+	}
 	umm count() {
 		umm total_count = 0;
 		Block *block = &first;
@@ -428,8 +444,8 @@ struct StringBuilder {
 	}
 
 	template <class Fn>
-	void for_each_block(Fn &&fn) {
-		Block *block = &first;
+	void for_each_block(Fn &&fn) const {
+		Block *block = (Block *)&first;
 		do {
 			if (block->count)
 				fn(block);
@@ -445,14 +461,16 @@ struct StringBuilder {
 		last = &first;
 	}
 
-	Block *allocate_block(TL_LPC) {
-		auto capacity = alloc_last->capacity*2;
-		auto block = (Block *)allocator.allocate_uninitialized(sizeof(Block) + capacity, alignof(Block) TL_LA);
+	Block *allocate_block(umm new_capacity TL_LP) {
+		auto block = (Block *)allocator.allocate_uninitialized(sizeof(Block) + new_capacity, alignof(Block) TL_LA);
 		block->count = 0;
-		block->capacity = capacity;
+		block->capacity = new_capacity;
 		block->next = 0;
 		alloc_last = alloc_last->next = block;
 		return block;
+	}
+	Block *allocate_block(TL_LPC) {
+		return allocate_block(alloc_last->capacity*2 TL_LA);
 	}
 };
 
@@ -535,30 +553,34 @@ forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b,
 forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
 
-template <class T>
-struct FormatList {
+template <class T, class Format>
+struct FormatSpan {
+	Span<T> value;
+	Format format;
 	Span<u8> before = "{"b;
 	Span<u8> separator = ", "b;
 	Span<u8> after = "}"b;
-	List<T> list;
 };
 
-template <class T>
-forceinline umm append(StringBuilder &b, FormatList<T> format) {
+template <class T, class Format>
+forceinline umm append(StringBuilder &b, FormatSpan<T, Format> format) {
 	umm count = 0;
 	count += append_bytes(b, format.before);
-	if (format.list.count)
-		count += append(b, *format.list.data);
-	for (auto &val : format.list.skip(1)) {
+	if (format.value.count) {
+		format.format.value = *format.value.data;
+		count += append(b, format.format);
+	}
+	for (auto &val : format.value.skip(1)) {
 		count += append_bytes(b, format.separator);
-		count += append(b, val);
+		format.format.value = val;
+		count += append(b, format.format);
 	}
 	count += append_bytes(b, format.after);
 	return count;
 }
 
 template <class T>
-forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatList{.list = list}); }
+forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatSpan{.span = list}); }
 
 template <> forceinline umm append(StringBuilder &b, List<u8   > list) { return append(b, as_span(list)); }
 template <> forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }
@@ -566,6 +588,14 @@ template <> forceinline umm append(StringBuilder &b, List<wchar> list) { return 
 template <> forceinline umm append(StringBuilder &b, List<utf8 > list) { return append(b, as_span(list)); }
 template <> forceinline umm append(StringBuilder &b, List<utf16> list) { return append(b, as_span(list)); }
 template <> forceinline umm append(StringBuilder &b, List<utf32> list) { return append(b, as_span(list)); }
+
+inline umm append(StringBuilder &b, StringBuilder const &that) {
+	umm result = 0;
+	that.for_each_block([&](StringBuilder::Block *block) {
+		result += append(b, block->span());
+	});
+	return result;
+}
 
 template <class T>
 inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;

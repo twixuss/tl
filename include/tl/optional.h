@@ -31,10 +31,20 @@ struct Optional {
 	explicit operator bool() const { return _has_value; }
 
 	bool has_value() const { return _has_value; }
-	T const &value() const { assert(_has_value); return _value; }
-	T       &value()       { assert(_has_value); return _value; }
+	T const &value() const { assert_always(_has_value); return _value; }
+	T       &value()       { assert_always(_has_value); return _value; }
 	T const &value_unchecked() const { return _value; }
 	T       &value_unchecked()       { return _value; }
+
+	template <class Fallback>
+	T value_or(Fallback &&fallback) {
+		if (_has_value)
+			return _value;
+		if constexpr (std::is_convertible_v<Fallback, T>)
+			return fallback;
+		else
+			return fallback();
+	}
 
 private:
 	union {

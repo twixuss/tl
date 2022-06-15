@@ -112,27 +112,6 @@ inline Thread *create_thread(void (*function)(Thread *self), void *param) {
 	return thread;
 }
 
-template <class ...Types>
-struct Tuple;
-
-template <>
-struct Tuple<> {
-};
-
-template <class First, class ...Rest>
-struct Tuple<First, Rest...> {
-	First first;
-	Tuple<Rest...> rest;
-};
-
-template <umm index, class ...Args>
-auto get(Tuple<Args...> tuple) {
-	if constexpr (index == 0) {
-		return tuple.first;
-	} else {
-		return get<index - 1>(tuple.rest);
-	}
-}
 template <class Ret>
 inline ThreadRet<Ret> *create_thread(Ret (*function)()) {
 	using Fn = Ret (*)();
@@ -164,7 +143,7 @@ inline static decltype(auto) invoke(Fn &&fn, Tuple &tuple, std::index_sequence<i
 template <class Ret, class First, class ...Rest>
 inline ThreadRet<Ret> *create_thread(Ret (*function)(First first, Rest ...rest), First first, Rest ...rest) {
 	using Fn = Ret (*)(First, Rest...);
-	using ArgTuple = Tuple<First, Rest...>;
+	using ArgTuple = std::tuple<First, Rest...>;
 
 	auto allocator = current_allocator;
 	auto thread = allocator.allocate<ThreadRet<Ret>>();
