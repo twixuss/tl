@@ -64,7 +64,7 @@ struct GetTextInfoParams {
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
 TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
-TL_API FontCollection *create_font_collection(Span<Span<pathchar>> font_paths);
+TL_API FontCollection *create_font_collection(Span<Span<utf8>> font_paths);
 TL_API void free(FontCollection *collection);
 TL_API TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params = {});
 inline List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
@@ -85,7 +85,7 @@ namespace tl {
 static FT_Library ft_library;
 
 struct FontFace {
-	List<pathchar> path;
+	List<utf8> path;
 	Buffer file;
 	FT_Face ft;
 	u32 size;
@@ -276,7 +276,7 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 
 	auto found = collection->size_to_font.find(size);
 	if (found) {
-		return found.raw();
+		return &found->value;
 	}
 
 	SizedFont &font = collection->size_to_font.get_or_insert(size);
@@ -288,7 +288,7 @@ SizedFont *get_font_at_size(FontCollection *collection, u32 size) {
 	return &font;
 }
 
-FontCollection *create_font_collection(Span<Span<pathchar>> font_paths) {
+FontCollection *create_font_collection(Span<Span<utf8>> font_paths) {
 	if (!ft_library) {
 		auto error = FT_Init_FreeType(&ft_library);
 		assert(!error, "FT_Init_FreeType Error {}", FT_Error_String(error));
@@ -328,7 +328,7 @@ namespace tl {
 FontChar get_char_info(u32 ch, SizedFont *font) {
 	auto found = font->chars.find(ch);
 	assert(found, "get_char_info: character '{}' is not present. Call ensure_all_chars_present before", ch);
-	return *found;
+	return found->value;
 }
 
 TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params) {

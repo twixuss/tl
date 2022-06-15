@@ -112,11 +112,14 @@ struct BucketHashMap {
 	using ValueType = Value;
 
 	struct KeyValue {
-		u64 hash;
 		Key key;
 		Value value;
 	};
-	using Bucket = LinkedList<KeyValue>;
+	struct HashKeyValue {
+		u64 hash;
+		KeyValue kv;
+	};
+	using Bucket = LinkedList<HashKeyValue>;
 
 	Allocator allocator = current_allocator;
 	Span<Bucket> buckets;
@@ -134,8 +137,8 @@ struct BucketHashMap {
 
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.key, key)) {
-					return it.value;
+				if (Traits::are_equal(it.kv.key, key)) {
+					return it.kv.value;
 				}
 			}
 		}
@@ -147,8 +150,8 @@ struct BucketHashMap {
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
-		it.key = key;
-		return it.value;
+		it.kv.key = key;
+		return it.kv.value;
 	}
 
 	//
@@ -168,8 +171,8 @@ struct BucketHashMap {
 		auto bucket = &buckets[hash & (buckets.count - 1)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.key, key)) {
-					callback(it.key, it.value);
+				if (Traits::are_equal(it.kv.key, key)) {
+					callback(it.kv.key, it.kv.value);
 					return false;
 				}
 			}
@@ -182,8 +185,8 @@ struct BucketHashMap {
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
-		it.key = key;
-		it.value = value;
+		it.kv.key = key;
+		it.kv.value = value;
 		return true;
 	}
 	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0 TL_LP) {
@@ -197,11 +200,11 @@ struct BucketHashMap {
 		auto bucket = &buckets[hash & (buckets.count - 1)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.key, key)) {
+				if (Traits::are_equal(it.kv.key, key)) {
 					if (existing)
-						*existing = &it.value;
+						*existing = &it.kv.value;
 					if (existing_key)
-						*existing_key = &it.key;
+						*existing_key = &it.kv.key;
 					return false;
 				}
 			}
@@ -214,8 +217,8 @@ struct BucketHashMap {
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
-		it.key = key;
-		it.value = value;
+		it.kv.key = key;
+		it.kv.value = value;
 		return true;
 	}
 
@@ -227,8 +230,8 @@ struct BucketHashMap {
 		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.key, key)) {
-					return &it;
+				if (Traits::are_equal(it.kv.key, key)) {
+					return &it.kv;
 				}
 			}
 		}
@@ -242,8 +245,8 @@ struct BucketHashMap {
 		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.key, key)) {
-					auto result = it.value;
+				if (Traits::are_equal(it.kv.key, key)) {
+					auto result = it.kv.value;
 					tl::erase(bucket, &it);
 					return result;
 				}
@@ -268,7 +271,7 @@ struct BucketHashMap {
 				next_node = next_node->next;
 				node->next = 0;
 
-				auto hash = Traits::get_hash(node->value.key);
+				auto hash = Traits::get_hash(node->value.kv.key);
 				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
 				new_bucket.add_steal(node);
 			}
@@ -284,6 +287,49 @@ struct BucketHashMap {
 			buckets[bucket_index].clear();
 		}
 	}
+
+
+	struct Iterator {
+		BucketHashMap *map;
+		Bucket *bucket;
+		typename Bucket::Iterator bucket_it;
+
+		Iterator &operator++() {
+			++bucket_it;
+			if (bucket_it == bucket->end()) {
+				do {
+					++bucket;
+					if (bucket == map->buckets.end()) {
+						bucket_it = {};
+						return *this;
+					} else {
+						bucket_it = bucket->begin();
+					}
+				} while (!bucket_it);
+			}
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return bucket_it == that.bucket_it; }
+		bool operator!=(Iterator const &that) { return bucket_it != that.bucket_it; }
+		auto &operator*() { return bucket_it->kv; }
+		auto *operator->() { return &bucket_it->kv; }
+	};
+
+	Iterator begin() {
+		Iterator result;
+		result.map = this;
+		result.bucket = buckets.data;
+		result.bucket_it = result.bucket->begin();
+		return result;
+	}
+	Iterator end() {
+		return {};
+	}
 };
 
 template <ForEachFlags flags=0, class Key, class Value, class Traits, class Fn>
@@ -294,7 +340,7 @@ void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
 
 	for (u32 i = 0; i < map.buckets.count; ++i) {
 		for (auto &it : map.buckets[i]) {
-			fn(it.key, it.value);
+			fn(it.kv.key, it.kv.value);
 		}
 	}
 }
