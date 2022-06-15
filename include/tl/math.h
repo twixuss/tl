@@ -1456,6 +1456,7 @@ struct RaycastHit {
 	bool hit = false;
 	v3f position = {};
 	v3f normal = {};
+	f32 distance = {};
 	operator bool() {
 		return hit;
 	}
@@ -1492,12 +1493,13 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
 
 	RaycastHit hit;
 	hit.hit = true;
+	hit.distance = t;
 	hit.position = ray.origin + ray.direction* t;
 	hit.normal = normalize(cross(e1, e2));
 	return hit;
 }
 
-inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box) {
+inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
 	v3f dirfrac = 1.0f / ray.direction;
 	v3f t1 = (box.min - ray.origin)*dirfrac;
 	v3f t2 = (box.max - ray.origin)*dirfrac;
@@ -1505,14 +1507,19 @@ inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box) {
 	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y), min(t1.z, t2.z));
 	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y), max(t1.z, t2.z));
 
-	if (tmin < 0 || tmax < 0 || tmin > tmax) {
-		return {};
+	if (from_inside) {
+		if (tmax < 0 || tmin > tmax) {
+			return {};
+		}
+	} else {
+		if (tmin < 0 || tmax < 0 || tmin > tmax) {
+			return {};
+		}
 	}
 
 	RaycastHit hit = {};
 	hit.hit = true;
 	hit.position = ray.origin + ray.direction * tmin;
-	assert(dot(ray.direction, hit.position - ray.origin) > 0);
 	return hit;
 }
 

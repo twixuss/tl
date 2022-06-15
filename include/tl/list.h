@@ -1050,7 +1050,17 @@ void free(LinearSet<T> &set) {
 }
 
 template <class T>
+umm index_of(LinearSet<T> const &list, T const *value) {
+	return value - list.data;
+}
+template <class T>
 void erase(LinearSet<T> &set, T *value) { return erase((List<T> &)set, value); }
+
+template <class T>
+void erase_unordered(LinearSet<T> &set, T *value) {
+	set[index_of(set, value)] = set.back();
+	set.count--;
+}
 
 #pragma warning(pop)
 

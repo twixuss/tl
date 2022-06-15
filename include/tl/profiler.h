@@ -5,11 +5,11 @@
 #endif
 
 #if TL_ENABLE_PROFILER
-#define timed_begin(profiler, name) (profiler).begin(name, as_span(__FILE__), __LINE__)
-#define timed_end(profiler) (profiler).end()
-#define timed_block(profiler, name) timed_begin(profiler, name); defer{ timed_end(profiler); }
+#define timed_begin(profiler, enabled, name) (enabled ? (profiler).begin(name, as_span(__FILE__), __LINE__) : void())
+#define timed_end(profiler, enabled) (enabled ? (profiler).end() : void())
+#define timed_block(profiler, enabled, name) timed_begin(profiler, enabled, name); defer{ timed_end(profiler, enabled); }
 //#define timed_function() timed_block(([](utf8 const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
-#define timed_function(profiler) timed_block(profiler, as_span(__FUNCSIG__))
+#define timed_function(profiler, enabled) timed_block(profiler, enabled, as_span(__FUNCSIG__))
 #else
 #define timed_begin(profiler, name)
 #define timed_end(profiler)
@@ -26,22 +26,24 @@
 namespace tl {
 struct TL_API Profiler {
 	struct TimeSpan {
-		s64 begin;
-		s64 end;
+		u64 begin;
+		u64 end;
 		Span<utf8> name;
 		Span<utf8> file;
 		u32 line;
 		u32 thread_id;
 	};
 	struct Mark {
-		s64 counter;
+		u64 counter;
 		u32 color;
 		u32 thread_id;
 	};
 	struct ThreadInfo {
 		List<TimeSpan> time_spans;
-		s64 self_time;
+		u64 self_time;
 	};
+
+	bool enabled = true;
 
 	List<Mark> marks;
 	Mutex marks_mutex;
@@ -179,7 +181,7 @@ List<ascii> Profiler::output_for_chrome() {
 )"s);
 
 
-	if (!recorded_time_spans.empty()) {
+	if (!recorded_time_spans.is_empty()) {
 		bool needComma = false;
 		for (auto span : recorded_time_spans) {
 			if (needComma) {

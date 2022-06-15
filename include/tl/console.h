@@ -129,17 +129,14 @@ struct Scoped<ConsoleColor> {
 
 thread_local Printer current_printer = {[](Span<utf8>, void *) {}};
 
-void init_printer() {
-	current_printer = standard_output_printer;
-}
 void deinit_printer() {
 
 }
 
 #if OS_WINDOWS
 
-static HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);
-static HWND console_window = GetConsoleWindow();
+static HANDLE std_out;
+static HWND console_window;
 
 Printer console_printer = {
 	[](Span<utf8> span, void *) {
@@ -246,6 +243,14 @@ void toggle_console_window() {
 }
 
 #endif
+
+void init_printer() {
+	current_printer = standard_output_printer;
+#if OS_WINDOWS
+	std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+	console_window = GetConsoleWindow();
+#endif
+}
 
 #endif
 

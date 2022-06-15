@@ -582,7 +582,7 @@ umm write(File file, Span<u8> span) {
 			return total_bytes_written;
 		}
 	}
-	return true;
+	return total_bytes_written;
 }
 void truncate_to_cursor(File file) {
 	SetEndOfFile(file.handle);

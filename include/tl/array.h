@@ -72,6 +72,10 @@ struct Array3 {
 		bounds_check(&data[z][y][x] < end());
 		return data[z][y][x];
 	}
+	constexpr T& operator()(umm x, umm y, umm z) {
+		bounds_check(&data[z][y][x] < end());
+		return data[z][y][x];
+	}
 	constexpr T& at(v3s v) { return at(v.x, v.y, v.z); }
 	constexpr T& at(v3u v) { return at(v.x, v.y, v.z); }
 

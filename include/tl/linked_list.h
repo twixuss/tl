@@ -158,4 +158,15 @@ void for_each(LinkedList<T> list, Fn &&fn) {
 	}
 }
 
+template <class T>
+umm count_of(LinkedList<T> list) {
+	umm result = 0;
+	auto node = list.head;
+	while (node) {
+		result += 1;
+		node = node->next;
+	}
+	return result;
+}
+
 }
