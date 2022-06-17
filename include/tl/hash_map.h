@@ -321,10 +321,18 @@ struct BucketHashMap {
 	};
 
 	Iterator begin() {
+		if (!buckets.count)
+			return {};
+
 		Iterator result;
 		result.map = this;
-		result.bucket = buckets.data;
-		result.bucket_it = result.bucket->begin();
+		for (auto &bucket : buckets) {
+			result.bucket_it = bucket.begin();
+			if (result.bucket_it) {
+				result.bucket = &bucket;
+				break;
+			}
+		}
 		return result;
 	}
 	Iterator end() {

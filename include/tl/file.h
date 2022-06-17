@@ -453,6 +453,16 @@ void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
 
 TL_API List<utf8> get_executable_path();
 
+struct MoveFileParams {
+	bool replace_existing = false;
+	bool allow_copy = true;
+};
+
+TL_API bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params = {});
+inline bool move_file(Span<utf8> old, Span<utf8> _new, MoveFileParams params = {}) {
+	return move_file(with(temporary_allocator, to_pathchars(old, true).data), with(temporary_allocator, to_pathchars(_new, true).data), params);
+}
+
 }
 
 #ifdef TL_IMPL
@@ -928,6 +938,14 @@ List<utf8> get_executable_path() {
 	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, (DWORD)temp.capacity);
 	return to_utf8(temp);
 }
+
+bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params) {
+	DWORD flags = 0;
+	if (params.allow_copy)       flags |= MOVEFILE_COPY_ALLOWED;
+	if (params.replace_existing) flags |= MOVEFILE_REPLACE_EXISTING;
+	return MoveFileExW((wchar *)old, (wchar *)_new, flags);
+}
+
 #else
 	XXX;
 #endif

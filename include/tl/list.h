@@ -55,7 +55,8 @@ struct List : Span<T, Size_> {
 		memcpy(dest, &value, sizeof(T));
 		return data[count++];
 	}
-	Span add(Span span TL_LP) {
+	template <class Size>
+	tl::Span<T> add(tl::Span<T, Size> span TL_LP) {
 		reserve_exponential(count + span.count TL_LA);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		count += span.count;

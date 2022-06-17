@@ -30,7 +30,7 @@ struct LinkedList {
 		bool operator==(Iterator const &that) const { return node == that.node; }
 		bool operator!=(Iterator const &that) const { return node != that.node; }
 		T *operator->() { return std::addressof(node->value); }
-		bool operator!() { return !node; }
+		explicit operator bool() { return node; }
 	};
 
 	LinkedList() = default;

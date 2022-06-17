@@ -37,15 +37,17 @@ struct Optional {
 	T       &value_unchecked()       { return _value; }
 
 	template <class Fallback>
-	T value_or(Fallback &&fallback) {
+	T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
 		if (_has_value)
 			return _value;
-		if constexpr (std::is_convertible_v<Fallback, T>)
-			return fallback;
-		else
-			return fallback();
+		return fallback();
 	}
 
+	T value_or(T fallback) {
+		if (_has_value)
+			return _value;
+		return fallback;
+	}
 private:
 	union {
 		T _value;
