@@ -123,7 +123,7 @@ union m2 {
 	static forceinline m2 scale(f32 v) { return scale(v, v); }
 	static forceinline m2 rotation(f32 a) {
 		f32 s, c;
-		cos_sin(a, s, c);
+		cos_sin(a, c, s);
 		return {
 			c, s,
 		   -s, c,
@@ -1520,6 +1520,15 @@ inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
 	RaycastHit hit = {};
 	hit.hit = true;
 	hit.position = ray.origin + ray.direction * tmin;
+	hit.distance = tmin;
+
+	       if (tmin == t1.x)   hit.normal = {-1, 0, 0};
+	else   if (tmin == t2.x)   hit.normal = { 1, 0, 0};
+	else   if (tmin == t1.y)   hit.normal = { 0,-1, 0};
+	else   if (tmin == t2.y)   hit.normal = { 0, 1, 0};
+	else   if (tmin == t1.z)   hit.normal = { 0, 0,-1};
+	else /*if (tmin == t2.z)*/ hit.normal = { 0, 0, 1};
+
 	return hit;
 }
 
@@ -1537,22 +1546,32 @@ union m4 {
 	using Scalar = f32;
 	using Vector = v4f;
 	struct {
-		v4f i, j, k, l;
+		f32x4 im, jm, km, lm;
 	};
 	struct {
-		f32x4 im, jm, km, lm;
+		v4f i, j, k, l;
 	};
 	f32x4 m[4];
 	v4f vectors[4];
 	f32 s[16];
-	forceinline v4f operator*(v4f const &b) const {
-		v4f x = V4f(b.x) * i;
-		v4f y = V4f(b.y) * j;
-		v4f z = V4f(b.z) * k;
-		v4f w = V4f(b.w) * l;
-		return x + y + z + w;
+	forceinline v4f operator*(v4f b) const {
+		// v4f x = V4f(b.x) * i;
+		// v4f y = V4f(b.y) * j;
+		// v4f z = V4f(b.z) * k;
+		// v4f w = V4f(b.w) * l;
+		// return x + y + z + w;
+
+		union {
+			v4f v;
+			f32x4 f;
+		};
+		f = f32x4_add(
+			f32x4_muladd(f32x4_set1(b.x), im, f32x4_mul(f32x4_set1(b.y), jm)),
+			f32x4_muladd(f32x4_set1(b.z), km, f32x4_mul(f32x4_set1(b.w), lm))
+		);
+		return v;
 	}
-	forceinline v3f operator*(v3f const &b) const {
+	forceinline v3f operator*(v3f b) const {
 		auto x = V4f(b.x) * i;
 		auto y = V4f(b.y) * j;
 		auto z = V4f(b.z) * k;
@@ -1561,8 +1580,46 @@ union m4 {
 		memcpy(&result, &r, 12);
 		return result;
 	}
-	forceinline m4 operator*(m4 const &b) const { return {*this * b.i, *this * b.j, *this * b.k, *this * b.l}; }
-	forceinline m4& operator*=(m4 const &b) { return *this = *this * b; }
+	forceinline m4 operator*(m4 b) const {
+		// return {
+		// 	.i = b.i.x*i + b.i.y*j + b.i.z*k + b.i.w*l,
+		// 	.j = b.j.x*i + b.j.y*j + b.j.z*k + b.j.w*l,
+		// 	.k = b.k.x*i + b.k.y*j + b.k.z*k + b.k.w*l,
+		// 	.l = b.l.x*i + b.l.y*j + b.l.z*k + b.l.w*l,
+		// };
+		return {
+			.im = f32x4_add(f32x4_muladd(f32x4_set1(b.i.x), im, f32x4_mul(f32x4_set1(b.i.y), jm)), f32x4_muladd(f32x4_set1(b.i.z), km, f32x4_mul(f32x4_set1(b.i.w), lm))),
+			.jm = f32x4_add(f32x4_muladd(f32x4_set1(b.j.x), im, f32x4_mul(f32x4_set1(b.j.y), jm)), f32x4_muladd(f32x4_set1(b.j.z), km, f32x4_mul(f32x4_set1(b.j.w), lm))),
+			.km = f32x4_add(f32x4_muladd(f32x4_set1(b.k.x), im, f32x4_mul(f32x4_set1(b.k.y), jm)), f32x4_muladd(f32x4_set1(b.k.z), km, f32x4_mul(f32x4_set1(b.k.w), lm))),
+			.lm = f32x4_add(f32x4_muladd(f32x4_set1(b.l.x), im, f32x4_mul(f32x4_set1(b.l.y), jm)), f32x4_muladd(f32x4_set1(b.l.z), km, f32x4_mul(f32x4_set1(b.l.w), lm))),
+		};
+
+		// "smart" compiler could not figure this out...
+		// it is so smart that even after i directly said it what to do,
+		// it still produces 68 instructions half of which just shuffle the registers!!
+		// btw on platforms with fma all of this is doable in just 32 instructions.
+
+		// xmm0 = i
+		// xmm1 = j
+		// xmm2 = k
+		// xmm3 = l
+		// xmm4 = b.i
+		// xmm5 = b.j
+		// xmm6 = b.k
+		// xmm7 = b.l
+		// compute b.i.x*i + b.i.y*j + b.i.z*k + b.i.w*l
+		// xmm9 = b.i.x // just shuffle
+		// xmm8 = xmm9*xmm0
+		// xmm9 = b.i.y
+		// xmm8 = xmm9*xmm1 + xmm8
+		// xmm9 = b.i.z
+		// xmm8 = xmm9*xmm2 + xmm8
+		// xmm9 = b.i.w
+		// xmm8 = xmm9*xmm3 + xmm8
+		// do same thing for j, k and l.
+
+	}
+	forceinline m4& operator*=(m4 b) { return *this = *this * b; }
 	static forceinline m4 scale(f32 x, f32 y, f32 z) {
 		return {
 			x, 0, 0, 0,
@@ -1782,27 +1839,29 @@ inline m4 inverse(m4 const &m) {
 }
 
 forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
-forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{i, j, k, l}; }
-forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
-	m4 r{};
-	r.im = i;
-	r.jm = j;
-	r.km = k;
-	r.lm = l;
-	return r;
-}
-forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 jz, f32 jw, f32 kx, f32 ky, f32 kz, f32 kw, f32 lx,
-				f32 ly, f32 lz, f32 lw) {
-	return {ix, iy, iz, iw, jx, jy, jz, jw, kx, ky, kz, kw, lx, ly, lz, lw};
+forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{.i=i, .j=j, .k=k, .l=l}; }
+forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) { return m4{.im=i, .jm=j, .km=k, .lm=l}; }
+forceinline constexpr m4 M4(
+	f32 ix, f32 iy, f32 iz, f32 iw,
+	f32 jx, f32 jy, f32 jz, f32 jw,
+	f32 kx, f32 ky, f32 kz, f32 kw,
+	f32 lx, f32 ly, f32 lz, f32 lw
+) {
+	return {
+		ix, iy, iz, iw,
+		jx, jy, jz, jw,
+		kx, ky, kz, kw,
+		lx, ly, lz, lw
+	};
 }
 
 forceinline m4 M4(m3 v) {
-	return {
+	return M4(
 		V4f(v.i, 0),
 		V4f(v.j, 0),
 		V4f(v.k, 0),
-		V4f(0, 0, 0, 1),
-	};
+		V4f(0, 0, 0, 1)
+	);
 }
 
 using FrustumPlanes = Array<v4f, 6>;

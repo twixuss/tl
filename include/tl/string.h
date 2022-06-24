@@ -553,7 +553,7 @@ forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b,
 forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
 
-template <class T, class Format>
+template <class T, class Format=void>
 struct FormatSpan {
 	Span<T> value;
 	Format format;
@@ -562,25 +562,47 @@ struct FormatSpan {
 	Span<u8> after = "}"b;
 };
 
+template <class T>
+struct FormatSpan<T, void> {
+	Span<T> value;
+	Span<u8> before = "{"b;
+	Span<u8> separator = ", "b;
+	Span<u8> after = "}"b;
+};
+
 template <class T, class Format>
 forceinline umm append(StringBuilder &b, FormatSpan<T, Format> format) {
-	umm count = 0;
-	count += append_bytes(b, format.before);
-	if (format.value.count) {
-		format.format.value = *format.value.data;
-		count += append(b, format.format);
+	if constexpr (is_same<Format, void>) {
+		umm count = 0;
+		count += append_bytes(b, format.before);
+		if (format.value.count) {
+			count += append(b, *format.value.data);
+		}
+		for (auto &val : format.value.skip(1)) {
+			count += append_bytes(b, format.separator);
+			count += append(b, val);
+		}
+		count += append_bytes(b, format.after);
+		return count;
+	} else {
+		umm count = 0;
+		count += append_bytes(b, format.before);
+		if (format.value.count) {
+			format.format.value = *format.value.data;
+			count += append(b, format.format);
+		}
+		for (auto &val : format.value.skip(1)) {
+			count += append_bytes(b, format.separator);
+			format.format.value = val;
+			count += append(b, format.format);
+		}
+		count += append_bytes(b, format.after);
+		return count;
 	}
-	for (auto &val : format.value.skip(1)) {
-		count += append_bytes(b, format.separator);
-		format.format.value = val;
-		count += append(b, format.format);
-	}
-	count += append_bytes(b, format.after);
-	return count;
 }
 
 template <class T>
-forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatSpan{.span = list}); }
+forceinline umm append(StringBuilder &b, List<T> list) { return append(b, FormatSpan{.value = list}); }
 
 template <> forceinline umm append(StringBuilder &b, List<u8   > list) { return append(b, as_span(list)); }
 template <> forceinline umm append(StringBuilder &b, List<ascii> list) { return append(b, as_span(list)); }

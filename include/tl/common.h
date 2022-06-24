@@ -1503,6 +1503,19 @@ struct StaticList {
 	template <class Size = umm>
 	forceinline constexpr Span<T, Size> span() { return {data, count}; }
 
+	template <class U, class ThatSize>
+	constexpr explicit operator Span<U, ThatSize>() const {
+		static_assert(sizeof(U) == sizeof(T));
+		assert((ThatSize)count == count);
+		return {(U *)data, (ThatSize)count};
+	}
+
+	template <class ThatSize>
+	constexpr operator Span<T, ThatSize>() const {
+		assert((ThatSize)count == count);
+		return {data, (ThatSize)count};
+	}
+
 	forceinline constexpr T &add() {
 		bounds_check(!full());
 		return *new(data + count++) T();

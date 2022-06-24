@@ -51,6 +51,7 @@ namespace tl {
 	K(semicolon    , 0xba) \
 	K(plus         , 0xbb) \
 	K(comma        , 0xbc) \
+	K(minus        , 0xbd) \
 	K(period       , 0xbe) \
 	K(slash        , 0xbf) \
 	K(left_bracket , 0xdb) \

@@ -17,7 +17,7 @@ TL_API List<char> get_time_string();
 
 TL_API void make_os_timing_precise();
 
-TL_API void sync(u64 &frame_time_counter, f32 frame_time);
+TL_API void sync(u64 &frame_time_counter, f32 target_frame_time);
 
 struct Date {
 	u16 year;        // 1601 - 30827
@@ -101,8 +101,8 @@ void make_os_timing_precise() {
 	timeBeginPeriod(1);
 }
 
-void sync(u64 &frame_time_counter, f32 frame_time) {
-	auto target_counter = frame_time_counter + (u64)(performance_frequency * frame_time);
+void sync(u64 &frame_time_counter, f32 target_frame_time) {
+	auto target_counter = frame_time_counter + (u64)(performance_frequency * target_frame_time);
 
 	auto now = get_performance_counter();
 

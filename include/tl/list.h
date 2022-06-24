@@ -1,5 +1,5 @@
 #pragma once
-#include "common.h"
+#include "optional.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
@@ -512,10 +512,14 @@ struct Queue : Span<T> {
 		data[0] = value;
 	}
 
-	void pop() {
-		bounds_check(count);
-		++data;
-		--count;
+	Optional<T> pop() {
+		if (!count)
+			return {};
+		defer {
+			++data;
+			--count;
+		};
+		return *data;
 	}
 	//void resize(umm new_count) {
 	//	if (new_count > capacity())
@@ -616,15 +620,15 @@ void free(Queue<T> &queue) {
 }
 
 template <class T, umm _capacity>
-struct StaticCircularBuffer {
-	using Storage = Storage<T>;
+struct StaticRingBuffer {
+	inline static constexpr umm capacity = _capacity;
 	struct Iterator {
 		using value_type = T;
-		StaticCircularBuffer *buffer;
+		StaticRingBuffer *buffer;
 		umm index;
-		Iterator(StaticCircularBuffer *buffer, umm index) : buffer(buffer), index(index) {}
-		T &operator*() { return buffer->_get(index); }
-		T &operator*() const { return buffer->_get(index); }
+		Iterator(StaticRingBuffer *buffer, umm index) : buffer(buffer), index(index) {}
+		T &operator*() { return buffer->at(index); }
+		T &operator*() const { return buffer->at(index); }
 		Iterator operator+(smm v) const { return Iterator(buffer, index + v); }
 		Iterator operator-(smm v) const { return Iterator(buffer, index - v); }
 		smm operator-(Iterator v) const { return index - v.index; }
@@ -639,108 +643,140 @@ struct StaticCircularBuffer {
 		bool operator==(Iterator const &that) const { return index == that.index; }
 		bool operator!=(Iterator const &that) const { return index != that.index; }
 	};
+#if 0
+	StaticRingBuffer() = default;
+	StaticRingBuffer(StaticRingBuffer const &that) {
+		count = that.count;
 
-	StaticCircularBuffer() = default;
-	StaticCircularBuffer(StaticCircularBuffer const &that) {
-		_size = that._size;
-		umm dstIndex = that._begin;
-		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
-			new (&_storage[srcIndex].value) T(that._storage[dstIndex].value);
-			if (++dstIndex == _capacity)
+		if (that.data + that.count > that.storage + that.capacity) {
+			auto first_count  = that.capacity - that.data;
+			auto second_count = that.count - first_count;
+			memcpy(data, that.data, first_count * sizeof(T));
+			memcpy(data, that.storage, second_count * sizeof(T));
+		} else {
+			memcpy(data, that.data, that.count * sizeof(T));
+		}
+	}
+	StaticRingBuffer(StaticRingBuffer &&that) {
+		count = that.count;
+		umm dstIndex = that.start;
+		for (umm srcIndex = 0; srcIndex < count; ++srcIndex) {
+			new (&storage[srcIndex].value) T(std::move(that.storage[dstIndex].value));
+			if (++dstIndex == capacity)
 				dstIndex = 0;
 		}
+		that.start = 0;
+		that.count = 0;
 	}
-	StaticCircularBuffer(StaticCircularBuffer &&that) {
-		_size = that._size;
-		umm dstIndex = that._begin;
-		for (umm srcIndex = 0; srcIndex < _size; ++srcIndex) {
-			new (&_storage[srcIndex].value) T(std::move(that._storage[dstIndex].value));
-			if (++dstIndex == _capacity)
-				dstIndex = 0;
+	StaticRingBuffer &operator=(StaticRingBuffer const &that) { clear(); return *new (this) StaticRingBuffer(that); }
+	StaticRingBuffer &operator=(StaticRingBuffer &&that) { clear(); return *new (this) StaticRingBuffer(std::move(that)); }
+	~StaticRingBuffer() {
+		for (umm i = 0; i < count; ++i) {
+			at(i).~T();
 		}
-		that._begin = 0;
-		that._size = 0;
+		start = 0;
+		count = 0;
 	}
-	StaticCircularBuffer &operator=(StaticCircularBuffer const &that) { clear(); return *new (this) StaticCircularBuffer(that); }
-	StaticCircularBuffer &operator=(StaticCircularBuffer &&that) { clear(); return *new (this) StaticCircularBuffer(std::move(that)); }
-	~StaticCircularBuffer() {
-		for (umm i = 0; i < _size; ++i) {
-			_get(i).~T();
+#endif
+	T &push_back(T value) {
+		bounds_check(count != capacity);
+		auto dst = data + count;
+		count += 1;
+		return *(dst - capacity * (dst >= storage + capacity)) = value;
+	}
+	void push_back(Span<T> span) {
+		bounds_check(count + span.count <= capacity);
+		if (data + span.count > storage + capacity) {
+			auto first_count  = storage + capacity - data;
+			auto second_count = span.count - first_count;
+			memcpy(data, span.data, first_count * sizeof(T));
+			memcpy(storage, span.data + first_count, second_count * sizeof(T));
+		} else {
+			memcpy(data, span.data, span.count * sizeof(T));
 		}
-		_begin = 0;
-		_size = 0;
-	}
-	template <class ...Args>
-	void emplace_back(Args &&...args) {
-		bounds_check(_size != _capacity);
-		new (&_storage[(_begin + _size++) % _capacity].value) T(std::forward<Args>(args)...);
-	}
-	template <class ...Args>
-	void emplace_front(Args &&...args) {
-		bounds_check(_size != _capacity);
-		++_size;
-		if (_begin) --_begin; else _begin = _capacity - 1;
-		new (&_storage[_begin].value) T(std::forward<Args>(args)...);
-	}
-	void push_back(T const &v) { emplace_back(v); }
-	void push_back(T &&v) { emplace_back(std::move(v)); }
-	void push_front(T const &v) { emplace_front(v); }
-	void push_front(T &&v) { emplace_front(std::move(v)); }
 
-	void pop_back() { _get(--_size).~T(); }
-	void pop_front() { _storage[_begin].value.~T(); _incBegin(); --_size; }
+		count += span.count;
+	}
+	T &push_front(T value) {
+		bounds_check(count != capacity);
+		count += 1;
+		data = sub_wrap(data, 1);
+		return *data = value;
+	}
+
+	Optional<T> pop_back() {
+		if (!count)
+			return {};
+		return at(count -= 1);
+	}
+	Optional<T> pop_front() {
+		if (!count)
+			return {};
+		auto result_ptr = data;
+		data = add_wrap(data, 1);
+		count -= 1;
+		return *result_ptr;
+	}
 
 	Iterator begin() { return Iterator(this, 0); }
-	Iterator end() { return Iterator(this, _size); }
+	Iterator end() { return Iterator(this, count); }
 
-	T &back() { bounds_check(_size); return _get(_size - 1); }
-	T &front() { bounds_check(_size); return _get(0); }
+	T &back() { bounds_check(count); return at(count - 1); }
+	T &front() { bounds_check(count); return at(0); }
 
-	umm size() const { return _size; }
-	bool empty() const { return _size == 0; }
-	bool full() const { return _size == _capacity; }
+	bool is_empty() const { return count == 0; }
+	bool is_full() const { return count == capacity; }
 
-	T &operator[](umm i) { bounds_check(i < _size); return _get(i); }
-	T const &operator[](umm i) const { bounds_check(i < _size); return _get(i); }
-
+	T &operator[](umm i) { bounds_check(i < count); return at(i); }
+	T const &operator[](umm i) const { bounds_check(i < count); return at(i); }
+#if 0
 	void erase(Iterator it) {
 		umm index = it.index;
-		bounds_check(index < _size);
-		--_size;
-		if (index > _size / 2) {
-			for (;index < _size; ++index) {
-				_get(index) = std::move(_get(index + 1));
+		bounds_check(index < count);
+		--count;
+		if (index > count / 2) {
+			for (;index < count; ++index) {
+				at(index) = std::move(at(index + 1));
 			}
-			_get(_size).~T();
+			at(count).~T();
 		} else {
 			for (;index; --index) {
-				_get(index) = std::move(_get(index - 1));
+				at(index) = std::move(at(index - 1));
 			}
-			_get(0).~T();
+			at(0).~T();
 			_incBegin();
 		}
 	}
 
-	void clear() {
-		for (umm i = 0; i < size(); ++i) {
-			_get(i).~T();
-		}
-		_begin = 0;
-		_size = 0;
-	}
-
-	T &_get(umm i) {
-		return _storage[(_begin + i) % _capacity].value;
-	}
 	void _incBegin() {
-		++_begin;
-		if (_begin == _capacity)
-			_begin = 0;
+		data += 1;
+		data -= capacity * (data >= storage + capacity);
+	}
+#endif
+
+	void clear() {
+		data  = storage;
+		count = 0;
 	}
 
-	Storage _storage[_capacity];
-	umm _begin = 0;
-	umm _size = 0;
+	T &at(umm i) {
+		return *add_wrap(data, i);
+	}
+
+	T *add_wrap(T *p, umm i) {
+		p += i;
+		return p - capacity * (p >= storage + capacity);
+	}
+	T *sub_wrap(T *p, umm i) {
+		p -= i;
+		return p + capacity * (p < storage);
+	}
+
+	union {
+		T storage[capacity];
+	};
+	T *data = storage;
+	umm count = 0;
 };
 
 #if 0
@@ -909,19 +945,18 @@ struct CircularBuffer {
 #endif
 
 template <class T, umm _capacity>
-struct StaticCircularQueue : private StaticCircularBuffer<T, _capacity> {
-	using Base = StaticCircularBuffer<T, _capacity>;
+struct StaticRingQueue : private StaticRingBuffer<T, _capacity> {
+	using Base = StaticRingBuffer<T, _capacity>;
+	using Base::data;
+	using Base::count;
+	using Base::capacity;
 	using Base::begin;
 	using Base::end;
-	using Base::size;
-	using Base::empty;
-	using Base::erase;
-	using Base::front;
 	using Base::clear;
 	using Base::operator[];
-	void push(T const &v) { this->push_back(v); }
-	void push(T &&v) { this->push_back(std::move(v)); }
-	void pop() { this->pop_front(); }
+	T &push(T value) { return this->push_back(value); }
+	void push(Span<T> span) { return this->push_back(span); }
+	Optional<T> pop() { return this->pop_front(); }
 };
 
 template <class T>

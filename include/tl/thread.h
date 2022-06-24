@@ -312,6 +312,17 @@ inline void wait_for_unlock(Mutex &m) {
 	});
 }
 
+template <>
+struct Scoped<Mutex> {
+	Mutex *mutex;
+	Scoped(Mutex &mutex) : mutex(&mutex) {
+		lock(mutex);
+	}
+	~Scoped() {
+		unlock(*mutex);
+	}
+};
+
 struct RecursiveMutex {
 	u32 volatile thread_id = 0;
 	u32 counter = 0;
@@ -343,6 +354,17 @@ inline void unlock(RecursiveMutex &m) {
 		--m.counter;
 	}
 }
+
+template <>
+struct Scoped<RecursiveMutex> {
+	RecursiveMutex *mutex;
+	Scoped(RecursiveMutex &mutex) : mutex(&mutex) {
+		lock(mutex);
+	}
+	~Scoped() {
+		unlock(*mutex);
+	}
+};
 
 #define scoped_lock(mutex) lock(mutex); defer { unlock(mutex); }
 #define scoped_unlock(mutex) unlock(mutex); defer { lock(mutex); }
@@ -418,43 +440,6 @@ struct MutexQueue {
 
 template <class T, class Mutex>
 Span<T> as_span(MutexQueue<T, Mutex> &queue) { return as_span(queue.base); }
-
-template <class T, umm capacity, class Mutex = Mutex>
-struct StaticMutexCircularQueue {
-	void push(T &&value) {
-		scoped_lock(mutex);
-		base.push(std::move(value));
-	}
-	void push(T const &value) {
-		scoped_lock(mutex);
-		base.push(value);
-	}
-	Optional<T> try_pop() {
-		Optional<T> result;
-		scoped_lock(mutex);
-		if (base.size()) {
-			result.emplace(std::move(base.front()));
-			base.pop();
-		}
-		return result;
-	}
-	T pop() {
-		Optional<T> opt;
-		loop_until([&] {
-			opt = try_pop();
-			return opt.has_value();
-		});
-		return opt.get();
-	}
-	void clear() {
-		scoped_lock(mutex);
-		base.clear();
-	}
-
-private:
-	StaticCircularQueue<T, capacity> base;
-	Mutex mutex;
-};
 
 struct WorkQueue;
 

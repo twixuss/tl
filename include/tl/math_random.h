@@ -20,6 +20,14 @@ inline static constexpr u32 u32_random_primes[] = {
 };
 
 template <class State>
+inline v2f next_v2f(State &state) {
+	return {
+		next_f32(state),
+		next_f32(state),
+	};
+}
+
+template <class State>
 inline v3f next_v3f(State &state) {
 	return {
 		next_f32(state),
