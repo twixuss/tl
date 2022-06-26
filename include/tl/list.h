@@ -499,13 +499,13 @@ struct Queue : Span<T> {
 	T &back() { bounds_check(count); return data[count - 1]; }
 	T &operator[](umm i) { bounds_check(count); return data[i]; }
 
-	void push(T const &value) {
-		_grow_if_needed(count + 1);
+	void push(T const &value TL_LP) {
+		_grow_if_needed(count + 1 TL_LA);
 		data[count++] = value;
 	}
 
-	void push_front_unordered(T const &value) {
-		_grow_if_needed(count + 1);
+	void push_front_unordered(T const &value TL_LP) {
+		_grow_if_needed(count + 1 TL_LA);
 		if (count != 0) {
 			data[count++] = data[0];
 		}
@@ -568,7 +568,7 @@ struct Queue : Span<T> {
 	void erase(T *val) { erase_at(val - data); }
 	void erase(T &val) { erase(&val); }
 
-	void _grow_if_needed(umm required_count) {
+	void _grow_if_needed(umm required_count TL_LP) {
 		if (required_count <= space_back())
 			return;
 		umm new_capacity = space_back();
@@ -578,21 +578,21 @@ struct Queue : Span<T> {
 			new_capacity *= 2;
 		}
 
-		T *new_data = allocator.allocate<T>(new_capacity);
+		T *new_data = allocator.allocate<T>(new_capacity TL_LA);
 		for (umm i = 0; i < count; ++i) {
 			new_data[i] = data[i];
 		}
 		if (alloc_data)
-			allocator.free(alloc_data);
+			allocator.free_t(alloc_data, alloc_count);
 
 		alloc_data = new_data;
 		data = new_data;
 		alloc_count = new_capacity;
 	}
-	T *insert(Span<T const> span, umm where) {
+	T *insert(Span<T const> span, umm where TL_LP) {
 		bounds_check(where <= count);
 
-		_grow_if_needed(count + span.count);
+		_grow_if_needed(count + span.count TL_LA);
 
 		for (umm i = where; i < count; ++i) {
 			data[span.count + i] = data[i];

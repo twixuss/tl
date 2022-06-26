@@ -1935,12 +1935,27 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 	return planes;
 }
 forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
+#if ARCH_AVX2
+	f32x8 plane_x = f32x8_set(planes[0].x, planes[1].x, planes[2].x, planes[3].x, planes[4].x, planes[5].x, 0, 0);
+	f32x8 plane_y = f32x8_set(planes[0].y, planes[1].y, planes[2].y, planes[3].y, planes[4].y, planes[5].y, 0, 0);
+	f32x8 plane_z = f32x8_set(planes[0].z, planes[1].z, planes[2].z, planes[3].z, planes[4].z, planes[5].z, 0, 0);
+	f32x8 plane_w = f32x8_set(planes[0].w, planes[1].w, planes[2].w, planes[3].w, planes[4].w, planes[5].w, 0, 0);
+	f32x8 position_x = f32x8_set1(position.x);
+	f32x8 position_y = f32x8_set1(position.y);
+	f32x8 position_z = f32x8_set1(position.z);
+	f32x8 negative_radius = f32x8_set1(-radius);
+
+	f32x8 f = f32x8_add(f32x8_muladd(plane_x, position_x, f32x8_muladd(plane_y, position_y, f32x8_mul(plane_z, position_z))), plane_w);
+	auto mask = b32x8_get_mask(f32x8_lt(f, f32x8_set1(-radius)));
+	return !(mask & 0b11111100);
+#else
 	for (auto p : planes) {
-		if (dot(v3f{p.x, p.y, p.z}, position) + p.w + radius < 0) {
+		if (dot(v3f{p.x, p.y, p.z}, position) + p.w < -radius) {
 			return false;
 		}
 	}
 	return true;
+#endif
 }
 
 forceinline f32 sdf_torus(v3f point, f32 radius, f32 thickness) {

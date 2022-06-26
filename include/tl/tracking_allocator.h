@@ -2,72 +2,105 @@
 #include "thread.h"
 #include "debug.h"
 #include "hash_map.h"
+#include "fly_string.h"
 
 namespace tl {
 
 extern TL_API Allocator tracking_allocator;
-
-struct AllocationInfo {
-	umm size;
-	std::source_location location;
-	CallStack call_stack;
-};
+extern TL_API Allocator tracking_allocator_fallback;
 
 //
 // Before accessing `tracked_allocations`, make sure that you lock `tracked_allocations_mutex`
 //
 
-extern TL_API HashMap<void *, AllocationInfo> tracked_allocations;
+struct AllocationInfo {
+	umm current_size;
+	umm total_size;
+};
+
+extern TL_API HashMap<FlyString, AllocationInfo> tracked_allocations;
 extern TL_API Mutex tracked_allocations_mutex;
+
+TL_API void init_tracking_allocator();
 
 #ifdef TL_IMPL
 
-HashMap<void *, AllocationInfo> tracked_allocations;
+HashMap<FlyString, AllocationInfo> tracked_allocations;
 Mutex tracked_allocations_mutex;
+Allocator tracking_allocator_fallback;
 
-forceinline void track_allocation(void *pointer, umm size, std::source_location location) {
-	scoped_allocator(default_allocator);
+struct AllocationMeta {
+	AllocationInfo *info;
+	umm this_size;
+};
 
-	AllocationInfo a;
-	a.size = size;
-	a.location = location;
-	a.call_stack = get_call_stack();
+static HashMap<void *, AllocationMeta> allocation_metas;
 
-	scoped_lock(tracked_allocations_mutex);
-	tracked_allocations.get_or_insert(pointer) = a;
+void init_tracking_allocator() {
+	construct(tracked_allocations);
+	construct(allocation_metas);
 }
-forceinline void untrack_allocation(void *pointer) {
-	scoped_lock(tracked_allocations_mutex);
-	tracked_allocations.erase(pointer);
-}
-forceinline void retrack_allocation(void *old_pointer, void *new_pointer, umm size, std::source_location location) {
-	scoped_allocator(default_allocator);
 
-	AllocationInfo a;
-	a.size = size;
-	a.location = location;
-	a.call_stack = get_call_stack();
-
-	scoped_lock(tracked_allocations_mutex);
-	tracked_allocations.get_or_insert(new_pointer) = a;
-	tracked_allocations.erase(old_pointer);
+static auto format_location(std::source_location location) {
+	return (List<utf8>)format("{}:{}", location.file_name(), location.line());
 }
+
 Allocator tracking_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> AllocationResult {
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
 		switch (mode) {
 			case Allocator_allocate: {
-				auto result = default_allocator.allocate_impl(new_size, align, location);
-				track_allocation(result.data, new_size, location);
+				auto result = tracking_allocator_fallback.allocate_impl(new_size, align, location);
+
+				scoped_allocator(os_allocator);
+
+				auto string = format_location(location);
+				defer { free(string); };
+
+				scoped_lock(tracked_allocations_mutex);
+
+				auto &info = tracked_allocations.get_or_insert(string);
+				info.current_size += new_size;
+				info.total_size   += new_size;
+
+				auto &meta = allocation_metas.get_or_insert(result.data);
+				meta.this_size = new_size;
+				meta.info = &info;
+
 				return result;
 			}
 			case Allocator_reallocate: {
-				auto result = default_allocator.reallocate_impl(data, old_size, new_size, align, location);
-				retrack_allocation(data, result.data, new_size, location);
+				auto result = tracking_allocator_fallback.reallocate_impl(data, old_size, new_size, align, location);
+
+				scoped_allocator(os_allocator);
+
+				auto string = format_location(location);
+				defer { free(string); };
+
+				scoped_lock(tracked_allocations_mutex);
+
+				auto &old_meta = allocation_metas.find(data)->value;
+				old_meta.info->current_size -= old_meta.this_size;
+				allocation_metas.erase(data);
+
+				auto &info = tracked_allocations.get_or_insert(string);
+				info.current_size += new_size;
+				info.total_size   += new_size;
+
+				auto &new_meta = allocation_metas.get_or_insert(result.data);
+				new_meta.this_size = new_size;
+				new_meta.info = &info;
+
 				return result;
 			}
 			case Allocator_free: {
-				default_allocator.free(data, new_size, align, location);
-				untrack_allocation(data);
+				tracking_allocator_fallback.free(data, new_size, align, location);
+
+				scoped_lock(tracked_allocations_mutex);
+
+				auto &old_meta = allocation_metas.find(data)->value;
+				old_meta.info->current_size -= old_meta.this_size;
+				allocation_metas.erase(data);
+
 				break;
 			}
 		}

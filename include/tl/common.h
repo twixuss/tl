@@ -383,15 +383,35 @@ forceinline constexpr bool is_power_of_2(s32 v) { return v > 0 && count_bits(v) 
 forceinline constexpr bool is_power_of_2(s64 v) { return v > 0 && count_bits(v) == 1; }
 
 template <class T> forceinline constexpr T select(bool mask, T a, T b) { return mask ? a : b; }
-template <class T, class U> forceinline constexpr auto min(T a, U b) { return a < b ? a : b; }
-template <class T, class U> forceinline constexpr auto max(T a, U b) { return a > b ? a : b; }
-template <class T, class U, class... Rest> forceinline constexpr auto min(T a, U b, Rest... rest) { return min(min(a, b), rest...); }
-template <class T, class U, class... Rest> forceinline constexpr auto max(T a, U b, Rest... rest) { return max(max(a, b), rest...); }
-template <class T, class U, class V, class W> forceinline constexpr void minmax(T a, U b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
+
+// NOTE: have to use const & to pass arrays, otherwise they rot.
+template <class T> forceinline constexpr auto min(T const &a) { return a; }
+template <class T> forceinline constexpr auto max(T const &a) { return a; }
+template <class T, class U> forceinline constexpr auto min(T const &a, U const &b) { return a < b ? a : b; }
+template <class T, class U> forceinline constexpr auto max(T const &a, U const &b) { return a > b ? a : b; }
+template <class T, class U, class... Rest> forceinline constexpr auto min(T const &a, U const &b, Rest const &...rest) { return min(min(a, b), rest...); }
+template <class T, class U, class... Rest> forceinline constexpr auto max(T const &a, U const &b, Rest const &...rest) { return max(max(a, b), rest...); }
+template <class T, class U, class V, class W> forceinline constexpr void minmax(T const &a, U const &b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
 template <class T, class U> forceinline constexpr void minmax(T& mn, U &mx) { minmax(mn, mx, mn, mx); }
 
 template <class T, umm count>
-forceinline constexpr auto min(T (&array)[count]) {
+forceinline constexpr auto min(T const &a, T const (&b)[count]) {
+	auto x = a;
+	for (auto const &v : b)
+		x = min(x, v);
+	return x;
+}
+
+template <class T, umm count>
+forceinline constexpr auto max(T const &a, T const (&b)[count]) {
+	auto x = a;
+	for (auto const &v : b)
+		x = max(x, v);
+	return x;
+}
+
+template <class T, umm count>
+forceinline constexpr auto min(T const (&array)[count]) {
 	T result = array[0];
 	for (umm i = 1; i < count; ++i) {
 		result = min(result, array[i]);
@@ -400,7 +420,7 @@ forceinline constexpr auto min(T (&array)[count]) {
 }
 
 template <class T, umm count>
-forceinline constexpr auto max(T (&array)[count]) {
+forceinline constexpr auto max(T const (&array)[count]) {
 	T result = array[0];
 	for (umm i = 1; i < count; ++i) {
 		result = max(result, array[i]);
@@ -1773,7 +1793,7 @@ struct AllocatorBase {
 		if (!result.is_zeroed && result.data && (new_size > old_size)) {
 			memset((u8 *)result.data + old_size, 0, new_size - old_size);
 		}
-		return result;
+		return result.data;
 	}
 
 	template <class T>

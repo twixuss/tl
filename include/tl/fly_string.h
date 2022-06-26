@@ -38,6 +38,11 @@ struct FlyString {
         return (Span<utf8, Size>)as_span(data);
     }
 
+    template <class Size=umm>
+    inline Span<utf8, Size> span() const {
+        return (Span<utf8, Size>)as_span(data);
+    }
+
     inline bool is_empty() const {
         return !data || *data == 0;
     }
@@ -58,7 +63,7 @@ inline umm append(StringBuilder &builder, FlyString str) {
 }
 
 template <>
-inline tl::u64 get_hash(tl::FlyString str) {
+inline tl::u64 get_hash(tl::FlyString const &str) {
     auto c = str.data;
 	tl::u64 result = 0xdeadc0debabeface;
 	while (*c) {

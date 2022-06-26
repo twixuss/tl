@@ -66,12 +66,12 @@ TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 TL_API SizedFont *get_font_at_size(FontCollection *collection, u32 size);
 TL_API FontCollection *create_font_collection(Span<Span<utf8>> font_paths);
 TL_API void free(FontCollection *collection);
-TL_API TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params = {});
-inline List<PlacedChar> place_text(Span<utf8> text, SizedFont *font) {
-	return get_text_info(text, font, {.place_chars=true}).placed_chars;
+TL_API TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params = {} TL_LP);
+inline List<PlacedChar> place_text(Span<utf8> text, SizedFont *font TL_LP) {
+	return get_text_info(text, font, {.place_chars=true} TL_LA).placed_chars;
 }
-inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font) {
-	return get_text_info(text, font, {.bounds=true}).bounds;
+inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font TL_LP) {
+	return get_text_info(text, font, {.bounds=true} TL_LA).bounds;
 }
 
 }
@@ -331,7 +331,7 @@ FontChar get_char_info(u32 ch, SizedFont *font) {
 	return found->value;
 }
 
-TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params) {
+TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams params TL_LPD) {
 	TextInfo info = {};
 	v2s char_position = {};
 	char_position.y = font->ascender - font->line_spacing;
@@ -367,7 +367,7 @@ TextInfo get_text_info(Span<utf8> text, SizedFont *font, GetTextInfoParams param
 				c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
 				c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
 
-				info.placed_chars.add(c);
+				info.placed_chars.add(c TL_LA);
 			}
 		}
 		if (params.bounds) {

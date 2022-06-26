@@ -494,7 +494,7 @@ inline List<u8, Allocator> to_string(StringBuilder &builder, Allocator allocator
 }
 
 inline List<u8> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
-	return to_string<Allocator>(builder, allocator);
+	return to_string<Allocator>(builder, allocator TL_LA);
 }
 
 inline List<u8> to_string(StringBuilder &builder TL_LP) {
@@ -552,6 +552,13 @@ forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b,
 forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
+
+template <class T>
+umm append(struct StringBuilder &builder, Optional<T> v) {
+	if (v.has_value())
+		return append(builder, v.value_unchecked());
+	return append(builder, "empty");
+}
 
 template <class T, class Format=void>
 struct FormatSpan {

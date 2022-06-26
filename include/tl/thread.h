@@ -328,13 +328,19 @@ struct RecursiveMutex {
 	u32 counter = 0;
 };
 
-inline bool try_lock(RecursiveMutex &m) {
+inline bool try_lock(RecursiveMutex &m, u32 *locked_by = 0) {
 	u32 thread_id = get_current_thread_id();
 	if (thread_id == m.thread_id) {
 		++m.counter;
 		return true;
 	} else {
-		return !atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
+		auto prev_id = atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
+		if (prev_id == 0)
+			return true;
+
+		if (locked_by)
+			*locked_by = prev_id;
+		return false;
 	}
 }
 inline void lock(RecursiveMutex &m) {
