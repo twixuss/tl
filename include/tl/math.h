@@ -787,7 +787,14 @@ forceinline v3f cross(v3f a, v3f b) {
 	};
 }
 
-forceinline f32 sum(v2f v) { return v.x + v.y; }
+template <class T>
+forceinline auto sum(v2<T> v) { return v.x + v.y; }
+
+template <class T>
+forceinline auto sum(v3<T> v) { return v.x + v.y + v.z; }
+
+template <class T>
+forceinline auto sum(v4<T> v) { return v.x + v.y + v.z + v.w; }
 
 forceinline f32 rsqrt(f32 v) { return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(v))); }
 

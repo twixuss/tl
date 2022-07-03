@@ -1002,9 +1002,13 @@ struct Span {
 	constexpr Span subspan(Size subspan_start, Size subspan_count) const {
 		return {data + subspan_start, subspan_count};
 	}
-	constexpr Span skip(Size amount) const {
-		amount = min(amount, count);
-		return {data + amount, count - amount};
+	constexpr Span skip(smm amount) const {
+		if (amount >= 0) {
+			auto offset = min((umm)amount, count);
+			return {data + offset, count - offset};
+		} else {
+			return {data, count + amount};
+		}
 	}
 	constexpr void set_begin(T *new_begin) {
 		count = end() - new_begin;

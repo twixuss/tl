@@ -182,7 +182,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #if ARCH_FMA
 #define f32x4_muladd(a,b,c) _mm_fmadd_ps(a,b,c)
 #else
-#define f32x4_muladd(a,b,t) f32x4_add(f32x4_mul(a,b),c)
+#define f32x4_muladd(a,b,c) f32x4_add(f32x4_mul(a,b),c)
 #endif
 #define f32x4_lerp(a,b,t) f32x4_muladd(f32x4_sub(b,a),t,a)
 #define f32x4_to_s32x4(a) i2f16(_mm_cvttps_epi32(a))

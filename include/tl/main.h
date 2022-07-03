@@ -12,7 +12,7 @@ int wmain(int argc, wchar_t **argv) {
 
 	List<Span<utf8>> arguments;
 	for (int i = 0; i < argc; ++i) {
-		arguments.add(to_utf8(as_span((utf16 *)argv[i])));
+		arguments.add(to_utf8(as_span((utf16 *)argv[i]), true).skip(-1));
 	}
 
 	return tl_main(arguments);
