@@ -1004,10 +1004,10 @@ struct Span {
 	}
 	constexpr Span skip(smm amount) const {
 		if (amount >= 0) {
-			auto offset = min((umm)amount, count);
-			return {data + offset, count - offset};
+			auto offset = min((Size)amount, count);
+			return {data + offset, (Size)((smm)count - offset)};
 		} else {
-			return {data, count + amount};
+			return {data, (Size)(count + amount)};
 		}
 	}
 	constexpr void set_begin(T *new_begin) {
