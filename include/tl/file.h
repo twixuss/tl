@@ -199,75 +199,31 @@ inline bool create_directory(Span<ascii> path) { return create_directory(tempora
 inline bool create_directory(Span<utf8>  path) { return create_directory(to_utf16(path, true).data); }
 inline bool create_directory(Span<utf16> path) { return create_directory(temporary_null_terminate(path).data); }
 
-struct FileTracker {
-	File file;
-	u64 last_write_time;
-
-	Allocator allocator;
-	void (*on_update)(FileTracker &tracker, void *state);
-	void *state;
+struct FileState {
+	bool changed : 1;
+	bool failed  : 1;
 };
 
-inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	FileTracker result = {};
-	result.on_update = on_update;
-	result.state = state;
-	result.file = file;
-	return result;
-}
-inline FileTracker create_file_tracker(File file, void (*on_update)(FileTracker &tracker)) {
-	return create_file_tracker(file, (void(*)(FileTracker &, void *))on_update, 0);
-}
-inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker, void *state), void *state) {
-	return create_file_tracker(open_file(path, {}), (void(*)(FileTracker &, void *))on_update, state);
-}
-inline FileTracker create_file_tracker(Span<pathchar> path, void (*on_update)(FileTracker &tracker)) {
-	return create_file_tracker(path, (void(*)(FileTracker &, void *))on_update, 0);
-}
-template <class Fn>
-inline FileTracker create_file_tracker(Span<pathchar> path, Fn &&on_update) {
-	auto allocator = current_allocator;
+using FileTime = u64;
 
-	auto params = ALLOCATE_NOINIT(Fn, allocator);
-	new(params) Fn(std::forward<Fn>(on_update));
-
-	FileTracker result = create_file_tracker(path, [](FileTracker &tracker, void *state) {
-		Fn &fn = *(Fn *)state;
-		fn(tracker);
-	}, params);
-	result.allocator = allocator;
-	return result;
-}
-
-enum class FileTrackerUpdateState {
-	none,
-	needs_update,
-	failure,
-};
-
-inline FileTrackerUpdateState update(FileTracker &tracker) {
-	auto retrieved_time = get_file_write_time(tracker.file);
-	if (!retrieved_time) {
-		return FileTrackerUpdateState::failure;
+inline FileState detect_change(File file, FileTime *last_write_time) {
+	auto maybe_retrieved_time = get_file_write_time(file);
+	if (!maybe_retrieved_time) {
+		return {.failed = true};
 	}
 
-	u64 last_write_time = retrieved_time.value();
-	if (last_write_time > tracker.last_write_time) {
-		tracker.last_write_time = last_write_time;
-		tracker.on_update(tracker, tracker.state);
-		return FileTrackerUpdateState::needs_update;
-	}
-	return FileTrackerUpdateState::none;
-}
+	auto retrieved_time = maybe_retrieved_time.value_unchecked();
 
-inline void free(FileTracker &tracker) {
-	if (is_valid(tracker.file)) {
-		if (tracker.allocator) {
-			tracker.allocator.free(tracker.state);
-		}
-		close(tracker.file);
-		tracker = {};
-	}
+	if (*last_write_time >= retrieved_time)
+		return {};
+
+	*last_write_time = retrieved_time;
+	return {.changed = true};
+}
+inline FileState detect_change(char const *path, FileTime *last_write_time) {
+	auto file = open_file(path, {.read=true});
+	defer { close(file); };
+	return detect_change(file, last_write_time);
 }
 
 inline u64 length(File file) {

@@ -49,14 +49,14 @@ Allocator tracking_allocator = {
 	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
 		switch (mode) {
 			case Allocator_allocate: {
+				scoped_lock(tracked_allocations_mutex);
+
 				auto result = tracking_allocator_fallback.allocate_impl(new_size, align, location);
 
 				scoped_allocator(os_allocator);
 
 				auto string = format_location(location);
 				defer { free(string); };
-
-				scoped_lock(tracked_allocations_mutex);
 
 				auto &info = tracked_allocations.get_or_insert(string);
 				info.current_size += new_size;
@@ -69,14 +69,14 @@ Allocator tracking_allocator = {
 				return result;
 			}
 			case Allocator_reallocate: {
+				scoped_lock(tracked_allocations_mutex);
+
 				auto result = tracking_allocator_fallback.reallocate_impl(data, old_size, new_size, align, location);
 
 				scoped_allocator(os_allocator);
 
 				auto string = format_location(location);
 				defer { free(string); };
-
-				scoped_lock(tracked_allocations_mutex);
 
 				auto &old_meta = allocation_metas.find(data)->value;
 				old_meta.info->current_size -= old_meta.this_size;
@@ -93,9 +93,9 @@ Allocator tracking_allocator = {
 				return result;
 			}
 			case Allocator_free: {
-				tracking_allocator_fallback.free(data, new_size, align, location);
-
 				scoped_lock(tracked_allocations_mutex);
+
+				tracking_allocator_fallback.free(data, new_size, align, location);
 
 				auto &old_meta = allocation_metas.find(data)->value;
 				old_meta.info->current_size -= old_meta.this_size;

@@ -287,13 +287,14 @@ Object parse(Token *&t) {
 				}
 
 				if (t->type == '}') {
-					++t;
 					break;
 				} else {
-					assert(t++->type == ',');
+					assert(t->type == ',');
+					++t;
 				}
 			}
 		}
+		++t;
 		return result;
 	} else if (t->type == '"') {
 		Object result = {Type_string};
@@ -321,13 +322,14 @@ Object parse(Token *&t) {
 				result._array.add(parse(t));
 
 				if (t->type == ']') {
-					++t;
 					break;
 				} else {
-					assert(t++->type == ',');
+					assert(t->type == ',');
+					t++;
 				}
 			}
 		}
+		++t;
 		return result;
 	} else {
 		invalid_code_path();

@@ -91,6 +91,13 @@ forceinline v2f random_v2f(v2s value) {
 	};
 }
 
+forceinline v3f random_v3f(u64 value) {
+	return {
+		random_f32((u32)rotate_left(value, 0)),
+		random_f32((u32)rotate_left(value, 21)),
+		random_f32((u32)rotate_left(value, 43)),
+	};
+}
 forceinline v3f random_v3f(v3u value) {
 	value.x = random_u32(value.x);
 	value.y = random_u32(value.x ^ value.y);
