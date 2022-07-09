@@ -899,8 +899,13 @@ private:
 	dst = src; \
 	defer { dst = CONCAT(old_, __LINE__); };
 
+#define scoped_replace_if(dst, src, condition) \
+	Optional<decltype(dst)> CONCAT(old_, __LINE__); \
+	if (condition) { CONCAT(old_, __LINE__) = dst; dst = src; } \
+	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); };
+
 template <class T>
-auto reverse(T &x) {
+auto reverse_iterate(T &x) {
 	using Iter = decltype(x.rbegin());
 	struct Range {
 		Iter begin() { return {_begin}; }
@@ -1265,6 +1270,13 @@ umm find_index_of_if(Collection &collection, Predicate predicate) {
 	return index_of(collection, find_if(collection, predicate));
 }
 
+template <class T>
+void reverse(Span<T> span) {
+	for (umm i = 0; i < span.count / 2; ++i) {
+		swap(span[i], span[span.count-i-1]);
+	}
+}
+
 inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
 }
@@ -1409,6 +1421,85 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 	}
 	return span;
 }
+
+inline static constexpr struct null_opt_t {} null_opt;
+
+template <class T>
+struct Optional {
+	Optional() {
+		_has_value = false;
+	}
+	Optional(T that) {
+		_value = that;
+		_has_value = true;
+	}
+	Optional(null_opt_t) {
+		_has_value = false;
+	}
+	Optional &operator=(T that) {
+		return *new(this) Optional(that);
+	}
+	Optional &operator=(null_opt_t) {
+		return *new(this) Optional();
+	}
+
+	void reset() {
+		_has_value = false;
+	}
+
+	explicit operator bool() const { return _has_value; }
+
+	bool has_value() const { return _has_value; }
+	T const &value() const { assert_always(_has_value); return _value; }
+	T       &value()       { assert_always(_has_value); return _value; }
+	T const &value_unchecked() const { return _value; }
+	T       &value_unchecked()       { return _value; }
+
+	template <class Fallback>
+	T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
+		if (_has_value)
+			return _value;
+		return fallback();
+	}
+
+	T value_or(T fallback) {
+		if (_has_value)
+			return _value;
+		return fallback;
+	}
+
+
+	template <class U>
+	Optional<U> map() {
+		if (_has_value) {
+			return (U)_value;
+		}
+		return null_opt;
+	}
+
+	void apply(auto &&fn) {
+		if (_has_value)
+			fn(_value);
+	}
+
+private:
+	union {
+		T _value;
+	};
+	bool _has_value;
+#pragma warning(suppress: 4820)
+};
+
+template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator*(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() * b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator/(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() / b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator%(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() % b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator^(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() ^ b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator&(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() & b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator|(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() | b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator<<(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() << b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator>>(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() >> b.value_unchecked()} : Optional<T>{}; }
 
 template <class T>
 struct Storage_Trivial {
@@ -1558,6 +1649,12 @@ struct StaticList {
 		return {data + count, span.count};
 	}
 
+	constexpr Optional<T> pop() {
+		if (count == 0)
+			return {};
+		return data[--count];
+	}
+
 	constexpr T pop_back() {
 		bounds_check(count);
 		return data[--count];
@@ -1616,6 +1713,48 @@ template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticLis
 
 template <class T, umm capacity>
 forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
+
+template <class T, umm capacity>
+struct StaticSet {
+
+	T *begin() { return data; }
+	T const *begin() const { return data; }
+	T *end() { return data + count; }
+	T const *end() const { return data + count; }
+
+	T *find(T const &value) {
+		for (auto &it : *this) {
+			if (it == value)
+				return &it;
+		}
+		return 0;
+	}
+	T &get_or_insert(T const &value) {
+		if (auto found = find(value))
+			return *found;
+		return data[count++] = value;
+	}
+
+	bool remove(T const &value) {
+		if (auto found = find(value)) {
+			--count;
+			memcpy(found, found + 1, sizeof(T) * (end() - found));
+			return true;
+		}
+		return false;
+	}
+
+	Optional<T> pop() {
+		if (count)
+			return data[--count];
+		return {};
+	}
+
+	union {
+		T data[capacity];
+	};
+	umm count = 0;
+};
 
 template <class Collection, class T>
 T *find_previous(Collection collection, T value) {

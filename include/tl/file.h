@@ -426,7 +426,7 @@ inline bool create_directories(Span<utf8> path) {
 		if (path.count == 0)
 			break;
 	}
-	for (auto dir : reverse(directories_to_create)) {
+	for (auto dir : reverse_iterate(directories_to_create)) {
 		if (!create_directory(dir))
 			return false;
 	}

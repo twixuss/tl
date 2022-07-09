@@ -109,7 +109,10 @@ struct List : Span<T, Size_> {
 		count = 0;
 	}
 
-	T pop() {
+	Optional<T> pop() {
+		if (count == 0)
+			return {};
+
 		--count;
 		return data[count];
 	}

@@ -466,7 +466,6 @@ struct BlockList {
 	Block *last = 0;
 	Block *alloc_last = 0;
 	umm count = 0;
-	umm next_capacity = 16;
 
 	void clear() {
 		for (auto block = first; block; block = block->next) {
@@ -490,15 +489,10 @@ struct BlockList {
 			last = last->next;
 		}
 		if (!last) {
-			while (next_capacity < desired_capacity)
-				next_capacity *= 2;
-
 			if (alloc_last)
-				last = alloc_last = alloc_last->next = allocate_block(next_capacity);
+				last = alloc_last = alloc_last->next = allocate_block(desired_capacity);
 			else
-				first = last = alloc_last = allocate_block(next_capacity);
-
-			next_capacity *= 2;
+				first = last = alloc_last = allocate_block(desired_capacity);
 		}
 	}
 
@@ -516,8 +510,8 @@ struct BlockList {
 		}
 
 
+		auto next_capacity = max(alloc_last ? alloc_last->count * 2 : 0, 16);
 		auto new_block = allocate_block(next_capacity TL_LA);
-		next_capacity *= 2;
 
 		if (first) {
 			new_block->previous = alloc_last;
@@ -902,8 +896,6 @@ void add_steal(BlockList<T> *destination, BlockList<T> *source) {
 	destination->last = source->last;
 
 	destination->count += source->count;
-
-	destination->next_capacity = max(destination->next_capacity, destination->count);
 }
 
 template <class T>
