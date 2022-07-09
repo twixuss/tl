@@ -23,6 +23,10 @@
 #include "hash_map.h"
 #include "thread.h"
 
+#ifndef TL_PROFILER_SUBTRACT_SELF_TIME
+#define TL_PROFILER_SUBTRACT_SELF_TIME 0
+#endif
+
 namespace tl {
 struct TL_API Profiler {
 	struct TimeSpan {
@@ -40,7 +44,9 @@ struct TL_API Profiler {
 	};
 	struct ThreadInfo {
 		List<TimeSpan> time_spans;
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 		u64 self_time;
+#endif
 	};
 
 	bool enabled = true;
@@ -119,30 +125,34 @@ void Profiler::deinit() {
 	free(recorded_time_spans);
 }
 void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto self_begin = get_performance_counter();
+#endif
+
 	u32 thread_id = get_current_thread_id();
 
-	lock(thread_infos_mutex);
-	auto &info = thread_infos.get_or_insert(thread_id);
-	unlock(thread_infos_mutex);
+	auto &info = with(thread_infos_mutex, thread_infos.get_or_insert(thread_id));
 
 	auto &span = info.time_spans.add();
 	span.name = name;
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
+
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto begin_counter = get_performance_counter();
 	info.self_time += begin_counter - self_begin;
 	span.begin = begin_counter - info.self_time;
+#else
+	span.begin = get_performance_counter();
+#endif
 }
 void Profiler::end() {
 	auto end_counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
-	lock(thread_infos_mutex);
-	auto found = thread_infos.find(thread_id);
+	auto found = with(thread_infos_mutex, thread_infos.find(thread_id));
 	assert(found);
-	unlock(thread_infos_mutex);
 
 	auto info = &found->value;
 	auto &list = info->time_spans;
@@ -150,12 +160,17 @@ void Profiler::end() {
 	TimeSpan span = list.back();
 	list.pop();
 
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	span.end = end_counter - info->self_time;
+#else
+	span.end = end_counter;
+#endif
 
-	scoped_lock(recorded_time_spans_mutex);
-	recorded_time_spans.add(span);
+	with(recorded_time_spans_mutex, recorded_time_spans.add(span));
 
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	info->self_time += get_performance_counter() - end_counter;
+#endif
 }
 void Profiler::mark(Span<utf8> name, u32 color) {
 	scoped_lock(thread_infos_mutex);
@@ -163,11 +178,16 @@ void Profiler::mark(Span<utf8> name, u32 color) {
 	auto found = thread_infos.find(get_current_thread_id());
 	assert(found);
 	auto info = &found->value;
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	marks.add({get_performance_counter() - info->self_time, color, get_current_thread_id()});
+#else
+	marks.add({get_performance_counter(), color, get_current_thread_id()});
+#endif
 }
 void Profiler::reset() {
 	recorded_time_spans.clear();
 	thread_infos.clear();
+	start_time = get_performance_counter();
 }
 
 Span<Profiler::TimeSpan> Profiler::get_recorded_time_spans() {

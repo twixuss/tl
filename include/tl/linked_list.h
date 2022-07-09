@@ -55,6 +55,27 @@ struct LinkedList {
 		return node->value;
 	}
 
+	void erase_at(umm index) {
+		Node *prev = 0;
+		Node *node = head;
+		while (index) {
+			--index;
+			prev = node;
+			node = node->next;
+			bounds_check(node);
+		}
+
+		if (prev) {
+			prev->next = node->next;
+			if (!node->next)
+				tail = prev;
+		} else {
+			head = node->next;
+		}
+
+		allocator.free(node);
+	}
+
 	T &add_steal(Node *node) {
 		assert(node->next == 0);
 		if (head == 0) {

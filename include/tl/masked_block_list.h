@@ -24,6 +24,7 @@ struct StaticMaskedBlockList {
 		Block() {}
 
 		bool get_mask(umm index) {
+			assert(index < values_per_block);
 			return masks[index / bits_in_mask] & ((Mask)1 << (index % bits_in_mask));
 		}
 	};
@@ -159,6 +160,7 @@ struct StaticMaskedBlockList {
 						break;
 					} else {
 						block = block->next;
+						index = 0;
 					}
 				}
 			} while (!block->get_mask(index));
