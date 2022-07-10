@@ -77,6 +77,15 @@ forceinline bool directory_exists(Span<ascii> path) {
 	return directory_exists((Span<utf8>)path);
 }
 
+inline Optional<u64> get_file_size(char const *path) {
+	auto file = open_file(path, {.read = true});
+	if (!is_valid(file))
+		return {};
+	defer { close(file); };
+
+	set_cursor(file, 0, File_end);
+	return (u64)get_cursor(file);
+}
 struct ReadEntireFileParams {
 	umm extra_space_before = 0;
 	umm extra_space_after = 0;

@@ -1271,6 +1271,26 @@ umm find_index_of_if(Collection &collection, Predicate predicate) {
 }
 
 template <class T>
+T *binary_search(Span<T> span, T value) {
+	auto begin = span.begin();
+	auto end   = span.end();
+	while (1) {
+		if (begin == end)
+			return 0;
+
+		auto mid = begin + (end - begin) / 2;
+		if (value == *mid)
+			return mid;
+
+		if (value < *mid) {
+			end = mid;
+		} else {
+			begin = mid + 1;
+		}
+	}
+}
+
+template <class T>
 void reverse(Span<T> span) {
 	for (umm i = 0; i < span.count / 2; ++i) {
 		swap(span[i], span[span.count-i-1]);
