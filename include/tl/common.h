@@ -1776,6 +1776,79 @@ struct StaticSet {
 	umm count = 0;
 };
 
+template <umm size>
+struct BitSet {
+	using Word = umm;
+	inline static constexpr auto bits_in_word = sizeof(Word) * 8;
+	Word words[size / bits_in_word] = {};
+
+	bool get(umm i) {
+		return word(i) & bit(i);
+	}
+	void set(umm i) {
+		word(i) |= bit(i);
+	}
+	void unset(umm i) {
+		word(i) &= ~bit(i);
+	}
+	void flip(umm i) {
+		word(i) ^= bit(i);
+	}
+
+	umm &word(umm i) {
+		return words[i / bits_in_word];
+	}
+	umm bit(umm i) {
+		return (Word)1 << (i % bits_in_word);
+	}
+
+	umm count() {
+		umm result = 0;
+		for (auto word : words) {
+			result += count_bits(word);
+		}
+		return result;
+	}
+
+	Optional<umm> pop() {
+		for (umm word_index = 0; word_index < count_of(words); ++word_index) {
+			auto &word = words[word_index];
+
+			auto bit_index = find_lowest_one_bit(word);
+			if (bit_index == ~0)
+				continue;
+			word &= ~(1 << bit_index);
+			return word_index * bits_in_word + bit_index;
+		}
+		return {};
+	}
+	inline constexpr auto operator<=>(BitSet const &) const = default;
+};
+
+template <umm size>
+void for_each(BitSet<size> set, auto &&fn)
+	requires requires { fn((umm)0); }
+{
+	using Word = typename decltype(set)::Word;
+	for (umm word_index = 0; word_index < count_of(set.words); ++word_index) {
+		auto word = set.words[word_index];
+		if (!word)
+			continue;
+
+		for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
+			if (word & ((Word)1 << bit)) {
+				auto absolute_index = word_index * set.bits_in_word + bit;
+				if constexpr (is_same<decltype(fn(absolute_index)), ForEachDirective>) {
+					if (fn(absolute_index) == ForEach_break)
+						return;
+				} else {
+					fn(absolute_index);
+				}
+			}
+		}
+	}
+}
+
 template <class Collection, class T>
 T *find_previous(Collection collection, T value) {
 	auto found = find(collection, value);
