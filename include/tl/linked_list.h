@@ -107,6 +107,31 @@ struct LinkedList {
 		tail = 0;
 	}
 
+	Optional<T> pop() {
+		if (!tail)
+			return {};
+
+		Node *prev = 0;
+		auto node = head;
+		while (node != tail) {
+			prev = node;
+			node = node->next;
+		}
+
+		auto result = tail->value;
+
+		allocator.free(tail);
+
+		if (prev) {
+			tail = prev;
+			tail->next = 0;
+		} else {
+			head = tail = 0;
+		}
+
+		return result;
+	}
+
 	T &front() { bounds_check(head); return head->value; }
 	T const &front() const { bounds_check(head); return head->value; }
 

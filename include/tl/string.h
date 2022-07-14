@@ -31,9 +31,9 @@
 
 namespace tl {
 
-template <class T>
-List<T> null_terminate(Span<T> span) {
-	List<T> result;
+template <class T, class Size>
+List<T, Allocator, Size> null_terminate(Span<T, Size> span) {
+	List<T, Allocator, Size> result;
 	result.count = span.count + 1;
 	result.data = result.allocator.allocate<T>(result.count);
 	result.capacity = result.count;
@@ -42,8 +42,8 @@ List<T> null_terminate(Span<T> span) {
 	return result;
 }
 
-template <class T>
-forceinline List<T> temporary_null_terminate(Span<T> span) {
+template <class T, class Size>
+forceinline List<T, Allocator, Size> temporary_null_terminate(Span<T, Size> span) {
 	return with(temporary_allocator, null_terminate(span));
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "memory.h"
+#include "string.h"
 #include <typeinfo>
 
 namespace tl {
@@ -104,5 +105,10 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	}
 
 };
+
+template <class Tag, class T>
+inline umm append(StringBuilder &builder, typename Pool32<Tag>::template Ptr<T> ptr) {
+	return append(builder, Pool32<Tag>::base + ptr.offset);
+}
 
 }
