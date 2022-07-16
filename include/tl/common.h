@@ -1968,6 +1968,8 @@ struct MyAllocator : AllocatorBase<MyAllocator> {
 };
 #endif
 
+template <class T>
+concept DefaultConstructible = requires { new T(); };
 
 // TODO:
 // Some allocators may give more memory than requested, so the caller should know about this.
@@ -1999,12 +2001,17 @@ struct AllocatorBase {
 		return (T *)allocate_uninitialized(count * sizeof(T), alignof(T), location);
 	}
 
+
 	template <class T>
 	inline T *allocate(umm count = 1, umm alignment = alignof(T), std::source_location location = std::source_location::current()) {
 		auto result = derived()->allocate_impl(count * sizeof(T), alignment, location);
 		if (result.data) {
 			for (auto it = (T *)result.data; it != (T *)result.data + count; ++it) {
-				new (it) T();
+				if constexpr (DefaultConstructible<T>) {
+					new (it) T();
+				} else {
+					memset(it, 0, sizeof(T));
+				}
 			}
 		}
 		return (T *)result.data;
