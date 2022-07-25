@@ -597,6 +597,31 @@ struct BigInt {
 	explicit operator s32() { return (s32)operator u32(); }
 	explicit operator s64() { return (s64)operator u64(); }
 
+	explicit operator f64() {
+		f64 result = 0;
+
+		BigInt src = *this;
+
+		if (msb) {
+			src = copy(*this);
+		}
+
+		for (auto part : src.parts) {
+			result *= 18'446'744'073'709'551'616.0; // 2^64
+			result += part;
+		}
+
+		if (msb) {
+			free(src);
+			result = -result;
+		}
+
+		return result;
+	}
+
+	template <class T>
+	explicit operator T() { return (T)operator u64(); }
+
 #if 0
 	BigInt &set(BigInt const &that) { free(parts); parts = copy(that.parts); return *this; }
 

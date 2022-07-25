@@ -339,7 +339,7 @@ TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP);
 TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP);
 
 #ifndef TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY
-#define TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY 0x4000
+#define TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY 0x1000
 #endif
 
 struct StringBuilder {
@@ -502,21 +502,21 @@ inline List<u8> to_string(StringBuilder &builder TL_LP) {
 }
 
 forceinline umm append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
-	umm chars_to_write = size;
+	umm remaining = size;
 	u8 *data = (u8 *)_data;
-	while (b.last->available_space() < chars_to_write) {
-		umm space_in_block = b.last->available_space();
-		memcpy(b.last->end(), data, space_in_block);
-		chars_to_write -= space_in_block;
-		b.last->count += space_in_block;
-		data += space_in_block;
-		if (!b.last->next) {
-			b.allocate_block(TL_LAC);
-			b.last = b.last->next;
+	while (remaining > b.last->available_space()) {
+		umm left = b.last->available_space();
+		memcpy(b.last->end(), data, left);
+		remaining -= left;
+		data += left;
+		b.last->count += left;
+		b.last = b.last->next;
+		if (!b.last) {
+			b.last = b.allocate_block(TL_LAC);
 		}
 	}
-	memcpy(b.last->end(), data, chars_to_write);
-	b.last->count += chars_to_write;
+	memcpy(b.last->end(), data, remaining);
+	b.last->count += remaining;
 	return size;
 }
 

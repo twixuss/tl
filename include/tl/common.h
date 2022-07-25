@@ -82,6 +82,9 @@
 
 #define breakable_scope for(bool CONCAT(_, __LINE__)=true;CONCAT(_, __LINE__);CONCAT(_, __LINE__)=false)
 
+#define REDECLARE_VAL(name, expr) auto _##name = expr; auto name = _##name;
+#define REDECLARE_REF(name, expr) auto &_##name = expr; auto &name = _##name;
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -1182,11 +1185,23 @@ inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str) {
 	return true;
 }
 
-template <class T, umm count> constexpr T *find(T (&arr)[count], T const &value) { return find(arr, arr + count, value); }
-template <class T, class Size> constexpr T *find(Span<T, Size> span, T const &value) { return find(span.begin(), span.end(), value); }
-template <class T, class SizeA, class SizeB> constexpr T *find(Span<T, SizeA> span, Span<T, SizeB> cmp) { return find(span.begin(), span.end(), cmp.begin(), cmp.end()); }
+template <class T, umm count>
+constexpr T *find(T (&where)[count], T const &what) {
+	return find(where, where + count, what);
+}
 
-template <class T> constexpr T *find(Span<T> where, Span<Span<T>> whats) {
+template <class T, class Size>
+constexpr T *find(Span<T, Size> where, T const &what) {
+	return find(where.begin(), where.end(), what);
+}
+
+template <class T, class SizeA, class SizeB>
+constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
+	return find(where.begin(), where.end(), what.begin(), what.end());
+}
+
+template <class T>
+constexpr T *find(Span<T> where, Span<Span<T>> whats) {
 	while (where.count) {
 		for (auto what : whats) {
 			if (starts_with(where, what)) {
