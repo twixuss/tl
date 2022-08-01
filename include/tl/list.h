@@ -75,6 +75,7 @@ struct List : Span<T, Size_> {
 			data[i] = data[i - 1];
 		}
 		data[0] = value;
+		count += 1;
 		return data[0];
 	}
 

@@ -32,9 +32,7 @@
 #endif
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "invalid_code_path", __VA_ARGS__), __assume(0))
-//#define invalid_code_path(...) ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__)
-
-#define not_implemented() invalid_code_path("not implemented")
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "not_implemented", __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
 #define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
@@ -1840,24 +1838,45 @@ struct BitSet {
 	inline constexpr auto operator<=>(BitSet const &) const = default;
 };
 
-template <umm size>
+template <ForEachFlags flags = 0, umm size>
 void for_each(BitSet<size> set, auto &&fn)
 	requires requires { fn((umm)0); }
 {
 	using Word = typename decltype(set)::Word;
-	for (umm word_index = 0; word_index < count_of(set.words); ++word_index) {
-		auto word = set.words[word_index];
-		if (!word)
-			continue;
 
-		for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
-			if (word & ((Word)1 << bit)) {
-				auto absolute_index = word_index * set.bits_in_word + bit;
-				if constexpr (is_same<decltype(fn(absolute_index)), ForEachDirective>) {
-					if (fn(absolute_index) == ForEach_break)
-						return;
-				} else {
-					fn(absolute_index);
+	if constexpr (flags & ForEach_reverse) {
+		for (umm word_index = count_of(set.words) - 1; word_index != -1; --word_index) {
+			auto word = set.words[word_index];
+			if (!word)
+				continue;
+
+			for (u64 bit = set.bits_in_word - 1; bit != -1; --bit) {
+				if (word & ((Word)1 << bit)) {
+					auto absolute_index = word_index * set.bits_in_word + bit;
+					if constexpr (is_same<decltype(fn(absolute_index)), ForEachDirective>) {
+						if (fn(absolute_index) == ForEach_break)
+							return;
+					} else {
+						fn(absolute_index);
+					}
+				}
+			}
+		}
+	} else {
+		for (umm word_index = 0; word_index < count_of(set.words); ++word_index) {
+			auto word = set.words[word_index];
+			if (!word)
+				continue;
+
+			for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
+				if (word & ((Word)1 << bit)) {
+					auto absolute_index = word_index * set.bits_in_word + bit;
+					if constexpr (is_same<decltype(fn(absolute_index)), ForEachDirective>) {
+						if (fn(absolute_index) == ForEach_break)
+							return;
+					} else {
+						fn(absolute_index);
+					}
 				}
 			}
 		}
@@ -2294,6 +2313,8 @@ Scoped(Thing) -> Scoped<Thing>;
 
 // for use with statements
 #define withs(new_thing, ...) ([&]{auto replacer=Scoped(new_thing);__VA_ARGS__;}())
+
+#define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = Scoped(new_thing)
 
 template <>
 struct Scoped<Allocator> {
