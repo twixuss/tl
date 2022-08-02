@@ -104,16 +104,12 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 	return result;
 }
 
-template <class Char>
-inline Buffer read_entire_file(Span<Char> path, ReadEntireFileParams params = {} TL_LP) {
+template <class Char, class Size>
+inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return read_entire_file(file, params TL_LA);
-}
-template <class Path>
-inline Buffer read_entire_file(Path path, ReadEntireFileParams params = {} TL_LP) {
-	return read_entire_file(as_span(path), params TL_LA);
 }
 
 
@@ -368,8 +364,12 @@ inline Span<utf8> parent_directory(Span<utf8> path, bool remove_last_slash = fal
 	return path;
 }
 
-inline List<utf8> make_absolute_path(Span<utf8> relative_path) {
-	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, relative_path);
+inline List<utf8> make_absolute_path(Span<utf8> path) {
+	if (path.count >= 2) {
+		if (path.data[1] == ':')
+			return to_list(path);
+	}
+	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, path);
 }
 
 template <class Size>
