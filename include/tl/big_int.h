@@ -34,7 +34,8 @@ struct BigInt {
 
 	static_assert(is_unsigned<Part>, "BigInt::List::ElementType must be unsigned");
 
-	inline static constexpr umm bits_in_part = sizeof(Part) * 8;
+	inline static constexpr umm bytes_in_part = sizeof(Part);
+	inline static constexpr umm bits_in_part = bytes_in_part * 8;
 
 	bool msb = false;
 	List parts;
@@ -152,6 +153,38 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
+
+	template <class A, class B>
+	bool shift_left(BigInt const &b, u64 bytes_threshold, A &&error_shift_by_negative, B &&error_too_big) {
+		BigInt zero_part_count_big, shift_amount;
+		b.divmod(bits_in_part, zero_part_count_big, shift_amount);
+		if (zero_part_count_big.msb) {
+			error_shift_by_negative();
+			return false;
+		}
+
+		if (zero_part_count_big.parts.count > 1) {
+			error_too_big(zero_part_count_big * bytes_in_part);
+			return false;
+		}
+
+		if (zero_part_count_big.parts.count == 1) {
+			if (zero_part_count_big.parts.data[0] > max_value<u64> / bytes_in_part) {
+				error_too_big(zero_part_count_big * bytes_in_part);
+				return false;
+			}
+			if (zero_part_count_big.parts.data[0] * bytes_in_part > bytes_threshold) {
+				error_too_big(zero_part_count_big * bytes_in_part);
+				return false;
+			}
+		}
+
+		*this <<= (u64)shift_amount;
+
+		parts.insert_n_at(0, 0, (u64)zero_part_count_big);
+		return true;
+	}
+
 	BigInt &operator<<=(Part b) {
 		parts.insert_n_at(0, 0, b >> 6);
 
@@ -173,15 +206,7 @@ struct BigInt {
 		return *this;
 	}
 	BigInt &operator<<=(BigInt const &b) {
-		BigInt zero_part_count_big, shift_amount;
-		b.divmod(bits_in_part, zero_part_count_big, shift_amount);
-		assert(!zero_part_count_big.msb, "Can't shift by negative amount");
-		assert(zero_part_count_big.parts.count <= 1, "Not enough memory");
-
-		*this <<= (u64)shift_amount;
-
-		parts.insert_n_at(0, 0, (u64)zero_part_count_big);
-
+		shift_left(b, max_value<u64>, []{}, [](auto){});
 		return *this;
 	}
 
@@ -606,7 +631,7 @@ struct BigInt {
 			src = copy(*this);
 		}
 
-		for (auto part : src.parts) {
+		for (auto part : reverse_iterate(src.parts)) {
 			result *= 18'446'744'073'709'551'616.0; // 2^64
 			result += part;
 		}

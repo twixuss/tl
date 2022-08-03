@@ -1076,14 +1076,14 @@ struct FormatBytesParams {
 	bool kilo_is_1024 = true;
 };
 
-inline FormattedBytes format_bytes(u64 _count, FormatBytesParams params = {}) {
+inline FormattedBytes format_bytes(auto byte_count, FormatBytesParams params = {}) {
 	FormattedBytes result{};
 
 	result.kilo_is_1024 = params.kilo_is_1024;
 
 	f64 kilo = params.kilo_is_1024 ? 1024 : 1000;
 
-	f64 count = (f64)_count;
+	f64 count = (f64)byte_count;
 	while (count > kilo) {
 		count /= kilo;
 		result.unit += 1;
