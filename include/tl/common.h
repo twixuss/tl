@@ -1793,7 +1793,7 @@ template <umm size>
 struct BitSet {
 	using Word = umm;
 	inline static constexpr auto bits_in_word = sizeof(Word) * 8;
-	Word words[size / bits_in_word] = {};
+	Word words[ceil(size, bits_in_word) / bits_in_word] = {};
 
 	bool get(umm i) {
 		return word(i) & bit(i);
