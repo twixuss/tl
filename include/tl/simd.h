@@ -50,6 +50,7 @@ static constexpr u32 simd_count = simd_width / sizeof(T);
 // b - boolean
 // a - any
 
+namespace simd {
 using vec16 = __m128;
 using f32x4 = __m128; using f64x2 = __m128;
 using s8x16 = __m128; using s16x8 = __m128; using s32x4 = __m128; using s64x2 = __m128;
@@ -74,7 +75,11 @@ using u8x64 = __m512; using u16x32  = __m512; using u32x16 = __m512; using u64x8
 using b8x64 = __m512; using b16x32  = __m512; using b32x16 = __m512; using b64x8 = __m512;
 using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8 = __m512;
 #endif
+}
 
+#ifndef TL_SIMD_NO_ALIAS
+using namespace simd;
+#endif
 
 //
 // Vector constants
@@ -313,8 +318,12 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 
 #if ARCH_AVX
 #if ARCH_AVX2
-#define s32x8_sari(a, b) i2f32(_mm256_srai_epi32(f2i32(a), b))
-#define s32x8_slri(a, b) i2f32(_mm256_slli_epi32(f2i32(a), b))
+#define s32x8_shift_right_i(a, b) i2f32(_mm256_srai_epi32(f2i32(a), b))
+#define u32x8_shift_right_i(a, b) i2f32(_mm256_srli_epi32(f2i32(a), b))
+#define i32x8_shift_left_i(a, b)  i2f32(_mm256_slli_epi32(f2i32(a), b))
+
+#define s32x8_get(a, b) ((s32)_mm256_extract_epi32(f2i32(a), b))
+#define u32x8_get(a, b) ((u32)_mm256_extract_epi32(f2i32(a), b))
 #endif
 
 #define f32x8_set(a,b,c,d,e,f,g,h) _mm256_setr_ps(a,b,c,d,e,f,g,h)
@@ -346,9 +355,11 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define f32x8_sign(a) select32x8(f32x8_gt(a, f32x8_set1(0)),f32x8_set1(1),f32x8_set1(-1))
 #endif
 #if ARCH_FMA
+// a * b + c
 #define f32x8_muladd(a,b,c) _mm256_fmadd_ps(a,b,c)
 #else
-#define f32x8_muladd(a,b,t) f32x8_add(f32x8_mul(a,b),c)
+// a * b + c
+#define f32x8_muladd(a,b,c) f32x8_add(f32x8_mul(a,b),c)
 #endif
 #define f32x8_lerp(a,b,t) f32x8_muladd(f32x8_sub(b,a),t,a)
 
@@ -367,6 +378,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #define s32x8_mul(a,b) i2f32(_mm256_mullo_epi32(f2i32(a),f2i32(b)))
 #define s32x8_div(a,b) i2f32(_mm256_div_epi32(f2i32(a),f2i32(b)))
 #define s32x8_floor(a,b) s32x8_mul(select32x8(s32x8_lt(a,s32x8_set1(0)),s32x8_sub(s32x8_div(s32x8_add(a, s32x8_set1(1)), b), s32x8_set1(1)),s32x8_div(a, b)),b)
+#define s32x8_neg(a) s32x8_sub(s32x8_set1(0),a)
 #endif
 
 #define u32x8_set(a,b,c,d,e,f,g,h) i2f32(_mm256_setr_epi32(a,b,c,d,e,f,g,h))
@@ -395,9 +407,12 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #endif
 
 #if ARCH_AVX2
-#define f32x8_to_s32x8(a) i2f32(_mm256_cvtps_epi32(a))
+#define f32x8_to_s32x8(a) i2f32(_mm256_cvttps_epi32(a))
+#define f32x8_to_u32x8(a) i2f32(_mm256_cvttps_epi32(a))
 #define s32x8_to_f32x8(a) _mm256_cvtepi32_ps(f2i32(a))
 #define u32x8_to_f32x8(a) _mm256_cvtepi32_ps(f2i32(a))
+#define s32x8_to_u32x8(a) a
+#define u32x8_to_s32x8(a) a
 #endif
 
 #define b32x8_get_mask(a) _mm256_movemask_ps(a)

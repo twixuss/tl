@@ -29,41 +29,6 @@
 
 namespace tl {
 
-constexpr f32 pi     = f32(3.1415926535897932384626433832795L);
-constexpr f32 tau    = f32(6.283185307179586476925286766559L);
-constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
-constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
-constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
-constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
-
-template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
-template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
-
-template <class T>
-forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
-	minmax(min_bound, max_bound, min_bound, max_bound);
-	return min(max(value, min_bound), max_bound);
-}
-
-// Does not check if min_bound is greater than max_bound
-template <class T>
-forceinline constexpr auto clamp_unchecked(T value, T min_bound, T max_bound) {
-	return min(max(value, min_bound), max_bound);
-}
-
-template <class T>
-forceinline constexpr auto map(T value, T source_min, T source_max, T dest_min, T dest_max) {
-	if constexpr (is_integer_like<T>) { // Do multiplication first
-		return (value - source_min) * (dest_max - dest_min) / (source_max - source_min) + dest_min;
-	} else {
-		return (value - source_min) / (source_max - source_min) * (dest_max - dest_min) + dest_min;
-	}
-}
-template <class T>
-forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T dest_min, T dest_max) {
-	return map(clamp(value, source_min, source_max), source_min, source_max, dest_min, dest_max);
-}
-template <class T> forceinline constexpr auto lerp(T a, T b, T t) { return a + (b - a) * t; }
 template <class M, class T> forceinline T &mask_assign(M mask, T &dst, T src) { return dst = select(mask, src, dst); }
 template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
 template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
@@ -565,8 +530,6 @@ FLOOR(v4s, s32, V4s)
 FLOOR(v4u, u32, V4u)
 #undef FLOOR
 
-forceinline s32 floor_to_int(f32 v) { return (s32)floor(v); }
-forceinline s64 floor_to_int(f64 v) { return (s64)floor(v); }
 forceinline v2s floor_to_int(v2f v) {
 	return {
 		floor_to_int(v.x),
@@ -1553,12 +1516,12 @@ union m4 {
 	using Scalar = f32;
 	using Vector = v4f;
 	struct {
-		f32x4 im, jm, km, lm;
+		simd::f32x4 im, jm, km, lm;
 	};
 	struct {
 		v4f i, j, k, l;
 	};
-	f32x4 m[4];
+	simd::f32x4 m[4];
 	v4f vectors[4];
 	f32 s[16];
 	forceinline v4f operator*(v4f b) const {
@@ -1570,7 +1533,7 @@ union m4 {
 
 		union {
 			v4f v;
-			f32x4 f;
+			simd::f32x4 f;
 		};
 		f = f32x4_add(
 			f32x4_muladd(f32x4_set1(b.x), im, f32x4_mul(f32x4_set1(b.y), jm)),
@@ -1782,6 +1745,7 @@ forceinline constexpr m3 transpose(m3 const& m) {
 	};
 }
 forceinline m4 transpose(m4 const& m) {
+	using namespace simd;
 	f32x4 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
 	f32x4 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
 	f32x4 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
@@ -1943,6 +1907,7 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 }
 forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 #if ARCH_AVX2
+	using namespace simd;
 	f32x8 plane_x = f32x8_set(planes[0].x, planes[1].x, planes[2].x, planes[3].x, planes[4].x, planes[5].x, 0, 0);
 	f32x8 plane_y = f32x8_set(planes[0].y, planes[1].y, planes[2].y, planes[3].y, planes[4].y, planes[5].y, 0, 0);
 	f32x8 plane_z = f32x8_set(planes[0].z, planes[1].z, planes[2].z, planes[3].z, planes[4].z, planes[5].z, 0, 0);

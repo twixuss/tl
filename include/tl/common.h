@@ -649,6 +649,9 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 forceinline constexpr f32 floor(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f32)(s32)v : ((f32)(s32)v - 1)) : ::floorf(v); }
 forceinline constexpr f64 floor(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f64)(s64)v : ((f64)(s64)v - 1)) : ::floor (v); }
 
+forceinline s32 floor_to_int(f32 v) { return (s32)floor(v); }
+forceinline s64 floor_to_int(f64 v) { return (s64)floor(v); }
+
 forceinline f32 ceil(f32 v) { return ::ceilf(v); }
 forceinline f64 ceil(f64 v) { return ::ceil(v); }
 forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
@@ -682,6 +685,42 @@ forceinline u16 rotate_right(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift
 forceinline u32 rotate_right(u32 v, s32 shift = 1) { return _rotr(v, shift); }
 forceinline u64 rotate_right(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
 #endif
+
+constexpr f32 pi     = f32(3.1415926535897932384626433832795L);
+constexpr f32 tau    = f32(6.283185307179586476925286766559L);
+constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
+constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
+constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
+constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
+
+template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
+template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+
+template <class T>
+forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
+	minmax(min_bound, max_bound, min_bound, max_bound);
+	return min(max(value, min_bound), max_bound);
+}
+
+// Does not check if min_bound is greater than max_bound
+template <class T>
+forceinline constexpr auto clamp_unchecked(T value, T min_bound, T max_bound) {
+	return min(max(value, min_bound), max_bound);
+}
+
+template <class T>
+forceinline constexpr auto map(T value, T source_min, T source_max, T dest_min, T dest_max) {
+	if constexpr (is_integer_like<T>) { // Do multiplication first
+		return (value - source_min) * (dest_max - dest_min) / (source_max - source_min) + dest_min;
+	} else {
+		return (value - source_min) / (source_max - source_min) * (dest_max - dest_min) + dest_min;
+	}
+}
+template <class T>
+forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T dest_min, T dest_max) {
+	return map(clamp(value, source_min, source_max), source_min, source_max, dest_min, dest_max);
+}
+template <class T, class U> forceinline constexpr auto lerp(T a, T b, U t) { return a + (b - a) * t; }
 
 template <class T>
 void swap(T &a, T &b) {
@@ -974,6 +1013,18 @@ struct Span {
 	constexpr ValueType &at(Size i) const {
 		bounds_check(i < count);
 		return data[i];
+	}
+
+	constexpr ValueType at_interpolated(f64 i) const {
+		auto a = at(floor_to_int(i));
+		auto b = at(ceil_to_int(i));
+		return lerp(a, b, frac(i));
+	}
+
+	constexpr ValueType at_interpolated_clamped(f64 i) const {
+		auto a = at(floor_to_int(i));
+		auto b = at(min(count - 1, ceil_to_int(i)));
+		return lerp(a, b, frac(i));
 	}
 
 	[[deprecated("use is_empty instead")]]
