@@ -1056,6 +1056,11 @@ struct aabb {
 	aabb operator+(T b) { return {min + b, max + b}; }
 	aabb &operator-=(T b) { return min -= b, max -= b, *this; }
 	aabb &operator+=(T b) { return min += b, max += b, *this; }
+
+	T minmin() { return {min.x, min.y}; }
+	T minmax() { return {min.x, max.y}; }
+	T maxmin() { return {max.x, min.y}; }
+	T maxmax() { return {max.x, max.y}; }
 };
 
 template <class T>
