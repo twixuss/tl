@@ -36,7 +36,7 @@ TL_API void set_cursor_position(s32 x, s32 y);
 inline void set_cursor_position(v2s position) {
 	set_cursor_position(position.x, position.y);
 }
-TL_API v2s get_cursor_position();
+TL_API v2s get_cursor_position(HWND relative_to = 0);
 
 TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
 TL_API f32 get_cursor_speed();
@@ -225,9 +225,12 @@ void show_cursor() {
 void set_cursor_position(s32 x, s32 y) {
 	SetCursorPos(x, y);
 }
-v2s get_cursor_position() {
+v2s get_cursor_position(HWND relative_to) {
 	POINT p;
 	GetCursorPos(&p);
+	if (relative_to) {
+		ScreenToClient(relative_to, &p);
+	}
 	return {p.x, p.y};
 }
 

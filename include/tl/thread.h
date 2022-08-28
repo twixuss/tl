@@ -177,6 +177,10 @@ inline Ret join(ThreadRet<Ret> *thread) {
 	join((Thread *)thread);
 	return thread->return_value;
 }
+template <>
+inline void join(ThreadRet<void> *thread) {
+	join((Thread *)thread);
+}
 
 TL_API bool finished(Thread *thread);
 TL_API void free(Thread *thread);

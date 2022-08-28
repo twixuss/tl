@@ -270,6 +270,12 @@ void erase_unordered_at(List<T, Allocator, Size> &list, umm index) {
 }
 
 template <class T, class Allocator, class Size>
+void erase_unordered(List<T, Allocator, Size> &list, T *at) {
+	*at = list.back();
+	list.count--;
+}
+
+template <class T, class Allocator, class Size>
 void free(List<T, Allocator, Size> &list) {
 	if (list.data == 0) return;
 
