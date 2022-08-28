@@ -106,6 +106,10 @@ struct List : Span<T, Size_> {
 		count = new_count;
 	}
 
+	void ensure_capacity(Size desired_space) {
+		reserve(count + desired_space);
+	}
+
 	void clear() {
 		count = 0;
 	}
@@ -963,17 +967,22 @@ struct StaticRingQueue : private StaticRingBuffer<T, _capacity> {
 	Optional<T> pop() { return this->pop_front(); }
 };
 
-template <class T>
-struct LinearSet : Span<T> {
-	using Span<T>::data;
-	using Span<T>::count;
-	using Span<T>::begin;
-	using Span<T>::end;
+template <class T, class Size_ = umm>
+struct LinearSet : Span<T, Size_> {
+	using ElementType = T;
+	using Allocator = Allocator;
+	using Size = Size_;
+	using Span = Span<T, Size>;
+
+	using Span::data;
+	using Span::count;
+	using Span::begin;
+	using Span::end;
 
 	umm capacity = 0;
 	Allocator allocator = current_allocator;
 
-	T &insert(T const &value TL_LP) {
+	T &add(T const &value TL_LP) {
 		for (auto &it : *this) {
 			if (it == value) {
 				return it;
@@ -1038,7 +1047,7 @@ struct LinearSet : Span<T> {
 		return result;
 	}
 
-	void erase(Span<T> where) {
+	void erase(Span where) {
 		bounds_check(
 			where.count <= count &&
 			begin() <= where.begin() && where.begin() < end() &&
@@ -1069,14 +1078,24 @@ struct LinearSet : Span<T> {
 		move(from, data + destination_index);
 	}
 
+	void set(T value TL_LP) {
+		reserve(1 TL_LA);
+		count = 1;
+		memcpy(data, &value, sizeof(T));
+	}
+	void set(Span span TL_LP) {
+		reserve(span.count TL_LA);
+		count = span.count;
+		memcpy(data, span.data, span.count * sizeof(T));
+	}
 private:
-	Span<T> add(Span<T> span TL_LP) {
+	Span add(Span span TL_LP) {
 		reserve_exponential(count + span.count TL_LA);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		count += span.count;
 		return {data + count - span.count, span.count};
 	}
-	Span<T> add(std::initializer_list<T> list TL_LP) {
+	Span add(std::initializer_list<T> list TL_LP) {
 		reserve_exponential(count + list.size() TL_LA);
 		memcpy(data + count, list.begin(), list.size() * sizeof(T));
 		count += list.size();

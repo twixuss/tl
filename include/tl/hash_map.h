@@ -105,16 +105,21 @@ void free(StaticBucketHashMap<Key, Value, capacity, Traits> &map) {
 	}
 }
 
+template <class Key_, class Value_>
+struct KeyValue {
+	using Key = Key_;
+	using Value = Value_;
+	Key key;
+	Value value;
+};
+
 template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>>
 struct BucketHashMap {
 	using Key = Key_;
 	using Value = Value_;
 	using ValueType = Value;
+	using KeyValue = KeyValue<Key, Value>;
 
-	struct KeyValue {
-		Key key;
-		Value value;
-	};
 	struct HashKeyValue {
 		u64 hash;
 		KeyValue kv;
@@ -400,19 +405,21 @@ bool is_empty(BucketHashMap<Key, Value, Traits> map) {
 
 enum class ContiguousHashMapCellState : u64 {
 	empty     = 0,
-	full      = 1,
+	occupied  = 1,
 	tombstone = 2,
 };
 
 template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
 struct ContiguousHashMap {
 	using CellState = ContiguousHashMapCellState;
+	using KeyValue = KeyValue<Key, Value>;
 
     struct Cell {
         CellState state : 2;
         u64 hash : 62;
-        Key key;
-        Value value;
+        KeyValue key_value;
+		Key &key() { return key_value.key; }
+		Value &value() { return key_value.value; }
     };
 
     Allocator allocator = current_allocator;
@@ -431,10 +438,10 @@ struct ContiguousHashMap {
 				if (cell.state == CellState::empty) {
 					break;
 				}
-				if (cell.state == CellState::full) {
+				if (cell.state == CellState::occupied) {
 					if (cell.hash == hash) {
-						if (Traits::are_equal(cell.key, key)) {
-							return cell.value;
+						if (Traits::are_equal(cell.key(), key)) {
+							return cell.value();
 						}
 					}
 				}
@@ -455,17 +462,17 @@ struct ContiguousHashMap {
 		count += 1;
 		defer { assert(find(key)); };
 
-		while (cells.data[index].state == CellState::full) {
-			Traits::on_collision(cells.data[index].key, key);
+		while (cells.data[index].state == CellState::occupied) {
+			Traits::on_collision(cells.data[index].key(), key);
 			index = step(index, cells.count);
 		}
 
 		auto &cell = cells.data[index];
 
-		cell.state = CellState::full;
+		cell.state = CellState::occupied;
 		cell.hash = hash;
-		cell.key = key;
-		return cell.value = {};
+		cell.key() = key;
+		return cell.value() = {};
     }
 
     bool reserve(umm desired) {
@@ -486,8 +493,8 @@ struct ContiguousHashMap {
         }
 
         for (auto &old_cell : cells) {
-			if (old_cell.state == CellState::full) {
-				insert_into(new_cells, old_cell.hash, old_cell.key, old_cell.value);
+			if (old_cell.state == CellState::occupied) {
+				insert_into(new_cells, old_cell.hash, old_cell.key(), old_cell.value());
 			}
         }
 
@@ -505,35 +512,35 @@ struct ContiguousHashMap {
         auto hash = get_the_hash(key);
         auto index = hash % cells.count;
 
-        while (cells.data[index].state == CellState::full) {
-			Traits::on_collision(cells.data[index].key, key);
+        while (cells.data[index].state == CellState::occupied) {
+			Traits::on_collision(cells.data[index].key(), key);
             index = step(index, cells.count);
         }
 
         auto &cell = cells.data[index];
 
-        cell.state = CellState::full;
+        cell.state = CellState::occupied;
         cell.hash = hash;
-        cell.key = key;
-        return cell.value = value;
+        cell.key() = key;
+        return cell.value() = value;
     }
     Value &insert_into(Span<Cell> cells, u64 hash, Key key, Value value) {
         auto index = hash % cells.count;
 
-        while (cells.data[index].state == CellState::full) {
-			Traits::on_collision(cells.data[index].key, key);
+        while (cells.data[index].state == CellState::occupied) {
+			Traits::on_collision(cells.data[index].key(), key);
             index = step(index, cells.count);
         }
 
         auto &cell = cells.data[index];
 
-        cell.state = CellState::full;
+        cell.state = CellState::occupied;
         cell.hash = hash;
-        cell.key = key;
-        return cell.value = value;
+        cell.key() = key;
+        return cell.value() = value;
     }
 
-    Value *find(Key key) {
+    KeyValue *find(Key key) {
 		if (cells.count == 0)
 			return 0;
 
@@ -545,10 +552,10 @@ struct ContiguousHashMap {
             if (cell.state == CellState::empty) {
 				return 0;
 			}
-            if (cell.state == CellState::full) {
+            if (cell.state == CellState::occupied) {
                 if (cell.hash == hash) {
-                    if (Traits::are_equal(cell.key, key)) {
-                        return &cell.value;
+                    if (Traits::are_equal(cell.key(), key)) {
+                        return &cell.key_value;
                     }
                 }
             }
@@ -585,8 +592,8 @@ umm count_of(ContiguousHashMap<Key, Value, Traits> map) {
 template <class Key, class Value, class Traits, class Fn>
 void for_each(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn) {
     for (auto &cell : map.cells) {
-        if (cell.state == ContiguousHashMapCellState::full) {
-            fn(cell.key, cell.value);
+        if (cell.state == ContiguousHashMapCellState::occupied) {
+            fn(cell.key(), cell.value());
         }
     }
 }
