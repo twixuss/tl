@@ -828,15 +828,15 @@ void split(Split &split) {
 
 using Anchor = v2f;
 
-inline static constexpr Anchor anchor_top_left      = {0.0f, 0.0f};
-inline static constexpr Anchor anchor_top_right     = {1.0f, 0.0f};
-inline static constexpr Anchor anchor_bottom_left   = {0.0f, 1.0f};
-inline static constexpr Anchor anchor_bottom_right  = {1.0f, 1.0f};
-inline static constexpr Anchor anchor_center        = {0.5f, 0.5f};
-inline static constexpr Anchor anchor_top_center    = {0.5f, 0.0f};
-inline static constexpr Anchor anchor_bottom_center = {0.5f, 1.0f};
-inline static constexpr Anchor anchor_center_left   = {0.0f, 0.5f};
-inline static constexpr Anchor anchor_center_right  = {1.0f, 0.5f};
+inline constexpr Anchor anchor_top_left      = {0.0f, 0.0f};
+inline constexpr Anchor anchor_top_right     = {1.0f, 0.0f};
+inline constexpr Anchor anchor_bottom_left   = {0.0f, 1.0f};
+inline constexpr Anchor anchor_bottom_right  = {1.0f, 1.0f};
+inline constexpr Anchor anchor_center        = {0.5f, 0.5f};
+inline constexpr Anchor anchor_top_center    = {0.5f, 0.0f};
+inline constexpr Anchor anchor_bottom_center = {0.5f, 1.0f};
+inline constexpr Anchor anchor_center_left   = {0.0f, 0.5f};
+inline constexpr Anchor anchor_center_right  = {1.0f, 0.5f};
 
 enum Dock {
 	Dock_top,

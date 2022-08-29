@@ -96,14 +96,14 @@ union m2 {
 	}
 };
 
-template<> inline static constexpr v2f min_value<v2f> = {min_value<v2f::Scalar>, min_value<v2f::Scalar>};
-template<> inline static constexpr v2f max_value<v2f> = {max_value<v2f::Scalar>, max_value<v2f::Scalar>};
+template<> inline constexpr v2f min_value<v2f> = {min_value<v2f::Scalar>, min_value<v2f::Scalar>};
+template<> inline constexpr v2f max_value<v2f> = {max_value<v2f::Scalar>, max_value<v2f::Scalar>};
 
-template<> inline static constexpr v2s min_value<v2s> = {min_value<v2s::Scalar>, min_value<v2s::Scalar>};
-template<> inline static constexpr v2s max_value<v2s> = {max_value<v2s::Scalar>, max_value<v2s::Scalar>};
+template<> inline constexpr v2s min_value<v2s> = {min_value<v2s::Scalar>, min_value<v2s::Scalar>};
+template<> inline constexpr v2s max_value<v2s> = {max_value<v2s::Scalar>, max_value<v2s::Scalar>};
 
-template<> inline static constexpr v2u min_value<v2u> = {min_value<v2u::Scalar>, min_value<v2u::Scalar>};
-template<> inline static constexpr v2u max_value<v2u> = {max_value<v2u::Scalar>, max_value<v2u::Scalar>};
+template<> inline constexpr v2u min_value<v2u> = {min_value<v2u::Scalar>, min_value<v2u::Scalar>};
+template<> inline constexpr v2u max_value<v2u> = {max_value<v2u::Scalar>, max_value<v2u::Scalar>};
 
 union m3 {
 	using Scalar = f32;
