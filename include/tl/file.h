@@ -12,7 +12,7 @@ template <class Size>
 inline List<pathchar> to_pathchars(Span<utf8, Size> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
 #define tl_file_string(x) u ## x
 
-inline static constexpr utf8 path_separator = u'\\';
+inline constexpr utf8 path_separator = u'\\';
 
 #endif
 
