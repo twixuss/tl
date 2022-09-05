@@ -308,6 +308,10 @@ forceinline constexpr bool any_false(v2b v) { return !all_true(v); }
 forceinline constexpr bool any_false(v3b v) { return !all_true(v); }
 forceinline constexpr bool any_false(v4b v) { return !all_true(v); }
 
+template <class T> forceinline constexpr v2<T> select(v2b t, v2<T> a, v2<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y)}; }
+template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z)}; }
+template <class T> forceinline constexpr v4<T> select(v4b t, v4<T> a, v4<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z), select(t.w, a.w, b.w)}; }
+
 }
 
 #pragma warning(pop)

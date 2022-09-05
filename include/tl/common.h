@@ -696,15 +696,16 @@ constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
 
+// Does not check if min_bound is greater than max_bound
+// There is `clamp_checked` for that.
 template <class T>
 forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
-	minmax(min_bound, max_bound, min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
 
-// Does not check if min_bound is greater than max_bound
 template <class T>
-forceinline constexpr auto clamp_unchecked(T value, T min_bound, T max_bound) {
+forceinline constexpr auto clamp_checked(T value, T min_bound, T max_bound) {
+	minmax(min_bound, max_bound, min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
 

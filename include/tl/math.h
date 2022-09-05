@@ -2021,6 +2021,7 @@ inline umm append(StringBuilder &builder, v2f v) {      \
 	return append_format(builder, "({}, {})"s, v.x, v.y); \
 }
 
+TO_STRING_V2(v2b)
 TO_STRING_V2(v2f)
 TO_STRING_V2(v2u)
 TO_STRING_V2(v2s)
@@ -2032,6 +2033,7 @@ inline umm append(StringBuilder &builder, v3f v) {              \
 	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z); \
 }
 
+TO_STRING_V3(v3b)
 TO_STRING_V3(v3f)
 TO_STRING_V3(v3u)
 TO_STRING_V3(v3s)
@@ -2043,6 +2045,7 @@ inline umm append(StringBuilder &builder, v4f v) {                      \
 	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w); \
 }
 
+TO_STRING_V4(v4b)
 TO_STRING_V4(v4f)
 TO_STRING_V4(v4u)
 TO_STRING_V4(v4s)
