@@ -8,7 +8,7 @@
 
 namespace tl {
 
-inline static constexpr u32 u32_random_primes[] = {
+inline constexpr u32 u32_random_primes[] = {
 	0x36DCD91D,
 	0x054A136F,
 	0x7DA1D8CD,

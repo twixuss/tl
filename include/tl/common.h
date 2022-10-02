@@ -223,11 +223,11 @@ constexpr void destruct(T &val) {
 #pragma warning(push)
 #pragma warning(disable : 4309)
 
-template <class T> inline static constexpr T min_value = {};
-template <class T> inline static constexpr T max_value = {};
+template <class T> inline constexpr T min_value = {};
+template <class T> inline constexpr T max_value = {};
 
-template <class T> inline static constexpr T min_value<T &> = min_value<T>;
-template <class T> inline static constexpr T max_value<T &> = max_value<T>;
+template <class T> inline constexpr T min_value<T &> = min_value<T>;
+template <class T> inline constexpr T max_value<T &> = max_value<T>;
 
 template<> inline constexpr u8  min_value<u8 > = 0;
 template<> inline constexpr u8  max_value<u8 > = 0xFF;
@@ -265,15 +265,15 @@ template<> inline constexpr f32 max_value<f32> = +3.402823466e+38f;
 template<> inline constexpr f64 min_value<f64> = -1.7976931348623158e+308;
 template<> inline constexpr f64 max_value<f64> = +1.7976931348623158e+308;
 
-template <class T> inline static constexpr T epsilon = {};
+template <class T> inline constexpr T epsilon = {};
 template<> inline constexpr f32 epsilon<f32> = 1.175494351e-38f;
 template<> inline constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
-template <class T> inline static constexpr T infinity = {};
+template <class T> inline constexpr T infinity = {};
 template<> inline constexpr f32 infinity<f32> = 1e300 * 1e300;
 template<> inline constexpr f64 infinity<f64> = 1e300 * 1e300;
 
-template <class T> inline static constexpr T nan = infinity<T> * 0;
+template <class T> inline constexpr T nan = infinity<T> * 0;
 
 #pragma warning(pop)
 
@@ -696,15 +696,16 @@ constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
 
+// Does not check if min_bound is greater than max_bound
+// There is `clamp_checked` for that.
 template <class T>
 forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
-	minmax(min_bound, max_bound, min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
 
-// Does not check if min_bound is greater than max_bound
 template <class T>
-forceinline constexpr auto clamp_unchecked(T value, T min_bound, T max_bound) {
+forceinline constexpr auto clamp_checked(T value, T min_bound, T max_bound) {
+	minmax(min_bound, max_bound, min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
 
@@ -974,7 +975,7 @@ struct ReverseIterator {
 };
 
 
-inline static constexpr struct null_opt_t {} null_opt;
+inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
 struct Optional {
@@ -1163,10 +1164,10 @@ struct Span {
 #pragma pack(pop)
 
 template <class T>
-inline static constexpr bool is_span = false;
+inline constexpr bool is_span = false;
 
 template <class T, class Size>
-inline static constexpr bool is_span<Span<T, Size>> = true;
+inline constexpr bool is_span<Span<T, Size>> = true;
 
 template <class T>
 concept cSpan = is_span<T>;

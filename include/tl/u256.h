@@ -237,9 +237,9 @@ union u256 {
 	explicit operator u64() const { return s[0]; };
 };
 
-template <> inline static constexpr bool is_integer<u256> = true;
-template <> inline static constexpr bool is_integer_like<u256> = true;
-template <> inline static constexpr bool is_signed<u256> = false;
+template <> inline constexpr bool is_integer<u256> = true;
+template <> inline constexpr bool is_integer_like<u256> = true;
+template <> inline constexpr bool is_signed<u256> = false;
 
 inline u256 U256(u64 val) {
 	return {.s = {val}};

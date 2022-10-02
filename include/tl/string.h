@@ -191,7 +191,7 @@ enum Encoding {
 	Encoding_utf32,
 };
 
-template <class Char> inline static constexpr Encoding encoding_from_type = Encoding_unknown;
+template <class Char> inline constexpr Encoding encoding_from_type = Encoding_unknown;
 template <> inline constexpr Encoding encoding_from_type<char > = Encoding_ascii;
 template <> inline constexpr Encoding encoding_from_type<utf8 > = Encoding_utf8;
 template <> inline constexpr Encoding encoding_from_type<utf16> = Encoding_utf16;
@@ -627,7 +627,7 @@ inline umm append(StringBuilder &b, StringBuilder const &that) {
 }
 
 template <class T>
-inline static constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
+inline constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
 
 template <class Char>
 inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> format_string) {
@@ -961,7 +961,7 @@ struct are_utf8_t<First> {
 };
 
 template <class ...Args>
-inline static constexpr bool are_utf8 = are_utf8_t<Args...>::value;
+inline constexpr bool are_utf8 = are_utf8_t<Args...>::value;
 
 
 template <class T> struct is_utf16_t { inline static constexpr bool value = false; };
@@ -979,7 +979,7 @@ struct are_utf16_t<First> {
 };
 
 template <class ...Args>
-inline static constexpr bool are_utf16 = are_utf16_t<Args...>::value;
+inline constexpr bool are_utf16 = are_utf16_t<Args...>::value;
 
 
 template <class ...Args>

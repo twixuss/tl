@@ -118,7 +118,7 @@ struct CpuCache {
 };
 
 using CpuFeatureMask = umm;
-inline static constexpr u32 bits_in_cpu_feature_mask = sizeof(CpuFeatureMask) * 8;
+inline constexpr u32 bits_in_cpu_feature_mask = sizeof(CpuFeatureMask) * 8;
 
 inline CpuFeatureIndex get_cpu_feature_index(CpuFeature f) {
 	CpuFeatureIndex result;

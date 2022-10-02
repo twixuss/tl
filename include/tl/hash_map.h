@@ -13,8 +13,7 @@ struct DefaultHashTraits {
 	inline static constexpr u32 rehash_percentage = 70;
 	inline static constexpr void on_collision(Key a, Key b) {}
 
-	// template is here because of situation where == operator is not defined, but
-	// are_equal is overriden in a base class.
+	// template is here because of situation where == operator is not defined, but are_equal is defined in derived class.
 	template <class=void> inline static constexpr bool are_equal(Key a, Key b) { return a == b; }
 	template <class=void> inline static constexpr u64 get_hash(Key key) { return ::get_hash(key); }
 };
