@@ -105,6 +105,14 @@ inline umm print(char const *string) {
 	return print(as_span(string));
 }
 
+template <class ...T>
+inline umm println(T const &...args) {
+	umm result = 0;
+	result += print(args...);
+	result += print('\n');
+	return result;
+}
+
 TL_API void hide_console_window();
 TL_API void show_console_window();
 TL_API void toggle_console_window();
