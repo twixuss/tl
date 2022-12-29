@@ -4,9 +4,11 @@
 #include "string.h"
 #include <typeinfo>
 
+// Provides linear strorage addressable by 32-bit number.
+// This basically allows to have 32-bit pointers in 64-bit programs.
+
 namespace tl {
 
-// Provides strorage, addressable by 32-bit number in constant time.
 template <class Tag>
 struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	template <class T>
@@ -18,52 +20,57 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 
 		forceinline Ptr() = default;
 		forceinline Ptr(T *pointer) {
+			*this = pointer;
+		}
+		template <class U>
+		requires std::is_base_of_v<T, U>
+		forceinline Ptr(Ptr<U> pointer) : Ptr(pointer.offset) {}
+
+
+		forceinline Ptr &operator=(T *that) {
 			assert(base);
 
-			if (!pointer) {
+			if (!that) {
 				offset = 0;
-				return;
+				return *this;
 			}
 
-			umm real_offset = (u8 *)pointer - base;
-			offset = (u32)real_offset;
-			assert(offset == real_offset);
+			umm full_offset = (u8 *)that - base;
+			offset = (u32)full_offset;
+			assert(offset == full_offset);
 			assert(offset);
+			return *this;
 		}
 
-		template <class U, class = EnableIf<std::is_convertible_v<U, T>>>
+		template <class U>
+		requires std::is_base_of_v<T, U>
 		forceinline Ptr &operator=(Pool32<Tag>::Ptr<U> that) {
 			assert(base);
 			offset = that.offset;
 			return *this;
 		}
 
-		forceinline operator T *() {
-			assert(base);
-			if (offset == 0)
-				return 0;
-			return (T *)(base + offset);
-		}
+		forceinline explicit operator bool() { return offset; }
+
 		template <class U>
-		forceinline explicit operator U *() {
-			assert(base);
-			if (offset == 0)
-				return 0;
-			return (U *)(base + offset);
-		}
+		forceinline explicit(!(std::is_same_v<T, U> || std::is_base_of_v<U, T>)) operator U *() { return (U *)raw(); }
 
-		forceinline T *operator->() {
-			assert(base);
-			assert(offset);
-			return (T *)(base + offset);
-		}
-		forceinline T &operator*() {
-			return *operator->();
-		}
+		template <class U>
+		forceinline explicit(!(std::is_same_v<T, U> || std::is_base_of_v<U, T>)) operator Ptr<U>() { return offset; }
 
-		T *raw() {
-			return (T *)(base + offset);
+
+		forceinline T *operator->() { assert(offset); return raw(); }
+		forceinline T &operator*() { assert(offset); return *raw(); }
+
+		forceinline bool operator==(T *that) { return raw() == that; };
+		forceinline bool operator!=(T *that) { return raw() != that; };
+
+		forceinline T *raw() {
+			assert(base);
+			return (T *)(((umm)base + offset) * (offset != 0));
 		}
+	private:
+		forceinline Ptr(umm offset) : offset(offset) {}
 	};
 
 	inline static u8 *base;
@@ -72,14 +79,20 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 
 	inline static Pool32 current() { return {}; }
 
-	static void init() {
+	inline static void init() {
 		base = (u8 *)reserve_memory(4 * GiB);
 		if (!base) {
 			with(ConsoleColor::red, print("ERROR :: FAILED TO RESERVE MEMORY FOR {}\n", typeid(Pool32).name()));
 			exit(-1);
 		}
-		next_free = base + 1; // first byte is reserved for `null` pointer, s+o skip it.
+		clear();
+	}
+	inline static void clear() {
+		next_free = base + 1; // first byte is reserved for `null` pointer, so skip it.
 		next_uncommitted = 0;
+	}
+	inline static umm size() {
+		return next_free - base;
 	}
 
 	AllocationResult allocate_impl(umm size, umm alignment, std::source_location location) {
@@ -101,7 +114,7 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	}
 
 	void deallocate_impl(void *data, umm size, umm alignment, std::source_location location) {
-		print("Pool32::deallocate is not implemented yet. leaking.\n");
+		// This allocator does not support fine-grained deallocation.
 	}
 
 };

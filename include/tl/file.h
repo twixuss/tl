@@ -59,7 +59,7 @@ inline bool file_exists(Span<ascii> path) {
 	return file_exists(temporary_null_terminate(path).data);
 }
 inline bool file_exists(Span<utf8> path) {
-	return file_exists(to_utf16(path, true).data);
+	return file_exists(with(temporary_allocator, to_utf16(path, true)).data);
 }
 inline bool file_exists(Span<utf16> path) {
 	return file_exists(temporary_null_terminate(path).data);
@@ -71,7 +71,7 @@ inline bool directory_exists(Span<utf16> path) {
 	return directory_exists(temporary_null_terminate(path).data);
 }
 inline bool directory_exists(Span<utf8> path) {
-	return directory_exists(to_utf16(path, true).data);
+	return directory_exists(with(temporary_allocator, to_utf16(path, true)).data);
 }
 forceinline bool directory_exists(Span<ascii> path) {
 	return directory_exists((Span<utf8>)path);
@@ -201,7 +201,7 @@ inline void delete_file(Span<utf8> path) {
 TL_API bool create_directory(ascii const *path);
 TL_API bool create_directory(utf16 const *path);
 inline bool create_directory(Span<ascii> path) { return create_directory(temporary_null_terminate(path).data); }
-inline bool create_directory(Span<utf8>  path) { return create_directory(to_utf16(path, true).data); }
+inline bool create_directory(Span<utf8>  path) { return create_directory(with(temporary_allocator, to_utf16(path, true)).data); }
 inline bool create_directory(Span<utf16> path) { return create_directory(temporary_null_terminate(path).data); }
 
 struct FileState {
@@ -416,7 +416,7 @@ void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
 	}
 }
 
-TL_API List<utf8> get_executable_path();
+TL_API List<utf8> get_executable_path(bool null_terminated = false TL_LP);
 
 struct MoveFileParams {
 	bool replace_existing = false;
@@ -807,7 +807,7 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 					append_format(builder, "*.{};", ext);
 				}
 			}
-			file_type = {L"Files", (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data};
+			file_type = {L"Files", with(temporary_allocator, (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data)};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
@@ -896,12 +896,12 @@ bool copy_file(pathchar const *source, pathchar const *destination) {
 	return CopyFileW((wchar *)source, (wchar *)destination, false);
 }
 
-List<utf8> get_executable_path() {
+List<utf8> get_executable_path(bool null_terminated TL_LPD) {
 	List<utf16> temp;
 	temp.allocator = temporary_allocator;
 	temp.reserve(512);
 	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, (DWORD)temp.capacity);
-	return to_utf8(temp);
+	return to_utf8(temp, null_terminated TL_LA);
 }
 
 bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params) {

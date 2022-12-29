@@ -2,112 +2,118 @@
 #include "thread.h"
 #include "debug.h"
 #include "hash_map.h"
-#include "fly_string.h"
 
 namespace tl {
-
-extern TL_API Allocator tracking_allocator;
-extern TL_API Allocator tracking_allocator_fallback;
 
 //
 // Before accessing `tracked_allocations`, make sure that you lock `tracked_allocations_mutex`
 //
 
 struct AllocationInfo {
+	std::source_location location;
 	umm current_size;
 	umm total_size;
 };
 
-extern TL_API HashMap<FlyString, AllocationInfo> tracked_allocations;
-extern TL_API Mutex tracked_allocations_mutex;
-
-TL_API void init_tracking_allocator();
+TL_API Allocator make_tracking_allocator(Allocator underlying);
+TL_API List<AllocationInfo> get_tracked_allocations(Allocator tracking_allocator);
 
 #ifdef TL_IMPL
 
-HashMap<FlyString, AllocationInfo> tracked_allocations;
-Mutex tracked_allocations_mutex;
-Allocator tracking_allocator_fallback;
+struct AllocationCounts {
+	umm current_size;
+	umm total_size;
+};
 
 struct AllocationMeta {
-	AllocationInfo *info;
+	AllocationCounts *counts;
 	umm this_size;
 };
 
-static HashMap<void *, AllocationMeta> allocation_metas;
-
-void init_tracking_allocator() {
-	construct(tracked_allocations);
-	construct(allocation_metas);
-}
-
-static auto format_location(std::source_location location) {
-	return (List<utf8>)format("{}:{}", location.file_name(), location.line());
-}
-
-Allocator tracking_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
-		switch (mode) {
-			case Allocator_allocate: {
-				scoped_lock(tracked_allocations_mutex);
-
-				auto result = tracking_allocator_fallback.allocate_impl(new_size, align, location);
-
-				scoped_allocator(os_allocator);
-
-				auto string = format_location(location);
-				defer { free(string); };
-
-				auto &info = tracked_allocations.get_or_insert(string);
-				info.current_size += new_size;
-				info.total_size   += new_size;
-
-				auto &meta = allocation_metas.get_or_insert(result.data);
-				meta.this_size = new_size;
-				meta.info = &info;
-
-				return result;
-			}
-			case Allocator_reallocate: {
-				scoped_lock(tracked_allocations_mutex);
-
-				auto result = tracking_allocator_fallback.reallocate_impl(data, old_size, new_size, align, location);
-
-				scoped_allocator(os_allocator);
-
-				auto string = format_location(location);
-				defer { free(string); };
-
-				auto &old_meta = allocation_metas.find(data)->value;
-				old_meta.info->current_size -= old_meta.this_size;
-				allocation_metas.erase(data);
-
-				auto &info = tracked_allocations.get_or_insert(string);
-				info.current_size += new_size;
-				info.total_size   += new_size;
-
-				auto &new_meta = allocation_metas.get_or_insert(result.data);
-				new_meta.this_size = new_size;
-				new_meta.info = &info;
-
-				return result;
-			}
-			case Allocator_free: {
-				scoped_lock(tracked_allocations_mutex);
-
-				tracking_allocator_fallback.free(data, new_size, align, location);
-
-				auto &old_meta = allocation_metas.find(data)->value;
-				old_meta.info->current_size -= old_meta.this_size;
-				allocation_metas.erase(data);
-
-				break;
-			}
-		}
-		return {};
-	},
-	.state = 0
+struct TrackingAllocatorState {
+	Allocator state_allocator;
+	Allocator underlying_allocator;
+	HashMap<std::source_location, AllocationCounts> tracked_allocations;
+	Mutex tracked_allocations_mutex;
+	HashMap<void *, AllocationMeta> allocation_metas;
 };
+
+Allocator make_tracking_allocator(Allocator underlying) {
+	auto state_allocator = current_allocator;
+
+
+	auto state = state_allocator.allocate<TrackingAllocatorState>();
+	state->state_allocator = state_allocator;
+	state->underlying_allocator = underlying;
+	return {
+		.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
+			auto state = (TrackingAllocatorState *)_state;
+			switch (mode) {
+				case Allocator_allocate: {
+					auto result = state->underlying_allocator.allocate_impl(new_size, align, location);
+
+					scoped_lock(state->tracked_allocations_mutex);
+					scoped_allocator(state->state_allocator);
+
+					auto &counts = state->tracked_allocations.get_or_insert(location);
+					counts.current_size += new_size;
+					counts.total_size   += new_size;
+
+					auto &meta = state->allocation_metas.get_or_insert(result.data);
+					meta.this_size = new_size;
+					meta.counts = &counts;
+
+					return result;
+				}
+				case Allocator_reallocate: {
+					auto result = state->underlying_allocator.reallocate_impl(data, old_size, new_size, align, location);
+
+					scoped_lock(state->tracked_allocations_mutex);
+					scoped_allocator(state->state_allocator);
+
+					auto &old_meta = state->allocation_metas.find(data)->value;
+					old_meta.counts->current_size -= old_meta.this_size;
+					state->allocation_metas.erase(data);
+
+					auto &counts = state->tracked_allocations.get_or_insert(location);
+					counts.current_size += new_size;
+					counts.total_size   += new_size;
+
+					auto &new_meta = state->allocation_metas.get_or_insert(result.data);
+					new_meta.this_size = new_size;
+					new_meta.counts = &counts;
+
+					return result;
+				}
+				case Allocator_free: {
+					state->underlying_allocator.free(data, new_size, align, location);
+
+					if (!data)
+						return {};
+
+					scoped_lock(state->tracked_allocations_mutex);
+					auto &old_meta = state->allocation_metas.find(data)->value;
+					old_meta.counts->current_size -= old_meta.this_size;
+					state->allocation_metas.erase(data);
+
+					break;
+				}
+			}
+			return {};
+		},
+		.state = state
+	};
+}
+List<AllocationInfo> get_tracked_allocations(Allocator tracking_allocator) {
+	auto state = (TrackingAllocatorState *)tracking_allocator.state;
+	return map(state->tracked_allocations, [](auto k, auto v){
+		return AllocationInfo {
+			.location = k,
+			.current_size = v.current_size,
+			.total_size = v.total_size
+		};
+	});
+}
 
 #endif
 

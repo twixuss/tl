@@ -2,6 +2,7 @@
 #include "list.h"
 #include "string.h"
 #include "console.h"
+#include "hash.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
@@ -15,6 +16,13 @@ struct StringizedCallStack {
 		Span<char> name;
 		Span<char> file;
 		u32 line = 0;
+
+		inline constexpr bool operator==(Entry const &that) const {
+			return
+				this->line == that.line &&
+				this->name == that.name &&
+				this->file == that.file;
+		}
 	};
 	List<Entry> call_stack;
 	List<char> string_buffer;
@@ -39,6 +47,20 @@ TL_API StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip);
 
 TL_API bool debugger_attached();
 
+inline umm append(StringBuilder &builder, StringizedCallStack::Entry const &entry) {
+	return append_format(builder, "{}:{}: {}", entry.file, entry.line, entry.name);
+}
+
+}
+
+template <>
+inline tl::u64 get_hash(tl::StringizedCallStack const &s) {
+	return get_hash(s.call_stack);
+}
+
+template <>
+inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
+	return get_hash(e.file) ^ get_hash(e.line) ^ get_hash(e.name);
 }
 
 #ifdef TL_IMPL

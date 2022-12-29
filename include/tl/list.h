@@ -295,8 +295,8 @@ List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
 	return result;
 }
 
-template <class Allocator = Allocator, class Size = umm, class T>
-List<T, Allocator, Size> to_list(Span<T> that, Allocator allocator = Allocator::current() TL_LP) {
+template <class Allocator = Allocator, class Size, class T>
+List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator, Size> result;
 	result.data = allocator.allocate<T>(that.count TL_LA);
 	result.count = that.count;
@@ -416,9 +416,9 @@ void split(Span<T, Size> what, T by, Fn &&callback) {
 
 	callback(Span(what.data + start, what.end()));
 }
-template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> split(Span<T> what, T by TL_LP) {
-	List<Span<T>, Allocator, Size> result;
+template <class T, class SSize, class Allocator = Allocator, class DSize = umm>
+List<Span<T>, Allocator, DSize> split(Span<T, SSize> what, T by TL_LP) {
+	List<Span<T>, Allocator, DSize> result;
 
 	split(what, by, [&](auto part) {
 		result.add(part TL_LA);
@@ -973,6 +973,7 @@ struct StaticRingQueue : private StaticRingBuffer<T, _capacity> {
 	Optional<T> pop() { return this->pop_front(); }
 };
 
+// Collection of unique elements, stored contiguously in order of addition.
 template <class T, class Size_ = umm>
 struct LinearSet : Span<T, Size_> {
 	using ElementType = T;
@@ -1115,16 +1116,35 @@ void free(LinearSet<T> &set) {
 }
 
 template <class T>
-umm index_of(LinearSet<T> const &list, T const *value) {
-	return value - list.data;
+umm index_of(LinearSet<T> const &list, T const *pointer) {
+	return pointer - list.data;
 }
 template <class T>
-void erase(LinearSet<T> &set, T *value) { return erase((List<T> &)set, value); }
+void erase(LinearSet<T> &set, T *pointer) { return erase((List<T> &)set, pointer); }
 
 template <class T>
-void erase_unordered(LinearSet<T> &set, T *value) {
-	set[index_of(set, value)] = set.back();
+void erase_unordered(LinearSet<T> &set, T *pointer) {
+	set[index_of(set, pointer)] = set.back();
 	set.count--;
+}
+
+template <class T>
+void erase(LinearSet<T> &set, T value) {
+	for (auto &existing : set) {
+		if (existing == value) {
+			erase(set, &existing);
+		}
+	}
+}
+
+template <class T, class Size>
+LinearSet<T, Size> copy(LinearSet<T, Size> that TL_LP) {
+	LinearSet<T, Size> result;
+	result.count = that.count;
+	result.capacity = result.count;
+	result.data = result.allocator.allocate<T>(result.count TL_LA);
+	memcpy(result.data, that.data, result.count * sizeof(T));
+	return result;
 }
 
 #pragma warning(pop)

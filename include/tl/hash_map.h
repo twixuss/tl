@@ -129,6 +129,12 @@ struct BucketHashMap {
 	Span<Bucket> buckets;
 	umm total_value_count = 0;
 
+	umm hash_to_index(u64 hash) {
+		hash ^= hash >> 32;
+		hash ^= hash >> 16;
+		return hash & (buckets.count - 1);
+	}
+
 	Value &get_or_insert(Key const &key TL_LP) {
 		scoped_allocator(allocator);
 
@@ -137,7 +143,7 @@ struct BucketHashMap {
 		}
 
 		umm hash = Traits::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		auto bucket = &buckets[hash_to_index(hash)];
 
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
@@ -149,12 +155,13 @@ struct BucketHashMap {
 
 		if (total_value_count >= buckets.count * Traits::rehash_percentage / 100) {
 			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[hash & (buckets.count - 1)];
+			bucket = &buckets[hash_to_index(hash)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.kv.key = key;
+
 		return it.kv.value;
 	}
 
@@ -172,7 +179,7 @@ struct BucketHashMap {
 		}
 
 		umm hash = Traits::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		auto bucket = &buckets[hash_to_index(hash)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
 				if (Traits::are_equal(it.kv.key, key)) {
@@ -184,7 +191,7 @@ struct BucketHashMap {
 
 		if (total_value_count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[hash & (buckets.count - 1)];
+			bucket = &buckets[hash_to_index(hash)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
@@ -201,7 +208,7 @@ struct BucketHashMap {
 		}
 
 		umm hash = Traits::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		auto bucket = &buckets[hash_to_index(hash)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
 				if (Traits::are_equal(it.kv.key, key)) {
@@ -216,7 +223,7 @@ struct BucketHashMap {
 
 		if (total_value_count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[hash & (buckets.count - 1)];
+			bucket = &buckets[hash_to_index(hash)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
@@ -231,7 +238,8 @@ struct BucketHashMap {
 			return 0;
 
 		umm hash = Traits::get_hash(key);
-		auto &bucket = buckets[hash & (buckets.count - 1)];
+		auto &bucket = buckets[hash_to_index(hash)];
+
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
 				if (Traits::are_equal(it.kv.key, key)) {
@@ -246,7 +254,7 @@ struct BucketHashMap {
 			return {};
 
 		umm hash = Traits::get_hash(key);
-		auto &bucket = buckets[hash & (buckets.count - 1)];
+		auto &bucket = buckets[hash_to_index(hash)];
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
 				if (Traits::are_equal(it.kv.key, key)) {
@@ -276,7 +284,7 @@ struct BucketHashMap {
 				node->next = 0;
 
 				auto hash = Traits::get_hash(node->value.kv.key);
-				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
+				auto &new_bucket = buckets[hash_to_index(hash)];
 				new_bucket.add_steal(node);
 			}
 		}
@@ -344,6 +352,15 @@ struct BucketHashMap {
 	}
 };
 
+template <class Key, class Value, class Traits>
+umm count_of(BucketHashMap<Key, Value, Traits> &map) {
+	umm result = 0;
+	for (auto &bucket : map.buckets) {
+		result += bucket.size();
+	}
+	return result;
+}
+
 template <ForEachFlags flags=0, class Key, class Value, class Traits, class Fn>
 void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
 	requires { fn(*(Key *)0, *(Value *)0); }
@@ -356,6 +373,16 @@ void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
 		}
 	}
 }
+
+template <class Key, class Value, class Traits, class Fn>
+auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(Key *)0, *(Value *)0); } {
+	using U = decltype(fn(*(Key *)0, *(Value *)0));
+	List<U, Allocator> result;
+	result.reserve(count_of(map) TL_LA);
+	for_each(map, [&](Key &key, Value &value) { result.add(fn(key, value)); });
+	return result;
+}
+
 
 template <class Key, class Value, class Traits>
 BucketHashMap<Key, Value, Traits> copy(BucketHashMap<Key, Value, Traits> const &source TL_LP) {
@@ -372,15 +399,6 @@ void set(BucketHashMap<Key, Value, Traits> &destination, BucketHashMap<Key, Valu
 	for_each(source, [&](Key const &key, Value const &value) {
 		destination.get_or_insert(key TL_LA) = value;
 	});
-}
-
-template <class Key, class Value, class Traits>
-umm count_of(BucketHashMap<Key, Value, Traits> &map) {
-	umm result = 0;
-	for (auto &bucket : map.buckets) {
-		result += bucket.size();
-	}
-	return result;
 }
 
 template <class Key, class Value, class Traits, class Fn>
@@ -426,7 +444,7 @@ struct ContiguousHashMap {
     umm count = 0;
 
 
-    Value &get_or_insert(Key key) {
+    Value &get_or_insert(Key key TL_LP) {
 		auto hash = get_the_hash(key);
 		u64 index = 0;
 		if (cells.count) {
@@ -449,13 +467,13 @@ struct ContiguousHashMap {
 
 			bool recalc = false;
 			if (count >= cells.count * Traits::rehash_percentage / 100) {
-				if (reserve(cells.count * 2)) {
+				if (reserve(cells.count * 2 TL_LA)) {
 					hash = get_the_hash(key);
 					index = hash % cells.count;
 				}
 			}
         } else {
-			reserve(7);
+			reserve(7 TL_LA);
 			index = hash % cells.count;
 		}
 		count += 1;
@@ -474,7 +492,7 @@ struct ContiguousHashMap {
 		return cell.value() = {};
     }
 
-    bool reserve(umm desired) {
+    bool reserve(umm desired TL_LP) {
         if (desired <= cells.count)
             return false;
 
@@ -486,7 +504,7 @@ struct ContiguousHashMap {
 		}
 		assert(is_power_of_2(new_cells.count + 1));
 
-        new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count);
+        new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count TL_LA);
         for (auto &new_cell : new_cells) {
             new_cell.state = CellState::empty;
         }
@@ -595,6 +613,15 @@ void for_each(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn) {
             fn(cell.key(), cell.value());
         }
     }
+}
+
+template <class Key, class Value, class Traits, class Fn>
+auto map(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(Key *)0, *(Value *)0); } {
+	using U = decltype(fn(*(Key *)0, *(Value *)0));
+	List<U, Allocator> result;
+	result.reserve(count_of(map) TL_LA);
+	for_each(map, [&](Key &key, Value &value) { result.add(fn(key, value)); });
+	return result;
 }
 
 #ifndef TL_DEFAULT_HASH_MAP

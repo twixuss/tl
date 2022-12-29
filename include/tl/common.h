@@ -53,17 +53,28 @@
 #define tl_base __super
 #endif
 
+
+
+// These are macros to propagate caller's location down the call stack.
+// The reason they exist is because I wanted to track allocations,
+// specifically the first non-tl entry in the call stack. I tried to
+// walk the stack on every allocation, but it turned way way slower and
+// excessively complicated than this method. The only downside of this
+// is noisy parameter and argument lists.
+// Comment after macro tells where to put it.
+// For examples just search for any data structure that does allocations.
+
 #ifndef TL_PARENT_SOURCE_LOCATION
 #define TL_PARENT_SOURCE_LOCATION 1
 #endif
 
 #if TL_PARENT_SOURCE_LOCATION
-#define TL_LPC std::source_location location = std::source_location::current()
-#define TL_LPCD std::source_location location
-#define TL_LAC location
-#define TL_LP , TL_LPC
-#define TL_LPD , TL_LPCD
-#define TL_LA , TL_LAC
+#define TL_LPC std::source_location location = std::source_location::current() // in empty parameter list (declaration)
+#define TL_LPCD std::source_location location                                  // in empty parameter list (definition)
+#define TL_LAC location														   // in empty argument list
+#define TL_LP , TL_LPC														   // after some parameters (declaration)
+#define TL_LPD , TL_LPCD													   // after some parameters (definition)
+#define TL_LA , TL_LAC														   // after some arguments
 #else
 #define TL_LPC
 #define TL_LPCD
@@ -72,6 +83,8 @@
 #define TL_LPD
 #define TL_LA
 #endif
+
+
 
 #define KiB 0x400ull
 #define MiB 0x100000ull
@@ -979,43 +992,43 @@ inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
 struct Optional {
-	Optional() {
+	constexpr Optional() {
 		_has_value = false;
 	}
-	Optional(T that) {
+	constexpr Optional(T that) {
 		_value = that;
 		_has_value = true;
 	}
-	Optional(null_opt_t) {
+	constexpr Optional(null_opt_t) {
 		_has_value = false;
 	}
-	Optional &operator=(T that) {
+	constexpr Optional &operator=(T that) {
 		return *new(this) Optional(that);
 	}
-	Optional &operator=(null_opt_t) {
+	constexpr Optional &operator=(null_opt_t) {
 		return *new(this) Optional();
 	}
 
-	void reset() {
+	constexpr void reset() {
 		_has_value = false;
 	}
 
-	explicit operator bool() const { return _has_value; }
+	constexpr explicit operator bool() const { return _has_value; }
 
-	bool has_value() const { return _has_value; }
-	T const &value() const { assert_always(_has_value); return _value; }
-	T       &value()       { assert_always(_has_value); return _value; }
-	T const &value_unchecked() const { return _value; }
-	T       &value_unchecked()       { return _value; }
+	constexpr bool has_value() const { return _has_value; }
+	constexpr T const &value() const { assert_always(_has_value); return _value; }
+	constexpr T       &value()       { assert_always(_has_value); return _value; }
+	constexpr T const &value_unchecked() const { return _value; }
+	constexpr T       &value_unchecked()       { return _value; }
 
 	template <class Fallback>
-	T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
+	constexpr T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
 		if (_has_value)
 			return _value;
 		return fallback();
 	}
 
-	T value_or(T fallback) {
+	constexpr T value_or(T fallback) {
 		if (_has_value)
 			return _value;
 		return fallback;
@@ -1023,14 +1036,14 @@ struct Optional {
 
 
 	template <class U>
-	Optional<U> map() {
+	constexpr Optional<U> map() {
 		if (_has_value) {
 			return (U)_value;
 		}
 		return null_opt;
 	}
 
-	void apply(auto &&fn) {
+	constexpr void apply(auto &&fn) {
 		if (_has_value)
 			fn(_value);
 	}
@@ -1142,6 +1155,12 @@ struct Span {
 			min(data + subspan_start + subspan_count, end()),
 		};
 	}
+	constexpr Span subspan(Size subspan_start) const {
+		return {
+			min(data + subspan_start, end()),
+			end(),
+		};
+	}
 	constexpr Span skip(smm amount) const {
 		if (amount >= 0) {
 			auto offset = min((Size)amount, count);
@@ -1158,6 +1177,17 @@ struct Span {
 		count = new_end - data;
 	}
 
+	template <class U, class ThatSize=Size>
+	constexpr Span<U, ThatSize> unsafe_as() const {
+		if constexpr (sizeof(T) > sizeof(U))
+			static_assert(sizeof(T) % sizeof(U) == 0);
+		else
+			static_assert(sizeof(U) % sizeof(T) == 0);
+
+		return {(U *)data, (ThatSize)(count * sizeof(T) / sizeof(U))};
+	}
+
+
 	ValueType *data = 0;
 	Size count = 0;
 };
@@ -1170,7 +1200,12 @@ template <class T, class Size>
 inline constexpr bool is_span<Span<T, Size>> = true;
 
 template <class T>
-concept cSpan = is_span<T>;
+concept ASpan = is_span<T>;
+
+template <class T>
+concept AnEnum = std::is_enum_v<T>;
+
+auto to_underlying(AnEnum auto e) { return (std::underlying_type_t<decltype(e)>)e; }
 
 template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
@@ -2069,6 +2104,28 @@ struct MyAllocator : AllocatorBase<MyAllocator> {
 #endif
 
 template <class T>
+Allocator make_allocator_from_static_class() {
+	return {
+		.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> AllocationResult {
+			switch (mode) {
+				case Allocator_allocate: {
+					return T{}.allocate_impl(new_size, align, location);
+				}
+				case Allocator_reallocate: {
+					return T{}.reallocate_impl(data, old_size, new_size, align, location);
+				}
+				case Allocator_free: {
+					T{}.deallocate_impl(data, new_size, align, location);
+					break;
+				}
+			}
+			return {};
+		},
+		.state = 0
+	};
+}
+
+template <class T>
 concept DefaultConstructible = requires { new T(); };
 
 // TODO:
@@ -2374,13 +2431,29 @@ struct Scoped {
 template <class Thing>
 Scoped(Thing) -> Scoped<Thing>;
 
-// for use with expressions
+// Example use:
+// auto str = with(temporary_allocator, format("{}, {}", a, b));
 #define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=Scoped(new_thing);return __VA_ARGS__;}())
-
-// for use with statements
-#define withs(new_thing, ...) ([&]{auto replacer=Scoped(new_thing);__VA_ARGS__;}())
-
 #define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = Scoped(new_thing)
+
+template <class Thing>
+struct ScopedBlock {
+	Thing thing;
+	ScopedBlock(Thing thing) : thing(thing) {}
+
+	template <class Fn>
+	void operator+(Fn &&fn) {
+		scoped(thing);
+		fn();
+	}
+};
+
+// Example use:
+// withs(temporary_allocator) {
+//     do_some_stuff();
+//     do_other_stuff();
+// };
+#define withs(new_thing) ScopedBlock(new_thing) + [&]
 
 template <>
 struct Scoped<Allocator> {
