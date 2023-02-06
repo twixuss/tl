@@ -1095,18 +1095,15 @@ struct LinearSet : Span<T, Size_> {
 		count = span.count;
 		memcpy(data, span.data, span.count * sizeof(T));
 	}
-private:
-	Span add(Span span TL_LP) {
-		reserve_exponential(count + span.count TL_LA);
-		memcpy(data + count, span.data, span.count * sizeof(T));
-		count += span.count;
-		return {data + count - span.count, span.count};
+	void add(Span span TL_LP) {
+		for (auto &value : span) {
+			add(value);
+		}
 	}
-	Span add(std::initializer_list<T> list TL_LP) {
-		reserve_exponential(count + list.size() TL_LA);
-		memcpy(data + count, list.begin(), list.size() * sizeof(T));
-		count += list.size();
-		return {data + count - list.size(), list.size()};
+	void add(std::initializer_list<T> list TL_LP) {
+		for (auto &value : list) {
+			add(value);
+		}
 	}
 };
 

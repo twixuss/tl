@@ -346,6 +346,7 @@ struct StringBuilder {
 	struct Block {
 		umm count = 0;
 		umm capacity = 0;
+		Block *prev = 0;
 		Block *next = 0;
 		u8 *data() { return (u8 *)(this + 1); }
 		u8 *begin() { return data(); }
@@ -399,7 +400,7 @@ struct StringBuilder {
 			auto new_capacity = alloc_last->capacity;
 			while (new_capacity < amount)
 				new_capacity *= 2;
-			last = alloc_last = alloc_last->next = allocate_block(new_capacity TL_LA);
+			last = allocate_block(new_capacity TL_LA);
 		}
 
 		defer {
@@ -465,12 +466,30 @@ struct StringBuilder {
 		auto block = (Block *)allocator.allocate_uninitialized(sizeof(Block) + new_capacity, alignof(Block) TL_LA);
 		block->count = 0;
 		block->capacity = new_capacity;
+		block->prev = alloc_last;
 		block->next = 0;
 		alloc_last = alloc_last->next = block;
 		return block;
 	}
 	Block *allocate_block(TL_LPC) {
 		return allocate_block(alloc_last->capacity*2 TL_LA);
+	}
+
+	Optional<u8> pop() {
+		if (!last)
+			return {};
+
+		if (!last->count)
+			return {};
+
+		last->count--;
+
+		auto result = *last->end();
+
+		if (last->count == 0 && last->prev)
+			last = last->prev;
+
+		return result;
 	}
 };
 
@@ -480,6 +499,8 @@ inline void free(StringBuilder &builder) {
 		builder.allocator.free_t(block);
 		block = next;
 	}
+	builder.first.next = {};
+	builder.last = &builder.first;
 	builder.allocator = {};
 }
 
@@ -640,6 +661,9 @@ inline constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same
 
 template <class Char>
 inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> format_string) {
+	// I think ignoring invalid format is better that crashing the program.
+	return append(b, format_string);
+
 	Char previous = {};
 	auto start = format_string.data;
 	auto c = start;
