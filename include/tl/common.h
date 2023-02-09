@@ -25,7 +25,7 @@
 #define ASSERTION_FAILURE(cause_string, expression, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
 
 #ifndef assert
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
@@ -1476,6 +1476,26 @@ T *binary_search(Span<T> span, T value) {
 			return mid;
 
 		if (value < *mid) {
+			end = mid;
+		} else {
+			begin = mid + 1;
+		}
+	}
+}
+
+template <class T, class U, class Fn>
+T *binary_search(Span<T> span, U value, Fn get_value) {
+	auto begin = span.begin();
+	auto end   = span.end();
+	while (1) {
+		if (begin == end)
+			return 0;
+
+		auto mid = begin + (end - begin) / 2;
+		if (value == get_value(*mid))
+			return mid;
+
+		if (value < get_value(*mid)) {
 			end = mid;
 		} else {
 			begin = mid + 1;

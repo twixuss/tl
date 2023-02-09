@@ -469,8 +469,8 @@ struct ThreadPool {
 	bool volatile stopping = false;
 	MutexQueue<ThreadWork> all_work;
 
-	u32 started_work_count = 0;
-	u32 finished_work_count = 0;
+	u32 volatile started_work_count = 0;
+	u32 volatile finished_work_count = 0;
 };
 bool try_do_work(ThreadPool *pool);
 
@@ -491,6 +491,7 @@ struct WorkQueue {
 #endif
 		atomic_increment(&pool->started_work_count);
 		if (pool->thread_count) {
+			atomic_add(&work_to_do, 1);
 			ThreadWork work;
 			work.fn = fn;
 			work.param = param;
@@ -498,6 +499,7 @@ struct WorkQueue {
 			pool->all_work.push(work);
 		} else {
 			fn(param);
+			atomic_increment(&pool->finished_work_count);
 		}
 	}
 	template <class Fn, class ...Args>
@@ -507,7 +509,6 @@ struct WorkQueue {
 			auto fnParams = pool->allocator.allocate_uninitialized<Tuple>();
 			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-			atomic_add(&work_to_do, 1);
 			push((void (*)(void *))invokerProc, (void *)fnParams);
 		} else {
 			std::invoke(fn, std::forward<Args>(args)...);
