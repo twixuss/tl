@@ -106,11 +106,11 @@ Allocator make_tracking_allocator(Allocator underlying) {
 }
 List<AllocationInfo> get_tracked_allocations(Allocator tracking_allocator) {
 	auto state = (TrackingAllocatorState *)tracking_allocator.state;
-	return map(state->tracked_allocations, [](auto k, auto v){
+	return map(state->tracked_allocations, [](auto &kv){
 		return AllocationInfo {
-			.location = k,
-			.current_size = v.current_size,
-			.total_size = v.total_size
+			.location = kv.key,
+			.current_size = kv.value.current_size,
+			.total_size = kv.value.total_size
 		};
 	});
 }

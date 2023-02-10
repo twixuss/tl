@@ -116,8 +116,8 @@ template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>>
 struct BucketHashMap {
 	using Key = Key_;
 	using Value = Value_;
-	using ValueType = Value;
 	using KeyValue = KeyValue<Key, Value>;
+	using ValueType = KeyValue;
 
 	struct HashKeyValue {
 		u64 hash;
@@ -363,23 +363,23 @@ umm count_of(BucketHashMap<Key, Value, Traits> &map) {
 
 template <ForEachFlags flags=0, class Key, class Value, class Traits, class Fn>
 void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
-	requires { fn(*(Key *)0, *(Value *)0); }
+	requires { fn(*(KeyValue<Key, Value> *)0); }
 {
 	static_assert(flags == 0, "Only default flags supported");
 
 	for (u32 i = 0; i < map.buckets.count; ++i) {
 		for (auto &it : map.buckets[i]) {
-			fn(it.kv.key, it.kv.value);
+			fn(it.kv);
 		}
 	}
 }
 
 template <class Key, class Value, class Traits, class Fn>
-auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(Key *)0, *(Value *)0); } {
-	using U = decltype(fn(*(Key *)0, *(Value *)0));
+auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
+	using U = decltype(fn(*(KeyValue<Key, Value> *)0));
 	List<U, Allocator> result;
 	result.reserve(count_of(map) TL_LA);
-	for_each(map, [&](Key &key, Value &value) { result.add(fn(key, value)); });
+	for_each(map, [&](auto &kv) { result.add(fn(kv)); });
 	return result;
 }
 
@@ -387,8 +387,8 @@ auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires
 template <class Key, class Value, class Traits>
 BucketHashMap<Key, Value, Traits> copy(BucketHashMap<Key, Value, Traits> const &source TL_LP) {
 	BucketHashMap<Key, Value, Traits> result;
-	for_each(source, [&](Key const &key, Value const &value) {
-		result.get_or_insert(key TL_LA) = value;
+	for_each(source, [&](auto &kv) {
+		result.get_or_insert(kv.key TL_LA) = kv.value;
 	});
 	return result;
 }
@@ -396,16 +396,16 @@ BucketHashMap<Key, Value, Traits> copy(BucketHashMap<Key, Value, Traits> const &
 template <class Key, class Value, class Traits>
 void set(BucketHashMap<Key, Value, Traits> &destination, BucketHashMap<Key, Value, Traits> const &source TL_LP) {
 	destination.clear();
-	for_each(source, [&](Key const &key, Value const &value) {
-		destination.get_or_insert(key TL_LA) = value;
+	for_each(source, [&](auto &kv) {
+		destination.get_or_insert(kv.key TL_LA) = kv.value;
 	});
 }
 
 template <class Key, class Value, class Traits, class Fn>
 umm count(BucketHashMap<Key, Value, Traits> map, Fn &&fn) {
 	umm result = 0;
-	for_each(map, [&](Key &key, Value &value) {
-		if (fn(key, value)) {
+	for_each(map, [&](auto &kv) {
+		if (fn(kv.key, kv.value)) {
 			result += 1;
 		}
 	});
@@ -415,7 +415,7 @@ umm count(BucketHashMap<Key, Value, Traits> map, Fn &&fn) {
 template <class Key, class Value, class Traits>
 bool is_empty(BucketHashMap<Key, Value, Traits> map) {
 	bool result = true;
-	for_each(map, [&](Key &key, Value &value) { (void)key; (void)value; result = false; for_each_break; });
+	for_each(map, [&](auto &kv) { (void)kv; result = false; for_each_break; });
 	return result;
 }
 
@@ -430,6 +430,7 @@ template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
 struct ContiguousHashMap {
 	using CellState = ContiguousHashMapCellState;
 	using KeyValue = KeyValue<Key, Value>;
+	using ValueType = KeyValue;
 
     struct Cell {
         CellState state : 2;
@@ -607,20 +608,20 @@ umm count_of(ContiguousHashMap<Key, Value, Traits> map) {
 
 
 template <class Key, class Value, class Traits, class Fn>
-void for_each(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn) {
+void for_each(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
     for (auto &cell : map.cells) {
         if (cell.state == ContiguousHashMapCellState::occupied) {
-            fn(cell.key(), cell.value());
+            fn(cell.key_value);
         }
     }
 }
 
 template <class Key, class Value, class Traits, class Fn>
-auto map(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(Key *)0, *(Value *)0); } {
-	using U = decltype(fn(*(Key *)0, *(Value *)0));
+auto map(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
+	using U = decltype(fn(*(KeyValue<Key, Value> *)0));
 	List<U, Allocator> result;
 	result.reserve(count_of(map) TL_LA);
-	for_each(map, [&](Key &key, Value &value) { result.add(fn(key, value)); });
+	for_each(map, [&](auto &kv) { result.add(fn(kv.key, kv.value)); });
 	return result;
 }
 
