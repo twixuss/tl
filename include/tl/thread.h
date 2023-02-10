@@ -297,6 +297,12 @@ inline void sync(SyncPoint &point) {
 
 struct Mutex {
 	bool volatile in_use = false;
+
+	Mutex() = default;
+	Mutex(const Mutex &) = delete;
+	Mutex(Mutex &&) = delete;
+	Mutex &operator=(const Mutex &) = delete;
+	Mutex &operator=(Mutex &&) = delete;
 };
 
 inline bool try_lock(Mutex &m) {
@@ -318,18 +324,24 @@ inline void wait_for_unlock(Mutex &m) {
 
 template <>
 struct Scoped<Mutex> {
-	Mutex *mutex;
-	Scoped(Mutex &mutex) : mutex(&mutex) {
+	Mutex &mutex;
+	Scoped(Mutex &mutex) : mutex(mutex) {
 		lock(mutex);
 	}
 	~Scoped() {
-		unlock(*mutex);
+		unlock(mutex);
 	}
 };
 
 struct RecursiveMutex {
 	u32 volatile thread_id = 0;
 	u32 counter = 0;
+
+	RecursiveMutex() = default;
+	RecursiveMutex(const RecursiveMutex &) = delete;
+	RecursiveMutex(RecursiveMutex &&) = delete;
+	RecursiveMutex &operator=(const RecursiveMutex &) = delete;
+	RecursiveMutex &operator=(RecursiveMutex &&) = delete;
 };
 
 inline bool try_lock(RecursiveMutex &m, u32 *locked_by = 0) {

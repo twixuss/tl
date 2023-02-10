@@ -2444,7 +2444,10 @@ struct AllocatorPusher {
 
 template <class Thing>
 struct Scoped {
-	Scoped(Thing) {
+	Scoped(Thing &) {
+		static_assert(false, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
+	}
+	Scoped(Thing &&) {
 		static_assert(false, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
 	}
 };
@@ -2458,15 +2461,20 @@ Scoped(Thing) -> Scoped<Thing>;
 
 template <class Thing>
 struct ScopedBlock {
-	Thing thing;
-	ScopedBlock(Thing thing) : thing(thing) {}
+	Thing storage;
+	Thing *pointer;
+	ScopedBlock(Thing &thing) : pointer(&thing) {}
+	ScopedBlock(Thing &&thing) : storage(thing), pointer(&storage) {}
 
 	template <class Fn>
 	void operator+(Fn &&fn) {
-		scoped(thing);
+		scoped(*pointer);
 		fn();
 	}
 };
+
+template <class Thing>
+ScopedBlock(Thing) -> ScopedBlock<Thing>;
 
 // Example use:
 // withs(temporary_allocator) {
