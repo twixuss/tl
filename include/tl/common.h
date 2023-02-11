@@ -2154,12 +2154,15 @@ concept DefaultConstructible = requires { new T(); };
 // But in case of generic types it's not clear what to do with excess objects.
 // For now allocation of T's will not report extra space.
 
-template <class Allocator>
+template <class Derived>
 struct AllocatorBase {
-	forceinline Allocator *derived() { return (Allocator*)this; }
+	forceinline Derived *derived() { return (Derived*)this; }
 
 	inline void *allocate_uninitialized(umm size, umm alignment = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		return derived()->allocate_impl(size, alignment, location).data;
+	}
+	inline void *allocate_uninitialized(umm size, std::source_location location) {
+		return derived()->allocate_impl(size, TL_DEFAULT_ALIGNMENT, location).data;
 	}
 	inline void *allocate(umm size, umm alignment = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
 		auto result = derived()->allocate_impl(size, alignment, location);
@@ -2278,87 +2281,14 @@ struct AllocatorBase {
 		return result;
 	}
 
-#if 0
-	Span<u8> (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) = 0;
-	void *state = 0;
-	forceinline operator bool() {
-		return func != 0;
-	}
-
-	inline Span<u8> allocate_uninitialized(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		return func(Allocator_allocate, 0, 0, size, align, location, state);
-	}
-	inline Span<u8> allocate(umm size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		auto result = allocate_uninitialized(size, align, location);
-		if (result.data) {
-			memset(result.data, 0, size);
+	inline AllocationResult execute(AllocatorMode mode, void *data, umm old_size, umm new_size, umm alignment, std::source_location location) {
+		switch (mode) {
+			case ::tl::Allocator_allocate:   return derived()->allocate_impl(new_size, alignment, location);
+			case ::tl::Allocator_reallocate: return derived()->reallocate_impl(data, old_size, new_size, alignment, location);
+			case ::tl::Allocator_free:       derived()->deallocate_impl(data, new_size, alignment, location); break;
 		}
-		return result;
+		return {};
 	}
-
-	template <class T>
-	inline Span<T> allocate_uninitialized(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		return {(T *)func(Allocator_allocate, 0, 0, count * sizeof(T), align, location, state), count};
-	}
-
-	template <class T>
-	inline Span<T> allocate_uninitialized(umm count, std::source_location location) {
-		return {(T *)func(Allocator_allocate, 0, 0, count * sizeof(T), alignof(T), location, state)};
-	}
-
-	template <class T>
-	inline Span<T> allocate(umm count = 1, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		auto result = allocate_uninitialized<T>(count, align, location);
-		if (result.data) {
-			for (auto it = result.data; it != result.data + count; ++it) {
-				new (it) T();
-			}
-		}
-		return result;
-	}
-
-	template <class T>
-	inline Span<T> allocate(umm count, std::source_location location) {
-		return allocate<T>(count, alignof(T), location);
-	}
-
-	template <class T>
-	inline Span<T> allocate(std::source_location location) {
-		return allocate<T>(1, alignof(T), location);
-	}
-
-
-
-
-	inline Span<u8> reallocate_uninitialized(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		return func(Allocator_reallocate, data, old_size, new_size, align, location, state);
-	}
-	inline Span<u8> reallocate(void *data, umm old_size, umm new_size, umm align = TL_DEFAULT_ALIGNMENT, std::source_location location = std::source_location::current()) {
-		auto result = reallocate_uninitialized(data, old_size, new_size, align, location);
-		if (result.data && (new_size > old_size)) {
-			memset((u8 *)result.data + old_size, 0, new_size - old_size);
-		}
-		return result;
-	}
-
-	template <class T>
-	inline Span<T> reallocate_uninitialized(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		return {(T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), align, location, state), new_count};
-	}
-	template <class T>
-	inline Span<T> reallocate_uninitialized(T *data, umm old_count, umm new_count, std::source_location location) {
-		return {(T *)func(Allocator_reallocate, data, old_count * sizeof(T), new_count * sizeof(T), alignof(T), location, state), new_count};
-	}
-
-	template <class T>
-	inline Span<T> reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T), std::source_location location = std::source_location::current()) {
-		auto result = reallocate_uninitialized(data, old_count, new_count, align, location);
-		for (auto it = result.data + old_count; it != result.data + new_count; ++it) {
-			new (it) T();
-		}
-		return result;
-	}
-#endif
 };
 
 struct Allocator : AllocatorBase<Allocator> {
@@ -2387,7 +2317,6 @@ struct Allocator : AllocatorBase<Allocator> {
 
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
-extern TL_API void clear_temporary_storage();
 
 #define tl_push(pusher, ...) if(auto CONCAT(_tl_, __LINE__)=pusher(__VA_ARGS__))
 #define tl_scoped(current, new) auto CONCAT(_tl_,__LINE__)=current;current=(new);defer{current=CONCAT(_tl_,__LINE__);}
@@ -2619,7 +2548,7 @@ Allocator page_allocator = {
 };
 Allocator default_allocator = os_allocator;
 
-struct TemporaryAllocatorState {
+struct TemporaryAllocatorState : AllocatorBase<TemporaryAllocatorState> {
 	struct Block {
 		Block *next;
 		umm size;
@@ -2630,6 +2559,67 @@ struct TemporaryAllocatorState {
 	Block *first = 0;
 	Block *last = 0;
 	umm last_block_capacity = 0x10000;
+
+
+	inline AllocationResult allocate_impl(umm new_size, umm align, std::source_location location = std::source_location::current()) {
+		auto block = first;
+		while (block) {
+			auto candidate = (u8 *)ceil(block->data() + block->size, align);
+			if (candidate + new_size <= block->data() + block->capacity) {
+				block->size = (candidate - block->data()) + new_size;
+				assert(block->size <= block->capacity);
+				return {
+					.data = candidate,
+					.count = new_size,
+					.is_zeroed = false,
+				};
+			}
+			block = block->next;
+		}
+
+		// Block with enough space was not found. Create a new bigger one
+		do {
+			last_block_capacity *= 2;
+		} while (last_block_capacity < new_size);
+
+		block = (TemporaryAllocatorState::Block *)allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + last_block_capacity, location);
+		block->size = new_size;
+		block->capacity = last_block_capacity;
+		block->next = 0;
+
+		if (first) {
+			last->next = block;
+		} else {
+			first = block;
+		}
+		last = block;
+
+		return {
+			.data = block->data(),
+			.count = new_size,
+			.is_zeroed = false,
+		};
+	}
+	inline AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment, std::source_location location = std::source_location::current()) {
+		auto result = temporary_allocator.allocate_uninitialized(new_size, location);
+		memcpy(result, data, old_size);
+
+		return {
+			.data = result,
+			.count = new_size,
+			.is_zeroed = false,
+		};
+	}
+	inline void deallocate_impl(void *data, umm size, umm alignment, std::source_location location = std::source_location::current()) {
+	}
+
+	inline void clear() {
+		auto block = first;
+		while (block) {
+			block->size = 0;
+			block = block->next;
+		}
+	}
 };
 
 void free(TemporaryAllocatorState &state) {
@@ -2644,75 +2634,11 @@ void free(TemporaryAllocatorState &state) {
 
 thread_local TemporaryAllocatorState temporary_allocator_state;
 thread_local Allocator temporary_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *_state) -> AllocationResult {
-		(void)location;
-		(void)_state;
-
-		auto &state = temporary_allocator_state;
-		switch (mode) {
-			case tl::Allocator_allocate: {
-				auto block = state.first;
-				while (block) {
-					auto candidate = (u8 *)ceil(block->data() + block->size, align);
-					if (candidate + new_size <= block->data() + block->capacity) {
-						block->size = (candidate - block->data()) + new_size;
-						assert(block->size <= block->capacity);
-						return {
-							.data = candidate,
-							.count = new_size,
-							.is_zeroed = false,
-						};
-					}
-					block = block->next;
-				}
-
-				// Block with enough space was not found. Create a new bigger one
-				do {
-					state.last_block_capacity *= 2;
-				} while (state.last_block_capacity < new_size);
-
-				block = (TemporaryAllocatorState::Block *)state.allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + state.last_block_capacity);
-				block->size = new_size;
-				block->capacity = state.last_block_capacity;
-				block->next = 0;
-
-				if (state.first) {
-					state.last->next = block;
-				} else {
-					state.first = block;
-				}
-				state.last = block;
-
-				return {
-					.data = block->data(),
-					.count = new_size,
-					.is_zeroed = false,
-				};
-			}
-			case tl::Allocator_reallocate: {
-				auto result = temporary_allocator.allocate_uninitialized(new_size);
-				memcpy(result, data, old_size);
-				return {
-					.data = result,
-					.count = new_size,
-					.is_zeroed = false,
-				};
-			}
-			case tl::Allocator_free:
-				break;
-		}
-		return {};
+	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *state) -> AllocationResult {
+		return ((TemporaryAllocatorState *)state)->execute(mode, data, old_size, new_size, align, location);
 	},
-	.state = 0
+	.state = &temporary_allocator_state
 };
-
-void clear_temporary_storage() {
-	auto block = temporary_allocator_state.first;
-	while (block) {
-		block->size = 0;
-		block = block->next;
-	}
-}
 
 thread_local Allocator current_allocator;
 
