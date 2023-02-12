@@ -59,6 +59,9 @@ inline u32 character_to_digit(utf32 character, u32 base) {
 }
 
 inline Optional<u64> parse_u64(Span<utf8> string, u32 base) {
+	if (string.count == 0)
+		return {};
+
 	u64 result = 0;
 	u64 previous = 0;
 	for (auto character : string) {

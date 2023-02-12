@@ -747,7 +747,7 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 template <class T>
 T *find(BlockList<T> &list, T const &to_find, BlockListIndex *result_index = 0) {
 	BlockListIndex index = {};
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		index.value_index = 0;
 		for (auto it = block->buffer; it != block->end; ++it) {
@@ -768,7 +768,7 @@ T *find(BlockList<T> &list, T const &to_find, BlockListIndex *result_index = 0) 
 template <class T>
 T *find(BlockList<T> &list, T const &to_find, typename BlockList<T>::Index *result_index = 0) {
 	typename BlockList<T, Allocator>::Index index = {};
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		index.block = block;
 		index.value_index = 0;
@@ -789,7 +789,7 @@ T *find(BlockList<T> &list, T const &to_find, typename BlockList<T>::Index *resu
 
 template <class T, class Predicate>
 T *find_if(BlockList<T> &list, Predicate &&predicate) {
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		for (auto it = block->buffer; it != block->end; ++it) {
 			if (predicate(it->value)) {
