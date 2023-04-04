@@ -102,7 +102,6 @@ void quickSort(Span<T> span) {
 	quickSort(span, [](T &a, T &b) { return a < b; });
 }
 
-// Fucking... nope, FUCKING FUCKING FUCKING FUCKING FUCKING c++!!!
 template <template <class T, class ...Args> class List, class T, class ...Args>
 void quickSort(List<T, Args...> &list) {
 	quickSort((Span<T>)list);
@@ -205,7 +204,6 @@ void mergeSort(Span<T> span, Allocator al = osAllocator) {
 
 #endif
 
-// Fucking... nope, FUCKING FUCKING FUCKING FUCKING FUCKING c++!!!
 template <template <class T, class ...Args> class List, class T, class ...Args> void mergeSort(List<T, Args...> &list) { mergeSort((Span<T>)list); }
 
 void radixSort(Span<u32> span) {

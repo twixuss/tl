@@ -256,6 +256,8 @@ struct List : Span<T, Size_> {
 	void move_at(T *from, Size destination_index) {
 		move(from, data + destination_index);
 	}
+
+	Span span() { return *this; }
 };
 #pragma pack(pop)
 
@@ -448,13 +450,13 @@ List<T, Allocator, Size> erase_all(Span<T, Size> where, T what TL_LP) {
 	return result;
 }
 
-template <class T, class Allocator, class Size, class Fn>
-auto map(List<T, Allocator, Size> list, Fn &&fn TL_LP) {
+template <class T, class Size, class Fn>
+auto map(Span<T, Size> span, Fn &&fn TL_LP) {
 	using U = decltype(fn(*(T*)0));
 	List<U> result;
-	result.reserve(list.count TL_LA);
+	result.reserve(span.count TL_LA);
 
-	for (auto &x : list) {
+	for (auto &x : span) {
 		result.add(fn(x));
 	}
 

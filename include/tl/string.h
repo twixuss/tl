@@ -586,6 +586,7 @@ umm append(struct StringBuilder &builder, Optional<T> v) {
 }
 
 template <class T, class Size=umm, class Format=void>
+[[deprecated("Use FormattedSpan instead")]]
 struct FormatSpan {
 	Span<T, Size> value;
 	Format format;
@@ -595,6 +596,7 @@ struct FormatSpan {
 };
 
 template <class T, class Size>
+[[deprecated("Use FormattedSpan instead")]]
 struct FormatSpan<T, Size, void> {
 	Span<T, Size> value;
 	Span<u8> before = "{"b;
@@ -602,7 +604,34 @@ struct FormatSpan<T, Size, void> {
 	Span<u8> after = "}"b;
 };
 
+struct SpanFormat {
+	Span<u8> before;
+	Span<u8> separator;
+	Span<u8> after;
+};
+
+inline static const SpanFormat default_span_format = {
+	.before = "{"b,
+	.separator = ", "b,
+	.after = "}"b,
+};
+
+template <class T, class Size>
+struct FormattedSpan : SpanFormat {
+	Span<T, Size> value;
+};
+
+template <class T, class Size>
+FormattedSpan<T, Size> format_span(Span<T, Size> span, SpanFormat format) {
+	FormattedSpan<T, Size> result;
+	(SpanFormat &)result = format;
+	result.value = span;
+	return result;
+}
+
+
 template <class T, class Size, class Format>
+[[deprecated("Use FormattedSpan instead")]]
 forceinline umm append(StringBuilder &b, FormatSpan<T, Size, Format> format) {
 	if constexpr (is_same<Format, void>) {
 		umm count = 0;
@@ -634,15 +663,30 @@ forceinline umm append(StringBuilder &b, FormatSpan<T, Size, Format> format) {
 }
 
 template <class T, class Size>
+forceinline umm append(StringBuilder &b, FormattedSpan<T, Size> formatted) {
+	umm count = 0;
+	count += append_bytes(b, formatted.before);
+	if (formatted.value.count) {
+		count += append(b, *formatted.value.data);
+	}
+	for (auto &val : formatted.value.skip(1)) {
+		count += append_bytes(b, formatted.separator);
+		count += append(b, val);
+	}
+	count += append_bytes(b, formatted.after);
+	return count;
+}
+
+template <class T, class Size>
 inline umm append(StringBuilder &b, Span<T, Size> span) {
-	return append(b, FormatSpan{.value = span});
+	return append(b, format_span(span, default_span_format));
 }
 
 template <class T, class Allocator, class Size>
-forceinline umm append(StringBuilder &b, List<T, Allocator, Size> list) { return append(b, FormatSpan{.value = list}); }
+forceinline umm append(StringBuilder &b, List<T, Allocator, Size> list) { return append(b, format_span(list, default_span_format)); }
 
 template <class T, class Size>
-forceinline umm append(StringBuilder &b, LinearSet<T, Size> set) { return append(b, FormatSpan{.value = set}); }
+forceinline umm append(StringBuilder &b, LinearSet<T, Size> set) { return append(b, format_span(set, default_span_format)); }
 
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<u8   , Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<ascii, Allocator, Size> list) { return append(b, as_span(list)); }

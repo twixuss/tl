@@ -96,6 +96,10 @@
 #define REDECLARE_VAL(name, expr) auto _##name = expr; auto name = _##name;
 #define REDECLARE_REF(name, expr) auto &_##name = expr; auto &name = _##name;
 
+// static_assert(false) is ill-formed in removed branch of constexpr if...
+#define static_error_t(t, ...) static_assert(!sizeof(t*), __VA_ARGS__)
+#define static_error_v(v, ...) static_error_t(decltype(v), __VA_ARGS__)
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -450,7 +454,7 @@ forceinline constexpr T floor(T v, T s) {
 	} else if constexpr (is_unsigned<T>) {
 		return v / s * s;
 	} else {
-		static_assert(false, "floor(T, T) can be used with integers only");
+		static_error_t(T, "floor(T, T) can be used with integers only");
 	}
 }
 
@@ -585,37 +589,35 @@ forceinline constexpr u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : 
 
 namespace ce {
 
-// is this readable? don't answer
-
 inline constexpr u8 floor_to_power_of_2(u8 x) {
-    x = (u8)(x | (u8)(x >> 1));
-    x = (u8)(x | (u8)(x >> 2));
-    x = (u8)(x | (u8)(x >> 4));
-    return (u8)(x - (u8)(x >> 1));
+	x = (u8)(x | (u8)(x >> 1));
+	x = (u8)(x | (u8)(x >> 2));
+	x = (u8)(x | (u8)(x >> 4));
+	return (u8)(x - (u8)(x >> 1));
 }
 inline constexpr u16 floor_to_power_of_2(u16 x) {
-    x = (u16)(x | (u16)(x >> 1));
-    x = (u16)(x | (u16)(x >> 2));
-    x = (u16)(x | (u16)(x >> 4));
-    x = (u16)(x | (u16)(x >> 8));
-    return (u16)(x - (u16)(x >> 1));
+	x = (u16)(x | (u16)(x >> 1));
+	x = (u16)(x | (u16)(x >> 2));
+	x = (u16)(x | (u16)(x >> 4));
+	x = (u16)(x | (u16)(x >> 8));
+	return (u16)(x - (u16)(x >> 1));
 }
 inline constexpr u32 floor_to_power_of_2(u32 x) {
-    x = (u32)(x | (u32)(x >> 1));
-    x = (u32)(x | (u32)(x >> 2));
-    x = (u32)(x | (u32)(x >> 4));
-    x = (u32)(x | (u32)(x >> 8));
-    x = (u32)(x | (u32)(x >> 16));
-    return (u32)(x - (u32)(x >> 1));
+	x = (u32)(x | (u32)(x >> 1));
+	x = (u32)(x | (u32)(x >> 2));
+	x = (u32)(x | (u32)(x >> 4));
+	x = (u32)(x | (u32)(x >> 8));
+	x = (u32)(x | (u32)(x >> 16));
+	return (u32)(x - (u32)(x >> 1));
 }
 inline constexpr u64 floor_to_power_of_2(u64 x) {
-    x = (u64)(x | (u64)(x >> 1));
-    x = (u64)(x | (u64)(x >> 2));
-    x = (u64)(x | (u64)(x >> 4));
-    x = (u64)(x | (u64)(x >> 8));
-    x = (u64)(x | (u64)(x >> 16));
-    x = (u64)(x | (u64)(x >> 32));
-    return (u64)(x - (u64)(x >> 1));
+	x = (u64)(x | (u64)(x >> 1));
+	x = (u64)(x | (u64)(x >> 2));
+	x = (u64)(x | (u64)(x >> 4));
+	x = (u64)(x | (u64)(x >> 8));
+	x = (u64)(x | (u64)(x >> 16));
+	x = (u64)(x | (u64)(x >> 32));
+	return (u64)(x - (u64)(x >> 1));
 }
 }
 
@@ -737,7 +739,7 @@ forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T de
 template <class T, class U> forceinline constexpr auto lerp(T a, T b, U t) { return a + (b - a) * t; }
 
 template <class T>
-void swap(T &a, T &b) {
+void Swap(T &a, T &b) {
 	T t = a;
 	a = b;
 	b = t;
@@ -849,10 +851,27 @@ constexpr void for_each(T (&array)[count], Fn &&fn) {
 				case ForEach_break: return;
 			}
 		} else {
-			static_assert(false, "Invalid return type of for_each function");
+			static_error_t(T, "Invalid return type of for_each function");
 		}
 	}
 }
+
+bool all(auto x, auto predicate) {
+	for (auto v : x) {
+		if (!predicate(v))
+			return false;
+	}
+	return true;
+}
+
+bool any(auto x, auto predicate) {
+	for (auto v : x) {
+		if (predicate(v))
+			return true;
+	}
+	return false;
+}
+
 /*
 template <ForEachFlags flags, umm count, class Fn, class ...Ts>
 constexpr void for_each(Fn &&fn, Ts ...ts) {
@@ -935,7 +954,7 @@ constexpr Iterator find(Iterator src_begin, Iterator src_end, CmpIterator cmp_be
 template <class Fn>
 struct Deferrer {
 	inline Deferrer(Fn &&fn) : fn(std::move(fn)) {}
-	inline ~Deferrer() { fn(); }
+	inline ~Deferrer() noexcept(false) { fn(); }
 
 private:
 	Fn fn;
@@ -1236,7 +1255,7 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 				break;
 			}
 		} else {
-			static_assert(false, "Invalid return type of for_each function");
+			static_error_t(T, "Invalid return type of for_each function");
 		}
 	}
 }
@@ -1249,7 +1268,7 @@ forceinline constexpr Span<char > operator""ts(char  const *string, umm count) {
 forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm count) { return Span((utf8  *)string, count + 1); }
 forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) { return Span((utf16 *)string, count + 1); }
 forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm count) { return Span((wchar *)string, count + 1); }
-forceinline Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
+forceinline constexpr Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
 forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }
 
@@ -2374,10 +2393,10 @@ struct AllocatorPusher {
 template <class Thing>
 struct Scoped {
 	Scoped(Thing &) {
-		static_assert(false, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
+		static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
 	}
 	Scoped(Thing &&) {
-		static_assert(false, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
+		static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
 	}
 };
 template <class Thing>

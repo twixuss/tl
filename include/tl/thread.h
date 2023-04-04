@@ -57,7 +57,7 @@ forceinline T atomic_set(T volatile *dst, T src) {
 	else if constexpr (sizeof(T) == 2) result = _InterlockedExchange16((short    *)dst, *(short    *)&src);
 	else if constexpr (sizeof(T) == 4) result = _InterlockedExchange  ((long     *)dst, *(long     *)&src);
 	else if constexpr (sizeof(T) == 8) result = _InterlockedExchange64((long long*)dst, *(long long*)&src);
-	else static_assert(false, "lockSet is not available for this size");
+	else static_error_t(T, "lockSet is not available for this size");
 	return *(T *)&result;
 }
 template <class T>
@@ -70,7 +70,7 @@ forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
 	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)&dst, *(long     *)&newValue, *(long     *)&comparand);
 	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)&dst, *(short    *)&newValue, *(short    *)&comparand);
 	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)&dst, *(char     *)&newValue, *(char     *)&comparand);
-	else static_assert(false, "atomic_set_if_equals is not available for this size");
+	else static_error_t(T, "atomic_set_if_equals is not available for this size");
 	return *(T *)&result;
 }
 
@@ -80,26 +80,6 @@ struct Thread {
 	void *param = 0;
 	void *handle = 0;
 };
-
-template <class Ret>
-struct ThreadRet : Thread {
-	void *returning_function = 0;
-
-	ThreadRet() {}
-	~ThreadRet() {}
-	union {
-		Ret return_value;
-	};
-};
-
-template <>
-struct ThreadRet<void> : Thread {
-	void *returning_function = 0;
-
-	ThreadRet() {}
-	~ThreadRet() {}
-};
-
 
 TL_API void run_thread(Thread *thread);
 inline Thread *create_thread(void (*function)(Thread *self), void *param) {
@@ -112,58 +92,11 @@ inline Thread *create_thread(void (*function)(Thread *self), void *param) {
 	return thread;
 }
 
-template <class Ret>
-inline ThreadRet<Ret> *create_thread(Ret (*function)()) {
-	using Fn = Ret (*)();
-
-	auto allocator = current_allocator;
-	auto thread = allocator.allocate<ThreadRet<Ret>>();
-
-	thread->allocator = allocator;
-	thread->returning_function = function;
-	thread->param = 0;
-	thread->function = [](Thread *thread) {
-		if constexpr (is_same<Ret, void>) {
-			((Fn)((ThreadRet<Ret> *)thread)->returning_function)();
-		} else {
-			thread->return_value = ((Fn)thread->returning_function)();
-		}
-	};
-	run_thread(thread);
-	return thread;
-}
-
 namespace td {
 template <class Fn, class Tuple, umm... indices>
 inline static decltype(auto) invoke(Fn &&fn, Tuple &tuple, std::index_sequence<indices...>) noexcept {
 	return fn(get<indices>(tuple)...);
 }
-}
-
-template <class Ret, class First, class ...Rest>
-inline ThreadRet<Ret> *create_thread(Ret (*function)(First first, Rest ...rest), First first, Rest ...rest) {
-	using Fn = Ret (*)(First, Rest...);
-	using ArgTuple = std::tuple<First, Rest...>;
-
-	auto allocator = current_allocator;
-	auto thread = allocator.allocate<ThreadRet<Ret>>();
-
-	auto arg_tuple = allocator.allocate<ArgTuple>();
-	*arg_tuple = {first, rest...};
-
-	thread->allocator = allocator;
-	thread->returning_function = function;
-	thread->param = arg_tuple;
-	thread->function = [](Thread *_thread) {
-		auto thread = (ThreadRet<Ret> *)_thread;
-		if constexpr (is_same<Ret, void>) {
-			td::invoke((Fn)thread->returning_function, *(ArgTuple *)thread->param, std::make_index_sequence<sizeof...(rest) + 1>{});
-		} else {
-			thread->return_value = td::invoke((Fn)thread->returning_function, *(ArgTuple *)thread->param, std::make_index_sequence<sizeof...(rest) + 1>{});
-		}
-	};
-	run_thread(thread);
-	return thread;
 }
 
 //template <class Fn, class ...Args>
@@ -172,15 +105,6 @@ inline ThreadRet<Ret> *create_thread(Ret (*function)(First first, Rest ...rest),
 //}
 
 TL_API void join(Thread *thread);
-template <class Ret>
-inline Ret join(ThreadRet<Ret> *thread) {
-	join((Thread *)thread);
-	return thread->return_value;
-}
-template <>
-inline void join(ThreadRet<void> *thread) {
-	join((Thread *)thread);
-}
 
 TL_API bool finished(Thread *thread);
 TL_API void free(Thread *thread);
@@ -622,8 +546,8 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 		params.pool = &pool;
 		params.proc = std::addressof(thread_proc);
 
-		auto start_proc = [](void *param) {
-			StartParams *info = (StartParams *)param;
+		auto start_proc = [](Thread *thread) {
+			StartParams *info = (StartParams *)thread->param;
 			(*info->proc)(info->pool);
 		};
 

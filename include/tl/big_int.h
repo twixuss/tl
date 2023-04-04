@@ -322,7 +322,7 @@ struct BigInt {
 		BigInt *min_int = this;
 		BigInt *max_int = &b;
 		if (min_int->parts.count > max_int->parts.count) {
-			swap(min_int, max_int);
+			Swap(min_int, max_int);
 		}
 
 		parts.resize(max_int->parts.count);
@@ -479,7 +479,7 @@ struct BigInt {
 
 		BigInt min_int = *this, max_int = b;
 		if (min_int.parts.count > max_int.parts.count) {
-			swap(min_int, max_int);
+			Swap(min_int, max_int);
 		}
 
 		for (Size i = 0; i < min_int.parts.count; ++i) {
@@ -614,7 +614,7 @@ struct BigInt {
 		if constexpr (bits_in_part == 64) {
 			return parts.count ? (u64)parts[0] : 0;
 		} else {
-			static_assert(false, "not implemented");
+			static_error_v(bits_in_part, "not implemented");
 		}
 	}
 	explicit operator s8 () { return (s8 )operator u8 (); }
