@@ -4,6 +4,9 @@
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
 
+#ifndef TL_INITIAL_LIST_CAPACITY
+#define TL_INITIAL_LIST_CAPACITY 4
+#endif
 
 namespace tl {
 
@@ -88,7 +91,7 @@ struct List : Span<T, Size_> {
 	bool reserve_exponential(Size desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) return false;
 
-		Size new_capacity = max(1u, capacity);
+		Size new_capacity = max(TL_INITIAL_LIST_CAPACITY, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity TL_LA);

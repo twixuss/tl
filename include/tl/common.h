@@ -619,6 +619,11 @@ inline constexpr u64 floor_to_power_of_2(u64 x) {
 	x = (u64)(x | (u64)(x >> 32));
 	return (u64)(x - (u64)(x >> 1));
 }
+
+inline constexpr u64 rotate_left(u64 x, u64 bits) {
+	return (x << bits) | (x >> (64 - bits));
+}
+
 }
 
 forceinline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
@@ -739,7 +744,7 @@ forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T de
 template <class T, class U> forceinline constexpr auto lerp(T a, T b, U t) { return a + (b - a) * t; }
 
 template <class T>
-void Swap(T &a, T &b) {
+inline constexpr void Swap(T &a, T &b) {
 	T t = a;
 	a = b;
 	b = t;

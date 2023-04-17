@@ -8,14 +8,23 @@
 
 namespace tl {
 
-template <class Key>
+template <class Key, bool use_high_bits = false>
 struct DefaultHashTraits {
 	inline static constexpr u32 rehash_percentage = 70;
 	inline static constexpr void on_collision(Key a, Key b) {}
 
 	// template is here because of situation where == operator is not defined, but are_equal is defined in derived class.
-	template <class=void> inline static constexpr bool are_equal(Key a, Key b) { return a == b; }
-	template <class=void> inline static constexpr u64 get_hash(Key key) { return ::get_hash(key); }
+	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return a == b; }
+	inline constexpr u64 get_hash(this auto &&self, Key const &key) { return ::get_hash(key); }
+	inline constexpr umm get_index(this auto &&self, Key const &key, umm capacity) {
+		auto hash = self.get_hash(key);
+		if constexpr (use_high_bits) {
+			hash ^= hash >> 32;
+			hash ^= hash >> 16;
+			hash ^= hash >> 8;
+		}
+		return hash % capacity;
+	}
 };
 
 template <class Key, class Value, umm _capacity, class Traits = DefaultHashTraits<Key>>
@@ -31,8 +40,10 @@ struct StaticBucketHashMap {
 
 	Array<Block, capacity> blocks = {};
 
+	[[no_unique_address]] Traits traits = {};
+
 	Value &get_or_insert(Key const &key) {
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto &block = blocks[hash % blocks.size];
 		for (auto &it : block) {
 			if (it.key == key) {
@@ -42,6 +53,9 @@ struct StaticBucketHashMap {
 		auto &it = block.add();
 		it.key = key;
 		return it.value;
+	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
 	}
 	Value *find(Key const &key) {
 		umm hash = Traits::get_hash(key);
@@ -128,8 +142,10 @@ struct BucketHashMap {
 	Allocator allocator = current_allocator;
 	Span<Bucket> buckets;
 	umm total_value_count = 0;
+	
+	[[no_unique_address]] Traits traits = {};
 
-	umm hash_to_index(u64 hash) {
+	umm hash_to_index(u64 hash) const {
 		hash ^= hash >> 32;
 		hash ^= hash >> 16;
 		return hash & (buckets.count - 1);
@@ -142,18 +158,18 @@ struct BucketHashMap {
 			rehash(4 TL_LA);
 		}
 
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto bucket = &buckets[hash_to_index(hash)];
 
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.kv.key, key)) {
+				if (traits.are_equal(it.kv.key, key)) {
 					return it.kv.value;
 				}
 			}
 		}
 
-		if (total_value_count >= buckets.count * Traits::rehash_percentage / 100) {
+		if (total_value_count >= buckets.count * traits.rehash_percentage / 100) {
 			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[hash_to_index(hash)];
 		}
@@ -163,6 +179,9 @@ struct BucketHashMap {
 		it.kv.key = key;
 
 		return it.kv.value;
+	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
 	}
 
 	//
@@ -178,11 +197,11 @@ struct BucketHashMap {
 			rehash(16 TL_LA);
 		}
 
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto bucket = &buckets[hash_to_index(hash)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.kv.key, key)) {
+				if (traits.are_equal(it.kv.key, key)) {
 					callback(it.kv.key, it.kv.value);
 					return false;
 				}
@@ -207,11 +226,11 @@ struct BucketHashMap {
 			rehash(16 TL_LA);
 		}
 
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto bucket = &buckets[hash_to_index(hash)];
 		for (auto &it : *bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.kv.key, key)) {
+				if (traits.are_equal(it.kv.key, key)) {
 					if (existing)
 						*existing = &it.kv.value;
 					if (existing_key)
@@ -233,16 +252,16 @@ struct BucketHashMap {
 		return true;
 	}
 
-	KeyValue *find(Key const &key) {
+	KeyValue *find(Key const &key) const {
 		if (buckets.count == 0)
 			return 0;
 
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto &bucket = buckets[hash_to_index(hash)];
 
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.kv.key, key)) {
+				if (traits.are_equal(it.kv.key, key)) {
 					return &it.kv;
 				}
 			}
@@ -253,11 +272,11 @@ struct BucketHashMap {
 		if (buckets.count == 0)
 			return {};
 
-		umm hash = Traits::get_hash(key);
+		umm hash = traits.get_hash(key);
 		auto &bucket = buckets[hash_to_index(hash)];
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
-				if (Traits::are_equal(it.kv.key, key)) {
+				if (traits.are_equal(it.kv.key, key)) {
 					auto result = it.kv.value;
 					tl::erase(bucket, &it);
 					return result;
@@ -283,7 +302,7 @@ struct BucketHashMap {
 				next_node = next_node->next;
 				node->next = 0;
 
-				auto hash = Traits::get_hash(node->value.kv.key);
+				auto hash = traits.get_hash(node->value.kv.key);
 				auto &new_bucket = buckets[hash_to_index(hash)];
 				new_bucket.add_steal(node);
 			}
@@ -432,20 +451,21 @@ struct ContiguousHashMap {
 	using KeyValue = KeyValue<Key, Value>;
 	using ValueType = KeyValue;
 
-    struct Cell {
-        CellState state : 2;
-        u64 hash : 62;
-        KeyValue key_value;
+	struct Cell {
+		CellState state : 2;
+		u64 hash : 62;
+		KeyValue key_value;
 		Key &key() { return key_value.key; }
 		Value &value() { return key_value.value; }
-    };
+	};
 
-    Allocator allocator = current_allocator;
-    Span<Cell> cells;
-    umm count = 0;
+	Allocator allocator = current_allocator;
+	Span<Cell> cells;
+	umm count = 0;
 
+	[[no_unique_address]] Traits traits = {};
 
-    Value &get_or_insert(Key key TL_LP) {
+	Value &get_or_insert(Key key TL_LP) {
 		auto hash = get_the_hash(key);
 		u64 index = 0;
 		if (cells.count) {
@@ -458,7 +478,7 @@ struct ContiguousHashMap {
 				}
 				if (cell.state == CellState::occupied) {
 					if (cell.hash == hash) {
-						if (Traits::are_equal(cell.key(), key)) {
+						if (traits.are_equal(cell.key(), key)) {
 							return cell.value();
 						}
 					}
@@ -467,13 +487,13 @@ struct ContiguousHashMap {
 			}
 
 			bool recalc = false;
-			if (count >= cells.count * Traits::rehash_percentage / 100) {
+			if (count >= cells.count * traits.rehash_percentage / 100) {
 				if (reserve(cells.count * 2 TL_LA)) {
 					hash = get_the_hash(key);
 					index = hash % cells.count;
 				}
 			}
-        } else {
+		} else {
 			reserve(7 TL_LA);
 			index = hash % cells.count;
 		}
@@ -481,7 +501,7 @@ struct ContiguousHashMap {
 		defer { assert(find(key)); };
 
 		while (cells.data[index].state == CellState::occupied) {
-			Traits::on_collision(cells.data[index].key(), key);
+			traits.on_collision(cells.data[index].key(), key);
 			index = step(index, cells.count);
 		}
 
@@ -491,100 +511,103 @@ struct ContiguousHashMap {
 		cell.hash = hash;
 		cell.key() = key;
 		return cell.value() = {};
-    }
+	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
+	}
 
-    bool reserve(umm desired TL_LP) {
-        if (desired <= cells.count)
-            return false;
+	bool reserve(umm desired TL_LP) {
+		if (desired <= cells.count)
+			return false;
 
-        Span<Cell> new_cells;
-        new_cells.count = max(1, cells.count);
+		Span<Cell> new_cells;
+		new_cells.count = max(1, cells.count);
 		while (new_cells.count < desired) {
 			new_cells.count *= 2;
 			new_cells.count += 1;
 		}
 		assert(is_power_of_2(new_cells.count + 1));
 
-        new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count TL_LA);
-        for (auto &new_cell : new_cells) {
-            new_cell.state = CellState::empty;
-        }
+		new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count TL_LA);
+		for (auto &new_cell : new_cells) {
+			new_cell.state = CellState::empty;
+		}
 
-        for (auto &old_cell : cells) {
+		for (auto &old_cell : cells) {
 			if (old_cell.state == CellState::occupied) {
 				insert_into(new_cells, old_cell.hash, old_cell.key(), old_cell.value());
 			}
-        }
+		}
 
-        allocator.free_t(cells.data, cells.count);
-        cells = new_cells;
+		allocator.free_t(cells.data, cells.count);
+		cells = new_cells;
 
 		return true;
-    }
+	}
 
-    umm step(umm index, umm cells_count) {
-        return (index + 2) % cells_count;
-    }
+	umm step(umm index, umm cells_count) {
+		return (index + 2) % cells_count;
+	}
 
-    Value &insert_into(Span<Cell> cells, Key key, Value value) {
-        auto hash = get_the_hash(key);
-        auto index = hash % cells.count;
+	Value &insert_into(Span<Cell> cells, Key key, Value value) {
+		auto hash = get_the_hash(key);
+		auto index = hash % cells.count;
 
-        while (cells.data[index].state == CellState::occupied) {
-			Traits::on_collision(cells.data[index].key(), key);
-            index = step(index, cells.count);
-        }
+		while (cells.data[index].state == CellState::occupied) {
+			traits.on_collision(cells.data[index].key(), key);
+			index = step(index, cells.count);
+		}
 
-        auto &cell = cells.data[index];
+		auto &cell = cells.data[index];
 
-        cell.state = CellState::occupied;
-        cell.hash = hash;
-        cell.key() = key;
-        return cell.value() = value;
-    }
-    Value &insert_into(Span<Cell> cells, u64 hash, Key key, Value value) {
-        auto index = hash % cells.count;
+		cell.state = CellState::occupied;
+		cell.hash = hash;
+		cell.key() = key;
+		return cell.value() = value;
+	}
+	Value &insert_into(Span<Cell> cells, u64 hash, Key key, Value value) {
+		auto index = hash % cells.count;
 
-        while (cells.data[index].state == CellState::occupied) {
-			Traits::on_collision(cells.data[index].key(), key);
-            index = step(index, cells.count);
-        }
+		while (cells.data[index].state == CellState::occupied) {
+			traits.on_collision(cells.data[index].key(), key);
+			index = step(index, cells.count);
+		}
 
-        auto &cell = cells.data[index];
+		auto &cell = cells.data[index];
 
-        cell.state = CellState::occupied;
-        cell.hash = hash;
-        cell.key() = key;
-        return cell.value() = value;
-    }
+		cell.state = CellState::occupied;
+		cell.hash = hash;
+		cell.key() = key;
+		return cell.value() = value;
+	}
 
-    KeyValue *find(Key key) {
+	KeyValue *find(Key key) {
 		if (cells.count == 0)
 			return 0;
 
-        auto hash = get_the_hash(key);
-        auto index = hash % cells.count;
-        auto steps = cells.count;
-        while (steps--) {
-            auto &cell = cells.data[index];
-            if (cell.state == CellState::empty) {
+		auto hash = get_the_hash(key);
+		auto index = hash % cells.count;
+		auto steps = cells.count;
+		while (steps--) {
+			auto &cell = cells.data[index];
+			if (cell.state == CellState::empty) {
 				return 0;
 			}
-            if (cell.state == CellState::occupied) {
-                if (cell.hash == hash) {
-                    if (Traits::are_equal(cell.key(), key)) {
-                        return &cell.key_value;
-                    }
-                }
-            }
-            index = step(index, cells.count);
-        }
+			if (cell.state == CellState::occupied) {
+				if (cell.hash == hash) {
+					if (traits.are_equal(cell.key(), key)) {
+						return &cell.key_value;
+					}
+				}
+			}
+			index = step(index, cells.count);
+		}
 
-        return 0;
-    }
+		return 0;
+	}
 
-    u64 get_the_hash(Key key) {
-        return Traits::get_hash(key) & 0x3FFF'FFFF'FFFF'FFFF; // get rid of 2 bits reserved for `state`
+	u64 get_the_hash(Key key) {
+		return traits.get_hash(key) & 0x3FFF'FFFF'FFFF'FFFF; // get rid of 2 bits reserved for `state`
     }
 
 	void clear() {
@@ -626,10 +649,10 @@ auto map(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requ
 }
 
 #ifndef TL_DEFAULT_HASH_MAP
-#define TL_DEFAULT_HASH_MAP(Key, Value, Hasher) BucketHashMap<Key, Value, Hasher>
+#define TL_DEFAULT_HASH_MAP BucketHashMap
 #endif
 
 template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
-using HashMap = TL_DEFAULT_HASH_MAP(Key, Value, Traits);
+using HashMap = TL_DEFAULT_HASH_MAP<Key, Value, Traits>;
 
 }

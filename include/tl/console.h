@@ -105,6 +105,10 @@ inline umm print(char const *string) {
 	return print(as_span(string));
 }
 
+inline umm println() {
+	return print('\n');
+}
+
 template <class ...T>
 inline umm println(T const &...args) {
 	umm result = 0;
@@ -228,7 +232,7 @@ void set_console_encoding(Encoding encoding) {
 }
 
 void set_console_color(ConsoleColor foreground, ConsoleColor background) {
-	SetConsoleTextAttribute(std_out, (DWORD)foreground | ((DWORD)background << 4));
+	SetConsoleTextAttribute(std_out, (WORD)((DWORD)foreground | ((DWORD)background << 4)));
 }
 
 void hide_console_window() {

@@ -9,41 +9,45 @@
 // there is no way to do that automatically. You have to write it yourself.
 
 template <class T>
-inline tl::u64 get_hash(T const &value);
+inline constexpr tl::u64 get_hash(T const &value);
 
 template <class T>
-inline tl::u64 get_hash(T *const &value) { return (tl::u64)value / alignof(T); }
+inline constexpr tl::u64 get_hash(T *const &value) { return (tl::u64)value / alignof(T); }
 
-template <> inline tl::u64 get_hash(void *const &value) { return (tl::u64)value / sizeof(void *); }
+template <> inline constexpr tl::u64 get_hash(void *const &value) { return (tl::u64)value / sizeof(void *); }
 
-template <> inline tl::u64 get_hash(tl::u8    const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::u16   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::u32   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::u64   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::s8    const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::s16   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::s32   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::s64   const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::ascii const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::utf8  const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::utf16 const &value) { return value; }
-template <> inline tl::u64 get_hash(tl::utf32 const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::u8    const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::u16   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::u32   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::u64   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::s8    const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::s16   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::s32   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::s64   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::ascii const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::utf8  const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::utf16 const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::utf32 const &value) { return value; }
 
 template <class T, class Size>
-tl::u64 get_hash(tl::Span<T, Size> const &span) {
+constexpr tl::u64 get_hash(tl::Span<T, Size> const &span) {
 	tl::u64 result = 0xdeadc0debabeface;
 	for (auto const &it : span) {
-		result = tl::rotate_left(result, 23) ^ get_hash(it);
+		if (std::is_constant_evaluated()) {
+			result = tl::ce::rotate_left(result, 23) ^ get_hash(it);
+		} else {
+			result = tl::rotate_left(result, 23) ^ get_hash(it);
+		}
 	}
 	return result;
 }
 
 template <class T, class Allocator, class Size>
-tl::u64 get_hash(tl::List<T, Allocator, Size> const &list) {
+constexpr tl::u64 get_hash(tl::List<T, Allocator, Size> const &list) {
 	return get_hash(as_span(list));
 }
 
 template <tl::AnEnum T>
-inline tl::u64 get_hash(T const &value) {
+inline constexpr tl::u64 get_hash(T const &value) {
 	return tl::to_underlying(value);
 }

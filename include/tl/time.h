@@ -32,6 +32,8 @@ struct Date {
 
 TL_API Date get_date();
 
+TL_API void sleep_nanoseconds(u64 nanoseconds);
+
 inline Span<utf8> month_string(u8 month) {
 	switch (month) {
 		case  1: return u8"January"s;
@@ -52,13 +54,13 @@ inline Span<utf8> month_string(u8 month) {
 
 inline umm append(StringBuilder &b, Date d) {
 	return append_format(b,
-		"{} {} {} - {}:{}:{}",
-		d.day,
-		month_string(d.month),
-		d.year,
-		FormatInt{.value=d.hour, .leading_zero_count=2},
-		FormatInt{.value=d.minute, .leading_zero_count=2},
-		FormatInt{.value=d.second, .leading_zero_count=2}
+						 "{} {} {} - {}:{}:{}",
+						 d.day,
+						 month_string(d.month),
+						 d.year,
+						 FormatInt{.value=d.hour, .leading_zero_count=2},
+						 FormatInt{.value=d.minute, .leading_zero_count=2},
+						 FormatInt{.value=d.second, .leading_zero_count=2}
 	);
 }
 
@@ -69,6 +71,7 @@ inline umm append(StringBuilder &b, Date d) {
 #if OS_WINDOWS
 
 #include "win32.h"
+#include "thread.h"
 
 #pragma comment(lib, "winmm")
 
@@ -131,6 +134,15 @@ Date get_date() {
 		.second = (u8)t.wSecond,
 		.millisecond = t.wMilliseconds,
 	};
+}
+
+void sleep_nanoseconds(u64 nanoseconds) {
+	auto start = get_performance_counter();
+	auto end = start + performance_frequency * nanoseconds / 1'000'000'000;
+	while (get_performance_counter() < end) {
+		yield_smt();
+		switch_thread();
+	}
 }
 
 }

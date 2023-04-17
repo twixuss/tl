@@ -17,7 +17,7 @@ TL_API void sleep_milliseconds(u32 milliseconds);
 TL_API void sleep_seconds(u32 seconds);
 #if OS_WINDOWS
 TL_API void switch_thread();
-forceinline void spin_iteration() { _mm_pause(); }
+forceinline void yield_smt() { YieldProcessor(); }
 
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
@@ -64,14 +64,18 @@ template <class T>
 forceinline T atomic_set(T volatile &dst, T src) { return atomic_set(&dst, src); }
 
 template <class T>
-forceinline T atomic_set_if_equals(T volatile &dst, T newValue, T comparand) {
+forceinline T atomic_compare_exchange(T volatile &dst, T new_value, T comparand) {
 	s64 result;
-	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)&dst, *(long long*)&newValue, *(long long*)&comparand);
-	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)&dst, *(long     *)&newValue, *(long     *)&comparand);
-	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)&dst, *(short    *)&newValue, *(short    *)&comparand);
-	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)&dst, *(char     *)&newValue, *(char     *)&comparand);
-	else static_error_t(T, "atomic_set_if_equals is not available for this size");
+	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)&dst, *(long long*)&new_value, *(long long*)&comparand);
+	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)&dst, *(long     *)&new_value, *(long     *)&comparand);
+	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)&dst, *(short    *)&new_value, *(short    *)&comparand);
+	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)&dst, *(char     *)&new_value, *(char     *)&comparand);
+	else static_error_t(T, "atomic_compare_exchange is not available for this size");
 	return *(T *)&result;
+}
+template <class T>
+forceinline bool atomic_replace(T volatile &dst, T new_value, T condition) {
+	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
 
 struct Thread {
@@ -88,6 +92,34 @@ inline Thread *create_thread(void (*function)(Thread *self), void *param) {
 	thread->allocator = allocator;
 	thread->function = function;
 	thread->param = param;
+	run_thread(thread);
+	return thread;
+}
+
+
+// These are used only once in `create_thread`, but sadly they can't be made local...
+template <class Tuple, umm... indices>
+static void thread_invoke(Thread *thread) noexcept {
+	Tuple &tuple = *(Tuple *)thread->param;
+	std::invoke(std::move(std::get<indices>(tuple))...);
+}
+template <class Tuple, umm... indices>
+static constexpr auto get_thread_invoke(std::index_sequence<indices...>) noexcept {
+	return &thread_invoke<Tuple, indices...>;
+}
+
+template <class Fn, class ...Args>
+inline Thread *create_thread(Fn &&fn, Args &&...args) {
+	auto allocator = current_allocator;
+	auto thread = allocator.allocate<Thread>();
+	thread->allocator = allocator;
+
+	using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+	auto params = allocator.allocate_uninitialized<Tuple>();
+	new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+	thread->function = get_thread_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+	thread->param = params;
+
 	run_thread(thread);
 	return thread;
 }
@@ -126,8 +158,8 @@ forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
 
 template <class T>
-forceinline T atomic_set_if_equals(T volatile *dst, T newValue, T comparand) {
-	return __sync_val_compare_and_swap(dst, comparand, newValue);
+forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
+	return __sync_val_compare_and_swap(dst, comparand, new_value);
 }
 #endif
 
@@ -178,23 +210,15 @@ u32 get_thread_id(Thread *thread) {
 #endif
 #endif // TL_IMPL
 
-struct Spinner {
-	u32 try_count = 0;
-};
-inline void iteration(Spinner &spinner) {
-	spin_iteration();
-	if (spinner.try_count >= 64)
-		switch_thread();
-	if (spinner.try_count >= 4096)
-		sleep_milliseconds(1);
-	++spinner.try_count;
-}
-
 template <class Predicate>
 void loop_while(Predicate &&predicate) {
-	Spinner spinner;
+	u32 try_count = 0;
 	while (predicate()) {
-		iteration(spinner);
+		for (u32 i = 0; i < 16; ++i) {
+			yield_smt();
+			switch_thread();
+		}
+		++try_count;
 	}
 }
 template <class Predicate>
@@ -219,37 +243,37 @@ inline void sync(SyncPoint &point) {
 	loop_until([&] { return point.synced_thread_count == point.target_thread_count; });
 }
 
-struct Mutex {
+struct SpinLock {
 	bool volatile in_use = false;
 
-	Mutex() = default;
-	Mutex(const Mutex &) = delete;
-	Mutex(Mutex &&) = delete;
-	Mutex &operator=(const Mutex &) = delete;
-	Mutex &operator=(Mutex &&) = delete;
+	SpinLock() = default;
+	SpinLock(const SpinLock &) = delete;
+	SpinLock(SpinLock &&) = delete;
+	SpinLock &operator=(const SpinLock &) = delete;
+	SpinLock &operator=(SpinLock &&) = delete;
 };
 
-inline bool try_lock(Mutex &m) {
-	return !atomic_set_if_equals(m.in_use, true, false);
+inline bool try_lock(SpinLock &m) {
+	return !atomic_compare_exchange(m.in_use, true, false);
 }
-inline void lock(Mutex &m) {
+inline void lock(SpinLock &m) {
 	loop_until([&] {
 		return try_lock(m);
 	});
 }
-inline void unlock(Mutex &m) {
+inline void unlock(SpinLock &m) {
 	m.in_use = false;
 }
-inline void wait_for_unlock(Mutex &m) {
+inline void wait_for_unlock(SpinLock &m) {
 	loop_until([&] {
 		return !m.in_use;
 	});
 }
 
 template <>
-struct Scoped<Mutex> {
-	Mutex &mutex;
-	Scoped(Mutex &mutex) : mutex(mutex) {
+struct Scoped<SpinLock> {
+	SpinLock &mutex;
+	Scoped(SpinLock &mutex) : mutex(mutex) {
 		lock(mutex);
 	}
 	~Scoped() {
@@ -257,24 +281,64 @@ struct Scoped<Mutex> {
 	}
 };
 
-struct RecursiveMutex {
+template <class T, class Lock>
+struct LockProtected {
+	using Value = T;
+
+	LockProtected() = default;
+	LockProtected(T value) : _value(value) {
+	}
+
+	template <class Fn>
+	decltype(auto) use(Fn fn) {
+		scoped(_lock);
+		return fn(_value);
+	}
+
+	template <class Fn>
+	decltype(auto) operator * (Fn fn) { return use(fn); }
+
+	T &use_unprotected() { return _value; }
+
+	Lock _lock;
+	T _value;
+};
+
+// `decltype(name)::Value` instead of `auto` breaks visual studio...
+#define locked_use(name) name * [&] (auto &name)
+
+template <class T, class Lock>
+struct LockQueue : LockProtected<Queue<T>, Lock> {
+	void push(T const &value) {
+		this->use([&](Queue<T> &queue) {
+			queue.push(value);
+		});
+	}
+	Optional<T> try_pop() {
+		return this->use([&](Queue<T> &queue) {
+			return queue.pop();
+		});
+	}
+};
+
+struct RecursiveSpinLock {
 	u32 volatile thread_id = 0;
 	u32 counter = 0;
 
-	RecursiveMutex() = default;
-	RecursiveMutex(const RecursiveMutex &) = delete;
-	RecursiveMutex(RecursiveMutex &&) = delete;
-	RecursiveMutex &operator=(const RecursiveMutex &) = delete;
-	RecursiveMutex &operator=(RecursiveMutex &&) = delete;
+	RecursiveSpinLock() = default;
+	RecursiveSpinLock(const RecursiveSpinLock &) = delete;
+	RecursiveSpinLock(RecursiveSpinLock &&) = delete;
+	RecursiveSpinLock &operator=(const RecursiveSpinLock &) = delete;
+	RecursiveSpinLock &operator=(RecursiveSpinLock &&) = delete;
 };
 
-inline bool try_lock(RecursiveMutex &m, u32 *locked_by = 0) {
+inline bool try_lock(RecursiveSpinLock &m, u32 *locked_by = 0) {
 	u32 thread_id = get_current_thread_id();
 	if (thread_id == m.thread_id) {
 		++m.counter;
 		return true;
 	} else {
-		auto prev_id = atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
+		auto prev_id = atomic_compare_exchange(m.thread_id, thread_id, (u32)0);
 		if (prev_id == 0)
 			return true;
 
@@ -283,17 +347,17 @@ inline bool try_lock(RecursiveMutex &m, u32 *locked_by = 0) {
 		return false;
 	}
 }
-inline void lock(RecursiveMutex &m) {
+inline void lock(RecursiveSpinLock &m) {
 	u32 thread_id = get_current_thread_id();
 	if (thread_id == m.thread_id) {
 		++m.counter;
 	} else {
 		loop_while([&] {
-			return atomic_set_if_equals(m.thread_id, thread_id, (u32)0);
+			return atomic_compare_exchange(m.thread_id, thread_id, (u32)0);
 		});
 	}
 }
-inline void unlock(RecursiveMutex &m) {
+inline void unlock(RecursiveSpinLock &m) {
 	if (m.counter == 0) {
 		m.thread_id = 0;
 	} else {
@@ -302,90 +366,15 @@ inline void unlock(RecursiveMutex &m) {
 }
 
 template <>
-struct Scoped<RecursiveMutex> {
-	RecursiveMutex *mutex;
-	Scoped(RecursiveMutex &mutex) : mutex(&mutex) {
+struct Scoped<RecursiveSpinLock> {
+	RecursiveSpinLock *mutex;
+	Scoped(RecursiveSpinLock &mutex) : mutex(&mutex) {
 		lock(mutex);
 	}
 	~Scoped() {
 		unlock(*mutex);
 	}
 };
-
-#define scoped_lock(mutex) lock(mutex); defer { unlock(mutex); }
-#define scoped_unlock(mutex) unlock(mutex); defer { lock(mutex); }
-
-template <class T, class Mutex = Mutex>
-struct MutexQueue {
-	Queue<T> base;
-	Mutex mutex;
-
-	void push_front_unordered_no_lock(T const &value) { base.push_front_unordered(value); }
-	void push_front_unordered(T const &value) { scoped_lock(mutex); base.push_front_unordered(value); }
-	void push_no_lock(T const &value) { base.push(value); }
-	void push(T const &value) { scoped_lock(mutex); base.push(value); }
-
-	Optional<T> try_pop() {
-		Optional<T> result;
-		scoped_lock(mutex);
-		if (base.count) {
-			result = base.front();
-			base.pop();
-		}
-		return result;
-	}
-	template <class Fn>
-	Optional<T> try_pop_and(Fn &&fn) {
-		Optional<T> result;
-		scoped_lock(mutex);
-		if (base.count) {
-			result = base.front();
-			base.pop();
-			fn(result.get());
-		}
-		return result;
-	}
-	T pop() {
-		Optional<T> opt;
-		loop_until([&] {
-			opt = try_pop();
-			return opt.has_value();
-		});
-		return opt.get();
-	}
-	void clear() {
-		scoped_lock(mutex);
-		base.clear();
-	}
-	void erase_no_lock(T *ptr) {
-		base.erase(ptr);
-	}
-	template <class Fn>
-	void pop_all_nolock(Fn &&fn) {
-		for (auto &value : base) {
-			fn(value);
-		}
-		base.clear();
-	}
-	template <class Fn>
-	void pop_all(Fn &&fn) {
-		scoped_lock(mutex);
-		pop_all_nolock(std::forward<Fn>(fn));
-	}
-	umm count() { return base.count; }
-
-	void add_no_lock(T const &v)                 { base.add(v); }
-	void add_no_lock(T &&v)                      { base.add(v); }
-	void add_no_lock(Span<T const> v)            { base.add(v); }
-	void add_no_lock(std::initializer_list<T> v) { base.add(v); }
-	void add(T const &v)                 { scoped_lock(mutex); base.add(v); }
-	void add(T &&v)                      { scoped_lock(mutex); base.add(v); }
-	void add(Span<T const> v)            { scoped_lock(mutex); base.add(v); }
-	void add(std::initializer_list<T> v) { scoped_lock(mutex); base.add(v); }
-};
-
-template <class T, class Mutex>
-Span<T> as_span(MutexQueue<T, Mutex> &queue) { return as_span(queue.base); }
 
 struct WorkQueue;
 
@@ -403,7 +392,7 @@ struct ThreadPool {
 	u32 volatile dead_thread_count = 0;
 	bool volatile running = false;
 	bool volatile stopping = false;
-	MutexQueue<ThreadWork> all_work;
+	LockQueue<ThreadWork, SpinLock> all_work;
 
 	u32 volatile started_work_count = 0;
 	u32 volatile finished_work_count = 0;
@@ -533,7 +522,7 @@ bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_pr
 	pool.thread_count = thread_count;
 	pool.allocator =
 	pool.threads.allocator =
-	pool.all_work.base.allocator =
+	pool.all_work.use_unprotected().allocator =
 	current_allocator;
 	if (thread_count) {
 		pool.threads.reserve(thread_count);

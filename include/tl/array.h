@@ -46,6 +46,15 @@ inline constexpr Span<T> as_span(Array<T, size> &arr) {
 	return {arr.data, arr.size};
 }
 
+template <class T, umm size>
+inline constexpr Array<T, size> to_array(T const (&array)[size]) {
+	Array<T, size> result{};
+	for (umm i = 0; i < size; ++i) {
+		result.data[i] = array[i];
+	}
+	return result;
+}
+
 template <class T, umm _size_x, umm _size_y>
 struct Array2 {
 	inline static constexpr umm size_x = _size_x;

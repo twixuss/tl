@@ -101,6 +101,9 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 	auto result = create_buffer_uninitialized(size + params.extra_space_before + params.extra_space_after TL_LA);
 	read(file, {result.data + params.extra_space_before, size});
 
+	memset(result.data, 0, params.extra_space_before);
+	memset(result.data + result.count - params.extra_space_after, 0, params.extra_space_after);
+
 	return result;
 }
 
