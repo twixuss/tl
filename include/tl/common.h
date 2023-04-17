@@ -31,8 +31,8 @@
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 #endif
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "invalid_code_path", __VA_ARGS__), __assume(0))
-#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "not_implemented", __VA_ARGS__), __assume(0))
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "", __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
 #define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
