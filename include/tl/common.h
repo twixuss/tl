@@ -1477,8 +1477,8 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 	return result;
 }
 
-template <class Collection, class T>
-umm find_index_of(Collection &collection, T value) {
+template <class Collection>
+umm find_index_of(Collection &collection, const ValueTypeOf<Collection> &value) {
 	return index_of(collection, find(collection, value));
 }
 
@@ -1530,7 +1530,7 @@ T *binary_search(Span<T> span, U value, Fn get_value) {
 template <class T>
 void reverse(Span<T> span) {
 	for (umm i = 0; i < span.count / 2; ++i) {
-		swap(span[i], span[span.count-i-1]);
+		Swap(span[i], span[span.count-i-1]);
 	}
 }
 

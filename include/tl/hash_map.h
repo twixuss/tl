@@ -27,6 +27,28 @@ struct DefaultHashTraits {
 	}
 };
 
+#ifndef TL_VALIDATE_POINTERS
+#define TL_VALIDATE_POINTERS TL_DEBUG
+#endif
+
+#if TL_VALIDATE_POINTERS
+template <class T, class Validator>
+struct ValidatedPointer {
+	inline constexpr T &operator*() const { check(); return *_pointer; }
+	inline constexpr T *operator->() const { check(); return _pointer; }
+
+	inline constexpr void check() const {
+		assert(_validator.is_valid());
+	}
+
+	Validator _validator;
+	T *_pointer;
+};
+#else
+template <class T, class Validator>
+using ValidatedPointer = T *;
+#endif
+
 template <class Key, class Value, umm _capacity, class Traits = DefaultHashTraits<Key>>
 struct StaticBucketHashMap {
 	inline static constexpr umm capacity = _capacity;
@@ -465,6 +487,26 @@ struct ContiguousHashMap {
 
 	[[no_unique_address]] Traits traits = {};
 
+	// TODO: I don't know if this could be useful. Either finish or delete this.
+
+	struct Validator {
+		ContiguousHashMap *map;
+		Cell *initial_data;
+	};
+
+	using ValidatedValue = ValidatedPointer<Value, Validator>;
+
+	template <class T>
+	ValidatedPointer<T, Validator> validated(T *value) {
+		return {
+			._pointer = value,
+			._validator = {
+				.map = this,
+				.initial_data = cells.data,
+			},
+		};
+	}
+
 	Value &get_or_insert(Key key TL_LP) {
 		auto hash = get_the_hash(key);
 		u64 index = 0;
@@ -510,7 +552,8 @@ struct ContiguousHashMap {
 		cell.state = CellState::occupied;
 		cell.hash = hash;
 		cell.key() = key;
-		return cell.value() = {};
+		cell.value() = {};
+		return cell.value();
 	}
 	void insert(Key const &key, Value value) {
 		get_or_insert(key) = value;
@@ -545,7 +588,7 @@ struct ContiguousHashMap {
 		return true;
 	}
 
-	umm step(umm index, umm cells_count) {
+	umm step(umm index, umm cells_count) const {
 		return (index + 2) % cells_count;
 	}
 
@@ -581,7 +624,7 @@ struct ContiguousHashMap {
 		return cell.value() = value;
 	}
 
-	KeyValue *find(Key key) {
+	KeyValue *find(Key key) const {
 		if (cells.count == 0)
 			return 0;
 
@@ -606,7 +649,7 @@ struct ContiguousHashMap {
 		return 0;
 	}
 
-	u64 get_the_hash(Key key) {
+	u64 get_the_hash(Key key) const {
 		return traits.get_hash(key) & 0x3FFF'FFFF'FFFF'FFFF; // get rid of 2 bits reserved for `state`
     }
 
