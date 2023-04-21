@@ -394,6 +394,15 @@ struct BucketHashMap {
 };
 
 template <class Key, class Value, class Traits>
+void free(BucketHashMap<Key, Value, Traits> &map) {
+	for (auto &bucket : map.buckets) {
+		free(bucket);
+	}
+	map.allocator.free(map.buckets.data);
+	map.buckets = {};
+}
+
+template <class Key, class Value, class Traits>
 umm count_of(BucketHashMap<Key, Value, Traits> &map) {
 	umm result = 0;
 	for (auto &bucket : map.buckets) {
@@ -661,6 +670,11 @@ struct ContiguousHashMap {
 	}
 };
 
+template <class Key, class Value, class Traits>
+void free(ContiguousHashMap<Key, Value, Traits> &map) {
+	map.allocator.free(map.cells.data);
+	map.cells = {};
+}
 template <class Key, class Value, class Traits>
 bool is_empty(ContiguousHashMap<Key, Value, Traits> map) {
 	return map.count == 0;

@@ -1187,9 +1187,12 @@ struct Span {
 	}
 	constexpr Span skip(smm amount) const {
 		if (amount >= 0) {
-			auto offset = min((Size)amount, count);
-			return {data + offset, (Size)((smm)count - offset)};
+			if ((Size)amount >= count)
+				return {};
+			return {data + amount, (Size)((smm)count - amount)};
 		} else {
+			if ((Size)-amount >= count)
+				return {};
 			return {data, (Size)(count + amount)};
 		}
 	}
