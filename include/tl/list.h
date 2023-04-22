@@ -53,9 +53,7 @@ struct List : Span<T, Size_> {
 	}
 	T &add(T value TL_LP) {
 		reserve_exponential(count + 1 TL_LA);
-		auto dest = data + count;
-		assert(dest == (data + count));
-		memcpy(dest, &value, sizeof(T));
+		memcpy(data + count, &value, sizeof(T));
 		return data[count++];
 	}
 	template <class Size>
