@@ -463,6 +463,9 @@ forceinline constexpr T ceil(T v, T s) {
 	return floor(v + s - 1, s);
 }
 
+forceinline constexpr u8 *floor(u8 *v, umm s) { return (u8 *)floor((umm)v, s); }
+forceinline constexpr u8 *ceil(u8 *v, umm s) { return floor(v + s - 1, s); }
+
 forceinline constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v, s); }
 forceinline constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 

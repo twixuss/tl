@@ -110,11 +110,25 @@ inline umm println() {
 }
 
 template <class ...T>
-inline umm println(T const &...args) {
-	umm result = 0;
-	result += print(args...);
-	result += print('\n');
-	return result;
+inline umm println(char const *fmt, T const &...args) {
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	append_format(builder, fmt, args...);
+	append(builder, '\n');
+	auto string = to_string(builder, temporary_allocator);
+	print((Span<utf8>)(string));
+	return string.count;
+}
+
+template <class T>
+inline umm println(T const &value) {
+	StringBuilder builder;
+	builder.allocator = temporary_allocator;
+	append(builder, value);
+	append(builder, '\n');
+	auto string = as_utf8(to_string(builder, temporary_allocator));
+	current_printer(string);
+	return string.count;
 }
 
 TL_API void hide_console_window();
