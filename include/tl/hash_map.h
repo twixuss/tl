@@ -476,7 +476,11 @@ enum class ContiguousHashMapCellState : u64 {
 	tombstone = 2,
 };
 
-template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
+#ifndef TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY
+#define TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY 7
+#endif
+
+template <class Key, class Value, class Traits = DefaultHashTraits<Key>, class Allocator = Allocator>
 struct ContiguousHashMap {
 	using CellState = ContiguousHashMapCellState;
 	using KeyValue = KeyValue<Key, Value>;
@@ -490,10 +494,10 @@ struct ContiguousHashMap {
 		Value &value() { return key_value.value; }
 	};
 
-	Allocator allocator = current_allocator;
 	Span<Cell> cells;
 	umm count = 0;
 
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	[[no_unique_address]] Traits traits = {};
 
 	// TODO: I don't know if this could be useful. Either finish or delete this.
@@ -545,7 +549,7 @@ struct ContiguousHashMap {
 				}
 			}
 		} else {
-			reserve(7 TL_LA);
+			reserve(TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY TL_LA);
 			index = hash % cells.count;
 		}
 		count += 1;
@@ -670,34 +674,43 @@ struct ContiguousHashMap {
 	}
 };
 
-template <class Key, class Value, class Traits>
-void free(ContiguousHashMap<Key, Value, Traits> &map) {
+// Dude this is so...
+
+template <class T>
+struct SContiguousHashMap { inline static constexpr bool value = false; };
+
+template <class Key, class Value, class Traits, class Allocator>
+struct SContiguousHashMap<ContiguousHashMap<Key, Value, Traits, Allocator>> { inline static constexpr bool value = true; };
+
+template <class T>
+concept CContiguousHashMap = SContiguousHashMap<T>::value;
+
+void free(CContiguousHashMap auto &map) {
 	map.allocator.free(map.cells.data);
 	map.cells = {};
 }
-template <class Key, class Value, class Traits>
-bool is_empty(ContiguousHashMap<Key, Value, Traits> map) {
+
+bool is_empty(CContiguousHashMap auto map) {
 	return map.count == 0;
 }
 
 
-template <class Key, class Value, class Traits>
-umm count_of(ContiguousHashMap<Key, Value, Traits> map) {
-    return map.count;
+umm count_of(CContiguousHashMap auto map) {
+	return map.count;
 }
 
 
 template <class Key, class Value, class Traits, class Fn>
-void for_each(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
-    for (auto &cell : map.cells) {
-        if (cell.state == ContiguousHashMapCellState::occupied) {
-            fn(cell.key_value);
-        }
-    }
+void for_each(CContiguousHashMap auto map, Fn &&fn) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
+	for (auto &cell : map.cells) {
+		if (cell.state == ContiguousHashMapCellState::occupied) {
+			fn(cell.key_value);
+		}
+	}
 }
 
 template <class Key, class Value, class Traits, class Fn>
-auto map(ContiguousHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
+auto map(CContiguousHashMap auto map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
 	using U = decltype(fn(*(KeyValue<Key, Value> *)0));
 	List<U, Allocator> result;
 	result.reserve(count_of(map) TL_LA);
