@@ -60,21 +60,20 @@ forceinline T atomic_set(T volatile *dst, T src) {
 	else static_error_t(T, "lockSet is not available for this size");
 	return *(T *)&result;
 }
-template <class T>
-forceinline T atomic_set(T volatile &dst, T src) { return atomic_set(&dst, src); }
 
 template <class T>
-forceinline T atomic_compare_exchange(T volatile &dst, T new_value, T comparand) {
+forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
 	s64 result;
-	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)&dst, *(long long*)&new_value, *(long long*)&comparand);
-	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)&dst, *(long     *)&new_value, *(long     *)&comparand);
-	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)&dst, *(short    *)&new_value, *(short    *)&comparand);
-	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)&dst, *(char     *)&new_value, *(char     *)&comparand);
+	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&new_value, *(long long*)&comparand);
+	else if constexpr (sizeof(T) == 4) result = _InterlockedCompareExchange  ((long     *)dst, *(long     *)&new_value, *(long     *)&comparand);
+	else if constexpr (sizeof(T) == 2) result = _InterlockedCompareExchange16((short    *)dst, *(short    *)&new_value, *(short    *)&comparand);
+	else if constexpr (sizeof(T) == 1) result = _InterlockedCompareExchange8 ((char     *)dst, *(char     *)&new_value, *(char     *)&comparand);
 	else static_error_t(T, "atomic_compare_exchange is not available for this size");
 	return *(T *)&result;
 }
+
 template <class T>
-forceinline bool atomic_replace(T volatile &dst, T new_value, T condition) {
+forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
 	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
 
@@ -254,7 +253,7 @@ struct SpinLock {
 };
 
 inline bool try_lock(SpinLock &m) {
-	return !atomic_compare_exchange(m.in_use, true, false);
+	return !atomic_compare_exchange(&m.in_use, true, false);
 }
 inline void lock(SpinLock &m) {
 	loop_until([&] {
@@ -338,7 +337,7 @@ inline bool try_lock(RecursiveSpinLock &m, u32 *locked_by = 0) {
 		++m.counter;
 		return true;
 	} else {
-		auto prev_id = atomic_compare_exchange(m.thread_id, thread_id, (u32)0);
+		auto prev_id = atomic_compare_exchange(&m.thread_id, thread_id, (u32)0);
 		if (prev_id == 0)
 			return true;
 
@@ -353,7 +352,7 @@ inline void lock(RecursiveSpinLock &m) {
 		++m.counter;
 	} else {
 		loop_while([&] {
-			return atomic_compare_exchange(m.thread_id, thread_id, (u32)0);
+			return atomic_compare_exchange(&m.thread_id, thread_id, (u32)0);
 		});
 	}
 }

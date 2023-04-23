@@ -323,10 +323,8 @@ template <class T, class Allocator, class Size> constexpr T *find(List<T, Alloca
 template <class T, class Allocator, class Size> constexpr T *find(List<T, Allocator, Size> list, Span<T> cmp) { return find(as_span(list), cmp); }
 template <class T, class Allocator, class Size> constexpr T *find_last(List<T, Allocator, Size> list, T const &value) { return find_last(as_span(list), value); }
 
-template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> find_all(Span<T> where, Span<T> what) {
-	List<Span<T>, Allocator, Size> result;
-
+template <class T>
+void find_all(Span<T> where, Span<T> what, auto &&on_find) {
 	for (umm where_start = 0; where_start != where.count - what.count + 1; ++where_start) {
 		for (umm what_index = 0; what_index < what.count; ++what_index) {
 			if (where.data[where_start + what_index] != what.data[what_index]) {
@@ -334,11 +332,16 @@ List<Span<T>, Allocator, Size> find_all(Span<T> where, Span<T> what) {
 			}
 		}
 
-		result.add(Span<T>(where.data + where_start, what.count));
+		on_find(Span<T>(where.data + where_start, what.count));
 
 	continue_where:;
 	}
+}
 
+template <class T, class Allocator = Allocator, class Size = umm>
+List<Span<T>, Allocator, Size> find_all(Span<T> where, Span<T> what) {
+	List<Span<T>, Allocator, Size> result;
+	find_all(where, what, [&](auto v) { result.add(v); });
 	return result;
 }
 
