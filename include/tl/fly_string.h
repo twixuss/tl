@@ -26,7 +26,7 @@ struct FlyString {
         return data == that.data;
     }
     inline bool operator==(char const *that) const {
-        return strcmp((char *)data, that) == 0;
+        return as_span((char *)data) == as_span(that);
     }
 
     inline umm count() const {
@@ -50,10 +50,13 @@ struct FlyString {
     utf8 const *data = 0;
 
     static HashMap<Span<utf8>, umm> storage;
+    static void init() {
+        construct(storage);
+    }
 };
 
 #ifdef TL_IMPL
-HashMap<Span<utf8>, umm> FlyString::storage = {default_allocator};
+HashMap<Span<utf8>, umm> FlyString::storage;
 #endif
 
 inline umm append(StringBuilder &builder, FlyString str) {
@@ -64,10 +67,5 @@ inline umm append(StringBuilder &builder, FlyString str) {
 
 template <>
 inline tl::u64 get_hash(tl::FlyString const &str) {
-    auto c = str.data;
-	tl::u64 result = 0xdeadc0debabeface;
-	while (*c) {
-		result = tl::rotate_left(result, 7) ^ *c++;
-	}
-	return result;
+	return get_hash(str.span());
 }

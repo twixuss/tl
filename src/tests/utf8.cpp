@@ -53,7 +53,7 @@ __declspec(noinline) void utf8_test() {
         }
 
         print("Testing get_char_and_advance_utf8 ... ");
-        float avg = 0;
+        f64 avg = 0;
         for (int i = 0; i < 11; ++i) {
             auto timer = create_precise_timer();
             defer { if (i) avg += get_time(timer); };

@@ -17,13 +17,49 @@ struct Printer {
 	void (*func)(Span<utf8> span, void *state);
 	void *state;
 
-	void operator()(Span<utf8> span) {
+	umm operator()(Span<utf8> span) { 
 		func(span, state);
+		return span.count;
+	}
+
+	template <class ...T>
+	inline umm write(char const *fmt, T const &...args) {
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+		append_format(builder, fmt, args...);
+		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+	}
+
+	template <class T>
+	inline umm write(T const &value) {
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+		append(builder, value);
+		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+	}
+
+	template <class ...T>
+	inline umm writeln(char const *fmt, T const &...args) {
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+		append_format(builder, fmt, args...);
+		append(builder, '\n');
+		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+	}
+
+	template <class T>
+	inline umm writeln(T const &value) {
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+		append(builder, value);
+		append(builder, '\n');
+		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
 	}
 };
 
 extern TL_API Printer console_printer;
 extern TL_API Printer standard_output_printer;
+extern TL_API Printer standard_error_printer;
 extern thread_local Printer current_printer;
 
 TL_API void init_printer();
@@ -91,14 +127,8 @@ inline umm print(utf8 const *string) {
 	return print(as_span(string));
 }
 
-template <class ...Args>
-inline umm print(char const *fmt, Args const &...args) {
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append_format(builder, fmt, args...);
-	auto string = to_string(builder, temporary_allocator);
-	print((Span<utf8>)(string));
-	return string.count;
+inline umm print(char const *fmt, auto const &...args) {
+	return current_printer.write(fmt, args...);
 }
 
 inline umm print(char const *string) {
@@ -109,26 +139,20 @@ inline umm println() {
 	return print('\n');
 }
 
-template <class ...T>
-inline umm println(char const *fmt, T const &...args) {
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append_format(builder, fmt, args...);
-	append(builder, '\n');
-	auto string = to_string(builder, temporary_allocator);
-	print((Span<utf8>)(string));
-	return string.count;
+inline umm println(char const *fmt, auto const &...args) {
+	return current_printer.writeln(fmt, args...);
 }
 
-template <class T>
-inline umm println(T const &value) {
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append(builder, value);
-	append(builder, '\n');
-	auto string = as_utf8(to_string(builder, temporary_allocator));
-	current_printer(string);
-	return string.count;
+inline umm println(auto const &value) {
+	return current_printer.writeln(value);
+}
+
+inline umm errln(char const *fmt, auto const &...args) {
+	return standard_error_printer.writeln(fmt, args...);
+}
+
+inline umm errln(auto const &value) {
+	return standard_error_printer.writeln(value);
 }
 
 TL_API void hide_console_window();
@@ -162,6 +186,7 @@ void deinit_printer() {
 #if OS_WINDOWS
 
 static HANDLE std_out;
+static HANDLE std_err;
 static HWND console_window;
 
 Printer console_printer = {
@@ -174,6 +199,13 @@ Printer console_printer = {
 Printer standard_output_printer = {
 	[](Span<utf8> span, void *) {
 		WriteFile(std_out, span.data, (DWORD)span.count, 0, 0);
+	},
+	0
+};
+
+Printer standard_error_printer = {
+	[](Span<utf8> span, void *) {
+		WriteFile(std_err, span.data, (DWORD)span.count, 0, 0);
 	},
 	0
 };
@@ -274,6 +306,7 @@ void init_printer() {
 	current_printer = standard_output_printer;
 #if OS_WINDOWS
 	std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+	std_err = GetStdHandle(STD_ERROR_HANDLE);
 	console_window = GetConsoleWindow();
 #endif
 }

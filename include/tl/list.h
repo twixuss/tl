@@ -325,6 +325,9 @@ template <class T, class Allocator, class Size> constexpr T *find_last(List<T, A
 
 template <class T>
 void find_all(Span<T> where, Span<T> what, auto &&on_find) {
+	if (what.count > where.count)
+		return;
+
 	for (umm where_start = 0; where_start != where.count - what.count + 1; ++where_start) {
 		for (umm what_index = 0; what_index < what.count; ++what_index) {
 			if (where.data[where_start + what_index] != what.data[what_index]) {

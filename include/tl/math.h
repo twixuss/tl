@@ -391,11 +391,7 @@ forceinline v4fx8 unpack(v4fx8 v) {
 	forceinline auto min(v2f a) { return min(a.x, a.y); }\
 	forceinline auto max(v2f a) { return max(a.x, a.y); }\
 	forceinline auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }\
-	forceinline auto max(v2f a, v2f b) { return V2f(max(a.x, b.x), max(a.y, b.y)); }\
-	forceinline void minmax(v2f a, v2f b, v2f& mn, v2f& mx) { \
-		minmax(a.x, b.x, mn.x, mx.x);		  \
-		minmax(a.y, b.y, mn.y, mx.y); 		  \
-	}
+	forceinline auto max(v2f a, v2f b) { return V2f(max(a.x, b.x), max(a.y, b.y)); }
 MINMAX(v2f, V2f)
 MINMAX(v2s, V2s)
 MINMAX(v2u, V2u)
@@ -405,12 +401,7 @@ MINMAX(v2u, V2u)
 	forceinline auto min(v3f a) { return min(a.x, a.y, a.z); }\
 	forceinline auto max(v3f a) { return max(a.x, a.y, a.z); }\
 	forceinline auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }\
-	forceinline auto max(v3f a, v3f b) { return V3f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }\
-	forceinline void minmax(v3f a, v3f b, v3f& mn, v3f& mx) { \
-		minmax(a.x, b.x, mn.x, mx.x);		  \
-		minmax(a.y, b.y, mn.y, mx.y); 		  \
-		minmax(a.z, b.z, mn.z, mx.z); 		  \
-	}
+	forceinline auto max(v3f a, v3f b) { return V3f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
 MINMAX(v3f, V3f)
 MINMAX(v3s, V3s)
 MINMAX(v3u, V3u)
@@ -420,13 +411,7 @@ MINMAX(v3u, V3u)
 	forceinline auto min(v4f a) { return min(a.x, a.y, a.z, a.w); }\
 	forceinline auto max(v4f a) { return max(a.x, a.y, a.z, a.w); }\
 	forceinline auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }\
-	forceinline auto max(v4f a, v4f b) { return V4f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }\
-	forceinline void minmax(v4f a, v4f b, v4f& mn, v4f& mx) { \
-		minmax(a.x, b.x, mn.x, mx.x);		  \
-		minmax(a.y, b.y, mn.y, mx.y); 		  \
-		minmax(a.z, b.z, mn.z, mx.z); 		  \
-		minmax(a.w, b.w, mn.w, mx.w); 		  \
-	}
+	forceinline auto max(v4f a, v4f b) { return V4f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }
 MINMAX(v4f, V4f)
 MINMAX(v4s, V4s)
 MINMAX(v4u, V4u)

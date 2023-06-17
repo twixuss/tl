@@ -100,6 +100,11 @@
 #define static_error_t(t, ...) static_assert(!sizeof(t*), __VA_ARGS__)
 #define static_error_v(v, ...) static_error_t(decltype(v), __VA_ARGS__)
 
+#define TL_DECLARE_CONCEPT(name) \
+template <class T> struct S##name : std::false_type {}; \
+template <class ...Args> struct S##name<name<Args...>> : std::true_type {}; \
+template <class T> concept C##name = S##name<T>::value
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -409,8 +414,8 @@ template <class T, class U> forceinline constexpr auto min(T const &a, U const &
 template <class T, class U> forceinline constexpr auto max(T const &a, U const &b) { return a > b ? a : b; }
 template <class T, class U, class... Rest> forceinline constexpr auto min(T const &a, U const &b, Rest const &...rest) { return min(min(a, b), rest...); }
 template <class T, class U, class... Rest> forceinline constexpr auto max(T const &a, U const &b, Rest const &...rest) { return max(max(a, b), rest...); }
-template <class T, class U, class V, class W> forceinline constexpr void minmax(T const &a, U const &b, V& mn, W& mx) { mn = min(a, b); mx = max(a, b); }
-template <class T, class U> forceinline constexpr void minmax(T& mn, U &mx) { minmax(mn, mx, mn, mx); }
+
+template <class T, class U> forceinline constexpr void sort_values(T& mn, U &mx) { if (mn > mx) { auto tmp = mx; mx = mn; mn = tmp; }; }
 
 template <class T, umm count>
 forceinline constexpr auto min(T const &a, T const (&b)[count]) {
@@ -728,7 +733,7 @@ forceinline constexpr auto clamp(T value, T min_bound, T max_bound) {
 
 template <class T>
 forceinline constexpr auto clamp_checked(T value, T min_bound, T max_bound) {
-	minmax(min_bound, max_bound, min_bound, max_bound);
+	sort_values(min_bound, max_bound);
 	return min(max(value, min_bound), max_bound);
 }
 
@@ -755,13 +760,13 @@ inline constexpr void Swap(T &a, T &b) {
 
 template <class T>
 constexpr T midpoint(T a, T b) {
-	minmax(a, b, a, b);
+	sort_values(a, b);
 	return a + (b - a) / 2;
 }
 
 template <class T>
 constexpr T *midpoint(T *a, T *b) {
-	minmax(a, b, a, b);
+	sort_values(a, b);
 	return a + ((umm)(b - a) >> 1);
 }
 
@@ -2092,7 +2097,7 @@ auto &get(Tuple<Args...> tuple) {
 
 using NativeWindowHandle = struct NativeWindow {} *;
 
-enum AllocatorMode : u8 {
+enum AllocatorAction : u8 {
 	Allocator_allocate,
 	Allocator_reallocate,
 	Allocator_free,
@@ -2107,7 +2112,7 @@ struct Allocator;
 extern TL_API Allocator os_allocator;
 extern TL_API Allocator page_allocator;
 extern TL_API Allocator default_allocator;
-extern TL_API thread_local Allocator temporary_allocator;
+
 extern TL_API thread_local Allocator current_allocator;
 
 struct AllocationResult {
@@ -2156,8 +2161,8 @@ struct MyAllocator : AllocatorBase<MyAllocator> {
 template <class T>
 Allocator make_allocator_from_static_class() {
 	return {
-		.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> AllocationResult {
-			switch (mode) {
+		.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, std::source_location location, void *) -> AllocationResult {
+			switch (action) {
 				case Allocator_allocate: {
 					return T{}.allocate_impl(new_size, align TL_LA);
 				}
@@ -2311,8 +2316,8 @@ struct AllocatorBase {
 		return result;
 	}
 
-	inline AllocationResult execute(AllocatorMode mode, void *data, umm old_size, umm new_size, umm alignment TL_LP) {
-		switch (mode) {
+	inline AllocationResult execute(AllocatorAction action, void *data, umm old_size, umm new_size, umm alignment TL_LP) {
+		switch (action) {
 			case ::tl::Allocator_allocate:   return derived()->allocate_impl(new_size, alignment TL_LA);
 			case ::tl::Allocator_reallocate: return derived()->reallocate_impl(data, old_size, new_size, alignment TL_LA);
 			case ::tl::Allocator_free:       derived()->deallocate_impl(data, new_size, alignment TL_LA); break;
@@ -2323,7 +2328,7 @@ struct AllocatorBase {
 
 struct Allocator : AllocatorBase<Allocator> {
 	// When deallocating size goes into `new_size`
-	AllocationResult (*func)(AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) = 0;
+	AllocationResult (*func)(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) = 0;
 	void *state = 0;
 
 	inline AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
@@ -2345,6 +2350,47 @@ struct Allocator : AllocatorBase<Allocator> {
 	}
 };
 
+#ifndef TL_TEMPORARY_STORAGE_CAPACITY
+#define TL_TEMPORARY_STORAGE_CAPACITY (1 * MiB)
+#endif
+
+struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
+
+	inline static constexpr umm buffer_size = TL_TEMPORARY_STORAGE_CAPACITY;
+	inline static thread_local u8 *base = 0;
+	inline static thread_local u8 *cursor = 0;
+
+	forceinline static void init() {
+		cursor = base = current_allocator.allocate_uninitialized<u8>(buffer_size);
+	}
+
+	forceinline static TemporaryAllocator current() { return {}; }
+
+	forceinline static AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
+		auto target = ceil(cursor, alignment);
+		cursor = target + size;
+		assert(cursor <= base + buffer_size, "Out of temporary memory");
+		return AllocationResult { .data = target, .count = size, .is_zeroed = true };
+	}
+	forceinline static AllocationResult reallocate_impl(void *old_data, umm old_size, umm new_size, umm alignment TL_LP) {
+		auto new_data = allocate_impl(new_size, alignment);
+		memcpy(new_data.data, old_data, old_size);
+		return new_data;
+	}
+	forceinline static void deallocate_impl(void *data, umm size, umm alignment TL_LP) {}
+
+	forceinline operator Allocator() {
+		return {
+			.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
+				return ((TemporaryAllocator *)state)->execute(action, data, old_size, new_size, align TL_LA);
+			},
+			.state = this
+		};
+	}
+};
+
+extern TL_API thread_local TemporaryAllocator temporary_allocator;
+
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
 
@@ -2359,8 +2405,8 @@ inline void allocate(T *&val) {
 #define MAKE_ALLOCATOR_FROM_TYPE(type, name, ...) \
 type CONCAT(_state, __LINE__) = {__VA_ARGS__}; \
 Allocator name = { \
-	[](AllocatorMode mode, void *data, umm old_size, umm new_size, umm alignment, std::source_location location, void *state) -> void * { \
-		switch (mode) { \
+	[](AllocatorAction action, void *data, umm old_size, umm new_size, umm alignment, std::source_location location, void *state) -> void * { \
+		switch (action) { \
 			case ::tl::Allocator_allocate:   return ((type *)state)->allocate(new_size, alignment TL_LA); \
 			case ::tl::Allocator_reallocate: return ((type *)state)->reallocate(data, old_size, new_size, alignment TL_LA); \
 			case ::tl::Allocator_free:       return ((type *)state)->deallocate(data, new_size, alignment TL_LA), (void *)0; \
@@ -2403,12 +2449,8 @@ struct AllocatorPusher {
 
 template <class Thing>
 struct Scoped {
-	Scoped(Thing &) {
-		static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
-	}
-	Scoped(Thing &&) {
-		static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below.");
-	}
+	Scoped(Thing &) { static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below."); }
+	Scoped(Thing &&) { static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below."); }
 };
 template <class Thing>
 Scoped(Thing) -> Scoped<Thing>;
@@ -2446,6 +2488,18 @@ template <>
 struct Scoped<Allocator> {
 	Allocator old_allocator;
 	Scoped(Allocator new_allocator) {
+		old_allocator = current_allocator;
+		current_allocator = new_allocator;
+	}
+	~Scoped() {
+		current_allocator = old_allocator;
+	}
+};
+
+template <>
+struct Scoped<TemporaryAllocator> {
+	Allocator old_allocator;
+	Scoped(TemporaryAllocator new_allocator) {
 		old_allocator = current_allocator;
 		current_allocator = new_allocator;
 	}
@@ -2496,13 +2550,13 @@ void rotate(Span<T> span, smm to_be_first_index) {
 #endif
 
 Allocator os_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
+	.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
 		(void)old_size;
 		(void)state;
 #if TL_PARENT_SOURCE_LOCATION
 		(void)location;
 #endif
-		switch (mode) {
+		switch (action) {
 			case Allocator_allocate: {
 				return {
 					.data = tl_allocate(new_size, align),
@@ -2526,12 +2580,12 @@ Allocator os_allocator = {
 	.state = 0
 };
 Allocator page_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
+	.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
 		(void)state;
 #if TL_PARENT_SOURCE_LOCATION
 		(void)location;
 #endif
-		switch (mode) {
+		switch (action) {
 			case Allocator_allocate: {
 				assert(align <= 4096);
 				return {
@@ -2582,107 +2636,18 @@ Allocator page_allocator = {
 };
 Allocator default_allocator = os_allocator;
 
-struct TemporaryAllocatorState : AllocatorBase<TemporaryAllocatorState> {
-	struct Block {
-		Block *next;
-		umm size;
-		umm capacity;
-		forceinline u8 *data() { return (u8 *)(this + 1); }
-	};
-	Allocator allocator;
-	Block *first = 0;
-	Block *last = 0;
-	umm last_block_capacity = 0x10000;
-
-
-	inline AllocationResult allocate_impl(umm new_size, umm align TL_LP) {
-		auto block = first;
-		while (block) {
-			auto candidate = (u8 *)ceil(block->data() + block->size, align);
-			if (candidate + new_size <= block->data() + block->capacity) {
-				block->size = (candidate - block->data()) + new_size;
-				assert(block->size <= block->capacity);
-				return {
-					.data = candidate,
-					.count = new_size,
-					.is_zeroed = false,
-				};
-			}
-			block = block->next;
-		}
-
-		// Block with enough space was not found. Create a new bigger one
-		do {
-			last_block_capacity *= 2;
-		} while (last_block_capacity < new_size);
-
-		block = (TemporaryAllocatorState::Block *)allocator.allocate_uninitialized(sizeof(TemporaryAllocatorState::Block) + last_block_capacity TL_LA);
-		block->size = new_size;
-		block->capacity = last_block_capacity;
-		block->next = 0;
-
-		if (first) {
-			last->next = block;
-		} else {
-			first = block;
-		}
-		last = block;
-
-		return {
-			.data = block->data(),
-			.count = new_size,
-			.is_zeroed = false,
-		};
-	}
-	inline AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP) {
-		auto result = temporary_allocator.allocate_uninitialized(new_size TL_LA);
-		memcpy(result, data, old_size);
-
-		return {
-			.data = result,
-			.count = new_size,
-			.is_zeroed = false,
-		};
-	}
-	inline void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-	}
-
-	inline void clear() {
-		auto block = first;
-		while (block) {
-			block->size = 0;
-			block = block->next;
-		}
-	}
-};
-
-void free(TemporaryAllocatorState &state) {
-	auto block = state.first;
-	while (block) {
-		auto next = block->next;
-		state.allocator.free(block, sizeof(TemporaryAllocatorState::Block) + block->capacity);
-		block = next;
-	}
-	state = {};
-}
-
-thread_local TemporaryAllocatorState temporary_allocator_state;
-thread_local Allocator temporary_allocator = {
-	.func = [](AllocatorMode mode, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
-		return ((TemporaryAllocatorState *)state)->execute(mode, data, old_size, new_size, align TL_LA);
-	},
-	.state = &temporary_allocator_state
-};
+thread_local TemporaryAllocator temporary_allocator;
 
 thread_local Allocator current_allocator;
 
 void init_allocator(Allocator temporary_allocator_backup) {
 	current_allocator = default_allocator;
-	temporary_allocator_state.allocator = temporary_allocator_backup;
+	withs (temporary_allocator_backup) {
+		TemporaryAllocator::init();
+	};
 }
 
 void deinit_allocator() {
-	free(temporary_allocator_state);
 }
 
 #endif

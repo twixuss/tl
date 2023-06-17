@@ -8,7 +8,7 @@ struct Hashablabla {
 };
 
 template <>
-u64 get_hash(Hashablabla x) {
+u64 get_hash(Hashablabla const &x) {
     return 0;
 }
 
@@ -18,28 +18,29 @@ bool operator==(Hashablabla a, Hashablabla b) {
 
 void hash_map_test() {
     {
-        ContiguousHashMap<s64, f64> map;
+        ContiguousHashMap<s64, s64> map;
 
         assert(map.count == 0);
-        map.get_or_insert(1337) = 2.34f; assert(map.get_or_insert(1337) == 2.34f); assert(map.count == 1);
-        map.get_or_insert(4242) = 1.34f; assert(map.get_or_insert(4242) == 1.34f); assert(map.count == 2);
-        map.get_or_insert(2020) = 3.34f; assert(map.get_or_insert(2020) == 3.34f); assert(map.count == 3);
-        map.get_or_insert(9999) = 5.34f; assert(map.get_or_insert(9999) == 5.34f); assert(map.count == 4);
+        map.get_or_insert(1337) = 234; assert(map.get_or_insert(1337) == 234); assert(map.count == 1);
+        map.get_or_insert(4242) = 134; assert(map.get_or_insert(4242) == 134); assert(map.count == 2);
+        map.get_or_insert(2020) = 334; assert(map.get_or_insert(2020) == 334); assert(map.count == 3);
+        map.get_or_insert(9999) = 534; assert(map.get_or_insert(9999) == 534); assert(map.count == 4);
 
-        assert(*map.find(1337) == 2.34f);
-        assert(*map.find(4242) == 1.34f);
-        assert(*map.find(2020) == 3.34f);
-        assert(*map.find(9999) == 5.34f);
+        assert(map.find(1337)->value == 234);
+        assert(map.find(4242)->value == 134);
+        assert(map.find(2020)->value == 334);
+        assert(map.find(9999)->value == 534);
         assert(!map.find(1));
         assert(!map.find(4));
         assert(!map.find(2));
         assert(!map.find(9));
 
-        sizeof(map.cells.data[0]);
-
-        for_each(map, [&](auto key, auto value) {
-            print("{}: {}\n", key, value);
+        int itercount = 0;
+        for_each(map, [&](auto kv) {
+            ++itercount;
+            print("{}: {}\n", kv.key, kv.value);
         });
+        assert(itercount == map.count);
 
         for (int i = 0; i < 1000; ++i) {
              map.get_or_insert(i) = i;
@@ -53,10 +54,10 @@ void hash_map_test() {
         map.get_or_insert({1}) = 1; assert(map.count == 2);
         map.get_or_insert({2}) = 2; assert(map.count == 3);
         map.get_or_insert({3}) = 3; assert(map.count == 4);
-        assert(*map.find({0}) == 0);
-        assert(*map.find({1}) == 1);
-        assert(*map.find({2}) == 2);
-        assert(*map.find({3}) == 3);
+        assert(map.find({0})->value == 0);
+        assert(map.find({1})->value == 1);
+        assert(map.find({2})->value == 2);
+        assert(map.find({3})->value == 3);
         assert(!map.find({4}));
         assert(!map.find({5}));
         assert(!map.find({6}));

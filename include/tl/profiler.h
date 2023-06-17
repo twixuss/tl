@@ -52,13 +52,13 @@ struct TL_API Profiler {
 	bool enabled = true;
 
 	List<Mark> marks;
-	Mutex marks_mutex;
+	SpinLock marks_lock;
 
 	List<TimeSpan> recorded_time_spans;
-	Mutex recorded_time_spans_mutex;
+	SpinLock recorded_time_spans_lock;
 
 	HashMap<u32, ThreadInfo> thread_infos;
-	Mutex thread_infos_mutex;
+	SpinLock thread_infos_lock;
 
 	s64 start_time;
 
@@ -131,7 +131,7 @@ void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
 
 	u32 thread_id = get_current_thread_id();
 
-	auto &info = with(thread_infos_mutex, thread_infos.get_or_insert(thread_id));
+	auto &info = with(thread_infos_lock, thread_infos.get_or_insert(thread_id));
 
 	auto &span = info.time_spans.add();
 	span.name = name;
@@ -151,7 +151,7 @@ void Profiler::end() {
 	auto end_counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
-	auto found = with(thread_infos_mutex, thread_infos.find(thread_id));
+	auto found = with(thread_infos_lock, thread_infos.find(thread_id));
 	assert(found);
 
 	auto info = &found->value;
@@ -166,15 +166,15 @@ void Profiler::end() {
 	span.end = end_counter;
 #endif
 
-	with(recorded_time_spans_mutex, recorded_time_spans.add(span));
+	with(recorded_time_spans_lock, recorded_time_spans.add(span));
 
 #if TL_PROFILER_SUBTRACT_SELF_TIME
 	info->self_time += get_performance_counter() - end_counter;
 #endif
 }
 void Profiler::mark(Span<utf8> name, u32 color) {
-	scoped_lock(thread_infos_mutex);
-	scoped_lock(marks_mutex);
+	scoped(thread_infos_lock);
+	scoped(marks_lock);
 	auto found = thread_infos.find(get_current_thread_id());
 	assert(found);
 	auto info = &found->value;

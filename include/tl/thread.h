@@ -226,8 +226,8 @@ void loop_until(Predicate &&predicate) {
 }
 
 struct SyncPoint {
-	u32 target_thread_count;
-	u32 volatile synced_thread_count;
+	u32 target_thread_count = 0;
+	u32 volatile synced_thread_count = 0;
 };
 
 inline SyncPoint create_sync_point(u32 thread_count) {
@@ -303,8 +303,7 @@ struct LockProtected {
 	T _value;
 };
 
-// `decltype(name)::Value` instead of `auto` breaks visual studio...
-#define locked_use(name) name * [&] (auto &name)
+#define locked_use(name) name * [&](auto &name)
 
 template <class T, class Lock>
 struct LockQueue : LockProtected<Queue<T>, Lock> {
@@ -313,10 +312,13 @@ struct LockQueue : LockProtected<Queue<T>, Lock> {
 			queue.push(value);
 		});
 	}
-	Optional<T> try_pop() {
+	Optional<T> pop() {
 		return this->use([&](Queue<T> &queue) {
 			return queue.pop();
 		});
+	}
+	umm count() {
+		return this->use_unprotected().count;
 	}
 };
 
@@ -375,203 +377,166 @@ struct Scoped<RecursiveSpinLock> {
 	}
 };
 
-struct WorkQueue;
-
-struct ThreadWork {
-	WorkQueue *queue;
-	void (*fn)(void *param);
-	void *param;
-};
-
 struct ThreadPool {
+	struct Task {
+		ThreadPool *pool = 0;
+		void (*fn)(void *param) = 0;
+		void *param = 0;
+
+		inline void run() {
+			assert(fn);
+			assert(pool);
+
+			fn(param);
+			pool->allocator.free(param);
+			atomic_increment(&pool->finished_task_count);
+		}
+	};
+
 	Allocator allocator = current_allocator;
 	List<Thread *> threads;
-	u32 thread_count = 0;
-	u32 volatile initialized_thread_count = 0;
-	u32 volatile dead_thread_count = 0;
-	bool volatile running = false;
+
+	SyncPoint start_sync_point;
+	u32 volatile stopped_thread_count = 0;
 	bool volatile stopping = false;
-	LockQueue<ThreadWork, SpinLock> all_work;
+	LockQueue<Task, SpinLock> tasks;
 
-	u32 volatile started_work_count = 0;
-	u32 volatile finished_work_count = 0;
-};
-bool try_do_work(ThreadPool *pool);
+	u32 volatile started_task_count = 0;
+	u32 volatile finished_task_count = 0;
 
-struct WorkQueue {
-	ThreadPool *pool = 0;
-	u32 volatile work_to_do = 0;
-
-#if TL_DEBUG
-	bool debug_finished = true;
-	~WorkQueue() {
-		assert(debug_finished, "WorkQueue can not be destroyed until all it's work is finished.");
-	}
-#endif
 
 	inline void push(void (*fn)(void *param), void *param) {
-#if TL_DEBUG
-		debug_finished = false;
-#endif
-		atomic_increment(&pool->started_work_count);
-		if (pool->thread_count) {
-			atomic_add(&work_to_do, 1);
-			ThreadWork work;
-			work.fn = fn;
-			work.param = param;
-			work.queue = this;
-			pool->all_work.push(work);
-		} else {
-			fn(param);
-			atomic_increment(&pool->finished_work_count);
-		}
+		atomic_increment(&started_task_count);
+		tasks.push({
+			.pool = this,
+			.fn = fn,
+			.param = param,
+		});
 	}
 	template <class Fn, class ...Args>
 	void push(Fn &&fn, Args &&...args) {
-		if (pool->thread_count) {
-			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-			auto fnParams = pool->allocator.allocate_uninitialized<Tuple>();
-			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
-			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-			push((void (*)(void *))invokerProc, (void *)fnParams);
-		} else {
-			std::invoke(fn, std::forward<Args>(args)...);
-		}
+		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+		auto fnParams = allocator.allocate_uninitialized<Tuple>();
+		new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+		constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+		push((void (*)(void *))invokerProc, (void *)fnParams);
 	}
 	template <class Fn>
-	WorkQueue &operator+=(Fn &&fn) {
+	auto &operator+=(Fn &&fn) {
 		push(std::forward<Fn>(fn));
 		return *this;
 	}
-	inline void wait_for_completion() {
-		if (pool->thread_count) {
-			loop_until([&] {
-				try_do_work(pool);
-				return work_to_do == 0;
-			});
-#if TL_DEBUG
-			debug_finished = true;
-#endif
+
+	inline bool pop_and_run_task() {
+		if (auto popped = tasks.pop()) {
+			popped.value_unchecked().run();
+			return true;
 		}
+		return false;
 	}
 
+	inline void wait_for_completion(bool run_tasks = true) {
+		loop_while([&] {
+			if (run_tasks)
+				pop_and_run_task();
+			return finished_task_count < started_task_count;
+		});
+	}
+
+	inline static void default_worker_proc(ThreadPool *pool) {
+
+		sync(pool->start_sync_point);
+
+		while (1) {
+			Optional<ThreadPool::Task> task;
+			loop_while([&] {
+				if (pool->stopping) {
+					return false;
+				}
+				if (auto popped = pool->tasks.pop()) {
+					task = popped.value_unchecked();
+					assert(task.value_unchecked().fn);
+					assert(task.value_unchecked().pool);
+					return false;
+				}
+				return true;
+			});
+
+			if (task) {
+				task.value_unchecked().run();
+			} else {
+				break;
+			}
+		}
+		atomic_add(&pool->stopped_thread_count, 1);
+	}
+
+#if TL_DEBUG
+	~ThreadPool() {
+		assert(stopping, "ThreadPool was not properly deinitted. Call `deinit_thread_pool`.");
+	}
+#endif
 };
 
-inline WorkQueue make_work_queue(ThreadPool &pool) {
-	WorkQueue result = {};
-	result.pool = &pool;
-	return result;
-}
+struct InitThreadPoolParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(ThreadPool *pool) = ThreadPool::default_worker_proc;
+};
 
-inline void do_work(ThreadWork work) {
-	assert(work.fn);
-	assert(work.queue);
-	assert(work.queue->pool);
-
-	work.fn(work.param);
-	work.queue->pool->allocator.free(work.param);
-	atomic_increment(&work.queue->pool->finished_work_count);
-
-	// NOTE: Because the queue may be immediately destroyed after work_to_do reaches 0,
-	// this must happen after incrementing finished_work_count
-	atomic_add(&work.queue->work_to_do, (u32)-1);
-}
-inline bool try_do_work(ThreadPool *pool) {
-	if (auto popped = pool->all_work.try_pop()) {
-		do_work(popped.value_unchecked());
-		return true;
-	}
-	return false;
-}
-inline bool do_work(ThreadPool *pool) {
-	ThreadWork work = {};
-	loop_until([&] {
-		if (pool->stopping) {
-			return true;
-		}
-		if (auto popped = pool->all_work.try_pop()) {
-			work = popped.value_unchecked();
-			return true;
-		}
-		return false;
-	});
-	if (work.fn) {
-		do_work(work);
-		return true;
-	} else {
-		return false;
-	}
-}
-
-inline void default_thread_pool_proc(ThreadPool *pool) {
-	atomic_add(&pool->initialized_thread_count, 1);
-	loop_until([&] { return pool->running || pool->stopping; });
-	while (1) {
-		if (!do_work(pool))
-			break;
-	}
-	atomic_add(&pool->dead_thread_count, 1);
-}
-template <class ThreadProc = decltype(default_thread_pool_proc)>
-bool init_thread_pool(ThreadPool &pool, u32 thread_count, ThreadProc &&thread_proc = default_thread_pool_proc) {
-	pool.initialized_thread_count = 0;
-	pool.dead_thread_count = 0;
-	pool.running = false;
-	pool.stopping = false;
-	pool.thread_count = thread_count;
-	pool.allocator =
-	pool.threads.allocator =
-	pool.all_work.use_unprotected().allocator =
+inline bool init_thread_pool(ThreadPool *pool, u32 thread_count, InitThreadPoolParams params = {}) {
+	pool->start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
+	pool->stopped_thread_count = 0;
+	pool->stopping = false;
+	pool->allocator =
+	pool->threads.allocator =
+	pool->tasks.use_unprotected().allocator =
 	current_allocator;
 	if (thread_count) {
-		pool.threads.reserve(thread_count);
+		pool->threads.reserve(thread_count);
 
-		struct StartParams {
+		struct StartInfo {
 			ThreadPool *pool;
-			ThreadProc *proc;
+			void (*init)();
+			void (*proc)(ThreadPool *pool);
 		};
-		StartParams params;
-		params.pool = &pool;
-		params.proc = std::addressof(thread_proc);
+		StartInfo info;
+		info.pool = pool;
+		info.init = params.worker_initter;
+		info.proc = params.worker_proc;
 
 		auto start_proc = [](Thread *thread) {
-			StartParams *info = (StartParams *)thread->param;
+			StartInfo *info = (StartInfo *)thread->param;
+			(*info->init)();
 			(*info->proc)(info->pool);
 		};
 
 		for (u32 i = 0; i < thread_count; ++i) {
-			auto thread = create_thread(+start_proc, (void *)&params);
+			auto thread = create_thread(+start_proc, (void *)&info);
 			if (!valid(thread)) {
-				pool.stopping = true;
-				for (auto t : pool.threads) {
+				pool->stopping = true;
+				for (auto t : pool->threads) {
 					free(t);
 				}
-				pool.threads.clear();
+				pool->threads.clear();
 				return false;
 			}
-			pool.threads.add(thread);
+			pool->threads.add(thread);
 		}
 
-		loop_until([&] {
-			return pool.initialized_thread_count == pool.thread_count;
-		});
-		pool.running = true;
+		sync(pool->start_sync_point);
+
 	} else {
-		pool.threads.clear();
+		pool->threads.clear();
 	}
 
 	return true;
 }
-inline void deinit_thread_pool(ThreadPool *pool, bool waitForThreads = true) {
+inline void deinit_thread_pool(ThreadPool *pool, bool wait_for_threads = true) {
 	pool->stopping = true;
-	if (waitForThreads) {
-		loop_until([&] { return pool->dead_thread_count == pool->thread_count; });
+	if (wait_for_threads) {
+		pool->wait_for_completion(false);
 	}
 	pool->threads.clear();
-}
-
-inline void wait_for_completion(ThreadPool &pool) {
-	loop_while([&]{ return pool.started_work_count != pool.finished_work_count; });
 }
 
 } // namespace tl

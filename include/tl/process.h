@@ -92,7 +92,7 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.hInstApp = NULL;
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
-		with(ConsoleColor::red, print("ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error));
+		with(ConsoleColor::red, errln("ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error));
 		return {};
 	}
 
@@ -121,6 +121,7 @@ void terminate(Process process) {
 
 void free(Process &process) {
 	CloseHandle((HANDLE)process.handle);
+	free(process.standard_out);
 	process = {};
 }
 
@@ -129,21 +130,18 @@ struct StdoutStream : Stream {
 	void *handle;
 	umm read(Span<u8> destination) {
 		DWORD bytes_read;
-		ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0);
+		if (!ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0))
+			return 0;
 		return bytes_read;
 	}
-	umm write(Span<u8> source) { (void)source; invalid_code_path("unavailable"); return {}; }
-	umm remaining_bytes() { invalid_code_path("unavailable"); return {}; }
 	void free() {
 		CloseHandle(handle);
 	}
 };
 
 Process start_process(utf16 const *command_line) {
-
-
 	SECURITY_ATTRIBUTES saAttr;
-	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.nLength = sizeof(saAttr);
 	saAttr.bInheritHandle = TRUE;
 	saAttr.lpSecurityDescriptor = NULL;
 
@@ -166,7 +164,7 @@ Process start_process(utf16 const *command_line) {
 	PROCESS_INFORMATION piProcInfo = {};
 
 	STARTUPINFOW siStartInfo = {};
-	siStartInfo.cb = sizeof(STARTUPINFO);
+	siStartInfo.cb = sizeof(siStartInfo);
 	siStartInfo.hStdError = child_stdout_write;
 	siStartInfo.hStdOutput = child_stdout_write;
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
@@ -180,7 +178,7 @@ Process start_process(utf16 const *command_line) {
 		NULL,          // use parent's environment
 		NULL,          // use parent's current directory
 		&siStartInfo,  // STARTUPINFO pointer
-		&piProcInfo)  // receives PROCESS_INFORMATION
+		&piProcInfo)   // receives PROCESS_INFORMATION
 	) {
 		free(child_stdout_stream);
 		return {};
