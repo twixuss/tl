@@ -577,7 +577,7 @@ struct ContiguousHashMap : Traits {
 	}
 
 	umm step(umm index, umm cells_count) const {
-		return (index + 2) & (cells_count - 1);
+		return (index + 1) & (cells_count - 1);
 	}
 
 	Value &insert_into(Span<Cell> cells, Key key, Value value) {
