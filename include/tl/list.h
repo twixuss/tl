@@ -48,30 +48,30 @@ struct List : Span<T, Size_> {
 		memcpy(data, span.data, span.count * sizeof(T));
 	}
 	T &add(TL_LPC) {
-		reserve_exponential(count + 1 TL_LA);
+		auto resized = reserve_exponential(count + 1 TL_LA);
 		return *new (data + count++) T();
 	}
 	T &add(T value TL_LP) {
-		reserve_exponential(count + 1 TL_LA);
+		auto resized = reserve_exponential(count + 1 TL_LA);
 		memcpy(data + count, &value, sizeof(T));
 		return data[count++];
 	}
 	template <class Size>
 	tl::Span<T> add(tl::Span<T, Size> span TL_LP) {
-		reserve_exponential(count + span.count TL_LA);
+		auto resized = reserve_exponential(count + span.count TL_LA);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		count += span.count;
 		return {data + count - span.count, span.count};
 	}
 	Span add(std::initializer_list<T> list TL_LP) {
-		reserve_exponential(count + list.size() TL_LA);
+		auto resized = reserve_exponential(count + list.size() TL_LA);
 		memcpy(data + count, list.begin(), list.size() * sizeof(T));
 		count += list.size();
 		return {data + count - list.size(), (Size)list.size()};
 	}
 
 	T &add_front(T value TL_LP) {
-		reserve_exponential(count + 1 TL_LA);
+		auto resized = reserve_exponential(count + 1 TL_LA);
 		for (Size i = count; i > 0; --i) {
 			data[i] = data[i - 1];
 		}

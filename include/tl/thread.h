@@ -285,22 +285,23 @@ struct LockProtected {
 	using Value = T;
 
 	LockProtected() = default;
-	LockProtected(T value) : _value(value) {
+	LockProtected(T value) : value(value) {
 	}
 
 	template <class Fn>
 	decltype(auto) use(Fn fn) {
-		scoped(_lock);
-		return fn(_value);
+		scoped(lock);
+		return fn(value);
 	}
 
 	template <class Fn>
 	decltype(auto) operator * (Fn fn) { return use(fn); }
 
-	T &use_unprotected() { return _value; }
+	T &use_unprotected() { return value; }
 
-	Lock _lock;
-	T _value;
+private:
+	Lock lock;
+	T value;
 };
 
 #define locked_use(name) name * [&](auto &name)

@@ -2549,89 +2549,93 @@ void rotate(Span<T> span, smm to_be_first_index) {
 #endif
 #endif
 
-Allocator os_allocator = {
-	.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
-		(void)old_size;
-		(void)state;
+AllocationResult os_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+	(void)old_size;
+	(void)state;
 #if TL_PARENT_SOURCE_LOCATION
-		(void)location;
+	(void)location;
 #endif
-		switch (action) {
-			case Allocator_allocate: {
-				return {
-					.data = tl_allocate(new_size, align),
-					.count = new_size,
-					.is_zeroed = false,
-				};
-			}
-			case Allocator_reallocate: {
-				return {
-					.data = tl_reallocate(data, new_size, align),
-					.count = new_size,
-					.is_zeroed = false,
-				};
-			}
-			case Allocator_free:
-				tl_free(data);
-				return {};
+	switch (action) {
+		case Allocator_allocate: {
+			return {
+				.data = tl_allocate(new_size, align),
+				.count = new_size,
+				.is_zeroed = false,
+			};
 		}
-		return {};
-	},
+		case Allocator_reallocate: {
+			return {
+				.data = tl_reallocate(data, new_size, align),
+				.count = new_size,
+				.is_zeroed = false,
+			};
+		}
+		case Allocator_free:
+			tl_free(data);
+			return {};
+	}
+	return {};
+}
+
+AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+	(void)state;
+#if TL_PARENT_SOURCE_LOCATION
+	(void)location;
+#endif
+	switch (action) {
+		case Allocator_allocate: {
+			assert(align <= 4096);
+			return {
+				.data = VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
+				.count = new_size / 4096 * 4096,
+				.is_zeroed = true,
+			};
+		}
+		case Allocator_reallocate: {
+			assert(align <= 4096);
+
+			if (old_size / 4096 == new_size / 4096) {
+				return {
+					.data = data,
+					.count = new_size,
+					.is_zeroed = true,
+				};
+			}
+
+			auto ceiled_old_size = ceil(old_size, (umm)4096);
+			auto ceiled_new_size = ceil(new_size, (umm)4096);
+
+			if (VirtualAlloc((u8 *)data + ceiled_old_size, ceiled_new_size - ceiled_old_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
+				return {
+					.data = data,
+					.count = new_size,
+					.is_zeroed = true,
+				};
+			}
+
+			auto new_data = VirtualAlloc(0, ceiled_new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+			memcpy(new_data, data, old_size);
+			VirtualFree(data, 0, MEM_RELEASE);
+
+			return {
+				.data = new_data,
+				.count = ceiled_new_size,
+				.is_zeroed = true,
+			};
+		}
+		case Allocator_free:
+			VirtualFree(data, 0, MEM_RELEASE);
+			return {};
+	}
+	return {};
+}
+
+Allocator os_allocator = {
+	.func = os_allocator_proc,
 	.state = 0
 };
 Allocator page_allocator = {
-	.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
-		(void)state;
-#if TL_PARENT_SOURCE_LOCATION
-		(void)location;
-#endif
-		switch (action) {
-			case Allocator_allocate: {
-				assert(align <= 4096);
-				return {
-					.data = VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
-					.count = new_size / 4096 * 4096,
-					.is_zeroed = true,
-				};
-			}
-			case Allocator_reallocate: {
-				assert(align <= 4096);
-
-				if (old_size / 4096 == new_size / 4096) {
-					return {
-						.data = data,
-						.count = new_size,
-						.is_zeroed = true,
-					};
-				}
-
-				auto ceiled_old_size = ceil(old_size, (umm)4096);
-				auto ceiled_new_size = ceil(new_size, (umm)4096);
-
-				if (VirtualAlloc((u8 *)data + ceiled_old_size, ceiled_new_size - ceiled_old_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
-					return {
-						.data = data,
-						.count = new_size,
-						.is_zeroed = true,
-					};
-				}
-
-				auto new_data = VirtualAlloc(0, ceiled_new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
-				memcpy(new_data, data, old_size);
-				VirtualFree(data, 0, MEM_RELEASE);
-
-				return {
-					.data = new_data,
-					.count = ceiled_new_size,
-					.is_zeroed = true,
-				};
-			}
-			case Allocator_free:
-				VirtualFree(data, 0, MEM_RELEASE);
-				return {};
-		}
-		return {};
-	},
+	.func = page_allocator_proc,
 	.state = 0
 };
 Allocator default_allocator = os_allocator;
