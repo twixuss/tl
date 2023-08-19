@@ -3,6 +3,7 @@
 #include "buffer.h"
 #include "string.h"
 #include "list_list.h"
+#include "logger.h"
 
 namespace tl {
 
@@ -481,15 +482,19 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 File open_file(ascii const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
-	if (handle == INVALID_HANDLE_VALUE)
+	if (handle == INVALID_HANDLE_VALUE) {
+		tl_logger.error("Could not open file {}", path);
 		handle = 0;
+	}
 	return {handle};
 }
 File open_file(pathchar const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
-	if (handle == INVALID_HANDLE_VALUE)
+	if (handle == INVALID_HANDLE_VALUE) {
+		tl_logger.error("Could not open file {}", path);
 		handle = 0;
+	}
 	return {handle};
 }
 

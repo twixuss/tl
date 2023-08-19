@@ -22,7 +22,7 @@
 #endif
 
 #ifndef ASSERTION_FAILURE
-#define ASSERTION_FAILURE(cause_string, expression, ...) debug_break()
+#define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
 #define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
@@ -1152,8 +1152,6 @@ struct Span {
 		return lerp(a, b, frac(i));
 	}
 
-	[[deprecated("use is_empty instead")]]
-	constexpr bool empty() const { return count == 0; }
 	constexpr bool is_empty() const { return count == 0; }
 
 	template <class U, class ThatSize>
