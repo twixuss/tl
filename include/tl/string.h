@@ -21,6 +21,18 @@
 // Testing get_char_and_advance_utf8_fast ... 1488.426 ms
 //
 
+// 
+// If you want to print your type or write it to a string builder:
+/*
+umm append(StringBuilder &builder, YourType t) {
+	return append_format(builder, "({} {})", t.first, t.second);
+}
+*/
+// This function should return the number of bytes written.
+// Note that a lot of other functions like `print` or `format` use `scoped(temporary_storage_checkpoint)` for better memory utilization.
+// With that make sure you don't make temporary allocations and use them after `append`.
+//
+
 #include "common.h"
 #include "list.h"
 #include "optional.h"
@@ -40,11 +52,6 @@ List<T, Allocator, Size> null_terminate(Span<T, Size> span) {
 	memcpy(result.data, span.data, span.count * sizeof(T));
 	result.data[result.count - 1] = {};
 	return result;
-}
-
-template <class T, class Size>
-forceinline List<T, Allocator, Size> temporary_null_terminate(Span<T, Size> span) {
-	return with(temporary_allocator, null_terminate(span));
 }
 
 inline u32 character_to_digit(utf32 character, u32 base) {

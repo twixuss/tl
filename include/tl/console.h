@@ -24,6 +24,7 @@ struct Printer {
 
 	template <class ...T>
 	inline umm write(char const *fmt, T const &...args) {
+		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 		append_format(builder, fmt, args...);
@@ -32,6 +33,7 @@ struct Printer {
 
 	template <class T>
 	inline umm write(T const &value) {
+		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 		append(builder, value);
@@ -40,6 +42,7 @@ struct Printer {
 
 	template <class ...T>
 	inline umm writeln(char const *fmt, T const &...args) {
+		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 		append_format(builder, fmt, args...);
@@ -49,6 +52,7 @@ struct Printer {
 
 	template <class T>
 	inline umm writeln(T const &value) {
+		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 		append(builder, value);
@@ -99,6 +103,7 @@ inline void set_console_color(ConsoleColor foreground) {
 
 template <class T>
 inline umm print(T const &value) {
+	scoped(temporary_storage_checkpoint);
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append(builder, value);
@@ -115,6 +120,7 @@ template <class Size> inline umm print(List<utf8> const &list) { current_printer
 
 template <class ...Args>
 inline umm print(utf8 const *fmt, Args const &...args) {
+	scoped(temporary_storage_checkpoint);
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append_format(builder, fmt, args...);

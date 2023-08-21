@@ -39,9 +39,9 @@ inline bool is_valid(File file) {
 TL_API File open_file(ascii const *path, OpenFileParams params);
 TL_API File open_file(utf16 const *path, OpenFileParams params);
 
-inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(temporary_null_terminate(path).data, params); }
-inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(temporary_null_terminate(path).data, params); }
-inline File open_file(Span<utf8> path, OpenFileParams params) { return open_file(with(temporary_allocator, to_utf16(path, true).data), params); }
+inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(with(temporary_allocator, null_terminate(path)).data, params); }
+inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(with(temporary_allocator, null_terminate(path)).data, params); }
+inline File open_file(Span<utf8> path, OpenFileParams params) { return with(temporary_allocator_and_checkpoint, open_file(to_utf16(path, true).data, params)); }
 
 TL_API void close(File file);
 
@@ -57,22 +57,22 @@ TL_API bool file_exists(ascii const *path);
 TL_API bool file_exists(utf16 const *path);
 
 inline bool file_exists(Span<ascii> path) {
-	return file_exists(temporary_null_terminate(path).data);
+	return file_exists(with(temporary_allocator, null_terminate(path)).data);
 }
 inline bool file_exists(Span<utf8> path) {
-	return file_exists(with(temporary_allocator, to_utf16(path, true)).data);
+	return with(temporary_allocator_and_checkpoint, file_exists(to_utf16(path, true).data));
 }
 inline bool file_exists(Span<utf16> path) {
-	return file_exists(temporary_null_terminate(path).data);
+	return file_exists(with(temporary_allocator, null_terminate(path)).data);
 }
 
 TL_API bool directory_exists(ascii const *path);
 TL_API bool directory_exists(utf16 const *path);
 inline bool directory_exists(Span<utf16> path) {
-	return directory_exists(temporary_null_terminate(path).data);
+	return directory_exists(with(temporary_allocator, null_terminate(path)).data);
 }
 inline bool directory_exists(Span<utf8> path) {
-	return directory_exists(with(temporary_allocator, to_utf16(path, true)).data);
+	return with(temporary_allocator_and_checkpoint, directory_exists(to_utf16(path, true).data));
 }
 forceinline bool directory_exists(Span<ascii> path) {
 	return directory_exists((Span<utf8>)path);
@@ -157,10 +157,10 @@ inline Optional<u64> get_file_write_time(pathchar const *path) {
 	return get_file_write_time(file);
 }
 inline Optional<u64> get_file_write_time(Span<pathchar> path) {
-	return get_file_write_time(temporary_null_terminate(path).data);
+	return get_file_write_time(with(temporary_allocator, null_terminate(path)).data);
 }
 inline Optional<u64> get_file_write_time(Span<utf8> path) {
-	return get_file_write_time(with(temporary_allocator, to_pathchars(path, true).data));
+	return with(temporary_allocator_and_checkpoint, get_file_write_time(to_pathchars(path, true).data));
 }
 
 
@@ -194,22 +194,22 @@ TL_API FileItemList get_items_in_directory(Span<utf8> directory);
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
-	return create_file(temporary_null_terminate(path).data);
+	return create_file(with(temporary_allocator, null_terminate(path)).data);
 }
 
 TL_API void delete_file(pathchar const *path);
 inline void delete_file(Span<pathchar> path) {
-	return delete_file(temporary_null_terminate(path).data);
+	return delete_file(with(temporary_allocator, null_terminate(path)).data);
 }
 inline void delete_file(Span<utf8> path) {
-	return delete_file(with(temporary_allocator, to_utf16(path, true)).data);
+	return with(temporary_allocator_and_checkpoint, delete_file(to_utf16(path, true).data));
 }
 
 TL_API bool create_directory(ascii const *path);
 TL_API bool create_directory(utf16 const *path);
-inline bool create_directory(Span<ascii> path) { return create_directory(temporary_null_terminate(path).data); }
-inline bool create_directory(Span<utf8>  path) { return create_directory(with(temporary_allocator, to_utf16(path, true)).data); }
-inline bool create_directory(Span<utf16> path) { return create_directory(temporary_null_terminate(path).data); }
+inline bool create_directory(Span<ascii> path) { return with(temporary_allocator_and_checkpoint, create_directory(null_terminate(path).data)); }
+inline bool create_directory(Span<utf8>  path) { return with(temporary_allocator_and_checkpoint, create_directory(to_utf16(path, true).data)); }
+inline bool create_directory(Span<utf16> path) { return with(temporary_allocator_and_checkpoint, create_directory(null_terminate(path).data)); }
 
 struct FileState {
 	bool changed : 1;
@@ -268,10 +268,10 @@ TL_API Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Spa
 TL_API List<utf8> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
 inline void set_current_directory(Span<pathchar> path) {
-	return set_current_directory(temporary_null_terminate(path).data);
+	return set_current_directory(with(temporary_allocator, null_terminate(path)).data);
 }
 inline void set_current_directory(Span<utf8> path) {
-	return set_current_directory(with(temporary_allocator, to_utf16(path, true)).data);
+	return with(temporary_allocator_and_checkpoint, set_current_directory(to_utf16(path, true).data));
 }
 
 struct MappedFile {
@@ -376,6 +376,7 @@ inline List<utf8> make_absolute_path(Span<utf8> path) {
 		if (path.data[1] == ':')
 			return to_list(path);
 	}
+	scoped(temporary_storage_checkpoint);
 	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, path);
 }
 
@@ -407,14 +408,18 @@ inline bool create_directories(Span<utf8> path) {
 
 TL_API bool copy_file(pathchar const *source, pathchar const *destination);
 inline bool copy_file(Span<utf8> source, Span<utf8> destination) {
-	return copy_file(with(temporary_allocator, to_pathchars(source, true).data), with(temporary_allocator, to_pathchars(destination, true).data));
+	scoped(temporary_storage_checkpoint);
+	return copy_file(
+		with(temporary_allocator, to_pathchars(source, true).data), 
+		with(temporary_allocator, to_pathchars(destination, true).data)
+	);
 }
 
 template <class Fn>
 void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
 	auto items = get_items_in_directory(with(temporary_allocator, to_pathchars(directory)));
 	for (auto &item : items) {
-		auto item_path = with(temporary_allocator, concatenate(directory, u8'/', with(temporary_allocator, to_utf8(item.name))));
+		auto item_path = with(temporary_allocator, concatenate(directory, u8'/', to_utf8(item.name)));
 		if (item.kind == FileItem_directory) {
 			for_each_file_recursive(item_path, std::forward<Fn>(fn));
 		} else {
@@ -432,7 +437,12 @@ struct MoveFileParams {
 
 TL_API bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params = {});
 inline bool move_file(Span<utf8> old, Span<utf8> _new, MoveFileParams params = {}) {
-	return move_file(with(temporary_allocator, to_pathchars(old, true).data), with(temporary_allocator, to_pathchars(_new, true).data), params);
+	scoped(temporary_storage_checkpoint);
+	return move_file(
+		with(temporary_allocator, to_pathchars(old, true).data), 
+		with(temporary_allocator, to_pathchars(_new, true).data),
+		params
+	);
 }
 
 template <class T>

@@ -2348,6 +2348,28 @@ struct Allocator : AllocatorBase<Allocator> {
 	}
 };
 
+// This library provides a temporary allocator, which you can use for fast allocations.
+// It is a very simple implementation, which just bumps a cursor. This of course means you can't just free
+// a portion of memory at arbitrary time and reuse it, but you can:
+//     1. Clear the entire temporary storage.
+//     2. Remember the cursor, do some allocations, reset the cursor.
+// 
+// Previously, temporary allocator used to create a new block if it ran out of space.
+// But that added some complexity to `allocate` function, and made it easy to forget
+// how much memory was used. For these reasons I decided to make it use a single block
+// of predefined size (TL_TEMPORARY_STORAGE_CAPACITY), which you can override.
+//
+// You can use this allocator as a regular one, e.g. in collections, etc.
+// 
+// Use `scoped(temporary_allocator)` to make temporary allocator current in the current scope.
+//
+// Optionally you can use `scoped(temporary_storage_checkpoint)` to remember the cursor and 
+// reset it to its previous state at the end of the scope. That way more memory space is utilized.
+// But you need to know the lifetimes.
+//
+// Use `scoped(temporary_allocator_and_checkpoint)` to use them both.
+//
+
 #ifndef TL_TEMPORARY_STORAGE_CAPACITY
 #define TL_TEMPORARY_STORAGE_CAPACITY (1 * MiB)
 #endif
@@ -2385,9 +2407,16 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 			.state = this
 		};
 	}
+
+	forceinline static void clear() {
+		cursor = base;
+	}
 };
 
 extern TL_API thread_local TemporaryAllocator temporary_allocator;
+
+inline struct TemporaryStorageCheckpoint {} temporary_storage_checkpoint;
+inline struct TemporaryAllocatorAndCheckpoint {} temporary_allocator_and_checkpoint;
 
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
@@ -2497,11 +2526,39 @@ struct Scoped<Allocator> {
 template <>
 struct Scoped<TemporaryAllocator> {
 	Allocator old_allocator;
-	Scoped(TemporaryAllocator new_allocator) {
+	Scoped(TemporaryAllocator) {
 		old_allocator = current_allocator;
-		current_allocator = new_allocator;
+		current_allocator = temporary_allocator;
 	}
 	~Scoped() {
+		current_allocator = old_allocator;
+	}
+};
+
+template <>
+struct Scoped<TemporaryStorageCheckpoint> {
+	u8 *initial_cursor = 0;
+
+	Scoped(TemporaryStorageCheckpoint) {
+		initial_cursor = temporary_allocator.cursor;
+	}
+	~Scoped() {
+		temporary_allocator.cursor = initial_cursor;
+	}
+};
+
+template <>
+struct Scoped<TemporaryAllocatorAndCheckpoint> {
+	Allocator old_allocator;
+	u8 *initial_cursor = 0;
+
+	Scoped(TemporaryAllocatorAndCheckpoint) {
+		old_allocator = current_allocator;
+		current_allocator = temporary_allocator;
+		initial_cursor = temporary_allocator.cursor;
+	}
+	~Scoped() {
+		temporary_allocator.cursor = initial_cursor;
 		current_allocator = old_allocator;
 	}
 };
@@ -2510,6 +2567,9 @@ template <class T>
 void rotate(Span<T> span, T *to_be_first) {
 	umm left_count = to_be_first - span.data;
 	umm right_count = span.count - left_count;
+
+	auto initial_cursor = temporary_allocator.cursor;
+	defer { temporary_allocator.cursor = initial_cursor; };
 
 	if (right_count < left_count) {
 		T *temp = temporary_allocator.allocate_uninitialized<T>(right_count);
