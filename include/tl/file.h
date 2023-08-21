@@ -159,6 +159,9 @@ inline Optional<u64> get_file_write_time(pathchar const *path) {
 inline Optional<u64> get_file_write_time(Span<pathchar> path) {
 	return get_file_write_time(temporary_null_terminate(path).data);
 }
+inline Optional<u64> get_file_write_time(Span<utf8> path) {
+	return get_file_write_time(with(temporary_allocator, to_pathchars(path, true).data));
+}
 
 
 TL_API ListList<pathchar> get_file_names_in_directory(Span<pathchar> directory);
@@ -430,6 +433,29 @@ struct MoveFileParams {
 TL_API bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params = {});
 inline bool move_file(Span<utf8> old, Span<utf8> _new, MoveFileParams params = {}) {
 	return move_file(with(temporary_allocator, to_pathchars(old, true).data), with(temporary_allocator, to_pathchars(_new, true).data), params);
+}
+
+template <class T>
+inline void visit_files(Span<utf8> directory, T &&process_file) requires requires(T x) { { x(Span<utf8>{}) } -> std::convertible_to<ForEachDirective>; } {
+	auto outer_allocator = current_allocator;
+	scoped(temporary_allocator);
+
+	auto list = get_items_in_directory(directory);
+
+	for (auto item : list) {
+		auto item_path = format(u8"{}\\{}", directory, item.name);
+		switch (item.kind) {
+			case FileItem_file: {
+				scoped(outer_allocator);
+				process_file(item_path);
+				break;
+			}
+			case FileItem_directory: {
+				visit_files(item_path, process_file);
+				break;
+			}
+		}
+	}
 }
 
 }
