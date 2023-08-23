@@ -232,6 +232,123 @@ forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_3d;
 }
 
+// Thanks https://www.ronja-tutorials.com/post/028-voronoi-noise/
+forceinline f32 voronoi_edge_v3f(v3f coordinate){
+	v3f baseCell = floor(coordinate);
+
+	//first pass to find the closest cell
+	float minDistToCell = 10;
+	v3f toClosestCell;
+	v3f closestCell;
+	for(f32 x1=-1; x1<=1; x1++){
+		for(f32 y1=-1; y1<=1; y1++){
+			for(f32 z1=-1; z1<=1; z1++){
+				v3f cell = baseCell + v3f{x1, y1, z1};
+				v3f cellPosition = cell + random_v3f(cell);
+				v3f toCell = cellPosition - coordinate;
+				float distToCell = length(toCell);
+				if(distToCell < minDistToCell){
+					minDistToCell = distToCell;
+					closestCell = cell;
+					toClosestCell = toCell;
+				}
+			}
+		}
+	}
+
+	//second pass to find the distance to the closest edge
+	float minEdgeDistance = 10;
+	for(f32 x2=-1; x2<=1; x2++){
+		for(f32 y2=-1; y2<=1; y2++){
+			for(f32 z2=-1; z2<=1; z2++){
+				v3f cell = baseCell + v3f{x2, y2, z2};
+				v3f cellPosition = cell + random_v3f(cell);
+				v3f toCell = cellPosition - coordinate;
+
+				v3f diffToClosestCell = absolute(closestCell - cell);
+				bool isClosestCell = diffToClosestCell.x + diffToClosestCell.y + diffToClosestCell.z < 0.1;
+				if(!isClosestCell){
+					v3f toCenter = (toClosestCell + toCell) * 0.5;
+					v3f cellDifference = normalize(toCell - toClosestCell);
+					float edgeDistance = dot(toCenter, cellDifference);
+					minEdgeDistance = min(minEdgeDistance, edgeDistance);
+				}
+			}
+		}
+	}
+
+	return minEdgeDistance;
+}
+
+template <class RandomV3f = decltype([](v3f x) { return tl::random_v3f(x); })>
+forceinline f32 voronoi_line_v3f(v3f coordinate, RandomV3f random_v3f = {}) {
+	v3f tile = floor(coordinate);
+	v3f local = coordinate - tile;
+
+	f32 d = 100.;
+
+	v3f r[3][3][3];
+
+	for (int x = -1; x <= 1; ++x) {
+		for (int y = -1; y <= 1; ++y) {
+			for (int z = -1; z <= 1; ++z) {
+				int ix = x + 1;
+				int iy = y + 1;
+				int iz = z + 1;
+				v3f offset = V3f(x,y,z);
+				r[ix][iy][iz] = offset + random_v3f(tile + offset);
+			}
+		}
+	}
+
+	for (int x = 0; x < 3; ++x) {
+		for (int y = 0; y < 3; ++y) {
+			for (int z = 0; z < 2; ++z) {
+				d = min(d, distance(local, line_segment{r[x][y][z], r[x][y][z+1]}));
+				d = min(d, distance(local, line_segment{r[x][z][y], r[x][z+1][y]}));
+				d = min(d, distance(local, line_segment{r[z][x][y], r[z+1][x][y]}));
+			}
+		}
+	}
+
+	return d;
+}
+
+template <class RandomV3f = decltype([](v3s x) { return tl::random_v3f(x); })>
+forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f = {}) {
+	v3s scaled_tile = floor(coordinate, step);
+	v3s tile = scaled_tile / step;
+	v3f local = (v3f)(coordinate - scaled_tile) * reciprocal((f32)step);
+
+	f32 d = 100.;
+
+	v3f r[3][3][3];
+
+	for (int x = -1; x <= 1; ++x) {
+		for (int y = -1; y <= 1; ++y) {
+			for (int z = -1; z <= 1; ++z) {
+				int ix = x + 1;
+				int iy = y + 1;
+				int iz = z + 1;
+				v3s offset = V3s(x,y,z);
+				r[ix][iy][iz] = (v3f)offset + random_v3f(tile + offset);
+			}
+		}
+	}
+
+	for (int x = 0; x < 3; ++x) {
+		for (int y = 0; y < 3; ++y) {
+			for (int z = 0; z < 2; ++z) {
+				d = min(d, distance(local, line_segment{r[x][y][z], r[x][y][z+1]}));
+				d = min(d, distance(local, line_segment{r[x][z][y], r[x][z+1][y]}));
+				d = min(d, distance(local, line_segment{r[z][x][y], r[z+1][x][y]}));
+			}
+		}
+	}
+
+	return d;
+}
+
 forceinline f32 value_noise_v2f(v2f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
 	v2f tile_position = floor(coordinate);
 	v2f local_position = coordinate - tile_position;

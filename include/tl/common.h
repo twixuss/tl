@@ -2387,6 +2387,8 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 	forceinline static TemporaryAllocator current() { return {}; }
 
 	forceinline static AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
+		assert(cursor, "temporary allocator was not initialized");
+
 		auto target = ceil(cursor, alignment);
 		cursor = target + size;
 		assert(cursor <= base + buffer_size, "Out of temporary memory");

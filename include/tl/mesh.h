@@ -101,7 +101,7 @@ void calculate_normals(Span<Vertex> vertices, Span<Index> indices) {
 		vertex.normal = {};
 	}
 
-	for (u32 i = 0; i < indices.size; i += 3) {
+	for (u32 i = 0; i < indices.count; i += 3) {
 		auto &a = vertices[indices[i + 0]];
 		auto &b = vertices[indices[i + 1]];
 		auto &c = vertices[indices[i + 2]];
