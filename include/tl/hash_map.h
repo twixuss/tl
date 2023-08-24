@@ -625,6 +625,63 @@ struct ContiguousHashMap : Traits {
 		}
 		count = 0;
 	}
+
+	void erase(v3s key) {
+		bounds_check(cells.count);
+		
+		auto hash = get_hash(key);
+		auto index = get_index_from_hash(hash, cells.count);
+
+		auto cell = cells.data + index;
+
+		auto steps = cells.count;
+		while (steps--) {
+			auto &cell = cells.data[index];
+			if (cell.state == CellState::occupied) {
+				if (are_equal(cell.key(), key)) {
+					cell.state = CellState::removed;
+				}
+			}
+			index = step(index, cells.count);
+		}
+	}
+
+	struct Iterator {
+		ContiguousHashMap *map = 0;
+		Cell *cell = 0;
+
+		Iterator &operator++() {
+			do {
+				++cell; 
+				if (cell == map->cells.end()) {
+					cell = 0;
+					return *this;
+				}
+			} while (cell->state != CellState::occupied);
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return cell == that.cell; }
+		bool operator!=(Iterator const &that) { return cell != that.cell; }
+		auto &operator*() { return cell->key_value; }
+		auto *operator->() { return &cell->key_value; }
+	};
+
+	Iterator begin() { 
+		if (cells.count == 0)
+			return {this, 0};
+
+		Iterator it = {this, cells.begin()};
+		if (cells[0].state != CellState::occupied)
+			++it;
+
+		return it;
+	}
+	Iterator end() { return {this, 0}; }
 };
 
 TL_DECLARE_CONCEPT(ContiguousHashMap);

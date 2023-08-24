@@ -8,7 +8,7 @@
 
 namespace tl {
 
-inline constexpr u32 u32_random_primes[] = {
+inline constexpr u32 random_primes_u32[] = {
 	0x36DCD91D,
 	0x054A136F,
 	0x7DA1D8CD,
@@ -17,6 +17,18 @@ inline constexpr u32 u32_random_primes[] = {
 	0xC9B813BD,
 	0x89617FB5,
 	0x19744049,
+	2594378797,
+	2492258647,
+	1486146737,
+	2542180853,
+	3580691981,
+	2370600803,
+	3755141909,
+	2359841707,
+	1110781999,
+	3868683751,
+	2164185601,
+	1290962723,
 };
 
 template <class State>
@@ -38,9 +50,9 @@ inline v3f next_v3f(State &state) {
 
 forceinline u32 random_u32(u32 seed) {
 	seed ^= 0x55555555u;
-	seed *= u32_random_primes[0];
+	seed *= random_primes_u32[0];
 	seed ^= 0x33333333u;
-	seed *= u32_random_primes[1];
+	seed *= random_primes_u32[1];
 	return seed;
 }
 
@@ -52,8 +64,8 @@ forceinline u64 random_u64(u64 seed) {
 }
 
 forceinline u32 random_u32(s32 seed) { return random_u32((u32)seed); }
-forceinline s32 random_s32(u32 seed) { return (s32)random_u32(seed); }
-forceinline s32 random_s32(s32 seed) { return (s32)random_u32(seed); }
+template <class T>
+forceinline s32 random_s32(T seed) { return (s32)random_u32(seed); }
 forceinline f32 random_f32(u32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
 forceinline f32 random_f32(s32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
 
@@ -98,11 +110,17 @@ forceinline v3f random_v3f(u64 value) {
 		random_f32((u32)rotate_left(value, 43)),
 	};
 }
-forceinline v3f random_v3f(v3u value) {
-	value.x = random_u32(value.x);
-	value.y = random_u32(value.x ^ value.y);
-	value.z = random_u32(value.y ^ value.z);
-	return normalize_range_f32<v3f>(value);
+forceinline v3f random_v3f(v3u x) {
+	x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
+
+	v3u a;
+	a.x = dot(x, *(v3u *)&random_primes_u32[9]);
+	a.y = dot(x, *(v3u *)&random_primes_u32[3]);
+	a.z = dot(x, *(v3u *)&random_primes_u32[6]);
+
+	a = ((a & 0x55555555) << 1) | ((a >> 1) & 0x55555555);
+
+	return normalize_range_f32<v3f>(a);
 }
 forceinline v3f random_v3f(v3s value) { return random_v3f((v3u)value); }
 
@@ -134,7 +152,9 @@ forceinline u32 random_u32(v3f seed) { return random_u32(seed.x) ^ random_u32(se
 //}
 
 forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
-forceinline u32 random_u32(v3s seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
+forceinline u32 random_u32(v3s seed) {
+	return dot((v3u)seed, *(v3u *)&random_primes_u32[0]);
+}
 
 static constexpr f32 voronoi_largest_possible_distance_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)
 static constexpr f32 voronoi_largest_possible_distance_3d = 1.6583123951776999245574663683353f; // sqrt(2.75)
@@ -281,7 +301,7 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 }
 
 template <class RandomV3f = decltype([](v3f x) { return tl::random_v3f(x); })>
-forceinline f32 voronoi_line_v3f(v3f coordinate, RandomV3f random_v3f = {}) {
+forceinline f32 voronoi_line_v3f(v3f coordinate, RandomV3f random_v3f = {}) requires is_same<decltype(random_v3f(v3f{})), v3f> {
 	v3f tile = floor(coordinate);
 	v3f local = coordinate - tile;
 
@@ -315,7 +335,7 @@ forceinline f32 voronoi_line_v3f(v3f coordinate, RandomV3f random_v3f = {}) {
 }
 
 template <class RandomV3f = decltype([](v3s x) { return tl::random_v3f(x); })>
-forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f = {}) {
+forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f = {}) requires is_same<decltype(random_v3f(v3s{})), v3f> {
 	v3s scaled_tile = floor(coordinate, step);
 	v3s tile = scaled_tile / step;
 	v3f local = (v3f)(coordinate - scaled_tile) * reciprocal((f32)step);
@@ -428,15 +448,15 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 
 	auto random_u32x8 = [] (__m256i s) {
 		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x55555555u));
-		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(u32_random_primes[0]));
+		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(random_primes_u32[0]));
 		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x33333333u));
-		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(u32_random_primes[1]));
+		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(random_primes_u32[1]));
 		return s;
 	};
-
 	__m256i s = random_u32x8(px);
 	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(py, s)));
 	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(pz, s)));
+
 
 	__m256 samples = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_srli_epi32(s, 8)), _mm256_set1_ps(1.0f / ((1 << 24) - 1)));
 

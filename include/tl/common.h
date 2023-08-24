@@ -694,6 +694,15 @@ forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000
 forceinline constexpr bool is_positive(f32 v) { return !(*(u32 *)&v & 0x80000000); }
 forceinline constexpr bool is_positive(f64 v) { return !(*(u64 *)&v & 0x8000000000000000); }
 
+template <class T> forceinline T rotate_left_8  (T v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
+template <class T> forceinline T rotate_left_16 (T v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
+template <class T> forceinline T rotate_left_32 (T v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
+template <class T> forceinline T rotate_left_64 (T v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
+template <class T> forceinline T rotate_right_8 (T v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
+template <class T> forceinline T rotate_right_16(T v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
+template <class T> forceinline T rotate_right_32(T v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
+template <class T> forceinline T rotate_right_64(T v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
+
 #if COMPILER_GCC
 forceinline u8  rotate_left (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
 forceinline u16 rotate_left (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
@@ -2593,6 +2602,40 @@ void rotate(Span<T> span, smm to_be_first_index) {
 	} else {
 		return rotate(span, span.data + to_be_first_index);
 	}
+}
+
+template <class T>
+void quick_sort(Span<T> span, auto fn) {
+	auto compare = [&] (T a, T b) {
+		if constexpr (std::is_invocable_r_v<bool, decltype(fn), T, T>) {
+			return fn(a, b);
+		} else {
+			return fn(a) < fn(b);
+		}
+	};
+
+	if (span.count < 2)
+		return;
+
+	auto partition = [&](T *begin, T *end) {
+		T mid = *midpoint(begin, end - 1);
+		--begin;
+		for (;;) {
+			while(compare(*++begin, mid)) {}
+			while(compare(mid, *--end)) {}
+			if (begin >= end)
+				return end + 1;
+			Swap(*begin, *end);
+		}
+	};
+
+	T *p = partition(span.begin(), span.end());
+	quick_sort(Span<T>{span.begin(), p}, fn);
+	quick_sort(Span<T>{p, span.end()}, fn);
+}
+template <class T>
+void quick_sort(Span<T> span) {
+	quick_sort(span, [](T &a, T &b) { return a < b; });
 }
 
 #ifdef TL_IMPL

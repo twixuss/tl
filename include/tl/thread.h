@@ -17,7 +17,7 @@ TL_API void sleep_milliseconds(u32 milliseconds);
 TL_API void sleep_seconds(u32 seconds);
 #if OS_WINDOWS
 TL_API void switch_thread();
-forceinline void yield_smt() { YieldProcessor(); }
+forceinline void yield_smt() { _mm_pause(); }
 
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }

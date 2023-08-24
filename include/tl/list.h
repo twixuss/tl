@@ -1114,6 +1114,8 @@ struct LinearSet : Span<T, Size_> {
 			add(value);
 		}
 	}
+	
+	Span span() { return *this; }
 };
 
 template <class T>

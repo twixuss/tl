@@ -701,24 +701,9 @@ forceinline constexpr auto lerpWrap(A a, B b, T t, S s) {
 
 forceinline constexpr f32 dot(f32 a, f32 b) { return a * b; }
 
-#define DOT(f32, v2f) forceinline constexpr f32 dot(v2f a, v2f b) { return a *= b, a.x + a.y; }
-DOT(f32, v2f)
-DOT(s32, v2s)
-DOT(u32, v2u)
-DOT(s64, v3s64)
-#undef DOT
-
-#define DOT(f32, v3f) forceinline constexpr f32 dot(v3f a, v3f b) { return a *= b, a.x + a.y + a.z; }
-DOT(f32, v3f)
-DOT(s32, v3s)
-DOT(u32, v3u)
-#undef DOT
-
-#define DOT(f32, v4f) forceinline constexpr f32 dot(v4f a, v4f b) { return a *= b, a.x + a.y + a.z + a.w; }
-forceinline f32 dot(v4f a, v4f b) { return f32x4_dot(f32x4_load(&a), f32x4_load(&b)); }
-DOT(s32, v4s)
-DOT(u32, v4u)
-#undef DOT
+template <class T> forceinline constexpr T dot(v2<T> a, v2<T> b) { return a *= b, a.x + a.y; }
+template <class T> forceinline constexpr T dot(v3<T> a, v3<T> b) { return a *= b, a.x + a.y + a.z; }
+template <class T> forceinline constexpr T dot(v4<T> a, v4<T> b) { return a *= b, a.x + a.y + a.z + a.w; }
 
 template <class T>
 forceinline auto reflect(T v, T n) {
