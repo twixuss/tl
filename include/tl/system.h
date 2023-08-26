@@ -246,6 +246,10 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 #define TL_DEBUG 1
 #endif
 
+#ifndef TL_USE_SIMD
+#define TL_USE_SIMD (!TL_DEBUG)
+#endif
+
 #ifdef TL_IMPL
 	#if OS_WINDOWS
 		#pragma push_macro("OS_WINDOWS")

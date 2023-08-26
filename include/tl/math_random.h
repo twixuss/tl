@@ -2,6 +2,8 @@
 #include "random.h"
 #include "math.h"
 #include "bits.h"
+#include "generated/simd.h"
+#include "generated/simd_vector.h"
 
 #pragma warning(push)
 //#pragma warning(disable : 4244)
@@ -9,26 +11,70 @@
 namespace tl {
 
 inline constexpr u32 random_primes_u32[] = {
-	0x36DCD91D,
-	0x054A136F,
-	0x7DA1D8CD,
-	0x914907D1,
-	0xAF446B4D,
-	0xC9B813BD,
-	0x89617FB5,
-	0x19744049,
-	2594378797,
-	2492258647,
-	1486146737,
-	2542180853,
-	3580691981,
-	2370600803,
-	3755141909,
-	2359841707,
-	1110781999,
-	3868683751,
-	2164185601,
-	1290962723,
+	3282017723,
+	351133033,
+	508145159,
+	2855044457,
+	1631354399,
+	2632283831,
+	2370294643,
+	1938940147,
+	562213447,
+	2126948981,
+	3949557629,
+	3678122521,
+	3655713521,
+	1228498429,
+	599422001,
+	4239407353,
+	4093924871,
+	3493474037,
+	2602211317,
+	2449047701,
+	626704889,
+	13879027,
+	156043579,
+	745948201,
+	3816082019,
+	2596961827,
+	1038441493,
+	2028981233,
+	2500564919,
+	2881014971,
+	2860922219,
+	2694697771,
+	3346293191,
+	1624834027,
+	4021269487,
+	2326660187,
+	3766783021,
+	2105476313,
+	679589551,
+	1501766527,
+	1251458261,
+	513627721,
+	2290561979,
+	2584981253,
+	2375601649,
+	1134211073,
+	1941167843,
+	942529583,
+	516400249,
+	1570433611,
+	1378307321,
+	3092642191,
+	698915071,
+	925783,
+	575859899,
+	979311371,
+	2967849541,
+	707293193,
+	4205096429,
+	1408547929,
+	2001825193,
+	1326360691,
+	1497718219,
+	1175102387,
 };
 
 template <class State>
@@ -334,12 +380,73 @@ forceinline f32 voronoi_line_v3f(v3f coordinate, RandomV3f random_v3f = {}) requ
 	return d;
 }
 
+static const simd_vector::v3sx8 voronoi_line_v3s_offsets_x8[] = {
+	simd_typed::S32x8(-1,-1,-1,-1, -1,-1,-1,-1),
+	simd_typed::S32x8(-1,-1,-1,+0, +0,+0,+1,+1),
+	simd_typed::S32x8(-1,+0,+1,-1, +0,+1,-1,+0),
+
+	simd_typed::S32x8(-1,+0,+0,+0, +0,+0,+0,+0),
+	simd_typed::S32x8(+1,-1,-1,-1, +0,+0,+0,+1),
+	simd_typed::S32x8(+1,-1,+0,+1, -1,+0,+1,-1),
+
+	simd_typed::S32x8(+0,+0,+1,+1, +1,+1,+1,+1),
+	simd_typed::S32x8(+1,+1,-1,-1, -1,+0,+0,+0),
+	simd_typed::S32x8(+0,+1,-1,+0, +1,-1,+0,+1),
+
+	simd_typed::S32x8(+1,+1,+1,+1, +1,+1,+1,+1), // NOTE: duplicates to fully fit
+	simd_typed::S32x8(+1,+1,+1,+1, +1,+1,+1,+1),
+	simd_typed::S32x8(-1,+0,+1,+1, +1,+1,+1,+1),
+};
+
 template <class RandomV3f = decltype([](v3s x) { return tl::random_v3f(x); })>
-forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f = {}) requires is_same<decltype(random_v3f(v3s{})), v3f> {
+__declspec(noinline) forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f = {}) requires is_same<decltype(random_v3f(v3s{})), v3f> {
 	v3s scaled_tile = floor(coordinate, step);
 	v3s tile = scaled_tile / step;
 	v3f local = (v3f)(coordinate - scaled_tile) * reciprocal((f32)step);
 
+#if 1//TL_USE_SIMD && ARCH_AVX
+	using namespace simd_typed;
+	using namespace simd_vector;
+
+	f32 d = 100.;
+
+	v3f r[3][3][3];
+
+	for (auto o : voronoi_line_v3s_offsets_x8) {
+		s32x8 ix = o.x + 1;
+		s32x8 iy = o.y + 1;
+		s32x8 iz = o.z + 1;
+
+		auto x = (v3ux8)(tile + o);
+		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
+
+		v3ux8 a;
+		a.x = dot(x, V3u32x8(*(v3u*)&random_primes_u32[0]));
+		a.y = dot(x, V3u32x8(*(v3u*)&random_primes_u32[3]));
+		a.z = dot(x, V3u32x8(*(v3u*)&random_primes_u32[6]));
+
+		a = ((a & 0x55555555) << 1) | ((a >> 1) & 0x55555555);
+
+		auto rnd = normalize_range_f32<v3fx8>(a);
+
+		auto n = (v3fx8)o + rnd;
+		for(int i = 0; i < 8; ++i)
+			r[ix[i]][iy[i]][iz[i]] = n.subvector(i);
+	}
+
+	for (int x = 0; x < 3; ++x) {
+		for (int y = 0; y < 3; ++y) {
+			for (int z = 0; z < 2; ++z) {
+				d = min(d, distance(local, line_segment{r[x][y][z], r[x][y][z+1]}));
+				d = min(d, distance(local, line_segment{r[x][z][y], r[x][z+1][y]}));
+				d = min(d, distance(local, line_segment{r[z][x][y], r[z+1][x][y]}));
+			}
+		}
+	}
+
+	return d;
+
+#else
 	f32 d = 100.;
 
 	v3f r[3][3][3];
@@ -367,6 +474,7 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step, RandomV3f random_v3f 
 	}
 
 	return d;
+#endif
 }
 
 forceinline f32 value_noise_v2f(v2f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
@@ -441,37 +549,38 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 	f32 tx = interpolate(local.x);
 	f32 ty = interpolate(local.y);
 	f32 tz = interpolate(local.z);
-#if ARCH_AVX2
-	__m256i px = _mm256_add_epi32(_mm256_set1_epi32(tile.x), _mm256_setr_epi32(0, 1, 0, 1, 0, 1, 0, 1));
-	__m256i py = _mm256_add_epi32(_mm256_set1_epi32(tile.y), _mm256_setr_epi32(0, 0, 1, 1, 0, 0, 1, 1));
-	__m256i pz = _mm256_add_epi32(_mm256_set1_epi32(tile.z), _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1));
+#if TL_USE_SIMD && ARCH_AVX2
+	using namespace simd_typed;
+	s32x8 px = S32x8(tile.x) + S32x8(0, 1, 0, 1, 0, 1, 0, 1);
+	s32x8 py = S32x8(tile.y) + S32x8(0, 0, 1, 1, 0, 0, 1, 1);
+	s32x8 pz = S32x8(tile.z) + S32x8(0, 0, 0, 0, 1, 1, 1, 1);
 
-	auto random_u32x8 = [] (__m256i s) {
-		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x55555555u));
-		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(random_primes_u32[0]));
-		s = _mm256_xor_si256  (s, _mm256_set1_epi32(0x33333333u));
-		s = _mm256_mullo_epi32(s, _mm256_set1_epi32(random_primes_u32[1]));
+	auto random_u32x8 = [] (s32x8 s) {
+		s ^= S32x8(0x55555555u);
+		s *= S32x8(random_primes_u32[0]);
+		s ^= S32x8(0x33333333u);
+		s *= S32x8(random_primes_u32[1]);
 		return s;
 	};
-	__m256i s = random_u32x8(px);
-	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(py, s)));
-	s = _mm256_xor_si256(s, random_u32x8(_mm256_add_epi32(pz, s)));
+	s32x8 s = random_u32x8(px);
+	s ^= random_u32x8(py + s);
+	s ^= random_u32x8(pz + s);
 
 
-	__m256 samples = _mm256_mul_ps(_mm256_cvtepi32_ps(_mm256_srli_epi32(s, 8)), _mm256_set1_ps(1.0f / ((1 << 24) - 1)));
+	f32x8 samples = (f32x8)(s >> 8) * F32x8(1.0f / ((1 << 24) - 1));
 
-	__m128 a = _mm256_extractf128_ps(samples, 0);
-	__m128 b = _mm256_extractf128_ps(samples, 1);
+	f32x4 a = samples.x4[0];
+	f32x4 b = samples.x4[1];
 
-	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(tz), a);
+	a = fmadd(b - a, F32x4(tz), a);
 
-	b = _mm_shuffle_ps(a, a, _MM_SHUFFLE(0, 0, 3, 2));
-	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(ty), a);
+	b = {_mm_shuffle_ps(a.m, a.m, _MM_SHUFFLE(0, 0, 3, 2))};
+	a = fmadd(b - a, F32x4(ty), a);
 
-	b = _mm_shuffle_ps(a, a, _MM_SHUFFLE(0, 0, 0, 1));
-	a = _mm_fmadd_ps(_mm_sub_ps(b, a), _mm_set1_ps(tx), a);
+	b = {_mm_shuffle_ps(a.m, a.m, _MM_SHUFFLE(0, 0, 0, 1))};
+	a = fmadd(b - a, F32x4(tx), a);
 
-	return _mm_cvtss_f32(a);
+	return a.s[0];
 #else
 	f32 left_bottom_back   = random_f32(tile + v3s{0,0,0});
 	f32 right_bottom_back  = random_f32(tile + v3s{1,0,0});

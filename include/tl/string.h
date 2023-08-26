@@ -715,9 +715,6 @@ inline constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same
 
 template <class Char>
 inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> format_string) {
-	// I think ignoring invalid format is better that crashing the program.
-	return append(b, format_string);
-
 	Char previous = {};
 	auto start = format_string.data;
 	auto c = start;

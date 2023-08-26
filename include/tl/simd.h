@@ -77,10 +77,6 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 #endif
 }
 
-#ifndef TL_SIMD_NO_ALIAS
-using namespace simd;
-#endif
-
 //
 // Vector constants
 //
