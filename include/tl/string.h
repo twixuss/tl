@@ -914,8 +914,9 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 
 	StaticList<ascii, 128> buffer;
 
-	if (is_negative(value)) {
-		buffer.add('-');
+	bool negative = is_negative(value);
+
+	if (negative) {
 		value = -value;
 	}
 
@@ -924,7 +925,7 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 	}
 
 	auto append_float = [&](Float f) {
-		write_as_string(buffer, (u64)f);
+		auto whole_part = (u64)f;
 
 		auto round_and_trim = [&] {
 			f = frac(f);
@@ -936,19 +937,23 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 						if (*it == (char)('9' + 1)) {
 							buffer.pop_back();
 							--it;
-							if (*it == '.')
+							if (*it == '.') {
+								++whole_part;
 								break;
-							else
+							} else {
 								continue;
+							}
 						}
 						break;
 					}
 				}
 			}
-			while (buffer.back() == '0')
+			while (buffer.back() == '0') {
 				buffer.pop_back();
-			if (buffer.back() == '.')
+			}
+			if (buffer.back() == '.') {
 				buffer.pop_back();
+			}
 		};
 
 		if (format.trailing_zeros) {
@@ -970,6 +975,12 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 				round_and_trim();
 			}
 		}
+
+		StaticList<ascii, 128> whole_part_buffer;
+		if (negative)
+			whole_part_buffer.add('-');
+		write_as_string(whole_part_buffer, whole_part);
+		buffer.insert_at(whole_part_buffer, 0);
 	};
 
 	switch (format.format) {

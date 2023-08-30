@@ -49,8 +49,6 @@ struct TL_API Profiler {
 #endif
 	};
 
-	bool enabled = true;
-
 	List<Mark> marks;
 	SpinLock marks_lock;
 
@@ -100,7 +98,37 @@ struct TL_API Profiler {
 		begin(name, as_span(location.file_name()), location.line());
 		return timer;
 	}
+
+
+	struct ScopeMeasurer {
+		Profiler *profiler = 0;
+		Span<utf8> name;
+		Span<utf8> file;
+		u32 line = 0;
+	};
+
+	ScopeMeasurer measure(Span<utf8> name, std::source_location location = std::source_location::current()) {
+		return {this, name, as_utf8(as_span(location.file_name())), location.line()};
+	}
+	ScopeMeasurer measure(char const *name, std::source_location location = std::source_location::current()) {
+		return measure(as_utf8(as_span(name)), location);
+	}
+	ScopeMeasurer measure(std::source_location location = std::source_location::current()) {
+		return measure(as_utf8(as_span(location.function_name())), location);
+	}
 };
+
+template <>
+struct Scoped<Profiler::ScopeMeasurer> {
+	Profiler *profiler;
+	Scoped(Profiler::ScopeMeasurer measurer) : profiler(measurer.profiler) {
+		measurer.profiler->begin(measurer.name, measurer.file, measurer.line);
+	}
+	~Scoped() {
+		profiler->end();
+	}
+};
+
 }
 
 #ifdef TL_IMPL

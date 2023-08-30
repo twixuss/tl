@@ -2606,6 +2606,9 @@ void rotate(Span<T> span, smm to_be_first_index) {
 
 template <class T>
 void quick_sort(Span<T> span, auto fn) {
+	if (span.count < 2)
+		return;
+
 	auto compare = [&] (T a, T b) {
 		if constexpr (std::is_invocable_r_v<bool, decltype(fn), T, T>) {
 			return fn(a, b);
@@ -2614,28 +2617,30 @@ void quick_sort(Span<T> span, auto fn) {
 		}
 	};
 
-	if (span.count < 2)
-		return;
-
 	auto partition = [&](T *begin, T *end) {
-		T mid = *midpoint(begin, end - 1);
-		--begin;
-		for (;;) {
-			while(compare(*++begin, mid)) {}
-			while(compare(mid, *--end)) {}
-			if (begin >= end)
-				return end + 1;
-			Swap(*begin, *end);
+		auto pivot = end[-1];
+		auto mid = begin;
+		for (auto i = begin; i < end-1; i++)
+		{
+			if (compare(*i, pivot))
+			{
+				Swap(*i, *mid);
+				mid++;
+			}
 		}
+
+		Swap(*mid, end[-1]);
+
+		return mid;
 	};
 
 	T *p = partition(span.begin(), span.end());
 	quick_sort(Span<T>{span.begin(), p}, fn);
-	quick_sort(Span<T>{p, span.end()}, fn);
+	quick_sort(Span<T>{p+1, span.end()}, fn);
 }
 template <class T>
 void quick_sort(Span<T> span) {
-	quick_sort(span, [](T &a, T &b) { return a < b; });
+	quick_sort(span, [](T a, T b) { return a < b; });
 }
 
 #ifdef TL_IMPL

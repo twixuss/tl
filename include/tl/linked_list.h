@@ -93,7 +93,9 @@ struct LinkedList {
 		return result;
 	}
 	T &add(TL_LPC) {
-		return add({} TL_LA);
+		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
+		new (&result) T();
+		return result;
 	}
 
 	void clear() {

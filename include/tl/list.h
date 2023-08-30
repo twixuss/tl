@@ -1037,10 +1037,10 @@ struct LinearSet : Span<T, Size_> {
 		count = 0;
 	}
 
-	T pop() {
-		bounds_check(count);
-		--count;
-		return data[count];
+	Optional<T> pop() {
+		if (count)
+			return data[--count];
+		return {};
 	}
 
 	template <class U>
@@ -1133,6 +1133,12 @@ void erase(LinearSet<T> &set, T *pointer) { return erase((List<T> &)set, pointer
 template <class T>
 void erase_unordered(LinearSet<T> &set, T *pointer) {
 	set[index_of(set, pointer)] = set.back();
+	set.count--;
+}
+
+template <class T>
+void erase_unordered_at(LinearSet<T> &set, umm index) {
+	set[index] = set.back();
 	set.count--;
 }
 

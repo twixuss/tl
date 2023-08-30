@@ -23,12 +23,12 @@ struct Logger {
 		func(this, severity, message);
 	}
 
-	inline void log(Severity severity, char const *format, auto &&...args) {
+	inline void log(Severity severity, char const *format, auto ...args) {
 		log(severity, with(temporary_allocator, tl::format(as_utf8(as_span(format)), args...)));
 	}
-	inline void info   (char const *format, auto &&...args) { log(Severity::info,    format, args...); }
-	inline void warning(char const *format, auto &&...args) { log(Severity::warning, format, args...); }
-	inline void error  (char const *format, auto &&...args) { log(Severity::error,   format, args...); }
+	inline void info   (char const *format, auto ...args) { log(Severity::info,    format, args...); }
+	inline void warning(char const *format, auto ...args) { log(Severity::warning, format, args...); }
+	inline void error  (char const *format, auto ...args) { log(Severity::error,   format, args...); }
 
 	inline void info   (auto &&arg) { log(Severity::info,    with(temporary_allocator, to_string(arg))); }
 	inline void warning(auto &&arg) { log(Severity::warning, with(temporary_allocator, to_string(arg))); }
@@ -49,12 +49,12 @@ extern TL_API thread_local Logger current_logger;
 
 namespace global_log {
 
-inline void log(Logger::Severity severity, char const *format, auto &&...args) {
+inline void log(Logger::Severity severity, char const *format, auto ...args) {
 	current_logger.log(severity, format, args...);
 }
-inline void log_info   (char const *format, auto &&...args) { current_logger.info   (format, args...); }
-inline void log_warning(char const *format, auto &&...args) { current_logger.warning(format, args...); }
-inline void log_error  (char const *format, auto &&...args) { current_logger.error  (format, args...); }
+inline void log_info   (char const *format, auto ...args) { current_logger.info   (format, args...); }
+inline void log_warning(char const *format, auto ...args) { current_logger.warning(format, args...); }
+inline void log_error  (char const *format, auto ...args) { current_logger.error  (format, args...); }
 
 }
 

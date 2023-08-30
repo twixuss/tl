@@ -36,7 +36,7 @@ template <class T> forceinline constexpr auto pow4(T v) { return pow2(v * v); }
 
 template <class T>
 inline constexpr T smooth_min(T a, T b, f32 k) {
-	f32 h = clamp((b - a) / k + .5f, 0, 1);
+	f32 h = clamp<f32>((b - a) / k + .5f, 0, 1);
 	return b + h * (a - b + k * 0.5f * (h - 1));
 }
 
@@ -1680,6 +1680,9 @@ union m4 {
 		v3f s;
 		v3f c;
 		cos_sin(a, c, s);
+		return rotation_r_y(a.y)
+			* rotation_r_x(a.x)
+			* rotation_r_z(a.z);
 		return {
 			 c.z*c.y + s.z*s.x*s.y, s.z*c.x,  c.z*-s.y + s.z*s.x*c.y, 0,
 			-s.z*c.y + c.z*s.x*s.y, c.z*c.x, -s.z*-s.y + c.z*s.x*c.y, 0,
