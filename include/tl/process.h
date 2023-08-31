@@ -30,10 +30,12 @@ inline Process execute(utf16 const *path, ExecuteParams params = {}) {
 }
 
 inline Process execute(Span<utf16> path, Span<utf16> arguments, ExecuteParams params = {}) {
-	return execute(temporary_null_terminate(path).data, temporary_null_terminate(arguments).data, params);
+	scoped(temporary_allocator_and_checkpoint);
+	return execute(null_terminate(path).data, null_terminate(arguments).data, params);
 }
 inline Process execute(Span<utf16> path, ExecuteParams params = {}) {
-	return execute(temporary_null_terminate(path).data, 0, params);
+	scoped(temporary_allocator_and_checkpoint);
+	return execute(null_terminate(path).data, 0, params);
 }
 inline Process execute(Span<utf8> path, ExecuteParams params = {}) {
 	return execute(to_utf16(path, true).data, 0, params);
@@ -50,8 +52,14 @@ TL_API void terminate(Process process);
 void free(Process &process);
 
 TL_API Process start_process(utf16 const *command_line);
-inline Process start_process(Span<utf16> command_line) { return start_process(temporary_null_terminate(command_line).data); }
-inline Process start_process(Span<utf8>  command_line) { return start_process(to_utf16(command_line, true).data); }
+inline Process start_process(Span<utf16> command_line) {
+	scoped(temporary_allocator_and_checkpoint);
+	return start_process(null_terminate(command_line).data);
+}
+inline Process start_process(Span<utf8>  command_line) {
+	scoped(temporary_allocator_and_checkpoint);
+	return start_process(to_utf16(command_line, true).data);
+}
 
 }
 

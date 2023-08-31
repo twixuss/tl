@@ -19,6 +19,8 @@
     <ClCompile Include="src\tests\hash_map.cpp" />
     <ClCompile Include="src\tests\utf8.cpp" />
     <ClCompile Include="src\tests\fly_string.cpp" />
+    <ClCompile Include="src\tests\big_int.cpp" />
+    <ClCompile Include="src\tests\array.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />

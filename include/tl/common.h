@@ -841,9 +841,6 @@ enum ForEachDirective {
 	ForEach_erase,
 };
 
-#define for_each_break    return ForEach_break
-#define for_each_continue return ForEach_continue
-
 using ForEachFlags = u8;
 enum : ForEachFlags {
 	ForEach_reverse = 0x1,
@@ -920,9 +917,9 @@ constexpr auto find_if(Container &container, Predicate &&predicate) {
 	for_each(container, [&] (auto &it) {
 		if (predicate(it)) {
 			result = &it;
-			for_each_break;
+			return ForEach_break;
 		}
-		for_each_continue;
+		return ForEach_continue;
 	});
 	return result;
 }
@@ -1487,10 +1484,10 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 		for (auto &b : what) {
 			if (a == b) {
 				result = &a;
-				for_each_break;
+				return ForEach_break;
 			}
 		}
-		for_each_continue;
+		return ForEach_continue;
 	});
 	return result;
 }

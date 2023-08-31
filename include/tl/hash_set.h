@@ -218,7 +218,7 @@ umm count(HashSet<Value, Traits> set, Fn &&fn) {
 template <class Value, class Traits>
 bool is_empty(HashSet<Value, Traits> set) {
 	bool result = true;
-	for_each(set, [&](Value &value) { result = false; for_each_break; });
+	for_each(set, [&](Value &value) { result = false; return ForEach_break; });
 	return result;
 }
 

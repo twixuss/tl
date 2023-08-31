@@ -460,7 +460,7 @@ umm count(BucketHashMap<Key, Value, Traits> map, Fn &&fn) {
 template <class Key, class Value, class Traits>
 bool is_empty(BucketHashMap<Key, Value, Traits> map) {
 	bool result = true;
-	for_each(map, [&](auto &kv) { (void)kv; result = false; for_each_break; });
+	for_each(map, [&](auto &kv) { (void)kv; result = false; return ForEach_break; });
 	return result;
 }
 

@@ -24,6 +24,8 @@
   <ItemGroup>
     <ClCompile Include="src\tests.cpp" />
     <ClCompile Include="src\tests\allocation.cpp" />
+    <ClCompile Include="src\tests\array.cpp" />
+    <ClCompile Include="src\tests\big_int.cpp" />
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
     <ClCompile Include="src\tests\coroutine.cpp" />

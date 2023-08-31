@@ -1680,9 +1680,6 @@ union m4 {
 		v3f s;
 		v3f c;
 		cos_sin(a, c, s);
-		return rotation_r_y(a.y)
-			* rotation_r_x(a.x)
-			* rotation_r_z(a.z);
 		return {
 			 c.z*c.y + s.z*s.x*s.y, s.z*c.x,  c.z*-s.y + s.z*s.x*c.y, 0,
 			-s.z*c.y + c.z*s.x*s.y, c.z*c.x, -s.z*-s.y + c.z*s.x*c.y, 0,

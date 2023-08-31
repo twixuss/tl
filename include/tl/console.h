@@ -22,42 +22,28 @@ struct Printer {
 		return span.count;
 	}
 
-	template <class ...T>
-	inline umm write(char const *fmt, T const &...args) {
+	template <class Fmt, class ...T>
+	inline umm write(Fmt fmt, T const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
-		append_format(builder, fmt, args...);
+		if constexpr (sizeof...(T) > 0) {
+			append_format(builder, fmt, args...);
+		} else {
+			append(builder, fmt);
+		}
 		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
 	}
 
-	template <class T>
-	inline umm write(T const &value) {
-		scoped(temporary_storage_checkpoint);
-		StringBuilder builder;
-		builder.allocator = temporary_allocator;
-		append(builder, value);
-		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
-	}
+	template <class Size> inline umm write(Span<char, Size> const &span) { return (*this)((Span<utf8>)span); }
+	template <class Size> inline umm write(Span<utf8, Size> const &span) { return (*this)((Span<utf8>)span); }
 
-	template <class ...T>
-	inline umm writeln(char const *fmt, T const &...args) {
-		scoped(temporary_storage_checkpoint);
-		StringBuilder builder;
-		builder.allocator = temporary_allocator;
-		append_format(builder, fmt, args...);
-		append(builder, '\n');
-		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
-	}
+	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
+	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
 
-	template <class T>
-	inline umm writeln(T const &value) {
-		scoped(temporary_storage_checkpoint);
-		StringBuilder builder;
-		builder.allocator = temporary_allocator;
-		append(builder, value);
-		append(builder, '\n');
-		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+	template <class Fmt, class ...T>
+	inline umm writeln(Fmt fmt, T const &...args) {
+		return write(fmt, args...) + write('\n');
 	}
 };
 
@@ -101,65 +87,11 @@ inline void set_console_color(ConsoleColor foreground) {
 	set_console_color(foreground, ConsoleColor::black);
 }
 
-template <class T>
-inline umm print(T const &value) {
-	scoped(temporary_storage_checkpoint);
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append(builder, value);
-	auto string = as_utf8(to_string(builder, temporary_allocator));
-	current_printer(string);
-	return string.count;
-}
+inline umm print(auto const &...args) { return current_printer.write(args...); }
+inline umm println() { return print('\n'); }
+inline umm println(auto const &...args) { return current_printer.writeln(args...); }
 
-template <class Size> inline umm print(Span<char, Size> const &span) { current_printer((Span<utf8>)span); return span.count; }
-template <class Size> inline umm print(Span<utf8, Size> const &span) { current_printer((Span<utf8>)span); return span.count; }
-
-template <class Size> inline umm print(List<char> const &list) { current_printer((Span<utf8>)(Span<char>)list); return list.count; }
-template <class Size> inline umm print(List<utf8> const &list) { current_printer((Span<utf8>)list); return list.count; }
-
-template <class ...Args>
-inline umm print(utf8 const *fmt, Args const &...args) {
-	scoped(temporary_storage_checkpoint);
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append_format(builder, fmt, args...);
-	auto string = to_string(builder, temporary_allocator);
-	print(string);
-	return string.count;
-}
-
-inline umm print(utf8 const *string) {
-	return print(as_span(string));
-}
-
-inline umm print(char const *fmt, auto const &...args) {
-	return current_printer.write(fmt, args...);
-}
-
-inline umm print(char const *string) {
-	return print(as_span(string));
-}
-
-inline umm println() {
-	return print('\n');
-}
-
-inline umm println(char const *fmt, auto const &...args) {
-	return current_printer.writeln(fmt, args...);
-}
-
-inline umm println(auto const &value) {
-	return current_printer.writeln(value);
-}
-
-inline umm errln(char const *fmt, auto const &...args) {
-	return standard_error_printer.writeln(fmt, args...);
-}
-
-inline umm errln(auto const &value) {
-	return standard_error_printer.writeln(value);
-}
+inline umm errln(auto const &...args) { return standard_error_printer.writeln(args...); }
 
 TL_API void hide_console_window();
 TL_API void show_console_window();
