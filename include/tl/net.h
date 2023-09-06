@@ -29,7 +29,7 @@ enum ConnectionKind {
 	Connection_udp,
 };
 
-TL_DECLARE_HANDLE(Socket);
+typedef struct SocketImpl *Socket;
 
 TL_API bool init();
 TL_API void deinit();
@@ -59,14 +59,6 @@ inline bool send_all(Socket s, Span<u8> span) {
 		bytes_sent += n;
 	} while (bytes_sent < span.count);
 	return true;
-}
-template <class T>
-inline umm send_bytes(Socket s, T const &val) {
-	return send(s, std::addressof(val), sizeof(val));
-}
-template <class T>
-inline void send_bytes(Socket s, sockaddr_in const &destination, T const &val) {
-	send(s, destination, std::addressof(val), sizeof(val));
 }
 
 struct TcpServer {

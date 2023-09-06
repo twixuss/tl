@@ -781,7 +781,7 @@ umm append(StringBuilder &builder, FormatInt<impl::BigInt<List>> f) {
 	if constexpr (is_signed<Int>) {
 		if (v < 0) {
 			negative = true;
-			if constexpr (is_same<Int, s8> || is_same<Int, s16> || is_same<Int, s32> || is_same<Int, s64>) {
+			if constexpr (OneOf<Int, s8, s16, s32, s64>) {
 				if (v == min_value<Int>) {
 					*lsc-- = charMap[(u32)-(v % radix)];
 					v /= radix;

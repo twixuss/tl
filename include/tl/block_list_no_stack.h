@@ -7,7 +7,6 @@ namespace tl {
 template <class T, umm block_capacity_>
 struct BlockListNoStack {
 	static constexpr umm block_capacity = block_capacity_;
-	using Storage = Storage<T>;
 	struct Block : StaticList<T, block_capacity> {
 		Block *next = 0;
 		Block *previous = 0;
@@ -298,7 +297,7 @@ void for_each(BlockListNoStack<T, block_size> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListNoStackIndex{}));
-		constexpr bool breakable = is_same<bool, ReturnType>;
+		constexpr bool breakable = std::is_same_v<bool, ReturnType>;
 		BlockListNoStackIndex index = {};
 		auto block = &list.first;
 		do {
@@ -317,7 +316,7 @@ void for_each(BlockListNoStack<T, block_size> &list, Fn &&fn) {
 		} while (block);
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool breakable = is_same<bool, ReturnType>;
+		constexpr bool breakable = std::is_same_v<bool, ReturnType>;
 		auto block = &list.first;
 		do {
 			for (auto it = block->buffer; it != block->end; ++it) {

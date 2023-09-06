@@ -193,20 +193,20 @@ struct FormatFloat {
 	bool trailing_zeros = false;
 };
 
-enum Encoding {
-	Encoding_unknown,
-	Encoding_ascii,
-	Encoding_utf8,
-	Encoding_utf16,
-	Encoding_utf32,
+enum class Encoding {
+	unknown,
+	ascii,
+	utf8,
+	utf16,
+	utf32,
 };
 
-template <class Char> inline constexpr Encoding encoding_from_type = Encoding_unknown;
-template <> inline constexpr Encoding encoding_from_type<char > = Encoding_ascii;
-template <> inline constexpr Encoding encoding_from_type<utf8 > = Encoding_utf8;
-template <> inline constexpr Encoding encoding_from_type<utf16> = Encoding_utf16;
-template <> inline constexpr Encoding encoding_from_type<utf32> = Encoding_utf32;
-template <> inline constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding_utf16 : Encoding_utf32;
+template <class Char> inline constexpr Encoding encoding_from_type = Encoding::unknown;
+template <> inline constexpr Encoding encoding_from_type<char > = Encoding::ascii;
+template <> inline constexpr Encoding encoding_from_type<utf8 > = Encoding::utf8;
+template <> inline constexpr Encoding encoding_from_type<utf16> = Encoding::utf16;
+template <> inline constexpr Encoding encoding_from_type<utf32> = Encoding::utf32;
+template <> inline constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding::utf16 : Encoding::utf32;
 
 inline u32 char_byte_count(utf8 const *ch) {
 	auto byte_count = count_leading_ones((u8)*ch);
@@ -640,7 +640,7 @@ FormattedSpan<T, Size> format_span(Span<T, Size> span, SpanFormat format) {
 template <class T, class Size, class Format>
 [[deprecated("Use FormattedSpan instead")]]
 forceinline umm append(StringBuilder &b, FormatSpan<T, Size, Format> format) {
-	if constexpr (is_same<Format, void>) {
+	if constexpr (std::is_same_v<Format, void>) {
 		umm count = 0;
 		count += append_bytes(b, format.before);
 		if (format.value.count) {
@@ -711,10 +711,10 @@ inline umm append(StringBuilder &b, StringBuilder const &that) {
 }
 
 template <class T>
-inline constexpr bool is_char = is_same<T, ascii> || is_same<T, utf8> || is_same<T, utf16> || is_same<T, utf32> || is_same<T, wchar>;
+concept AChar = OneOf<T, ascii, utf8, utf16, utf32, wchar>;
 
-template <class Char>
-inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> format_string) {
+template <AChar Char>
+inline umm append_format(StringBuilder &b, Span<Char> format_string) {
 	Char previous = {};
 	auto start = format_string.data;
 	auto c = start;
@@ -752,7 +752,7 @@ inline EnableIf<is_char<Char>, umm> append_format(StringBuilder &b, Span<Char> f
 	return appended_char_count;
 }
 
-template <class Arg, class ...Args, class Char, class = EnableIf<is_char<Char>>>
+template <class Arg, class ...Args, AChar Char>
 umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
 	Char previous = {};
 	auto start = format_string.data;
@@ -771,7 +771,7 @@ umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Ar
 					break;
 				case '}':
 					appended_char_count += append(b, Span(start, c - 1));
-					static_assert(is_same<decltype(append(b, arg)), tl::umm>, "`append` must return `umm`");
+					static_assert(std::is_same_v<decltype(append(b, arg)), tl::umm>, "`append` must return `umm`");
 					appended_char_count += append(b, arg);
 					appended_char_count += append_format(b, Span(c + 1, end), args...);
 					start = end;
@@ -794,7 +794,7 @@ umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Ar
 	invalid_code_path("Too many arguments provided for this format string");
 	return {};
 }
-template <class ...Args, class Char, class = EnableIf<is_char<Char>>>
+template <class ...Args, AChar Char>
 umm append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
 	return append_format(b, as_span(format_string), args...);
 }
@@ -841,7 +841,7 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	if constexpr (is_signed<Int>) {
 		if (v < 0) {
 			negative = true;
-			if constexpr (is_same<Int, s8> || is_same<Int, s16> || is_same<Int, s32> || is_same<Int, s64>) {
+			if constexpr (std::is_same_v<Int, s8> || std::is_same_v<Int, s16> || std::is_same_v<Int, s32> || std::is_same_v<Int, s64>) {
 				if (v == min_value<Int>) {
 					*lsc-- = charMap[(u32)-(v % radix)];
 					v /= radix;
@@ -879,7 +879,7 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	buffer.add(Span(lsc + 1, charsWritten));
 	return charsWritten;
 }
-template <class Int, umm capacity, class = EnableIf<is_integer<Int>>>
+template <class Int, umm capacity> requires is_integer<Int>
 umm write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
 	return write_as_string(buffer, FormatInt{.value = v});
 }
@@ -891,7 +891,7 @@ umm append(StringBuilder &builder, FormatInt<Int> f) {
 	return append(builder, buffer.span());
 }
 
-template <class Int, class = EnableIf<is_integer<Int>>>
+template <class Int> requires is_integer<Int>
 umm append(StringBuilder &builder, Int v) {
 	return append(builder, FormatInt{.value = v});
 }

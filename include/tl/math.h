@@ -387,34 +387,32 @@ forceinline v4fx8 unpack(v4fx8 v) {
 
 #endif
 
-#define MINMAX(v2f, V2f)						  \
-	forceinline auto min(v2f a) { return min(a.x, a.y); }\
-	forceinline auto max(v2f a) { return max(a.x, a.y); }\
-	forceinline auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }\
-	forceinline auto max(v2f a, v2f b) { return V2f(max(a.x, b.x), max(a.y, b.y)); }
+#define MINMAX(t, c) PART(t, c, min) PART(t, c, max)
+
+#define PART(v2f, V2f, min)                                                          \
+	forceinline auto min(v2f a) { return min(a.x, a.y); }                            \
+	forceinline auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }
 MINMAX(v2f, V2f)
 MINMAX(v2s, V2s)
 MINMAX(v2u, V2u)
-#undef MINMAX
+#undef PART
 
-#define MINMAX(v3f, V3f)						  \
-	forceinline auto min(v3f a) { return min(a.x, a.y, a.z); }\
-	forceinline auto max(v3f a) { return max(a.x, a.y, a.z); }\
-	forceinline auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }\
-	forceinline auto max(v3f a, v3f b) { return V3f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
+#define PART(v3f, V3f, min)                                                                         \
+	forceinline auto min(v3f a) { return min(a.x, a.y, a.z); }                                      \
+	forceinline auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
 MINMAX(v3f, V3f)
 MINMAX(v3s, V3s)
 MINMAX(v3u, V3u)
-#undef MINMAX
+#undef PART
 
-#define MINMAX(v4f, V4f)						  \
-	forceinline auto min(v4f a) { return min(a.x, a.y, a.z, a.w); }\
-	forceinline auto max(v4f a) { return max(a.x, a.y, a.z, a.w); }\
-	forceinline auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }\
-	forceinline auto max(v4f a, v4f b) { return V4f(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }
+#define PART(v4f, V4f, min)                                                                                        \
+	forceinline auto min(v4f a) { return min(a.x, a.y, a.z, a.w); }                                                \
+	forceinline auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }
 MINMAX(v4f, V4f)
 MINMAX(v4s, V4s)
 MINMAX(v4u, V4u)
+#undef PART
+
 #undef MINMAX
 
 #define HALF(f32) forceinline f32 half(f32 v) { return v * 0.5f; }

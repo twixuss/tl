@@ -240,7 +240,7 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		BlockListIndex index = {};
 		auto block = &list.first;
@@ -260,7 +260,7 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 		} while (block);
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		auto block = &list.first;
 		do {
@@ -707,7 +707,7 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		BlockListIndex index = {};
 		auto block = list.first;
@@ -727,7 +727,7 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 		}
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		auto block = list.first;
 		while (block) {

@@ -553,7 +553,7 @@ struct ContiguousHashMap : Traits {
 			return false;
 
 		Span<Cell> new_cells;
-		new_cells.count = max(TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, cells.count);
+		new_cells.count = max((umm)TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, cells.count);
 		while (new_cells.count < desired) {
 			new_cells.count *= 2;
 		}

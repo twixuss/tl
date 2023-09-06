@@ -113,6 +113,18 @@ struct Scoped<ConsoleColor> {
 	}
 };
 
+template <>
+struct Scoped<Printer> {
+	Printer old_printer;
+	Scoped(Printer new_printer) {
+		old_printer = current_printer;
+		current_printer = new_printer;
+	}
+	~Scoped() {
+		current_printer = old_printer;
+	}
+};
+
 #ifdef TL_IMPL
 
 thread_local Printer current_printer = {[](Span<utf8>, void *) {}};
@@ -199,11 +211,11 @@ void clear_console() {
 
 DWORD get_code_page(Encoding encoding) {
 	switch (encoding) {
-		case Encoding_unknown: break;
-		case Encoding_ascii: return 1251;
-		case Encoding_utf8: return 65001;
-		case Encoding_utf16: return 1200;
-		case Encoding_utf32: invalid_code_path("not implemented");
+		case Encoding::unknown: break;
+		case Encoding::ascii: return 1251;
+		case Encoding::utf8: return 65001;
+		case Encoding::utf16: return 1200;
+		case Encoding::utf32: invalid_code_path("not implemented");
 	}
 	invalid_code_path();
 	return (DWORD)-1;
@@ -250,21 +262,6 @@ void init_printer() {
 }
 
 #endif
-
-struct PrinterPusher {
-	Printer old_printer;
-	PrinterPusher(Printer new_printer) {
-		old_printer = current_printer;
-		current_printer = new_printer;
-	}
-	~PrinterPusher() {
-		current_printer = old_printer;
-	}
-	operator bool() { return true; }
-};
-
-#define push_printer(printer) tl_push(::tl::PrinterPusher, printer)
-#define scoped_printer(printer) tl_scoped(::tl::current_printer, printer)
 
 } // namespace tl
 

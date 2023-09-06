@@ -285,8 +285,12 @@ struct LockProtected {
 	using Value = T;
 
 	LockProtected() = default;
-	LockProtected(T value) : value(value) {
-	}
+	LockProtected(LockProtected const &) = delete;
+	LockProtected(LockProtected &&) = delete;
+	LockProtected(T value) : value(value) {}
+
+	LockProtected &operator=(LockProtected const &) = delete;
+	LockProtected &operator=(LockProtected &&) = delete;
 
 	template <class Fn>
 	decltype(auto) use(Fn fn) {

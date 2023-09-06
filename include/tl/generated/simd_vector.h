@@ -35,8 +35,6 @@ union v4s32x4;
 union v4s64x2;
 union v4f32x4;
 union v4f64x2;
-
-#if ARCH_AVX
 union v2u8x32;
 union v2u16x16;
 union v2u32x8;
@@ -67,10 +65,6 @@ union v4s32x8;
 union v4s64x4;
 union v4f32x8;
 union v4f64x4;
-
-#endif
-
-#if ARCH_AVX512
 union v2u8x64;
 union v2u16x32;
 union v2u32x16;
@@ -101,8 +95,6 @@ union v4s32x16;
 union v4s64x8;
 union v4f32x16;
 union v4f64x8;
-
-#endif
 union v2u8x16 {
 	struct { simd_typed::u8x16 x, y; };
 	simd_typed::u8x16 d[2];
@@ -142,6 +134,16 @@ union v2u8x16 {
 	forceinline friend v2u8x16 operator|(v2u8 a, v2u8x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u8x16 operator|(v2u8x16 a, u8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u8x16 operator|(u8 a, v2u8x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u8x16 operator<<(v2u8x16 a, v2u8x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x16 operator<<(v2u8x16 a, v2u8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x16 operator<<(v2u8 a, v2u8x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x16 operator<<(v2u8x16 a, u8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u8x16 operator<<(u8 a, v2u8x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u8x16 operator>>(v2u8x16 a, v2u8x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x16 operator>>(v2u8x16 a, v2u8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x16 operator>>(v2u8 a, v2u8x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x16 operator>>(v2u8x16 a, u8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u8x16 operator>>(u8 a, v2u8x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2s8x16() const;
 };
 
@@ -187,6 +189,16 @@ union v2u16x8 {
 	forceinline friend v2u16x8 operator|(v2u16 a, v2u16x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u16x8 operator|(v2u16x8 a, u16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u16x8 operator|(u16 a, v2u16x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u16x8 operator<<(v2u16x8 a, v2u16x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x8 operator<<(v2u16x8 a, v2u16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x8 operator<<(v2u16 a, v2u16x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x8 operator<<(v2u16x8 a, u16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u16x8 operator<<(u16 a, v2u16x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u16x8 operator>>(v2u16x8 a, v2u16x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x8 operator>>(v2u16x8 a, v2u16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x8 operator>>(v2u16 a, v2u16x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x8 operator>>(v2u16x8 a, u16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u16x8 operator>>(u16 a, v2u16x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u16x8 operator<<(v2u16x8 a, u16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u16x8 operator>>(v2u16x8 a, u16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s16x8() const;
@@ -234,6 +246,16 @@ union v2u32x4 {
 	forceinline friend v2u32x4 operator|(v2u32 a, v2u32x4 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u32x4 operator|(v2u32x4 a, u32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u32x4 operator|(u32 a, v2u32x4 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u32x4 operator<<(v2u32x4 a, v2u32x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x4 operator<<(v2u32x4 a, v2u32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x4 operator<<(v2u32 a, v2u32x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x4 operator<<(v2u32x4 a, u32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u32x4 operator<<(u32 a, v2u32x4 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u32x4 operator>>(v2u32x4 a, v2u32x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x4 operator>>(v2u32x4 a, v2u32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x4 operator>>(v2u32 a, v2u32x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x4 operator>>(v2u32x4 a, u32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u32x4 operator>>(u32 a, v2u32x4 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u32x4 operator<<(v2u32x4 a, u32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u32x4 operator>>(v2u32x4 a, u32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s32x4() const;
@@ -282,6 +304,16 @@ union v2u64x2 {
 	forceinline friend v2u64x2 operator|(v2u64 a, v2u64x2 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u64x2 operator|(v2u64x2 a, u64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u64x2 operator|(u64 a, v2u64x2 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u64x2 operator<<(v2u64x2 a, v2u64x2 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x2 operator<<(v2u64x2 a, v2u64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x2 operator<<(v2u64 a, v2u64x2 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x2 operator<<(v2u64x2 a, u64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u64x2 operator<<(u64 a, v2u64x2 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u64x2 operator>>(v2u64x2 a, v2u64x2 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x2 operator>>(v2u64x2 a, v2u64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x2 operator>>(v2u64 a, v2u64x2 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x2 operator>>(v2u64x2 a, u64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u64x2 operator>>(u64 a, v2u64x2 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u64x2 operator<<(v2u64x2 a, u64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u64x2 operator>>(v2u64x2 a, u64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s64x2() const;
@@ -330,6 +362,16 @@ union v2s8x16 {
 	forceinline friend v2s8x16 operator|(v2s8 a, v2s8x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s8x16 operator|(v2s8x16 a, s8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s8x16 operator|(s8 a, v2s8x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s8x16 operator<<(v2s8x16 a, v2s8x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x16 operator<<(v2s8x16 a, v2s8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x16 operator<<(v2s8 a, v2s8x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x16 operator<<(v2s8x16 a, s8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s8x16 operator<<(s8 a, v2s8x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s8x16 operator>>(v2s8x16 a, v2s8x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x16 operator>>(v2s8x16 a, v2s8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x16 operator>>(v2s8 a, v2s8x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x16 operator>>(v2s8x16 a, s8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s8x16 operator>>(s8 a, v2s8x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2u8x16() const;
 };
 
@@ -375,6 +417,16 @@ union v2s16x8 {
 	forceinline friend v2s16x8 operator|(v2s16 a, v2s16x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s16x8 operator|(v2s16x8 a, s16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s16x8 operator|(s16 a, v2s16x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s16x8 operator<<(v2s16x8 a, v2s16x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x8 operator<<(v2s16x8 a, v2s16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x8 operator<<(v2s16 a, v2s16x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x8 operator<<(v2s16x8 a, s16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s16x8 operator<<(s16 a, v2s16x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s16x8 operator>>(v2s16x8 a, v2s16x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x8 operator>>(v2s16x8 a, v2s16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x8 operator>>(v2s16 a, v2s16x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x8 operator>>(v2s16x8 a, s16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s16x8 operator>>(s16 a, v2s16x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s16x8 operator<<(v2s16x8 a, s16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s16x8 operator>>(v2s16x8 a, s16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u16x8() const;
@@ -422,6 +474,16 @@ union v2s32x4 {
 	forceinline friend v2s32x4 operator|(v2s32 a, v2s32x4 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s32x4 operator|(v2s32x4 a, s32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s32x4 operator|(s32 a, v2s32x4 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s32x4 operator<<(v2s32x4 a, v2s32x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x4 operator<<(v2s32x4 a, v2s32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x4 operator<<(v2s32 a, v2s32x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x4 operator<<(v2s32x4 a, s32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s32x4 operator<<(s32 a, v2s32x4 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s32x4 operator>>(v2s32x4 a, v2s32x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x4 operator>>(v2s32x4 a, v2s32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x4 operator>>(v2s32 a, v2s32x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x4 operator>>(v2s32x4 a, s32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s32x4 operator>>(s32 a, v2s32x4 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s32x4 operator<<(v2s32x4 a, s32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s32x4 operator>>(v2s32x4 a, s32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u32x4() const;
@@ -470,6 +532,16 @@ union v2s64x2 {
 	forceinline friend v2s64x2 operator|(v2s64 a, v2s64x2 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s64x2 operator|(v2s64x2 a, s64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s64x2 operator|(s64 a, v2s64x2 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s64x2 operator<<(v2s64x2 a, v2s64x2 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x2 operator<<(v2s64x2 a, v2s64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x2 operator<<(v2s64 a, v2s64x2 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x2 operator<<(v2s64x2 a, s64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s64x2 operator<<(s64 a, v2s64x2 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s64x2 operator>>(v2s64x2 a, v2s64x2 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x2 operator>>(v2s64x2 a, v2s64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x2 operator>>(v2s64 a, v2s64x2 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x2 operator>>(v2s64x2 a, s64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s64x2 operator>>(s64 a, v2s64x2 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s64x2 operator<<(v2s64x2 a, s64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s64x2 operator>>(v2s64x2 a, s64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u64x2() const;
@@ -596,6 +668,16 @@ union v3u8x16 {
 	forceinline friend v3u8x16 operator|(v3u8 a, v3u8x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u8x16 operator|(v3u8x16 a, u8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u8x16 operator|(u8 a, v3u8x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u8x16 operator<<(v3u8x16 a, v3u8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x16 operator<<(v3u8x16 a, v3u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x16 operator<<(v3u8 a, v3u8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x16 operator<<(v3u8x16 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u8x16 operator<<(u8 a, v3u8x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u8x16 operator>>(v3u8x16 a, v3u8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x16 operator>>(v3u8x16 a, v3u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x16 operator>>(v3u8 a, v3u8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x16 operator>>(v3u8x16 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u8x16 operator>>(u8 a, v3u8x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3s8x16() const;
 };
 
@@ -641,6 +723,16 @@ union v3u16x8 {
 	forceinline friend v3u16x8 operator|(v3u16 a, v3u16x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u16x8 operator|(v3u16x8 a, u16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u16x8 operator|(u16 a, v3u16x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u16x8 operator<<(v3u16x8 a, v3u16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x8 operator<<(v3u16x8 a, v3u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x8 operator<<(v3u16 a, v3u16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x8 operator<<(v3u16x8 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u16x8 operator<<(u16 a, v3u16x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u16x8 operator>>(v3u16x8 a, v3u16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x8 operator>>(v3u16x8 a, v3u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x8 operator>>(v3u16 a, v3u16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x8 operator>>(v3u16x8 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u16x8 operator>>(u16 a, v3u16x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u16x8 operator<<(v3u16x8 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u16x8 operator>>(v3u16x8 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s16x8() const;
@@ -688,6 +780,16 @@ union v3u32x4 {
 	forceinline friend v3u32x4 operator|(v3u32 a, v3u32x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u32x4 operator|(v3u32x4 a, u32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u32x4 operator|(u32 a, v3u32x4 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u32x4 operator<<(v3u32x4 a, v3u32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x4 operator<<(v3u32x4 a, v3u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x4 operator<<(v3u32 a, v3u32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x4 operator<<(v3u32x4 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u32x4 operator<<(u32 a, v3u32x4 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u32x4 operator>>(v3u32x4 a, v3u32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x4 operator>>(v3u32x4 a, v3u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x4 operator>>(v3u32 a, v3u32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x4 operator>>(v3u32x4 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u32x4 operator>>(u32 a, v3u32x4 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u32x4 operator<<(v3u32x4 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u32x4 operator>>(v3u32x4 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s32x4() const;
@@ -736,6 +838,16 @@ union v3u64x2 {
 	forceinline friend v3u64x2 operator|(v3u64 a, v3u64x2 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u64x2 operator|(v3u64x2 a, u64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u64x2 operator|(u64 a, v3u64x2 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u64x2 operator<<(v3u64x2 a, v3u64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x2 operator<<(v3u64x2 a, v3u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x2 operator<<(v3u64 a, v3u64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x2 operator<<(v3u64x2 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u64x2 operator<<(u64 a, v3u64x2 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u64x2 operator>>(v3u64x2 a, v3u64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x2 operator>>(v3u64x2 a, v3u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x2 operator>>(v3u64 a, v3u64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x2 operator>>(v3u64x2 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u64x2 operator>>(u64 a, v3u64x2 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u64x2 operator<<(v3u64x2 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u64x2 operator>>(v3u64x2 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s64x2() const;
@@ -784,6 +896,16 @@ union v3s8x16 {
 	forceinline friend v3s8x16 operator|(v3s8 a, v3s8x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s8x16 operator|(v3s8x16 a, s8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s8x16 operator|(s8 a, v3s8x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s8x16 operator<<(v3s8x16 a, v3s8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x16 operator<<(v3s8x16 a, v3s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x16 operator<<(v3s8 a, v3s8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x16 operator<<(v3s8x16 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s8x16 operator<<(s8 a, v3s8x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s8x16 operator>>(v3s8x16 a, v3s8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x16 operator>>(v3s8x16 a, v3s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x16 operator>>(v3s8 a, v3s8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x16 operator>>(v3s8x16 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s8x16 operator>>(s8 a, v3s8x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3u8x16() const;
 };
 
@@ -829,6 +951,16 @@ union v3s16x8 {
 	forceinline friend v3s16x8 operator|(v3s16 a, v3s16x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s16x8 operator|(v3s16x8 a, s16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s16x8 operator|(s16 a, v3s16x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s16x8 operator<<(v3s16x8 a, v3s16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x8 operator<<(v3s16x8 a, v3s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x8 operator<<(v3s16 a, v3s16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x8 operator<<(v3s16x8 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s16x8 operator<<(s16 a, v3s16x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s16x8 operator>>(v3s16x8 a, v3s16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x8 operator>>(v3s16x8 a, v3s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x8 operator>>(v3s16 a, v3s16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x8 operator>>(v3s16x8 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s16x8 operator>>(s16 a, v3s16x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s16x8 operator<<(v3s16x8 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s16x8 operator>>(v3s16x8 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u16x8() const;
@@ -876,6 +1008,16 @@ union v3s32x4 {
 	forceinline friend v3s32x4 operator|(v3s32 a, v3s32x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s32x4 operator|(v3s32x4 a, s32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s32x4 operator|(s32 a, v3s32x4 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s32x4 operator<<(v3s32x4 a, v3s32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x4 operator<<(v3s32x4 a, v3s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x4 operator<<(v3s32 a, v3s32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x4 operator<<(v3s32x4 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s32x4 operator<<(s32 a, v3s32x4 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s32x4 operator>>(v3s32x4 a, v3s32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x4 operator>>(v3s32x4 a, v3s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x4 operator>>(v3s32 a, v3s32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x4 operator>>(v3s32x4 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s32x4 operator>>(s32 a, v3s32x4 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s32x4 operator<<(v3s32x4 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s32x4 operator>>(v3s32x4 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u32x4() const;
@@ -924,6 +1066,16 @@ union v3s64x2 {
 	forceinline friend v3s64x2 operator|(v3s64 a, v3s64x2 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s64x2 operator|(v3s64x2 a, s64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s64x2 operator|(s64 a, v3s64x2 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s64x2 operator<<(v3s64x2 a, v3s64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x2 operator<<(v3s64x2 a, v3s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x2 operator<<(v3s64 a, v3s64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x2 operator<<(v3s64x2 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s64x2 operator<<(s64 a, v3s64x2 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s64x2 operator>>(v3s64x2 a, v3s64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x2 operator>>(v3s64x2 a, v3s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x2 operator>>(v3s64 a, v3s64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x2 operator>>(v3s64x2 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s64x2 operator>>(s64 a, v3s64x2 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s64x2 operator<<(v3s64x2 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s64x2 operator>>(v3s64x2 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u64x2() const;
@@ -1050,6 +1202,16 @@ union v4u8x16 {
 	forceinline friend v4u8x16 operator|(v4u8 a, v4u8x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u8x16 operator|(v4u8x16 a, u8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u8x16 operator|(u8 a, v4u8x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u8x16 operator<<(v4u8x16 a, v4u8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x16 operator<<(v4u8x16 a, v4u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x16 operator<<(v4u8 a, v4u8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x16 operator<<(v4u8x16 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u8x16 operator<<(u8 a, v4u8x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u8x16 operator>>(v4u8x16 a, v4u8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x16 operator>>(v4u8x16 a, v4u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x16 operator>>(v4u8 a, v4u8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x16 operator>>(v4u8x16 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u8x16 operator>>(u8 a, v4u8x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4s8x16() const;
 };
 
@@ -1095,6 +1257,16 @@ union v4u16x8 {
 	forceinline friend v4u16x8 operator|(v4u16 a, v4u16x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u16x8 operator|(v4u16x8 a, u16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u16x8 operator|(u16 a, v4u16x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u16x8 operator<<(v4u16x8 a, v4u16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x8 operator<<(v4u16x8 a, v4u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x8 operator<<(v4u16 a, v4u16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x8 operator<<(v4u16x8 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u16x8 operator<<(u16 a, v4u16x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u16x8 operator>>(v4u16x8 a, v4u16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x8 operator>>(v4u16x8 a, v4u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x8 operator>>(v4u16 a, v4u16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x8 operator>>(v4u16x8 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u16x8 operator>>(u16 a, v4u16x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u16x8 operator<<(v4u16x8 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u16x8 operator>>(v4u16x8 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s16x8() const;
@@ -1142,6 +1314,16 @@ union v4u32x4 {
 	forceinline friend v4u32x4 operator|(v4u32 a, v4u32x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u32x4 operator|(v4u32x4 a, u32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u32x4 operator|(u32 a, v4u32x4 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u32x4 operator<<(v4u32x4 a, v4u32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x4 operator<<(v4u32x4 a, v4u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x4 operator<<(v4u32 a, v4u32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x4 operator<<(v4u32x4 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u32x4 operator<<(u32 a, v4u32x4 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u32x4 operator>>(v4u32x4 a, v4u32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x4 operator>>(v4u32x4 a, v4u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x4 operator>>(v4u32 a, v4u32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x4 operator>>(v4u32x4 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u32x4 operator>>(u32 a, v4u32x4 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u32x4 operator<<(v4u32x4 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u32x4 operator>>(v4u32x4 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s32x4() const;
@@ -1190,6 +1372,16 @@ union v4u64x2 {
 	forceinline friend v4u64x2 operator|(v4u64 a, v4u64x2 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u64x2 operator|(v4u64x2 a, u64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u64x2 operator|(u64 a, v4u64x2 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u64x2 operator<<(v4u64x2 a, v4u64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x2 operator<<(v4u64x2 a, v4u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x2 operator<<(v4u64 a, v4u64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x2 operator<<(v4u64x2 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u64x2 operator<<(u64 a, v4u64x2 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u64x2 operator>>(v4u64x2 a, v4u64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x2 operator>>(v4u64x2 a, v4u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x2 operator>>(v4u64 a, v4u64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x2 operator>>(v4u64x2 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u64x2 operator>>(u64 a, v4u64x2 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u64x2 operator<<(v4u64x2 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u64x2 operator>>(v4u64x2 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s64x2() const;
@@ -1238,6 +1430,16 @@ union v4s8x16 {
 	forceinline friend v4s8x16 operator|(v4s8 a, v4s8x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s8x16 operator|(v4s8x16 a, s8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s8x16 operator|(s8 a, v4s8x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s8x16 operator<<(v4s8x16 a, v4s8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x16 operator<<(v4s8x16 a, v4s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x16 operator<<(v4s8 a, v4s8x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x16 operator<<(v4s8x16 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s8x16 operator<<(s8 a, v4s8x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s8x16 operator>>(v4s8x16 a, v4s8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x16 operator>>(v4s8x16 a, v4s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x16 operator>>(v4s8 a, v4s8x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x16 operator>>(v4s8x16 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s8x16 operator>>(s8 a, v4s8x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4u8x16() const;
 };
 
@@ -1283,6 +1485,16 @@ union v4s16x8 {
 	forceinline friend v4s16x8 operator|(v4s16 a, v4s16x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s16x8 operator|(v4s16x8 a, s16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s16x8 operator|(s16 a, v4s16x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s16x8 operator<<(v4s16x8 a, v4s16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x8 operator<<(v4s16x8 a, v4s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x8 operator<<(v4s16 a, v4s16x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x8 operator<<(v4s16x8 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s16x8 operator<<(s16 a, v4s16x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s16x8 operator>>(v4s16x8 a, v4s16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x8 operator>>(v4s16x8 a, v4s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x8 operator>>(v4s16 a, v4s16x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x8 operator>>(v4s16x8 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s16x8 operator>>(s16 a, v4s16x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s16x8 operator<<(v4s16x8 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s16x8 operator>>(v4s16x8 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u16x8() const;
@@ -1330,6 +1542,16 @@ union v4s32x4 {
 	forceinline friend v4s32x4 operator|(v4s32 a, v4s32x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s32x4 operator|(v4s32x4 a, s32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s32x4 operator|(s32 a, v4s32x4 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s32x4 operator<<(v4s32x4 a, v4s32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x4 operator<<(v4s32x4 a, v4s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x4 operator<<(v4s32 a, v4s32x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x4 operator<<(v4s32x4 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s32x4 operator<<(s32 a, v4s32x4 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s32x4 operator>>(v4s32x4 a, v4s32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x4 operator>>(v4s32x4 a, v4s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x4 operator>>(v4s32 a, v4s32x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x4 operator>>(v4s32x4 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s32x4 operator>>(s32 a, v4s32x4 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s32x4 operator<<(v4s32x4 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s32x4 operator>>(v4s32x4 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u32x4() const;
@@ -1378,6 +1600,16 @@ union v4s64x2 {
 	forceinline friend v4s64x2 operator|(v4s64 a, v4s64x2 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s64x2 operator|(v4s64x2 a, s64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s64x2 operator|(s64 a, v4s64x2 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s64x2 operator<<(v4s64x2 a, v4s64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x2 operator<<(v4s64x2 a, v4s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x2 operator<<(v4s64 a, v4s64x2 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x2 operator<<(v4s64x2 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s64x2 operator<<(s64 a, v4s64x2 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s64x2 operator>>(v4s64x2 a, v4s64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x2 operator>>(v4s64x2 a, v4s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x2 operator>>(v4s64 a, v4s64x2 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x2 operator>>(v4s64x2 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s64x2 operator>>(s64 a, v4s64x2 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s64x2 operator<<(v4s64x2 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s64x2 operator>>(v4s64x2 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u64x2() const;
@@ -1465,8 +1697,6 @@ forceinline v4f32x4::operator v4u32x4() const { return {(simd_typed::u32x4)x, (s
 forceinline v4f32x4::operator v4s32x4() const { return {(simd_typed::s32x4)x, (simd_typed::s32x4)y, (simd_typed::s32x4)z, (simd_typed::s32x4)w, }; }
 forceinline v4f64x2::operator v4u64x2() const { return {(simd_typed::u64x2)x, (simd_typed::u64x2)y, (simd_typed::u64x2)z, (simd_typed::u64x2)w, }; }
 forceinline v4f64x2::operator v4s64x2() const { return {(simd_typed::s64x2)x, (simd_typed::s64x2)y, (simd_typed::s64x2)z, (simd_typed::s64x2)w, }; }
-
-#if ARCH_AVX
 union v2u8x32 {
 	struct { simd_typed::u8x32 x, y; };
 	simd_typed::u8x32 d[2];
@@ -1506,6 +1736,16 @@ union v2u8x32 {
 	forceinline friend v2u8x32 operator|(v2u8 a, v2u8x32 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u8x32 operator|(v2u8x32 a, u8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u8x32 operator|(u8 a, v2u8x32 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u8x32 operator<<(v2u8x32 a, v2u8x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x32 operator<<(v2u8x32 a, v2u8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x32 operator<<(v2u8 a, v2u8x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x32 operator<<(v2u8x32 a, u8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u8x32 operator<<(u8 a, v2u8x32 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u8x32 operator>>(v2u8x32 a, v2u8x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x32 operator>>(v2u8x32 a, v2u8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x32 operator>>(v2u8 a, v2u8x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x32 operator>>(v2u8x32 a, u8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u8x32 operator>>(u8 a, v2u8x32 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2s8x32() const;
 };
 
@@ -1551,6 +1791,16 @@ union v2u16x16 {
 	forceinline friend v2u16x16 operator|(v2u16 a, v2u16x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u16x16 operator|(v2u16x16 a, u16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u16x16 operator|(u16 a, v2u16x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u16x16 operator<<(v2u16x16 a, v2u16x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x16 operator<<(v2u16x16 a, v2u16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x16 operator<<(v2u16 a, v2u16x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x16 operator<<(v2u16x16 a, u16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u16x16 operator<<(u16 a, v2u16x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u16x16 operator>>(v2u16x16 a, v2u16x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x16 operator>>(v2u16x16 a, v2u16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x16 operator>>(v2u16 a, v2u16x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x16 operator>>(v2u16x16 a, u16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u16x16 operator>>(u16 a, v2u16x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u16x16 operator<<(v2u16x16 a, u16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u16x16 operator>>(v2u16x16 a, u16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s16x16() const;
@@ -1598,6 +1848,16 @@ union v2u32x8 {
 	forceinline friend v2u32x8 operator|(v2u32 a, v2u32x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u32x8 operator|(v2u32x8 a, u32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u32x8 operator|(u32 a, v2u32x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u32x8 operator<<(v2u32x8 a, v2u32x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x8 operator<<(v2u32x8 a, v2u32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x8 operator<<(v2u32 a, v2u32x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x8 operator<<(v2u32x8 a, u32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u32x8 operator<<(u32 a, v2u32x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u32x8 operator>>(v2u32x8 a, v2u32x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x8 operator>>(v2u32x8 a, v2u32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x8 operator>>(v2u32 a, v2u32x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x8 operator>>(v2u32x8 a, u32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u32x8 operator>>(u32 a, v2u32x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u32x8 operator<<(v2u32x8 a, u32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u32x8 operator>>(v2u32x8 a, u32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s32x8() const;
@@ -1646,6 +1906,16 @@ union v2u64x4 {
 	forceinline friend v2u64x4 operator|(v2u64 a, v2u64x4 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u64x4 operator|(v2u64x4 a, u64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u64x4 operator|(u64 a, v2u64x4 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u64x4 operator<<(v2u64x4 a, v2u64x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x4 operator<<(v2u64x4 a, v2u64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x4 operator<<(v2u64 a, v2u64x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x4 operator<<(v2u64x4 a, u64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u64x4 operator<<(u64 a, v2u64x4 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u64x4 operator>>(v2u64x4 a, v2u64x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x4 operator>>(v2u64x4 a, v2u64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x4 operator>>(v2u64 a, v2u64x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x4 operator>>(v2u64x4 a, u64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u64x4 operator>>(u64 a, v2u64x4 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u64x4 operator<<(v2u64x4 a, u64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u64x4 operator>>(v2u64x4 a, u64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s64x4() const;
@@ -1694,6 +1964,16 @@ union v2s8x32 {
 	forceinline friend v2s8x32 operator|(v2s8 a, v2s8x32 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s8x32 operator|(v2s8x32 a, s8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s8x32 operator|(s8 a, v2s8x32 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s8x32 operator<<(v2s8x32 a, v2s8x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x32 operator<<(v2s8x32 a, v2s8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x32 operator<<(v2s8 a, v2s8x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x32 operator<<(v2s8x32 a, s8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s8x32 operator<<(s8 a, v2s8x32 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s8x32 operator>>(v2s8x32 a, v2s8x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x32 operator>>(v2s8x32 a, v2s8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x32 operator>>(v2s8 a, v2s8x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x32 operator>>(v2s8x32 a, s8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s8x32 operator>>(s8 a, v2s8x32 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2u8x32() const;
 };
 
@@ -1739,6 +2019,16 @@ union v2s16x16 {
 	forceinline friend v2s16x16 operator|(v2s16 a, v2s16x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s16x16 operator|(v2s16x16 a, s16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s16x16 operator|(s16 a, v2s16x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s16x16 operator<<(v2s16x16 a, v2s16x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x16 operator<<(v2s16x16 a, v2s16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x16 operator<<(v2s16 a, v2s16x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x16 operator<<(v2s16x16 a, s16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s16x16 operator<<(s16 a, v2s16x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s16x16 operator>>(v2s16x16 a, v2s16x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x16 operator>>(v2s16x16 a, v2s16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x16 operator>>(v2s16 a, v2s16x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x16 operator>>(v2s16x16 a, s16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s16x16 operator>>(s16 a, v2s16x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s16x16 operator<<(v2s16x16 a, s16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s16x16 operator>>(v2s16x16 a, s16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u16x16() const;
@@ -1786,6 +2076,16 @@ union v2s32x8 {
 	forceinline friend v2s32x8 operator|(v2s32 a, v2s32x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s32x8 operator|(v2s32x8 a, s32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s32x8 operator|(s32 a, v2s32x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s32x8 operator<<(v2s32x8 a, v2s32x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x8 operator<<(v2s32x8 a, v2s32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x8 operator<<(v2s32 a, v2s32x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x8 operator<<(v2s32x8 a, s32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s32x8 operator<<(s32 a, v2s32x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s32x8 operator>>(v2s32x8 a, v2s32x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x8 operator>>(v2s32x8 a, v2s32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x8 operator>>(v2s32 a, v2s32x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x8 operator>>(v2s32x8 a, s32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s32x8 operator>>(s32 a, v2s32x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s32x8 operator<<(v2s32x8 a, s32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s32x8 operator>>(v2s32x8 a, s32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u32x8() const;
@@ -1834,6 +2134,16 @@ union v2s64x4 {
 	forceinline friend v2s64x4 operator|(v2s64 a, v2s64x4 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s64x4 operator|(v2s64x4 a, s64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s64x4 operator|(s64 a, v2s64x4 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s64x4 operator<<(v2s64x4 a, v2s64x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x4 operator<<(v2s64x4 a, v2s64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x4 operator<<(v2s64 a, v2s64x4 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x4 operator<<(v2s64x4 a, s64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s64x4 operator<<(s64 a, v2s64x4 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s64x4 operator>>(v2s64x4 a, v2s64x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x4 operator>>(v2s64x4 a, v2s64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x4 operator>>(v2s64 a, v2s64x4 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x4 operator>>(v2s64x4 a, s64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s64x4 operator>>(s64 a, v2s64x4 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s64x4 operator<<(v2s64x4 a, s64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s64x4 operator>>(v2s64x4 a, s64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u64x4() const;
@@ -1960,6 +2270,16 @@ union v3u8x32 {
 	forceinline friend v3u8x32 operator|(v3u8 a, v3u8x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u8x32 operator|(v3u8x32 a, u8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u8x32 operator|(u8 a, v3u8x32 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u8x32 operator<<(v3u8x32 a, v3u8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x32 operator<<(v3u8x32 a, v3u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x32 operator<<(v3u8 a, v3u8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x32 operator<<(v3u8x32 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u8x32 operator<<(u8 a, v3u8x32 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u8x32 operator>>(v3u8x32 a, v3u8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x32 operator>>(v3u8x32 a, v3u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x32 operator>>(v3u8 a, v3u8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x32 operator>>(v3u8x32 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u8x32 operator>>(u8 a, v3u8x32 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3s8x32() const;
 };
 
@@ -2005,6 +2325,16 @@ union v3u16x16 {
 	forceinline friend v3u16x16 operator|(v3u16 a, v3u16x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u16x16 operator|(v3u16x16 a, u16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u16x16 operator|(u16 a, v3u16x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u16x16 operator<<(v3u16x16 a, v3u16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x16 operator<<(v3u16x16 a, v3u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x16 operator<<(v3u16 a, v3u16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x16 operator<<(v3u16x16 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u16x16 operator<<(u16 a, v3u16x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u16x16 operator>>(v3u16x16 a, v3u16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x16 operator>>(v3u16x16 a, v3u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x16 operator>>(v3u16 a, v3u16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x16 operator>>(v3u16x16 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u16x16 operator>>(u16 a, v3u16x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u16x16 operator<<(v3u16x16 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u16x16 operator>>(v3u16x16 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s16x16() const;
@@ -2052,6 +2382,16 @@ union v3u32x8 {
 	forceinline friend v3u32x8 operator|(v3u32 a, v3u32x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u32x8 operator|(v3u32x8 a, u32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u32x8 operator|(u32 a, v3u32x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u32x8 operator<<(v3u32x8 a, v3u32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x8 operator<<(v3u32x8 a, v3u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x8 operator<<(v3u32 a, v3u32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x8 operator<<(v3u32x8 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u32x8 operator<<(u32 a, v3u32x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u32x8 operator>>(v3u32x8 a, v3u32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x8 operator>>(v3u32x8 a, v3u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x8 operator>>(v3u32 a, v3u32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x8 operator>>(v3u32x8 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u32x8 operator>>(u32 a, v3u32x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u32x8 operator<<(v3u32x8 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u32x8 operator>>(v3u32x8 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s32x8() const;
@@ -2100,6 +2440,16 @@ union v3u64x4 {
 	forceinline friend v3u64x4 operator|(v3u64 a, v3u64x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u64x4 operator|(v3u64x4 a, u64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u64x4 operator|(u64 a, v3u64x4 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u64x4 operator<<(v3u64x4 a, v3u64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x4 operator<<(v3u64x4 a, v3u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x4 operator<<(v3u64 a, v3u64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x4 operator<<(v3u64x4 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u64x4 operator<<(u64 a, v3u64x4 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u64x4 operator>>(v3u64x4 a, v3u64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x4 operator>>(v3u64x4 a, v3u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x4 operator>>(v3u64 a, v3u64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x4 operator>>(v3u64x4 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u64x4 operator>>(u64 a, v3u64x4 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u64x4 operator<<(v3u64x4 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u64x4 operator>>(v3u64x4 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s64x4() const;
@@ -2148,6 +2498,16 @@ union v3s8x32 {
 	forceinline friend v3s8x32 operator|(v3s8 a, v3s8x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s8x32 operator|(v3s8x32 a, s8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s8x32 operator|(s8 a, v3s8x32 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s8x32 operator<<(v3s8x32 a, v3s8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x32 operator<<(v3s8x32 a, v3s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x32 operator<<(v3s8 a, v3s8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x32 operator<<(v3s8x32 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s8x32 operator<<(s8 a, v3s8x32 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s8x32 operator>>(v3s8x32 a, v3s8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x32 operator>>(v3s8x32 a, v3s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x32 operator>>(v3s8 a, v3s8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x32 operator>>(v3s8x32 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s8x32 operator>>(s8 a, v3s8x32 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3u8x32() const;
 };
 
@@ -2193,6 +2553,16 @@ union v3s16x16 {
 	forceinline friend v3s16x16 operator|(v3s16 a, v3s16x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s16x16 operator|(v3s16x16 a, s16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s16x16 operator|(s16 a, v3s16x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s16x16 operator<<(v3s16x16 a, v3s16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x16 operator<<(v3s16x16 a, v3s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x16 operator<<(v3s16 a, v3s16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x16 operator<<(v3s16x16 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s16x16 operator<<(s16 a, v3s16x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s16x16 operator>>(v3s16x16 a, v3s16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x16 operator>>(v3s16x16 a, v3s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x16 operator>>(v3s16 a, v3s16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x16 operator>>(v3s16x16 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s16x16 operator>>(s16 a, v3s16x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s16x16 operator<<(v3s16x16 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s16x16 operator>>(v3s16x16 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u16x16() const;
@@ -2240,6 +2610,16 @@ union v3s32x8 {
 	forceinline friend v3s32x8 operator|(v3s32 a, v3s32x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s32x8 operator|(v3s32x8 a, s32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s32x8 operator|(s32 a, v3s32x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s32x8 operator<<(v3s32x8 a, v3s32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x8 operator<<(v3s32x8 a, v3s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x8 operator<<(v3s32 a, v3s32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x8 operator<<(v3s32x8 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s32x8 operator<<(s32 a, v3s32x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s32x8 operator>>(v3s32x8 a, v3s32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x8 operator>>(v3s32x8 a, v3s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x8 operator>>(v3s32 a, v3s32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x8 operator>>(v3s32x8 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s32x8 operator>>(s32 a, v3s32x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s32x8 operator<<(v3s32x8 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s32x8 operator>>(v3s32x8 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u32x8() const;
@@ -2288,6 +2668,16 @@ union v3s64x4 {
 	forceinline friend v3s64x4 operator|(v3s64 a, v3s64x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s64x4 operator|(v3s64x4 a, s64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s64x4 operator|(s64 a, v3s64x4 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s64x4 operator<<(v3s64x4 a, v3s64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x4 operator<<(v3s64x4 a, v3s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x4 operator<<(v3s64 a, v3s64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x4 operator<<(v3s64x4 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s64x4 operator<<(s64 a, v3s64x4 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s64x4 operator>>(v3s64x4 a, v3s64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x4 operator>>(v3s64x4 a, v3s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x4 operator>>(v3s64 a, v3s64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x4 operator>>(v3s64x4 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s64x4 operator>>(s64 a, v3s64x4 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s64x4 operator<<(v3s64x4 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s64x4 operator>>(v3s64x4 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u64x4() const;
@@ -2414,6 +2804,16 @@ union v4u8x32 {
 	forceinline friend v4u8x32 operator|(v4u8 a, v4u8x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u8x32 operator|(v4u8x32 a, u8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u8x32 operator|(u8 a, v4u8x32 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u8x32 operator<<(v4u8x32 a, v4u8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x32 operator<<(v4u8x32 a, v4u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x32 operator<<(v4u8 a, v4u8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x32 operator<<(v4u8x32 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u8x32 operator<<(u8 a, v4u8x32 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u8x32 operator>>(v4u8x32 a, v4u8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x32 operator>>(v4u8x32 a, v4u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x32 operator>>(v4u8 a, v4u8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x32 operator>>(v4u8x32 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u8x32 operator>>(u8 a, v4u8x32 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4s8x32() const;
 };
 
@@ -2459,6 +2859,16 @@ union v4u16x16 {
 	forceinline friend v4u16x16 operator|(v4u16 a, v4u16x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u16x16 operator|(v4u16x16 a, u16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u16x16 operator|(u16 a, v4u16x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u16x16 operator<<(v4u16x16 a, v4u16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x16 operator<<(v4u16x16 a, v4u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x16 operator<<(v4u16 a, v4u16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x16 operator<<(v4u16x16 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u16x16 operator<<(u16 a, v4u16x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u16x16 operator>>(v4u16x16 a, v4u16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x16 operator>>(v4u16x16 a, v4u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x16 operator>>(v4u16 a, v4u16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x16 operator>>(v4u16x16 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u16x16 operator>>(u16 a, v4u16x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u16x16 operator<<(v4u16x16 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u16x16 operator>>(v4u16x16 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s16x16() const;
@@ -2506,6 +2916,16 @@ union v4u32x8 {
 	forceinline friend v4u32x8 operator|(v4u32 a, v4u32x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u32x8 operator|(v4u32x8 a, u32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u32x8 operator|(u32 a, v4u32x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u32x8 operator<<(v4u32x8 a, v4u32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x8 operator<<(v4u32x8 a, v4u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x8 operator<<(v4u32 a, v4u32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x8 operator<<(v4u32x8 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u32x8 operator<<(u32 a, v4u32x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u32x8 operator>>(v4u32x8 a, v4u32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x8 operator>>(v4u32x8 a, v4u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x8 operator>>(v4u32 a, v4u32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x8 operator>>(v4u32x8 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u32x8 operator>>(u32 a, v4u32x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u32x8 operator<<(v4u32x8 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u32x8 operator>>(v4u32x8 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s32x8() const;
@@ -2554,6 +2974,16 @@ union v4u64x4 {
 	forceinline friend v4u64x4 operator|(v4u64 a, v4u64x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u64x4 operator|(v4u64x4 a, u64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u64x4 operator|(u64 a, v4u64x4 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u64x4 operator<<(v4u64x4 a, v4u64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x4 operator<<(v4u64x4 a, v4u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x4 operator<<(v4u64 a, v4u64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x4 operator<<(v4u64x4 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u64x4 operator<<(u64 a, v4u64x4 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u64x4 operator>>(v4u64x4 a, v4u64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x4 operator>>(v4u64x4 a, v4u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x4 operator>>(v4u64 a, v4u64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x4 operator>>(v4u64x4 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u64x4 operator>>(u64 a, v4u64x4 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u64x4 operator<<(v4u64x4 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u64x4 operator>>(v4u64x4 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s64x4() const;
@@ -2602,6 +3032,16 @@ union v4s8x32 {
 	forceinline friend v4s8x32 operator|(v4s8 a, v4s8x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s8x32 operator|(v4s8x32 a, s8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s8x32 operator|(s8 a, v4s8x32 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s8x32 operator<<(v4s8x32 a, v4s8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x32 operator<<(v4s8x32 a, v4s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x32 operator<<(v4s8 a, v4s8x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x32 operator<<(v4s8x32 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s8x32 operator<<(s8 a, v4s8x32 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s8x32 operator>>(v4s8x32 a, v4s8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x32 operator>>(v4s8x32 a, v4s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x32 operator>>(v4s8 a, v4s8x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x32 operator>>(v4s8x32 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s8x32 operator>>(s8 a, v4s8x32 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4u8x32() const;
 };
 
@@ -2647,6 +3087,16 @@ union v4s16x16 {
 	forceinline friend v4s16x16 operator|(v4s16 a, v4s16x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s16x16 operator|(v4s16x16 a, s16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s16x16 operator|(s16 a, v4s16x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s16x16 operator<<(v4s16x16 a, v4s16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x16 operator<<(v4s16x16 a, v4s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x16 operator<<(v4s16 a, v4s16x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x16 operator<<(v4s16x16 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s16x16 operator<<(s16 a, v4s16x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s16x16 operator>>(v4s16x16 a, v4s16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x16 operator>>(v4s16x16 a, v4s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x16 operator>>(v4s16 a, v4s16x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x16 operator>>(v4s16x16 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s16x16 operator>>(s16 a, v4s16x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s16x16 operator<<(v4s16x16 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s16x16 operator>>(v4s16x16 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u16x16() const;
@@ -2694,6 +3144,16 @@ union v4s32x8 {
 	forceinline friend v4s32x8 operator|(v4s32 a, v4s32x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s32x8 operator|(v4s32x8 a, s32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s32x8 operator|(s32 a, v4s32x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s32x8 operator<<(v4s32x8 a, v4s32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x8 operator<<(v4s32x8 a, v4s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x8 operator<<(v4s32 a, v4s32x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x8 operator<<(v4s32x8 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s32x8 operator<<(s32 a, v4s32x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s32x8 operator>>(v4s32x8 a, v4s32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x8 operator>>(v4s32x8 a, v4s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x8 operator>>(v4s32 a, v4s32x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x8 operator>>(v4s32x8 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s32x8 operator>>(s32 a, v4s32x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s32x8 operator<<(v4s32x8 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s32x8 operator>>(v4s32x8 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u32x8() const;
@@ -2742,6 +3202,16 @@ union v4s64x4 {
 	forceinline friend v4s64x4 operator|(v4s64 a, v4s64x4 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s64x4 operator|(v4s64x4 a, s64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s64x4 operator|(s64 a, v4s64x4 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s64x4 operator<<(v4s64x4 a, v4s64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x4 operator<<(v4s64x4 a, v4s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x4 operator<<(v4s64 a, v4s64x4 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x4 operator<<(v4s64x4 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s64x4 operator<<(s64 a, v4s64x4 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s64x4 operator>>(v4s64x4 a, v4s64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x4 operator>>(v4s64x4 a, v4s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x4 operator>>(v4s64 a, v4s64x4 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x4 operator>>(v4s64x4 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s64x4 operator>>(s64 a, v4s64x4 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s64x4 operator<<(v4s64x4 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s64x4 operator>>(v4s64x4 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u64x4() const;
@@ -2829,10 +3299,6 @@ forceinline v4f32x8::operator v4u32x8() const { return {(simd_typed::u32x8)x, (s
 forceinline v4f32x8::operator v4s32x8() const { return {(simd_typed::s32x8)x, (simd_typed::s32x8)y, (simd_typed::s32x8)z, (simd_typed::s32x8)w, }; }
 forceinline v4f64x4::operator v4u64x4() const { return {(simd_typed::u64x4)x, (simd_typed::u64x4)y, (simd_typed::u64x4)z, (simd_typed::u64x4)w, }; }
 forceinline v4f64x4::operator v4s64x4() const { return {(simd_typed::s64x4)x, (simd_typed::s64x4)y, (simd_typed::s64x4)z, (simd_typed::s64x4)w, }; }
-
-#endif
-
-#if ARCH_AVX512
 union v2u8x64 {
 	struct { simd_typed::u8x64 x, y; };
 	simd_typed::u8x64 d[2];
@@ -2872,6 +3338,16 @@ union v2u8x64 {
 	forceinline friend v2u8x64 operator|(v2u8 a, v2u8x64 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u8x64 operator|(v2u8x64 a, u8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u8x64 operator|(u8 a, v2u8x64 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u8x64 operator<<(v2u8x64 a, v2u8x64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x64 operator<<(v2u8x64 a, v2u8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x64 operator<<(v2u8 a, v2u8x64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u8x64 operator<<(v2u8x64 a, u8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u8x64 operator<<(u8 a, v2u8x64 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u8x64 operator>>(v2u8x64 a, v2u8x64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x64 operator>>(v2u8x64 a, v2u8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x64 operator>>(v2u8 a, v2u8x64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u8x64 operator>>(v2u8x64 a, u8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u8x64 operator>>(u8 a, v2u8x64 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2s8x64() const;
 };
 
@@ -2917,6 +3393,16 @@ union v2u16x32 {
 	forceinline friend v2u16x32 operator|(v2u16 a, v2u16x32 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u16x32 operator|(v2u16x32 a, u16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u16x32 operator|(u16 a, v2u16x32 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u16x32 operator<<(v2u16x32 a, v2u16x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x32 operator<<(v2u16x32 a, v2u16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x32 operator<<(v2u16 a, v2u16x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u16x32 operator<<(v2u16x32 a, u16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u16x32 operator<<(u16 a, v2u16x32 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u16x32 operator>>(v2u16x32 a, v2u16x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x32 operator>>(v2u16x32 a, v2u16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x32 operator>>(v2u16 a, v2u16x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u16x32 operator>>(v2u16x32 a, u16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u16x32 operator>>(u16 a, v2u16x32 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u16x32 operator<<(v2u16x32 a, u16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u16x32 operator>>(v2u16x32 a, u16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s16x32() const;
@@ -2964,6 +3450,16 @@ union v2u32x16 {
 	forceinline friend v2u32x16 operator|(v2u32 a, v2u32x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u32x16 operator|(v2u32x16 a, u32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u32x16 operator|(u32 a, v2u32x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u32x16 operator<<(v2u32x16 a, v2u32x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x16 operator<<(v2u32x16 a, v2u32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x16 operator<<(v2u32 a, v2u32x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u32x16 operator<<(v2u32x16 a, u32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u32x16 operator<<(u32 a, v2u32x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u32x16 operator>>(v2u32x16 a, v2u32x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x16 operator>>(v2u32x16 a, v2u32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x16 operator>>(v2u32 a, v2u32x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u32x16 operator>>(v2u32x16 a, u32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u32x16 operator>>(u32 a, v2u32x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u32x16 operator<<(v2u32x16 a, u32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u32x16 operator>>(v2u32x16 a, u32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s32x16() const;
@@ -3012,6 +3508,16 @@ union v2u64x8 {
 	forceinline friend v2u64x8 operator|(v2u64 a, v2u64x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2u64x8 operator|(v2u64x8 a, u64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2u64x8 operator|(u64 a, v2u64x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2u64x8 operator<<(v2u64x8 a, v2u64x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x8 operator<<(v2u64x8 a, v2u64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x8 operator<<(v2u64 a, v2u64x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2u64x8 operator<<(v2u64x8 a, u64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2u64x8 operator<<(u64 a, v2u64x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2u64x8 operator>>(v2u64x8 a, v2u64x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x8 operator>>(v2u64x8 a, v2u64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x8 operator>>(v2u64 a, v2u64x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2u64x8 operator>>(v2u64x8 a, u64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2u64x8 operator>>(u64 a, v2u64x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2u64x8 operator<<(v2u64x8 a, u64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2u64x8 operator>>(v2u64x8 a, u64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2s64x8() const;
@@ -3060,6 +3566,16 @@ union v2s8x64 {
 	forceinline friend v2s8x64 operator|(v2s8 a, v2s8x64 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s8x64 operator|(v2s8x64 a, s8 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s8x64 operator|(s8 a, v2s8x64 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s8x64 operator<<(v2s8x64 a, v2s8x64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x64 operator<<(v2s8x64 a, v2s8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x64 operator<<(v2s8 a, v2s8x64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s8x64 operator<<(v2s8x64 a, s8 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s8x64 operator<<(s8 a, v2s8x64 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s8x64 operator>>(v2s8x64 a, v2s8x64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x64 operator>>(v2s8x64 a, v2s8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x64 operator>>(v2s8 a, v2s8x64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s8x64 operator>>(v2s8x64 a, s8 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s8x64 operator>>(s8 a, v2s8x64 b) { return {a>>b.x, a>>b.y};}
 	forceinline operator v2u8x64() const;
 };
 
@@ -3105,6 +3621,16 @@ union v2s16x32 {
 	forceinline friend v2s16x32 operator|(v2s16 a, v2s16x32 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s16x32 operator|(v2s16x32 a, s16 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s16x32 operator|(s16 a, v2s16x32 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s16x32 operator<<(v2s16x32 a, v2s16x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x32 operator<<(v2s16x32 a, v2s16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x32 operator<<(v2s16 a, v2s16x32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s16x32 operator<<(v2s16x32 a, s16 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s16x32 operator<<(s16 a, v2s16x32 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s16x32 operator>>(v2s16x32 a, v2s16x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x32 operator>>(v2s16x32 a, v2s16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x32 operator>>(v2s16 a, v2s16x32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s16x32 operator>>(v2s16x32 a, s16 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s16x32 operator>>(s16 a, v2s16x32 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s16x32 operator<<(v2s16x32 a, s16 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s16x32 operator>>(v2s16x32 a, s16 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u16x32() const;
@@ -3152,6 +3678,16 @@ union v2s32x16 {
 	forceinline friend v2s32x16 operator|(v2s32 a, v2s32x16 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s32x16 operator|(v2s32x16 a, s32 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s32x16 operator|(s32 a, v2s32x16 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s32x16 operator<<(v2s32x16 a, v2s32x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x16 operator<<(v2s32x16 a, v2s32 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x16 operator<<(v2s32 a, v2s32x16 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s32x16 operator<<(v2s32x16 a, s32 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s32x16 operator<<(s32 a, v2s32x16 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s32x16 operator>>(v2s32x16 a, v2s32x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x16 operator>>(v2s32x16 a, v2s32 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x16 operator>>(v2s32 a, v2s32x16 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s32x16 operator>>(v2s32x16 a, s32 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s32x16 operator>>(s32 a, v2s32x16 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s32x16 operator<<(v2s32x16 a, s32 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s32x16 operator>>(v2s32x16 a, s32 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u32x16() const;
@@ -3200,6 +3736,16 @@ union v2s64x8 {
 	forceinline friend v2s64x8 operator|(v2s64 a, v2s64x8 b) { return {a.x|b.x, a.y|b.y};}
 	forceinline friend v2s64x8 operator|(v2s64x8 a, s64 b) { return {a.x|b, a.y|b};}
 	forceinline friend v2s64x8 operator|(s64 a, v2s64x8 b) { return {a|b.x, a|b.y};}
+	forceinline friend v2s64x8 operator<<(v2s64x8 a, v2s64x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x8 operator<<(v2s64x8 a, v2s64 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x8 operator<<(v2s64 a, v2s64x8 b) { return {a.x<<b.x, a.y<<b.y};}
+	forceinline friend v2s64x8 operator<<(v2s64x8 a, s64 b) { return {a.x<<b, a.y<<b};}
+	forceinline friend v2s64x8 operator<<(s64 a, v2s64x8 b) { return {a<<b.x, a<<b.y};}
+	forceinline friend v2s64x8 operator>>(v2s64x8 a, v2s64x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x8 operator>>(v2s64x8 a, v2s64 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x8 operator>>(v2s64 a, v2s64x8 b) { return {a.x>>b.x, a.y>>b.y};}
+	forceinline friend v2s64x8 operator>>(v2s64x8 a, s64 b) { return {a.x>>b, a.y>>b};}
+	forceinline friend v2s64x8 operator>>(s64 a, v2s64x8 b) { return {a>>b.x, a>>b.y};}
 	forceinline friend v2s64x8 operator<<(v2s64x8 a, s64 b) { return {a.x<<b, a.y<<b};}
 	forceinline friend v2s64x8 operator>>(v2s64x8 a, s64 b) { return {a.x>>b, a.y>>b};}
 	forceinline operator v2u64x8() const;
@@ -3326,6 +3872,16 @@ union v3u8x64 {
 	forceinline friend v3u8x64 operator|(v3u8 a, v3u8x64 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u8x64 operator|(v3u8x64 a, u8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u8x64 operator|(u8 a, v3u8x64 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u8x64 operator<<(v3u8x64 a, v3u8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x64 operator<<(v3u8x64 a, v3u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x64 operator<<(v3u8 a, v3u8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u8x64 operator<<(v3u8x64 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u8x64 operator<<(u8 a, v3u8x64 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u8x64 operator>>(v3u8x64 a, v3u8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x64 operator>>(v3u8x64 a, v3u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x64 operator>>(v3u8 a, v3u8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u8x64 operator>>(v3u8x64 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u8x64 operator>>(u8 a, v3u8x64 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3s8x64() const;
 };
 
@@ -3371,6 +3927,16 @@ union v3u16x32 {
 	forceinline friend v3u16x32 operator|(v3u16 a, v3u16x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u16x32 operator|(v3u16x32 a, u16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u16x32 operator|(u16 a, v3u16x32 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u16x32 operator<<(v3u16x32 a, v3u16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x32 operator<<(v3u16x32 a, v3u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x32 operator<<(v3u16 a, v3u16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u16x32 operator<<(v3u16x32 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u16x32 operator<<(u16 a, v3u16x32 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u16x32 operator>>(v3u16x32 a, v3u16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x32 operator>>(v3u16x32 a, v3u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x32 operator>>(v3u16 a, v3u16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u16x32 operator>>(v3u16x32 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u16x32 operator>>(u16 a, v3u16x32 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u16x32 operator<<(v3u16x32 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u16x32 operator>>(v3u16x32 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s16x32() const;
@@ -3418,6 +3984,16 @@ union v3u32x16 {
 	forceinline friend v3u32x16 operator|(v3u32 a, v3u32x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u32x16 operator|(v3u32x16 a, u32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u32x16 operator|(u32 a, v3u32x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u32x16 operator<<(v3u32x16 a, v3u32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x16 operator<<(v3u32x16 a, v3u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x16 operator<<(v3u32 a, v3u32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u32x16 operator<<(v3u32x16 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u32x16 operator<<(u32 a, v3u32x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u32x16 operator>>(v3u32x16 a, v3u32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x16 operator>>(v3u32x16 a, v3u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x16 operator>>(v3u32 a, v3u32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u32x16 operator>>(v3u32x16 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u32x16 operator>>(u32 a, v3u32x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u32x16 operator<<(v3u32x16 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u32x16 operator>>(v3u32x16 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s32x16() const;
@@ -3466,6 +4042,16 @@ union v3u64x8 {
 	forceinline friend v3u64x8 operator|(v3u64 a, v3u64x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3u64x8 operator|(v3u64x8 a, u64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3u64x8 operator|(u64 a, v3u64x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3u64x8 operator<<(v3u64x8 a, v3u64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x8 operator<<(v3u64x8 a, v3u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x8 operator<<(v3u64 a, v3u64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3u64x8 operator<<(v3u64x8 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3u64x8 operator<<(u64 a, v3u64x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3u64x8 operator>>(v3u64x8 a, v3u64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x8 operator>>(v3u64x8 a, v3u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x8 operator>>(v3u64 a, v3u64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3u64x8 operator>>(v3u64x8 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3u64x8 operator>>(u64 a, v3u64x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3u64x8 operator<<(v3u64x8 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3u64x8 operator>>(v3u64x8 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3s64x8() const;
@@ -3514,6 +4100,16 @@ union v3s8x64 {
 	forceinline friend v3s8x64 operator|(v3s8 a, v3s8x64 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s8x64 operator|(v3s8x64 a, s8 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s8x64 operator|(s8 a, v3s8x64 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s8x64 operator<<(v3s8x64 a, v3s8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x64 operator<<(v3s8x64 a, v3s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x64 operator<<(v3s8 a, v3s8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s8x64 operator<<(v3s8x64 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s8x64 operator<<(s8 a, v3s8x64 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s8x64 operator>>(v3s8x64 a, v3s8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x64 operator>>(v3s8x64 a, v3s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x64 operator>>(v3s8 a, v3s8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s8x64 operator>>(v3s8x64 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s8x64 operator>>(s8 a, v3s8x64 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline operator v3u8x64() const;
 };
 
@@ -3559,6 +4155,16 @@ union v3s16x32 {
 	forceinline friend v3s16x32 operator|(v3s16 a, v3s16x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s16x32 operator|(v3s16x32 a, s16 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s16x32 operator|(s16 a, v3s16x32 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s16x32 operator<<(v3s16x32 a, v3s16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x32 operator<<(v3s16x32 a, v3s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x32 operator<<(v3s16 a, v3s16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s16x32 operator<<(v3s16x32 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s16x32 operator<<(s16 a, v3s16x32 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s16x32 operator>>(v3s16x32 a, v3s16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x32 operator>>(v3s16x32 a, v3s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x32 operator>>(v3s16 a, v3s16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s16x32 operator>>(v3s16x32 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s16x32 operator>>(s16 a, v3s16x32 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s16x32 operator<<(v3s16x32 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s16x32 operator>>(v3s16x32 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u16x32() const;
@@ -3606,6 +4212,16 @@ union v3s32x16 {
 	forceinline friend v3s32x16 operator|(v3s32 a, v3s32x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s32x16 operator|(v3s32x16 a, s32 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s32x16 operator|(s32 a, v3s32x16 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s32x16 operator<<(v3s32x16 a, v3s32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x16 operator<<(v3s32x16 a, v3s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x16 operator<<(v3s32 a, v3s32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s32x16 operator<<(v3s32x16 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s32x16 operator<<(s32 a, v3s32x16 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s32x16 operator>>(v3s32x16 a, v3s32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x16 operator>>(v3s32x16 a, v3s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x16 operator>>(v3s32 a, v3s32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s32x16 operator>>(v3s32x16 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s32x16 operator>>(s32 a, v3s32x16 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s32x16 operator<<(v3s32x16 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s32x16 operator>>(v3s32x16 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u32x16() const;
@@ -3654,6 +4270,16 @@ union v3s64x8 {
 	forceinline friend v3s64x8 operator|(v3s64 a, v3s64x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z};}
 	forceinline friend v3s64x8 operator|(v3s64x8 a, s64 b) { return {a.x|b, a.y|b, a.z|b};}
 	forceinline friend v3s64x8 operator|(s64 a, v3s64x8 b) { return {a|b.x, a|b.y, a|b.z};}
+	forceinline friend v3s64x8 operator<<(v3s64x8 a, v3s64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x8 operator<<(v3s64x8 a, v3s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x8 operator<<(v3s64 a, v3s64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z};}
+	forceinline friend v3s64x8 operator<<(v3s64x8 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
+	forceinline friend v3s64x8 operator<<(s64 a, v3s64x8 b) { return {a<<b.x, a<<b.y, a<<b.z};}
+	forceinline friend v3s64x8 operator>>(v3s64x8 a, v3s64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x8 operator>>(v3s64x8 a, v3s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x8 operator>>(v3s64 a, v3s64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z};}
+	forceinline friend v3s64x8 operator>>(v3s64x8 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
+	forceinline friend v3s64x8 operator>>(s64 a, v3s64x8 b) { return {a>>b.x, a>>b.y, a>>b.z};}
 	forceinline friend v3s64x8 operator<<(v3s64x8 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b};}
 	forceinline friend v3s64x8 operator>>(v3s64x8 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b};}
 	forceinline operator v3u64x8() const;
@@ -3780,6 +4406,16 @@ union v4u8x64 {
 	forceinline friend v4u8x64 operator|(v4u8 a, v4u8x64 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u8x64 operator|(v4u8x64 a, u8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u8x64 operator|(u8 a, v4u8x64 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u8x64 operator<<(v4u8x64 a, v4u8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x64 operator<<(v4u8x64 a, v4u8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x64 operator<<(v4u8 a, v4u8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u8x64 operator<<(v4u8x64 a, u8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u8x64 operator<<(u8 a, v4u8x64 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u8x64 operator>>(v4u8x64 a, v4u8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x64 operator>>(v4u8x64 a, v4u8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x64 operator>>(v4u8 a, v4u8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u8x64 operator>>(v4u8x64 a, u8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u8x64 operator>>(u8 a, v4u8x64 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4s8x64() const;
 };
 
@@ -3825,6 +4461,16 @@ union v4u16x32 {
 	forceinline friend v4u16x32 operator|(v4u16 a, v4u16x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u16x32 operator|(v4u16x32 a, u16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u16x32 operator|(u16 a, v4u16x32 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u16x32 operator<<(v4u16x32 a, v4u16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x32 operator<<(v4u16x32 a, v4u16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x32 operator<<(v4u16 a, v4u16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u16x32 operator<<(v4u16x32 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u16x32 operator<<(u16 a, v4u16x32 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u16x32 operator>>(v4u16x32 a, v4u16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x32 operator>>(v4u16x32 a, v4u16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x32 operator>>(v4u16 a, v4u16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u16x32 operator>>(v4u16x32 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u16x32 operator>>(u16 a, v4u16x32 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u16x32 operator<<(v4u16x32 a, u16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u16x32 operator>>(v4u16x32 a, u16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s16x32() const;
@@ -3872,6 +4518,16 @@ union v4u32x16 {
 	forceinline friend v4u32x16 operator|(v4u32 a, v4u32x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u32x16 operator|(v4u32x16 a, u32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u32x16 operator|(u32 a, v4u32x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u32x16 operator<<(v4u32x16 a, v4u32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x16 operator<<(v4u32x16 a, v4u32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x16 operator<<(v4u32 a, v4u32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u32x16 operator<<(v4u32x16 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u32x16 operator<<(u32 a, v4u32x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u32x16 operator>>(v4u32x16 a, v4u32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x16 operator>>(v4u32x16 a, v4u32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x16 operator>>(v4u32 a, v4u32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u32x16 operator>>(v4u32x16 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u32x16 operator>>(u32 a, v4u32x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u32x16 operator<<(v4u32x16 a, u32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u32x16 operator>>(v4u32x16 a, u32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s32x16() const;
@@ -3920,6 +4576,16 @@ union v4u64x8 {
 	forceinline friend v4u64x8 operator|(v4u64 a, v4u64x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4u64x8 operator|(v4u64x8 a, u64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4u64x8 operator|(u64 a, v4u64x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4u64x8 operator<<(v4u64x8 a, v4u64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x8 operator<<(v4u64x8 a, v4u64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x8 operator<<(v4u64 a, v4u64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4u64x8 operator<<(v4u64x8 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4u64x8 operator<<(u64 a, v4u64x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4u64x8 operator>>(v4u64x8 a, v4u64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x8 operator>>(v4u64x8 a, v4u64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x8 operator>>(v4u64 a, v4u64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4u64x8 operator>>(v4u64x8 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4u64x8 operator>>(u64 a, v4u64x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4u64x8 operator<<(v4u64x8 a, u64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4u64x8 operator>>(v4u64x8 a, u64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4s64x8() const;
@@ -3968,6 +4634,16 @@ union v4s8x64 {
 	forceinline friend v4s8x64 operator|(v4s8 a, v4s8x64 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s8x64 operator|(v4s8x64 a, s8 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s8x64 operator|(s8 a, v4s8x64 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s8x64 operator<<(v4s8x64 a, v4s8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x64 operator<<(v4s8x64 a, v4s8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x64 operator<<(v4s8 a, v4s8x64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s8x64 operator<<(v4s8x64 a, s8 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s8x64 operator<<(s8 a, v4s8x64 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s8x64 operator>>(v4s8x64 a, v4s8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x64 operator>>(v4s8x64 a, v4s8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x64 operator>>(v4s8 a, v4s8x64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s8x64 operator>>(v4s8x64 a, s8 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s8x64 operator>>(s8 a, v4s8x64 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline operator v4u8x64() const;
 };
 
@@ -4013,6 +4689,16 @@ union v4s16x32 {
 	forceinline friend v4s16x32 operator|(v4s16 a, v4s16x32 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s16x32 operator|(v4s16x32 a, s16 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s16x32 operator|(s16 a, v4s16x32 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s16x32 operator<<(v4s16x32 a, v4s16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x32 operator<<(v4s16x32 a, v4s16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x32 operator<<(v4s16 a, v4s16x32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s16x32 operator<<(v4s16x32 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s16x32 operator<<(s16 a, v4s16x32 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s16x32 operator>>(v4s16x32 a, v4s16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x32 operator>>(v4s16x32 a, v4s16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x32 operator>>(v4s16 a, v4s16x32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s16x32 operator>>(v4s16x32 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s16x32 operator>>(s16 a, v4s16x32 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s16x32 operator<<(v4s16x32 a, s16 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s16x32 operator>>(v4s16x32 a, s16 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u16x32() const;
@@ -4060,6 +4746,16 @@ union v4s32x16 {
 	forceinline friend v4s32x16 operator|(v4s32 a, v4s32x16 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s32x16 operator|(v4s32x16 a, s32 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s32x16 operator|(s32 a, v4s32x16 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s32x16 operator<<(v4s32x16 a, v4s32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x16 operator<<(v4s32x16 a, v4s32 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x16 operator<<(v4s32 a, v4s32x16 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s32x16 operator<<(v4s32x16 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s32x16 operator<<(s32 a, v4s32x16 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s32x16 operator>>(v4s32x16 a, v4s32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x16 operator>>(v4s32x16 a, v4s32 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x16 operator>>(v4s32 a, v4s32x16 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s32x16 operator>>(v4s32x16 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s32x16 operator>>(s32 a, v4s32x16 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s32x16 operator<<(v4s32x16 a, s32 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s32x16 operator>>(v4s32x16 a, s32 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u32x16() const;
@@ -4108,6 +4804,16 @@ union v4s64x8 {
 	forceinline friend v4s64x8 operator|(v4s64 a, v4s64x8 b) { return {a.x|b.x, a.y|b.y, a.z|b.z, a.w|b.w};}
 	forceinline friend v4s64x8 operator|(v4s64x8 a, s64 b) { return {a.x|b, a.y|b, a.z|b, a.w|b};}
 	forceinline friend v4s64x8 operator|(s64 a, v4s64x8 b) { return {a|b.x, a|b.y, a|b.z, a|b.w};}
+	forceinline friend v4s64x8 operator<<(v4s64x8 a, v4s64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x8 operator<<(v4s64x8 a, v4s64 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x8 operator<<(v4s64 a, v4s64x8 b) { return {a.x<<b.x, a.y<<b.y, a.z<<b.z, a.w<<b.w};}
+	forceinline friend v4s64x8 operator<<(v4s64x8 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
+	forceinline friend v4s64x8 operator<<(s64 a, v4s64x8 b) { return {a<<b.x, a<<b.y, a<<b.z, a<<b.w};}
+	forceinline friend v4s64x8 operator>>(v4s64x8 a, v4s64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x8 operator>>(v4s64x8 a, v4s64 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x8 operator>>(v4s64 a, v4s64x8 b) { return {a.x>>b.x, a.y>>b.y, a.z>>b.z, a.w>>b.w};}
+	forceinline friend v4s64x8 operator>>(v4s64x8 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
+	forceinline friend v4s64x8 operator>>(s64 a, v4s64x8 b) { return {a>>b.x, a>>b.y, a>>b.z, a>>b.w};}
 	forceinline friend v4s64x8 operator<<(v4s64x8 a, s64 b) { return {a.x<<b, a.y<<b, a.z<<b, a.w<<b};}
 	forceinline friend v4s64x8 operator>>(v4s64x8 a, s64 b) { return {a.x>>b, a.y>>b, a.z>>b, a.w>>b};}
 	forceinline operator v4u64x8() const;
@@ -4195,8 +4901,6 @@ forceinline v4f32x16::operator v4u32x16() const { return {(simd_typed::u32x16)x,
 forceinline v4f32x16::operator v4s32x16() const { return {(simd_typed::s32x16)x, (simd_typed::s32x16)y, (simd_typed::s32x16)z, (simd_typed::s32x16)w, }; }
 forceinline v4f64x8::operator v4u64x8() const { return {(simd_typed::u64x8)x, (simd_typed::u64x8)y, (simd_typed::u64x8)z, (simd_typed::u64x8)w, }; }
 forceinline v4f64x8::operator v4s64x8() const { return {(simd_typed::s64x8)x, (simd_typed::s64x8)y, (simd_typed::s64x8)z, (simd_typed::s64x8)w, }; }
-
-#endif
 
 using v2sx8 = v2s32x8;
 using v2ux8 = v2u32x8;

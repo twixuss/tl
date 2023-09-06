@@ -89,7 +89,7 @@ struct List : Span<T, Size_> {
 	bool reserve_exponential(Size desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) return false;
 
-		Size new_capacity = max(TL_INITIAL_LIST_CAPACITY, capacity);
+		Size new_capacity = max((Size)TL_INITIAL_LIST_CAPACITY, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity TL_LA);
@@ -366,7 +366,7 @@ constexpr T const *find_if(List<T, Allocator, Size> const &list, Predicate &&pre
 template <class T, class Allocator, class Size, class Fn>
 constexpr void for_each(List<T, Allocator, Size> list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
-	constexpr bool breakable = is_same<bool, ReturnType>;
+	constexpr bool breakable = std::is_same_v<bool, ReturnType>;
 	for (auto &it : list) {
 		if constexpr (breakable) {
 			if (fn(it))
@@ -1027,7 +1027,7 @@ struct LinearSet : Span<T, Size_> {
 	void reserve_exponential(umm desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) return;
 
-		umm new_capacity = max(1u, capacity);
+		umm new_capacity = max((umm)1, capacity);
 		while (new_capacity < desired_capacity) new_capacity *= 2;
 
 		reallocate(new_capacity TL_LA);

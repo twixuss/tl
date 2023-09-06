@@ -196,7 +196,7 @@ template <ForEachFlags flags, class T, class Fn>
 void for_each(LinkedList<T> list, Fn &&fn) {
 	auto node = list.head;
 	while (node) {
-		if constexpr (is_same<decltype(fn(*(T*)0)), ForEachDirective>) {
+		if constexpr (std::is_same_v<decltype(fn(*(T*)0)), ForEachDirective>) {
 			if (fn(node->value) == ForEach_break)
 				return;
 		} else {

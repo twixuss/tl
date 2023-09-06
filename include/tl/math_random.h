@@ -537,7 +537,7 @@ forceinline f32 value_noise_v2s(v2s coordinate, s32 step, f32(*interpolate)(f32)
 }
 template <class Randomizer = DefaultRandomizer, class Interpolate>
 forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpolate) {
-	static_assert(is_same<decltype(interpolate(0.0f)), f32>);
+	static_assert(std::is_same_v<decltype(interpolate(0.0f)), f32>);
 	v3s floored = floor(coordinate, step);
 	v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
