@@ -569,6 +569,12 @@ forceinline constexpr auto lerp_int(Int a, Int b, T t) {
 		return ceil_to_int(r);
 	}
 }
+
+template <class T, class Float>
+forceinline constexpr auto bezier(T a, T b, T c, Float t) {
+	return a + t * (a * -2 + b * 2 + t * (a - b * 2 + c));
+}
+
 forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
 forceinline constexpr v2f absolute(v2f v) { return {absolute(v.x), absolute(v.y)}; }
 forceinline constexpr v3f absolute(v3f v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }

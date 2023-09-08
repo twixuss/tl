@@ -2599,6 +2599,10 @@ template <class T>
 void quick_sort(Span<T> span) {
 	quick_sort(span, [](T a, T b) { return a < b; });
 }
+template <class T, umm size>
+void quick_sort(T (&array)[size], auto ...args) {
+	quick_sort(array_as_span(array), args...);
+}
 
 #ifdef TL_IMPL
 
