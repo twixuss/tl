@@ -902,8 +902,6 @@ forceinline umm append(StringBuilder &builder, void const *p) {
 
 template <class Float>
 inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
-	scoped_allocator(temporary_allocator);
-
 	auto value = format.value;
 
 	if (is_nan(value)) {

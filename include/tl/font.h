@@ -127,7 +127,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 
 	assert(collection->update_atlas);
 
-	scoped_allocator(collection->allocator);
+	scoped(collection->allocator);
 
 
 	auto current_char = text.data;

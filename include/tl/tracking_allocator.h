@@ -52,8 +52,8 @@ Allocator make_tracking_allocator(Allocator underlying) {
 				case Allocator_allocate: {
 					auto result = state->underlying_allocator.allocate_impl(new_size, align, location);
 
-					scoped_lock(state->tracked_allocations_mutex);
-					scoped_allocator(state->state_allocator);
+					scoped(state->tracked_allocations_mutex);
+					scoped(state->state_allocator);
 
 					auto &counts = state->tracked_allocations.get_or_insert(location);
 					counts.current_size += new_size;
@@ -68,8 +68,8 @@ Allocator make_tracking_allocator(Allocator underlying) {
 				case Allocator_reallocate: {
 					auto result = state->underlying_allocator.reallocate_impl(data, old_size, new_size, align, location);
 
-					scoped_lock(state->tracked_allocations_mutex);
-					scoped_allocator(state->state_allocator);
+					scoped(state->tracked_allocations_mutex);
+					scoped(state->state_allocator);
 
 					auto &old_meta = state->allocation_metas.find(data)->value;
 					old_meta.counts->current_size -= old_meta.this_size;
@@ -91,7 +91,7 @@ Allocator make_tracking_allocator(Allocator underlying) {
 					if (!data)
 						return {};
 
-					scoped_lock(state->tracked_allocations_mutex);
+					scoped(state->tracked_allocations_mutex);
 					auto &old_meta = state->allocation_metas.find(data)->value;
 					old_meta.counts->current_size -= old_meta.this_size;
 					state->allocation_metas.erase(data);

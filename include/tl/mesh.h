@@ -237,7 +237,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 				return {};
 			}
 
-			scoped_allocator(temporary_allocator);
+			scoped(temporary_allocator_and_checkpoint);
 			if (color_type == u8"VEC4"s) {
 				switch ((s64)color_component_type) {
 					case Glb::ComponentType_f32: {

@@ -92,8 +92,6 @@ struct HashSet {
 	umm count = 0;
 
 	Value &insert(Value const &value TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
@@ -134,7 +132,7 @@ struct HashSet {
 	}
 
 	void rehash(umm new_buckets_count TL_LP) {
-		scoped_allocator(allocator);
+		scoped(allocator);
 
 		auto old_buckets = buckets;
 

@@ -811,6 +811,9 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 }
 
 Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
+	auto allocator = current_allocator;
+	scoped(temporary_allocator_and_checkpoint);
+
 	IFileOpenDialog *dialog = NULL;
 	if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return {};
 	defer { dialog->Release(); };
@@ -842,7 +845,6 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 	if (kind != FileDialog_directory) {
 		COMDLG_FILTERSPEC file_type;
 		if (allowed_extensions.count) {
-			scoped_allocator(temporary_allocator);
 			StringBuilder builder;
 			for (auto &ext : allowed_extensions) {
 				if (&ext == &allowed_extensions.back()) {
@@ -851,7 +853,7 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 					append_format(builder, "*.{};", ext);
 				}
 			}
-			file_type = {L"Files", with(temporary_allocator, (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data)};
+			file_type = {L"Files", (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
@@ -863,6 +865,7 @@ Optional<ListList<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>
 
 
 	ListList<utf8> result;
+	result.allocator = allocator;
 
 	auto add_item = [&](IShellItem *item) {
 		PWSTR path = NULL;

@@ -86,7 +86,7 @@ bool fft(Span<Complex<Float>> span) {
 
 template <class Float>
 void time_domain_to_frequency_domain(Span<Float> span) {
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator_and_checkpoint);
 
 	List<Complex<Float>> complexs;
 	complexs.reserve(span.size);

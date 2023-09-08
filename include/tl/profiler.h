@@ -8,7 +8,7 @@
 #define timed_begin(profiler, enabled, name) (enabled ? (profiler).begin(name, as_span(__FILE__), __LINE__) : void())
 #define timed_end(profiler, enabled) (enabled ? (profiler).end() : void())
 #define timed_block(profiler, enabled, name) timed_begin(profiler, enabled, name); defer{ timed_end(profiler, enabled); }
-//#define timed_function() timed_block(([](utf8 const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
+//#define timed_function() timed_block(([](utf8 const *name){scoped(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
 #define timed_function(profiler, enabled) timed_block(profiler, enabled, as_span(__FUNCSIG__))
 #else
 #define timed_begin(profiler, name)

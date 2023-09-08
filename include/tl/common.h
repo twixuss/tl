@@ -2439,9 +2439,6 @@ struct AllocatorPusher {
 	forceinline operator bool() { return true; }
 };
 
-#define push_allocator(allocator) tl_push(::tl::AllocatorPusher, allocator)
-#define scoped_allocator(allocator) tl_scoped(::tl::current_allocator, allocator)
-
 template <class Thing>
 struct Scoped {
 	Scoped(Thing &) { static_error_t(Thing, "scoped replacer for that type was not defined. for an example check Scoped<Allocator> down below."); }

@@ -97,6 +97,7 @@ TL_API void hide_console_window();
 TL_API void show_console_window();
 TL_API void toggle_console_window();
 
+TL_API bool is_stdout_console();
 
 template <>
 struct Scoped<ConsoleColor> {
@@ -259,6 +260,11 @@ void init_printer() {
 	std_err = GetStdHandle(STD_ERROR_HANDLE);
 	console_window = GetConsoleWindow();
 #endif
+}
+
+bool is_stdout_console() {
+	DWORD temp;
+	return GetConsoleMode(std_out, &temp) != 0;
 }
 
 #endif

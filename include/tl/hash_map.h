@@ -148,6 +148,7 @@ struct KeyValue {
 	Value value;
 };
 
+// TODO: add Allocator parameter
 template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>>
 struct BucketHashMap : Traits {
 	TL_USE_HASH_TRAITS_MEMBERS;
@@ -168,8 +169,6 @@ struct BucketHashMap : Traits {
 	umm total_value_count = 0;
 	
 	Value &get_or_insert(Key const &key TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(4 TL_LA);
 		}
@@ -208,8 +207,6 @@ struct BucketHashMap : Traits {
 	//
 	template <class Callback>
 	bool insert_or(Key const &key, Value value, Callback &&callback TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
@@ -237,8 +234,6 @@ struct BucketHashMap : Traits {
 		return true;
 	}
 	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0 TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
@@ -305,7 +300,8 @@ struct BucketHashMap : Traits {
 	}
 
 	void rehash(umm new_buckets_count TL_LP) {
-		scoped_allocator(allocator);
+		// Set current allocator so new buckets inherit it.
+		scoped(allocator);
 
 		auto old_buckets = buckets;
 
