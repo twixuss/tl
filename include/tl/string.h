@@ -1038,6 +1038,12 @@ inline umm append(StringBuilder &builder, std::source_location location) {
 	return append_format(builder, "{}:{}:{}: {}", location.file_name(), location.line(), location.column(), location.function_name());
 }
 
+struct OnlyFileAndLine : std::source_location {};
+
+inline umm append(StringBuilder &builder, OnlyFileAndLine location) {
+	return append_format(builder, "{}:{}", location.file_name(), location.line());
+}
+
 
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };

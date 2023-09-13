@@ -53,12 +53,10 @@ void free(Process &process);
 
 TL_API Process start_process(utf16 const *command_line);
 inline Process start_process(Span<utf16> command_line) {
-	scoped(temporary_allocator_and_checkpoint);
-	return start_process(null_terminate(command_line).data);
+	return start_process(with(temporary_allocator, null_terminate(command_line)).data);
 }
 inline Process start_process(Span<utf8>  command_line) {
-	scoped(temporary_allocator_and_checkpoint);
-	return start_process(to_utf16(command_line, true).data);
+	return start_process(with(temporary_allocator, to_utf16(command_line, true)).data);
 }
 
 }

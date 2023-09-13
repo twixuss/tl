@@ -251,6 +251,32 @@ forceinline constexpr t operator~(t a){using u=std::underlying_type_t<t>;return 
 forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a|(u)b);} \
 forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
 
+template <class T>
+concept AnEnum = std::is_enum_v<T>;
+
+forceinline constexpr auto to_underlying(AnEnum auto e) { return (std::underlying_type_t<decltype(e)>)e; }
+
+template <AnEnum Enum>
+requires requires { { Enum::count }; }
+forceinline constexpr auto enum_values() {
+	struct EnumValues {
+		using Underlying = std::underlying_type_t<Enum>;
+		struct Iterator {
+			Underlying value;
+			forceinline constexpr Enum operator*() const { return (Enum)value; }
+			forceinline constexpr Iterator &operator++() { ++value; }
+			forceinline constexpr bool operator==(Iterator const &that) { return value == that.value; }
+		};
+
+		forceinline constexpr Iterator begin() { return {}; }
+		forceinline constexpr Iterator end() { return {(Underlying)Enum::count}; }
+	};
+
+	return EnumValues{};
+}
+
+
+
 // This function exists because C++ does not provide a way to convert
 // fundamental types to structs without adding a constructor to a struct.
 // If there's a need to do that, specialize this function.
@@ -1189,6 +1215,7 @@ struct Span {
 		return {(U *)data, (ThatSize)(count * sizeof(T) / sizeof(U))};
 	}
 
+	constexpr explicit operator bool() const { return count; }
 
 	ValueType *data = 0;
 	Size count = 0;
@@ -1203,11 +1230,6 @@ inline constexpr bool is_span<Span<T, Size>> = true;
 
 template <class T>
 concept ASpan = is_span<T>;
-
-template <class T>
-concept AnEnum = std::is_enum_v<T>;
-
-auto to_underlying(AnEnum auto e) { return (std::underlying_type_t<decltype(e)>)e; }
 
 template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
@@ -2257,25 +2279,25 @@ struct Allocator : AllocatorBase<Allocator> {
 	}
 };
 
-template <class T>
-Allocator make_allocator_from_static_class() {
+template <class CustomAllocator>
+Allocator make_allocator_from(CustomAllocator *allocator) {
 	return {
 		.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
 			switch (action) {
 				case Allocator_allocate: {
-					return T{}.allocate_impl(new_size, align TL_LA);
+					return ((CustomAllocator *)state)->allocate_impl(new_size, align TL_LA);
 				}
 				case Allocator_reallocate: {
-					return T{}.reallocate_impl(data, old_size, new_size, align TL_LA);
+					return ((CustomAllocator *)state)->reallocate_impl(data, old_size, new_size, align TL_LA);
 				}
 				case Allocator_free: {
-					T{}.deallocate_impl(data, new_size, align TL_LA);
+					((CustomAllocator *)state)->deallocate_impl(data, new_size, align TL_LA);
 					break;
 				}
 			}
 			return {};
 		},
-		.state = 0
+		.state = allocator
 	};
 }
 
@@ -2656,7 +2678,7 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 	return {};
 }
 
-Allocator os_allocator = make_allocator_from_static_class<DefaultAllocator>();
+Allocator os_allocator = make_allocator_from<DefaultAllocator>(0);
 Allocator page_allocator = {
 	.func = page_allocator_proc,
 	.state = 0
