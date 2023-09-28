@@ -21,6 +21,7 @@
     <ClCompile Include="src\tests\fly_string.cpp" />
     <ClCompile Include="src\tests\big_int.cpp" />
     <ClCompile Include="src\tests\array.cpp" />
+    <ClCompile Include="src\tests\simd.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />

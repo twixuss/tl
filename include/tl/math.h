@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 #include "array.h"
-#include "simd.h"
+#include "simd_macros.h"
 #include "string.h"
 #include "vector.h"
 

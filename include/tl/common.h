@@ -533,15 +533,6 @@ forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zer
 #endif
 
 
-namespace ce {
-// https://stackoverflow.com/a/24748637
-#define S(k) if (n >= ((decltype(n))1 << k)) { i += k; n >>= k; }
-constexpr s32 log2(u8 n)  { s32 i = -(n == 0); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u16 n) { s32 i = -(n == 0); S(8); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u32 n) { s32 i = -(n == 0); S(16); S(8); S(4); S(2); S(1); return i; }
-constexpr s32 log2(u64 n) { s32 i = -(n == 0); S(32); S(16); S(8); S(4); S(2); S(1); return i; }
-#undef S
-}
 forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
 forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
 forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
@@ -715,17 +706,17 @@ forceinline constexpr auto clamp_checked(T value, T min_bound, T max_bound) {
 	return min(max(value, min_bound), max_bound);
 }
 
-template <class T>
-forceinline constexpr auto map(T value, T source_min, T source_max, T dest_min, T dest_max) {
-	if constexpr (is_integer_like<T>) { // Do multiplication first
+template <class From, class To>
+forceinline constexpr auto map(From value, From source_min, From source_max, To dest_min, To dest_max) {
+	if constexpr (is_integer_like<From>) { // Do multiplication first
 		return (value - source_min) * (dest_max - dest_min) / (source_max - source_min) + dest_min;
 	} else {
 		return (value - source_min) / (source_max - source_min) * (dest_max - dest_min) + dest_min;
 	}
 }
-template <class T>
-forceinline constexpr auto map_clamped(T value, T source_min, T source_max, T dest_min, T dest_max) {
-	return map(clamp(value, source_min, source_max), source_min, source_max, dest_min, dest_max);
+template <class From, class To>
+forceinline constexpr auto map_clamped(From value, From source_min, From source_max, To dest_min, To dest_max) {
+	return map(clamp(value, min(source_min, source_max), max(source_min, source_max)), source_min, source_max, dest_min, dest_max);
 }
 template <class T, class U> forceinline constexpr auto lerp(T a, T b, U t) { return a + (b - a) * t; }
 
@@ -979,7 +970,7 @@ private:
 	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); };
 
 template <class T>
-auto reverse_iterate(T &x) {
+auto reversed(T x) {
 	using Iter = decltype(x.rbegin());
 	struct Range {
 		Iter begin() { return {_begin}; }
@@ -1021,6 +1012,10 @@ struct Optional {
 	}
 	constexpr Optional(null_opt_t) {
 		_has_value = false;
+	}
+	constexpr ~Optional() {
+		if (_has_value)
+			_value.~T();
 	}
 	constexpr Optional &operator=(T that) {
 		return *new(this) Optional(that);
@@ -1076,16 +1071,48 @@ private:
 #pragma warning(suppress: 4820)
 };
 
-template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator*(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() * b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator/(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() / b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator%(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() % b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator^(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() ^ b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator&(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() & b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator|(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() | b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator<<(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() << b.value_unchecked()} : Optional<T>{}; }
-template <class T> Optional<T> operator>>(Optional<T> a, Optional<T> b) { return (a.has_value() && b.has_value()) ? Optional<T>{a.value_unchecked() >> b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator*(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() * b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator/(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() / b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator%(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() % b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator^(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() ^ b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator&(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() & b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator|(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() | b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator<<(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() << b.value_unchecked()} : Optional<T>{}; }
+template <class T> Optional<T> operator>>(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() >> b.value_unchecked()} : Optional<T>{}; }
+
+template <class Value, class Error> 
+struct Result {
+
+	Result(Value value) : _is_value(true), _value(value) {}
+	Result(Error error) : _is_value(false), _error(error) {}
+	Result(const Result &that) { memcpy(this, &that, sizeof *this); }
+	Result(Result &&that) { memcpy(this, &that, sizeof *this); }
+	~Result() {
+		if (_is_value)
+			_value.~Value();
+		else
+			_error.~Error();
+	}
+	Result &operator=(const Result &that) { memcpy(this, &that, sizeof *this); return *this; }
+	Result &operator=(Result &&that) { memcpy(this, &that, sizeof *this); return *this; }
+
+	Value value() { assert(_is_value); return _value; }
+	Error error() { assert(!_is_value); return _error; }
+
+	bool is_value() { return _is_value; }
+	bool is_error() { return !_is_value; }
+
+	explicit operator bool() { return _is_value; }
+
+private:
+	bool _is_value;
+	union {
+		Value _value;
+		Error _error;
+	};
+};
 
 #pragma pack(push, 1)
 template <class T, class Size_ = umm>
@@ -1528,7 +1555,7 @@ T *binary_search(Span<T> span, U value, Fn get_value) {
 }
 
 template <class T>
-void reverse(Span<T> span) {
+void flip_order(Span<T> span) {
 	for (umm i = 0; i < span.count / 2; ++i) {
 		Swap(span[i], span[span.count-i-1]);
 	}

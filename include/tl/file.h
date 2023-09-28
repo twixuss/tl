@@ -399,7 +399,7 @@ inline bool create_directories(Span<utf8> path) {
 		if (path.count == 0)
 			break;
 	}
-	for (auto dir : reverse_iterate(directories_to_create)) {
+	for (auto dir : reversed(directories_to_create)) {
 		if (!create_directory(dir))
 			return false;
 	}
@@ -528,7 +528,7 @@ File open_file(pathchar const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
-		tl_logger.error("Could not open file {}", path);
+		tl_logger.error("Could not open file {}", with(temporary_allocator, to_utf8(as_span((utf16 const *)path))));
 		handle = 0;
 	}
 	return {handle};

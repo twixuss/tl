@@ -31,24 +31,30 @@ struct StringizedCallStack {
 TL_API bool debug_init();
 TL_API void debug_deinit();
 
-TL_API CallStack get_call_stack();
+TL_API CallStack get_call_stack(umm frames_to_skip = 0);
 
-TL_API StringizedCallStack to_string(CallStack &call_stack);
+TL_API StringizedCallStack resolve_names(CallStack call_stack);
 TL_API void free(StringizedCallStack &call_stack);
 
 inline StringizedCallStack get_stack_trace() {
-	auto call_stack = with(temporary_allocator, get_call_stack());
-	return to_string(call_stack);
+	return resolve_names(with(temporary_allocator, get_call_stack()));
 }
 
 #ifdef CreateWindow
-TL_API StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip);
+TL_API StringizedCallStack get_stack_trace(CONTEXT context, umm frames_to_skip);
 #endif
 
 TL_API bool debugger_attached();
 
 inline umm append(StringBuilder &builder, StringizedCallStack::Entry const &entry) {
 	return append_format(builder, "{}:{}: {}", entry.file, entry.line, entry.name);
+}
+inline umm append(StringBuilder &builder, StringizedCallStack const &call_stack) {
+	umm result = 0;
+	for (auto entry : call_stack.call_stack) {
+		result += append_format(builder, "{}\n", entry);
+	}
+	return result;
 }
 
 }
@@ -134,15 +140,15 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 
 	return call_stack;
 }
-CallStack get_call_stack() {
+CallStack get_call_stack(umm frames_to_skip) {
 	CONTEXT context = {};
 	context.ContextFlags = CONTEXT_CONTROL;
 	RtlCaptureContext(&context);
 
-	return get_call_stack(context, 1);
+	return get_call_stack(context, 1 + frames_to_skip);
 }
 
-StringizedCallStack to_string(CallStack &call_stack) {
+StringizedCallStack resolve_names(CallStack call_stack) {
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
 
@@ -152,7 +158,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 
         if (call == 0) {
 			file = "NULL"s;
-			name = "ATTEMP TO EXECUTE AT ADDRESS 0"s;
+			name = "ATTEMPT TO EXECUTE AT ADDRESS 0"s;
 		} else {
 			constexpr u32 maxNameLength = MAX_SYM_NAME;
 			DWORD64 displacement;
@@ -169,9 +175,22 @@ StringizedCallStack to_string(CallStack &call_stack) {
 			}
 
 #if 1
+			DWORD const flags = UNDNAME_NO_MS_KEYWORDS
+				| UNDNAME_NO_ACCESS_SPECIFIERS 
+				| UNDNAME_NO_CV_THISTYPE 
+				| UNDNAME_NO_FUNCTION_RETURNS 
+				| UNDNAME_NO_MEMBER_TYPE 
+				| UNDNAME_NO_ALLOCATION_LANGUAGE 
+				| UNDNAME_NO_ALLOCATION_MODEL 
+				| UNDNAME_NO_MS_THISTYPE 
+				| UNDNAME_NO_RETURN_UDT_MODEL
+				| UNDNAME_NO_SPECIAL_SYMS
+				| UNDNAME_NO_THISTYPE
+				| UNDNAME_NO_THROW_SIGNATURES
+			;
 			char name_buffer[256];
 			name.data = name_buffer;
-			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
+			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
 #else
 			name = with(temporary_allocator, demangle(symbol->Name));
 #endif
@@ -205,7 +224,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 
 StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 	auto call_stack = with(temporary_allocator, get_call_stack(context, frames_to_skip));
-	return to_string(call_stack);
+	return resolve_names(call_stack);
 }
 
 void free(StringizedCallStack &call_stack) {

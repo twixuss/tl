@@ -2,8 +2,8 @@
 #include "random.h"
 #include "math.h"
 #include "bits.h"
-#include "generated/simd.h"
-#include "generated/simd_vector.h"
+//#include "generated/simd.h"
+//#include "generated/simd_vector.h"
 
 #pragma warning(push)
 //#pragma warning(disable : 4244)
@@ -170,6 +170,7 @@ struct DefaultRandomizer {
 		return normalize_range_f32<v3f>(a);
 	}
 	forceinline v3f random_v3f(v3s value) { return random_v3f((v3u)value); }
+	/*
 	forceinline simd_vector::v3fx8 random_v3fx8(simd_vector::v3ux8 x) {
 		using namespace simd_vector;
 		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
@@ -183,6 +184,7 @@ struct DefaultRandomizer {
 
 		return normalize_range_f32<v3fx8>(a);
 	}
+	*/
 
 	forceinline f32 random_f32(v2u seed) {
 		u32 s = 0;
@@ -399,7 +401,7 @@ forceinline f32 voronoi_line_v3f(v3f coordinate) {
 
 	return d;
 }
-
+/*
 static const simd_vector::v3sx8 voronoi_line_v3s_offsets_x8[] = {
 	simd_typed::S32x8(-1,-1,-1,-1, -1,-1,-1,-1),
 	simd_typed::S32x8(-1,-1,-1,+0, +0,+0,+1,+1),
@@ -417,6 +419,10 @@ static const simd_vector::v3sx8 voronoi_line_v3s_offsets_x8[] = {
 	simd_typed::S32x8(+1,+1,+1,+1, +1,+1,+1,+1),
 	simd_typed::S32x8(-1,+0,+1,+1, +1,+1,+1,+1),
 };
+*/
+
+namespace simd_typed {};
+namespace simd_vector {};
 
 template <class Randomizer = DefaultRandomizer>
 forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
@@ -431,17 +437,17 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 	using namespace simd_typed;
 	using namespace simd_vector;
 
-	if constexpr (TL_USE_SIMD && ARCH_AVX && requires(Randomizer r) { { r.random_v3fx8(v3sx8{}) } -> std::same_as<v3fx8>; }) {
-		for (auto offset : voronoi_line_v3s_offsets_x8) {
-			s32x8 ix = offset.x + 1;
-			s32x8 iy = offset.y + 1;
-			s32x8 iz = offset.z + 1;
-			s32x8 in = ix*3*3 + iy*3 + iz;
-
-			auto n = (v3fx8)offset + Randomizer{}.random_v3fx8(tile + offset);
-			for(int i = 0; i < 8; ++i)
-				((v3f *)r)[in[i]] = n.subvector(i);
-		}
+	if constexpr (false) { //TL_USE_SIMD && ARCH_AVX && requires(Randomizer r) { { r.random_v3fx8(v3sx8{}) } -> std::same_as<v3fx8>; }) {
+		//for (auto offset : voronoi_line_v3s_offsets_x8) {
+		//	s32x8 ix = offset.x + 1;
+		//	s32x8 iy = offset.y + 1;
+		//	s32x8 iz = offset.z + 1;
+		//	s32x8 in = ix*3*3 + iy*3 + iz;
+		//
+		//	auto n = (v3fx8)offset + Randomizer{}.random_v3fx8(tile + offset);
+		//	for(int i = 0; i < 8; ++i)
+		//		((v3f *)r)[in[i]] = n.subvector(i);
+		//}
 	} else {
 		static_assert(requires(Randomizer r) { { r.random_v3f(v3s{}) } -> std::same_as<v3f>; }, "random_v3f / random_v3fx8 must be defined");
 		for (int x = -1; x <= 1; ++x) {

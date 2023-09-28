@@ -730,6 +730,7 @@ s32 tl_main(Span<Span<utf8>> args) {
 	// TEST(utf8_test);
 	TEST(fly_string_test);
 	TEST(big_int_test);
+	TEST(simd_test);
 #undef TEST;
 
 	u8  test8 [][2] = {{0,  8}, {0xFF,  0}};

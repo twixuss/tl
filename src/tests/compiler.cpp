@@ -237,3 +237,83 @@ void compiler_test() {
 		assert(false);
 	}
 }
+
+#if 0
+char const *mangled;
+char func() { mangled = __FUNCDNAME__; return {}; }
+void func(char) { mangled = __FUNCDNAME__; }
+char func(u8) { mangled = __FUNCDNAME__; return {}; }
+void func(u16) { mangled = __FUNCDNAME__; }
+char func(u32) { mangled = __FUNCDNAME__; return {}; }
+void func(u64) { mangled = __FUNCDNAME__; }
+char func(s8) { mangled = __FUNCDNAME__; return {}; }
+void func(s16) { mangled = __FUNCDNAME__; }
+char func(s32) { mangled = __FUNCDNAME__; return {}; }
+void func(s64) { mangled = __FUNCDNAME__; }
+char func(bool) { mangled = __FUNCDNAME__; return {}; }
+void func(utf8) { mangled = __FUNCDNAME__; }
+char func(utf16) { mangled = __FUNCDNAME__; return {}; }
+void func(utf32) { mangled = __FUNCDNAME__; }
+char func(ulong) { mangled = __FUNCDNAME__; return {}; }
+void func(slong) { mangled = __FUNCDNAME__; }
+char func(wchar) { mangled = __FUNCDNAME__; return {}; }
+void func(u8,u8) { mangled = __FUNCDNAME__; }
+namespace test {
+void func(u8) { mangled = __FUNCDNAME__; }
+struct Struct {};
+}
+struct Struct {};
+void func(Struct) { mangled = __FUNCDNAME__; }
+void func(test::Struct) { mangled = __FUNCDNAME__; }
+
+Struct func0() { mangled = __FUNCDNAME__; return {};}
+test::Struct func1() { mangled = __FUNCDNAME__; return {};}
+
+void test_demangler() {
+	List<ascii> demangled;
+
+#define TESTS \
+	/*TEST(func0, "func0()"); */\
+	/*TEST(func1, "func1()"); */\
+	/*TEST(func2, "func2()"); */\
+	/*TEST(func3, "func3()"); */\
+	TEST(func0, "func0()"); \
+	TEST(func1, "func1()"); \
+	TEST(func, "func(Struct)", Struct{}); \
+	TEST(func, "func(test::Struct)", test::Struct{}); \
+	TEST(func, "func()"); \
+	TEST(func, "func(char)", (char)0); \
+	TEST(func, "func(u8)", (u8)0); \
+	TEST(func, "func(u16)", (u16)0); \
+	TEST(func, "func(u32)", (u32)0); \
+	TEST(func, "func(u64)", (u64)0); \
+	TEST(func, "func(s8)", (s8)0); \
+	TEST(func, "func(s16)", (s16)0); \
+	TEST(func, "func(s32)", (s32)0); \
+	TEST(func, "func(s64)", (s64)0); \
+	TEST(func, "func(bool)", (bool)0); \
+	TEST(func, "func(utf8)", (utf8)0); \
+	TEST(func, "func(utf16)", (utf16)0); \
+	TEST(func, "func(utf32)", (utf32)0); \
+	TEST(func, "func(ulong)", (ulong)0); \
+	TEST(func, "func(slong)", (slong)0); \
+	TEST(func, "func(wchar)", (wchar)0); \
+	TEST(func, "func(u8,u8)", (u8)0, (u8)0); \
+	TEST(test::func, "test::func(u8)", (u8)0); \
+
+
+#define TEST(func, b, ...) \
+	func(__VA_ARGS__); \
+	println("{} => {}", mangled, b); \
+
+	TESTS;
+
+#define TEST(func, b, ...) \
+	func(__VA_ARGS__); \
+	demangled = demangle(mangled); \
+	println("{} == {}", b, demangled); \
+	assert(as_span(b) == demangled)
+
+	TESTS;
+}
+#endif
