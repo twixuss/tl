@@ -69,12 +69,12 @@
 #endif
 
 #if TL_PARENT_SOURCE_LOCATION
-#define TL_LPC std::source_location location = std::source_location::current() // in empty parameter list (declaration)
-#define TL_LPCD std::source_location location                                  // in empty parameter list (definition)
-#define TL_LAC location														   // in empty argument list
-#define TL_LP , TL_LPC														   // after some parameters (declaration)
-#define TL_LPD , TL_LPCD													   // after some parameters (definition)
-#define TL_LA , TL_LAC														   // after some arguments
+#define TL_LPC [[maybe_unused]] std::source_location location = std::source_location::current() // in empty parameter list (declaration)
+#define TL_LPCD [[maybe_unused]] std::source_location location                                  // in empty parameter list (definition)
+#define TL_LAC location                                                                         // in empty argument list
+#define TL_LP , TL_LPC                                                                          // after some parameters (declaration)
+#define TL_LPD , TL_LPCD                                                                        // after some parameters (definition)
+#define TL_LA , TL_LAC                                                                          // after some arguments
 #else
 #define TL_LPC
 #define TL_LPCD
@@ -750,12 +750,12 @@ struct AutoCastable {
 
 struct AutoCaster {
 	template <class T>
-	forceinline constexpr auto operator*(T const &value) {
+	forceinline constexpr auto operator->*(T const &value) {
 		return AutoCastable{value};
 	}
 };
 
-#define autocast AutoCaster{} * 
+#define autocast AutoCaster{} ->* 
 
 template <class... Callables>
 struct Combine : public Callables... {
@@ -1290,6 +1290,33 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 			static_error_t(T, "Invalid return type of for_each function");
 		}
 	}
+}
+
+template <class Enumerable>
+forceinline constexpr auto enumerate(Enumerable &&enumerable) {
+
+	using BaseIterator = decltype(enumerable.begin());
+
+	struct IndexedEnumerable {
+		struct Iterator {
+			BaseIterator base;
+			umm index;
+
+			forceinline constexpr auto &operator++() {
+				++base;
+				++index;
+				return *this;
+			}
+			forceinline constexpr auto operator*() { return std::pair<umm, decltype(*base)>{index, *base}; }
+			forceinline constexpr bool operator==(const Iterator &that) const { return base == that.base; }
+		};
+
+		Enumerable enumerable;
+		forceinline constexpr Iterator begin() { return { enumerable.begin(), 0 }; }
+		forceinline constexpr Iterator end() { return { enumerable.end(), 0 }; }
+	};
+
+	return IndexedEnumerable{enumerable};
 }
 
 forceinline constexpr Span<char > operator""s(char  const *string, umm count) { return Span((char  *)string, count); }
@@ -1989,6 +2016,12 @@ struct BitSet {
 		return {};
 	}
 	inline constexpr auto operator<=>(BitSet const &) const = default;
+	inline constexpr BitSet operator~() const {
+		auto result = *this;
+		for (auto &word : result.words)
+			word = ~word;
+		return result;
+	}
 };
 
 template <ForEachFlags flags = 0, umm size>
@@ -2006,6 +2039,8 @@ void for_each(BitSet<size> set, auto &&fn)
 			for (u64 bit = set.bits_in_word - 1; bit != -1; --bit) {
 				if (word & ((Word)1 << bit)) {
 					auto absolute_index = word_index * set.bits_in_word + bit;
+					if (absolute_index >= size)
+						continue;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
 						if (fn(absolute_index) == ForEach_break)
 							return;
@@ -2024,6 +2059,8 @@ void for_each(BitSet<size> set, auto &&fn)
 			for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
 				if (word & ((Word)1 << bit)) {
 					auto absolute_index = word_index * set.bits_in_word + bit;
+					if (absolute_index >= size)
+						return;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
 						if (fn(absolute_index) == ForEach_break)
 							return;
@@ -2352,6 +2389,7 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 		};
 	}
 	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP) {
+		(void)old_size;
 		return {
 			.data = tl_reallocate(data, new_size, alignment),
 			.count = new_size,
@@ -2359,6 +2397,8 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 		};
 	}
 	void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
+		(void)size;
+		(void)alignment;
 		tl_free(data);
 	}
 };
@@ -2414,7 +2454,11 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 		memcpy(new_data.data, old_data, old_size);
 		return new_data;
 	}
-	forceinline static void deallocate_impl(void *data, umm size, umm alignment TL_LP) {}
+	forceinline static void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
+		(void)data;
+		(void)size;
+		(void)alignment;
+	}
 
 	forceinline operator Allocator() {
 		return {

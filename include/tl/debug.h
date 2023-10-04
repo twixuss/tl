@@ -9,8 +9,6 @@
 
 namespace tl {
 
-using CallStack = List<void *>;
-
 struct StringizedCallStack {
 	struct Entry {
 		Span<char> name;
@@ -31,9 +29,9 @@ struct StringizedCallStack {
 TL_API bool debug_init();
 TL_API void debug_deinit();
 
-TL_API CallStack get_call_stack(umm frames_to_skip = 0);
+TL_API List<void *> get_call_stack(umm frames_to_skip = 0);
 
-TL_API StringizedCallStack resolve_names(CallStack call_stack);
+TL_API StringizedCallStack resolve_names(Span<void *> call_stack);
 TL_API void free(StringizedCallStack &call_stack);
 
 inline StringizedCallStack get_stack_trace() {
@@ -103,7 +101,7 @@ void debug_deinit() {
 	SymCleanup(debug_process);
 }
 
-static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
+static List<void *> get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	STACKFRAME64 frame = {};
 #if ARCH_X64
 	frame.AddrPC.Offset    = context.Rip;
@@ -128,7 +126,7 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	DuplicateHandle(debug_process, GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
 	defer { CloseHandle(thread); };
 
-	CallStack call_stack;
+	List<void *> call_stack;
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (frames_to_skip) {
 			--frames_to_skip;
@@ -140,7 +138,7 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 
 	return call_stack;
 }
-CallStack get_call_stack(umm frames_to_skip) {
+List<void *> get_call_stack(umm frames_to_skip) {
 	CONTEXT context = {};
 	context.ContextFlags = CONTEXT_CONTROL;
 	RtlCaptureContext(&context);
@@ -148,7 +146,7 @@ CallStack get_call_stack(umm frames_to_skip) {
 	return get_call_stack(context, 1 + frames_to_skip);
 }
 
-StringizedCallStack resolve_names(CallStack call_stack) {
+StringizedCallStack resolve_names(Span<void *> call_stack) {
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
 

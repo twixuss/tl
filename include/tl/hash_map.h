@@ -513,7 +513,6 @@ struct ContiguousHashMap : Traits {
 				index = step(index, cells.count);
 			}
 
-			bool recalc = false;
 			if (count >= cells.count * rehash_percentage / 100) {
 				if (reserve(cells.count * 2 TL_LA)) {
 					hash = get_hash(key);
