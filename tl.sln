@@ -1,13 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31129.286
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tl", "tl.vcxproj", "{B6C8883B-F0CF-4EBD-A8A1-09C5728A9E11}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tl_opengl_generator", "tl_opengl_generator.vcxproj", "{E808C7D6-2DAB-4077-820B-182AF6FF9B44}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tl_multi_window_test", "tl_multi_window_test.vcxproj", "{76BADD7A-330D-40A8-BB25-030FAA12622C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tl_simd_generator", "tl_simd_generator.vcxproj", "{5B643020-8E70-4CDA-9A68-8B5FA930A286}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,14 @@ Global
 		{76BADD7A-330D-40A8-BB25-030FAA12622C}.Release|x64.Build.0 = Release|x64
 		{76BADD7A-330D-40A8-BB25-030FAA12622C}.Release|x86.ActiveCfg = Release|Win32
 		{76BADD7A-330D-40A8-BB25-030FAA12622C}.Release|x86.Build.0 = Release|Win32
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Debug|x64.ActiveCfg = Debug|x64
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Debug|x64.Build.0 = Debug|x64
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Debug|x86.ActiveCfg = Debug|Win32
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Debug|x86.Build.0 = Debug|Win32
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Release|x64.ActiveCfg = Release|x64
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Release|x64.Build.0 = Release|x64
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Release|x86.ActiveCfg = Release|Win32
+		{5B643020-8E70-4CDA-9A68-8B5FA930A286}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -154,8 +154,8 @@ inline u64 next(splitmix64 &state) {
 static constexpr f32 random_u32_to_f32 = 1.0f / ((1 << 24) - 1);
 static constexpr f64 random_u64_to_f64 = 1.0 / ((1llu << 53) - 1);
 
-template <class F32, class U32> forceinline F32 normalize_range_f32(U32 v) { return (F32)(v >> 8) * (1.0f / ((1 << 24) - 1)); }
-template <class F64, class U64> forceinline F64 normalize_range_f64(U64 v) { return (F64)(v >> 11) * (1.0 / ((1llu << 53) - 1)); }
+template <class F32, class U32> forceinline F32 normalize_range_f32(U32 v) requires requires(U32 x) { {(F32)x}; } { return (F32)(v >> 8) * (1.0f / ((1 << 24) - 1)); }
+template <class F64, class U64> forceinline F64 normalize_range_f64(U64 v) requires requires(U64 x) { {(F64)x}; } { return (F64)(v >> 11) * (1.0 / ((1llu << 53) - 1)); }
 
 template <class State> u8  next_u8 (State &state) { return (u8)next(state); }
 template <class State> u16 next_u16(State &state) { return (u16)next(state); }

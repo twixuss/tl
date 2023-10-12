@@ -30,10 +30,12 @@ inline Process execute(utf16 const *path, ExecuteParams params = {}) {
 }
 
 inline Process execute(Span<utf16> path, Span<utf16> arguments, ExecuteParams params = {}) {
-	return execute(temporary_null_terminate(path).data, temporary_null_terminate(arguments).data, params);
+	scoped(temporary_allocator_and_checkpoint);
+	return execute(null_terminate(path).data, null_terminate(arguments).data, params);
 }
 inline Process execute(Span<utf16> path, ExecuteParams params = {}) {
-	return execute(temporary_null_terminate(path).data, 0, params);
+	scoped(temporary_allocator_and_checkpoint);
+	return execute(null_terminate(path).data, 0, params);
 }
 inline Process execute(Span<utf8> path, ExecuteParams params = {}) {
 	return execute(to_utf16(path, true).data, 0, params);
@@ -50,8 +52,27 @@ TL_API void terminate(Process process);
 void free(Process &process);
 
 TL_API Process start_process(utf16 const *command_line);
-inline Process start_process(Span<utf16> command_line) { return start_process(temporary_null_terminate(command_line).data); }
-inline Process start_process(Span<utf8>  command_line) { return start_process(to_utf16(command_line, true).data); }
+inline Process start_process(Span<utf16> command_line) {
+	return start_process(with(temporary_allocator, null_terminate(command_line)).data);
+}
+inline Process start_process(Span<utf8> command_line) {
+	return start_process(with(temporary_allocator, to_utf16(command_line, true)).data);
+}
+
+inline List<u8> start_process_and_get_output(Span<utf8> command_line) {
+	auto process = start_process(command_line);
+	StringBuilder builder;
+	while (true) {
+		u8 buffer[256];
+		auto bytes_read = process.standard_out->read(array_as_span(buffer));
+		if (bytes_read == 0) {
+			break;
+		}
+		append(builder, Span(buffer, bytes_read));
+	}
+	free(process);
+	return to_string(builder);
+}
 
 }
 
@@ -92,7 +113,7 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.hInstApp = NULL;
 	if (!ShellExecuteExW(&ShExecInfo)) {
 		auto error = GetLastError();
-		print(Print_error, "ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
+		with(ConsoleColor::red, errln("ShellExecuteExA failed with error code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error));
 		return {};
 	}
 
@@ -121,6 +142,7 @@ void terminate(Process process) {
 
 void free(Process &process) {
 	CloseHandle((HANDLE)process.handle);
+	free(process.standard_out);
 	process = {};
 }
 
@@ -129,21 +151,18 @@ struct StdoutStream : Stream {
 	void *handle;
 	umm read(Span<u8> destination) {
 		DWORD bytes_read;
-		ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0);
+		if (!ReadFile(handle, destination.data, (DWORD)destination.count, &bytes_read, 0))
+			return 0;
 		return bytes_read;
 	}
-	umm write(Span<u8> source) { (void)source; invalid_code_path("unavailable"); return {}; }
-	umm remaining_bytes() { invalid_code_path("unavailable"); return {}; }
 	void free() {
 		CloseHandle(handle);
 	}
 };
 
 Process start_process(utf16 const *command_line) {
-
-
 	SECURITY_ATTRIBUTES saAttr;
-	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.nLength = sizeof(saAttr);
 	saAttr.bInheritHandle = TRUE;
 	saAttr.lpSecurityDescriptor = NULL;
 
@@ -166,7 +185,7 @@ Process start_process(utf16 const *command_line) {
 	PROCESS_INFORMATION piProcInfo = {};
 
 	STARTUPINFOW siStartInfo = {};
-	siStartInfo.cb = sizeof(STARTUPINFO);
+	siStartInfo.cb = sizeof(siStartInfo);
 	siStartInfo.hStdError = child_stdout_write;
 	siStartInfo.hStdOutput = child_stdout_write;
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
@@ -180,7 +199,7 @@ Process start_process(utf16 const *command_line) {
 		NULL,          // use parent's environment
 		NULL,          // use parent's current directory
 		&siStartInfo,  // STARTUPINFO pointer
-		&piProcInfo)  // receives PROCESS_INFORMATION
+		&piProcInfo)   // receives PROCESS_INFORMATION
 	) {
 		free(child_stdout_stream);
 		return {};

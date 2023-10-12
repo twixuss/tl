@@ -16,12 +16,17 @@ struct StaticMaskedBlockList {
 
 	struct Block {
 		Block *next = 0;
-		umm free_mask_count = count_of(masks);
+		umm available_mask_count = count_of(masks);
 		Mask masks[values_per_block / bits_in_mask] = {};
 		union {
 			T values[values_per_block];
 		};
 		Block() {}
+
+		bool get_mask(umm index) {
+			assert(index < values_per_block);
+			return masks[index / bits_in_mask] & ((Mask)1 << (index % bits_in_mask));
+		}
 	};
 
 	Allocator allocator = current_allocator;
@@ -36,9 +41,7 @@ struct StaticMaskedBlockList {
 		umm index;
 	};
 
-	Added add(T const &that) {
-		Added result;
-
+	Added add(T const &that = {}) {
 		auto block = &first;
 
 		umm block_index = 0;
@@ -50,7 +53,7 @@ struct StaticMaskedBlockList {
 				last = block;
 			}
 
-			if (block->free_mask_count != 0) {
+			if (block->available_mask_count != 0) {
 				// Search for free space in current block
 				for (umm mask_index = 0; mask_index < count_of(block->masks); mask_index += 1) {
 					auto mask = block->masks[mask_index];
@@ -65,12 +68,13 @@ struct StaticMaskedBlockList {
 					block->masks[mask_index] = mask;
 
 					if (mask == ~0)
-						block->free_mask_count -= 1;
+						block->available_mask_count -= 1;
 
 					block->values[value_index] = that;
-					result.pointer = &block->values[value_index];
-					result.index = block_index * values_per_block + value_index;
-					goto _return;
+					return {
+						.pointer = &block->values[value_index],
+						.index = block_index * values_per_block + value_index,
+					};
 				}
 			}
 
@@ -78,15 +82,32 @@ struct StaticMaskedBlockList {
 			block = block->next;
 			block_index += 1;
 		}
-	_return:
-		return result;
+		return {};
 	}
 
-	Added add() {
-		return add(T{});
-	}
+	void erase_at(umm index) {
+		auto block = &first;
+		while (block) {
+			if (index < values_per_block) {
+				u32 mask_index = index / bits_in_mask;
+				u32 bit_index  = index % bits_in_mask;
 
-	void remove(T *value) {
+				bounds_check(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList");
+
+				if (block->masks[mask_index] == ~0)
+					block->available_mask_count += 1;
+
+				block->masks[mask_index] &= ~((Mask)1 << bit_index);
+
+
+				return;
+			}
+			block = block->next;
+			index -= values_per_block;
+		}
+		bounds_check(false, "attempt to remove non-existant value from StaticMaskedBlockList");
+	}
+	void erase(T *value) {
 		auto block = &first;
 		while (block) {
 			if (block->values <= value && value < block->values + values_per_block) {
@@ -115,13 +136,50 @@ struct StaticMaskedBlockList {
 			--block_index;
 		}
 
-		bounds_check(block->masks[value_index / bits_in_mask] & (1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in StaticMaskedBlockList");
+		bounds_check(block->masks[value_index / bits_in_mask] & ((Mask)1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in StaticMaskedBlockList");
 
 		return block->values[value_index];
 	}
 	T &operator[](umm index) {
 		return at(index);
 	}
+
+	struct Iterator {
+		StaticMaskedBlockList *list = 0;
+		Block *block = 0;
+		umm index = 0;
+
+		T &operator*() { return block->values[index]; }
+		T *operator->() { return &block->values[index]; }
+
+		Iterator &operator++() {
+			do {
+				index++;
+				if (index == values_per_block) {
+					if (block == list->last) {
+						break;
+					} else {
+						block = block->next;
+						index = 0;
+					}
+				}
+			} while (!block->get_mask(index));
+			return *this;
+		}
+
+		Iterator operator++(int) { auto it = *this; ++*this; return it; }
+
+		bool operator==(Iterator const &that) { return list == that.list && block == that.block && index == that.index; }
+		bool operator!=(Iterator const &that) { return !(*this == that); }
+	};
+
+	Iterator begin() {
+		Iterator result = {this, &first, 0};
+		if (!first.get_mask(0))
+			++result;
+		return result;
+	}
+	Iterator end() { return {this, last, values_per_block}; }
 };
 
 template <class T, umm values_per_block>

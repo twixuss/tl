@@ -187,6 +187,8 @@ using u64 = unsigned long long;
 using f32 = float;
 using f64 = double;
 using f80 = long double;
+using b8  = s8;
+using b16 = s16;
 using b32 = s32;
 using b64 = s64;
 
@@ -244,6 +246,10 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 #endif
 #else
 #define TL_DEBUG 1
+#endif
+
+#ifndef TL_USE_SIMD
+#define TL_USE_SIMD (!TL_DEBUG)
 #endif
 
 #ifdef TL_IMPL

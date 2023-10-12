@@ -26,6 +26,7 @@
 #include <tl/thread.h>
 #include <tl/time.h>
 #include <tl/u256.h>
+#include <tl/fly_string.h>
 
 #if OS_WINDOWS
 #include <tl/win32.h>

@@ -118,11 +118,12 @@ struct CpuCache {
 };
 
 using CpuFeatureMask = umm;
-inline static constexpr u32 bits_in_cpu_feature_mask = sizeof(CpuFeatureMask) * 8;
+inline constexpr u32 bits_in_cpu_feature_mask = sizeof(CpuFeatureMask) * 8;
 
 inline CpuFeatureIndex get_cpu_feature_index(CpuFeature f) {
 	CpuFeatureIndex result;
-	result.slot = (CpuFeatureMask)f >> ce::log2(bits_in_cpu_feature_mask);
+	constexpr u32 shift = log2(bits_in_cpu_feature_mask);
+	result.slot = (CpuFeatureMask)f >> shift;
 	result.bit  = (CpuFeatureMask)f & (bits_in_cpu_feature_mask - 1);
 	return result;
 }

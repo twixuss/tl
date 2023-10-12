@@ -26,7 +26,7 @@ struct Catalog {
 	};
 	Allocator allocator;
 	std::unordered_map<Span<utf8>, Entry> entries;
-	ListList<pathchar> file_names;
+	ListOfLists<pathchar> file_names;
 	Entry *fallback = 0;
 	void (*update_entry)(Entry &) = 0;
 	bool (*entry_valid)(Entry &) = 0;

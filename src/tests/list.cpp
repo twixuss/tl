@@ -7,7 +7,7 @@ using namespace tl;
 void list_test() {
 	Queue<int> test;
 
-	assert(test.allocator != 0);
+	assert(test.allocator);
 	assert(test.data == 0);
 	assert(test.count == 0);
 	assert(test.alloc_data == 0);

@@ -1,4 +1,7 @@
 #pragma once
+
+// TODO: why tf find returns KeyValue? Make it return only Value.
+
 #include "list.h"
 #include "linked_list.h"
 #include "array.h"
@@ -8,9 +11,47 @@
 
 namespace tl {
 
-template <class Key, class Value, umm _capacity, class Hasher = DefaultHasher<Key>>
-struct StaticBucketHashMap {
+template <class Key, bool use_high_bits = true>
+struct DefaultHashTraits {
+	inline static constexpr u32 rehash_percentage = 70;
+	inline static constexpr void on_collision(Key a, Key b) {}
+
+	// These are templates because of situation where == operator is not defined, but are_equal is defined in derived class.
+	// In that case these functions will not be instantiated.
+	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return a == b; }
+	inline constexpr u64 get_hash(this auto &&self, Key const &key) { return ::get_hash(key); }
+
+	inline constexpr umm get_index_from_hash(this auto &&self, u64 hash, u64 capacity) {
+		if constexpr (use_high_bits) {
+			hash ^= hash >> 32;
+			hash ^= hash >> 16;
+			hash ^= hash >> 8;
+		}
+
+		assert(is_power_of_2(capacity));
+		return hash & (capacity - 1);
+	}
+	inline constexpr umm get_index_from_key(this auto &&self, Key const &key, u64 capacity) {
+		return self.get_index_from_hash(self.get_hash(key), capacity);
+	}
+};
+
+#define TL_USE_HASH_TRAITS_MEMBERS \
+	using Traits::rehash_percentage; \
+	using Traits::on_collision; \
+	using Traits::are_equal; \
+	using Traits::get_hash; \
+	using Traits::get_index_from_hash; \
+	using Traits::get_index_from_key; \
+
+
+template <class Key, class Value, umm _capacity, class Traits = DefaultHashTraits<Key>>
+struct StaticBucketHashMap : Traits {
+	TL_USE_HASH_TRAITS_MEMBERS;
+
 	inline static constexpr umm capacity = _capacity;
+
+	static_assert(is_power_of_2(capacity));
 
 	struct Entry {
 		Key key;
@@ -21,9 +62,12 @@ struct StaticBucketHashMap {
 
 	Array<Block, capacity> blocks = {};
 
+	[[no_unique_address]] Traits traits = {};
+	
+	inline constexpr umm get_index_from_key(Key const &key) { return get_index_from_key(key, capacity); }
+
 	Value &get_or_insert(Key const &key) {
-		umm hash = Hasher::get_hash(key);
-		auto &block = blocks[hash % blocks.size];
+		auto &block = blocks[get_index_from_key(key)];
 		for (auto &it : block) {
 			if (it.key == key) {
 				return it.value;
@@ -33,9 +77,11 @@ struct StaticBucketHashMap {
 		it.key = key;
 		return it.value;
 	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
+	}
 	Value *find(Key const &key) {
-		umm hash = Hasher::get_hash(key);
-		auto &block = blocks[hash % blocks.size];
+		auto &block = blocks[get_index_from_key(key)];
 		for (auto &it : block) {
 			if (it.key == key) {
 				return &it.value;
@@ -87,50 +133,71 @@ struct StaticBucketHashMap {
 	}
 };
 
-template <class Key, class Value, umm capacity, class Hasher>
-void free(StaticBucketHashMap<Key, Value, capacity, Hasher> &map) {
+template <class Key, class Value, umm capacity, class Traits>
+void free(StaticBucketHashMap<Key, Value, capacity, Traits> &map) {
 	for (auto &block : map.blocks) {
 		free(block);
 	}
 }
 
-template <class Key, class Value, class Hasher = DefaultHasher<Key>>
-struct BucketHashMap {
-	using ValueType = Value;
+template <class Key_, class Value_>
+struct KeyValue {
+	using Key = Key_;
+	using Value = Value_;
+	Key key;
+	Value value;
+};
 
-	struct KeyValue {
-		Key key;
-		Value value;
+// TODO: add Allocator parameter
+template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>>
+struct BucketHashMap : Traits {
+	TL_USE_HASH_TRAITS_MEMBERS;
+
+	using Key = Key_;
+	using Value = Value_;
+	using KeyValue = KeyValue<Key, Value>;
+	using ValueType = KeyValue;
+
+	struct HashKeyValue {
+		u64 hash;
+		KeyValue kv;
 	};
-	using Bucket = LinkedList<KeyValue>;
+	using Bucket = LinkedList<HashKeyValue>;
 
-	Allocator allocator = current_allocator;
+	[[no_unique_address]] Allocator allocator = current_allocator;
 	Span<Bucket> buckets;
 	umm total_value_count = 0;
-
+	
 	Value &get_or_insert(Key const &key TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(4 TL_LA);
 		}
 
-		umm hash = Hasher::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		umm hash = get_hash(key);
+		auto bucket = &buckets[get_index_from_hash(hash, buckets.count)];
+
 		for (auto &it : *bucket) {
-			if (it.key == key) {
-				return it.value;
+			if (it.hash == hash) {
+				if (are_equal(it.kv.key, key)) {
+					return it.kv.value;
+				}
 			}
 		}
 
-		if (total_value_count == buckets.count) {
-			rehash(buckets.count * 2);
-			bucket = &buckets[hash & (buckets.count - 1)];
+		// NOTE: Optimizer is able to get rid of this division.
+		if (total_value_count >= buckets.count * rehash_percentage / 100) {
+			rehash(buckets.count * 2 TL_LA);
+			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
-		it.key = key;
-		return it.value;
+		it.hash = hash;
+		it.kv.key = key;
+
+		return it.kv.value;
+	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
 	}
 
 	//
@@ -140,70 +207,75 @@ struct BucketHashMap {
 	//
 	template <class Callback>
 	bool insert_or(Key const &key, Value value, Callback &&callback TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
 
-		umm hash = Hasher::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		umm hash = get_hash(key);
+		auto bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		for (auto &it : *bucket) {
-			if (it.key == key) {
-				callback(it.key, it.value);
-				return false;
+			if (it.hash == hash) {
+				if (are_equal(it.kv.key, key)) {
+					callback(it.kv.key, it.kv.value);
+					return false;
+				}
 			}
 		}
 
 		if (total_value_count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[hash & (buckets.count - 1)];
+			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
-		it.key = key;
-		it.value = value;
+		it.hash = hash;
+		it.kv.key = key;
+		it.kv.value = value;
 		return true;
 	}
 	bool try_insert(Key const &key, Value value, Value **existing = 0, Key **existing_key = 0 TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
 
-		umm hash = Hasher::get_hash(key);
-		auto bucket = &buckets[hash & (buckets.count - 1)];
+		umm hash = get_hash(key);
+		auto bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		for (auto &it : *bucket) {
-			if (it.key == key) {
-				if (existing)
-					*existing = &it.value;
-				if (existing_key)
-					*existing_key = &it.key;
-				return false;
+			if (it.hash == hash) {
+				if (are_equal(it.kv.key, key)) {
+					if (existing)
+						*existing = &it.kv.value;
+					if (existing_key)
+						*existing_key = &it.kv.key;
+					return false;
+				}
 			}
 		}
 
 		if (total_value_count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[hash & (buckets.count - 1)];
+			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
 		++total_value_count;
 		auto &it = bucket->add(TL_LAC);
-		it.key = key;
-		it.value = value;
+		it.hash = hash;
+		it.kv.key = key;
+		it.kv.value = value;
 		return true;
 	}
 
-	Pointer<Value> find(Key const &key) {
+	KeyValue *find(Key const &key) const {
 		if (buckets.count == 0)
 			return 0;
 
-		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (buckets.count - 1)];
+		umm hash = get_hash(key);
+		auto &bucket = buckets[get_index_from_hash(hash, buckets.count)];
+
 		for (auto &it : bucket) {
-			if (it.key == key) {
-				return &it.value;
+			if (it.hash == hash) {
+				if (are_equal(it.kv.key, key)) {
+					return &it.kv;
+				}
 			}
 		}
 		return 0;
@@ -212,13 +284,15 @@ struct BucketHashMap {
 		if (buckets.count == 0)
 			return {};
 
-		umm hash = Hasher::get_hash(key);
-		auto &bucket = buckets[hash & (buckets.count - 1)];
+		umm hash = get_hash(key);
+		auto &bucket = buckets[get_index_from_hash(hash, buckets.count)];
 		for (auto &it : bucket) {
-			if (it.key == key) {
-				auto result = it.value;
-				tl::erase(bucket, &it);
-				return result;
+			if (it.hash == hash) {
+				if (are_equal(it.kv.key, key)) {
+					auto result = it.kv.value;
+					tl::erase(bucket, &it);
+					return result;
+				}
 			}
 		}
 
@@ -226,7 +300,8 @@ struct BucketHashMap {
 	}
 
 	void rehash(umm new_buckets_count TL_LP) {
-		scoped_allocator(allocator);
+		// Set current allocator so new buckets inherit it.
+		scoped(allocator);
 
 		auto old_buckets = buckets;
 
@@ -240,9 +315,9 @@ struct BucketHashMap {
 				next_node = next_node->next;
 				node->next = 0;
 
-				auto hash = Hasher::get_hash(node->value.key);
-				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
-				new_bucket.add_steal(node TL_LA);
+				auto hash = get_hash(node->value.kv.key);
+				auto &new_bucket = buckets[get_index_from_hash(hash, buckets.count)];
+				new_bucket.add_steal(node);
 			}
 		}
 
@@ -256,38 +331,70 @@ struct BucketHashMap {
 			buckets[bucket_index].clear();
 		}
 	}
+
+
+	struct Iterator {
+		BucketHashMap *map;
+		Bucket *bucket;
+		typename Bucket::Iterator bucket_it;
+
+		Iterator &operator++() {
+			++bucket_it;
+			if (bucket_it == bucket->end()) {
+				do {
+					++bucket;
+					if (bucket == map->buckets.end()) {
+						bucket_it = {};
+						return *this;
+					} else {
+						bucket_it = bucket->begin();
+					}
+				} while (!bucket_it);
+			}
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return bucket_it == that.bucket_it; }
+		bool operator!=(Iterator const &that) { return bucket_it != that.bucket_it; }
+		auto &operator*() { return bucket_it->kv; }
+		auto *operator->() { return &bucket_it->kv; }
+	};
+
+	Iterator begin() {
+		if (!buckets.count)
+			return {};
+
+		Iterator result;
+		result.map = this;
+		for (auto &bucket : buckets) {
+			result.bucket_it = bucket.begin();
+			if (result.bucket_it) {
+				result.bucket = &bucket;
+				break;
+			}
+		}
+		return result;
+	}
+	Iterator end() {
+		return {};
+	}
 };
 
-template <ForEachFlags flags, class Key, class Value, class Hasher, class Fn>
-void for_each(BucketHashMap<Key, Value, Hasher> map, Fn &&fn) {
-	static_assert(flags == 0, "Only default flags supported");
-
-	for (u32 i = 0; i < map.buckets.count; ++i) {
-		for (auto &it : map.buckets[i]) {
-			fn(it.key, it.value);
-		}
+template <class Key, class Value, class Traits>
+void free(BucketHashMap<Key, Value, Traits> &map) {
+	for (auto &bucket : map.buckets) {
+		free(bucket);
 	}
+	map.allocator.free(map.buckets.data);
+	map.buckets = {};
 }
 
-template <class Key, class Value, class Hasher>
-BucketHashMap<Key, Value, Hasher> copy(BucketHashMap<Key, Value, Hasher> const &source TL_LP) {
-	BucketHashMap<Key, Value, Hasher> result;
-	for_each(source, [&](Key const &key, Value const &value) {
-		result.get_or_insert(key TL_LA) = value;
-	});
-	return result;
-}
-
-template <class Key, class Value, class Hasher>
-void set(BucketHashMap<Key, Value, Hasher> &destination, BucketHashMap<Key, Value, Hasher> const &source TL_LP) {
-	destination.clear();
-	for_each(source, [&](Key const &key, Value const &value) {
-		destination.get_or_insert(key TL_LA) = value;
-	});
-}
-
-template <class Key, class Value, class Hasher>
-umm count_of(BucketHashMap<Key, Value, Hasher> &map) {
+template <class Key, class Value, class Traits>
+umm count_of(BucketHashMap<Key, Value, Traits> &map) {
 	umm result = 0;
 	for (auto &bucket : map.buckets) {
 		result += bucket.size();
@@ -295,143 +402,341 @@ umm count_of(BucketHashMap<Key, Value, Hasher> &map) {
 	return result;
 }
 
-template <class Key, class Value, class Hasher, class Fn>
-umm count(BucketHashMap<Key, Value, Hasher> map, Fn &&fn) {
+template <ForEachFlags flags=0, class Key, class Value, class Traits, class Fn>
+void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
+	requires { fn(*(KeyValue<Key, Value> *)0); }
+{
+	static_assert(flags == 0, "Only default flags supported");
+
+	for (u32 i = 0; i < map.buckets.count; ++i) {
+		for (auto &it : map.buckets[i]) {
+			fn(it.kv);
+		}
+	}
+}
+
+template <class Key, class Value, class Traits, class Fn>
+auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
+	using U = decltype(fn(*(KeyValue<Key, Value> *)0));
+	List<U, Allocator> result;
+	result.reserve(count_of(map) TL_LA);
+	for_each(map, [&](auto &kv) { result.add(fn(kv)); });
+	return result;
+}
+
+
+template <class Key, class Value, class Traits>
+BucketHashMap<Key, Value, Traits> copy(BucketHashMap<Key, Value, Traits> const &source TL_LP) {
+	BucketHashMap<Key, Value, Traits> result;
+	for_each(source, [&](auto &kv) {
+		result.get_or_insert(kv.key TL_LA) = kv.value;
+	});
+	return result;
+}
+
+template <class Key, class Value, class Traits>
+void set(BucketHashMap<Key, Value, Traits> &destination, BucketHashMap<Key, Value, Traits> const &source TL_LP) {
+	destination.clear();
+	for_each(source, [&](auto &kv) {
+		destination.get_or_insert(kv.key TL_LA) = kv.value;
+	});
+}
+
+template <class Key, class Value, class Traits, class Fn>
+umm count(BucketHashMap<Key, Value, Traits> map, Fn &&fn) {
 	umm result = 0;
-	for_each(map, [&](Key &key, Value &value) {
-		if (fn(key, value)) {
+	for_each(map, [&](auto &kv) {
+		if (fn(kv.key, kv.value)) {
 			result += 1;
 		}
 	});
 	return result;
 }
 
-template <class Key, class Value, class Hasher>
-bool is_empty(BucketHashMap<Key, Value, Hasher> map) {
+template <class Key, class Value, class Traits>
+bool is_empty(BucketHashMap<Key, Value, Traits> map) {
 	bool result = true;
-	for_each(map, [&](Key &key, Value &value) { (void)key; (void)value; result = false; for_each_break; });
+	for_each(map, [&](auto &kv) { (void)kv; result = false; return ForEach_break; });
 	return result;
 }
 
 
+enum class ContiguousHashMapCellState : u8 {
+	empty    = 0,
+	occupied = 1,
+	removed  = 2,
+};
 
-inline static constexpr u64 map_cell_state_empty     = 0;
-inline static constexpr u64 map_cell_state_full      = 1;
-inline static constexpr u64 map_cell_state_tombstone = 2;
+#ifndef TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY
+#define TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY 8
+#endif
 
-template <class Key, class Value, class Hasher = DefaultHasher<Key>>
-struct ContiguousHashMap {
-    struct Cell {
-        u64 state : 2;
-        u64 hash : 62;
-        Key key;
-        Value value;
-    };
+static_assert(is_power_of_2(TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY));
 
-    Allocator allocator = current_allocator;
-    Span<Cell> cells;
-    umm count = 0;
+template <class Key, class Value, class Traits = DefaultHashTraits<Key>, class Allocator = Allocator>
+struct ContiguousHashMap : Traits {
+	TL_USE_HASH_TRAITS_MEMBERS;
 
+	using CellState = ContiguousHashMapCellState;
+	using KeyValue = KeyValue<Key, Value>;
+	using ValueType = KeyValue;
 
-    Value &get_or_insert(Key key) {
-        reserve(count + 1);
-        count += 1;
-        return insert_into(cells, key, {});
-    }
+	// TODO: SOA, store hash
+	struct Cell {
+		CellState state;
+		KeyValue key_value;
+		Key &key() { return key_value.key; }
+		Value &value() { return key_value.value; }
+	};
 
-    bool reserve(umm desired) {
-        if (desired <= cells.count)
-            return false;
+	Span<Cell> cells;
+	umm count = 0;
 
-        Span<Cell> new_cells;
-        new_cells.count = max(1, cells.count * 2);
-        new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count);
-        for (auto &new_cell : new_cells) {
-            new_cell.state = map_cell_state_empty;
-        }
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-        for (auto &old_cell : cells) {
-            insert_into(new_cells, old_cell.key, old_cell.value);
-        }
+	Value &get_or_insert(Key key TL_LP) {
+		defer { debug(); };
 
-        allocator.free_t(cells.data, cells.count);
-        cells = new_cells;
+		auto hash = get_hash(key);
+		u64 index = 0;
+		if (cells.count) {
+			index = get_index_from_hash(hash, cells.count);
+			auto steps = cells.count;
+			while (steps--) {
+				auto &cell = cells.data[index];
+				if (cell.state == CellState::empty) {
+					break;
+				}
+				if (cell.state == CellState::occupied) {
+					if (are_equal(cell.key(), key)) {
+						return cell.value();
+					}
+				}
+				index = step(index, cells.count);
+			}
+
+			if (count >= cells.count * rehash_percentage / 100) {
+				if (reserve(cells.count * 2 TL_LA)) {
+					hash = get_hash(key);
+					index = get_index_from_hash(hash, cells.count);
+				}
+			}
+		} else {
+			// NOTE: TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY will be used inside `reserve`
+			reserve(1 TL_LA);
+			index = get_index_from_hash(hash, cells.count);
+		}
+		count += 1;
+		defer { assert(find(key)); };
+
+		while (cells.data[index].state == CellState::occupied) {
+			on_collision(cells.data[index].key(), key);
+			index = step(index, cells.count);
+		}
+
+		auto &cell = cells.data[index];
+
+		cell.state = CellState::occupied;
+		cell.key() = key;
+		cell.value() = {};
+		return cell.value();
+	}
+	void insert(Key const &key, Value value) {
+		get_or_insert(key) = value;
+	}
+
+	bool reserve(umm desired TL_LP) {
+		defer { debug(); };
+
+		if (desired <= cells.count)
+			return false;
+
+		Span<Cell> new_cells;
+		new_cells.count = max((umm)TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, cells.count);
+		while (new_cells.count < desired) {
+			new_cells.count *= 2;
+		}
+		assert(is_power_of_2(new_cells.count));
+
+		new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count TL_LA);
+		for (auto &new_cell : new_cells) {
+			new_cell.state = CellState::empty;
+		}
+
+		for (auto &old_cell : cells) {
+			if (old_cell.state == CellState::occupied) {
+				insert_into(new_cells, old_cell.key(), old_cell.value());
+			}
+		}
+
+		allocator.free_t(cells.data, cells.count);
+		cells = new_cells;
 
 		return true;
-    }
+	}
 
-    void step(umm *index) {
-        *index = (*index + 1) % cells.count;
-    }
+	umm step(umm index, umm cells_count) const {
+		return (index + 1) & (cells_count - 1);
+	}
 
-    Value &insert_into(Span<Cell> cells, Key key, Value value) {
-        auto hash = get_the_hash(key);
-        auto index = hash % cells.count;
+	Value &insert_into(Span<Cell> cells, Key key, Value value) {
+		defer { debug(); };
 
-        while (cells.data[index].state == map_cell_state_full) {
-            step(&index);
-        }
+		auto hash = get_hash(key);
+		auto index = get_index_from_hash(hash, cells.count);
 
-        auto &cell = cells.data[index];
+		while (cells.data[index].state == CellState::occupied) {
+			on_collision(cells.data[index].key(), key);
+			index = step(index, cells.count);
+		}
 
-        cell.state = map_cell_state_full;
-        cell.hash = hash;
-        cell.key = key;
-        return cell.value = value;
-    }
+		auto &cell = cells.data[index];
 
-    Value *find(Key key) {
-        auto hash = get_the_hash(key);
-        auto index = hash % cells.count;
-        auto steps = cells.count; // TODO: i don't know if there is a good way to handle absence of a value
-        while (steps--) {
-            auto &cell = cells.data[index];
-            if (cell.state == map_cell_state_full) {
-                if (cell.hash == hash) {
-                    if (cell.key == key) {
-                        return &cell.value;
-                    }
-                }
-            }
-            step(&index);
-        }
+		cell.state = CellState::occupied;
+		cell.key() = key;
+		return cell.value() = value;
+	}
 
-        return 0;
-    }
+	KeyValue *find(Key key) const {
+		defer { debug(); };
 
-    u64 get_the_hash(Key key) {
-        return Hasher::get_hash(key) & 0x3FFF'FFFF'FFFF'FFFF; // get rid of 2 bits reserved for `state`
-    }
+		if (cells.count == 0)
+			return 0;
+
+		auto hash = get_hash(key);
+		auto index = get_index_from_hash(hash, cells.count);
+		auto steps = cells.count;
+		while (steps--) {
+			auto &cell = cells.data[index];
+			if (cell.state == CellState::empty) {
+				return 0;
+			}
+			if (cell.state == CellState::occupied) {
+				if (are_equal(cell.key(), key)) {
+					return &cell.key_value;
+				}
+			}
+			index = step(index, cells.count);
+		}
+
+		return 0;
+	}
 
 	void clear() {
 		for (auto &cell : cells) {
-			cell.state = map_cell_state_empty;
+			cell.state = CellState::empty;
 		}
 		count = 0;
 	}
+
+	void erase(v3s key) {
+		defer { debug(); };
+
+		bounds_check(cells.count);
+		
+		auto hash = get_hash(key);
+		auto index = get_index_from_hash(hash, cells.count);
+
+		auto cell = cells.data + index;
+
+		auto steps = cells.count;
+		while (steps--) {
+			auto &cell = cells.data[index];
+			if (cell.state == CellState::occupied) {
+				if (are_equal(cell.key(), key)) {
+					cell.state = CellState::removed;
+				}
+			}
+			index = step(index, cells.count);
+		}
+	}
+
+	struct Iterator {
+		ContiguousHashMap *map = 0;
+		Cell *cell = 0;
+
+		Iterator &operator++() {
+			do {
+				++cell; 
+				if (cell == map->cells.end()) {
+					cell = 0;
+					return *this;
+				}
+			} while (cell->state != CellState::occupied);
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return cell == that.cell; }
+		bool operator!=(Iterator const &that) { return cell != that.cell; }
+		auto &operator*() { return cell->key_value; }
+		auto *operator->() { return &cell->key_value; }
+	};
+
+	Iterator begin() { 
+		if (cells.count == 0)
+			return {this, 0};
+
+		Iterator it = {this, cells.begin()};
+		if (cells[0].state != CellState::occupied)
+			++it;
+
+		return it;
+	}
+	Iterator end() { return {this, 0}; }
+
+	void debug() const {
+
+		for (auto cell : cells) {
+			if ((int)cell.state > 2) {
+				debug_break();
+			}
+		}
+
+	}
 };
 
+TL_DECLARE_CONCEPT(ContiguousHashMap);
 
-template <class Key, class Value>
-umm count_of(ContiguousHashMap<Key, Value> map) {
-    return map.count;
+void free(CContiguousHashMap auto &map) {
+	map.allocator.free(map.cells.data);
+	map.cells = {};
 }
 
+bool is_empty(CContiguousHashMap auto map) {
+	return map.count == 0;
+}
 
-template <class Key, class Value, class Fn>
-void for_each(ContiguousHashMap<Key, Value> map, Fn &&fn) {
-    for (auto &cell : map.cells) {
-        if (cell.state == map_cell_state_full) {
-            fn(cell.key, cell.value);
-        }
-    }
+umm count_of(CContiguousHashMap auto map) {
+	return map.count;
+}
+
+template <CContiguousHashMap Map, class Fn>
+void for_each(Map map, Fn &&fn) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
+	for (auto &cell : map.cells) {
+		if (cell.state == ContiguousHashMapCellState::occupied) {
+			fn(cell.key_value);
+		}
+	}
+}
+
+template <class Allocator = Allocator, CContiguousHashMap Map, class Fn>
+auto map(CContiguousHashMap auto map, auto &&fn TL_LP) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
+	using U = decltype(fn(*(typename decltype(map)::KeyValue *)0));
+	List<U, Allocator> result;
+	result.reserve(map.count TL_LA);
+	for_each(map, [&](auto &kv) { result.add(fn(kv)); });
+	return result;
 }
 
 #ifndef TL_DEFAULT_HASH_MAP
-#define TL_DEFAULT_HASH_MAP(Key, Value, Hasher) BucketHashMap<Key, Value, Hasher>
+#define TL_DEFAULT_HASH_MAP BucketHashMap
 #endif
 
-template <class Key, class Value, class Hasher = DefaultHasher<Key>>
-using HashMap = TL_DEFAULT_HASH_MAP(Key, Value, Hasher);
+template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
+using HashMap = TL_DEFAULT_HASH_MAP<Key, Value, Traits>;
 
 }

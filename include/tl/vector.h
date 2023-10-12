@@ -13,7 +13,10 @@ namespace tl {
 	template <class U>\
 	forceinline constexpr explicit operator v2<U>() const { return {(U)x, (U)y}; } \
 	forceinline constexpr v2 operator+() const { return *this; } \
+	forceinline constexpr v2 xx() const { return {x, x}; } \
+	forceinline constexpr v2 xy() const { return {x, y}; } \
 	forceinline constexpr v2 yx() const { return {y, x}; } \
+	forceinline constexpr v2 yy() const { return {y, y}; } \
 
 
 #define DEFN_3 \
@@ -25,12 +28,14 @@ namespace tl {
 	template <class U>\
 	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
 	forceinline constexpr v3 operator+() const { return *this; } \
-	forceinline constexpr v2 xz() const { return {x, z}; } \
-	forceinline constexpr v2 yx() const { return {y, x}; } \
-	forceinline constexpr v2 zx() const { return {z, x}; } \
-	forceinline constexpr v2 zy() const { return {z, y}; } \
-	forceinline constexpr v3 yzx() const { return {y, z, x}; } \
-	forceinline constexpr v3 zxy() const { return {z, x, y}; }
+	forceinline constexpr v2 xz() const { return {x,z}; } \
+	forceinline constexpr v2 yx() const { return {y,x}; } \
+	forceinline constexpr v2 zx() const { return {z,x}; } \
+	forceinline constexpr v2 zy() const { return {z,y}; } \
+	forceinline constexpr v3 yzx() const { return {y,z,x}; } \
+	forceinline constexpr v3 zxy() const { return {z,x,y}; } \
+	forceinline constexpr v3 xzy() const { return {x,z,y}; } \
+	forceinline constexpr v3 zyx() const { return {z,y,x}; } \
 
 
 #define DEFN_4 \
@@ -236,19 +241,19 @@ using v2f = v2f32; using v3f = v3f32; using v4f = v4f32;
 using v2s = v2s32; using v3s = v3s32; using v4s = v4s32;
 using v2u = v2u32; using v3u = v3u32; using v4u = v4u32;
 
-template<class T> inline static constexpr bool is_vector = false;
-template<class T> inline static constexpr bool is_vector<v2<T>> = true;
-template<class T> inline static constexpr bool is_vector<v3<T>> = true;
-template<class T> inline static constexpr bool is_vector<v4<T>> = true;
+template<class T> inline constexpr bool is_vector = false;
+template<class T> inline constexpr bool is_vector<v2<T>> = true;
+template<class T> inline constexpr bool is_vector<v3<T>> = true;
+template<class T> inline constexpr bool is_vector<v4<T>> = true;
 
-template<class T> inline static constexpr bool is_integer_like<v2<T>> = is_integer_like<T>;
-template<class T> inline static constexpr bool is_integer_like<v3<T>> = is_integer_like<T>;
-template<class T> inline static constexpr bool is_integer_like<v4<T>> = is_integer_like<T>;
+template<class T> inline constexpr bool is_integer_like<v2<T>> = is_integer_like<T>;
+template<class T> inline constexpr bool is_integer_like<v3<T>> = is_integer_like<T>;
+template<class T> inline constexpr bool is_integer_like<v4<T>> = is_integer_like<T>;
 
-template <class T> inline static constexpr u32 dimension_of = 0;
-template <class T> inline static constexpr u32 dimension_of<v2<T>> = 2;
-template <class T> inline static constexpr u32 dimension_of<v3<T>> = 3;
-template <class T> inline static constexpr u32 dimension_of<v4<T>> = 4;
+template <class T> inline constexpr u32 dimension_of = 0;
+template <class T> inline constexpr u32 dimension_of<v2<T>> = 2;
+template <class T> inline constexpr u32 dimension_of<v3<T>> = 3;
+template <class T> inline constexpr u32 dimension_of<v4<T>> = 4;
 
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
@@ -302,6 +307,10 @@ forceinline constexpr bool all_false(v4b v) { return !any_true(v); }
 forceinline constexpr bool any_false(v2b v) { return !all_true(v); }
 forceinline constexpr bool any_false(v3b v) { return !all_true(v); }
 forceinline constexpr bool any_false(v4b v) { return !all_true(v); }
+
+template <class T> forceinline constexpr v2<T> select(v2b t, v2<T> a, v2<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y)}; }
+template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z)}; }
+template <class T> forceinline constexpr v4<T> select(v4b t, v4<T> a, v4<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z), select(t.w, a.w, b.w)}; }
 
 }
 

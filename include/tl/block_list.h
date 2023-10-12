@@ -109,14 +109,15 @@ struct StaticBlockList {
 	T &back() { return last->back(); }
 	T const &back() const { return last->back(); }
 
-	void pop_back() {
+	T pop_back() {
 		if (last == &first)
 			bounds_check(first.count);
 
-		last->count--;
+		T result = last->data[--last->count];
 		if (last->count == 0 && last != &first) {
 			last = last->previous;
 		}
+		return result;
 	}
 
 	template <class Fn>
@@ -239,7 +240,7 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		BlockListIndex index = {};
 		auto block = &list.first;
@@ -259,7 +260,7 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 		} while (block);
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		auto block = &list.first;
 		do {
@@ -357,6 +358,7 @@ List<T> to_list(StaticBlockList<T, block_size> list TL_LP) {
 
 template <class T>
 struct BlockList {
+	using Value = T;
 	struct Block {
 		umm count = 0;
 		umm capacity = 0;
@@ -370,10 +372,13 @@ struct BlockList {
 
 		umm available_space() const { return capacity - count; }
 		T &add(T value) {
+			defer { assert(count <= capacity); };
 			return data()[count++] = value;
 		}
 		T &front() { return *data(); }
 		T &back() { return data()[count - 1]; }
+
+		Span<T> span() { return {data(), count}; }
 
 		T &operator[](umm i) { bounds_check(i < count); return data()[i]; }
 	};
@@ -460,13 +465,7 @@ struct BlockList {
 	Block *first = 0;
 	Block *last = 0;
 	Block *alloc_last = 0;
-	umm initial_capacity = 256;
-
-	BlockList() = default;
-	BlockList(BlockList const &that) = default;
-	BlockList(BlockList &&that) = delete;
-	BlockList &operator=(BlockList const &that) = default;
-	BlockList &operator=(BlockList &&that) = delete;
+	umm count = 0;
 
 	void clear() {
 		for (auto block = first; block; block = block->next) {
@@ -475,33 +474,54 @@ struct BlockList {
 		last = first;
 	}
 
+	Block *allocate_block(umm capacity TL_LP) {
+		auto result = (Block *)allocator.allocate(
+			sizeof(Block) + sizeof(T) * capacity,
+			max(alignof(T), alignof(Block))
+			TL_LA
+		);
+		result->capacity = capacity;
+		return result;
+	}
+
+	void ensure_capacity(umm desired_capacity) {
+		while (last && last->available_space() < desired_capacity) {
+			last = last->next;
+		}
+		if (!last) {
+			if (alloc_last)
+				last = alloc_last = alloc_last->next = allocate_block(desired_capacity);
+			else
+				first = last = alloc_last = allocate_block(desired_capacity);
+		}
+	}
+
 	T &add(T value TL_LP) {
-		auto dest_block = last;
-		while (dest_block && !dest_block->available_space()) {
-			dest_block = dest_block->next;
+		defer { count += 1; };
+
+		for (;;) {
+			if (!last)
+				break;
+
+			if (last->available_space())
+				return last->add(value);
+
+			last = last->next;
 		}
-		if (!dest_block) {
-			umm capacity = first ? alloc_last->capacity * 2 : initial_capacity;
 
-			dest_block = (Block *)allocator.allocate(
-				sizeof(Block) + sizeof(T) * capacity,
-				max(alignof(T), alignof(Block))
-				TL_LA
-			);
 
-			dest_block->next = 0;
-			dest_block->count = 0;
-			dest_block->capacity = capacity;
+		auto next_capacity = max(alloc_last ? alloc_last->count * 2 : 0, 16);
+		auto new_block = allocate_block(next_capacity TL_LA);
 
-			if (first) {
-				dest_block->previous = alloc_last;
-				alloc_last->next = dest_block;
-				last = alloc_last = dest_block;
-			} else {
-				first = last = alloc_last = dest_block;
-			}
+		if (first) {
+			new_block->previous = alloc_last;
+			alloc_last->next = new_block;
+			last = alloc_last = new_block;
+		} else {
+			first = last = alloc_last = new_block;
 		}
-		return dest_block->add(value);
+
+		return new_block->add(value);
 	}
 	T &add(TL_LPC) { return add({} TL_LA); }
 
@@ -510,23 +530,27 @@ struct BlockList {
 	T &back() { return last->back(); }
 	T const &back() const { return last->back(); }
 
-	void pop_back() {
+	T pop_back() {
 		if (last == first)
 			bounds_check(first->count);
 
+		defer { debug_count_check(); };
+
+		count -= 1;
+		auto result = last->back();
 		last->count--;
 		if (last->count == 0 && last != first) {
 			last = last->previous;
 		}
+		return result;
 	}
 
 	template <class Fn>
 	void for_each_block(Fn &&fn) const {
-		auto block = &first;
+		auto block = first;
 		do {
-			auto block_capacity = block->count;
-			if (block_capacity) {
-				fn(block->buffer, block_capacity);
+			if (block->count) {
+				fn(block->data(), block->count);
 			}
 			block = block->next;
 		} while (block);
@@ -573,17 +597,60 @@ struct BlockList {
 		return {first, 0};
 	}
 	Iterator end() {
-		return {last, last->count};
+		return {last, last ? last->count : 0};
+	}
+
+	void debug_count_check() {
+		umm sum = 0;
+		auto block = first;
+		while (block) {
+			sum += block->count;
+			if (block == last)
+				break;
+			block = block->next;
+		}
+		assert(count == sum);
+	}
+
+	void copy_into(T *d) {
+		for_each_block([&] (T *s, umm count) {
+			memcpy(d, s, count);
+			d += count;
+		});
+	}
+
+	Optional<Span<T>> subspan(umm offset, umm count) {
+		auto block = first;
+		while (offset >= block->count) {
+			offset -= block->count;
+			block = block->next;
+		}
+
+		if (offset + count > block->count)
+			return {};
+
+		return Span{block->begin() + offset, count};
 	}
 };
 
 template <class T>
 umm count_of(BlockList<T> const &list) {
-	umm total_count = 0;
-	for (auto block = list.first; block != 0; block = block->next) {
-		total_count += block->count;
+	return list.count;
+}
+
+template <class T>
+umm index_of(BlockList<T> const &list, T *value) {
+	umm index = 0;
+	auto block = list.first;
+	while (block) {
+		if (block->begin() <= value && value < block->end()) {
+			return index + (value - block->begin());
+		}
+		index += block->count;
+		block = block->next;
 	}
-	return total_count;
+	bounds_check(false);
+	return (umm)~0;
 }
 
 template <class T>
@@ -640,11 +707,11 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 
 	if constexpr (using_index) {
 		using ReturnType = decltype(fn(*(T*)0, BlockListIndex{}));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		BlockListIndex index = {};
 		auto block = list.first;
-		do {
+		while (block) {
 			for (auto &it : *block) {
 				if constexpr (returns_directive) {
 					if (fn(it, index) == ForEach_break)
@@ -657,13 +724,13 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 			block = block->next;
 			++index.block_index;
 			index.value_index = 0;
-		} while (block);
+		}
 	} else {
 		using ReturnType = decltype(fn(*(T*)0));
-		constexpr bool returns_directive = is_same<ForEachDirective, ReturnType>;
+		constexpr bool returns_directive = std::is_same_v<ForEachDirective, ReturnType>;
 
 		auto block = list.first;
-		do {
+		while (block) {
 			for (auto it : *block) {
 				if constexpr (returns_directive) {
 					if (fn(it) == ForEach_break)
@@ -673,14 +740,14 @@ void for_each(BlockList<T> &list, Fn &&fn) {
 				}
 			}
 			block = block->next;
-		} while (block);
+		}
 	}
 }
 
 template <class T>
 T *find(BlockList<T> &list, T const &to_find, BlockListIndex *result_index = 0) {
 	BlockListIndex index = {};
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		index.value_index = 0;
 		for (auto it = block->buffer; it != block->end; ++it) {
@@ -701,7 +768,7 @@ T *find(BlockList<T> &list, T const &to_find, BlockListIndex *result_index = 0) 
 template <class T>
 T *find(BlockList<T> &list, T const &to_find, typename BlockList<T>::Index *result_index = 0) {
 	typename BlockList<T, Allocator>::Index index = {};
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		index.block = block;
 		index.value_index = 0;
@@ -722,7 +789,7 @@ T *find(BlockList<T> &list, T const &to_find, typename BlockList<T>::Index *resu
 
 template <class T, class Predicate>
 T *find_if(BlockList<T> &list, Predicate &&predicate) {
-	auto block = &list.first;
+	auto block = list.first;
 	do {
 		for (auto it = block->buffer; it != block->end; ++it) {
 			if (predicate(it->value)) {
@@ -736,10 +803,176 @@ T *find_if(BlockList<T> &list, Predicate &&predicate) {
 }
 
 template <class T>
-void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
-	for_each(source, [&](T const &value) {
-		destination->add(value TL_LA);
+void free(BlockList<T> &list) {
+	auto block = list.first;
+	while (block) {
+		auto next = block->next;
+		list.allocator.free(block);
+		block = next;
+	}
+	list.first = list.last = list.alloc_last = 0;
+	list.count = 0;
+}
+
+template <class T>
+BlockList<T> copy(BlockList<T> list) {
+	// TODO: optimize
+	BlockList<T> result;
+	for_each(list, [&](T value) {
+		result.add(value);
 	});
+	return result;
+}
+
+template <class Block>
+void double_join(Block *a, Block *b) {
+	a->next = b;
+	b->previous = a;
+}
+
+template <class T>
+void add_steal(BlockList<T> *destination, BlockList<T> *source) {
+	if (source->last) {
+		if (source->last->next) {
+			assert(source->last->next->count == 0);
+		}
+	}
+
+	assert(destination->allocator == source->allocator, "different allocator are not implemented");
+
+	if (!source->last) {
+		assert(source->count == 0);
+		return;
+	}
+
+	defer {
+		source->first = source->last = source->alloc_last = 0;
+		source->count = 0;
+	};
+
+	if (!destination->last) {
+		*destination = *source;
+		return;
+	}
+
+	auto destination_excess_blocks = destination->last->next;
+	auto source_excess_blocks = source->last->next;
+
+	if (destination_excess_blocks) {
+		if (!source_excess_blocks) {
+			assert(source->last == source->alloc_last);
+		}
+
+		if (source_excess_blocks) {
+			// have: dst <-> dstex     src <-> srcex
+			// need: dst <-> src <-> srcex <-> dstex
+
+			destination->last->next = source->first;
+			source->first->previous = destination->last;
+
+			source->alloc_last->next = destination_excess_blocks;
+			destination_excess_blocks->previous = source->alloc_last;
+		} else {
+			// have: dst <-> dstex     src
+			// need: dst <-> src <-> dstex
+
+			destination->last->next = source->first;
+			source->first->previous = destination->last;
+
+			source->last->next = destination_excess_blocks;
+			destination_excess_blocks->previous = source->last;
+		}
+
+		// double_join(destination->last, source->first);
+		// double_join(source->alloc_last, destination_excess_blocks);
+	} else {
+		// have: dst     src <-> srcex
+		// need: dst <-> src <-> srcex
+		double_join(destination->last, source->first);
+
+		destination->alloc_last = source->alloc_last;
+	}
+
+	destination->last = source->last;
+
+	destination->count += source->count;
+}
+
+template <class T>
+void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
+	for_each(source, [&](T &x) {
+		destination->add(x TL_LA);
+	});
+	return;
+	// TODO: de-bug this
+
+	auto src_block = source.first;
+	auto src_remaining = src_block->count;
+	auto src_data = src_block->data();
+
+	auto dst_block = destination->last;
+
+	while (dst_block) {
+		auto copy_count = min(src_remaining, dst_block->available_space());
+
+		memcpy(dst_block->end(), src_data, copy_count * sizeof(T));
+
+		dst_block->count += copy_count;
+		src_remaining -= copy_count;
+		src_data += copy_count;
+
+		if (src_remaining == 0) {
+			// Source block has no more data left. Go to the next one.
+			src_block = src_block->next;
+			if (!src_block) {
+				break;
+			}
+		}
+
+		if (dst_block->available_space() == 0) {
+			// Destination block has no more space. Go to the next one.
+			dst_block = dst_block->next;
+		}
+	}
+
+	if (src_block) {
+		// We still have source data an destination ran out of space.
+		// Allocate a big enough block to store everything that is left.
+		umm remaining_count = src_remaining;
+		auto stopped_on_src_block = src_block;
+		src_block = src_block->next;
+		while (src_block) {
+			remaining_count += src_remaining;
+			src_block = src_block->next;
+		}
+
+		if (!remaining_count)
+			return;
+
+		dst_block = destination->allocate_block(max(remaining_count, destination->next_capacity) TL_LA);
+		destination->next_capacity *= 2;
+
+		memcpy(dst_block->end(), src_data, src_remaining * sizeof(T));
+
+		src_block = stopped_on_src_block->next;
+		while (src_block) {
+			memcpy(dst_block->end(), src_block->data(), src_block->count * sizeof(T));
+			src_block = src_block->next;
+		}
+
+		dst_block->count = remaining_count;
+
+		assert(destination->last == destination->alloc_last);
+		if (destination->first) {
+			destination->last =
+			destination->alloc_last =
+			destination->alloc_last->next = dst_block;
+		} else {
+			destination->first =
+			destination->last =
+			destination->alloc_last = dst_block;
+		}
+	}
 }
 
 

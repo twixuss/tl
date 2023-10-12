@@ -5,11 +5,11 @@
 #endif
 
 #if TL_ENABLE_PROFILER
-#define timed_begin(profiler, name) (profiler).begin(name, as_span(__FILE__), __LINE__)
-#define timed_end(profiler) (profiler).end()
-#define timed_block(profiler, name) timed_begin(profiler, name); defer{ timed_end(profiler); }
-//#define timed_function() timed_block(([](utf8 const *name){scoped_allocator(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
-#define timed_function(profiler) timed_block(profiler, as_span(__FUNCSIG__))
+#define timed_begin(profiler, enabled, name) (enabled ? (profiler).begin(name, as_span(__FILE__), __LINE__) : void())
+#define timed_end(profiler, enabled) (enabled ? (profiler).end() : void())
+#define timed_block(profiler, enabled, name) timed_begin(profiler, enabled, name); defer{ timed_end(profiler, enabled); }
+//#define timed_function() timed_block(([](utf8 const *name){scoped(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
+#define timed_function(profiler, enabled) timed_block(profiler, enabled, as_span(__FUNCSIG__))
 #else
 #define timed_begin(profiler, name)
 #define timed_end(profiler)
@@ -23,34 +23,40 @@
 #include "hash_map.h"
 #include "thread.h"
 
+#ifndef TL_PROFILER_SUBTRACT_SELF_TIME
+#define TL_PROFILER_SUBTRACT_SELF_TIME 0
+#endif
+
 namespace tl {
 struct TL_API Profiler {
 	struct TimeSpan {
-		s64 begin;
-		s64 end;
+		u64 begin;
+		u64 end;
 		Span<utf8> name;
 		Span<utf8> file;
 		u32 line;
 		u32 thread_id;
 	};
 	struct Mark {
-		s64 counter;
+		u64 counter;
 		u32 color;
 		u32 thread_id;
 	};
 	struct ThreadInfo {
 		List<TimeSpan> time_spans;
-		s64 self_time;
+#if TL_PROFILER_SUBTRACT_SELF_TIME
+		u64 self_time;
+#endif
 	};
 
 	List<Mark> marks;
-	Mutex marks_mutex;
+	SpinLock marks_lock;
 
 	List<TimeSpan> recorded_time_spans;
-	Mutex recorded_time_spans_mutex;
+	SpinLock recorded_time_spans_lock;
 
 	HashMap<u32, ThreadInfo> thread_infos;
-	Mutex thread_infos_mutex;
+	SpinLock thread_infos_lock;
 
 	s64 start_time;
 
@@ -71,7 +77,58 @@ struct TL_API Profiler {
 	Span<TimeSpan> get_recorded_time_spans();
 	List<ascii> output_for_chrome();
 	List<u8> output_for_timed();
+
+	struct ScopedTimer {
+		Profiler *profiler = 0;
+		ScopedTimer() = default;
+		ScopedTimer(ScopedTimer const &) = delete;
+		ScopedTimer(ScopedTimer &&that) : profiler(that.profiler) {
+			that.profiler = 0;
+		}
+		~ScopedTimer() {
+			if (profiler) {
+				profiler->end();
+			}
+		}
+	};
+
+	ScopedTimer scoped_timer(char const *name, std::source_location location = std::source_location::current()) {
+		ScopedTimer timer;
+		timer.profiler = this;
+		begin(name, as_span(location.file_name()), location.line());
+		return timer;
+	}
+
+
+	struct ScopeMeasurer {
+		Profiler *profiler = 0;
+		Span<utf8> name;
+		Span<utf8> file;
+		u32 line = 0;
+	};
+
+	ScopeMeasurer measure(Span<utf8> name, std::source_location location = std::source_location::current()) {
+		return {this, name, as_utf8(as_span(location.file_name())), location.line()};
+	}
+	ScopeMeasurer measure(char const *name, std::source_location location = std::source_location::current()) {
+		return measure(as_utf8(as_span(name)), location);
+	}
+	ScopeMeasurer measure(std::source_location location = std::source_location::current()) {
+		return measure(as_utf8(as_span(location.function_name())), location);
+	}
 };
+
+template <>
+struct Scoped<Profiler::ScopeMeasurer> {
+	Profiler *profiler;
+	Scoped(Profiler::ScopeMeasurer measurer) : profiler(measurer.profiler) {
+		measurer.profiler->begin(measurer.name, measurer.file, measurer.line);
+	}
+	~Scoped() {
+		profiler->end();
+	}
+};
+
 }
 
 #ifdef TL_IMPL
@@ -96,53 +153,69 @@ void Profiler::deinit() {
 	free(recorded_time_spans);
 }
 void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto self_begin = get_performance_counter();
+#endif
+
 	u32 thread_id = get_current_thread_id();
 
-	lock(thread_infos_mutex);
-	auto &info = thread_infos.get_or_insert(thread_id);
-	unlock(thread_infos_mutex);
+	auto &info = with(thread_infos_lock, thread_infos.get_or_insert(thread_id));
 
 	auto &span = info.time_spans.add();
 	span.name = name;
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
+
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto begin_counter = get_performance_counter();
 	info.self_time += begin_counter - self_begin;
 	span.begin = begin_counter - info.self_time;
+#else
+	span.begin = get_performance_counter();
+#endif
 }
 void Profiler::end() {
 	auto end_counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
-	lock(thread_infos_mutex);
-	auto info = thread_infos.find(thread_id);
-	assert(info);
-	unlock(thread_infos_mutex);
+	auto found = with(thread_infos_lock, thread_infos.find(thread_id));
+	assert(found);
 
+	auto info = &found->value;
 	auto &list = info->time_spans;
 
 	TimeSpan span = list.back();
 	list.pop();
 
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	span.end = end_counter - info->self_time;
+#else
+	span.end = end_counter;
+#endif
 
-	scoped_lock(recorded_time_spans_mutex);
-	recorded_time_spans.add(span);
+	with(recorded_time_spans_lock, recorded_time_spans.add(span));
 
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	info->self_time += get_performance_counter() - end_counter;
+#endif
 }
 void Profiler::mark(Span<utf8> name, u32 color) {
-	scoped_lock(thread_infos_mutex);
-	scoped_lock(marks_mutex);
-	auto info = thread_infos.find(get_current_thread_id());
-	assert(info);
+	scoped(thread_infos_lock);
+	scoped(marks_lock);
+	auto found = thread_infos.find(get_current_thread_id());
+	assert(found);
+	auto info = &found->value;
+#if TL_PROFILER_SUBTRACT_SELF_TIME
 	marks.add({get_performance_counter() - info->self_time, color, get_current_thread_id()});
+#else
+	marks.add({get_performance_counter(), color, get_current_thread_id()});
+#endif
 }
 void Profiler::reset() {
 	recorded_time_spans.clear();
 	thread_infos.clear();
+	start_time = get_performance_counter();
 }
 
 Span<Profiler::TimeSpan> Profiler::get_recorded_time_spans() {
@@ -156,7 +229,7 @@ List<ascii> Profiler::output_for_chrome() {
 )"s);
 
 
-	if (!recorded_time_spans.empty()) {
+	if (!recorded_time_spans.is_empty()) {
 		bool needComma = false;
 		for (auto span : recorded_time_spans) {
 			if (needComma) {

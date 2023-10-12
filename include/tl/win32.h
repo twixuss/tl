@@ -15,12 +15,12 @@ enum RawInputDevice {
 	RawInput_mouse = 0x1,
 };
 
-TL_API extern s64 performance_frequency;
+TL_API extern u64 performance_frequency;
 
 TL_API bool init_rawinput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
-TL_API s64 get_performance_counter();
+TL_API u64 get_performance_counter();
 TL_API bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
 TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
@@ -36,9 +36,10 @@ TL_API void set_cursor_position(s32 x, s32 y);
 inline void set_cursor_position(v2s position) {
 	set_cursor_position(position.x, position.y);
 }
-TL_API v2s get_cursor_position();
+TL_API v2s get_cursor_position(HWND relative_to = 0);
 
 TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
+TL_API f32 get_cursor_speed();
 
 #ifdef TL_IMPL
 bool init_rawinput(RawInputDevice deviceFlags) {
@@ -114,12 +115,12 @@ bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleR
 	}
 	return false;
 }
-s64 performance_frequency = [] {
+u64 performance_frequency = [] {
 	LARGE_INTEGER frequency;
 	QueryPerformanceFrequency(&frequency);
 	return frequency.QuadPart;
 }();
-s64 get_performance_counter() {
+u64 get_performance_counter() {
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
 	return counter.QuadPart;
@@ -224,9 +225,12 @@ void show_cursor() {
 void set_cursor_position(s32 x, s32 y) {
 	SetCursorPos(x, y);
 }
-v2s get_cursor_position() {
+v2s get_cursor_position(HWND relative_to) {
 	POINT p;
 	GetCursorPos(&p);
+	if (relative_to) {
+		ScreenToClient(relative_to, &p);
+	}
 	return {p.x, p.y};
 }
 
@@ -259,6 +263,35 @@ FormattedLastError last_error() {
 
 inline umm append(StringBuilder &b, FormattedLastError e) {
 	return append_format(b, "0x{} ({})", FormatInt{.value = e.value, .radix = 16}, e.value);
+}
+
+f32 get_cursor_speed() {
+	int speed;
+	SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &speed, 0);
+	f32 speed_table[20] = {
+		0.03125f,
+		0.0625f,
+		0.125f,
+		0.25f,
+		0.375f,
+		0.5f,
+		0.666666f,
+		0.75f,
+		0.875f,
+		1,
+		1.25f,
+		1.5f,
+		1.75f,
+		2,
+		2.25f,
+		2.5f,
+		2.75f,
+		3,
+		3.25f,
+		3.5f,
+	};
+
+	return speed_table[speed - 1];
 }
 
 #endif

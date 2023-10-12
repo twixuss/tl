@@ -2,19 +2,25 @@
 #include "list.h"
 #include "string.h"
 #include "console.h"
+#include "hash.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
 namespace tl {
 
-using CallStack = List<void *>;
-
 struct StringizedCallStack {
 	struct Entry {
 		Span<char> name;
 		Span<char> file;
 		u32 line = 0;
+
+		inline constexpr bool operator==(Entry const &that) const {
+			return
+				this->line == that.line &&
+				this->name == that.name &&
+				this->file == that.file;
+		}
 	};
 	List<Entry> call_stack;
 	List<char> string_buffer;
@@ -23,22 +29,42 @@ struct StringizedCallStack {
 TL_API bool debug_init();
 TL_API void debug_deinit();
 
-TL_API CallStack get_call_stack();
+TL_API List<void *> get_call_stack(umm frames_to_skip = 0);
 
-TL_API StringizedCallStack to_string(CallStack &call_stack);
+TL_API StringizedCallStack resolve_names(Span<void *> call_stack);
 TL_API void free(StringizedCallStack &call_stack);
 
 inline StringizedCallStack get_stack_trace() {
-	auto call_stack = with(temporary_allocator, get_call_stack());
-	return to_string(call_stack);
+	return resolve_names(with(temporary_allocator, get_call_stack()));
 }
 
 #ifdef CreateWindow
-TL_API StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip);
+TL_API StringizedCallStack get_stack_trace(CONTEXT context, umm frames_to_skip);
 #endif
 
 TL_API bool debugger_attached();
 
+inline umm append(StringBuilder &builder, StringizedCallStack::Entry const &entry) {
+	return append_format(builder, "{}:{}: {}", entry.file, entry.line, entry.name);
+}
+inline umm append(StringBuilder &builder, StringizedCallStack const &call_stack) {
+	umm result = 0;
+	for (auto entry : call_stack.call_stack) {
+		result += append_format(builder, "{}\n", entry);
+	}
+	return result;
+}
+
+}
+
+template <>
+inline tl::u64 get_hash(tl::StringizedCallStack const &s) {
+	return get_hash(s.call_stack);
+}
+
+template <>
+inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
+	return get_hash(e.file) ^ get_hash(e.line) ^ get_hash(e.name);
 }
 
 #ifdef TL_IMPL
@@ -75,7 +101,7 @@ void debug_deinit() {
 	SymCleanup(debug_process);
 }
 
-static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
+static List<void *> get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	STACKFRAME64 frame = {};
 #if ARCH_X64
 	frame.AddrPC.Offset    = context.Rip;
@@ -100,7 +126,7 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 	DuplicateHandle(debug_process, GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
 	defer { CloseHandle(thread); };
 
-	CallStack call_stack;
+	List<void *> call_stack;
 	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (frames_to_skip) {
 			--frames_to_skip;
@@ -112,15 +138,15 @@ static CallStack get_call_stack(CONTEXT context, u32 frames_to_skip) {
 
 	return call_stack;
 }
-CallStack get_call_stack() {
+List<void *> get_call_stack(umm frames_to_skip) {
 	CONTEXT context = {};
 	context.ContextFlags = CONTEXT_CONTROL;
 	RtlCaptureContext(&context);
 
-	return get_call_stack(context, 1);
+	return get_call_stack(context, 1 + frames_to_skip);
 }
 
-StringizedCallStack to_string(CallStack &call_stack) {
+StringizedCallStack resolve_names(Span<void *> call_stack) {
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
 
@@ -130,7 +156,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 
         if (call == 0) {
 			file = "NULL"s;
-			name = "ATTEMP TO EXECUTE AT ADDRESS 0"s;
+			name = "ATTEMPT TO EXECUTE AT ADDRESS 0"s;
 		} else {
 			constexpr u32 maxNameLength = MAX_SYM_NAME;
 			DWORD64 displacement;
@@ -147,9 +173,22 @@ StringizedCallStack to_string(CallStack &call_stack) {
 			}
 
 #if 1
+			DWORD const flags = UNDNAME_NO_MS_KEYWORDS
+				| UNDNAME_NO_ACCESS_SPECIFIERS 
+				| UNDNAME_NO_CV_THISTYPE 
+				| UNDNAME_NO_FUNCTION_RETURNS 
+				| UNDNAME_NO_MEMBER_TYPE 
+				| UNDNAME_NO_ALLOCATION_LANGUAGE 
+				| UNDNAME_NO_ALLOCATION_MODEL 
+				| UNDNAME_NO_MS_THISTYPE 
+				| UNDNAME_NO_RETURN_UDT_MODEL
+				| UNDNAME_NO_SPECIAL_SYMS
+				| UNDNAME_NO_THISTYPE
+				| UNDNAME_NO_THROW_SIGNATURES
+			;
 			char name_buffer[256];
 			name.data = name_buffer;
-			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), UNDNAME_NO_MS_KEYWORDS | UNDNAME_NO_ACCESS_SPECIFIERS | UNDNAME_NO_CV_THISTYPE | UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_MEMBER_TYPE);
+			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
 #else
 			name = with(temporary_allocator, demangle(symbol->Name));
 #endif
@@ -183,7 +222,7 @@ StringizedCallStack to_string(CallStack &call_stack) {
 
 StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
 	auto call_stack = with(temporary_allocator, get_call_stack(context, frames_to_skip));
-	return to_string(call_stack);
+	return resolve_names(call_stack);
 }
 
 void free(StringizedCallStack &call_stack) {

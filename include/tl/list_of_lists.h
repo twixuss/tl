@@ -6,24 +6,26 @@ namespace tl {
 //
 // Each list is allocated in the same buffer
 //
-// Note: To start iterating ensure that list is in 'absolute mode',
-// so 'data' member of lists' elements represent a pointer to the beginning of a list
-// stored in 'buffer'
-//
-// Addition is allowed only In 'relative mode', where 'data' member of list's elements holds
-// an index to the 'buffer'
+// 
+// If you want to read from list ensure that reading mode is enabled by calling list.enable_reading().
+// 
+// If you want to write to list ensure that writing mode is enabled by calling list.enable_writing(). It is enabled by default.
+// 
+// In reading mode 'data' member of lists' elements represent a pointer to the beginning of a list
+// stored in 'buffer'.
+// In writing mode 'data' represents an index into the 'buffer' where the element starts.
 //
 template <class T>
-struct ListList : List<Span<T>> {
+struct ListOfLists : List<Span<T>> {
 	using Base = List<Span<T>>;
 	List<T> buffer;
 #if TL_DEBUG
-	bool is_absolute = false;
+	bool is_reading = false;
 #endif
 
 	void add(Span<T> string) {
 #if TL_DEBUG
-		assert(is_absolute == false);
+		assert(is_reading == false);
 #endif
 
 		Span<T> dest;
@@ -34,17 +36,17 @@ struct ListList : List<Span<T>> {
 		buffer.add(string);
 	}
 
-	void make_absolute() {
+	void enable_reading() {
 #if TL_DEBUG
-		is_absolute = true;
+		is_reading = true;
 #endif
 		for (auto &string : *this) {
 			string.data = buffer.data + (umm)string.data;
 		}
 	}
-	void make_relative() {
+	void enable_writing() {
 #if TL_DEBUG
-		is_absolute = false;
+		is_reading = false;
 #endif
 		for (auto &string : *this) {
 			string.data = (T *)(string.data - buffer.data);
@@ -59,11 +61,11 @@ struct ListList : List<Span<T>> {
 };
 
 template <class T>
-void free(ListList<T> &list) {
+void free(ListOfLists<T> &list) {
 	free(list.base());
 	free(list.buffer);
 #if TL_DEBUG
-	list.is_absolute = false;
+	list.is_reading = false;
 #endif
 }
 

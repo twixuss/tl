@@ -101,12 +101,12 @@ struct State {
 	ID3D11Device3 *device3;
 	ID3D11DeviceContext *immediateContext;
 	RenderTarget backBuffer;
-	RecursiveMutex immediateContextMutex;
+	RecursiveSpinLock immediateContextLock;
 	u32 syncInterval = 1;
 
 	template <class Fn>
 	inline void useContext(Fn &&fn) {
-		scoped_lock(immediateContextMutex);
+		scoped(immediateContextLock);
 		fn();
 	}
 	TL_API void initBackBuffer();

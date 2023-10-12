@@ -2,6 +2,7 @@
 #include "linked_list.h"
 #include "array.h"
 #include "hash.h"
+#include "pointer.h"
 
 namespace tl {
 
@@ -80,7 +81,7 @@ struct StaticHashSet {
 	}
 };
 
-template <class Value, class Hasher = DefaultHasher<Value>>
+template <class Value, class Traits = DefaultHashTraits<Value>>
 struct HashSet {
 	using ValueType = Value;
 
@@ -88,16 +89,14 @@ struct HashSet {
 
 	Allocator allocator = current_allocator;
 	Span<Bucket> buckets;
-	umm total_value_count = 0;
+	umm count = 0;
 
 	Value &insert(Value const &value TL_LP) {
-		scoped_allocator(allocator);
-
 		if (!buckets.count) {
 			rehash(16 TL_LA);
 		}
 
-		umm hash = Hasher::get_hash(value);
+		umm hash = Traits::get_hash(value);
 		auto bucket = &buckets[hash & (buckets.count - 1)];
 		for (auto &it : *bucket) {
 			if (it == value) {
@@ -105,11 +104,11 @@ struct HashSet {
 			}
 		}
 
-		if (total_value_count == buckets.count) {
+		if (count == buckets.count) {
 			rehash(buckets.count * 2);
 			bucket = &buckets[hash & (buckets.count - 1)];
 		}
-		++total_value_count;
+		++count;
 		auto &it = bucket->add(TL_LAC);
 		return it = value;
 	}
@@ -118,12 +117,13 @@ struct HashSet {
 		if (buckets.count == 0)
 			return {};
 
-		umm hash = Hasher::get_hash(value);
+		umm hash = Traits::get_hash(value);
 		auto &bucket = buckets[hash & (buckets.count - 1)];
 		for (auto &it : bucket) {
 			if (it == value) {
 				auto result = it;
 				::tl::erase(bucket, &it);
+				count -= 1;
 				return result;
 			}
 		}
@@ -132,7 +132,7 @@ struct HashSet {
 	}
 
 	void rehash(umm new_buckets_count TL_LP) {
-		scoped_allocator(allocator);
+		scoped(allocator);
 
 		auto old_buckets = buckets;
 
@@ -140,10 +140,15 @@ struct HashSet {
 		buckets.count = new_buckets_count;
 
 		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
-			for (auto &it : old_buckets[bucket_index]) {
-				auto hash = Hasher::get_hash(it);
+			auto next_node = old_buckets[bucket_index].head;
+			while (next_node) {
+				auto node = next_node;
+				next_node = next_node->next;
+				node->next = 0;
+
+				auto hash = Traits::get_hash(node->value);
 				auto &new_bucket = buckets[hash & (new_buckets_count - 1)];
-				new_bucket.add(it TL_LA);
+				new_bucket.add_steal(node);
 			}
 		}
 
@@ -153,14 +158,15 @@ struct HashSet {
 	}
 
 	void clear() {
+		count = 0;
 		for (umm bucket_index = 0; bucket_index < buckets.count; ++bucket_index) {
 			buckets[bucket_index].clear();
 		}
 	}
 };
 
-template <ForEachFlags flags, class Value, class Hasher, class Fn>
-void for_each(HashSet<Value, Hasher> set, Fn &&fn) {
+template <ForEachFlags flags=0, class Value, class Traits, class Fn>
+void for_each(HashSet<Value, Traits> set, Fn &&fn) {
 	static_assert(flags == 0, "Only default flags supported");
 
 	for (u32 i = 0; i < set.buckets.count; ++i) {
@@ -170,25 +176,25 @@ void for_each(HashSet<Value, Hasher> set, Fn &&fn) {
 	}
 }
 
-template <class Value, class Hasher>
-HashSet<Value, Hasher> copy(HashSet<Value, Hasher> const &source TL_LP) {
-	HashSet<Value, Hasher> result;
+template <class Value, class Traits>
+HashSet<Value, Traits> copy(HashSet<Value, Traits> const &source TL_LP) {
+	HashSet<Value, Traits> result;
 	for_each(source, [&](Value const &value) {
 		result.insert(value TL_LA);
 	});
 	return result;
 }
 
-template <class Value, class Hasher>
-void set(HashSet<Value, Hasher> &destination, HashSet<Value, Hasher> const &source TL_LP) {
+template <class Value, class Traits>
+void set(HashSet<Value, Traits> &destination, HashSet<Value, Traits> const &source TL_LP) {
 	destination.clear();
 	for_each(source, [&](Value const &value) {
 		destination.insert(value TL_LA);
 	});
 }
 
-template <class Value, class Hasher>
-umm count_of(HashSet<Value, Hasher> &set) {
+template <class Value, class Traits>
+umm count_of(HashSet<Value, Traits> &set) {
 	umm result = 0;
 	for (auto &bucket : set.buckets) {
 		result += bucket.size();
@@ -196,8 +202,8 @@ umm count_of(HashSet<Value, Hasher> &set) {
 	return result;
 }
 
-template <class Value, class Hasher, class Fn>
-umm count(HashSet<Value, Hasher> set, Fn &&fn) {
+template <class Value, class Traits, class Fn>
+umm count(HashSet<Value, Traits> set, Fn &&fn) {
 	umm result = 0;
 	for_each(set, [&](Value &value) {
 		if (fn(value)) {
@@ -207,18 +213,18 @@ umm count(HashSet<Value, Hasher> set, Fn &&fn) {
 	return result;
 }
 
-template <class Value, class Hasher>
-bool is_empty(HashSet<Value, Hasher> set) {
+template <class Value, class Traits>
+bool is_empty(HashSet<Value, Traits> set) {
 	bool result = true;
-	for_each(set, [&](Value &value) { result = false; for_each_break; });
+	for_each(set, [&](Value &value) { result = false; return ForEach_break; });
 	return result;
 }
 
-template <class Value, class Hasher>
-Pointer<Value> find(HashSet<Value, Hasher> set, Value const &value) {
+template <class Value, class Traits>
+Value *find(HashSet<Value, Traits> set, Value const &value) {
 	if (set.buckets.count == 0)
 		return 0;
-	umm hash = Hasher::get_hash(value);
+	umm hash = Traits::get_hash(value);
 	auto &bucket = set.buckets[hash & (set.buckets.count - 1)];
 	for (auto &it : bucket)
 		if (it == value)

@@ -4,7 +4,7 @@
 namespace tl {
 
 struct PreciseTimer {
-	s64 counter;
+	u64 counter;
 };
 
 TL_API PreciseTimer create_precise_timer();
@@ -16,6 +16,8 @@ TL_API u64 read_timestamp_counter();
 TL_API List<char> get_time_string();
 
 TL_API void make_os_timing_precise();
+
+TL_API void sync(u64 &frame_time_counter, f32 target_frame_time);
 
 struct Date {
 	u16 year;        // 1601 - 30827
@@ -29,6 +31,8 @@ struct Date {
 };
 
 TL_API Date get_date();
+
+TL_API void sleep_nanoseconds(u64 nanoseconds);
 
 inline Span<utf8> month_string(u8 month) {
 	switch (month) {
@@ -50,13 +54,13 @@ inline Span<utf8> month_string(u8 month) {
 
 inline umm append(StringBuilder &b, Date d) {
 	return append_format(b,
-		"{} {} {} - {}:{}:{}",
-		d.day,
-		month_string(d.month),
-		d.year,
-		FormatInt{.value=d.hour, .leading_zero_count=2},
-		FormatInt{.value=d.minute, .leading_zero_count=2},
-		FormatInt{.value=d.second, .leading_zero_count=2}
+						 "{} {} {} - {}:{}:{}",
+						 d.day,
+						 month_string(d.month),
+						 d.year,
+						 FormatInt{.value=d.hour, .leading_zero_count=2},
+						 FormatInt{.value=d.minute, .leading_zero_count=2},
+						 FormatInt{.value=d.second, .leading_zero_count=2}
 	);
 }
 
@@ -67,6 +71,7 @@ inline umm append(StringBuilder &b, Date d) {
 #if OS_WINDOWS
 
 #include "win32.h"
+#include "thread.h"
 
 #pragma comment(lib, "winmm")
 
@@ -99,6 +104,23 @@ void make_os_timing_precise() {
 	timeBeginPeriod(1);
 }
 
+void sync(u64 &frame_time_counter, f32 target_frame_time) {
+	auto target_counter = frame_time_counter + (u64)(performance_frequency * target_frame_time);
+
+	auto now = get_performance_counter();
+
+	if (now < target_counter) {
+		while ((s64)(target_counter - get_performance_counter()) > (s64)(performance_frequency / 1000))
+			Sleep(1);
+
+		while (get_performance_counter() < target_counter) {}
+
+		frame_time_counter = target_counter;
+	} else {
+		frame_time_counter = now;
+	}
+
+}
 Date get_date() {
 	SYSTEMTIME t;
 	GetLocalTime(&t);
@@ -112,6 +134,15 @@ Date get_date() {
 		.second = (u8)t.wSecond,
 		.millisecond = t.wMilliseconds,
 	};
+}
+
+void sleep_nanoseconds(u64 nanoseconds) {
+	auto start = get_performance_counter();
+	auto end = start + performance_frequency * nanoseconds / 1'000'000'000;
+	while (get_performance_counter() < end) {
+		yield_smt();
+		switch_thread();
+	}
 }
 
 }

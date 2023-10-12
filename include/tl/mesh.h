@@ -40,6 +40,7 @@ forceinline u8 *chunk_data(Chunk *chunk) {
 struct CommonVertex {
 	v3f position;
 	v3f normal;
+	v4f tangent;
 	v4f color;
 	v2f uv;
 };
@@ -100,7 +101,7 @@ void calculate_normals(Span<Vertex> vertices, Span<Index> indices) {
 		vertex.normal = {};
 	}
 
-	for (u32 i = 0; i < indices.size; i += 3) {
+	for (u32 i = 0; i < indices.count; i += 3) {
 		auto &a = vertices[indices[i + 0]];
 		auto &b = vertices[indices[i + 1]];
 		auto &c = vertices[indices[i + 2]];
@@ -185,7 +186,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 			normals                       = (v3f *)(binary_chunk_data + (umm)normal_buffer_view->member(u8"byteOffset"s)->number());
 			u32 normal_count              = (u32)normal_accessor->member(u8"count"s)->number();
 			if (normal_count != position_count) {
-				print(Print_error, "Failed parsing glb file. Normal count does not match position count.\n");
+				with(ConsoleColor::red, print("Failed parsing glb file. Normal count does not match position count.\n"));
 				return {};
 			}
 		}
@@ -200,7 +201,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 			auto uv_buffer_view       = buffer_views->index(uv_buffer_view_index->number());
 			u32 uv_count              = (u32)uv_accessor->member(u8"count"s)->number();
 			if (uv_count != position_count) {
-				print(Print_error, "Failed parsing glb file. Normal count does not match position count.\n");
+				with(ConsoleColor::red, print("Failed parsing glb file. Normal count does not match position count.\n"));
 				return {};
 			}
 			switch (uv_component_type) {
@@ -208,12 +209,12 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 					if (uv_type == u8"VEC2"s) {
 						uvs = (v2f *)(binary_chunk_data + (umm)uv_buffer_view->member(u8"byteOffset"s)->number());
 					} else {
-						print(Print_warning, "Only uvs with type vec2 are supported.\n");
+						with(ConsoleColor::yellow, print("Only uvs with type vec2 are supported.\n"));
 					}
 					break;
 				}
 				default: {
-					print(Print_warning, "Only uvs with type float32 are supported.\n");
+					with(ConsoleColor::yellow, print("Only uvs with type float32 are supported.\n"));
 					break;
 				}
 			}
@@ -232,11 +233,11 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 			auto colors_data             = binary_chunk_data + (umm)color_buffer_view->member(u8"byteOffset"s)->number();
 			u32 color_count              = (u32)color_accessor->member(u8"count"s)->number();
 			if (color_count != position_count) {
-				print(Print_error, "Failed parsing glb file. Color count does not match position count.\n");
+				with(ConsoleColor::red, print("Failed parsing glb file. Color count does not match position count.\n"));
 				return {};
 			}
 
-			scoped_allocator(temporary_allocator);
+			scoped(temporary_allocator_and_checkpoint);
 			if (color_type == u8"VEC4"s) {
 				switch ((s64)color_component_type) {
 					case Glb::ComponentType_f32: {
@@ -271,7 +272,36 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 				}
 			}
 			if (!colors) {
-				print(Print_error, "Color has unsupported component_type={} and type={}\n", (s64)color_component_type, color_type);
+				with(ConsoleColor::red, print("Color has unsupported component_type={} and type={}\n", (s64)color_component_type, color_type));
+			}
+		}
+
+		v4f *tangents = 0;
+		auto tangent_attribute_index = attributes->member(u8"TANGENT"s);
+		if (tangent_attribute_index) {
+			auto tangent_accessor          = accessors->index(tangent_attribute_index->number());
+			auto tangent_component_type    = (s64)tangent_accessor->member(u8"componentType"s)->number();
+			auto tangent_type              = tangent_accessor->member(u8"type"s)->string();
+			auto tangent_buffer_view_index = tangent_accessor->member(u8"bufferView"s);
+			auto tangent_buffer_view       = buffer_views->index(tangent_buffer_view_index->number());
+			u32 tangent_count              = (u32)tangent_accessor->member(u8"count"s)->number();
+			if (tangent_count != position_count) {
+				with(ConsoleColor::red, print("Failed parsing glb file. Tangent count does not match position count.\n"));
+				return {};
+			}
+			switch (tangent_component_type) {
+				case Glb::ComponentType_f32: {
+					if (tangent_type == u8"VEC4"s) {
+						tangents = (v4f *)(binary_chunk_data + (umm)tangent_buffer_view->member(u8"byteOffset"s)->number());
+					} else {
+						with(ConsoleColor::yellow, print("Only tangents with type vec4 are supported.\n"));
+					}
+					break;
+				}
+				default: {
+					with(ConsoleColor::yellow, print("Only tangents with type float32 are supported.\n"));
+					break;
+				}
 			}
 		}
 
@@ -280,6 +310,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 
 		v4f default_color = {1,1,1,1};
 		v3f default_normal = {};
+		v4f default_tangent = {1,0,0,0};
 		v2f default_uv = {};
 
 		CommonMesh mesh;
@@ -288,9 +319,10 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 		for (u32 i = 0; i < vertex_count; ++i) {
 			CommonVertex v = {};
 			v.position = positions[i];
-			v.normal = normals ? normals[i] : default_normal;
-			v.color  = colors  ? colors [i] : default_color;
-			v.uv     = uvs     ? uvs    [i] : default_uv;
+			v.normal  = normals  ? normals [i] : default_normal;
+			v.tangent = tangents ? tangents[i] : default_tangent;
+			v.color   = colors   ? colors  [i] : default_color;
+			v.uv      = uvs      ? uvs     [i] : default_uv;
 			mesh.vertices.add(v);
 		}
 

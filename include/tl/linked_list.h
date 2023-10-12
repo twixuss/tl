@@ -30,7 +30,7 @@ struct LinkedList {
 		bool operator==(Iterator const &that) const { return node == that.node; }
 		bool operator!=(Iterator const &that) const { return node != that.node; }
 		T *operator->() { return std::addressof(node->value); }
-		bool operator!() { return !node; }
+		explicit operator bool() { return node; }
 	};
 
 	LinkedList() = default;
@@ -55,7 +55,28 @@ struct LinkedList {
 		return node->value;
 	}
 
-	T &add_steal(Node *node TL_LP) {
+	void erase_at(umm index) {
+		Node *prev = 0;
+		Node *node = head;
+		while (index) {
+			--index;
+			prev = node;
+			node = node->next;
+			bounds_check(node);
+		}
+
+		if (prev) {
+			prev->next = node->next;
+			if (!node->next)
+				tail = prev;
+		} else {
+			head = node->next;
+		}
+
+		allocator.free(node);
+	}
+
+	T &add_steal(Node *node) {
 		assert(node->next == 0);
 		if (head == 0) {
 			head = tail = node;
@@ -67,12 +88,14 @@ struct LinkedList {
 	}
 
 	T &add(T value TL_LP) {
-		auto &result = add_steal(allocator.allocate<Node>(TL_LAC) TL_LA);
+		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
 		memcpy(&result, &value, sizeof(value));
 		return result;
 	}
 	T &add(TL_LPC) {
-		return add({} TL_LA);
+		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
+		new (&result) T();
+		return result;
 	}
 
 	void clear() {
@@ -84,6 +107,31 @@ struct LinkedList {
 		}
 		head = 0;
 		tail = 0;
+	}
+
+	Optional<T> pop() {
+		if (!tail)
+			return {};
+
+		Node *prev = 0;
+		auto node = head;
+		while (node != tail) {
+			prev = node;
+			node = node->next;
+		}
+
+		auto result = tail->value;
+
+		allocator.free(tail);
+
+		if (prev) {
+			tail = prev;
+			tail->next = 0;
+		} else {
+			head = tail = 0;
+		}
+
+		return result;
 	}
 
 	T &front() { bounds_check(head); return head->value; }
@@ -148,7 +196,7 @@ template <ForEachFlags flags, class T, class Fn>
 void for_each(LinkedList<T> list, Fn &&fn) {
 	auto node = list.head;
 	while (node) {
-		if constexpr (is_same<decltype(fn(*(T*)0)), ForEachDirective>) {
+		if constexpr (std::is_same_v<decltype(fn(*(T*)0)), ForEachDirective>) {
 			if (fn(node->value) == ForEach_break)
 				return;
 		} else {
@@ -156,6 +204,17 @@ void for_each(LinkedList<T> list, Fn &&fn) {
 		}
 		node = node->next;
 	}
+}
+
+template <class T>
+umm count_of(LinkedList<T> list) {
+	umm result = 0;
+	auto node = list.head;
+	while (node) {
+		result += 1;
+		node = node->next;
+	}
+	return result;
 }
 
 }

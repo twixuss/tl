@@ -160,7 +160,7 @@ bool parse_shader(Shader &shader, Span<char> source) {
 }
 
 Buffer load_shader_file(Span<pathchar> terminated_full_path) {
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator);
 
 	auto full_path = terminated_full_path;
 	full_path.size -= 1;

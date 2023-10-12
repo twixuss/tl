@@ -13,24 +13,43 @@ print:
 
 namespace tl {
 
-enum PrintKind {
-	Print_default,
-	Print_info,
-	Print_warning,
-	Print_error,
-};
-
 struct Printer {
-	void (*func)(PrintKind kind, Span<utf8> span, void *state);
+	void (*func)(Span<utf8> span, void *state);
 	void *state;
 
-	void operator()(PrintKind kind, Span<utf8> span) {
-		func(kind, span, state);
+	umm operator()(Span<utf8> span) { 
+		func(span, state);
+		return span.count;
+	}
+
+	template <class Fmt, class ...T>
+	inline umm write(Fmt fmt, T const &...args) {
+		scoped(temporary_storage_checkpoint);
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+		if constexpr (sizeof...(T) > 0) {
+			append_format(builder, fmt, args...);
+		} else {
+			append(builder, fmt);
+		}
+		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+	}
+
+	template <class Size> inline umm write(Span<char, Size> const &span) { return (*this)((Span<utf8>)span); }
+	template <class Size> inline umm write(Span<utf8, Size> const &span) { return (*this)((Span<utf8>)span); }
+
+	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
+	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
+
+	template <class Fmt, class ...T>
+	inline umm writeln(Fmt fmt, T const &...args) {
+		return write(fmt, args...) + write('\n');
 	}
 };
 
 extern TL_API Printer console_printer;
 extern TL_API Printer standard_output_printer;
+extern TL_API Printer standard_error_printer;
 extern thread_local Printer current_printer;
 
 TL_API void init_printer();
@@ -44,88 +63,100 @@ TL_API void print_to_console(Span<utf8 > string);
 TL_API void print_to_console(Span<utf16> string);
 TL_API void print_to_console(Span<utf32> string);
 
-template <class T>
-inline umm print(PrintKind kind, T const &value) {
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append(builder, value);
-	auto string = as_utf8(to_string(builder, temporary_allocator));
-	current_printer(kind, string);
-	return string.count;
+enum class ConsoleColor {
+    black,
+    dark_blue,
+    dark_green,
+    dark_cyan,
+    dark_red,
+    dark_magenta,
+    dark_yellow,
+    dark_gray,
+    gray,
+    blue,
+    green,
+    cyan,
+    red,
+    magenta,
+    yellow,
+    white,
+};
+
+TL_API void set_console_color(ConsoleColor foreground, ConsoleColor background);
+inline void set_console_color(ConsoleColor foreground) {
+	set_console_color(foreground, ConsoleColor::black);
 }
 
-template <> inline umm print(PrintKind kind, Span<char> const &span) { current_printer(kind, (Span<utf8>)span); return span.count; }
-template <> inline umm print(PrintKind kind, Span<utf8> const &span) { current_printer(kind, span); return span.count; }
+inline umm print(auto const &...args) { return current_printer.write(args...); }
+inline umm println() { return print('\n'); }
+inline umm println(auto const &...args) { return current_printer.writeln(args...); }
 
-template <> inline umm print(PrintKind kind, List<char> const &list) { current_printer(kind, (Span<utf8>)(Span<char>)list); return list.count; }
-template <> inline umm print(PrintKind kind, List<utf8> const &list) { current_printer(kind, (Span<utf8>)list); return list.count; }
-
-template <class ...Args>
-inline umm print(PrintKind kind, char const *fmt, Args const &...args) {
-	StringBuilder builder;
-	builder.allocator = temporary_allocator;
-	append_format(builder, fmt, args...);
-	auto string = to_string(builder, temporary_allocator);
-	print(kind, string);
-	return string.count;
-}
-
-inline umm print(PrintKind kind, char const *string) {
-	return print(kind, as_span(string));
-}
-
-template <class ...T>
-inline umm print(char const *fmt, T const &...values) {
-	return print(Print_default, fmt, values...);
-}
-
-template <class T>
-inline umm print(T const &value) {
-	return print(Print_default, value);
-}
+inline umm errln(auto const &...args) { return standard_error_printer.writeln(args...); }
 
 TL_API void hide_console_window();
 TL_API void show_console_window();
 TL_API void toggle_console_window();
 
+TL_API bool is_stdout_console();
+
+template <>
+struct Scoped<ConsoleColor> {
+	inline static ConsoleColor current = ConsoleColor::dark_gray;
+	ConsoleColor old;
+	Scoped(ConsoleColor _new) {
+		old = current;
+		current = _new;
+		set_console_color(_new);
+	}
+	~Scoped() {
+		current = old;
+		set_console_color(old);
+	}
+};
+
+template <>
+struct Scoped<Printer> {
+	Printer old_printer;
+	Scoped(Printer new_printer) {
+		old_printer = current_printer;
+		current_printer = new_printer;
+	}
+	~Scoped() {
+		current_printer = old_printer;
+	}
+};
+
 #ifdef TL_IMPL
 
-thread_local Printer current_printer = {[](PrintKind, Span<utf8>, void *) {}};
+thread_local Printer current_printer = {[](Span<utf8>, void *) {}};
 
-void init_printer() {
-	current_printer = standard_output_printer;
-}
 void deinit_printer() {
 
 }
 
 #if OS_WINDOWS
 
-static HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);
-static HWND console_window = GetConsoleWindow();
+static HANDLE std_out;
+static HANDLE std_err;
+static HWND console_window;
 
 Printer console_printer = {
-	[](PrintKind kind, Span<utf8> span, void *) {
-		switch (kind) {
-			case Print_default: SetConsoleTextAttribute(std_out, 7); break;
-			case Print_info:    SetConsoleTextAttribute(std_out, 7); break;
-			case Print_warning: SetConsoleTextAttribute(std_out, 14); break;
-			case Print_error:   SetConsoleTextAttribute(std_out, 12); break;
-		}
+	[](Span<utf8> span, void *) {
 		print_to_console(span);
 	},
 	0
 };
 
 Printer standard_output_printer = {
-	[](PrintKind kind, Span<utf8> span, void *) {
-		switch (kind) {
-			case Print_default: SetConsoleTextAttribute(std_out, 7); break;
-			case Print_info:    SetConsoleTextAttribute(std_out, 7); break;
-			case Print_warning: SetConsoleTextAttribute(std_out, 14); break;
-			case Print_error:   SetConsoleTextAttribute(std_out, 12); break;
-		}
+	[](Span<utf8> span, void *) {
 		WriteFile(std_out, span.data, (DWORD)span.count, 0, 0);
+	},
+	0
+};
+
+Printer standard_error_printer = {
+	[](Span<utf8> span, void *) {
+		WriteFile(std_err, span.data, (DWORD)span.count, 0, 0);
 	},
 	0
 };
@@ -181,11 +212,11 @@ void clear_console() {
 
 DWORD get_code_page(Encoding encoding) {
 	switch (encoding) {
-		case Encoding_unknown: break;
-		case Encoding_ascii: return 1251;
-		case Encoding_utf8: return 65001;
-		case Encoding_utf16: return 1200;
-		case Encoding_utf32: invalid_code_path("not implemented");
+		case Encoding::unknown: break;
+		case Encoding::ascii: return 1251;
+		case Encoding::utf8: return 65001;
+		case Encoding::utf16: return 1200;
+		case Encoding::utf32: invalid_code_path("not implemented");
 	}
 	invalid_code_path();
 	return (DWORD)-1;
@@ -195,6 +226,10 @@ void set_console_encoding(Encoding encoding) {
 	auto cp = get_code_page(encoding);
 	SetConsoleOutputCP(cp);
 	SetConsoleCP(cp);
+}
+
+void set_console_color(ConsoleColor foreground, ConsoleColor background) {
+	SetConsoleTextAttribute(std_out, (WORD)((DWORD)foreground | ((DWORD)background << 4)));
 }
 
 void hide_console_window() {
@@ -218,22 +253,21 @@ void toggle_console_window() {
 
 #endif
 
+void init_printer() {
+	current_printer = standard_output_printer;
+#if OS_WINDOWS
+	std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+	std_err = GetStdHandle(STD_ERROR_HANDLE);
+	console_window = GetConsoleWindow();
 #endif
+}
 
-struct PrinterPusher {
-	Printer old_printer;
-	PrinterPusher(Printer new_printer) {
-		old_printer = current_printer;
-		current_printer = new_printer;
-	}
-	~PrinterPusher() {
-		current_printer = old_printer;
-	}
-	operator bool() { return true; }
-};
+bool is_stdout_console() {
+	DWORD temp;
+	return GetConsoleMode(std_out, &temp) != 0;
+}
 
-#define push_printer(printer) tl_push(::tl::PrinterPusher, printer)
-#define scoped_printer(printer) tl_scoped(::tl::current_printer, printer)
+#endif
 
 } // namespace tl
 

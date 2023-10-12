@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "list.h"
+#include "stream.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
@@ -28,43 +29,36 @@ enum ConnectionKind {
 	Connection_udp,
 };
 
-TL_DECLARE_HANDLE(Socket);
+typedef struct SocketImpl *Socket;
 
 TL_API bool init();
 TL_API void deinit();
 TL_API Socket create_socket(ConnectionKind kind);
+TL_API void close(Socket);
 TL_API void bind(Socket s, u16 port);
-TL_API void listen(Socket s);
+TL_API void listen(Socket s, u32 n = 0x7fff'ffff);
+TL_API Socket accept(Socket listener);
 TL_API bool connect(Socket s, u32 ip, u16 port);
 TL_API bool connect(Socket s, char const *ip, u16 port);
-TL_API void send(Socket s, void const *data, u32 size);
-TL_API void send(Socket s, sockaddr_in const &destination, void const *data, u32 size);
-TL_API Span<u8> receive_into(Socket socket, void *data, u32 size);
+TL_API umm send(Socket s, void const *data, u32 size);
+TL_API umm send(Socket s, sockaddr_in const &destination, void const *data, u32 size);
+TL_API umm receive(Socket socket, void *data, u32 size);
 
-inline void send(Socket s, Span<u8> span) {
-	send(s, span.data, (u32)span.size);
+inline umm send(Socket s, Span<u8> span) {
+	return send(s, span.data, (u32)span.count);
 }
-template <class T>
-inline void send_bytes(Socket s, T const &val) {
-	send(s, std::addressof(val), sizeof(val));
+inline umm receive(Socket s, Span<u8> span) {
+	return receive(s, span.data, (u32)span.count);
 }
-template <class T>
-inline void send_bytes(Socket s, sockaddr_in const &destination, T const &val) {
-	send(s, destination, std::addressof(val), sizeof(val));
-}
-
-inline List<u8> receive(Socket socket, u32 max_size) {
-	List<u8> message;
-	message.reserve(max_size);
-	auto received = receive_into(socket, message.data, message.capacity);
-	if (received.data) {
-		message.size = received.size;
-	} else {
-		free(message);
-		message.allocator = {};
-	}
-	return message;
-
+inline bool send_all(Socket s, Span<u8> span) {
+	umm bytes_sent = 0;
+	do {
+		int n = send(s, span.data + bytes_sent, (u32)(span.count - bytes_sent));
+		if (n < 0)
+			return false;
+		bytes_sent += n;
+	} while (bytes_sent < span.count);
+	return true;
 }
 
 struct TcpServer {
@@ -79,7 +73,21 @@ struct TcpServer {
 TL_API void run(TcpServer *server, void *context = 0);
 TL_API void run_udp(TcpServer *server, void *context = 0);
 
-}}
+}
+
+struct NetStream : Stream {
+	net::Socket socket;
+	umm read(Span<u8> destination) { return net::receive(socket, destination); }
+	umm write(Span<u8> source) { return net::send(socket, source); }
+};
+
+inline Stream *create_file_stream(net::Socket socket) {
+	auto result = create_stream<NetStream>();
+	result->socket = socket;
+	return result;
+}
+
+}
 
 
 #ifdef TL_IMPL
@@ -110,6 +118,9 @@ Socket create_socket(ConnectionKind kind) {
 	}
 	return (Socket)s;
 }
+void close(Socket s) {
+	closesocket((SOCKET)s);
+}
 
 void bind(Socket s, u16 port) {
 	SOCKADDR_IN addr;
@@ -119,8 +130,8 @@ void bind(Socket s, u16 port) {
 	::bind((SOCKET)s, (SOCKADDR *)&addr, sizeof(addr));
 }
 
-void listen(Socket s) {
-	::listen((SOCKET)s, SOMAXCONN);
+void listen(Socket s, u32 n) {
+	::listen((SOCKET)s, n);
 }
 
 bool connect(Socket s, u32 ip, u16 port) {
@@ -135,30 +146,36 @@ bool connect(Socket s, char const *ip, u16 port) {
 	return connect(s, inet_addr(ip), port);
 }
 
-void send(Socket s, void const *data, u32 size) {
-	::send((SOCKET)s, (char *)data, (int)size, 0);
+umm send(Socket s, void const *data, u32 size) {
+	return ::send((SOCKET)s, (char *)data, (int)size, 0);
 }
 
-void send(Socket s, sockaddr_in const &destination, void const *data, u32 size) {
-	::sendto((SOCKET)s, (char *)data, (int)size, 0, (sockaddr *)&destination, sizeof(destination));
+umm send(Socket s, sockaddr_in const &destination, void const *data, u32 size) {
+	return ::sendto((SOCKET)s, (char *)data, (int)size, 0, (sockaddr *)&destination, sizeof(destination));
 }
 
-Span<u8> receive_into(Socket socket, void *data, u32 size) {
-	int bytes_received = ::recv((SOCKET)socket, (char *)data, (int)size, 0);
-	if (bytes_received <= 0) {
+umm receive(Socket socket, void *data, u32 size) {
+	return ::recv((SOCKET)socket, (char *)data, (int)size, 0);
+
+}
+
+Socket accept(Socket listener) {
+	SOCKADDR_IN client;
+	int clientSize = sizeof(client);
+	auto socket = accept((SOCKET)listener, (SOCKADDR*)&client, &clientSize);
+	if (socket == INVALID_SOCKET) {
 		return {};
 	}
-	return {(u8 *)data, (umm)bytes_received};
-
+	return (Socket)socket;
 }
 
 void run(TcpServer &server, void *context) {
 	server.running = true;
 	while (server.running) {
 		fd_set fdSet;
-		fdSet.fd_count = (u_int)server.clients.size + 1;
+		fdSet.fd_count = (u_int)server.clients.count + 1;
 		fdSet.fd_array[0] = (SOCKET)server.listener;
-		for (u32 i = 0; i < server.clients.size; ++i) {
+		for (u32 i = 0; i < server.clients.count; ++i) {
 			fdSet.fd_array[i + 1] = (SOCKET)server.clients[i];
 		}
 
