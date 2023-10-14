@@ -465,8 +465,13 @@ namespace simd_typed {
 				}
 			}
 		}
+	}
 
-		// Cast definitions
+	//
+	// Cast definitions
+	//
+	for (auto reg : register_types) {
+		auto reg_bits = reg.size * 8;
 		for (auto &scalar : scalar_types) {
 			auto n_scalars_in_register = reg.size / scalar.size;
 			auto type = format("{}x{}", scalar.name, n_scalars_in_register);
@@ -480,15 +485,40 @@ namespace simd_typed {
 						auto n_other_scalars_in_register = other_reg.size / other_scalar.size;
 						if (n_scalars_in_register != n_other_scalars_in_register)
 							continue;
+						
+						auto other_reg_bits = other_reg.size * 8;
 
 						auto mm_prefix = [&]() -> Span<char> {
-							auto bits = max(reg_bits, other_reg.size*8);
+							auto bits = max(reg_bits, other_reg_bits);
 							if (bits == 128)
 								return "_mm_"s;
 							return format("_mm{}_", bits);
 						}();
 
 						auto other_type = format("{}x{}", other_scalar.name, n_other_scalars_in_register);
+
+						auto scalars_are = [&] (Span<char> a, Span<char> b) {
+							return 
+								(scalar.name == a && other_scalar.name == b) ||
+								(scalar.name == b && other_scalar.name == a);
+						};
+
+						auto append_intrinsic = [&] {
+							if (scalar.mask == M_FLOAT && (other_scalar.mask&(M_UINT|M_SINT))) {
+								append_format(builder, "forceinline {}::operator {}() const {{ return {{{}cvtt{}_{}(m)}}; }}\n", type, other_type, mm_prefix, scalar.suffix, other_scalar.suffix);
+							} else {
+								append_format(builder, "forceinline {}::operator {}() const {{ return {{{}cvt{}_{}(m)}}; }}\n", type, other_type, mm_prefix, scalar.suffix, other_scalar.suffix);
+							}
+						};
+						auto append_element_wise = [&] {
+							append_format(builder, "forceinline {}::operator {}() const {{\n", type, other_type);
+							append_format(builder, "	{} r;\n", other_type);
+							for (u32 i = 0; i < n_scalars_in_register; ++i) {
+								append_format(builder, "	r[{}] = ({})s[{}];\n", i, other_scalar.name, i);
+							}
+							append       (builder, "	return r;\n");
+							append       (builder, "}\n");
+						};
 
 						if ((scalar.mask & (M_UINT|M_SINT)) && (other_scalar.mask & (M_UINT|M_SINT))) {
 							// INT <-> UINT is noop
@@ -505,14 +535,46 @@ namespace simd_typed {
 							}
 							append       (builder, "	return r;\n");
 							append       (builder, "#endif\n}\n");
-						} else {
+						} else if (
+							scalars_are("f32"s, "u32"s) ||
+							scalars_are("f32"s, "u64"s) ||
+							scalars_are("f32"s, "s32"s) ||
+							scalars_are("f32"s, "s64"s) ||
+							scalars_are("f32"s, "f64"s) ||
+							scalars_are("f64"s, "u32"s) ||
+							scalars_are("f64"s, "u64"s) ||
+							scalars_are("f64"s, "s32"s) ||
+							scalars_are("f64"s, "s64"s)
+						) {
 							// Convert wide
-							if (scalar.mask == M_FLOAT && (other_scalar.mask&(M_UINT|M_SINT))) {
-								append_format(builder, "forceinline {}::operator {}() const {{ return {{{}cvtt{}_{}(m)}}; }}\n", type, other_type, mm_prefix, scalar.suffix, other_scalar.suffix);
 
-							} else {
-								append_format(builder, "forceinline {}::operator {}() const {{ return {{{}cvt{}_{}(m)}}; }}\n", type, other_type, mm_prefix, scalar.suffix, other_scalar.suffix);
+							bool might_be_not_supported = false;
+							Span<char> support_condition;
+
+							switch (max(reg_bits, other_reg_bits)) {
+								case 128:
+								case 256:
+									might_be_not_supported = true;
+									support_condition = "ARCH_AVX"s;
+									break;
+								case 512:
+									might_be_not_supported = true;
+									support_condition = "ARCH_AVX512"s;
+									break;
 							}
+
+							if (might_be_not_supported) {
+								append_format(builder, "#if {}\n", support_condition);
+								append_intrinsic();
+								append(builder, "#else\n");
+								append_element_wise();
+								append(builder, "#endif\n");
+							} else {
+								append_intrinsic();
+							}
+						} else {
+							// Convert element-wise
+							append_element_wise();
 						}
 					}
 				}
@@ -625,27 +687,27 @@ namespace simd_vector {
 					}
 
 					// Shifts
-					if (scalar.mask & (M_UINT|M_SINT)) {
-						if (scalar.size != 1) {  // there's no instructions for 8-bit shifts...
-							auto suffix = format("epi{}"s, scalar.size * 8);
-
-							append_format(builder, "	forceinline friend {} operator<<({} a, {} b) {{ return {{", vecx_name, vecx_name, scalar.name);
-							for (u32 i = 0; i < dim; ++i) {
-								if (i != 0)
-									append(builder, ", ");
-								append_format(builder, "a.{}<<b", axes[i]);
-							}
-							append(builder, "};}\n");
-
-							append_format(builder, "	forceinline friend {} operator>>({} a, {} b) {{ return {{", vecx_name, vecx_name, scalar.name);
-							for (u32 i = 0; i < dim; ++i) {
-								if (i != 0)
-									append(builder, ", ");
-								append_format(builder, "a.{}>>b", axes[i]);
-							}
-							append(builder, "};}\n");
-						}
-					}
+					//if (scalar.mask & (M_UINT|M_SINT)) {
+					//	if (scalar.size != 1) {  // there's no instructions for 8-bit shifts...
+					//		auto suffix = format("epi{}"s, scalar.size * 8);
+					//
+					//		append_format(builder, "	forceinline friend {} operator<<({} a, {} b) {{ return {{", vecx_name, vecx_name, scalar.name);
+					//		for (u32 i = 0; i < dim; ++i) {
+					//			if (i != 0)
+					//				append(builder, ", ");
+					//			append_format(builder, "a.{}<<b", axes[i]);
+					//		}
+					//		append(builder, "};}\n");
+					//
+					//		append_format(builder, "	forceinline friend {} operator>>({} a, {} b) {{ return {{", vecx_name, vecx_name, scalar.name);
+					//		for (u32 i = 0; i < dim; ++i) {
+					//			if (i != 0)
+					//				append(builder, ", ");
+					//			append_format(builder, "a.{}>>b", axes[i]);
+					//		}
+					//		append(builder, "};}\n");
+					//	}
+					//}
 
 					// Cast Declarations
 					for (auto &other_scalar : scalar_types) {

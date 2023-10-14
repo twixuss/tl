@@ -693,160 +693,6 @@ forceinline f64x2 fmadd(f64x2 a, f64x2 b, f64x2 c) { return {_mm_fmadd_pd(a.m, b
 forceinline f64x2 fmadd(f64x2 a, f64x2 b, f64x2 c) {a.s[0]=a.s[0]*b.s[0]+c.s[0];a.s[1]=a.s[1]*b.s[1]+c.s[1];return a;}
 #endif
 
-forceinline u8x16::operator u16x16() const { return *(u16x16*)this; }
-forceinline u8x16::operator u32x16() const { return *(u32x16*)this; }
-forceinline u8x16::operator s8x16() const { return *(s8x16*)this; }
-forceinline u8x16::operator s16x16() const { return *(s16x16*)this; }
-forceinline u8x16::operator s32x16() const { return *(s32x16*)this; }
-forceinline u8x16::operator f32x16() const {
-#if ARCH_AVX512
-	return {_mm512_cvtepu8_ps(m)}; }
-#else
-	f32x16 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	r[4] = (f32)s[4];
-	r[5] = (f32)s[5];
-	r[6] = (f32)s[6];
-	r[7] = (f32)s[7];
-	r[8] = (f32)s[8];
-	r[9] = (f32)s[9];
-	r[10] = (f32)s[10];
-	r[11] = (f32)s[11];
-	r[12] = (f32)s[12];
-	r[13] = (f32)s[13];
-	r[14] = (f32)s[14];
-	r[15] = (f32)s[15];
-	return r;
-#endif
-}
-forceinline u16x8::operator u32x8() const { return *(u32x8*)this; }
-forceinline u16x8::operator u64x8() const { return *(u64x8*)this; }
-forceinline u16x8::operator s16x8() const { return *(s16x8*)this; }
-forceinline u16x8::operator s32x8() const { return *(s32x8*)this; }
-forceinline u16x8::operator s64x8() const { return *(s64x8*)this; }
-forceinline u16x8::operator f32x8() const {
-#if ARCH_AVX512
-	return {_mm256_cvtepu16_ps(m)}; }
-#else
-	f32x8 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	r[4] = (f32)s[4];
-	r[5] = (f32)s[5];
-	r[6] = (f32)s[6];
-	r[7] = (f32)s[7];
-	return r;
-#endif
-}
-forceinline u16x8::operator f64x8() const {
-#if ARCH_AVX512
-	return {_mm512_cvtepu16_pd(m)}; }
-#else
-	f64x8 r;
-	r[0] = (f64)s[0];
-	r[1] = (f64)s[1];
-	r[2] = (f64)s[2];
-	r[3] = (f64)s[3];
-	r[4] = (f64)s[4];
-	r[5] = (f64)s[5];
-	r[6] = (f64)s[6];
-	r[7] = (f64)s[7];
-	return r;
-#endif
-}
-forceinline u32x4::operator u64x4() const { return *(u64x4*)this; }
-forceinline u32x4::operator s32x4() const { return *(s32x4*)this; }
-forceinline u32x4::operator s64x4() const { return *(s64x4*)this; }
-forceinline u32x4::operator f32x4() const {
-#if ARCH_AVX512
-	return {_mm_cvtepu32_ps(m)}; }
-#else
-	f32x4 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	return r;
-#endif
-}
-forceinline u32x4::operator f64x4() const {
-#if ARCH_AVX512
-	return {_mm256_cvtepu32_pd(m)}; }
-#else
-	f64x4 r;
-	r[0] = (f64)s[0];
-	r[1] = (f64)s[1];
-	r[2] = (f64)s[2];
-	r[3] = (f64)s[3];
-	return r;
-#endif
-}
-forceinline u64x2::operator s64x2() const { return *(s64x2*)this; }
-forceinline u64x2::operator f64x2() const {
-#if ARCH_AVX512
-	return {_mm_cvtepu64_pd(m)}; }
-#else
-	f64x2 r;
-	r[0] = (f64)s[0];
-	r[1] = (f64)s[1];
-	return r;
-#endif
-}
-forceinline s8x16::operator u8x16() const { return *(u8x16*)this; }
-forceinline s8x16::operator u16x16() const { return *(u16x16*)this; }
-forceinline s8x16::operator u32x16() const { return *(u32x16*)this; }
-forceinline s8x16::operator s16x16() const { return *(s16x16*)this; }
-forceinline s8x16::operator s32x16() const { return *(s32x16*)this; }
-forceinline s8x16::operator f32x16() const {
-#if ARCH_AVX512
-	return {_mm512_cvtepi8_ps(m)}; }
-#else
-	f32x16 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	r[4] = (f32)s[4];
-	r[5] = (f32)s[5];
-	r[6] = (f32)s[6];
-	r[7] = (f32)s[7];
-	r[8] = (f32)s[8];
-	r[9] = (f32)s[9];
-	r[10] = (f32)s[10];
-	r[11] = (f32)s[11];
-	r[12] = (f32)s[12];
-	r[13] = (f32)s[13];
-	r[14] = (f32)s[14];
-	r[15] = (f32)s[15];
-	return r;
-#endif
-}
-forceinline s16x8::operator u16x8() const { return *(u16x8*)this; }
-forceinline s16x8::operator u32x8() const { return *(u32x8*)this; }
-forceinline s16x8::operator u64x8() const { return *(u64x8*)this; }
-forceinline s16x8::operator s32x8() const { return *(s32x8*)this; }
-forceinline s16x8::operator s64x8() const { return *(s64x8*)this; }
-forceinline s16x8::operator f32x8() const { return {_mm256_cvtepi16_ps(m)}; }
-forceinline s16x8::operator f64x8() const { return {_mm512_cvtepi16_pd(m)}; }
-forceinline s32x4::operator u32x4() const { return *(u32x4*)this; }
-forceinline s32x4::operator u64x4() const { return *(u64x4*)this; }
-forceinline s32x4::operator s64x4() const { return *(s64x4*)this; }
-forceinline s32x4::operator f32x4() const { return {_mm_cvtepi32_ps(m)}; }
-forceinline s32x4::operator f64x4() const { return {_mm256_cvtepi32_pd(m)}; }
-forceinline s64x2::operator u64x2() const { return *(u64x2*)this; }
-forceinline s64x2::operator f64x2() const { return {_mm_cvtepi64_pd(m)}; }
-forceinline f32x4::operator u32x4() const { return {_mm_cvttps_epu32(m)}; }
-forceinline f32x4::operator u64x4() const { return {_mm256_cvttps_epu64(m)}; }
-forceinline f32x4::operator s32x4() const { return {_mm_cvttps_epi32(m)}; }
-forceinline f32x4::operator s64x4() const { return {_mm256_cvttps_epi64(m)}; }
-forceinline f32x4::operator f64x4() const { return {_mm256_cvtps_pd(m)}; }
-forceinline f64x2::operator u64x2() const { return {_mm_cvttpd_epu64(m)}; }
-forceinline f64x2::operator s64x2() const { return {_mm_cvttpd_epi64(m)}; }
 forceinline u8x32 U8x32(u8);
 forceinline u8x32 U8x32(u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8);
 
@@ -1917,135 +1763,6 @@ forceinline f64x4 fmadd(f64x4 a, f64x4 b, f64x4 c) { return {_mm256_fmadd_pd(a.m
 forceinline f64x4 fmadd(f64x4 a, f64x4 b, f64x4 c) {a.s[0]=a.s[0]*b.s[0]+c.s[0];a.s[1]=a.s[1]*b.s[1]+c.s[1];a.s[2]=a.s[2]*b.s[2]+c.s[2];a.s[3]=a.s[3]*b.s[3]+c.s[3];return a;}
 #endif
 
-forceinline u8x32::operator u16x32() const { return *(u16x32*)this; }
-forceinline u8x32::operator s8x32() const { return *(s8x32*)this; }
-forceinline u8x32::operator s16x32() const { return *(s16x32*)this; }
-forceinline u16x16::operator u8x16() const { return *(u8x16*)this; }
-forceinline u16x16::operator u32x16() const { return *(u32x16*)this; }
-forceinline u16x16::operator s8x16() const { return *(s8x16*)this; }
-forceinline u16x16::operator s16x16() const { return *(s16x16*)this; }
-forceinline u16x16::operator s32x16() const { return *(s32x16*)this; }
-forceinline u16x16::operator f32x16() const {
-#if ARCH_AVX512
-	return {_mm512_cvtepu16_ps(m)}; }
-#else
-	f32x16 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	r[4] = (f32)s[4];
-	r[5] = (f32)s[5];
-	r[6] = (f32)s[6];
-	r[7] = (f32)s[7];
-	r[8] = (f32)s[8];
-	r[9] = (f32)s[9];
-	r[10] = (f32)s[10];
-	r[11] = (f32)s[11];
-	r[12] = (f32)s[12];
-	r[13] = (f32)s[13];
-	r[14] = (f32)s[14];
-	r[15] = (f32)s[15];
-	return r;
-#endif
-}
-forceinline u32x8::operator u16x8() const { return *(u16x8*)this; }
-forceinline u32x8::operator u64x8() const { return *(u64x8*)this; }
-forceinline u32x8::operator s16x8() const { return *(s16x8*)this; }
-forceinline u32x8::operator s32x8() const { return *(s32x8*)this; }
-forceinline u32x8::operator s64x8() const { return *(s64x8*)this; }
-forceinline u32x8::operator f32x8() const {
-#if ARCH_AVX512
-	return {_mm256_cvtepu32_ps(m)}; }
-#else
-	f32x8 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	r[4] = (f32)s[4];
-	r[5] = (f32)s[5];
-	r[6] = (f32)s[6];
-	r[7] = (f32)s[7];
-	return r;
-#endif
-}
-forceinline u32x8::operator f64x8() const {
-#if ARCH_AVX512
-	return {_mm512_cvtepu32_pd(m)}; }
-#else
-	f64x8 r;
-	r[0] = (f64)s[0];
-	r[1] = (f64)s[1];
-	r[2] = (f64)s[2];
-	r[3] = (f64)s[3];
-	r[4] = (f64)s[4];
-	r[5] = (f64)s[5];
-	r[6] = (f64)s[6];
-	r[7] = (f64)s[7];
-	return r;
-#endif
-}
-forceinline u64x4::operator u32x4() const { return *(u32x4*)this; }
-forceinline u64x4::operator s32x4() const { return *(s32x4*)this; }
-forceinline u64x4::operator s64x4() const { return *(s64x4*)this; }
-forceinline u64x4::operator f32x4() const {
-#if ARCH_AVX512
-	return {_mm256_cvtepu64_ps(m)}; }
-#else
-	f32x4 r;
-	r[0] = (f32)s[0];
-	r[1] = (f32)s[1];
-	r[2] = (f32)s[2];
-	r[3] = (f32)s[3];
-	return r;
-#endif
-}
-forceinline u64x4::operator f64x4() const {
-#if ARCH_AVX512
-	return {_mm256_cvtepu64_pd(m)}; }
-#else
-	f64x4 r;
-	r[0] = (f64)s[0];
-	r[1] = (f64)s[1];
-	r[2] = (f64)s[2];
-	r[3] = (f64)s[3];
-	return r;
-#endif
-}
-forceinline s8x32::operator u8x32() const { return *(u8x32*)this; }
-forceinline s8x32::operator u16x32() const { return *(u16x32*)this; }
-forceinline s8x32::operator s16x32() const { return *(s16x32*)this; }
-forceinline s16x16::operator u8x16() const { return *(u8x16*)this; }
-forceinline s16x16::operator u16x16() const { return *(u16x16*)this; }
-forceinline s16x16::operator u32x16() const { return *(u32x16*)this; }
-forceinline s16x16::operator s8x16() const { return *(s8x16*)this; }
-forceinline s16x16::operator s32x16() const { return *(s32x16*)this; }
-forceinline s16x16::operator f32x16() const { return {_mm512_cvtepi16_ps(m)}; }
-forceinline s32x8::operator u16x8() const { return *(u16x8*)this; }
-forceinline s32x8::operator u32x8() const { return *(u32x8*)this; }
-forceinline s32x8::operator u64x8() const { return *(u64x8*)this; }
-forceinline s32x8::operator s16x8() const { return *(s16x8*)this; }
-forceinline s32x8::operator s64x8() const { return *(s64x8*)this; }
-forceinline s32x8::operator f32x8() const { return {_mm256_cvtepi32_ps(m)}; }
-forceinline s32x8::operator f64x8() const { return {_mm512_cvtepi32_pd(m)}; }
-forceinline s64x4::operator u32x4() const { return *(u32x4*)this; }
-forceinline s64x4::operator u64x4() const { return *(u64x4*)this; }
-forceinline s64x4::operator s32x4() const { return *(s32x4*)this; }
-forceinline s64x4::operator f32x4() const { return {_mm256_cvtepi64_ps(m)}; }
-forceinline s64x4::operator f64x4() const { return {_mm256_cvtepi64_pd(m)}; }
-forceinline f32x8::operator u16x8() const { return {_mm256_cvttps_epu16(m)}; }
-forceinline f32x8::operator u32x8() const { return {_mm256_cvttps_epu32(m)}; }
-forceinline f32x8::operator u64x8() const { return {_mm512_cvttps_epu64(m)}; }
-forceinline f32x8::operator s16x8() const { return {_mm256_cvttps_epi16(m)}; }
-forceinline f32x8::operator s32x8() const { return {_mm256_cvttps_epi32(m)}; }
-forceinline f32x8::operator s64x8() const { return {_mm512_cvttps_epi64(m)}; }
-forceinline f32x8::operator f64x8() const { return {_mm512_cvtps_pd(m)}; }
-forceinline f64x4::operator u32x4() const { return {_mm256_cvttpd_epu32(m)}; }
-forceinline f64x4::operator u64x4() const { return {_mm256_cvttpd_epu64(m)}; }
-forceinline f64x4::operator s32x4() const { return {_mm256_cvttpd_epi32(m)}; }
-forceinline f64x4::operator s64x4() const { return {_mm256_cvttpd_epi64(m)}; }
-forceinline f64x4::operator f32x4() const { return {_mm256_cvtpd_ps(m)}; }
 forceinline u8x64 U8x64(u8);
 forceinline u8x64 U8x64(u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8,u8);
 
@@ -3119,6 +2836,638 @@ forceinline f64x8 fmadd(f64x8 a, f64x8 b, f64x8 c) { return {_mm512_fmadd_pd(a.m
 forceinline f64x8 fmadd(f64x8 a, f64x8 b, f64x8 c) {a.s[0]=a.s[0]*b.s[0]+c.s[0];a.s[1]=a.s[1]*b.s[1]+c.s[1];a.s[2]=a.s[2]*b.s[2]+c.s[2];a.s[3]=a.s[3]*b.s[3]+c.s[3];a.s[4]=a.s[4]*b.s[4]+c.s[4];a.s[5]=a.s[5]*b.s[5]+c.s[5];a.s[6]=a.s[6]*b.s[6]+c.s[6];a.s[7]=a.s[7]*b.s[7]+c.s[7];return a;}
 #endif
 
+forceinline u8x16::operator u16x16() const { return *(u16x16*)this; }
+forceinline u8x16::operator u32x16() const { return *(u32x16*)this; }
+forceinline u8x16::operator s8x16() const { return *(s8x16*)this; }
+forceinline u8x16::operator s16x16() const { return *(s16x16*)this; }
+forceinline u8x16::operator s32x16() const { return *(s32x16*)this; }
+forceinline u8x16::operator f32x16() const {
+#if ARCH_AVX512
+	return {_mm512_cvtepu8_ps(m)}; }
+#else
+	f32x16 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	r[8] = (f32)s[8];
+	r[9] = (f32)s[9];
+	r[10] = (f32)s[10];
+	r[11] = (f32)s[11];
+	r[12] = (f32)s[12];
+	r[13] = (f32)s[13];
+	r[14] = (f32)s[14];
+	r[15] = (f32)s[15];
+	return r;
+#endif
+}
+forceinline u16x8::operator u32x8() const { return *(u32x8*)this; }
+forceinline u16x8::operator u64x8() const { return *(u64x8*)this; }
+forceinline u16x8::operator s16x8() const { return *(s16x8*)this; }
+forceinline u16x8::operator s32x8() const { return *(s32x8*)this; }
+forceinline u16x8::operator s64x8() const { return *(s64x8*)this; }
+forceinline u16x8::operator f32x8() const {
+#if ARCH_AVX512
+	return {_mm256_cvtepu16_ps(m)}; }
+#else
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+#endif
+}
+forceinline u16x8::operator f64x8() const {
+#if ARCH_AVX512
+	return {_mm512_cvtepu16_pd(m)}; }
+#else
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+#endif
+}
+forceinline u32x4::operator u64x4() const { return *(u64x4*)this; }
+forceinline u32x4::operator s32x4() const { return *(s32x4*)this; }
+forceinline u32x4::operator s64x4() const { return *(s64x4*)this; }
+forceinline u32x4::operator f32x4() const {
+#if ARCH_AVX512
+	return {_mm_cvtepu32_ps(m)}; }
+#else
+	f32x4 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	return r;
+#endif
+}
+forceinline u32x4::operator f64x4() const {
+#if ARCH_AVX512
+	return {_mm256_cvtepu32_pd(m)}; }
+#else
+	f64x4 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	return r;
+#endif
+}
+forceinline u64x2::operator s64x2() const { return *(s64x2*)this; }
+forceinline u64x2::operator f64x2() const {
+#if ARCH_AVX512
+	return {_mm_cvtepu64_pd(m)}; }
+#else
+	f64x2 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	return r;
+#endif
+}
+forceinline s8x16::operator u8x16() const { return *(u8x16*)this; }
+forceinline s8x16::operator u16x16() const { return *(u16x16*)this; }
+forceinline s8x16::operator u32x16() const { return *(u32x16*)this; }
+forceinline s8x16::operator s16x16() const { return *(s16x16*)this; }
+forceinline s8x16::operator s32x16() const { return *(s32x16*)this; }
+forceinline s8x16::operator f32x16() const {
+#if ARCH_AVX512
+	return {_mm512_cvtepi8_ps(m)}; }
+#else
+	f32x16 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	r[8] = (f32)s[8];
+	r[9] = (f32)s[9];
+	r[10] = (f32)s[10];
+	r[11] = (f32)s[11];
+	r[12] = (f32)s[12];
+	r[13] = (f32)s[13];
+	r[14] = (f32)s[14];
+	r[15] = (f32)s[15];
+	return r;
+#endif
+}
+forceinline s16x8::operator u16x8() const { return *(u16x8*)this; }
+forceinline s16x8::operator u32x8() const { return *(u32x8*)this; }
+forceinline s16x8::operator u64x8() const { return *(u64x8*)this; }
+forceinline s16x8::operator s32x8() const { return *(s32x8*)this; }
+forceinline s16x8::operator s64x8() const { return *(s64x8*)this; }
+forceinline s16x8::operator f32x8() const {
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+}
+forceinline s16x8::operator f64x8() const {
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+}
+forceinline s32x4::operator u32x4() const { return *(u32x4*)this; }
+forceinline s32x4::operator u64x4() const { return *(u64x4*)this; }
+forceinline s32x4::operator s64x4() const { return *(s64x4*)this; }
+#if ARCH_AVX
+forceinline s32x4::operator f32x4() const { return {_mm_cvtepi32_ps(m)}; }
+#else
+forceinline s32x4::operator f32x4() const {
+	f32x4 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline s32x4::operator f64x4() const { return {_mm256_cvtepi32_pd(m)}; }
+#else
+forceinline s32x4::operator f64x4() const {
+	f64x4 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	return r;
+}
+#endif
+forceinline s64x2::operator u64x2() const { return *(u64x2*)this; }
+#if ARCH_AVX
+forceinline s64x2::operator f64x2() const { return {_mm_cvtepi64_pd(m)}; }
+#else
+forceinline s64x2::operator f64x2() const {
+	f64x2 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f32x4::operator u32x4() const { return {_mm_cvttps_epu32(m)}; }
+#else
+forceinline f32x4::operator u32x4() const {
+	u32x4 r;
+	r[0] = (u32)s[0];
+	r[1] = (u32)s[1];
+	r[2] = (u32)s[2];
+	r[3] = (u32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f32x4::operator u64x4() const { return {_mm256_cvttps_epu64(m)}; }
+#else
+forceinline f32x4::operator u64x4() const {
+	u64x4 r;
+	r[0] = (u64)s[0];
+	r[1] = (u64)s[1];
+	r[2] = (u64)s[2];
+	r[3] = (u64)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f32x4::operator s32x4() const { return {_mm_cvttps_epi32(m)}; }
+#else
+forceinline f32x4::operator s32x4() const {
+	s32x4 r;
+	r[0] = (s32)s[0];
+	r[1] = (s32)s[1];
+	r[2] = (s32)s[2];
+	r[3] = (s32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f32x4::operator s64x4() const { return {_mm256_cvttps_epi64(m)}; }
+#else
+forceinline f32x4::operator s64x4() const {
+	s64x4 r;
+	r[0] = (s64)s[0];
+	r[1] = (s64)s[1];
+	r[2] = (s64)s[2];
+	r[3] = (s64)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f32x4::operator f64x4() const { return {_mm256_cvtps_pd(m)}; }
+#else
+forceinline f32x4::operator f64x4() const {
+	f64x4 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x2::operator u64x2() const { return {_mm_cvttpd_epu64(m)}; }
+#else
+forceinline f64x2::operator u64x2() const {
+	u64x2 r;
+	r[0] = (u64)s[0];
+	r[1] = (u64)s[1];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x2::operator s64x2() const { return {_mm_cvttpd_epi64(m)}; }
+#else
+forceinline f64x2::operator s64x2() const {
+	s64x2 r;
+	r[0] = (s64)s[0];
+	r[1] = (s64)s[1];
+	return r;
+}
+#endif
+forceinline u8x32::operator u16x32() const { return *(u16x32*)this; }
+forceinline u8x32::operator s8x32() const { return *(s8x32*)this; }
+forceinline u8x32::operator s16x32() const { return *(s16x32*)this; }
+forceinline u16x16::operator u8x16() const { return *(u8x16*)this; }
+forceinline u16x16::operator u32x16() const { return *(u32x16*)this; }
+forceinline u16x16::operator s8x16() const { return *(s8x16*)this; }
+forceinline u16x16::operator s16x16() const { return *(s16x16*)this; }
+forceinline u16x16::operator s32x16() const { return *(s32x16*)this; }
+forceinline u16x16::operator f32x16() const {
+#if ARCH_AVX512
+	return {_mm512_cvtepu16_ps(m)}; }
+#else
+	f32x16 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	r[8] = (f32)s[8];
+	r[9] = (f32)s[9];
+	r[10] = (f32)s[10];
+	r[11] = (f32)s[11];
+	r[12] = (f32)s[12];
+	r[13] = (f32)s[13];
+	r[14] = (f32)s[14];
+	r[15] = (f32)s[15];
+	return r;
+#endif
+}
+forceinline u32x8::operator u16x8() const { return *(u16x8*)this; }
+forceinline u32x8::operator u64x8() const { return *(u64x8*)this; }
+forceinline u32x8::operator s16x8() const { return *(s16x8*)this; }
+forceinline u32x8::operator s32x8() const { return *(s32x8*)this; }
+forceinline u32x8::operator s64x8() const { return *(s64x8*)this; }
+forceinline u32x8::operator f32x8() const {
+#if ARCH_AVX512
+	return {_mm256_cvtepu32_ps(m)}; }
+#else
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+#endif
+}
+forceinline u32x8::operator f64x8() const {
+#if ARCH_AVX512
+	return {_mm512_cvtepu32_pd(m)}; }
+#else
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+#endif
+}
+forceinline u64x4::operator u32x4() const { return *(u32x4*)this; }
+forceinline u64x4::operator s32x4() const { return *(s32x4*)this; }
+forceinline u64x4::operator s64x4() const { return *(s64x4*)this; }
+forceinline u64x4::operator f32x4() const {
+#if ARCH_AVX512
+	return {_mm256_cvtepu64_ps(m)}; }
+#else
+	f32x4 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	return r;
+#endif
+}
+forceinline u64x4::operator f64x4() const {
+#if ARCH_AVX512
+	return {_mm256_cvtepu64_pd(m)}; }
+#else
+	f64x4 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	return r;
+#endif
+}
+forceinline s8x32::operator u8x32() const { return *(u8x32*)this; }
+forceinline s8x32::operator u16x32() const { return *(u16x32*)this; }
+forceinline s8x32::operator s16x32() const { return *(s16x32*)this; }
+forceinline s16x16::operator u8x16() const { return *(u8x16*)this; }
+forceinline s16x16::operator u16x16() const { return *(u16x16*)this; }
+forceinline s16x16::operator u32x16() const { return *(u32x16*)this; }
+forceinline s16x16::operator s8x16() const { return *(s8x16*)this; }
+forceinline s16x16::operator s32x16() const { return *(s32x16*)this; }
+forceinline s16x16::operator f32x16() const {
+	f32x16 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	r[8] = (f32)s[8];
+	r[9] = (f32)s[9];
+	r[10] = (f32)s[10];
+	r[11] = (f32)s[11];
+	r[12] = (f32)s[12];
+	r[13] = (f32)s[13];
+	r[14] = (f32)s[14];
+	r[15] = (f32)s[15];
+	return r;
+}
+forceinline s32x8::operator u16x8() const { return *(u16x8*)this; }
+forceinline s32x8::operator u32x8() const { return *(u32x8*)this; }
+forceinline s32x8::operator u64x8() const { return *(u64x8*)this; }
+forceinline s32x8::operator s16x8() const { return *(s16x8*)this; }
+forceinline s32x8::operator s64x8() const { return *(s64x8*)this; }
+#if ARCH_AVX
+forceinline s32x8::operator f32x8() const { return {_mm256_cvtepi32_ps(m)}; }
+#else
+forceinline s32x8::operator f32x8() const {
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
+forceinline s32x8::operator f64x8() const { return {_mm512_cvtepi32_pd(m)}; }
+#else
+forceinline s32x8::operator f64x8() const {
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+}
+#endif
+forceinline s64x4::operator u32x4() const { return *(u32x4*)this; }
+forceinline s64x4::operator u64x4() const { return *(u64x4*)this; }
+forceinline s64x4::operator s32x4() const { return *(s32x4*)this; }
+#if ARCH_AVX
+forceinline s64x4::operator f32x4() const { return {_mm256_cvtepi64_ps(m)}; }
+#else
+forceinline s64x4::operator f32x4() const {
+	f32x4 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline s64x4::operator f64x4() const { return {_mm256_cvtepi64_pd(m)}; }
+#else
+forceinline s64x4::operator f64x4() const {
+	f64x4 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	return r;
+}
+#endif
+forceinline f32x8::operator u16x8() const {
+	u16x8 r;
+	r[0] = (u16)s[0];
+	r[1] = (u16)s[1];
+	r[2] = (u16)s[2];
+	r[3] = (u16)s[3];
+	r[4] = (u16)s[4];
+	r[5] = (u16)s[5];
+	r[6] = (u16)s[6];
+	r[7] = (u16)s[7];
+	return r;
+}
+#if ARCH_AVX
+forceinline f32x8::operator u32x8() const { return {_mm256_cvttps_epu32(m)}; }
+#else
+forceinline f32x8::operator u32x8() const {
+	u32x8 r;
+	r[0] = (u32)s[0];
+	r[1] = (u32)s[1];
+	r[2] = (u32)s[2];
+	r[3] = (u32)s[3];
+	r[4] = (u32)s[4];
+	r[5] = (u32)s[5];
+	r[6] = (u32)s[6];
+	r[7] = (u32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
+forceinline f32x8::operator u64x8() const { return {_mm512_cvttps_epu64(m)}; }
+#else
+forceinline f32x8::operator u64x8() const {
+	u64x8 r;
+	r[0] = (u64)s[0];
+	r[1] = (u64)s[1];
+	r[2] = (u64)s[2];
+	r[3] = (u64)s[3];
+	r[4] = (u64)s[4];
+	r[5] = (u64)s[5];
+	r[6] = (u64)s[6];
+	r[7] = (u64)s[7];
+	return r;
+}
+#endif
+forceinline f32x8::operator s16x8() const {
+	s16x8 r;
+	r[0] = (s16)s[0];
+	r[1] = (s16)s[1];
+	r[2] = (s16)s[2];
+	r[3] = (s16)s[3];
+	r[4] = (s16)s[4];
+	r[5] = (s16)s[5];
+	r[6] = (s16)s[6];
+	r[7] = (s16)s[7];
+	return r;
+}
+#if ARCH_AVX
+forceinline f32x8::operator s32x8() const { return {_mm256_cvttps_epi32(m)}; }
+#else
+forceinline f32x8::operator s32x8() const {
+	s32x8 r;
+	r[0] = (s32)s[0];
+	r[1] = (s32)s[1];
+	r[2] = (s32)s[2];
+	r[3] = (s32)s[3];
+	r[4] = (s32)s[4];
+	r[5] = (s32)s[5];
+	r[6] = (s32)s[6];
+	r[7] = (s32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
+forceinline f32x8::operator s64x8() const { return {_mm512_cvttps_epi64(m)}; }
+#else
+forceinline f32x8::operator s64x8() const {
+	s64x8 r;
+	r[0] = (s64)s[0];
+	r[1] = (s64)s[1];
+	r[2] = (s64)s[2];
+	r[3] = (s64)s[3];
+	r[4] = (s64)s[4];
+	r[5] = (s64)s[5];
+	r[6] = (s64)s[6];
+	r[7] = (s64)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
+forceinline f32x8::operator f64x8() const { return {_mm512_cvtps_pd(m)}; }
+#else
+forceinline f32x8::operator f64x8() const {
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x4::operator u32x4() const { return {_mm256_cvttpd_epu32(m)}; }
+#else
+forceinline f64x4::operator u32x4() const {
+	u32x4 r;
+	r[0] = (u32)s[0];
+	r[1] = (u32)s[1];
+	r[2] = (u32)s[2];
+	r[3] = (u32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x4::operator u64x4() const { return {_mm256_cvttpd_epu64(m)}; }
+#else
+forceinline f64x4::operator u64x4() const {
+	u64x4 r;
+	r[0] = (u64)s[0];
+	r[1] = (u64)s[1];
+	r[2] = (u64)s[2];
+	r[3] = (u64)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x4::operator s32x4() const { return {_mm256_cvttpd_epi32(m)}; }
+#else
+forceinline f64x4::operator s32x4() const {
+	s32x4 r;
+	r[0] = (s32)s[0];
+	r[1] = (s32)s[1];
+	r[2] = (s32)s[2];
+	r[3] = (s32)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x4::operator s64x4() const { return {_mm256_cvttpd_epi64(m)}; }
+#else
+forceinline f64x4::operator s64x4() const {
+	s64x4 r;
+	r[0] = (s64)s[0];
+	r[1] = (s64)s[1];
+	r[2] = (s64)s[2];
+	r[3] = (s64)s[3];
+	return r;
+}
+#endif
+#if ARCH_AVX
+forceinline f64x4::operator f32x4() const { return {_mm256_cvtpd_ps(m)}; }
+#else
+forceinline f64x4::operator f32x4() const {
+	f32x4 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	return r;
+}
+#endif
 forceinline u8x64::operator s8x64() const { return *(s8x64*)this; }
 forceinline u16x32::operator u8x32() const { return *(u8x32*)this; }
 forceinline u16x32::operator s8x32() const { return *(s8x32*)this; }
@@ -3198,27 +3547,299 @@ forceinline s32x16::operator u16x16() const { return *(u16x16*)this; }
 forceinline s32x16::operator u32x16() const { return *(u32x16*)this; }
 forceinline s32x16::operator s8x16() const { return *(s8x16*)this; }
 forceinline s32x16::operator s16x16() const { return *(s16x16*)this; }
+#if ARCH_AVX512
 forceinline s32x16::operator f32x16() const { return {_mm512_cvtepi32_ps(m)}; }
+#else
+forceinline s32x16::operator f32x16() const {
+	f32x16 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	r[8] = (f32)s[8];
+	r[9] = (f32)s[9];
+	r[10] = (f32)s[10];
+	r[11] = (f32)s[11];
+	r[12] = (f32)s[12];
+	r[13] = (f32)s[13];
+	r[14] = (f32)s[14];
+	r[15] = (f32)s[15];
+	return r;
+}
+#endif
 forceinline s64x8::operator u16x8() const { return *(u16x8*)this; }
 forceinline s64x8::operator u32x8() const { return *(u32x8*)this; }
 forceinline s64x8::operator u64x8() const { return *(u64x8*)this; }
 forceinline s64x8::operator s16x8() const { return *(s16x8*)this; }
 forceinline s64x8::operator s32x8() const { return *(s32x8*)this; }
+#if ARCH_AVX512
 forceinline s64x8::operator f32x8() const { return {_mm512_cvtepi64_ps(m)}; }
+#else
+forceinline s64x8::operator f32x8() const {
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
 forceinline s64x8::operator f64x8() const { return {_mm512_cvtepi64_pd(m)}; }
-forceinline f32x16::operator u8x16() const { return {_mm512_cvttps_epu8(m)}; }
-forceinline f32x16::operator u16x16() const { return {_mm512_cvttps_epu16(m)}; }
+#else
+forceinline s64x8::operator f64x8() const {
+	f64x8 r;
+	r[0] = (f64)s[0];
+	r[1] = (f64)s[1];
+	r[2] = (f64)s[2];
+	r[3] = (f64)s[3];
+	r[4] = (f64)s[4];
+	r[5] = (f64)s[5];
+	r[6] = (f64)s[6];
+	r[7] = (f64)s[7];
+	return r;
+}
+#endif
+forceinline f32x16::operator u8x16() const {
+	u8x16 r;
+	r[0] = (u8)s[0];
+	r[1] = (u8)s[1];
+	r[2] = (u8)s[2];
+	r[3] = (u8)s[3];
+	r[4] = (u8)s[4];
+	r[5] = (u8)s[5];
+	r[6] = (u8)s[6];
+	r[7] = (u8)s[7];
+	r[8] = (u8)s[8];
+	r[9] = (u8)s[9];
+	r[10] = (u8)s[10];
+	r[11] = (u8)s[11];
+	r[12] = (u8)s[12];
+	r[13] = (u8)s[13];
+	r[14] = (u8)s[14];
+	r[15] = (u8)s[15];
+	return r;
+}
+forceinline f32x16::operator u16x16() const {
+	u16x16 r;
+	r[0] = (u16)s[0];
+	r[1] = (u16)s[1];
+	r[2] = (u16)s[2];
+	r[3] = (u16)s[3];
+	r[4] = (u16)s[4];
+	r[5] = (u16)s[5];
+	r[6] = (u16)s[6];
+	r[7] = (u16)s[7];
+	r[8] = (u16)s[8];
+	r[9] = (u16)s[9];
+	r[10] = (u16)s[10];
+	r[11] = (u16)s[11];
+	r[12] = (u16)s[12];
+	r[13] = (u16)s[13];
+	r[14] = (u16)s[14];
+	r[15] = (u16)s[15];
+	return r;
+}
+#if ARCH_AVX512
 forceinline f32x16::operator u32x16() const { return {_mm512_cvttps_epu32(m)}; }
-forceinline f32x16::operator s8x16() const { return {_mm512_cvttps_epi8(m)}; }
-forceinline f32x16::operator s16x16() const { return {_mm512_cvttps_epi16(m)}; }
+#else
+forceinline f32x16::operator u32x16() const {
+	u32x16 r;
+	r[0] = (u32)s[0];
+	r[1] = (u32)s[1];
+	r[2] = (u32)s[2];
+	r[3] = (u32)s[3];
+	r[4] = (u32)s[4];
+	r[5] = (u32)s[5];
+	r[6] = (u32)s[6];
+	r[7] = (u32)s[7];
+	r[8] = (u32)s[8];
+	r[9] = (u32)s[9];
+	r[10] = (u32)s[10];
+	r[11] = (u32)s[11];
+	r[12] = (u32)s[12];
+	r[13] = (u32)s[13];
+	r[14] = (u32)s[14];
+	r[15] = (u32)s[15];
+	return r;
+}
+#endif
+forceinline f32x16::operator s8x16() const {
+	s8x16 r;
+	r[0] = (s8)s[0];
+	r[1] = (s8)s[1];
+	r[2] = (s8)s[2];
+	r[3] = (s8)s[3];
+	r[4] = (s8)s[4];
+	r[5] = (s8)s[5];
+	r[6] = (s8)s[6];
+	r[7] = (s8)s[7];
+	r[8] = (s8)s[8];
+	r[9] = (s8)s[9];
+	r[10] = (s8)s[10];
+	r[11] = (s8)s[11];
+	r[12] = (s8)s[12];
+	r[13] = (s8)s[13];
+	r[14] = (s8)s[14];
+	r[15] = (s8)s[15];
+	return r;
+}
+forceinline f32x16::operator s16x16() const {
+	s16x16 r;
+	r[0] = (s16)s[0];
+	r[1] = (s16)s[1];
+	r[2] = (s16)s[2];
+	r[3] = (s16)s[3];
+	r[4] = (s16)s[4];
+	r[5] = (s16)s[5];
+	r[6] = (s16)s[6];
+	r[7] = (s16)s[7];
+	r[8] = (s16)s[8];
+	r[9] = (s16)s[9];
+	r[10] = (s16)s[10];
+	r[11] = (s16)s[11];
+	r[12] = (s16)s[12];
+	r[13] = (s16)s[13];
+	r[14] = (s16)s[14];
+	r[15] = (s16)s[15];
+	return r;
+}
+#if ARCH_AVX512
 forceinline f32x16::operator s32x16() const { return {_mm512_cvttps_epi32(m)}; }
-forceinline f64x8::operator u16x8() const { return {_mm512_cvttpd_epu16(m)}; }
+#else
+forceinline f32x16::operator s32x16() const {
+	s32x16 r;
+	r[0] = (s32)s[0];
+	r[1] = (s32)s[1];
+	r[2] = (s32)s[2];
+	r[3] = (s32)s[3];
+	r[4] = (s32)s[4];
+	r[5] = (s32)s[5];
+	r[6] = (s32)s[6];
+	r[7] = (s32)s[7];
+	r[8] = (s32)s[8];
+	r[9] = (s32)s[9];
+	r[10] = (s32)s[10];
+	r[11] = (s32)s[11];
+	r[12] = (s32)s[12];
+	r[13] = (s32)s[13];
+	r[14] = (s32)s[14];
+	r[15] = (s32)s[15];
+	return r;
+}
+#endif
+forceinline f64x8::operator u16x8() const {
+	u16x8 r;
+	r[0] = (u16)s[0];
+	r[1] = (u16)s[1];
+	r[2] = (u16)s[2];
+	r[3] = (u16)s[3];
+	r[4] = (u16)s[4];
+	r[5] = (u16)s[5];
+	r[6] = (u16)s[6];
+	r[7] = (u16)s[7];
+	return r;
+}
+#if ARCH_AVX512
 forceinline f64x8::operator u32x8() const { return {_mm512_cvttpd_epu32(m)}; }
+#else
+forceinline f64x8::operator u32x8() const {
+	u32x8 r;
+	r[0] = (u32)s[0];
+	r[1] = (u32)s[1];
+	r[2] = (u32)s[2];
+	r[3] = (u32)s[3];
+	r[4] = (u32)s[4];
+	r[5] = (u32)s[5];
+	r[6] = (u32)s[6];
+	r[7] = (u32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
 forceinline f64x8::operator u64x8() const { return {_mm512_cvttpd_epu64(m)}; }
-forceinline f64x8::operator s16x8() const { return {_mm512_cvttpd_epi16(m)}; }
+#else
+forceinline f64x8::operator u64x8() const {
+	u64x8 r;
+	r[0] = (u64)s[0];
+	r[1] = (u64)s[1];
+	r[2] = (u64)s[2];
+	r[3] = (u64)s[3];
+	r[4] = (u64)s[4];
+	r[5] = (u64)s[5];
+	r[6] = (u64)s[6];
+	r[7] = (u64)s[7];
+	return r;
+}
+#endif
+forceinline f64x8::operator s16x8() const {
+	s16x8 r;
+	r[0] = (s16)s[0];
+	r[1] = (s16)s[1];
+	r[2] = (s16)s[2];
+	r[3] = (s16)s[3];
+	r[4] = (s16)s[4];
+	r[5] = (s16)s[5];
+	r[6] = (s16)s[6];
+	r[7] = (s16)s[7];
+	return r;
+}
+#if ARCH_AVX512
 forceinline f64x8::operator s32x8() const { return {_mm512_cvttpd_epi32(m)}; }
+#else
+forceinline f64x8::operator s32x8() const {
+	s32x8 r;
+	r[0] = (s32)s[0];
+	r[1] = (s32)s[1];
+	r[2] = (s32)s[2];
+	r[3] = (s32)s[3];
+	r[4] = (s32)s[4];
+	r[5] = (s32)s[5];
+	r[6] = (s32)s[6];
+	r[7] = (s32)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
 forceinline f64x8::operator s64x8() const { return {_mm512_cvttpd_epi64(m)}; }
+#else
+forceinline f64x8::operator s64x8() const {
+	s64x8 r;
+	r[0] = (s64)s[0];
+	r[1] = (s64)s[1];
+	r[2] = (s64)s[2];
+	r[3] = (s64)s[3];
+	r[4] = (s64)s[4];
+	r[5] = (s64)s[5];
+	r[6] = (s64)s[6];
+	r[7] = (s64)s[7];
+	return r;
+}
+#endif
+#if ARCH_AVX512
 forceinline f64x8::operator f32x8() const { return {_mm512_cvtpd_ps(m)}; }
+#else
+forceinline f64x8::operator f32x8() const {
+	f32x8 r;
+	r[0] = (f32)s[0];
+	r[1] = (f32)s[1];
+	r[2] = (f32)s[2];
+	r[3] = (f32)s[3];
+	r[4] = (f32)s[4];
+	r[5] = (f32)s[5];
+	r[6] = (f32)s[6];
+	r[7] = (f32)s[7];
+	return r;
+}
+#endif
 
 }
 }

@@ -276,6 +276,18 @@ C(f,32, >=, r.mf = _mm_cmpge_ps(a.mf, b.mf));
 C(f,32, <, r.mf = _mm_cmplt_ps(a.mf, b.mf));
 C(f,32, >, r.mf = _mm_cmpgt_ps(a.mf, b.mf));
 
+#undef noti
+#undef notf
+#undef notd
+#undef fsb8i
+#undef fsb16i
+#undef fsb32i
+#undef fsb64i
+#undef fsb32f
+#undef fsb64f
+#undef fsb32d
+#undef fsb64d
+
 #if ARCH_AVX
 #define noti(x)   _mm256_xor_si256(x, _mm256_set1_epi32(~0))
 #define notf(x)   _mm256_xor_ps(x, _mm256_castsi256_ps(_mm256_set1_epi32(~0)))
@@ -334,5 +346,7 @@ C(f,32, >, r.mf = _mm_cmpgt_ps(a.mf, b.mf));
 #undef AVX512
 #undef SC
 #undef SA
+#undef A
+#undef C
 
 }

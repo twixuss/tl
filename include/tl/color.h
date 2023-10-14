@@ -1,4 +1,5 @@
 #include "common.h"
+#include "vector.h"
 
 namespace tl {
 
@@ -8,19 +9,19 @@ struct color4u16 {
 
 color4u16 to_color4u16(v4f v) {
     return {
-        (u16)min(v.x * 65535, 65535),
-        (u16)min(v.y * 65535, 65535),
-        (u16)min(v.z * 65535, 65535),
-        (u16)min(v.w * 65535, 65535),
+        (u16)min<f32>(v.x * 65535, 65535),
+        (u16)min<f32>(v.y * 65535, 65535),
+        (u16)min<f32>(v.z * 65535, 65535),
+        (u16)min<f32>(v.w * 65535, 65535),
     };
 }
 
 color4u16 operator+(color4u16 a, color4u16 b) {
     return {
-        (u16)min((u32)a.r + (u32)b.r, 65535),
-        (u16)min((u32)a.g + (u32)b.g, 65535),
-        (u16)min((u32)a.b + (u32)b.b, 65535),
-        (u16)min((u32)a.a + (u32)b.a, 65535),
+        (u16)min<u32>((u32)a.r + (u32)b.r, 65535),
+        (u16)min<u32>((u32)a.g + (u32)b.g, 65535),
+        (u16)min<u32>((u32)a.b + (u32)b.b, 65535),
+        (u16)min<u32>((u32)a.a + (u32)b.a, 65535),
     };
 }
 
