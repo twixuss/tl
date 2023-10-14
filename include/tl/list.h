@@ -460,7 +460,7 @@ List<T, Allocator, Size> erase_all(Span<T, Size> where, T what TL_LP) {
 template <class Allocator = Allocator, class T, class Size, class Fn>
 auto map(Span<T, Size> span, Fn &&fn TL_LP) {
 	using U = decltype(fn(*(T*)0));
-	List<U, Size, Allocator> result;
+	List<U, Allocator, Size> result;
 	result.reserve(span.count TL_LA);
 
 	for (auto &x : span) {
