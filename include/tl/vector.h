@@ -292,21 +292,13 @@ C(v3f, V3f) C(v3s, V3s) C(v3u, V3u);
 C(v4f, V4f) C(v4s, V4s) C(v4u, V4u);
 #undef C
 
-forceinline constexpr bool all_true(v2b v) { return v.x && v.y; }
-forceinline constexpr bool all_true(v3b v) { return v.x && v.y && v.z; }
-forceinline constexpr bool all_true(v4b v) { return v.x && v.y && v.z && v.w; }
+forceinline constexpr bool all(v2b v) { return v.x && v.y; }
+forceinline constexpr bool all(v3b v) { return v.x && v.y && v.z; }
+forceinline constexpr bool all(v4b v) { return v.x && v.y && v.z && v.w; }
 
-forceinline constexpr bool any_true(v2b v) { return v.x || v.y; }
-forceinline constexpr bool any_true(v3b v) { return v.x || v.y || v.z; }
-forceinline constexpr bool any_true(v4b v) { return v.x || v.y || v.z || v.w; }
-
-forceinline constexpr bool all_false(v2b v) { return !any_true(v); }
-forceinline constexpr bool all_false(v3b v) { return !any_true(v); }
-forceinline constexpr bool all_false(v4b v) { return !any_true(v); }
-
-forceinline constexpr bool any_false(v2b v) { return !all_true(v); }
-forceinline constexpr bool any_false(v3b v) { return !all_true(v); }
-forceinline constexpr bool any_false(v4b v) { return !all_true(v); }
+forceinline constexpr bool any(v2b v) { return v.x || v.y; }
+forceinline constexpr bool any(v3b v) { return v.x || v.y || v.z; }
+forceinline constexpr bool any(v4b v) { return v.x || v.y || v.z || v.w; }
 
 template <class T> forceinline constexpr v2<T> select(v2b t, v2<T> a, v2<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y)}; }
 template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z)}; }

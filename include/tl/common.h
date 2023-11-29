@@ -101,10 +101,16 @@
 #define static_error_t(t, ...) static_assert(!sizeof(t*), __VA_ARGS__)
 #define static_error_v(v, ...) static_error_t(decltype(v), __VA_ARGS__)
 
-#define TL_DECLARE_CONCEPT(name) \
-template <class T> struct S##name : std::false_type {}; \
-template <class ...Args> struct S##name<name<Args...>> : std::true_type {}; \
-template <class T> concept C##name = S##name<T>::value
+#define TL_DECLARE_CONCEPT(name)                                                \
+	template <class T> struct S##name : std::false_type {};                     \
+	template <class ...Args> struct S##name<name<Args...>> : std::true_type {}; \
+	template <class T> concept C##name = S##name<T>::value
+
+#define TL_MAKE_FIXED(T)              \
+	T(const T &) = delete;            \
+	T(T &&) = delete;                 \
+	T &operator=(const T &) = delete; \
+	T &operator=(T &&) = delete
 
 namespace tl {
 
@@ -1169,7 +1175,7 @@ struct Span {
 
 	constexpr ValueType at_interpolated_clamped(f64 i) const {
 		auto a = at(floor_to_int(i));
-		auto b = at(min(count - 1, ceil_to_int(i)));
+		auto b = at(min(count - 1, (Size)ceil_to_int(i)));
 		return lerp(a, b, frac(i));
 	}
 

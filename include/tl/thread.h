@@ -209,20 +209,39 @@ u32 get_thread_id(Thread *thread) {
 #endif
 #endif // TL_IMPL
 
-template <class Predicate>
-void loop_while(Predicate &&predicate) {
-	u32 try_count = 0;
-	while (predicate()) {
-		for (u32 i = 0; i < 16; ++i) {
-			yield_smt();
-			switch_thread();
+template <class T>
+concept Spinner = requires(T t) { t.spin(); };
+
+struct BasicSpinner {
+	inline void spin() {
+		yield_smt();
+		switch_thread();
+	}
+};
+
+struct SleepySpinner {
+	u32 threshold = 256;
+
+	inline void spin() {
+		yield_smt();
+		switch_thread();
+		if (threshold == 0) {
+			Sleep(1);
+		} else {
+			--threshold;
 		}
-		++try_count;
+	}
+};
+
+template <class Predicate, class Spinner = SleepySpinner>
+void loop_while(Predicate &&predicate, Spinner spinner = {}) {
+	while (predicate()) {
+		spinner.spin();
 	}
 }
-template <class Predicate>
-void loop_until(Predicate &&predicate) {
-	return loop_while([&]{return!predicate();});
+template <class Predicate, class Spinner = SleepySpinner>
+void loop_until(Predicate &&predicate, Spinner spinner = {}) {
+	return loop_while([&]{return!predicate();}, spinner);
 }
 
 struct SyncPoint {
@@ -237,36 +256,31 @@ inline SyncPoint create_sync_point(u32 thread_count) {
 	};
 }
 
-inline void sync(SyncPoint &point) {
+template <class Spinner = SleepySpinner>
+inline void sync(SyncPoint &point, Spinner spinner = {}) {
 	atomic_add(&point.synced_thread_count, 1);
-	loop_until([&] { return point.synced_thread_count == point.target_thread_count; });
+	loop_until([&] { return point.synced_thread_count == point.target_thread_count; }, spinner);
 }
 
 struct SpinLock {
+	TL_MAKE_FIXED(SpinLock);
+
 	bool volatile in_use = false;
 
 	SpinLock() = default;
-	SpinLock(const SpinLock &) = delete;
-	SpinLock(SpinLock &&) = delete;
-	SpinLock &operator=(const SpinLock &) = delete;
-	SpinLock &operator=(SpinLock &&) = delete;
 };
 
 inline bool try_lock(SpinLock &m) {
 	return !atomic_compare_exchange(&m.in_use, true, false);
 }
-inline void lock(SpinLock &m) {
+template <class Spinner = SleepySpinner>
+inline void lock(SpinLock &m, Spinner spinner = {}) {
 	loop_until([&] {
 		return try_lock(m);
-	});
+	}, spinner);
 }
 inline void unlock(SpinLock &m) {
 	m.in_use = false;
-}
-inline void wait_for_unlock(SpinLock &m) {
-	loop_until([&] {
-		return !m.in_use;
-	});
 }
 
 template <>
@@ -280,17 +294,53 @@ struct Scoped<SpinLock> {
 	}
 };
 
+struct TL_API OsLock {
+	TL_MAKE_FIXED(OsLock);
+
+	void *handle;
+
+	OsLock();
+};
+
+TL_API bool try_lock(OsLock &m);
+TL_API void lock(OsLock &m);
+TL_API void unlock(OsLock &m);
+
+#ifdef TL_IMPL
+OsLock::OsLock() {
+	handle = DefaultAllocator{}.allocate<CRITICAL_SECTION>();
+}
+bool try_lock(OsLock &m) {
+	return TryEnterCriticalSection((CRITICAL_SECTION *)m.handle);
+}
+void lock(OsLock &m) {
+	EnterCriticalSection((CRITICAL_SECTION *)m.handle);
+}
+void unlock(OsLock &m) {
+	LeaveCriticalSection((CRITICAL_SECTION *)m.handle);
+}
+#endif
+
+
+template <>
+struct Scoped<OsLock> {
+	OsLock &mutex;
+	Scoped(OsLock &mutex) : mutex(mutex) {
+		lock(mutex);
+	}
+	~Scoped() {
+		unlock(mutex);
+	}
+};
+
 template <class T, class Lock>
 struct LockProtected {
+	TL_MAKE_FIXED(LockProtected);
+
 	using Value = T;
 
 	LockProtected() = default;
-	LockProtected(LockProtected const &) = delete;
-	LockProtected(LockProtected &&) = delete;
 	LockProtected(T value) : value(value) {}
-
-	LockProtected &operator=(LockProtected const &) = delete;
-	LockProtected &operator=(LockProtected &&) = delete;
 
 	template <class Fn>
 	decltype(auto) use(Fn fn) {
@@ -328,14 +378,12 @@ struct LockQueue : LockProtected<Queue<T>, Lock> {
 };
 
 struct RecursiveSpinLock {
+	TL_MAKE_FIXED(RecursiveSpinLock);
+
 	u32 volatile thread_id = 0;
 	u32 counter = 0;
 
 	RecursiveSpinLock() = default;
-	RecursiveSpinLock(const RecursiveSpinLock &) = delete;
-	RecursiveSpinLock(RecursiveSpinLock &&) = delete;
-	RecursiveSpinLock &operator=(const RecursiveSpinLock &) = delete;
-	RecursiveSpinLock &operator=(RecursiveSpinLock &&) = delete;
 };
 
 inline bool try_lock(RecursiveSpinLock &m, u32 *locked_by = 0) {
@@ -353,14 +401,15 @@ inline bool try_lock(RecursiveSpinLock &m, u32 *locked_by = 0) {
 		return false;
 	}
 }
-inline void lock(RecursiveSpinLock &m) {
+template <class Spinner = SleepySpinner>
+inline void lock(RecursiveSpinLock &m, Spinner spinner = {}) {
 	u32 thread_id = get_current_thread_id();
 	if (thread_id == m.thread_id) {
 		++m.counter;
 	} else {
 		loop_while([&] {
 			return atomic_compare_exchange(&m.thread_id, thread_id, (u32)0);
-		});
+		}, spinner);
 	}
 }
 inline void unlock(RecursiveSpinLock &m) {
@@ -382,6 +431,72 @@ struct Scoped<RecursiveSpinLock> {
 	}
 };
 
+struct TL_API ConditionVariable {
+	TL_MAKE_FIXED(ConditionVariable);
+
+	struct Sleeper {
+		Sleeper(ConditionVariable *cv) : cv(cv) {}
+
+		void sleep();
+
+	private:
+		ConditionVariable *cv;
+	};
+
+	ConditionVariable();
+
+	void wake();
+	void wake_all();
+	void section(auto &&block) {
+		lock();
+		if constexpr (requires { block(); }) {
+			block();
+		} else {
+			block(Sleeper(this));
+		}
+		unlock();
+	}
+
+private:
+	void *handle;
+
+	inline struct ConditionVariableImpl &impl() {
+		return *(struct ConditionVariableImpl *)handle;
+	}
+	void lock();
+	void unlock();
+};
+
+#ifdef TL_IMPL
+
+struct ConditionVariableImpl {
+	CONDITION_VARIABLE c = {};
+	CRITICAL_SECTION s = {};
+};
+
+ConditionVariable::ConditionVariable() {
+	handle = DefaultAllocator{}.allocate<ConditionVariableImpl>();
+	InitializeConditionVariable(&impl().c);
+	InitializeCriticalSection(&impl().s);
+}
+
+void ConditionVariable::Sleeper::sleep() {
+	SleepConditionVariableCS(&cv->impl().c, &cv->impl().s, INFINITE);
+}
+void ConditionVariable::wake() {
+	WakeConditionVariable(&impl().c);
+}
+void ConditionVariable::wake_all() {
+	WakeAllConditionVariable(&impl().c);
+}
+void ConditionVariable::lock() {
+	EnterCriticalSection(&impl().s);
+}
+void ConditionVariable::unlock() {
+	LeaveCriticalSection(&impl().s);
+}
+#endif
+
 struct ThreadPool {
 	struct Task {
 		ThreadPool *pool = 0;
@@ -398,25 +513,79 @@ struct ThreadPool {
 		}
 	};
 
-	Allocator allocator = current_allocator;
-	List<Thread *> threads;
+	struct InitParams {
+		void (*worker_initter)() = [](){};
+		void (*worker_proc)(ThreadPool *pool) = ThreadPool::default_worker_proc;
+	};
 
-	SyncPoint start_sync_point;
-	u32 volatile stopped_thread_count = 0;
-	bool volatile stopping = false;
-	LockQueue<Task, SpinLock> tasks;
+	inline bool init(u32 thread_count, InitParams params = {}) {
+		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
+		stopped_thread_count = 0;
+		stopping = false;
+		allocator =
+		threads.allocator =
+		tasks.allocator =
+			current_allocator;
+		if (thread_count) {
+			threads.reserve(thread_count);
 
-	u32 volatile started_task_count = 0;
-	u32 volatile finished_task_count = 0;
+			struct StartInfo {
+				ThreadPool *pool;
+				void (*init)();
+				void (*proc)(ThreadPool *pool);
+			};
+			StartInfo info;
+			info.pool = this;
+			info.init = params.worker_initter;
+			info.proc = params.worker_proc;
 
+			auto start_proc = [](Thread *thread) {
+				StartInfo *info = (StartInfo *)thread->param;
+				(*info->init)();
+				(*info->proc)(info->pool);
+			};
+
+			for (u32 i = 0; i < thread_count; ++i) {
+				auto thread = create_thread(+start_proc, (void *)&info);
+				if (!valid(thread)) {
+					stopping = true;
+					for (auto t : threads) {
+						free(t);
+					}
+					threads.clear();
+					return false;
+				}
+				threads.add(thread);
+			}
+
+			sync(start_sync_point);
+
+		} else {
+			threads.clear();
+		}
+
+		return true;
+	}
+	inline void deinit(bool wait_for_threads = true) {
+		stopping = true;
+		if (wait_for_threads) {
+			wait_for_completion(false);
+		}
+		threads.clear();
+	}
 
 	inline void push(void (*fn)(void *param), void *param) {
 		atomic_increment(&started_task_count);
-		tasks.push({
-			.pool = this,
-			.fn = fn,
-			.param = param,
+
+		cv.section([&]{
+			tasks.push({
+				.pool = this,
+				.fn = fn,
+				.param = param,
+			});
 		});
+
+		cv.wake();
 	}
 	template <class Fn, class ...Args>
 	void push(Fn &&fn, Args &&...args) {
@@ -432,20 +601,27 @@ struct ThreadPool {
 		return *this;
 	}
 
-	inline bool pop_and_run_task() {
-		if (auto popped = tasks.pop()) {
-			popped.value_unchecked().run();
+	inline bool try_run_task() {
+		Optional<Task> task;
+		cv.section([&] {
+			task = tasks.pop();
+		});
+		if (task) {
+			task.value_unchecked().run();
 			return true;
 		}
+
 		return false;
 	}
 
-	inline void wait_for_completion(bool run_tasks = true) {
+	template <class Spinner = SleepySpinner>
+	inline void wait_for_completion(bool run_tasks = true, Spinner spinner = {}) {
 		loop_while([&] {
-			if (run_tasks)
-				pop_and_run_task();
+			if (run_tasks) {
+				try_run_task();
+			}
 			return finished_task_count < started_task_count;
-		});
+		}, spinner);
 	}
 
 	inline static void default_worker_proc(ThreadPool *pool) {
@@ -454,17 +630,19 @@ struct ThreadPool {
 
 		while (1) {
 			Optional<ThreadPool::Task> task;
-			loop_while([&] {
-				if (pool->stopping) {
-					return false;
+			pool->cv.section([&] (auto sleeper) {
+				while (1) {
+					if (pool->stopping) {
+						break;
+					}
+					if (task = pool->tasks.pop()) {
+						assert(task.value_unchecked().fn);
+						assert(task.value_unchecked().pool);
+						break;
+					} else {
+						sleeper.sleep();
+					}
 				}
-				if (auto popped = pool->tasks.pop()) {
-					task = popped.value_unchecked();
-					assert(task.value_unchecked().fn);
-					assert(task.value_unchecked().pool);
-					return false;
-				}
-				return true;
 			});
 
 			if (task) {
@@ -478,71 +656,33 @@ struct ThreadPool {
 
 #if TL_DEBUG
 	~ThreadPool() {
-		assert(stopping, "ThreadPool was not properly deinitted. Call `deinit_thread_pool`.");
+		assert(stopping, "ThreadPool was not properly deinitted. Call `deinit` on the thread pool.");
 	}
 #endif
+
+private:
+	Allocator allocator = current_allocator;
+	List<Thread *> threads;
+
+	SyncPoint start_sync_point;
+	u32 volatile stopped_thread_count = 0;
+	bool volatile stopping = false;
+	Queue<Task> tasks;
+
+	u32 volatile started_task_count = 0;
+	u32 volatile finished_task_count = 0;
+
+	ConditionVariable cv;
+
 };
-
-struct InitThreadPoolParams {
-	void (*worker_initter)() = [](){};
-	void (*worker_proc)(ThreadPool *pool) = ThreadPool::default_worker_proc;
-};
-
-inline bool init_thread_pool(ThreadPool *pool, u32 thread_count, InitThreadPoolParams params = {}) {
-	pool->start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
-	pool->stopped_thread_count = 0;
-	pool->stopping = false;
-	pool->allocator =
-	pool->threads.allocator =
-	pool->tasks.use_unprotected().allocator =
-	current_allocator;
-	if (thread_count) {
-		pool->threads.reserve(thread_count);
-
-		struct StartInfo {
-			ThreadPool *pool;
-			void (*init)();
-			void (*proc)(ThreadPool *pool);
-		};
-		StartInfo info;
-		info.pool = pool;
-		info.init = params.worker_initter;
-		info.proc = params.worker_proc;
-
-		auto start_proc = [](Thread *thread) {
-			StartInfo *info = (StartInfo *)thread->param;
-			(*info->init)();
-			(*info->proc)(info->pool);
-		};
-
-		for (u32 i = 0; i < thread_count; ++i) {
-			auto thread = create_thread(+start_proc, (void *)&info);
-			if (!valid(thread)) {
-				pool->stopping = true;
-				for (auto t : pool->threads) {
-					free(t);
-				}
-				pool->threads.clear();
-				return false;
-			}
-			pool->threads.add(thread);
-		}
-
-		sync(pool->start_sync_point);
-
-	} else {
-		pool->threads.clear();
-	}
-
-	return true;
-}
-inline void deinit_thread_pool(ThreadPool *pool, bool wait_for_threads = true) {
-	pool->stopping = true;
-	if (wait_for_threads) {
-		pool->wait_for_completion(false);
-	}
-	pool->threads.clear();
-}
 
 } // namespace tl
 #pragma warning(pop)
+
+#ifdef TL_IMPL
+
+namespace tl {
+
+}
+
+#endif

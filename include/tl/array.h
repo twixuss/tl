@@ -94,4 +94,13 @@ struct Array3 {
 	T data[size_z][size_y][size_x];
 };
 
+template <class T, umm size>
+auto dot(Array<T, size> const &a, Array<T, size> const &b) {
+	T result = 0;
+	for (umm i = 0; i < size; ++i) {
+		result += a.data[i] * b.data[i];
+	}
+	return result;
+}
+
 }
