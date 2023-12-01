@@ -199,6 +199,12 @@ List<Token> lex(Span<utf8> json) {
 	List<Token> result;
 	auto c = json.begin();
 	while (c != json.end()) {
+		while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r') {
+			++c;
+			if (c == json.end()) {
+				goto end;
+			}
+		}
 		switch (*c) {
 			case '{':
 			case '}':
@@ -267,6 +273,7 @@ List<Token> lex(Span<utf8> json) {
 
 		invalid_code_path();
 	}
+end:
 	return result;
 }
 
@@ -291,6 +298,10 @@ Object parse(Token *&t) {
 				} else {
 					assert(t->type == ',');
 					++t;
+					// Allow trailing comma ;)
+					if (t->type == '}') {
+						break;
+					}
 				}
 			}
 		}
