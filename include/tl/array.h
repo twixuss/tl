@@ -64,12 +64,20 @@ struct Array2 {
 		bounds_check(&data[y][x] < end());
 		return data[y][x];
 	}
+	template <class Scalar>
+	constexpr T& at(v2<Scalar> v) {
+		return at(v.x, v.y);
+	}
+	template <class Scalar>
+	constexpr T& operator[](v2<Scalar> v) { return at(v); }
 
 	constexpr T *begin() { return (T *)data; }
 	constexpr T *end() { return (T *)data + size_x * size_y; }
 
 	T data[size_y][size_x];
 };
+
+// Is there actually no way to have an Array2 that takes vector size of any type? Sadge.
 
 template <class T, umm _size_x, umm _size_y, umm _size_z>
 struct Array3 {

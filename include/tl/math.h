@@ -549,13 +549,10 @@ CEIL(v3s, v3f)
 CEIL(v4s, v4f)
 #undef CEIL
 
-forceinline f32 round(f32 v) { return ::roundf(v); }
 forceinline v2f round(v2f v) { return {round(v.x), round(v.y)}; }
 forceinline v3f round(v3f v) { return {round(v.x), round(v.y), round(v.z)}; }
 forceinline v4f round(v4f v) { return {round(v.x), round(v.y), round(v.z), round(v.w)}; }
 
-forceinline s32 round_to_int(f32 v) { return (s32)lroundf(v); }
-forceinline s64 round_to_int(f64 v) { return llround(v); }
 forceinline v2s round_to_int(v2f v) { return {round_to_int(v.x), round_to_int(v.y)}; }
 forceinline v3s round_to_int(v3f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z)}; }
 forceinline v4s round_to_int(v4f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z), round_to_int(v.w)}; }
@@ -606,9 +603,10 @@ forceinline s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 
 forceinline f32 sign(f32 v) { return set_sign(1.0f, v); }
-forceinline v2f sign(v2f v) { return {sign(v.x), sign(v.y)}; }
-forceinline v3f sign(v3f v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
-forceinline v4f sign(v4f v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
+
+template <class T> forceinline v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
+template <class T> forceinline v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
+template <class T> forceinline v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
 
 forceinline f32 trunc(f32 v) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
 forceinline v2f trunc(v2f v) { return {trunc(v.x), trunc(v.y)}; }
@@ -784,6 +782,44 @@ forceinline constexpr auto move_toward(T a, T b, f32 t) {
 }
 
 template <class T>
+forceinline constexpr auto move_toward_wrapped(T a, T b, f32 t, T min, T max) {
+	if (a < b) {
+		if (b - a < t)
+			return b;
+		auto dl = absolute(a - min + max - b);
+		auto dr = absolute(b - a);
+		if (dl < dr) {
+			a -= t;
+			if (a < min) {
+				a += max - min;
+			}
+		} else {
+			a += t;
+			if (a > max) {
+				a -= max - min;
+			}
+		}
+	} else {
+		if (a - b < t)
+			return b;
+		auto dl = absolute(a - b);
+		auto dr = absolute(b - min + max - a);
+		if (dl < dr) {
+			a -= t;
+			if (a < min) {
+				a += max - min;
+			}
+		} else {
+			a += t;
+			if (a > max) {
+				a -= max - min;
+			}
+		}
+	}
+	return a;
+}
+
+template <class T>
 forceinline constexpr auto moveAway(T a, T b, f32 t) {
 	return a + normalize(a - b) * t;
 }
@@ -791,6 +827,22 @@ forceinline constexpr auto moveAway(T a, T b, f32 t) {
 template <class T>
 forceinline constexpr T project(T vector, T normal) {
 	return normal * dot(normal, vector);
+}
+
+forceinline f32 signed_angle(v2f a, v2f b) {
+	return atan2(a.x*b.y - a.y*b.x, dot(a, b));
+}
+
+forceinline f32 signed_angle(v3f a, v3f b, v3f n) {
+	return atan2(dot(n, cross(a, b)), dot(a, b));
+}
+
+forceinline f32 angle(v2f a, v2f b) {
+	return abs(signed_angle(a, b));
+}
+
+forceinline f32 angle(v3f a, v3f b) {
+	return acos(dot(a, b)/sqrt(length_squared(a) * length_squared(b)));
 }
 
 forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
@@ -1019,8 +1071,8 @@ struct aabb {
 	T center() const {
 		return half(max + min);
 	}
-	template <class U>
-	aabb<T> operator*(U const &b) { return {min * b, max * b}; }
+	template <class U> aabb<T> operator*(U const &b) { return {min * b, max * b}; }
+	template <class U> aabb<T> operator/(U const &b) { return {min / b, max / b}; }
 	auto operator==(aabb const &that) const { return min == that.min && max == that.max; }
 	auto operator!=(aabb const &that) const { return min != that.min || max != that.max; }
 	template <class U>
@@ -1035,6 +1087,64 @@ struct aabb {
 	T minmax() { return {min.x, max.y}; }
 	T maxmin() { return {max.x, min.y}; }
 	T maxmax() { return {max.x, max.y}; }
+
+
+	struct Iterator {
+		aabb<T> range;
+		T value;
+
+		T operator*() const {
+			return value;
+		}
+		Iterator &operator++() {
+			increment(value);
+			return *this;
+		}
+		bool operator==(Iterator const &that) const {
+			return all(value == that.value);
+		}
+
+		template <class Scalar>
+		void increment(Scalar &value) {
+			++value;
+		}
+		template <class Scalar>
+		void increment(v2<Scalar> &value) {
+			++value.x;
+			if (value.x == range.max.x) {
+				value.x = range.min.x;
+				++value.y;
+			}
+		}
+		template <class Scalar>
+		void increment(v3<Scalar> &value) {
+			++value.x;
+			if (value.x == range.max.x) {
+				value.x = range.min.x;
+				++value.y;
+				if (value.y == range.max.y) {
+					value.y = range.min.y;
+					++value.z;
+				}
+			}
+		}
+	};
+
+	template <class Scalar>
+	static Scalar sentinel(aabb<Scalar> aabb) {
+		return aabb.max;
+	}
+	template <class Scalar>
+	static v2<Scalar> sentinel(aabb<v2<Scalar>> aabb) {
+		return {aabb.min.x, aabb.max.y};
+	}
+	template <class Scalar>
+	static v3<Scalar> sentinel(aabb<v3<Scalar>> aabb) {
+		return {aabb.min.x, aabb.min.y, aabb.max.z};
+	}
+
+	Iterator begin() { return {*this, min}; }
+	Iterator end() { return {*this, sentinel(*this)}; }
 };
 
 template <class T>
@@ -1092,16 +1202,21 @@ forceinline aabb<T> intersection(aabb<T> box, aabb<T> bounds) {
 }
 
 template <class T>
-forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
-	auto diff = max(bounds.min - box.min, T{});
+forceinline aabb<T> clamp(aabb<T> box, T bounds_min, T bounds_max) {
+	auto diff = max(bounds_min - box.min, T{});
 	box.min += diff;
 	box.max += diff;
 
-	diff = min(bounds.max - box.max, T{});
+	diff = min(bounds_max - box.max, T{});
 	box.min += diff;
 	box.max += diff;
 
 	return box;
+}
+
+template <class T>
+forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
+	return clamp(box, bounds.min, bounds.max);
 }
 
 #define for_aabb3(x, y, z, condition, box)           \
@@ -1109,70 +1224,79 @@ for (auto z = box.min.z; z condition box.max.z; ++z) \
 for (auto y = box.min.y; y condition box.max.y; ++y) \
 for (auto x = box.min.x; x condition box.max.x; ++x)
 
-#define IN_BOUNDS2(bool, v2fA, v2fB) 			       \
-	forceinline bool in_bounds(v2fA v, aabb<v2fB> b) { \
-		return 								           \
-			(v.x >= b.min.x) && 			           \
-			(v.y >= b.min.y) && 			           \
-			(v.x < b.max.x) && 				           \
-			(v.y < b.max.y); 				           \
-	}
-IN_BOUNDS2(bool, v2f, v2f)
-IN_BOUNDS2(bool, v2s, v2s)
-IN_BOUNDS2(bool, v2u, v2u)
-#undef IN_BOUNDS2
+template <class Scalar>
+forceinline bool in_bounds(Scalar a, aabb<Scalar> b) {
+	return
+		(a >= b.min) &&
+		(a < b.max);
+}
+template <class Scalar>
+forceinline bool in_bounds(v2<Scalar> a, aabb<v2<Scalar>> b) {
+	return
+		(a.x >= b.min.x) &&
+		(a.y >= b.min.y) &&
+		(a.x < b.max.x) &&
+		(a.y < b.max.y);
+}
+template <class Scalar>
+forceinline bool in_bounds(v3<Scalar> a, aabb<v3<Scalar>> b) {
+	return
+		(a.x >= b.min.x) &&
+		(a.y >= b.min.y) &&
+		(a.z >= b.min.z) &&
+		(a.x < b.max.x) &&
+		(a.y < b.max.y) &&
+		(a.z < b.max.z);
+}
+template <class Scalar>
+forceinline bool in_bounds(v4<Scalar> a, aabb<v4<Scalar>> b) {
+	return
+		(a.x >= b.min.x) &&
+		(a.y >= b.min.y) &&
+		(a.z >= b.min.z) &&
+		(a.w >= b.min.w) &&
+		(a.x < b.max.x) &&
+		(a.y < b.max.y) &&
+		(a.z < b.max.z) &&
+		(a.w < b.max.w);
+}
 
-#define IN_BOUNDS3(bool, v3fA, v3fB) 			       \
-	forceinline bool in_bounds(v3fA v, aabb<v3fB> b) { \
-		return 								           \
-			(v.x >= b.min.x) && 			           \
-			(v.y >= b.min.y) &&				           \
-			(v.z >= b.min.z) &&				           \
-			(v.x < b.max.x) &&				           \
-			(v.y < b.max.y) &&				           \
-			(v.z < b.max.z);				           \
-	}
-IN_BOUNDS3(bool, v3f, v3f)
-IN_BOUNDS3(bool, v3s, v3s)
-IN_BOUNDS3(bool, v3u, v3u)
-#undef IN_BOUNDS3
-
-#define INTERSECTS1(bool, scl)						        \
-	forceinline bool intersects(aabb<scl> a, aabb<scl> b) { \
-		return 										        \
-			(a.min < b.max) && 					            \
-			(a.max > b.min); 					            \
-	}
-INTERSECTS1(bool, s64)
-#undef INTERSECTS1
-
-#define INTERSECTS2(bool, v2f)						        \
-	forceinline bool intersects(aabb<v2f> a, aabb<v2f> b) { \
-		return 										        \
-			(a.min.x < b.max.x) && 					        \
-			(a.min.y < b.max.y) && 					        \
-			(a.max.x > b.min.x) && 					        \
-			(a.max.y > b.min.y); 					        \
-	}
-INTERSECTS2(bool, v2f)
-INTERSECTS2(bool, v2s)
-INTERSECTS2(bool, v2u)
-#undef INTERSECTS2
-
-#define INTERSECTS3(bool, v3f)						        \
-	forceinline bool intersects(aabb<v3f> a, aabb<v3f> b) { \
-		return 										        \
-			(a.min.x < b.max.x) && 					        \
-			(a.min.y < b.max.y) && 					        \
-			(a.min.z < b.max.z) && 					        \
-			(a.max.x > b.min.x) && 					        \
-			(a.max.y > b.min.y) && 					        \
-			(a.max.z > b.min.z); 					        \
-	}
-INTERSECTS3(bool, v3f)
-INTERSECTS3(bool, v3s)
-INTERSECTS3(bool, v3u)
-#undef INTERSECTS3
+template <class Scalar>
+forceinline bool intersects(aabb<Scalar> a, aabb<Scalar> b) {
+	return
+		(a.min < b.max) &&
+		(a.max > b.min);
+}
+template <class Scalar>
+forceinline bool intersects(aabb<v2<Scalar>> a, aabb<v2<Scalar>> b) {
+	return
+		(a.min.x < b.max.x) &&
+		(a.min.y < b.max.y) &&
+		(a.max.x > b.min.x) &&
+		(a.max.y > b.min.y);
+}
+template <class Scalar>
+forceinline bool intersects(aabb<v3<Scalar>> a, aabb<v3<Scalar>> b) {
+	return
+		(a.min.x < b.max.x) &&
+		(a.min.y < b.max.y) &&
+		(a.min.z < b.max.z) &&
+		(a.max.x > b.min.x) &&
+		(a.max.y > b.min.y) &&
+		(a.max.z > b.min.z);
+}
+template <class Scalar>
+forceinline bool intersects(aabb<v4<Scalar>> a, aabb<v4<Scalar>> b) {
+	return
+		(a.min.x < b.max.x) &&
+		(a.min.y < b.max.y) &&
+		(a.min.z < b.max.z) &&
+		(a.min.w < b.max.w) &&
+		(a.max.x > b.min.x) &&
+		(a.max.y > b.min.y) &&
+		(a.max.z > b.min.z) &&
+		(a.max.w > b.min.w);
+}
 
 template <class T>
 forceinline aabb<T> Union(aabb<T> const &a, aabb<T> const &b) {
@@ -1205,6 +1329,14 @@ forceinline bool has_volume(aabb<v3<Scalar>> rect) {
 	return rect.min.x < rect.max.x
 		&& rect.min.y < rect.max.y
 		&& rect.min.z < rect.max.z;
+}
+
+template <class Vector>
+forceinline aabb<Vector> floor_ceil(aabb<Vector> rect) {
+	return {
+		floor(rect.min),
+		ceil (rect.max),
+	};
 }
 
 // Axis aligned bounding box subrtacion routines
@@ -1401,17 +1533,18 @@ forceinline bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 	return u >= 0.0f && u <= dot(p21, p21) && v >= 0.0f && v <= dot(p31, p31);
 }
 #endif
+template <class Vector>
 struct RaycastHit {
 	bool hit = false;
-	v3f position = {};
-	v3f normal = {};
+	Vector position = {};
+	Vector normal = {};
 	f32 distance = {};
 	operator bool() {
 		return hit;
 	}
 };
 
-inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
+inline RaycastHit<v3f> raycast(ray<v3f> ray, triangle<v3f> tri) {
     v3f e1 = tri.b - tri.a;
     v3f e2 = tri.c - tri.a;
     // ¬ычисление вектора нормали к плоскости
@@ -1440,7 +1573,7 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
 	if (t < 0)
 		return {};
 
-	RaycastHit hit;
+	RaycastHit<v3f> hit;
 	hit.hit = true;
 	hit.distance = t;
 	hit.position = ray.origin + ray.direction* t;
@@ -1448,7 +1581,38 @@ inline RaycastHit raycast(ray<v3f> ray, triangle<v3f> tri) {
 	return hit;
 }
 
-inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
+inline RaycastHit<v2f> raycast(ray<v2f> ray, aabb<v2f> box, bool from_inside=false) {
+	v2f dirfrac = 1.0f / ray.direction;
+	v2f t1 = (box.min - ray.origin)*dirfrac;
+	v2f t2 = (box.max - ray.origin)*dirfrac;
+
+	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y));
+	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y));
+
+	if (from_inside) {
+		if (tmax < 0 || tmin > tmax) {
+			return {};
+		}
+	} else {
+		if (tmin < 0 || tmax < 0 || tmin > tmax) {
+			return {};
+		}
+	}
+
+	RaycastHit<v2f> hit = {};
+	hit.hit = true;
+	hit.position = ray.origin + ray.direction * tmin;
+	hit.distance = tmin;
+
+	       if (tmin == t1.x)   hit.normal = {-1, 0};
+	else   if (tmin == t2.x)   hit.normal = { 1, 0};
+	else   if (tmin == t1.y)   hit.normal = { 0,-1};
+	else /*if (tmin == t2.y)*/ hit.normal = { 0, 1};
+
+	return hit;
+}
+
+inline RaycastHit<v3f> raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
 	v3f dirfrac = 1.0f / ray.direction;
 	v3f t1 = (box.min - ray.origin)*dirfrac;
 	v3f t2 = (box.max - ray.origin)*dirfrac;
@@ -1466,12 +1630,12 @@ inline RaycastHit raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
 		}
 	}
 
-	RaycastHit hit = {};
+	RaycastHit<v3f> hit = {};
 	hit.hit = true;
 	hit.position = ray.origin + ray.direction * tmin;
 	hit.distance = tmin;
 
-	       if (tmin == t1.x)   hit.normal = {-1, 0, 0};
+	if (tmin == t1.x)   hit.normal = {-1, 0, 0};
 	else   if (tmin == t2.x)   hit.normal = { 1, 0, 0};
 	else   if (tmin == t1.y)   hit.normal = { 0,-1, 0};
 	else   if (tmin == t2.y)   hit.normal = { 0, 1, 0};
@@ -1989,42 +2153,6 @@ inline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
 }
-
-#define TO_STRING_V2(v2f)                               \
-inline umm append(StringBuilder &builder, v2f v) {      \
-	return append_format(builder, "({}, {})"s, v.x, v.y); \
-}
-
-TO_STRING_V2(v2b)
-TO_STRING_V2(v2f)
-TO_STRING_V2(v2u)
-TO_STRING_V2(v2s)
-
-#undef TO_STRING_V2
-
-#define TO_STRING_V3(v3f)                                       \
-inline umm append(StringBuilder &builder, v3f v) {              \
-	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z); \
-}
-
-TO_STRING_V3(v3b)
-TO_STRING_V3(v3f)
-TO_STRING_V3(v3u)
-TO_STRING_V3(v3s)
-
-#undef TO_STRING_V3
-
-#define TO_STRING_V4(v4f)                                               \
-inline umm append(StringBuilder &builder, v4f v) {                      \
-	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w); \
-}
-
-TO_STRING_V4(v4b)
-TO_STRING_V4(v4f)
-TO_STRING_V4(v4u)
-TO_STRING_V4(v4s)
-
-#undef TO_STRING_V3
 
 inline umm append(StringBuilder &builder, m4 m) {
 	return append_format(builder, "({}, {}, {}, {})", m.i, m.j, m.k, m.l);

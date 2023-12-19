@@ -226,7 +226,7 @@ struct SleepySpinner {
 		yield_smt();
 		switch_thread();
 		if (threshold == 0) {
-			Sleep(1);
+			sleep_milliseconds(1);
 		} else {
 			--threshold;
 		}
@@ -437,7 +437,7 @@ struct TL_API ConditionVariable {
 	struct Sleeper {
 		Sleeper(ConditionVariable *cv) : cv(cv) {}
 
-		void sleep();
+		void sleep(u32 timeout_milliseconds = -1);
 
 	private:
 		ConditionVariable *cv;
@@ -480,8 +480,8 @@ ConditionVariable::ConditionVariable() {
 	InitializeCriticalSection(&impl().s);
 }
 
-void ConditionVariable::Sleeper::sleep() {
-	SleepConditionVariableCS(&cv->impl().c, &cv->impl().s, INFINITE);
+void ConditionVariable::Sleeper::sleep(u32 timeout_milliseconds) {
+	SleepConditionVariableCS(&cv->impl().c, &cv->impl().s, timeout_milliseconds == -1 ? INFINITE : timeout_milliseconds);
 }
 void ConditionVariable::wake() {
 	WakeConditionVariable(&impl().c);
@@ -508,7 +508,6 @@ struct ThreadPool {
 			assert(pool);
 
 			fn(param);
-			pool->allocator.free(param);
 			atomic_increment(&pool->finished_task_count);
 		}
 	};
@@ -525,6 +524,7 @@ struct ThreadPool {
 		allocator =
 		threads.allocator =
 		tasks.allocator =
+		data_to_free_on_main_thread.allocator =
 			current_allocator;
 		if (thread_count) {
 			threads.reserve(thread_count);
@@ -569,7 +569,7 @@ struct ThreadPool {
 	inline void deinit(bool wait_for_threads = true) {
 		stopping = true;
 		if (wait_for_threads) {
-			wait_for_completion(false);
+			wait_for_completion();
 		}
 		threads.clear();
 	}
@@ -577,7 +577,7 @@ struct ThreadPool {
 	inline void push(void (*fn)(void *param), void *param) {
 		atomic_increment(&started_task_count);
 
-		cv.section([&]{
+		new_work_notifier.section([&]{
 			tasks.push({
 				.pool = this,
 				.fn = fn,
@@ -585,13 +585,17 @@ struct ThreadPool {
 			});
 		});
 
-		cv.wake();
+		new_work_notifier.wake();
 	}
 	template <class Fn, class ...Args>
 	void push(Fn &&fn, Args &&...args) {
 		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+		
 		auto fnParams = allocator.allocate_uninitialized<Tuple>();
 		new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+
+		data_to_free_on_main_thread.add(fnParams);
+
 		constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
 		push((void (*)(void *))invokerProc, (void *)fnParams);
 	}
@@ -601,27 +605,34 @@ struct ThreadPool {
 		return *this;
 	}
 
-	inline bool try_run_task() {
-		Optional<Task> task;
-		cv.section([&] {
-			task = tasks.pop();
-		});
-		if (task) {
-			task.value_unchecked().run();
-			return true;
+	inline void wait_for_completion() {
+		while (started_task_count > finished_task_count) {
+			completion_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+				sleeper.sleep(1);
+			});
 		}
-
-		return false;
+		for (auto param : data_to_free_on_main_thread) {
+			allocator.free(param);
+		}
+		data_to_free_on_main_thread.clear();
 	}
 
 	template <class Spinner = SleepySpinner>
-	inline void wait_for_completion(bool run_tasks = true, Spinner spinner = {}) {
+	inline void wait_for_completion_doing_tasks(Spinner spinner = {}) {
 		loop_while([&] {
-			if (run_tasks) {
-				try_run_task();
+			Optional<Task> task;
+			new_work_notifier.section([&] {
+				task = tasks.pop();
+			});
+			if (task) {
+				task.value_unchecked().run();
 			}
 			return finished_task_count < started_task_count;
 		}, spinner);
+		for (auto param : data_to_free_on_main_thread) {
+			allocator.free(param);
+		}
+		data_to_free_on_main_thread.clear();
 	}
 
 	inline static void default_worker_proc(ThreadPool *pool) {
@@ -630,11 +641,8 @@ struct ThreadPool {
 
 		while (1) {
 			Optional<ThreadPool::Task> task;
-			pool->cv.section([&] (auto sleeper) {
-				while (1) {
-					if (pool->stopping) {
-						break;
-					}
+			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+				while (!pool->stopping) {
 					if (task = pool->tasks.pop()) {
 						assert(task.value_unchecked().fn);
 						assert(task.value_unchecked().pool);
@@ -647,6 +655,7 @@ struct ThreadPool {
 
 			if (task) {
 				task.value_unchecked().run();
+				pool->completion_notifier.wake();
 			} else {
 				break;
 			}
@@ -666,14 +675,15 @@ private:
 
 	SyncPoint start_sync_point;
 	u32 volatile stopped_thread_count = 0;
-	bool volatile stopping = false;
+	bool volatile stopping = true;
 	Queue<Task> tasks;
+	List<void *> data_to_free_on_main_thread;
 
 	u32 volatile started_task_count = 0;
 	u32 volatile finished_task_count = 0;
 
-	ConditionVariable cv;
-
+	ConditionVariable new_work_notifier;
+	ConditionVariable completion_notifier;
 };
 
 } // namespace tl

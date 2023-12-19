@@ -210,6 +210,20 @@ struct List : Span<T, Size_> {
 		}
 	}
 
+	template <class Predicate>
+	void erase_all(Predicate predicate) requires requires(Predicate p, T v) { p(v); } {
+		auto end = data + count;
+		auto dst = data;
+		for (auto it = data; it != end; ++it) {
+			if (predicate(*it)) {
+				*dst++ = *it;
+			} else {
+				it->~T();
+				--count;
+			}
+		}
+	}
+
 	void replace(Span where, T with_what) {
 		bounds_check(
 			where.count <= count &&
@@ -410,21 +424,6 @@ List<Span<T>, Allocator, Size> split(Span<T> what, Span<T> by TL_LP) {
 	return result;
 }
 
-template <class T, class Size, class Fn>
-void split(Span<T, Size> what, T by, Fn &&callback) {
-	umm start = 0;
-	umm what_start = 0;
-
-	for (; what_start < what.count;) {
-		if (what.data[what_start] == by) {
-			callback(what.subspan(start, what_start - start));
-			start = what_start + 1;
-		}
-		++what_start;
-	}
-
-	callback(Span(what.data + start, what.end()));
-}
 template <class Allocator = Allocator, class T, class Size>
 List<Span<T>, Allocator, Size> split(Span<T, Size> what, T by TL_LP) {
 	List<Span<T>, Allocator, Size> result;
@@ -486,7 +485,7 @@ umm index_of(List<T, Allocator, Size> const &list, T const *value) {
 	return value - list.data;
 }
 
-template <class T, class Allocator, class Size> umm count_of(List<T, Allocator, Size> const &list) { return list.size(); }
+template <class T, class Allocator, class Size> umm count_of(List<T, Allocator, Size> const &list) { return list.count; }
 
 template <class T, class Allocator, class Size> T const &front(List<T, Allocator, Size> const &list) { return list.front(); }
 template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size> &list) { return list.front(); }

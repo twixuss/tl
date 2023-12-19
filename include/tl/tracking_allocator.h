@@ -86,14 +86,15 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		return result;
 	}
 	void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-
 		underlying_allocator.free(data, size, alignment, location);
 
 		if (!data)
 			return;
 
 		shared.use([&] (auto &shared) {
-			auto &old_meta = shared.allocation_metas.find(data)->value;
+			auto found = shared.allocation_metas.find(data);
+			assert(found, "Attempt to free unallocated / double free at {}", data);
+			auto &old_meta = found->value;
 			old_meta.counts->current_size -= old_meta.this_size;
 			shared.allocation_metas.erase(data);
 		});

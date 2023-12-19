@@ -95,12 +95,13 @@ inline v3f next_v3f(State &state) {
 }
 
 struct DefaultRandomizer {
-	forceinline u32 random_u32(u32 seed) {
-		seed ^= 0x55555555u;
-		seed *= random_primes_u32[0];
-		seed ^= 0x33333333u;
-		seed *= random_primes_u32[1];
-		return seed;
+	forceinline u32 random_u32(u32 x) {
+		const u32 k = 3037000507u; // next_prime(2**31.5)
+		x = x*k^k;
+		x = x*k^k;
+		x = x*k^k;
+		x = x*k^k;
+		return x;
 	}
 
 	forceinline u64 random_u64(u64 seed) {

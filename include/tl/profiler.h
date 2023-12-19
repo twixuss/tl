@@ -5,11 +5,11 @@
 #endif
 
 #if TL_ENABLE_PROFILER
-#define timed_begin(profiler, enabled, name) (enabled ? (profiler).begin(name, as_span(__FILE__), __LINE__) : void())
-#define timed_end(profiler, enabled) (enabled ? (profiler).end() : void())
-#define timed_block(profiler, enabled, name) timed_begin(profiler, enabled, name); defer{ timed_end(profiler, enabled); }
+#define timed_begin(profiler, name) (profiler).begin(name, as_span(__FILE__), __LINE__)
+#define timed_end(profiler) (profiler).end()
+#define timed_block(profiler, name) timed_begin(profiler, name); defer{ timed_end(profiler); }
 //#define timed_function() timed_block(([](utf8 const *name){scoped(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
-#define timed_function(profiler, enabled) timed_block(profiler, enabled, as_span(__FUNCSIG__))
+#define timed_function(profiler) timed_block(profiler, as_span(__FUNCTION__))
 #else
 #define timed_begin(profiler, name)
 #define timed_end(profiler)
@@ -49,6 +49,8 @@ struct TL_API Profiler {
 #endif
 	};
 
+	ArenaAllocator allocator;
+
 	List<Mark> marks;
 	SpinLock marks_lock;
 
@@ -60,9 +62,14 @@ struct TL_API Profiler {
 
 	s64 start_time;
 
-	void init();
-	void deinit();
+	bool enabled = true;
+
+	void init(ArenaAllocator allocator);
 	void reset();
+	void free();
+
+	// Returns old arena
+	ArenaAllocator switch_arena(ArenaAllocator new_arena);
 
 	void begin(Span<utf8> name, Span<utf8> file, u32 line);
 	void end();
@@ -129,6 +136,76 @@ struct Scoped<Profiler::ScopeMeasurer> {
 	}
 };
 
+struct ProfileRenderer {
+	using Nanoseconds = s64;
+	struct Event {
+		aabb<v2s64> rect;
+		Event *parent;
+		Span<utf8> name;
+		Nanoseconds begin;
+		Nanoseconds end;
+		u32 depth;
+		Nanoseconds self_duration;
+		forceinline Nanoseconds duration() const {
+			return end - begin;
+		}
+	};
+
+	struct Mark {
+		aabb<v2s64> rect;
+		Nanoseconds time;
+	};
+
+	struct ThreadDrawList {
+		u32 id = 0;
+		u32 height = 0;
+		List<Event> events;
+		List<Mark> marks;
+	};
+
+	struct EventGroup {
+		Span<utf8> name;
+		Nanoseconds total_duration;
+	};
+
+private:
+
+	List<ThreadDrawList> all_events_to_draw;
+	Nanoseconds events_begin = 0;
+	Nanoseconds events_end = 0;
+	Nanoseconds events_duration = 0;
+
+public:
+	void setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark> marks);
+	void free();
+
+	template <class Drawer>
+	void render(f64 view_scale, f64 scroll_amount, s32 button_height, Drawer drawer) {
+		for (auto &events_to_draw : all_events_to_draw) {
+			u32 max_depth = 0;
+
+			for (auto &mark : events_to_draw.marks) {
+				mark.rect.min.x = mark.time / view_scale + scroll_amount;
+				mark.rect.max.x = mark.rect.min.x + 1;
+				mark.rect.min.y = 0;
+				mark.rect.max.y = button_height * 1;
+			}
+			for (auto &event : events_to_draw.events) {
+				event.rect.min.x = event.begin / view_scale + scroll_amount;
+				event.rect.max.x = max<f64>(event.end / view_scale + scroll_amount, event.rect.min.x + 1);
+				event.rect.min.y = button_height * (event.depth + 0);
+				event.rect.max.y = button_height * (event.depth + 1);
+
+				max_depth = max(max_depth, event.depth);
+			}
+
+			events_to_draw.height = max_depth * button_height;
+
+			drawer(events_to_draw);
+		}
+	}
+};
+
 }
 
 #ifdef TL_IMPL
@@ -144,15 +221,32 @@ struct Scoped<Profiler::ScopeMeasurer> {
 
 namespace tl {
 
-void Profiler::init() {
-	marks.allocator = current_allocator;
-	recorded_time_spans.allocator = current_allocator;
+void Profiler::init(ArenaAllocator _allocator) {
+	allocator = _allocator;
+	marks.allocator = allocator;
+	recorded_time_spans.allocator = allocator;
+	thread_infos.allocator = allocator;
 	start_time = get_performance_counter();
 }
-void Profiler::deinit() {
-	free(recorded_time_spans);
+ArenaAllocator Profiler::switch_arena(ArenaAllocator new_arena) {
+	tl::free(marks);
+	tl::free(recorded_time_spans);
+	tl::free(thread_infos);
+	defer {
+		allocator = new_arena;
+	};
+	return allocator;
+}
+void Profiler::free() {
+	tl::free(marks);
+	tl::free(recorded_time_spans);
+	tl::free(thread_infos);
+	allocator.free();
 }
 void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
+	if (!enabled)
+		return;
+
 #if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto self_begin = get_performance_counter();
 #endif
@@ -176,6 +270,9 @@ void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
 #endif
 }
 void Profiler::end() {
+	if (!enabled)
+		return;
+
 	auto end_counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
@@ -201,6 +298,9 @@ void Profiler::end() {
 #endif
 }
 void Profiler::mark(Span<utf8> name, u32 color) {
+	if (!enabled)
+		return;
+
 	scoped(thread_infos_lock);
 	scoped(marks_lock);
 	auto found = thread_infos.find(get_current_thread_id());
@@ -213,13 +313,10 @@ void Profiler::mark(Span<utf8> name, u32 color) {
 #endif
 }
 void Profiler::reset() {
+	marks.clear();
 	recorded_time_spans.clear();
 	thread_infos.clear();
 	start_time = get_performance_counter();
-}
-
-Span<Profiler::TimeSpan> Profiler::get_recorded_time_spans() {
-	return recorded_time_spans;
 }
 
 List<ascii> Profiler::output_for_chrome() {
@@ -278,6 +375,124 @@ List<u8> Profiler::output_for_timed() {
 		append_bytes(builder, (u32)mark.color);
 	}
 	return (List<u8>)to_string(builder);
+}
+
+void ProfileRenderer::free() {
+	for (auto &events_to_draw : all_events_to_draw) {
+		tl::free(events_to_draw.events);
+		tl::free(events_to_draw.marks);
+	}
+	tl::free(all_events_to_draw);
+}
+
+void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark> marks) {
+	events_begin = max_value<Nanoseconds>;
+	events_end = min_value<Nanoseconds>;
+
+	ContiguousHashMap<u32, ThreadDrawList, DefaultHashTraits<u32>, TemporaryAllocator> thread_id_to_events_to_draw;
+
+	for (auto span : spans) {
+		Event e = {
+			.name = span.name,
+			.begin = (Nanoseconds)divide(multiply(span.begin, 1'000'000'000), performance_frequency),
+			.end = (Nanoseconds)divide(multiply(span.end, 1'000'000'000), performance_frequency),
+			.self_duration = (Nanoseconds)divide(multiply(span.end - span.begin, 1'000'000'000), performance_frequency),
+		};
+		auto &t = thread_id_to_events_to_draw.get_or_insert(span.thread_id);
+		t.id = span.thread_id;
+		t.events.add(e);
+		events_begin = min(events_begin, e.begin);
+		events_end = max(events_end, e.end);
+	}
+	for (auto mark : marks) {
+		Mark m = {
+			.time = (Nanoseconds)divide(multiply(mark.counter, 1'000'000'000), performance_frequency),
+		};
+		auto &t = thread_id_to_events_to_draw.get_or_insert(mark.thread_id);
+		t.id = mark.thread_id;
+		t.marks.add(m);
+		events_begin = min(events_begin, m.time);
+		events_end = max(events_end, m.time);
+	}
+
+	events_duration = events_end - events_begin;
+	
+	List<EventGroup, TemporaryAllocator> event_groups;
+
+	for (auto &[thread_id, events_to_draw] : thread_id_to_events_to_draw) {
+		quick_sort(events_to_draw.events, [](Event const &a, Event const &b) {
+			if (a.begin == b.begin) {
+				return a.duration() > b.duration();
+			}
+			return a.begin < b.begin;
+		});
+
+		List<Event *, TemporaryAllocator> parent_events;
+
+		for (auto &event : events_to_draw.events) {
+			//
+			// Insert group
+			//
+			auto found_group = find_if(event_groups, [&](auto &g) {return g.name == event.name;});
+			auto &group = *(found_group ? found_group : &event_groups.add({event.name}));
+			group.total_duration += event.duration();
+
+
+			//
+			// Calculate depth
+			//
+			event.begin -= events_begin;
+			event.end -= events_begin;
+
+			Event *parent = 0;
+
+		check_next_parent:
+			if (parent_events.count) {
+				parent = parent_events.back();
+			}
+			if (parent) {
+				if (intersects(aabb_min_max<s64>(parent->begin, parent->end), aabb_min_max<s64>(event.begin, event.end))) {
+					if (event.begin == parent->begin && event.duration() > parent->duration()) {
+						// 'parent' is actually a child (deeper in the stack), and 'event' is parent,
+						// so swap em
+						if (parent->parent) {
+							parent->parent->self_duration =
+								parent->parent->self_duration
+								+ parent->duration()
+								- event.duration();
+						}
+						event.self_duration -= parent->duration();
+
+						event.parent = parent->parent;
+						event.depth  = parent->depth;
+						parent->parent = &event;
+						parent->depth += 1;
+						parent_events.back() = &event;
+						parent_events.add(parent);
+					} else {
+						event.parent = parent;
+						event.depth = parent->depth + 1;
+						parent_events.add(&event);
+						parent->self_duration -= event.duration();
+					}
+					continue;
+				} else {
+					parent_events.pop();
+					parent = 0;
+					goto check_next_parent;
+				}
+			} else {
+				parent_events.add(&event);
+			}
+		}
+
+		for (auto &mark : events_to_draw.marks) {
+			mark.time -= events_begin;
+		}
+	}
+
+	all_events_to_draw = map(thread_id_to_events_to_draw, [](auto kv) { return kv.value; });
+	quick_sort(all_events_to_draw, [](ThreadDrawList t) { return t.id; });
 }
 
 }

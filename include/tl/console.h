@@ -43,7 +43,9 @@ struct Printer {
 
 	template <class Fmt, class ...T>
 	inline umm writeln(Fmt fmt, T const &...args) {
-		return write(fmt, args...) + write('\n');
+		auto a = write(fmt, args...);
+		auto b = write('\n');
+		return a + b;
 	}
 };
 

@@ -46,21 +46,28 @@ s32 tl_main(Span<Span<utf8>> args) {
 		Span<char> name;
 		bool is_bitwise;
 		u32 mask;
+		bool is_comparison;
 	};
 
 	BinaryOperation binary_operations[] {
-		{"+"s, "add"s,   false, M_UINT|M_SINT|M_FLOAT},
-		{"-"s, "sub"s,   false, M_UINT|M_SINT|M_FLOAT},
-		{"*"s, "mul"s,   false, M_FLOAT},
-		{"*"s, "mullo"s, false, M_UINT|M_SINT},
-		{"/"s, "div"s,   false, M_UINT|M_SINT|M_FLOAT},
-		//{"%"s, "mod"s,   false, M_UINT|M_SINT},
-		{"^"s, "xor"s,   true,  M_UINT|M_SINT},
-		{"&"s, "and"s,   true,  M_UINT|M_SINT},
-		{"|"s, "or"s ,   true,  M_UINT|M_SINT},
-		{"<<"s, "sllv"s, false, M_UINT|M_SINT},
-		{">>"s, "srlv"s, false, M_UINT},
-		{">>"s, "srav"s, false, M_SINT},
+		{"+"s, "add"s,   false, M_UINT|M_SINT|M_FLOAT, false},
+		{"-"s, "sub"s,   false, M_UINT|M_SINT|M_FLOAT, false},
+		{"*"s, "mul"s,   false, M_FLOAT, false},
+		{"*"s, "mullo"s, false, M_UINT|M_SINT, false},
+		{"/"s, "div"s,   false, M_UINT|M_SINT|M_FLOAT, false},
+		//{"%"s, "mod"s,   false, M_UINT|M_SINT, false},
+		{"^"s, "xor"s,   true,  M_UINT|M_SINT, false},
+		{"&"s, "and"s,   true,  M_UINT|M_SINT, false},
+		{"|"s, "or"s ,   true,  M_UINT|M_SINT, false},
+		{"<<"s, "sllv"s, false, M_UINT|M_SINT, false},
+		{">>"s, "srlv"s, false, M_UINT, false},
+		{">>"s, "srav"s, false, M_SINT, false},
+		{"<"s, "cmplt"s, false, M_FLOAT, true},
+		{">"s, "cmpgt"s, false, M_FLOAT, true},
+		{"<="s, "cmple"s, false, M_FLOAT, true},
+		{">="s, "cmpge"s, false, M_FLOAT, true},
+		{"=="s, "cmpeq"s, false, M_FLOAT, true},
+		{"!="s, "cmpneq"s, false, M_FLOAT, true},
 	};
 
 	StringBuilder builder;
@@ -210,8 +217,10 @@ namespace simd_typed {
 							}
 							append(builder, "return r; }\n");
 
-							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, type, op.op);
-							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, scalar.name, op.op);
+							if (!op.is_comparison) {
+								append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, type, op.op);
+								append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, scalar.name, op.op);
+							}
 
 							continue;
 						}
@@ -320,8 +329,10 @@ namespace simd_typed {
 								append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return a{}{}(b); }}\n", type, op.op, type, scalar.name, op.op, constructor);
 							}
 							append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return {}(a){}b; }}\n", type, op.op, scalar.name, type, constructor, op.op);
-							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, type, op.op);
-							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, scalar.name, op.op);
+							if (!op.is_comparison) {
+								append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, type, op.op);
+								append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", type, op.op, type, scalar.name, op.op);
+							}
 						}
 					}
 				}
@@ -597,7 +608,7 @@ namespace simd_typed {
 
 	builder.clear();
 	append(builder, R"(#pragma once
-#include "simd.h"
+#include "../simd_typed.h"
 #include "../vector.h"
 
 namespace tl {
@@ -666,23 +677,31 @@ namespace simd_vector {
 							append_vec_op(vecx_name, vec_name);
 							append_vec_op(vec_name, vecx_name);
 
+							auto append_vec_scalar_op = [&] (auto vec, auto scl) {
+								append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return {{", vec, op.op, vec, scl);
+								for (u32 i = 0; i < dim; ++i) {
+									if (i != 0)
+										append(builder, ", ");
+									append_format(builder, "a.{}{}b", axes[i], op.op);
+								}
+								append(builder, "};}\n");
 
+								append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return {{", vec, op.op, scl, vec);
+								for (u32 i = 0; i < dim; ++i) {
+									if (i != 0)
+										append(builder, ", ");
+									append_format(builder, "a{}b.{}", op.op, axes[i]);
+								}
+								append(builder, "};}\n");
+							};
 
-							append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return {{", vecx_name, op.op, vecx_name, scalar.name);
-							for (u32 i = 0; i < dim; ++i) {
-								if (i != 0)
-									append(builder, ", ");
-								append_format(builder, "a.{}{}b", axes[i], op.op);
-							}
-							append(builder, "};}\n");
+							append_vec_scalar_op(vecx_name, scalar.name);
+							append_vec_scalar_op(vecx_name, sclx_name);
 
-							append_format(builder, "	forceinline friend {} operator{}({} a, {} b) {{ return {{", vecx_name, op.op, scalar.name, vecx_name);
-							for (u32 i = 0; i < dim; ++i) {
-								if (i != 0)
-									append(builder, ", ");
-								append_format(builder, "a{}b.{}", op.op, axes[i]);
-							}
-							append(builder, "};}\n");
+							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", vecx_name, op.op, vecx_name, vec_name, op.op);
+							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", vecx_name, op.op, vecx_name, vecx_name, op.op);
+							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", vecx_name, op.op, vecx_name, scalar.name, op.op);
+							append_format(builder, "	forceinline friend {} &operator{}=({} &a, {} b) {{ return a=a{}b; }}\n", vecx_name, op.op, vecx_name, sclx_name, op.op);
 						}
 					}
 
@@ -734,10 +753,40 @@ namespace simd_vector {
 
 						auto scalar_constructor = format("{}x{}", scalar.name, n_scalars_in_register);
 						scalar_constructor[0] = to_upper(scalar_constructor[0]);
+						scalar_constructor = tformat("simd_typed::{}", scalar_constructor);
 
+						// From vector
 						append_format(builder, "forceinline {} {}({} a) {{ return {{", vecx_name, constructor, vec_name);
 						for (u32 i = 0; i < dim; ++i) {
-							append_format(builder, "simd_typed::{}(a.{}), ", scalar_constructor, axes[i]);
+							append_format(builder, "{}(a.{}), ", scalar_constructor, axes[i]);
+						}
+						append(builder, "}; }\n");
+
+						// From N scalars
+						append_format(builder, "forceinline {} {}(", vecx_name, constructor);
+						for (u32 i = 0; i < dim; ++i) {
+							if (i) {
+								append(builder, ", ");
+							}
+							append_format(builder, "{} {}", scalar.name, axes[i]);
+						}
+						append(builder, ") { return {");
+						for (u32 i = 0; i < dim; ++i) {
+							append_format(builder, "{}({}),", scalar_constructor, axes[i]);
+						}
+						append(builder, "}; }\n");
+
+						// From one scalar
+						append_format(builder, "forceinline {} {}({} v) {{ return {{", vecx_name, constructor, scalar.name);
+						for (u32 i = 0; i < dim; ++i) {
+							append_format(builder, "{}(v),", scalar_constructor);
+						}
+						append(builder, "}; }\n");
+
+						// From one X scalar
+						append_format(builder, "forceinline {} {}(simd_typed::{}x{} v) {{ return {{", vecx_name, constructor, scalar.name, n_scalars_in_register);
+						for (u32 i = 0; i < dim; ++i) {
+							append(builder, "v,");
 						}
 						append(builder, "}; }\n");
 					}
@@ -805,6 +854,15 @@ using v3fx8 = v3f32x8;
 using v4sx8 = v4s32x8;
 using v4ux8 = v4u32x8;
 using v4fx8 = v4f32x8;
+auto V2sx8(auto ...args) requires requires { V2s32x8(args...); } { return V2s32x8(args...); }
+auto V2ux8(auto ...args) requires requires { V2u32x8(args...); } { return V2u32x8(args...); }
+auto V2fx8(auto ...args) requires requires { V2f32x8(args...); } { return V2f32x8(args...); }
+auto V3sx8(auto ...args) requires requires { V3s32x8(args...); } { return V3s32x8(args...); }
+auto V3ux8(auto ...args) requires requires { V3u32x8(args...); } { return V3u32x8(args...); }
+auto V3fx8(auto ...args) requires requires { V3f32x8(args...); } { return V3f32x8(args...); }
+auto V4sx8(auto ...args) requires requires { V4s32x8(args...); } { return V4s32x8(args...); }
+auto V4ux8(auto ...args) requires requires { V4u32x8(args...); } { return V4u32x8(args...); }
+auto V4fx8(auto ...args) requires requires { V4f32x8(args...); } { return V4f32x8(args...); }
 }
 }
 )");

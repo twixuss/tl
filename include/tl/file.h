@@ -5,6 +5,11 @@
 #include "list_of_lists.h"
 #include "logger.h"
 
+// Including Shlwapi.h might cause bullshit errors inside it. Until I figure this shit out can just disable dialogs.
+#ifndef TL_FILE_INCLUDE_DIALOG
+#define TL_FILE_INCLUDE_DIALOG 1
+#endif
+
 namespace tl {
 
 #if OS_WINDOWS
@@ -256,6 +261,7 @@ inline void truncate(File file, u64 size) {
 	truncate_to_cursor(file);
 }
 
+#if TL_FILE_INCLUDE_DIALOG
 using FileDialogFlags = u32;
 enum : FileDialogFlags {
 	FileDialog_file      = 0x0,
@@ -264,6 +270,7 @@ enum : FileDialogFlags {
 };
 
 TL_API Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions = {});
+#endif
 
 TL_API List<utf8> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
@@ -476,6 +483,8 @@ inline void visit_files(Span<utf8> directory, T &&process_file) requires require
 
 #ifdef TL_IMPL
 
+#if TL_FILE_INCLUDE_DIALOG
+
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
 #pragma warning(push, 0)
@@ -489,6 +498,8 @@ inline void visit_files(Span<utf8> directory, T &&process_file) requires require
 #pragma comment(lib, "Ole32.lib")
 
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+#endif
 
 namespace tl {
 
@@ -765,6 +776,7 @@ bool create_directory(utf16 const *path) {
 	return (bool)CreateDirectoryW((wchar *)path, 0);
 }
 
+#if TL_FILE_INCLUDE_DIALOG
 class CDialogEventHandler : public IFileDialogEvents, public IFileDialogControlEvents {
 public:
 	// IUnknown methods
@@ -914,6 +926,7 @@ Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<ut
 	result.enable_reading();
 	return result;
 }
+#endif
 
 List<utf8> get_current_directory() {
 	List<utf16> temp;

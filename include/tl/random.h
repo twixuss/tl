@@ -174,4 +174,18 @@ template <class State> s64 next_s64(State &state) { return (tl::s64)next_u64(sta
 template <class State> f32 next_f32(State &state) { return normalize_range_f32<f32>(next_u32(state)); }
 template <class State> f64 next_f64(State &state) { return normalize_range_f64<f64>(next_u64(state)); }
 
+template <class T, class Size, class State>
+void shuffle(Span<T, Size> span, State &state) {
+	if (span.count < 2)
+		return;
+	for (Size i = 0; i < span.count - 1; ++i) {
+		Swap(span[i], span[i + next(state) % (span.count - i)]);
+	}
+}
+
+template <class T, umm count, class State>
+void shuffle(T (&array)[count], State &state) {
+	shuffle(array_as_span(array), state);
+}
+
 }

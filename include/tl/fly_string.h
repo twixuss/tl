@@ -30,6 +30,8 @@ struct FlyString {
     }
 
     inline umm count() const {
+        if (!data)
+            return 0;
         return as_span(data).count;
     }
 

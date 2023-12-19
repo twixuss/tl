@@ -28,12 +28,10 @@ struct DilateParams {
 };
 
 template <class Pixel>
-inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u32 stride, bool keep_alpha) {
-    auto radius = max(size.x, size.y) * 1.5f;
+inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u32 source_stride, u32 destination_stride, bool keep_alpha) {
+    scoped(temporary_allocator_and_checkpoint);
 
-    if (stride == 0) {
-        stride = size.x;
-    }
+    auto radius = max(size.x, size.y) * 1.5f;
 
     auto should_be_dilated = [](Pixel p) {
         if constexpr (std::is_same_v<Pixel, u32>) {
@@ -60,8 +58,6 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
     }();
 
     List<v2u> offsets;
-    defer { free(offsets); };
-
     offsets.reserve(size.x*size.y);
 
     for (u32 iy = 0; iy < size.y; ++iy) {
@@ -77,7 +73,7 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
     for (u32 iy = 0; iy < size.y; ++iy) {
         for (u32 ix = 0; ix < size.x; ++ix) {
 
-            Pixel p = source_pixels[iy*stride + ix];
+            Pixel p = source_pixels[iy*source_stride + ix];
 
             if (should_be_dilated(p)) {
                 for (auto offset : offsets) {
@@ -87,7 +83,7 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                     if (jx >= (u32)size.x) continue;
                     if (jy >= (u32)size.y) continue;
 
-                    auto t = source_pixels[jy*stride + jx];
+                    auto t = source_pixels[jy*source_stride + jx];
                     if (!should_be_dilated(t)) {
                         p.xyz = t.xyz;
                         if (!keep_alpha) {
@@ -102,14 +98,21 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                 }
             }
 
-            destination_pixels[iy*stride + ix] = p;
+            destination_pixels[iy*destination_stride + ix] = p;
         }
     }
 }
 
 template <class Pixel>
 inline void dilate(Pixel *pixels, v2u size, u32 stride, bool keep_alpha) {
-    return dilate(pixels, pixels, size, stride, keep_alpha);
+    scoped(temporary_allocator_and_checkpoint);
+    auto copy = temporary_allocator.allocate<Pixel>(size.y*size.x);
+
+    for (u32 y = 0; y < size.y; ++y) {
+        memcpy(copy + y*size.x, pixels + y*stride, sizeof(Pixel)*size.x);
+    }
+
+    return dilate(copy, pixels, size, size.x, stride, keep_alpha);
 }
 
 }

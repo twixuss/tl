@@ -166,7 +166,7 @@ struct BucketHashMap : Traits {
 
 	[[no_unique_address]] Allocator allocator = current_allocator;
 	Span<Bucket> buckets;
-	umm total_value_count = 0;
+	umm count = 0;
 	
 	Value &get_or_insert(Key const &key TL_LP) {
 		if (!buckets.count) {
@@ -185,11 +185,11 @@ struct BucketHashMap : Traits {
 		}
 
 		// NOTE: Optimizer is able to get rid of this division.
-		if (total_value_count >= buckets.count * rehash_percentage / 100) {
+		if (count >= buckets.count * rehash_percentage / 100) {
 			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
-		++total_value_count;
+		++count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.kv.key = key;
@@ -222,11 +222,11 @@ struct BucketHashMap : Traits {
 			}
 		}
 
-		if (total_value_count == buckets.count) {
+		if (count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
-		++total_value_count;
+		++count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.kv.key = key;
@@ -252,11 +252,11 @@ struct BucketHashMap : Traits {
 			}
 		}
 
-		if (total_value_count == buckets.count) {
+		if (count == buckets.count) {
 			rehash(buckets.count * 2 TL_LA);
 			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
 		}
-		++total_value_count;
+		++count;
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.kv.key = key;
@@ -724,7 +724,7 @@ void for_each(Map map, Fn &&fn) requires requires (Map &&map, Fn &&fn) { fn(map.
 }
 
 template <class Allocator = Allocator, CContiguousHashMap Map, class Fn>
-auto map(CContiguousHashMap auto map, auto &&fn TL_LP) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
+auto map(Map map, Fn &&fn TL_LP) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
 	using U = decltype(fn(*(typename decltype(map)::KeyValue *)0));
 	List<U, Allocator> result;
 	result.reserve(map.count TL_LA);

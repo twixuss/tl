@@ -636,6 +636,24 @@ union f32x4 {
 	forceinline friend f32x4 operator/(f32 a, f32x4 b) { return F32x4(a)/b; }
 	forceinline friend f32x4 &operator/=(f32x4 &a, f32x4 b) { return a=a/b; }
 	forceinline friend f32x4 &operator/=(f32x4 &a, f32 b) { return a=a/b; }
+	forceinline friend f32x4 operator<(f32x4 a, f32x4 b) { return {_mm_cmplt_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator<(f32x4 a, f32 b) { return a<F32x4(b); }
+	forceinline friend f32x4 operator<(f32 a, f32x4 b) { return F32x4(a)<b; }
+	forceinline friend f32x4 operator>(f32x4 a, f32x4 b) { return {_mm_cmpgt_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator>(f32x4 a, f32 b) { return a>F32x4(b); }
+	forceinline friend f32x4 operator>(f32 a, f32x4 b) { return F32x4(a)>b; }
+	forceinline friend f32x4 operator<=(f32x4 a, f32x4 b) { return {_mm_cmple_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator<=(f32x4 a, f32 b) { return a<=F32x4(b); }
+	forceinline friend f32x4 operator<=(f32 a, f32x4 b) { return F32x4(a)<=b; }
+	forceinline friend f32x4 operator>=(f32x4 a, f32x4 b) { return {_mm_cmpge_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator>=(f32x4 a, f32 b) { return a>=F32x4(b); }
+	forceinline friend f32x4 operator>=(f32 a, f32x4 b) { return F32x4(a)>=b; }
+	forceinline friend f32x4 operator==(f32x4 a, f32x4 b) { return {_mm_cmpeq_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator==(f32x4 a, f32 b) { return a==F32x4(b); }
+	forceinline friend f32x4 operator==(f32 a, f32x4 b) { return F32x4(a)==b; }
+	forceinline friend f32x4 operator!=(f32x4 a, f32x4 b) { return {_mm_cmpneq_ps(a.m, b.m)}; }
+	forceinline friend f32x4 operator!=(f32x4 a, f32 b) { return a!=F32x4(b); }
+	forceinline friend f32x4 operator!=(f32 a, f32x4 b) { return F32x4(a)!=b; }
 	forceinline operator u32x4() const;
 	forceinline operator u64x4() const;
 	forceinline operator s32x4() const;
@@ -681,6 +699,24 @@ union f64x2 {
 	forceinline friend f64x2 operator/(f64 a, f64x2 b) { return F64x2(a)/b; }
 	forceinline friend f64x2 &operator/=(f64x2 &a, f64x2 b) { return a=a/b; }
 	forceinline friend f64x2 &operator/=(f64x2 &a, f64 b) { return a=a/b; }
+	forceinline friend f64x2 operator<(f64x2 a, f64x2 b) { return {_mm_cmplt_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator<(f64x2 a, f64 b) { return a<F64x2(b); }
+	forceinline friend f64x2 operator<(f64 a, f64x2 b) { return F64x2(a)<b; }
+	forceinline friend f64x2 operator>(f64x2 a, f64x2 b) { return {_mm_cmpgt_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator>(f64x2 a, f64 b) { return a>F64x2(b); }
+	forceinline friend f64x2 operator>(f64 a, f64x2 b) { return F64x2(a)>b; }
+	forceinline friend f64x2 operator<=(f64x2 a, f64x2 b) { return {_mm_cmple_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator<=(f64x2 a, f64 b) { return a<=F64x2(b); }
+	forceinline friend f64x2 operator<=(f64 a, f64x2 b) { return F64x2(a)<=b; }
+	forceinline friend f64x2 operator>=(f64x2 a, f64x2 b) { return {_mm_cmpge_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator>=(f64x2 a, f64 b) { return a>=F64x2(b); }
+	forceinline friend f64x2 operator>=(f64 a, f64x2 b) { return F64x2(a)>=b; }
+	forceinline friend f64x2 operator==(f64x2 a, f64x2 b) { return {_mm_cmpeq_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator==(f64x2 a, f64 b) { return a==F64x2(b); }
+	forceinline friend f64x2 operator==(f64 a, f64x2 b) { return F64x2(a)==b; }
+	forceinline friend f64x2 operator!=(f64x2 a, f64x2 b) { return {_mm_cmpneq_pd(a.m, b.m)}; }
+	forceinline friend f64x2 operator!=(f64x2 a, f64 b) { return a!=F64x2(b); }
+	forceinline friend f64x2 operator!=(f64 a, f64x2 b) { return F64x2(a)!=b; }
 	forceinline operator u64x2() const;
 	forceinline operator s64x2() const;
 };
@@ -1672,6 +1708,48 @@ union f32x8 {
 	forceinline friend f32x8 operator/(f32 a, f32x8 b) { return F32x8(a)/b; }
 	forceinline friend f32x8 &operator/=(f32x8 &a, f32x8 b) { return a=a/b; }
 	forceinline friend f32x8 &operator/=(f32x8 &a, f32 b) { return a=a/b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator<(f32x8 a, f32x8 b) { return {_mm256_cmplt_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator<(f32x8 a, f32x8 b) {a.x4[0] <= b.x4[0]; a.x4[1] <= b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator<(f32x8 a, f32 b) { return a<F32x8(b); }
+	forceinline friend f32x8 operator<(f32 a, f32x8 b) { return F32x8(a)<b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator>(f32x8 a, f32x8 b) { return {_mm256_cmpgt_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator>(f32x8 a, f32x8 b) {a.x4[0] >= b.x4[0]; a.x4[1] >= b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator>(f32x8 a, f32 b) { return a>F32x8(b); }
+	forceinline friend f32x8 operator>(f32 a, f32x8 b) { return F32x8(a)>b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator<=(f32x8 a, f32x8 b) { return {_mm256_cmple_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator<=(f32x8 a, f32x8 b) {a.x4[0] <== b.x4[0]; a.x4[1] <== b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator<=(f32x8 a, f32 b) { return a<=F32x8(b); }
+	forceinline friend f32x8 operator<=(f32 a, f32x8 b) { return F32x8(a)<=b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator>=(f32x8 a, f32x8 b) { return {_mm256_cmpge_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator>=(f32x8 a, f32x8 b) {a.x4[0] >== b.x4[0]; a.x4[1] >== b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator>=(f32x8 a, f32 b) { return a>=F32x8(b); }
+	forceinline friend f32x8 operator>=(f32 a, f32x8 b) { return F32x8(a)>=b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator==(f32x8 a, f32x8 b) { return {_mm256_cmpeq_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator==(f32x8 a, f32x8 b) {a.x4[0] === b.x4[0]; a.x4[1] === b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator==(f32x8 a, f32 b) { return a==F32x8(b); }
+	forceinline friend f32x8 operator==(f32 a, f32x8 b) { return F32x8(a)==b; }
+#if ARCH_AVX
+	forceinline friend f32x8 operator!=(f32x8 a, f32x8 b) { return {_mm256_cmpneq_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x8 operator!=(f32x8 a, f32x8 b) {a.x4[0] !== b.x4[0]; a.x4[1] !== b.x4[1]; return a; }
+#endif
+	forceinline friend f32x8 operator!=(f32x8 a, f32 b) { return a!=F32x8(b); }
+	forceinline friend f32x8 operator!=(f32 a, f32x8 b) { return F32x8(a)!=b; }
 	forceinline operator u16x8() const;
 	forceinline operator u32x8() const;
 	forceinline operator u64x8() const;
@@ -1743,6 +1821,48 @@ union f64x4 {
 	forceinline friend f64x4 operator/(f64 a, f64x4 b) { return F64x4(a)/b; }
 	forceinline friend f64x4 &operator/=(f64x4 &a, f64x4 b) { return a=a/b; }
 	forceinline friend f64x4 &operator/=(f64x4 &a, f64 b) { return a=a/b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator<(f64x4 a, f64x4 b) { return {_mm256_cmplt_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator<(f64x4 a, f64x4 b) {a.x2[0] <= b.x2[0]; a.x2[1] <= b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator<(f64x4 a, f64 b) { return a<F64x4(b); }
+	forceinline friend f64x4 operator<(f64 a, f64x4 b) { return F64x4(a)<b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator>(f64x4 a, f64x4 b) { return {_mm256_cmpgt_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator>(f64x4 a, f64x4 b) {a.x2[0] >= b.x2[0]; a.x2[1] >= b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator>(f64x4 a, f64 b) { return a>F64x4(b); }
+	forceinline friend f64x4 operator>(f64 a, f64x4 b) { return F64x4(a)>b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator<=(f64x4 a, f64x4 b) { return {_mm256_cmple_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator<=(f64x4 a, f64x4 b) {a.x2[0] <== b.x2[0]; a.x2[1] <== b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator<=(f64x4 a, f64 b) { return a<=F64x4(b); }
+	forceinline friend f64x4 operator<=(f64 a, f64x4 b) { return F64x4(a)<=b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator>=(f64x4 a, f64x4 b) { return {_mm256_cmpge_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator>=(f64x4 a, f64x4 b) {a.x2[0] >== b.x2[0]; a.x2[1] >== b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator>=(f64x4 a, f64 b) { return a>=F64x4(b); }
+	forceinline friend f64x4 operator>=(f64 a, f64x4 b) { return F64x4(a)>=b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator==(f64x4 a, f64x4 b) { return {_mm256_cmpeq_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator==(f64x4 a, f64x4 b) {a.x2[0] === b.x2[0]; a.x2[1] === b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator==(f64x4 a, f64 b) { return a==F64x4(b); }
+	forceinline friend f64x4 operator==(f64 a, f64x4 b) { return F64x4(a)==b; }
+#if ARCH_AVX
+	forceinline friend f64x4 operator!=(f64x4 a, f64x4 b) { return {_mm256_cmpneq_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x4 operator!=(f64x4 a, f64x4 b) {a.x2[0] !== b.x2[0]; a.x2[1] !== b.x2[1]; return a; }
+#endif
+	forceinline friend f64x4 operator!=(f64x4 a, f64 b) { return a!=F64x4(b); }
+	forceinline friend f64x4 operator!=(f64 a, f64x4 b) { return F64x4(a)!=b; }
 	forceinline operator u32x4() const;
 	forceinline operator u64x4() const;
 	forceinline operator s32x4() const;
@@ -2743,6 +2863,48 @@ union f32x16 {
 	forceinline friend f32x16 operator/(f32 a, f32x16 b) { return F32x16(a)/b; }
 	forceinline friend f32x16 &operator/=(f32x16 &a, f32x16 b) { return a=a/b; }
 	forceinline friend f32x16 &operator/=(f32x16 &a, f32 b) { return a=a/b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator<(f32x16 a, f32x16 b) { return {_mm512_cmplt_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator<(f32x16 a, f32x16 b) {a.x8[0] <= b.x8[0]; a.x8[1] <= b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator<(f32x16 a, f32 b) { return a<F32x16(b); }
+	forceinline friend f32x16 operator<(f32 a, f32x16 b) { return F32x16(a)<b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator>(f32x16 a, f32x16 b) { return {_mm512_cmpgt_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator>(f32x16 a, f32x16 b) {a.x8[0] >= b.x8[0]; a.x8[1] >= b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator>(f32x16 a, f32 b) { return a>F32x16(b); }
+	forceinline friend f32x16 operator>(f32 a, f32x16 b) { return F32x16(a)>b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator<=(f32x16 a, f32x16 b) { return {_mm512_cmple_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator<=(f32x16 a, f32x16 b) {a.x8[0] <== b.x8[0]; a.x8[1] <== b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator<=(f32x16 a, f32 b) { return a<=F32x16(b); }
+	forceinline friend f32x16 operator<=(f32 a, f32x16 b) { return F32x16(a)<=b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator>=(f32x16 a, f32x16 b) { return {_mm512_cmpge_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator>=(f32x16 a, f32x16 b) {a.x8[0] >== b.x8[0]; a.x8[1] >== b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator>=(f32x16 a, f32 b) { return a>=F32x16(b); }
+	forceinline friend f32x16 operator>=(f32 a, f32x16 b) { return F32x16(a)>=b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator==(f32x16 a, f32x16 b) { return {_mm512_cmpeq_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator==(f32x16 a, f32x16 b) {a.x8[0] === b.x8[0]; a.x8[1] === b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator==(f32x16 a, f32 b) { return a==F32x16(b); }
+	forceinline friend f32x16 operator==(f32 a, f32x16 b) { return F32x16(a)==b; }
+#if ARCH_AVX512
+	forceinline friend f32x16 operator!=(f32x16 a, f32x16 b) { return {_mm512_cmpneq_ps(a.m, b.m)}; }
+#else
+	forceinline friend f32x16 operator!=(f32x16 a, f32x16 b) {a.x8[0] !== b.x8[0]; a.x8[1] !== b.x8[1]; return a; }
+#endif
+	forceinline friend f32x16 operator!=(f32x16 a, f32 b) { return a!=F32x16(b); }
+	forceinline friend f32x16 operator!=(f32 a, f32x16 b) { return F32x16(a)!=b; }
 	forceinline operator u8x16() const;
 	forceinline operator u16x16() const;
 	forceinline operator u32x16() const;
@@ -2814,6 +2976,48 @@ union f64x8 {
 	forceinline friend f64x8 operator/(f64 a, f64x8 b) { return F64x8(a)/b; }
 	forceinline friend f64x8 &operator/=(f64x8 &a, f64x8 b) { return a=a/b; }
 	forceinline friend f64x8 &operator/=(f64x8 &a, f64 b) { return a=a/b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator<(f64x8 a, f64x8 b) { return {_mm512_cmplt_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator<(f64x8 a, f64x8 b) {a.x4[0] <= b.x4[0]; a.x4[1] <= b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator<(f64x8 a, f64 b) { return a<F64x8(b); }
+	forceinline friend f64x8 operator<(f64 a, f64x8 b) { return F64x8(a)<b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator>(f64x8 a, f64x8 b) { return {_mm512_cmpgt_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator>(f64x8 a, f64x8 b) {a.x4[0] >= b.x4[0]; a.x4[1] >= b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator>(f64x8 a, f64 b) { return a>F64x8(b); }
+	forceinline friend f64x8 operator>(f64 a, f64x8 b) { return F64x8(a)>b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator<=(f64x8 a, f64x8 b) { return {_mm512_cmple_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator<=(f64x8 a, f64x8 b) {a.x4[0] <== b.x4[0]; a.x4[1] <== b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator<=(f64x8 a, f64 b) { return a<=F64x8(b); }
+	forceinline friend f64x8 operator<=(f64 a, f64x8 b) { return F64x8(a)<=b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator>=(f64x8 a, f64x8 b) { return {_mm512_cmpge_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator>=(f64x8 a, f64x8 b) {a.x4[0] >== b.x4[0]; a.x4[1] >== b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator>=(f64x8 a, f64 b) { return a>=F64x8(b); }
+	forceinline friend f64x8 operator>=(f64 a, f64x8 b) { return F64x8(a)>=b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator==(f64x8 a, f64x8 b) { return {_mm512_cmpeq_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator==(f64x8 a, f64x8 b) {a.x4[0] === b.x4[0]; a.x4[1] === b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator==(f64x8 a, f64 b) { return a==F64x8(b); }
+	forceinline friend f64x8 operator==(f64 a, f64x8 b) { return F64x8(a)==b; }
+#if ARCH_AVX512
+	forceinline friend f64x8 operator!=(f64x8 a, f64x8 b) { return {_mm512_cmpneq_pd(a.m, b.m)}; }
+#else
+	forceinline friend f64x8 operator!=(f64x8 a, f64x8 b) {a.x4[0] !== b.x4[0]; a.x4[1] !== b.x4[1]; return a; }
+#endif
+	forceinline friend f64x8 operator!=(f64x8 a, f64 b) { return a!=F64x8(b); }
+	forceinline friend f64x8 operator!=(f64 a, f64x8 b) { return F64x8(a)!=b; }
 	forceinline operator u16x8() const;
 	forceinline operator u32x8() const;
 	forceinline operator u64x8() const;

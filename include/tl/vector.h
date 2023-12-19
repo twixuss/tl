@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "string.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4201) // anonymous struct
@@ -11,7 +12,7 @@ namespace tl {
 	struct { Scalar x, y; }; \
 	Scalar s[2];\
 	template <class U>\
-	forceinline constexpr explicit operator v2<U>() const { return {(U)x, (U)y}; } \
+	forceinline constexpr explicit operator v2<U>() const { return {convert<U>(x), convert<U>(y)}; } \
 	forceinline constexpr v2 operator+() const { return *this; } \
 	forceinline constexpr v2 xx() const { return {x, x}; } \
 	forceinline constexpr v2 xy() const { return {x, y}; } \
@@ -26,7 +27,7 @@ namespace tl {
 	struct { Scalar _pad; v2 yz; }; \
 	Scalar s[3];\
 	template <class U>\
-	forceinline constexpr explicit operator v3<U>() const { return {(U)x, (U)y, (U)z}; } \
+	forceinline constexpr explicit operator v3<U>() const { return {convert<U>(x), convert<U>(y), convert<U>(z)}; } \
 	forceinline constexpr v3 operator+() const { return *this; } \
 	forceinline constexpr v2 xz() const { return {x,z}; } \
 	forceinline constexpr v2 yx() const { return {y,x}; } \
@@ -48,7 +49,7 @@ namespace tl {
 	struct { Scalar _; v3 yzw; }; \
 	Scalar s[4];\
 	template <class U>\
-	forceinline constexpr explicit operator v4<U>() const { return {(U)x, (U)y, (U)z, (U)w}; } \
+	forceinline constexpr explicit operator v4<U>() const { return {convert<U>(x), convert<U>(y), convert<U>(z), convert<U>(w)}; } \
 	forceinline constexpr v4 operator+() const { return *this; }
 
 #define UNOP_2(o) \
@@ -303,6 +304,19 @@ forceinline constexpr bool any(v4b v) { return v.x || v.y || v.z || v.w; }
 template <class T> forceinline constexpr v2<T> select(v2b t, v2<T> a, v2<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y)}; }
 template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z)}; }
 template <class T> forceinline constexpr v4<T> select(v4b t, v4<T> a, v4<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z), select(t.w, a.w, b.w)}; }
+
+template <class T>
+inline umm append(StringBuilder &builder, v2<T> v) {
+	return append_format(builder, "({}, {})"s, v.x, v.y);
+}
+template <class T>
+inline umm append(StringBuilder &builder, v3<T> v) {
+	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z);
+}
+template <class T>
+inline umm append(StringBuilder &builder, v4<T> v) {
+	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w);
+}
 
 }
 

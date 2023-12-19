@@ -81,6 +81,7 @@ struct TextInfo {
 struct GetTextInfoParams {
 	bool place_chars = false;
 	bool bounds = false;
+	f32 line_alignment = -1; // -1 = left-aligned; 0 = centered; 1 = right-aligned
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
@@ -135,12 +136,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 
 	auto current_char = text.data;
 
-	struct CharPointer {
-		utf32 code_point;
-		FontChar *info;
-	};
-
-	List<CharPointer> new_chars;
+	List<utf32> new_chars;
 	new_chars.allocator = temporary_allocator;
 
 	while (current_char < text.end()) {
@@ -149,21 +145,16 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 			invalid_code_path();
 		}
 		auto code_point = got_char.value();
-		auto found = sized_font->chars.find(code_point);
-		if (!found) {
-			auto &inserted = sized_font->chars.get_or_insert(code_point);
-
-			CharPointer p;
-			p.code_point = code_point;
-			p.info = &inserted;
-			new_chars.add(p);
+		if (!sized_font->chars.find(code_point)) {
+			new_chars.add(code_point);
 		}
 	}
 
 	if (new_chars.count) {
 
 	redo_all:
-		for (auto &[new_char_code_point, new_char] : new_chars) {
+		while (new_chars.count) {
+			auto new_char_code_point = new_chars.pop().value();
 
 		retry_glyph:
 			if (!font->face) {
@@ -218,13 +209,10 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 				sized_font->next_char_position = {};
 				sized_font->current_row_height = 0;
 
-				new_chars.clear();
+				new_chars.add(new_char_code_point);
 				for_each(sized_font->chars, [&] (auto &kv) {
-					auto &[code_point, new_char] = kv;
-					CharPointer p;
-					p.code_point = code_point;
-					p.info = &new_char;
-					new_chars.add(p);
+					auto &[code_point, _] = kv;
+					new_chars.add(code_point);
 				});
 
 				goto redo_all;
@@ -233,7 +221,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 			//
 			// NOTE bitmap.width is in bytes not pixels
 			//
-			auto &info = *new_char;
+			auto &info = sized_font->chars.get_or_insert(new_char_code_point);
 			info.position = sized_font->next_char_position;
 			info.size = char_size;
 			info.offset = {slot->bitmap_left, slot->bitmap_top};
@@ -264,6 +252,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 SizedFont *get_font_at_size(Font *font, u32 size) {
 	assert(font);
 	assert(size);
+	scoped(font->collection->allocator);
 
 	auto found = font->size_to_font.find(size);
 	if (found) {
@@ -325,6 +314,7 @@ namespace tl {
 
 FontChar get_char_info(u32 ch, SizedFont *font) {
 	auto found = font->chars.find(ch);
+
 	assert(found, "get_char_info: character '{}' is not present. Call ensure_all_chars_present before", ch);
 	return found->value;
 }
@@ -340,7 +330,20 @@ TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams para
 	}
 	info.line_count = 1;
 
+	struct LineInfo {
+		umm begin_index;
+		umm end_index;
+		s32 width = 0;
+	};
+	List<LineInfo, TemporaryAllocator> line_infos;
+
+	aabb<s32> line_x_bounds = {max_value<s32>, min_value<s32>};
+	umm begin_index = 0;
+	
+	s32 max_line_width = 0;
+
 	auto current_char = text.data;
+
 	while (current_char < text.end()) {
 		auto got_char = get_char_and_advance_utf8(&current_char);
 		if (!got_char) {
@@ -351,9 +354,13 @@ TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams para
 		auto d = get_char_info(code_point, font);
 
 		if (code_point == '\n') {
+			line_infos.add({.begin_index = begin_index, .end_index = info.placed_chars.count, .width = line_x_bounds.size()});
+			max_line_width = max(max_line_width, line_x_bounds.size());
+			line_x_bounds = {max_value<s32>, min_value<s32>};
 			char_position.x = 0;
 			char_position.y += font->line_spacing;
 			info.line_count += 1;
+			begin_index = info.placed_chars.count;
 		}
 		if (params.place_chars) {
 			if (code_point != '\n') {
@@ -366,6 +373,9 @@ TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams para
 				c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
 
 				info.placed_chars.add(c TL_LA);
+
+				line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
+				line_x_bounds.max = max(line_x_bounds.max, c.position.max.x);
 			}
 		}
 		if (params.bounds) {
@@ -381,6 +391,18 @@ TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams para
 			char_position.x += d.advance.x;
 		}
 	}
+	
+	line_infos.add({.begin_index = begin_index, .end_index = info.placed_chars.count, .width = line_x_bounds.size()});
+	max_line_width = max(max_line_width, line_x_bounds.size());
+
+	for (auto &line_info : line_infos) {
+		for (umm i = line_info.begin_index; i < line_info.end_index; ++i) {
+			s32 offset = round_to_int((max_line_width - line_info.width) * map_clamped<f32, f32>(params.line_alignment, -1, 1, 0, 1));
+			info.placed_chars[i].position.min.x += offset;
+			info.placed_chars[i].position.max.x += offset;
+		}
+	}
+
 	return info;
 }
 

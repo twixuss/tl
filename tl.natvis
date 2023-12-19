@@ -93,4 +93,6 @@
         <Intrinsic Name="data" Expression="(T*)(this+1)" />
 -->
     </Type>
+    <Type Name="tl::f16">
+    </Type>
 </AutoVisualizer>

@@ -1,91 +1,216 @@
 #include "common.h"
-#include <zmmintrin.h>
+#include <immintrin.h>
 
 namespace tl {
 
+template <class Scalar, umm count>
+struct SimdTypeT { using Type = void; };
+
+template <class Scalar, umm count>
+using SimdType = typename SimdTypeT<Scalar, count>::Type;
+
+#define S(Scalar, count, mtype) \
+	template <> \
+	struct SimdTypeT<Scalar, count> { \
+		using Type = mtype; \
+	}
+
+S(u8, 16, __m128i);
+S(u16, 8, __m128i);
+S(u32, 4, __m128i);
+S(u64, 2, __m128i);
+S(s8, 16, __m128i);
+S(s16, 8, __m128i);
+S(s32, 4, __m128i);
+S(s64, 2, __m128i);
+S(f32, 4, __m128);
+S(f64, 2, __m128d);
+
+S(u8, 32, __m256i);
+S(u16, 16, __m256i);
+S(u32, 8, __m256i);
+S(u64, 4, __m256i);
+S(s8, 32, __m256i);
+S(s16, 16, __m256i);
+S(s32, 8, __m256i);
+S(s64, 4, __m256i);
+S(f32, 8, __m256);
+S(f64, 4, __m256d);
+
+S(u8, 64, __m512i);
+S(u16, 32, __m512i);
+S(u32, 16, __m512i);
+S(u64, 8, __m512i);
+S(s8, 64, __m512i);
+S(s16, 32, __m512i);
+S(s32, 16, __m512i);
+S(s64, 8, __m512i);
+S(f32, 16, __m512);
+S(f64, 8, __m512d);
+
+#undef S
+
 template <class Scalar_, umm count_>
-struct Vector {
+union Vector {
 	using Scalar = Scalar_;
 	inline static constexpr umm count = count_;
 
 	Scalar s[count];
+	SimdType<Scalar, count> m;
+
+	Scalar &operator[](umm i) { return s[i]; }
+	Scalar const &operator[](umm i) const { return s[i]; }
+
+	template <class U>
+	requires requires(Scalar s) { (U)s; }
+	forceinline explicit operator Vector<U, count>() const {
+		Vector<U, count> result;
+		for (umm i = 0; i < count; ++i) {
+			result.s[i] = (U)s[i];
+		}
+		return result;
+	}
 };
 
-template <class Scalar, umm count>
-using MaskVector = Vector<TypeAt<log2(sizeof Scalar), u8, u16, u32, u64>, count>;
+template <class Scalar_, umm count_>
+struct Vector<v2<Scalar_>, count_> {
+	using Scalar = Scalar_;
+	inline static constexpr umm count = count_;
 
-#define S(Scalar_, count_, bits) \
-	template <> \
-	struct Vector<Scalar_, count_> { \
-		using Scalar = Scalar_; \
-		inline static constexpr umm count = count_; \
-		union { \
-			Scalar s[count]; \
-			__m##bits mf; \
-			__m##bits##d md; \
-			__m##bits##i mi; \
-		}; \
+	Vector<Scalar, count> x;
+	Vector<Scalar, count> y;
+
+	struct Accessor {
+		Vector &v;
+		umm i;
+
+		operator v2<Scalar>() { return {v.x.s[i], v.y.s[i]}; }
+		Accessor &operator=(v2<Scalar> n) { return v.x.s[i] = n.x, v.y.s[i] = n.y, *this; }
+	};
+
+	Accessor operator[](umm i) { return {*this, i}; }
+	Accessor const operator[](umm i) const { return {*this, i}; }
+
+	template <class U>
+	requires requires(Scalar s) { (U)s; }
+	forceinline explicit operator Vector<v2<U>, count>() const {
+		return {
+			(Vector<U, count>)x,
+			(Vector<U, count>)y,
+		};
 	}
+};
 
-S(u8, 16, 128);
-S(u16, 8, 128);
-S(u32, 4, 128);
-S(u64, 2, 128);
-S(s8, 16, 128);
-S(s16, 8, 128);
-S(s32, 4, 128);
-S(s64, 2, 128);
-S(f32, 4, 128);
-S(f64, 2, 128);
+TL_DECLARE_CONCEPT(Vector);
 
-S(u8, 32, 256);
-S(u16, 16, 256);
-S(u32, 8, 256);
-S(u64, 4, 256);
-S(s8, 32, 256);
-S(s16, 16, 256);
-S(s32, 8, 256);
-S(s64, 4, 256);
-S(f32, 8, 256);
-S(f64, 4, 256);
+template <class Scalar, umm count>
+using MaskVector = Vector<TypeAt<log2(sizeof Scalar), u8, u16, u32, u64, u64, u64>, count>; // FIXME: compiler error when two last u64's are not provided. wtf
 
-S(u8, 64, 512);
-S(u16, 32, 512);
-S(u32, 16, 512);
-S(u64, 8, 512);
-S(s8, 64, 512);
-S(s16, 32, 512);
-S(s32, 16, 512);
-S(s64, 8, 512);
-S(f32, 16, 512);
-S(f64, 8, 512);
+template <umm count, class Scalar>
+forceinline Vector<Scalar, count> broadcast(Scalar s) {
+	Vector<Scalar, count> r;
+	for (umm i = 0; i < count; ++i) {
+		r.s[i] = s;
+	}
+	return r;
+}
+template <umm count, class Scalar>
+forceinline Vector<v2<Scalar>, count> V2(Scalar s) {
+	Vector<v2<Scalar>, count> r;
+	r.x = broadcast<count>(s);
+	r.y = broadcast<count>(s);
+	return r;
+}
+template <umm count, class Scalar>
+forceinline Vector<v2<Scalar>, count> V2(v2<Scalar> s) {
+	Vector<v2<Scalar>, count> r;
+	r.x = broadcast<count>(s.x);
+	r.y = broadcast<count>(s.y);
+	return r;
+}
+template <class Scalar, umm count>
+forceinline Vector<v2<Scalar>, count> V2(Vector<Scalar, count> x, Vector<Scalar, count> y) {
+	Vector<v2<Scalar>, count> r;
+	r.x = x;
+	r.y = y;
+	return r;
+}
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> select(MaskVector<Scalar, count> mask, Vector<Scalar, count> a, Vector<Scalar, count> b) {
+	for (umm i = 0; i < count; ++i) {
+		a.s[i] = mask.s[i] ? a.s[i] : b.s[i];
+	}
+	return a;
+}
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> select(MaskVector<Scalar, count> mask, std::type_identity_t<Scalar> a, Vector<Scalar, count> b) {
+	for (umm i = 0; i < count; ++i) {
+		a.s[i] = mask.s[i] ? a : b.s[i];
+	}
+	return a;
+}
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> select(MaskVector<Scalar, count> mask, Vector<Scalar, count> a, std::type_identity_t<Scalar> b) {
+	for (umm i = 0; i < count; ++i) {
+		a.s[i] = mask.s[i] ? a.s[i] : b;
+	}
+	return a;
+}
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> select(MaskVector<Scalar, count> mask, Scalar a, Scalar b) {
+	Vector<Scalar, count> r;
+	for (umm i = 0; i < count; ++i) {
+		r.s[i] = mask.s[i] ? a : b;
+	}
+	return r;
+}
 
-#undef S
+template <class Scalar, umm count> requires requires(Scalar s) { -s; } forceinline constexpr Vector<Scalar, count> operator-(Vector<Scalar, count> a) { for (umm i = 0; i < count; ++i) a.s[i] = -a.s[i]; return a; }
+template <class Scalar, umm count> requires requires(Scalar s) { +s; } forceinline constexpr Vector<Scalar, count> operator+(Vector<Scalar, count> a) { for (umm i = 0; i < count; ++i) a.s[i] = +a.s[i]; return a; }
 
 #define O(op) \
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> operator op(Vector<Scalar, count> a, Vector<Scalar, count> b) { for (umm i = 0; i < count; ++i) a.s[i] = a.s[i] op b.s[i]; return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> operator op(Vector<Scalar, count> a, Scalar b) { for (umm i = 0; i < count; ++i) a.s[i] = a.s[i] op b; return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> operator op(Scalar a, Vector<Scalar, count> b) { for (umm i = 0; i < count; ++i) b.s[i] = a op b.s[i]; return b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> operator op(Vector<Scalar, count> a, std::type_identity_t<Scalar> b) { for (umm i = 0; i < count; ++i) a.s[i] = a.s[i] op b; return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> operator op(std::type_identity_t<Scalar> a, Vector<Scalar, count> b) { for (umm i = 0; i < count; ++i) b.s[i] = a op b.s[i]; return b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, Vector<v2<Scalar>, count> b) { for (umm i = 0; i < count; ++i) { a.x[i] = a.x[i] op b.x[i]; a.y[i] = a.y[i] op b.y[i]; } return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, std::type_identity_t<Scalar> b) { for (umm i = 0; i < count; ++i) { a.x[i] = a.x[i] op b; a.y[i] = a.y[i] op b; } return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v2<Scalar>, count> b) { for (umm i = 0; i < count; ++i) { b.x[i] = a op b.x[i]; b.y[i] = a op b.y[i]; } return b; } \
 
-O(+);
-O(-);
-O(*);
-O(/);
-O(%);
-O(^);
-O(&);
-O(|);
-O(<<);
-O(>>);
+#define A(op) \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, Vector<Scalar, count> b) { for (umm i = 0; i < count; ++i) a.s[i] = a.s[i] op b.s[i]; return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, std::type_identity_t<Scalar> b) { for (umm i = 0; i < count; ++i) a.s[i] = a.s[i] op b; return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, Vector<v2<Scalar>, count> b) { for (umm i = 0; i < count; ++i) { a.x[i] = a.x[i] op b.x[i]; a.y[i] = a.y[i] op b.y[i]; } return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, std::type_identity_t<Scalar> b) { for (umm i = 0; i < count; ++i) { a.x[i] = a.x[i] op b; a.y[i] = a.y[i] op b; } return a; } \
+
+#define X(op) O(op) A(op)
+
+X(+);
+X(-);
+X(*);
+X(/);
+X(%);
+X(^);
+X(&);
+X(|);
+X(<<);
+X(>>);
+
+#undef X
+
+#define X(op) O(op)
+
 O(&&);
 O(||);
 
+#undef X
+
 #undef O
+#undef A
 
 #define O(op) \
 	template <class Scalar, umm count> forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, Vector<Scalar, count> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a.s[i] op b.s[i]); return r; } \
-	template <class Scalar, umm count> forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, Scalar b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a.s[i] op b); return r; } \
-	template <class Scalar, umm count> forceinline constexpr MaskVector<Scalar, count> operator op(Scalar a, Vector<Scalar, count> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a op b.s[i]); return r; } \
+	template <class Scalar, umm count> forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, std::type_identity_t<Scalar> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a.s[i] op b); return r; } \
+	template <class Scalar, umm count> forceinline constexpr MaskVector<Scalar, count> operator op(std::type_identity_t<Scalar> a, Vector<Scalar, count> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a op b.s[i]); return r; } \
 
 O(==);
 O(!=);
@@ -147,27 +272,27 @@ template <std::integral Scalar, umm count> forceinline constexpr bool any(Vector
 #define fsb64f(x) _mm_xor_ps(x, _mm_castsi128_ps(_mm_set1_epi64x(sb64)))
 #define fsb32d(x) _mm_xor_pd(x, _mm_castsi128_ps(_mm_set1_epi32(sb32)))
 #define fsb64d(x) _mm_xor_pd(x, _mm_castsi128_ps(_mm_set1_epi64x(sb64)))
-#define ugt(bits) C(u,bits,>, r.mi = _mm_cmpgt_epi##bits(fsb##bits##i(a.mi), fsb##bits##i(b.mi)))
-#define ult(bits) C(u,bits,<, r.mi = _mm_cmpgt_epi##bits(fsb##bits##i(b.mi), fsb##bits##i(a.mi)))
-#define uge(bits) C(u,bits,>=,r.mi = noti(_mm_cmpgt_epi##bits(fsb##bits##i(b.mi), fsb##bits##i(a.mi))))
-#define ule(bits) C(u,bits,<=,r.mi = noti(_mm_cmpgt_epi##bits(fsb##bits##i(a.mi), fsb##bits##i(b.mi))))
-#define sgt(bits) C(s,bits,>, r.mi = _mm_cmpgt_epi##bits(a.mi, b.mi))
-#define slt(bits) C(s,bits,<, r.mi = _mm_cmpgt_epi##bits(b.mi, a.mi))
-#define sge(bits) C(s,bits,>=,r.mi = noti(_mm_cmpgt_epi##bits(b.mi, a.mi)))
-#define sle(bits) C(s,bits,<=,r.mi = noti(_mm_cmpgt_epi##bits(a.mi, b.mi)))
+#define ugt(bits) C(u,bits,>, r.m = _mm_cmpgt_epi##bits(fsb##bits##i(a.m), fsb##bits##i(b.m)))
+#define ult(bits) C(u,bits,<, r.m = _mm_cmpgt_epi##bits(fsb##bits##i(b.m), fsb##bits##i(a.m)))
+#define uge(bits) C(u,bits,>=,r.m = noti(_mm_cmpgt_epi##bits(fsb##bits##i(b.m), fsb##bits##i(a.m))))
+#define ule(bits) C(u,bits,<=,r.m = noti(_mm_cmpgt_epi##bits(fsb##bits##i(a.m), fsb##bits##i(b.m))))
+#define sgt(bits) C(s,bits,>, r.m = _mm_cmpgt_epi##bits(a.m, b.m))
+#define slt(bits) C(s,bits,<, r.m = _mm_cmpgt_epi##bits(b.m, a.m))
+#define sge(bits) C(s,bits,>=,r.m = noti(_mm_cmpgt_epi##bits(b.m, a.m)))
+#define sle(bits) C(s,bits,<=,r.m = noti(_mm_cmpgt_epi##bits(a.m, b.m)))
 
 #define A(type, bits, op, intrinsic) SA(type##bits, 128/bits, op, intrinsic)
 #define C(type, bits, op, intrinsic) SC(type##bits, 128/bits, op, intrinsic)
 
-#define iadd(type,bits) A(type,bits,+,r.mi=_mm_add_epi##bits(a.mi,b.mi))
-#define isub(type,bits) A(type,bits,-,r.mi=_mm_sub_epi##bits(a.mi,b.mi))
-#define imul(type,bits) A(type,bits,*,r.mi=_mm_mullo_epi##bits(a.mi,b.mi))
-#define udiv(bits) A(u,bits,/,r.mi=_mm_div_epu##bits(a.mi,b.mi))
-#define sdiv(bits) A(s,bits,/,r.mi=_mm_div_epi##bits(a.mi,b.mi))
-#define umod(bits) A(u,bits,%,r.mi=_mm_sub_epi##bits(a.mi,(Vector<u##bits,128/bits>{.mi=_mm_div_epu##bits(a.mi,b.mi)}*b).mi))
-#define smod(bits) A(s,bits,%,r.mi=_mm_sub_epi##bits(a.mi,(Vector<s##bits,128/bits>{.mi=_mm_div_epi##bits(a.mi,b.mi)}*b).mi))
-#define ieq(type,bits) C(type,bits,==,r.mi=_mm_cmpeq_epi##bits(a.mi,b.mi));
-#define ine(type,bits) C(type,bits,!=,r.mi=noti(_mm_cmpeq_epi##bits(a.mi,b.mi)));
+#define iadd(type,bits) A(type,bits,+,r.m=_mm_add_epi##bits(a.m,b.m))
+#define isub(type,bits) A(type,bits,-,r.m=_mm_sub_epi##bits(a.m,b.m))
+#define imul(type,bits) A(type,bits,*,r.m=_mm_mullo_epi##bits(a.m,b.m))
+#define udiv(bits) A(u,bits,/,r.m=_mm_div_epu##bits(a.m,b.m))
+#define sdiv(bits) A(s,bits,/,r.m=_mm_div_epi##bits(a.m,b.m))
+#define umod(bits) A(u,bits,%,r.m=_mm_sub_epi##bits(a.m,(Vector<u##bits,128/bits>{.m=_mm_div_epu##bits(a.m,b.m)}*b).m))
+#define smod(bits) A(s,bits,%,r.m=_mm_sub_epi##bits(a.m,(Vector<s##bits,128/bits>{.m=_mm_div_epi##bits(a.m,b.m)}*b).m))
+#define ieq(type,bits) C(type,bits,==,r.m=_mm_cmpeq_epi##bits(a.m,b.m));
+#define ine(type,bits) C(type,bits,!=,r.m=noti(_mm_cmpeq_epi##bits(a.m,b.m)));
 
 iadd(u,8);
 isub(u,8);
@@ -265,16 +390,16 @@ sge(64);
 slt(64);
 sgt(64);
 
-A(f,32, +, r.mf = _mm_add_ps(a.mf, b.mf));
-A(f,32, -, r.mf = _mm_sub_ps(a.mf, b.mf));
-A(f,32, *, r.mf = _mm_mul_ps(a.mf, b.mf));
-A(f,32, /, r.mf = _mm_div_ps(a.mf, b.mf));
-C(f,32, ==, r.mf = _mm_cmpeq_ps(a.mf, b.mf));
-C(f,32, !=, r.mf = _mm_cmpneq_ps(a.mf, b.mf));
-C(f,32, <=, r.mf = _mm_cmple_ps(a.mf, b.mf));
-C(f,32, >=, r.mf = _mm_cmpge_ps(a.mf, b.mf));
-C(f,32, <, r.mf = _mm_cmplt_ps(a.mf, b.mf));
-C(f,32, >, r.mf = _mm_cmpgt_ps(a.mf, b.mf));
+A(f,32, +, r.m = _mm_add_ps(a.m, b.m));
+A(f,32, -, r.m = _mm_sub_ps(a.m, b.m));
+A(f,32, *, r.m = _mm_mul_ps(a.m, b.m));
+A(f,32, /, r.m = _mm_div_ps(a.m, b.m));
+C(f,32, ==, r.m = _mm_castps_si128(_mm_cmpeq_ps(a.m, b.m)));
+C(f,32, !=, r.m = _mm_castps_si128(_mm_cmpneq_ps(a.m, b.m)));
+C(f,32, <=, r.m = _mm_castps_si128(_mm_cmple_ps(a.m, b.m)));
+C(f,32, >=, r.m = _mm_castps_si128(_mm_cmpge_ps(a.m, b.m)));
+C(f,32, <, r.m = _mm_castps_si128(_mm_cmplt_ps(a.m, b.m)));
+C(f,32, >, r.m = _mm_castps_si128(_mm_cmpgt_ps(a.m, b.m)));
 
 #undef noti
 #undef notf

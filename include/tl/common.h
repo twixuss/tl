@@ -303,6 +303,8 @@ constexpr To convert(From from) {
 }
 } // namespace ce
 
+forceinline bool all(bool v) { return v; }
+forceinline bool any(bool v) { return v; }
 
 forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (0, a, b, result); }
 forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(0, a, b, result); }
@@ -664,6 +666,11 @@ forceinline f64 ceil(f64 v) { return ::ceil(v); }
 forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
 forceinline s64 ceil_to_int(f64 v) { return (s64)ceil(v); }
 
+forceinline f32 round(f32 v) { return ::roundf(v); }
+forceinline f64 round(f64 v) { return ::round(v); }
+forceinline s32 round_to_int(f32 v) { return (s32)lroundf(v); }
+forceinline s64 round_to_int(f64 v) { return llround(v); }
+
 forceinline f32 frac(f32 v) { return v - floor(v); }
 forceinline f64 frac(f64 v) { return v - floor(v); }
 
@@ -725,6 +732,14 @@ forceinline constexpr auto clamp_checked(T value, T min_bound, T max_bound) {
 	return min(max(value, min_bound), max_bound);
 }
 
+template <class Value, class FromMin, class FromMax, class ToMin, class ToMax>
+forceinline constexpr auto map_relaxed(Value value, FromMin source_min, FromMax source_max, ToMin dest_min, ToMax dest_max) {
+	if constexpr (is_integer_like<Value>) { // Do multiplication first
+		return (value - source_min) * (dest_max - dest_min) / (source_max - source_min) + dest_min;
+	} else {
+		return (value - source_min) / (source_max - source_min) * (dest_max - dest_min) + dest_min;
+	}
+}
 template <class From, class To>
 forceinline constexpr auto map(From value, From source_min, From source_max, To dest_min, To dest_max) {
 	if constexpr (is_integer_like<From>) { // Do multiplication first
@@ -921,7 +936,7 @@ constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) 
 template <class T, class Iterator>
 constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
 	for (Iterator it = begin; it != end; ++it) {
-		if (all_true(*it == value)) {
+		if (all(*it == value)) {
 			return it;
 		}
 	}
@@ -1126,6 +1141,22 @@ private:
 	};
 };
 
+enum class Overflow {
+	clamp,
+	wrap,
+};
+
+enum class Interpolation {
+	linear,
+	nearest,
+};
+
+struct SampleParams {
+	Overflow overflow = Overflow::clamp;
+	Interpolation interpolation = Interpolation::linear;
+	bool normalized = true;
+};
+
 #pragma pack(push, 1)
 template <class T, class Size_ = umm>
 struct Span {
@@ -1167,17 +1198,58 @@ struct Span {
 		return data[i];
 	}
 
+	[[deprecated("use `sample` instead")]]
 	constexpr ValueType at_interpolated(f64 i) const {
 		auto a = at(floor_to_int(i));
 		auto b = at(ceil_to_int(i));
 		return lerp(a, b, frac(i));
 	}
 
+	[[deprecated("use `sample` instead")]]
 	constexpr ValueType at_interpolated_clamped(f64 i) const {
-		auto a = at(floor_to_int(i));
+		auto a = at(max((Size)0, (Size)floor_to_int(i)));
 		auto b = at(min(count - 1, (Size)ceil_to_int(i)));
 		return lerp(a, b, frac(i));
 	}
+
+	constexpr ValueType sample_impl(auto i, SampleParams params) const {
+		using I = decltype(i);
+		if (params.normalized) {
+			i *= count;
+		}
+		using SSize = std::make_signed_t<Size>;
+		switch (params.interpolation) {
+			case Interpolation::linear: {
+				switch (params.overflow) {
+					case Overflow::clamp: {
+						i = clamp<I>(i, 0, (I)(count-1));
+						auto a = at((SSize)floor_to_int(i));
+						auto b = at((SSize)ceil_to_int(i));
+						return lerp(a, b, frac(i));
+					}
+					case Overflow::wrap: {
+						auto a = at(frac((SSize)floor_to_int(i), (SSize)count));
+						auto b = at(frac((SSize)ceil_to_int(i), (SSize)count));
+						return lerp(a, b, frac(i));
+					}
+				}
+				break;
+			}
+			case Interpolation::nearest: {
+				switch (params.overflow) {
+					case Overflow::clamp: {
+						return at(clamp<SSize>(floor_to_int(i), 0, count - 1));
+					}
+					case Overflow::wrap: {
+						return at(frac((SSize)floor_to_int(i), (SSize)count));
+					}
+				}
+				break;
+			}
+		}
+	}
+	constexpr ValueType sample(f32 i, SampleParams params = {}) const { return sample_impl(i, params); }
+	constexpr ValueType sample(f64 i, SampleParams params = {}) const { return sample_impl(i, params); }
 
 	constexpr bool is_empty() const { return count == 0; }
 
@@ -1295,11 +1367,14 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 		if constexpr (std::is_same_v<FnRet, void>) {
 			fn(*it);
 		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			if (fn(*it) == ForEach_break) {
+			auto d = fn(*it);
+			if (d == ForEach_break) {
 				break;
+			} else if (d == ForEach_erase) {
+				invalid_code_path("Can't erase from a span.");
 			}
 		} else {
-			static_error_t(T, "Invalid return type of for_each function");
+			static_error_v(fn, "Invalid return type of for_each function");
 		}
 	}
 }
@@ -1598,6 +1673,54 @@ void flip_order(Span<T> span) {
 	for (umm i = 0; i < span.count / 2; ++i) {
 		Swap(span[i], span[span.count-i-1]);
 	}
+}
+
+template <class T, class Size, class Fn>
+void split(Span<T, Size> what, T by, Fn &&callback) {
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.count;) {
+		if (what.data[what_start] == by) {
+			callback(what.subspan(start, what_start - start));
+			start = what_start + 1;
+		}
+		++what_start;
+	}
+
+	callback(Span(what.data + start, what.end()));
+}
+
+template <class T, class Size, class Selector, class GroupProcessor>
+void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
+	if (!span.count) {
+		return;
+	}
+
+	auto first = selector(span.data[0]);
+	Size first_index = 0;
+	umm group_index = 0;
+
+	auto process_group = [&](Span<T, Size> group) {
+		if constexpr (requires { processor(group); }) {
+			processor(group);
+		} else if constexpr (requires { processor(group_index, group); }) {
+			processor(group_index++, group);
+		} else {
+			static_error_t(T, "Invalid group processor signature");
+		}
+	};
+
+	for (Size i = 1; i < span.count; ++i) {
+		auto next = selector(span.data[i]);
+		if (first != next) {
+			process_group(span.subspan(first_index, i - first_index));
+			first = next;
+			first_index = i;
+		}
+	}
+
+	process_group(span.subspan(first_index, span.count - first_index));
 }
 
 inline constexpr bool is_whitespace(ascii c) {
@@ -2415,6 +2538,78 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 	}
 };
 
+struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
+private:
+	Allocator parent_allocator;
+	umm buffer_size = 0;
+	u8 *base = 0;
+	u8 *cursor = 0;
+
+public:
+	struct Checkpoint {
+		u8 *cursor;
+	};
+
+	forceinline static ArenaAllocator create(umm size TL_LP) {
+		ArenaAllocator result = {};
+		result.parent_allocator = current_allocator;
+		result.buffer_size = size;
+		result.cursor = result.base = result.parent_allocator.allocate_uninitialized<u8>(size TL_LA);
+		return result;
+	}
+
+	forceinline static ArenaAllocator current() { return {}; }
+
+	forceinline Checkpoint checkpoint() { 
+		return {cursor};
+	}
+	forceinline void reset(Checkpoint checkpoint) { 
+		cursor = checkpoint.cursor;
+	}
+
+	forceinline AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
+		assert(cursor, "arena allocator was not initialized");
+
+		auto target = ceil(cursor, alignment);
+		cursor = target + size;
+		assert(cursor <= base + buffer_size, "Out of arena memory");
+		return AllocationResult { .data = target, .count = size, .is_zeroed = true };
+	}
+	forceinline AllocationResult reallocate_impl(void *old_data, umm old_size, umm new_size, umm alignment TL_LP) {
+		auto new_data = allocate_impl(new_size, alignment);
+		memcpy(new_data.data, old_data, old_size);
+		return new_data;
+	}
+	forceinline void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
+		(void)data;
+		(void)size;
+		(void)alignment;
+	}
+
+	forceinline operator Allocator() {
+		return {
+			.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
+				return ((ArenaAllocator *)state)->execute(action, data, old_size, new_size, align TL_LA);
+			},
+			.state = this
+		};
+	}
+
+	forceinline void clear() {
+		cursor = base;
+	}
+	forceinline void free() {
+		if (!base)
+			return;
+
+		parent_allocator.free(base);
+		base = 0;
+		cursor = 0;
+		buffer_size = 0;
+	}
+};
+
+
 // This library provides a temporary allocator, which you can use for fast allocations.
 // It is a very simple implementation, which just bumps a cursor. This of course means you can't just free
 // a portion of memory at arbitrary time and reuse it, but you can:
@@ -2442,34 +2637,22 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 #endif
 
 struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
-
-	inline static constexpr umm buffer_size = TL_TEMPORARY_STORAGE_CAPACITY;
-	inline static thread_local u8 *base = 0;
-	inline static thread_local u8 *cursor = 0;
+	inline static thread_local ArenaAllocator arena;
 
 	forceinline static void init() {
-		cursor = base = current_allocator.allocate_uninitialized<u8>(buffer_size);
+		arena = ArenaAllocator::create(TL_TEMPORARY_STORAGE_CAPACITY);
 	}
 
 	forceinline static TemporaryAllocator current() { return {}; }
 
 	forceinline static AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
-		assert(cursor, "temporary allocator was not initialized");
-
-		auto target = ceil(cursor, alignment);
-		cursor = target + size;
-		assert(cursor <= base + buffer_size, "Out of temporary memory");
-		return AllocationResult { .data = target, .count = size, .is_zeroed = true };
+		return arena.allocate_impl(size, alignment TL_LA);
 	}
 	forceinline static AllocationResult reallocate_impl(void *old_data, umm old_size, umm new_size, umm alignment TL_LP) {
-		auto new_data = allocate_impl(new_size, alignment);
-		memcpy(new_data.data, old_data, old_size);
-		return new_data;
+		return arena.reallocate_impl(old_data, old_size, new_size, alignment TL_LA);
 	}
 	forceinline static void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-		(void)data;
-		(void)size;
-		(void)alignment;
+		return arena.deallocate_impl(data, size, alignment TL_LA);
 	}
 
 	forceinline operator Allocator() {
@@ -2482,7 +2665,7 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 	}
 
 	forceinline static void clear() {
-		cursor = base;
+		arena.clear();
 	}
 };
 
@@ -2594,43 +2777,29 @@ struct Scoped<Allocator> {
 };
 
 template <>
-struct Scoped<TemporaryAllocator> {
-	Allocator old_allocator;
-	Scoped(TemporaryAllocator) {
-		old_allocator = current_allocator;
-		current_allocator = temporary_allocator;
-	}
-	~Scoped() {
-		current_allocator = old_allocator;
-	}
+struct Scoped<ArenaAllocator> : Scoped<Allocator> {
+	Scoped(ArenaAllocator &arena) : Scoped<Allocator>(arena) {}
+};
+template <>
+struct Scoped<TemporaryAllocator> : Scoped<Allocator> {
+	Scoped(TemporaryAllocator) : Scoped<Allocator>(temporary_allocator) {}
 };
 
 template <>
 struct Scoped<TemporaryStorageCheckpoint> {
-	u8 *initial_cursor = 0;
+	ArenaAllocator::Checkpoint checkpoint;
 
 	Scoped(TemporaryStorageCheckpoint) {
-		initial_cursor = temporary_allocator.cursor;
+		checkpoint = temporary_allocator.arena.checkpoint();
 	}
 	~Scoped() {
-		temporary_allocator.cursor = initial_cursor;
+		temporary_allocator.arena.reset(checkpoint);
 	}
 };
 
 template <>
-struct Scoped<TemporaryAllocatorAndCheckpoint> {
-	Allocator old_allocator;
-	u8 *initial_cursor = 0;
-
-	Scoped(TemporaryAllocatorAndCheckpoint) {
-		old_allocator = current_allocator;
-		current_allocator = temporary_allocator;
-		initial_cursor = temporary_allocator.cursor;
-	}
-	~Scoped() {
-		temporary_allocator.cursor = initial_cursor;
-		current_allocator = old_allocator;
-	}
+struct Scoped<TemporaryAllocatorAndCheckpoint> : Scoped<Allocator>, Scoped<TemporaryStorageCheckpoint> {
+	Scoped(TemporaryAllocatorAndCheckpoint) : Scoped<Allocator>(temporary_allocator), Scoped<TemporaryStorageCheckpoint>({}) {}
 };
 
 template <class T>
@@ -2638,8 +2807,7 @@ void rotate(Span<T> span, T *to_be_first) {
 	umm left_count = to_be_first - span.data;
 	umm right_count = span.count - left_count;
 
-	auto initial_cursor = temporary_allocator.cursor;
-	defer { temporary_allocator.cursor = initial_cursor; };
+	scoped(temporary_storage_checkpoint);
 
 	if (right_count < left_count) {
 		T *temp = temporary_allocator.allocate_uninitialized<T>(right_count);

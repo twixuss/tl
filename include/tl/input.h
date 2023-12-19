@@ -79,27 +79,13 @@ enum Key {
 #undef K
 };
 
-inline char const *to_string(Key key) {
+inline umm append(StringBuilder &builder, Key key) {
 	switch (key) {
-#define K(key, value) case Key_##key: return #key;
+#define K(key, value) case Key_##key: return append(builder, u8#key##s);
 	ALL_KEYS(K)
 #undef K
 	}
-	return "unknown";
+	return append(builder, u8"none"s);
 }
-/*
-inline void update_key_state(Span<KeyState> key_state) {
-	for (KeyState &key : key_state) {
-		if (key & KeyState_down) {
-			key &= ~KeyState_down;
-		} else if (key & KeyState_up) {
-			key = KeyState_none;
-		}
-		if (key & KeyState_repeated) {
-			key &= ~KeyState_repeated;
-		}
-	}
-}
-*/
 
 }

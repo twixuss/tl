@@ -191,6 +191,16 @@ struct FormatFloat {
 	u32 precision = 3;
 	FloatFormat format = FloatFormat_default;
 	bool trailing_zeros = false;
+
+	template <class U>
+	FormatFloat<U> with_value(U new_value) const {
+		return FormatFloat<U> {
+			.value = new_value,
+			.precision = precision,
+			.format = format,
+			.trailing_zeros = trailing_zeros,
+		};
+	}
 };
 
 enum class Encoding {
@@ -919,7 +929,7 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 	}
 
 	if (value == infinity<Float>) {
-		return append(builder, "inf");
+		return append_format(builder, "{}inf", negative ? "-" : "");
 	}
 
 	auto append_float = [&](Float f) {
