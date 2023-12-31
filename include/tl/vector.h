@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "string.h"
+#include "hash.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4201) // anonymous struct
@@ -242,6 +243,9 @@ using v2f = v2f32; using v3f = v3f32; using v4f = v4f32;
 using v2s = v2s32; using v3s = v3s32; using v4s = v4s32;
 using v2u = v2u32; using v3u = v3u32; using v4u = v4u32;
 
+using v2umm = v2<umm>; using v3umm = v3<umm>; using v4umm = v4<umm>;
+using v2smm = v2<smm>; using v3smm = v3<smm>; using v4smm = v4<smm>;
+
 template<class T> inline constexpr bool is_vector = false;
 template<class T> inline constexpr bool is_vector<v2<T>> = true;
 template<class T> inline constexpr bool is_vector<v3<T>> = true;
@@ -318,6 +322,28 @@ inline umm append(StringBuilder &builder, v4<T> v) {
 	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w);
 }
 
+}
+
+template <class T>
+tl::u64 get_hash(tl::v2<T> const &v) {
+	return 
+		get_hash(v.x) * 13043817825332782231ull +
+		get_hash(v.y) * 6521908912666391129ull;
+}
+template <class T>
+tl::u64 get_hash(tl::v3<T> const &v) {
+	return 
+		get_hash(v.x) * 13043817825332782231ull +
+		get_hash(v.y) * 6521908912666391129ull +
+		get_hash(v.z) * 3260954456333195593ull;
+}
+template <class T>
+tl::u64 get_hash(tl::v4<T> const &v) {
+	return 
+		get_hash(v.x) * 13043817825332782231ull +
+		get_hash(v.y) * 6521908912666391129ull +
+		get_hash(v.z) * 3260954456333195593ull +
+		get_hash(v.w) * 1630477228166597791ull;
 }
 
 #pragma warning(pop)

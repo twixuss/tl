@@ -24,6 +24,8 @@ template <> inline constexpr tl::u64 get_hash(tl::s8    const &value) { return v
 template <> inline constexpr tl::u64 get_hash(tl::s16   const &value) { return value; }
 template <> inline constexpr tl::u64 get_hash(tl::s32   const &value) { return value; }
 template <> inline constexpr tl::u64 get_hash(tl::s64   const &value) { return value; }
+template <> inline constexpr tl::u64 get_hash(tl::f32   const &value) { return std::bit_cast<tl::u32>(value); }
+template <> inline constexpr tl::u64 get_hash(tl::f64   const &value) { return std::bit_cast<tl::u64>(value); }
 template <> inline constexpr tl::u64 get_hash(tl::ascii const &value) { return value; }
 template <> inline constexpr tl::u64 get_hash(tl::utf8  const &value) { return value; }
 template <> inline constexpr tl::u64 get_hash(tl::utf16 const &value) { return value; }

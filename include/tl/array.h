@@ -4,61 +4,73 @@
 
 namespace tl {
 
-template <class T, umm size_>
+template <class T, umm count_>
 struct Array {
-	inline static constexpr umm size = size_;
+	inline static constexpr umm count = count_;
 
-	inline operator Span<T>() const { return {(T *)data, size}; }
+	inline operator Span<T>() const { return {(T *)data, count}; }
 
 	constexpr T *begin() { return data; }
-	constexpr T *end() { return data + size; }
+	constexpr T *end() { return data + count; }
 	constexpr T& operator[](umm i) {
-		bounds_check(i < size);
+		bounds_check(i < count);
 		return data[i];
 	}
 
 	constexpr T const *begin() const { return data; }
-	constexpr T const *end() const { return data + size; }
+	constexpr T const *end() const { return data + count; }
 	constexpr T const& operator[](umm i) const {
-		bounds_check(i < size);
+		bounds_check(i < count);
 		return data[i];
 	}
+	
+	constexpr Span<T> span() { return {begin(), end()}; }
 
-	constexpr T &back() { return data[size - 1]; }
-	constexpr T const &back() const { return data[size - 1]; }
+	constexpr T &back() { return data[count - 1]; }
+	constexpr T const &back() const { return data[count - 1]; }
 
 	constexpr Span<T> operator+(umm i) {
-		bounds_check(i <= size);
-		return {data + i, size - i};
+		bounds_check(i <= count);
+		return {data + i, count - i};
 	}
 
-	T data[size];
+	T data[count];
 };
 
-template <class T, umm size>
-inline constexpr umm count_of(Array<T, size> const &arr) {
-	return size;
+template <class T, umm count>
+constexpr umm count_of(Array<T, count> const &arr) {
+	return count;
 }
 
-
-template <class T, umm size>
-inline constexpr Span<T> as_span(Array<T, size> &arr) {
-	return {arr.data, arr.size};
+template <class T, umm count>
+constexpr umm index_of(Array<T, count> const &arr, T *pointer) {
+	return pointer - arr.begin();
 }
 
-template <class T, umm size>
-inline constexpr Array<T, size> to_array(T const (&array)[size]) {
-	Array<T, size> result{};
-	for (umm i = 0; i < size; ++i) {
+template <class T, umm count>
+constexpr bool owns(Array<T, count> &array, T *pointer) {
+	return index_of(array, pointer) < count;
+}
+
+template <class T, umm count>
+constexpr Span<T> as_span(Array<T, count> &arr) {
+	return {arr.data, arr.count};
+}
+
+template <class T, umm count>
+constexpr Array<T, count> to_array(T const (&array)[count]) {
+	Array<T, count> result{};
+	for (umm i = 0; i < count; ++i) {
 		result.data[i] = array[i];
 	}
 	return result;
 }
 
-template <class T, umm _size_x, umm _size_y>
+template <class T, umm _count_x, umm _count_y>
 struct Array2 {
-	inline static constexpr umm size_x = _size_x;
-	inline static constexpr umm size_y = _size_y;
+	inline static constexpr umm count_x = _count_x;
+	inline static constexpr umm count_y = _count_y;
+	inline static constexpr umm flat_count = count_x * count_y;
 
 	constexpr T& at(umm x, umm y) {
 		bounds_check(&data[y][x] < end());
@@ -72,18 +84,34 @@ struct Array2 {
 	constexpr T& operator[](v2<Scalar> v) { return at(v); }
 
 	constexpr T *begin() { return (T *)data; }
-	constexpr T *end() { return (T *)data + size_x * size_y; }
+	constexpr T *end() { return (T *)data + flat_count; }
 
-	T data[size_y][size_x];
+	constexpr Span<T> span() { return {begin(), end()}; }
+
+	T data[count_y][count_x];
 };
 
-// Is there actually no way to have an Array2 that takes vector size of any type? Sadge.
+template <class T, umm count_x, umm count_y>
+v2umm index_of(Array2<T, count_x, count_y> &array, T *value) {
+	umm flat_index = value - &array.data[0][0];
+	return {
+		flat_index % count_x,
+		flat_index / count_x,
+	};
+}
 
-template <class T, umm _size_x, umm _size_y, umm _size_z>
+template <class T, umm count_x, umm count_y>
+constexpr bool owns(Array2<T, count_x, count_y> &array, T *pointer) {
+	return index_of(array, pointer) < array.flat_count;
+}
+
+// Is there actually no way to have an Array2 that takes vector count of any type? Sadge.
+
+template <class T, umm _count_x, umm _count_y, umm _count_z>
 struct Array3 {
-	inline static constexpr umm size_x = _size_x;
-	inline static constexpr umm size_y = _size_y;
-	inline static constexpr umm size_z = _size_z;
+	inline static constexpr umm count_x = _count_x;
+	inline static constexpr umm count_y = _count_y;
+	inline static constexpr umm count_z = _count_z;
 
 	constexpr T& at(umm x, umm y, umm z) {
 		bounds_check(&data[z][y][x] < end());
@@ -97,15 +125,15 @@ struct Array3 {
 	constexpr T& at(v3u v) { return at(v.x, v.y, v.z); }
 
 	constexpr T *begin() { return (T *)data; }
-	constexpr T *end() { return (T *)data + size_x * size_y * size_z; }
+	constexpr T *end() { return (T *)data + count_x * count_y * count_z; }
 
-	T data[size_z][size_y][size_x];
+	T data[count_z][count_y][count_x];
 };
 
-template <class T, umm size>
-auto dot(Array<T, size> const &a, Array<T, size> const &b) {
+template <class T, umm count>
+auto dot(Array<T, count> const &a, Array<T, count> const &b) {
 	T result = 0;
-	for (umm i = 0; i < size; ++i) {
+	for (umm i = 0; i < count; ++i) {
 		result += a.data[i] * b.data[i];
 	}
 	return result;

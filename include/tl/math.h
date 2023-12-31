@@ -569,7 +569,11 @@ forceinline constexpr auto lerp_int(Int a, Int b, T t) {
 
 template <class T, class Float>
 forceinline constexpr auto bezier(T a, T b, T c, Float t) {
-	return a + t * (a * -2 + b * 2 + t * (a - b * 2 + c));
+	return a + t * (-2*a + 2*b + t * (a - 2*b + c));
+}
+template <class T, class Float>
+forceinline constexpr auto bezier(T a, T b, T c, T d, Float t) {
+	return a + t * (-3*a + 3*b + t * (a - 6*b + 3*c + t * (a + 3*b - 3*c + d)));
 }
 
 forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
@@ -617,7 +621,7 @@ forceinline f64 trunc(f64 v) { return _mm_cvtsd_f64(_mm_round_pd(_mm_set_sd(v), 
 
 #define MOD(f32) \
 forceinline f32 modulo(f32 a, f32 b) { return set_sign(a - trunc(a / b) * b, a); } \
-forceinline f32 positive_modulo(f32 a, f32 b) { return frac(a / b) * b; }
+forceinline f32 frac(f32 a, f32 b) { return frac(a / b) * b; }
 MOD(f32)
 MOD(f64)
 #undef MOD
@@ -626,9 +630,9 @@ forceinline v2f modulo(v2f a, v2f b) { return {modulo(a.x, b.x), modulo(a.y, b.y
 forceinline v3f modulo(v3f a, v3f b) { return {modulo(a.x, b.x), modulo(a.y, b.y), modulo(a.z, b.z)}; }
 forceinline v4f modulo(v4f a, v4f b) { return {modulo(a.x, b.x), modulo(a.y, b.y), modulo(a.z, b.z), modulo(a.w, b.w)}; }
 
-forceinline v2f positive_modulo(v2f a, v2f b) { return {positive_modulo(a.x, b.x), positive_modulo(a.y, b.y)}; }
-forceinline v3f positive_modulo(v3f a, v3f b) { return {positive_modulo(a.x, b.x), positive_modulo(a.y, b.y), positive_modulo(a.z, b.z)}; }
-forceinline v4f positive_modulo(v4f a, v4f b) { return {positive_modulo(a.x, b.x), positive_modulo(a.y, b.y), positive_modulo(a.z, b.z), positive_modulo(a.w, b.w)}; }
+forceinline v2f frac(v2f a, v2f b) { return {frac(a.x, b.x), frac(a.y, b.y)}; }
+forceinline v3f frac(v3f a, v3f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z)}; }
+forceinline v4f frac(v4f a, v4f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z), frac(a.w, b.w)}; }
 
 constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
     return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
@@ -669,7 +673,7 @@ forceinline void cos_sin(f32 v, v2f &result) { result.x = cos(v); result.y = sin
 forceinline v2f cos_sin(f32 v) { return {cos(v), sin(v)}; }
 
 forceinline f32 sin_bhaskara(f32 v) {
-	v = positive_modulo(v, pi * 2);
+	v = frac(v, pi * 2);
 	auto mask = v >= pi;
 	v = select(mask, v - pi, v);
 	return (16 * v * (pi - v)) * reciprocal(5 * pi * pi - 4 * v * (pi - v)) * select(mask, -1.0f, 1.0f);
@@ -692,12 +696,12 @@ forceinline f32 atan2_approx(f32 y, f32 x) {
 forceinline f32 atan2_approx(v2f v) { return atan2_approx(v.y, v.x); }
 
 template <class A, class B, class T, class S>
-forceinline constexpr auto lerpWrap(A a, B b, T t, S s) {
-	a = positiveModulo(a, s);
-	b = positiveModulo(b, s);
+forceinline constexpr auto lerp_wrapped(A a, B b, T t, S s) {
+	a = positive_modulo(a, s);
+	b = positive_modulo(b, s);
 	auto d = a - b;
 	return select(absolute(d) > half(s),
-				  positiveModulo(lerp(a, b+sign(d)*s, t), s),
+				  positive_modulo(lerp(a, b+sign(d)*s, t), s),
 				  lerp(a, b, t));
 }
 
@@ -712,9 +716,13 @@ forceinline auto reflect(T v, T n) {
 	return v - dot(v, n) * n * 2;
 }
 
-forceinline v2f cross(v2f a) { return {a.y, -a.x}; }
-forceinline v2s cross(v2s a) { return {a.y, -a.x}; }
-forceinline v3f cross(v3f a, v3f b) {
+forceinline constexpr v2f perp(v2f a) { return {-a.y, a.x}; }
+forceinline constexpr v2s perp(v2s a) { return {-a.y, a.x}; }
+
+forceinline constexpr f32 cross(v2f a, v2f b) {
+	return a.x * b.y - a.y * b.x;
+}
+forceinline constexpr v3f cross(v3f a, v3f b) {
 	return {
 		a.y * b.z - a.z * b.y,
 		a.z * b.x - a.x * b.z,
@@ -742,15 +750,24 @@ forceinline constexpr auto length(T a) {
 	return sqrt(dot(a, a));
 }
 template <class T>
-forceinline constexpr auto normalize(T a) {
+forceinline constexpr auto normalize_unchecked(T a) {
 	return a / sqrt(dot(a, a));
 }
 template <class T>
-forceinline constexpr auto normalize(T a, T fallback) {
+forceinline constexpr void normalize_unchecked(T *a) {
+	*a = normalize(*a);
+}
+
+template <class T>
+forceinline constexpr auto normalize(T a, T fallback = {1}) {
 	auto lsq = length_squared(a);
 	if (lsq == decltype(lsq){})
 		return fallback;
 	return a * (1.0f / sqrt(lsq));
+}
+template <class T>
+forceinline constexpr void normalize(T *a, T fallback = {1}) {
+	*a = normalize(*a, fallback);
 }
 template <class T>
 forceinline constexpr auto distance_squared(T a, T b) {
@@ -820,13 +837,18 @@ forceinline constexpr auto move_toward_wrapped(T a, T b, f32 t, T min, T max) {
 }
 
 template <class T>
-forceinline constexpr auto moveAway(T a, T b, f32 t) {
+forceinline constexpr auto move_away(T a, T b, f32 t) {
 	return a + normalize(a - b) * t;
 }
 
 template <class T>
-forceinline constexpr T project(T vector, T normal) {
+forceinline constexpr T project_on_line(T vector, T normal) {
 	return normal * dot(normal, vector);
+}
+
+template <class T>
+forceinline constexpr T project_on_plane(T vector, T normal) {
+	return vector - project_on_line(vector, normal);
 }
 
 forceinline f32 signed_angle(v2f a, v2f b) {
@@ -1080,6 +1102,8 @@ struct aabb {
 
 	aabb operator-(T b) { return {min - b, max - b}; }
 	aabb operator+(T b) { return {min + b, max + b}; }
+	friend aabb operator-(T a, aabb<T> b) { return {a - b.min, a - b.max}; }
+	friend aabb operator+(T a, aabb<T> b) { return {a + b.min, a + b.max}; }
 	aabb &operator-=(T b) { return min -= b, max -= b, *this; }
 	aabb &operator+=(T b) { return min += b, max += b, *this; }
 
@@ -1173,6 +1197,20 @@ forceinline aabb<T> include(aabb<T> box, T point) {
 }
 
 template <class T>
+forceinline aabb<T> aabb_including_points(Span<T> points) {
+	aabb<T> result = {points[0], points[0]};
+	for (auto point : points.skip(1)) {
+		result = include(result, point);
+	}
+	return result;
+}
+
+template <class T>
+forceinline aabb<T> aabb_including_points(std::initializer_list<T> points) {
+	return aabb_including_points(Span(points));
+}
+
+template <class T>
 forceinline aabb<T> extend(aabb<T> box, T radius) {
 	box.min -= radius;
 	box.max += radius;
@@ -1202,7 +1240,7 @@ forceinline aabb<T> intersection(aabb<T> box, aabb<T> bounds) {
 }
 
 template <class T>
-forceinline aabb<T> clamp(aabb<T> box, T bounds_min, T bounds_max) {
+forceinline aabb<T> constrain(aabb<T> box, T bounds_min, T bounds_max) {
 	auto diff = max(bounds_min - box.min, T{});
 	box.min += diff;
 	box.max += diff;
@@ -1215,8 +1253,8 @@ forceinline aabb<T> clamp(aabb<T> box, T bounds_min, T bounds_max) {
 }
 
 template <class T>
-forceinline aabb<T> clamp(aabb<T> box, aabb<T> bounds) {
-	return clamp(box, bounds.min, bounds.max);
+forceinline aabb<T> constrain(aabb<T> box, aabb<T> bounds) {
+	return constrain(box, bounds.min, bounds.max);
 }
 
 #define for_aabb3(x, y, z, condition, box)           \
@@ -1487,6 +1525,18 @@ forceinline bool intersects(line<v3f> line, aabb<v3f> aabb) {
 
 	return tMax > 0 && tMin < tMax;
 }
+
+template <class T>
+struct sphere {
+	T center;
+	T::Scalar radius;
+};
+
+template <class T>
+sphere<T> sphere_center_radius(T center, typename T::Scalar radius) {
+	return {center, radius};
+}
+
 #if 0
 forceinline bool raycastLine(v2f a, v2f b, v2f c, v2f d, v2f& point, v2f& normal) {
 	v2f ba = b - a;
@@ -1544,15 +1594,72 @@ struct RaycastHit {
 	}
 };
 
+inline RaycastHit<v2f> raycast(ray<v2f> ray, line_segment<v2f> line) {
+	normalize(&ray.direction);
+	auto v1 = ray.origin - line.a;
+	auto v2 = line.b - line.a;
+	auto v3 = perp(ray.direction);
+
+	auto d = dot(v2, v3);
+	if (absolute(d) < 1e-6f)
+		return {};
+
+	auto t1 = cross(v2, v1) / d;
+	auto t2 = dot(v1, v3) / d;
+
+	if (t1 < 0 || t2 < 0 || t2 > 1.0)
+		return {};
+
+	auto n = perp(normalize(line.a - line.b));
+
+	return {
+		.hit = true,
+		.position = ray.origin + t1 * ray.direction,
+		.normal = n * -sign(dot(n, ray.direction)),
+		.distance = t1,
+	};
+}
+
+template <class Vector>
+inline RaycastHit<Vector> raycast(ray<Vector> ray, sphere<Vector> sphere) {
+	normalize(&ray.direction);
+	auto to_sphere = sphere.center - ray.origin;
+	auto t = dot(to_sphere, ray.direction);
+	auto closest_to_center = ray.origin + t * ray.direction;
+	auto distance_to_center_sq = distance_squared(sphere.center, closest_to_center);
+	auto radius_sq = pow2(sphere.radius);
+	if (distance_to_center_sq > radius_sq) {
+		return {};
+	}
+
+	auto hcl = sqrt(distance_to_center_sq + radius_sq);
+	auto point = ray.origin + (t - hcl) * ray.direction;
+	return {
+		.hit = true,
+		.position = point,
+		.normal = normalize(point - sphere.center),
+		.distance = distance(ray.origin, point),
+	};
+}
+
+inline RaycastHit<v2f> raycast(ray<v2f> ray, triangle<v2f> tri) {
+	RaycastHit<v2f> result = {.distance = infinity<f32>};
+	if (auto hit = raycast(ray, line_segment_begin_end(tri.a, tri.b)); hit && hit.distance < result.distance) result = hit;
+	if (auto hit = raycast(ray, line_segment_begin_end(tri.b, tri.c)); hit && hit.distance < result.distance) result = hit;
+	if (auto hit = raycast(ray, line_segment_begin_end(tri.c, tri.a)); hit && hit.distance < result.distance) result = hit;
+	return result;
+}
+
 inline RaycastHit<v3f> raycast(ray<v3f> ray, triangle<v3f> tri) {
-    v3f e1 = tri.b - tri.a;
+	normalize(&ray.direction);
+	v3f e1 = tri.b - tri.a;
     v3f e2 = tri.c - tri.a;
     // Вычисление вектора нормали к плоскости
     v3f pvec = cross(ray.direction, e2);
     f32 det = dot(e1, pvec);
 
     // Луч параллелен плоскости
-    if (det < 1e-8 && det > -1e-8) {
+    if (absolute(det) < 1e-8) {
 		return {};
     }
 
@@ -1582,6 +1689,7 @@ inline RaycastHit<v3f> raycast(ray<v3f> ray, triangle<v3f> tri) {
 }
 
 inline RaycastHit<v2f> raycast(ray<v2f> ray, aabb<v2f> box, bool from_inside=false) {
+	normalize(&ray.direction);
 	v2f dirfrac = 1.0f / ray.direction;
 	v2f t1 = (box.min - ray.origin)*dirfrac;
 	v2f t2 = (box.max - ray.origin)*dirfrac;
@@ -1613,6 +1721,7 @@ inline RaycastHit<v2f> raycast(ray<v2f> ray, aabb<v2f> box, bool from_inside=fal
 }
 
 inline RaycastHit<v3f> raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
+	normalize(&ray.direction);
 	v3f dirfrac = 1.0f / ray.direction;
 	v3f t1 = (box.min - ray.origin)*dirfrac;
 	v3f t2 = (box.max - ray.origin)*dirfrac;
@@ -2181,8 +2290,16 @@ forceinline T saturate(T t) {
 }
 
 template <class T>
-forceinline auto smoothstep(T x) {
+forceinline auto smoothstep3(T x) {
+	return (3 - 2 * x) * x * x;
+}
+template <class T>
+forceinline auto smoothstep5(T x) {
 	return x*x*x*(x*(6*x - 15) + 10);
+}
+template <class T>
+forceinline auto smoothstep(T x) {
+	return smoothstep3(x);
 }
 
 } // namespace tl
@@ -2211,3 +2328,10 @@ forceinline auto smoothstep(T x) {
 #if COMPILER_MSVC
 #pragma warning(pop)
 #endif
+
+template <class T>
+tl::u64 get_hash(tl::aabb<T> const &x) {
+	return 
+		get_hash(x.min) * 13043817825332782231ull +
+		get_hash(x.max) * 6521908912666391129ull;
+}

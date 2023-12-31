@@ -309,6 +309,7 @@ TL_API void unlock(OsLock &m);
 #ifdef TL_IMPL
 OsLock::OsLock() {
 	handle = DefaultAllocator{}.allocate<CRITICAL_SECTION>();
+	InitializeCriticalSection((CRITICAL_SECTION *)handle);
 }
 bool try_lock(OsLock &m) {
 	return TryEnterCriticalSection((CRITICAL_SECTION *)m.handle);

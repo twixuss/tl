@@ -95,7 +95,16 @@ inline v3f next_v3f(State &state) {
 }
 
 struct DefaultRandomizer {
-	forceinline u32 random_u32(u32 x) {
+	template <class Result, class From>
+	forceinline Result random(From value) {
+		if constexpr (std::is_same_v<Result, s32>) {
+			return random<u32>(value);
+		} else {
+			static_error_t(Result, "overload for randomizing not implemented");
+		}
+	}
+
+	template <> forceinline u32 random(u32 x) {
 		const u32 k = 3037000507u; // next_prime(2**31.5)
 		x = x*k^k;
 		x = x*k^k;
@@ -104,61 +113,69 @@ struct DefaultRandomizer {
 		return x;
 	}
 
-	forceinline u64 random_u64(u64 seed) {
+	template <> forceinline u64 random(u64 seed) {
 		u64 r0 = seed;
 		u64 r1 = rotate_left(seed, 32);
 		u64 r2 = ((seed << 8) & 0xFF00FF00FF00FF00) | ((seed >> 8) & 0x00FF00FF00FF00FF);
 		return r2 * r1 * r0 * 0x8F2A63394D;
 	}
 
-	forceinline u32 random_u32(s32 seed) { return random_u32((u32)seed); }
-	template <class T>
-	forceinline s32 random_s32(T seed) { return (s32)random_u32(seed); }
-	forceinline f32 random_f32(u32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
-	forceinline f32 random_f32(s32 seed) { return normalize_range_f32<f32>(random_u32(seed)); }
+	template <> forceinline u32 random(s32 seed) { return random<u32>((u32)seed); }
 
-	forceinline u64 random_u64(s64 seed) { return random_u64((u64)seed); }
-	forceinline s64 random_s64(u64 seed) { return (s64)random_u64(seed); }
-	forceinline s64 random_s64(s64 seed) { return (s64)random_u64(seed); }
-	forceinline f64 random_f64(u64 seed) { return normalize_range_f64<f64>(random_u64(seed)); }
-	forceinline f64 random_f64(s64 seed) { return normalize_range_f64<f64>(random_u64(seed)); }
+	template <> forceinline f32 random(u32 seed) { return normalize_range_f32<f32>(random<u32>(seed)); }
+	template <> forceinline f32 random(s32 seed) { return random<f32>((u32)seed); }
+	template <> forceinline f32 random(f32 seed) { return random<f32>(*(u32 *)&seed); }
 
-	forceinline f32 random_f32(v2f value) {
+	template <> forceinline u64 random(s64 seed) { return random<u64>((u64)seed); }
+	template <> forceinline s64 random(u64 seed) { return (s64)random<u64>(seed); }
+	template <> forceinline s64 random(s64 seed) { return (s64)random<u64>(seed); }
+	template <> forceinline f64 random(u64 seed) { return normalize_range_f64<f64>(random<u64>(seed)); }
+	template <> forceinline f64 random(s64 seed) { return normalize_range_f64<f64>(random<u64>(seed)); }
+	
+	template <> forceinline v2u random(v3u seed) {
+		return {
+			dot(seed, *(v3u *)&random_primes_u32[0]),
+			dot(seed, *(v3u *)&random_primes_u32[3]),
+		};
+	}
+
+	template <> forceinline f32 random(v2f value) {
 		v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
 		a += dot(a, a + 12.34f);
 		return frac(a.x * a.y * 136.51f);
 	}
-	forceinline f32 random_f32(v3f value) {
+	template <> forceinline f32 random(v3f value) {
 		v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
 		a += dot(a, a + 12.34f);
 		a = frac(a * a.yzx() * 136.51f);
 		return frac(dot(a, a));
 	}
-	forceinline v2f random_v2f(v2f value) {
+	template <> forceinline v2f random(v2f value) {
 		v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
 		return frac(a + dot(a, a + 12.34f));
 	}
-	forceinline v3f random_v3f(v3f value) {
+	template <> forceinline v3f random(v3f value) {
 		v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
 		a = frac(a);
 		return frac(a * a.yzx() + dot(a, a + 12.34f));
 	}
+	template <> forceinline v2f random(v3f value) { return normalize_range_f32<v2f>(random<v2u>(*(v3u *)&value)); }
 
-	forceinline v2f random_v2f(v2s value) {
+	template <> forceinline v2f random(v2s value) {
 		return {
-			random_f32((value.x + reverse_bits(value.y)) ^ 0xABCDEF01),
-			random_f32((value.y - reverse_bits(value.x)) ^ 0x12435687)
+			random<f32>((value.x + reverse_bits(value.y)) ^ 0xABCDEF01),
+			random<f32>((value.y - reverse_bits(value.x)) ^ 0x12435687)
 		};
 	}
 
-	forceinline v3f random_v3f(u64 value) {
+	template <> forceinline v3f random(u64 value) {
 		return {
-			random_f32((u32)rotate_left(value, 0)),
-			random_f32((u32)rotate_left(value, 21)),
-			random_f32((u32)rotate_left(value, 43)),
+			random<f32>((u32)rotate_left(value, 0)),
+			random<f32>((u32)rotate_left(value, 21)),
+			random<f32>((u32)rotate_left(value, 43)),
 		};
 	}
-	forceinline v3f random_v3f(v3u x) {
+	template <> forceinline v3f random(v3u x) {
 		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
 
 		v3u a;
@@ -170,9 +187,9 @@ struct DefaultRandomizer {
 
 		return normalize_range_f32<v3f>(a);
 	}
-	forceinline v3f random_v3f(v3s value) { return random_v3f((v3u)value); }
+	template <> forceinline v3f random(v3s value) { return random<v3f>((v3u)value); }
 	/*
-	forceinline simd_vector::v3fx8 random_v3fx8(simd_vector::v3ux8 x) {
+	template <> forceinline simd_vector::v3fxrandom_v3fx8(simd_vector::v3ux8 x) {
 		using namespace simd_vector;
 		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
 
@@ -187,36 +204,33 @@ struct DefaultRandomizer {
 	}
 	*/
 
-	forceinline f32 random_f32(v2u seed) {
-		u32 s = 0;
-		s ^= random_u32(seed.x);
-		s ^= random_u32(seed.y + s);
-		return normalize_range_f32<f32>(s);
-	}
-	forceinline f32 random_f32(v3u seed) {
-		u32 s = 0;
-		s ^= random_u32(seed.x);
-		s ^= random_u32(seed.y + s);
-		s ^= random_u32(seed.z + s);
-		return normalize_range_f32<f32>(s);
-	}
-	forceinline f32 random_f32(v2s seed) { return random_f32((v2u)seed); }
-	forceinline f32 random_f32(v3s seed) { return random_f32((v3u)seed); }
+	template <> forceinline f32 random(v2u seed) { return random<f32>(dot(seed, *(v2u *)random_primes_u32)); }
+	template <> forceinline f32 random(v3u seed) { return random<f32>(dot(seed, *(v3u *)random_primes_u32)); }
+	template <> forceinline f32 random(v4u seed) { return random<f32>(dot(seed, *(v4u *)random_primes_u32)); }
+	template <> forceinline f32 random(v2s seed) { return random<f32>((v2u)seed); }
+	template <> forceinline f32 random(v3s seed) { return random<f32>((v3u)seed); }
+	template <> forceinline f32 random(v4s seed) { return random<f32>((v4u)seed); }
 
-	forceinline u32 random_u32(f32 seed) { return random_u32(*(u32 *)&seed); }
-	forceinline u32 random_u32(v2f seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
-	forceinline u32 random_u32(v3f seed) { return random_u32(seed.x) ^ random_u32(seed.y) ^ random_u32(seed.z); }
-	//forceinline u32 random_u32(v3f seed) {
+	template <> forceinline u32 random(f32 seed) { return random<u32>(*(u32 *)&seed); }
+	template <> forceinline u32 random(v2f seed) { return random<u32>(seed.x) ^ random<u32>(seed.y); }
+	template <> forceinline u32 random(v3f seed) { return random<u32>(seed.x) ^ random<u32>(seed.y) ^ random<u32>(seed.z); }
+	//template <> forceinline u32 random(v3f seed) {
 	//	u32 result = 0xbabeface;
-	//	result ^= random_u32(seed.x);
-	//	result ^= random_u32(result ^ *(u32 *)&seed.y);
-	//	result ^= random_u32(result ^ *(u32 *)&seed.z);
+	//	result ^= random<u32>(seed.x);
+	//	result ^= random<u32>(result ^ *(u32 *)&seed.y);
+	//	result ^= random<u32>(result ^ *(u32 *)&seed.z);
 	//	return result;
 	//}
 
-	forceinline u32 random_u32(v2s seed) { return random_u32(seed.x) ^ random_u32(seed.y); }
-	forceinline u32 random_u32(v3s seed) {
+	template <> forceinline u32 random(v2s seed) { return random<u32>(seed.x) ^ random<u32>(seed.y); }
+	template <> forceinline u32 random(v3s seed) {
 		return dot((v3u)seed, *(v3u *)&random_primes_u32[0]);
+	}
+	template <> forceinline v2f random(f32 seed) {
+		return {
+			random<f32>(+seed),
+			random<f32>(-seed),
+		};
 	}
 };
 
@@ -244,7 +258,7 @@ forceinline f32 voronoi_v2f(v2f coordinate) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random_v2f(tile_position + offset) + offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v2f>(tile_position + offset) + offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
@@ -269,7 +283,7 @@ forceinline f32 voronoi_v3f(v3f coordinate) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random_v3f(tile_position + offset) + offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v3f>(tile_position + offset) + offset));
 	}
 
 
@@ -289,7 +303,7 @@ forceinline f32 voronoi_v2s(v2s coordinate, s32 step_size) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random_v2f(tile_position + offset) + (v2f)offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v2f>(tile_position + offset) + (v2f)offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
@@ -314,7 +328,7 @@ forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 		{ 1, 1,-1}, { 1, 1, 0}, { 1, 1, 1},
 	};
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random_v3f(tile_position + offset) + (v3f)offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v3f>(tile_position + offset) + (v3f)offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_3d;
@@ -333,7 +347,7 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 		for(f32 y1=-1; y1<=1; y1++){
 			for(f32 z1=-1; z1<=1; z1++){
 				v3f cell = baseCell + v3f{x1, y1, z1};
-				v3f cellPosition = cell + Randomizer{}.random_v3f(cell);
+				v3f cellPosition = cell + Randomizer{}.random<v3f>(cell);
 				v3f toCell = cellPosition - coordinate;
 				float distToCell = length(toCell);
 				if(distToCell < minDistToCell){
@@ -351,7 +365,7 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 		for(f32 y2=-1; y2<=1; y2++){
 			for(f32 z2=-1; z2<=1; z2++){
 				v3f cell = baseCell + v3f{x2, y2, z2};
-				v3f cellPosition = cell + Randomizer{}.random_v3f(cell);
+				v3f cellPosition = cell + Randomizer{}.random<v3f>(cell);
 				v3f toCell = cellPosition - coordinate;
 
 				v3f diffToClosestCell = absolute(closestCell - cell);
@@ -385,7 +399,7 @@ forceinline f32 voronoi_line_v3f(v3f coordinate) {
 				int iy = y + 1;
 				int iz = z + 1;
 				v3f offset = V3f(x,y,z);
-				r[ix][iy][iz] = offset + Randomizer{}.random_v3f(tile + offset);
+				r[ix][iy][iz] = offset + Randomizer{}.random<v3f>(tile + offset);
 			}
 		}
 	}
@@ -445,7 +459,7 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 		//	s32x8 iz = offset.z + 1;
 		//	s32x8 in = ix*3*3 + iy*3 + iz;
 		//
-		//	auto n = (v3fx8)offset + Randomizer{}.random_v3fx8(tile + offset);
+		//	auto n = (v3fx8)offset + Randomizer{}.random<v3fx8>(tile + offset);
 		//	for(int i = 0; i < 8; ++i)
 		//		((v3f *)r)[in[i]] = n.subvector(i);
 		//}
@@ -458,7 +472,7 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 					int iy = y + 1;
 					int iz = z + 1;
 					v3s offset = V3s(x,y,z);
-					r[ix][iy][iz] = (v3f)offset + Randomizer{}.random_v3f(tile + offset);
+					r[ix][iy][iz] = (v3f)offset + Randomizer{}.random<v3f>(tile + offset);
 				}
 			}
 		}
@@ -477,73 +491,65 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 	return d;
 }
 
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v2f(v2f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
-	v2f tile_position = floor(coordinate);
-	v2f local_position = coordinate - tile_position;
-
-	f32 top_left     = Randomizer{}.random_f32(tile_position + v2f{0,0});
-	f32 bottom_left  = Randomizer{}.random_f32(tile_position + v2f{0,1});
-	f32 bottom_right = Randomizer{}.random_f32(tile_position + v2f{1,1});
-	f32 top_right    = Randomizer{}.random_f32(tile_position + v2f{1,0});
-
-	f32 tx = interpolate(local_position.x);
-	f32 ty = interpolate(local_position.y);
-	f32 top    = lerp(   top_left,    top_right, tx);
-	f32 bottom = lerp(bottom_left, bottom_right, tx);
-
-	return lerp(top, bottom, ty);
+template <class Result, class Randomizer = DefaultRandomizer>
+forceinline Result value_noise(f32 tile_position, f32 local_position) {
+	Result left  = Randomizer{}.random<Result>(tile_position + 0);
+	Result right = Randomizer{}.random<Result>(tile_position + 1);
+	return lerp(left, right, local_position);
 }
+template <class Result, class Randomizer = DefaultRandomizer>
+forceinline Result value_noise(v2f tile_position, v2f local_position) {
+	Result top_left     = Randomizer{}.random<Result>(tile_position + v2f{0,0});
+	Result bottom_left  = Randomizer{}.random<Result>(tile_position + v2f{0,1});
+	Result bottom_right = Randomizer{}.random<Result>(tile_position + v2f{1,1});
+	Result top_right    = Randomizer{}.random<Result>(tile_position + v2f{1,0});
 
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v3f(v3f coordinate, f32(*interpolate)(f32) = [](f32 v){return v;}) {
-	v3f tile_position = floor(coordinate);
-	v3f local_position = coordinate - tile_position;
+	f32 tx = local_position.x;
+	f32 ty = local_position.y;
 
-	f32 left_bottom_front  = Randomizer{}.random_f32(tile_position + v3f{0,0,0});
-	f32 left_bottom_back   = Randomizer{}.random_f32(tile_position + v3f{0,0,1});
-	f32 left_top_front     = Randomizer{}.random_f32(tile_position + v3f{0,1,0});
-	f32 left_top_back      = Randomizer{}.random_f32(tile_position + v3f{0,1,1});
-	f32 right_bottom_front = Randomizer{}.random_f32(tile_position + v3f{1,0,0});
-	f32 right_bottom_back  = Randomizer{}.random_f32(tile_position + v3f{1,0,1});
-	f32 right_top_front    = Randomizer{}.random_f32(tile_position + v3f{1,1,0});
-	f32 right_top_back     = Randomizer{}.random_f32(tile_position + v3f{1,1,1});
-
-	f32 tx = interpolate(local_position.x);
-	f32 ty = interpolate(local_position.y);
-	f32 tz = interpolate(local_position.z);
-
-	f32 bottom_front = lerp(left_bottom_front, right_bottom_front, tx);
-	f32 bottom_back  = lerp(left_bottom_back,  right_bottom_back,  tx);
-	f32 top_front    = lerp(left_top_front,    right_top_front,    tx);
-	f32 top_back     = lerp(left_top_back,     right_top_back,     tx);
-
-	f32 front = lerp(bottom_front, top_front, ty);
-	f32 back  = lerp(bottom_back,  top_back,  ty);
-
-	return lerp(front, back, tz);
+	return lerp(lerp(top_left,    top_right,    tx),
+		lerp(bottom_left, bottom_right, tx), ty);
 }
+template <class Result, class Randomizer = DefaultRandomizer>
+forceinline Result value_noise(v3f tile_position, v3f local_position) {
+	Result left_bottom_front  = Randomizer{}.random<Result>(tile_position + v3f{0,0,0});
+	Result left_bottom_back   = Randomizer{}.random<Result>(tile_position + v3f{0,0,1});
+	Result left_top_front     = Randomizer{}.random<Result>(tile_position + v3f{0,1,0});
+	Result left_top_back      = Randomizer{}.random<Result>(tile_position + v3f{0,1,1});
+	Result right_bottom_front = Randomizer{}.random<Result>(tile_position + v3f{1,0,0});
+	Result right_bottom_back  = Randomizer{}.random<Result>(tile_position + v3f{1,0,1});
+	Result right_top_front    = Randomizer{}.random<Result>(tile_position + v3f{1,1,0});
+	Result right_top_back     = Randomizer{}.random<Result>(tile_position + v3f{1,1,1});
 
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v2s(v2s coordinate, s32 step, f32(*interpolate)(f32)) {
+	f32 tx = local_position.x;
+	f32 ty = local_position.y;
+	f32 tz = local_position.z;
+
+	return lerp(lerp(lerp(left_bottom_front, right_bottom_front, tx), 
+		             lerp(left_top_front,    right_top_front,    tx), ty),
+		        lerp(lerp(left_bottom_back,  right_bottom_back,  tx),
+		             lerp(left_top_back,     right_top_back,     tx), ty), tz);
+}
+template <class Result, class Randomizer = DefaultRandomizer, class Interpolate = decltype([](f32 f){ return f; })>
+forceinline Result value_noise(v2s coordinate, s32 step, Interpolate interpolate = {}) {
 	v2s floored = floor(coordinate, step);
 	v2s tile = floored / step;
 	v2f local = (v2f)(coordinate - floored) * reciprocal((f32)step);
 
-	f32 top_left     = Randomizer{}.random_f32(tile + v2s{0,0});
-	f32 bottom_left  = Randomizer{}.random_f32(tile + v2s{0,1});
-	f32 bottom_right = Randomizer{}.random_f32(tile + v2s{1,1});
-	f32 top_right    = Randomizer{}.random_f32(tile + v2s{1,0});
+	Result top_left     = Randomizer{}.random<Result>(tile + v2s{0,0});
+	Result bottom_left  = Randomizer{}.random<Result>(tile + v2s{0,1});
+	Result bottom_right = Randomizer{}.random<Result>(tile + v2s{1,1});
+	Result top_right    = Randomizer{}.random<Result>(tile + v2s{1,0});
 
 	f32 tx = interpolate(local.x);
 	f32 ty = interpolate(local.y);
-	f32 top    = lerp(   top_left,    top_right, tx);
-	f32 bottom = lerp(bottom_left, bottom_right, tx);
+	Result top    = lerp(   top_left,    top_right, tx);
+	Result bottom = lerp(bottom_left, bottom_right, tx);
 
 	return lerp(top, bottom, ty);
 }
-template <class Randomizer = DefaultRandomizer, class Interpolate>
-forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpolate) {
+template <class Result, class Randomizer = DefaultRandomizer, class Interpolate = decltype([](f32 f){ return f; })>
+forceinline Result value_noise(v3s coordinate, s32 step, Interpolate interpolate = {}) {
 	static_assert(std::is_same_v<decltype(interpolate(0.0f)), f32>);
 	v3s floored = floor(coordinate, step);
 	v3s tile = floored / step;
@@ -588,43 +594,36 @@ forceinline f32 value_noise_v3s(v3s coordinate, s32 step, Interpolate &&interpol
 
 	return a.s[0];
 #else
-	f32 left_bottom_back   = Randomizer{}.random_f32(tile + v3s{0,0,0});
-	f32 right_bottom_back  = Randomizer{}.random_f32(tile + v3s{1,0,0});
-	f32 left_top_back      = Randomizer{}.random_f32(tile + v3s{0,1,0});
-	f32 right_top_back     = Randomizer{}.random_f32(tile + v3s{1,1,0});
-	f32 left_bottom_front  = Randomizer{}.random_f32(tile + v3s{0,0,1});
-	f32 right_bottom_front = Randomizer{}.random_f32(tile + v3s{1,0,1});
-	f32 left_top_front     = Randomizer{}.random_f32(tile + v3s{0,1,1});
-	f32 right_top_front    = Randomizer{}.random_f32(tile + v3s{1,1,1});
+	Result left_bottom_back   = Randomizer{}.random<Result>(tile + v3s{0,0,0});
+	Result right_bottom_back  = Randomizer{}.random<Result>(tile + v3s{1,0,0});
+	Result left_top_back      = Randomizer{}.random<Result>(tile + v3s{0,1,0});
+	Result right_top_back     = Randomizer{}.random<Result>(tile + v3s{1,1,0});
+	Result left_bottom_front  = Randomizer{}.random<Result>(tile + v3s{0,0,1});
+	Result right_bottom_front = Randomizer{}.random<Result>(tile + v3s{1,0,1});
+	Result left_top_front     = Randomizer{}.random<Result>(tile + v3s{0,1,1});
+	Result right_top_front    = Randomizer{}.random<Result>(tile + v3s{1,1,1});
 
-	f32 left_bottom  = lerp(left_bottom_back,  left_bottom_front,  tz);
-	f32 right_bottom = lerp(right_bottom_back, right_bottom_front, tz);
-	f32 left_top     = lerp(left_top_back,     left_top_front,     tz);
-	f32 right_top    = lerp(right_top_back,    right_top_front,    tz);
+	Result left_bottom  = lerp(left_bottom_back,  left_bottom_front,  tz);
+	Result right_bottom = lerp(right_bottom_back, right_bottom_front, tz);
+	Result left_top     = lerp(left_top_back,     left_top_front,     tz);
+	Result right_top    = lerp(right_top_back,    right_top_front,    tz);
 
-	f32 left  = lerp(left_bottom,  left_top,  ty);
-	f32 right = lerp(right_bottom, right_top, ty);
+	Result left  = lerp(left_bottom,  left_top,  ty);
+	Result right = lerp(right_bottom, right_top, ty);
 
 	return lerp(left, right, tx);
 #endif
 }
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v2s_linear(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return v; }); }
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v3s_linear(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return v; }); }
+
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(f32 position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(v2f position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(v3f position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(f32 position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v2f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v3f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
 
 template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v2s_smooth(v2s coordinate, s32 step) { return value_noise_v2s(coordinate, step, [](f32 v){ return smoothstep(v); }); }
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v3s_smooth(v3s coordinate, s32 step) { return value_noise_v3s(coordinate, step, [](f32 v){ return smoothstep(v); }); }
-
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v2s(v2s coordinate, s32 step) { return value_noise_v2s_linear(coordinate, step); }
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 value_noise_v3s(v3s coordinate, s32 step) { return value_noise_v3s_linear(coordinate, step); }
-
-template <class Randomizer = DefaultRandomizer>
-forceinline f32 gradient_noise_f32(f32 coordinate) {
+forceinline f32 gradient_noise(f32 coordinate) {
 	f32 tile = floor(coordinate);
 	f32 local = frac(coordinate);
 
@@ -633,7 +632,7 @@ forceinline f32 gradient_noise_f32(f32 coordinate) {
 
 	static constexpr f32 directions[] = {-1, -.75, -.5, -.25, .25, .5, .75, 1};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](f32 offset) { return directions[(Randomizer{}.random_u32(tile + offset) >> 26) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](f32 offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 26) & (count_of(directions) - 1)]; };
 	f32 d0 = get_direction(0);
 	f32 d1 = get_direction(1);
 
@@ -645,7 +644,7 @@ forceinline f32 gradient_noise_f32(f32 coordinate) {
 }
 
 template <class Randomizer = DefaultRandomizer>
-forceinline f32 gradient_noise_v2f(v2f coordinate) {
+forceinline f32 gradient_noise(v2f coordinate) {
 	v2f tile = floor(coordinate);
 	v2f local = frac(coordinate);
 
@@ -663,7 +662,7 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
 		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2f offset) { return directions[(Randomizer{}.random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v2f offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v2f g00 = get_direction(v2f{0, 0});
 	v2f g10 = get_direction(v2f{1, 0});
 	v2f g01 = get_direction(v2f{0, 1});
@@ -679,7 +678,7 @@ forceinline f32 gradient_noise_v2f(v2f coordinate) {
 }
 
 template <class Randomizer = DefaultRandomizer>
-forceinline f32 gradient_noise_v3f(v3f coordinate) {
+forceinline f32 gradient_noise(v3f coordinate) {
 	v3f tile = floor(coordinate);
 	v3f local = frac(coordinate);
 
@@ -700,7 +699,7 @@ forceinline f32 gradient_noise_v3f(v3f coordinate) {
 
 	v3f t = smoothstep(local);
 
-	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v3f g000 = get_direction({0, 0, 0});
 	v3f g100 = get_direction({1, 0, 0});
 	v3f g010 = get_direction({0, 1, 0});
@@ -727,7 +726,7 @@ forceinline f32 gradient_noise_v3f(v3f coordinate) {
 }
 
 template <class Randomizer = DefaultRandomizer>
-forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
+forceinline f32 gradient_noise(v2s coordinate, s32 step) {
 	v2s floored = floor(coordinate, step);
 	v2s tile = floored / step;
 	v2f local = (v2f)(coordinate - floored) * reciprocal((f32)step);
@@ -746,7 +745,7 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
 		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2s offset) { return directions[(Randomizer{}.random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v2s offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v2f g00 = get_direction(v2s{0, 0});
 	v2f g10 = get_direction(v2s{1, 0});
 	v2f g01 = get_direction(v2s{0, 1});
@@ -762,7 +761,7 @@ forceinline f32 gradient_noise_v2s(v2s coordinate, s32 step) {
 }
 
 template <class Randomizer = DefaultRandomizer>
-forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
+forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 	v3s floored = floor(coordinate, step);
 	v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
@@ -790,7 +789,7 @@ forceinline f32 gradient_noise_v3s(v3s coordinate, s32 step) {
 
 	v3f t = smoothstep(local);
 
-	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.random_u32(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
     v3f g000 = get_direction({0, 0, 0});
     v3f g100 = get_direction({1, 0, 0});
     v3f g010 = get_direction({0, 1, 0});

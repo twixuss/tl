@@ -54,6 +54,7 @@ namespace tl {
 	K(minus        , 0xbd) \
 	K(period       , 0xbe) \
 	K(slash        , 0xbf) \
+	K(accent       , 0xc0) \
 	K(left_bracket , 0xdb) \
 	K(backslash    , 0xdc) \
 	K(right_bracket, 0xdd) \

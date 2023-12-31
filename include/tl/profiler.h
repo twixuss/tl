@@ -140,7 +140,7 @@ struct ProfileRenderer {
 	using Nanoseconds = s64;
 	struct Event {
 		aabb<v2s64> rect;
-		Event *parent;
+		//Event *parent;
 		Span<utf8> name;
 		Nanoseconds begin;
 		Nanoseconds end;
@@ -392,11 +392,13 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 	ContiguousHashMap<u32, ThreadDrawList, DefaultHashTraits<u32>, TemporaryAllocator> thread_id_to_events_to_draw;
 
 	for (auto span : spans) {
+		auto begin = (Nanoseconds)divide(multiply(span.begin, 1'000'000'000), performance_frequency);
+		auto end = (Nanoseconds)divide(multiply(span.end, 1'000'000'000), performance_frequency);
 		Event e = {
 			.name = span.name,
-			.begin = (Nanoseconds)divide(multiply(span.begin, 1'000'000'000), performance_frequency),
-			.end = (Nanoseconds)divide(multiply(span.end, 1'000'000'000), performance_frequency),
-			.self_duration = (Nanoseconds)divide(multiply(span.end - span.begin, 1'000'000'000), performance_frequency),
+			.begin = begin,
+			.end = end,
+			.self_duration = end - begin,
 		};
 		auto &t = thread_id_to_events_to_draw.get_or_insert(span.thread_id);
 		t.id = span.thread_id;
@@ -416,74 +418,90 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 	}
 
 	events_duration = events_end - events_begin;
-	
-	List<EventGroup, TemporaryAllocator> event_groups;
 
 	for (auto &[thread_id, events_to_draw] : thread_id_to_events_to_draw) {
 		quick_sort(events_to_draw.events, [](Event const &a, Event const &b) {
-			if (a.begin == b.begin) {
-				return a.duration() > b.duration();
+			if (a.begin != b.begin) {
+				return a.begin < b.begin;
 			}
-			return a.begin < b.begin;
+			return a.duration() > b.duration();
 		});
 
-		List<Event *, TemporaryAllocator> parent_events;
+		List<Event *, TemporaryAllocator> event_stack;
 
 		for (auto &event : events_to_draw.events) {
-			//
-			// Insert group
-			//
-			auto found_group = find_if(event_groups, [&](auto &g) {return g.name == event.name;});
-			auto &group = *(found_group ? found_group : &event_groups.add({event.name}));
-			group.total_duration += event.duration();
-
-
 			//
 			// Calculate depth
 			//
 			event.begin -= events_begin;
 			event.end -= events_begin;
 
-			Event *parent = 0;
 
-		check_next_parent:
-			if (parent_events.count) {
-				parent = parent_events.back();
-			}
-			if (parent) {
-				if (intersects(aabb_min_max<s64>(parent->begin, parent->end), aabb_min_max<s64>(event.begin, event.end))) {
-					if (event.begin == parent->begin && event.duration() > parent->duration()) {
-						// 'parent' is actually a child (deeper in the stack), and 'event' is parent,
-						// so swap em
-						if (parent->parent) {
-							parent->parent->self_duration =
-								parent->parent->self_duration
-								+ parent->duration()
-								- event.duration();
-						}
-						event.self_duration -= parent->duration();
-
-						event.parent = parent->parent;
-						event.depth  = parent->depth;
-						parent->parent = &event;
-						parent->depth += 1;
-						parent_events.back() = &event;
-						parent_events.add(parent);
-					} else {
-						event.parent = parent;
-						event.depth = parent->depth + 1;
-						parent_events.add(&event);
-						parent->self_duration -= event.duration();
+			while (1) {
+				if (event_stack.count) {
+					auto previous = event_stack.back();
+					assert(event.begin >= previous->begin);
+					if (event.begin >= previous->end) {
+						event_stack.pop();
+						continue;
 					}
-					continue;
+					previous->self_duration -= event.duration();
+					event.depth = previous->depth + 1;
 				} else {
-					parent_events.pop();
-					parent = 0;
-					goto check_next_parent;
+					event.depth = 0;
 				}
-			} else {
-				parent_events.add(&event);
+				event_stack.add(&event);
+				break;
 			}
+
+
+
+
+
+
+
+
+
+		//	Event *parent = 0;
+
+		//check_next_parent:
+		//	if (event_stack.count) {
+		//		parent = event_stack.back();
+		//	}
+		//	if (parent) {
+		//		if (intersects(aabb_min_max(parent->begin, parent->end), aabb_min_max(event.begin, event.end))) {
+		//			if (event.begin == parent->begin && event.duration() > parent->duration()) {
+		//				// 'parent' is actually a child (deeper in the stack), and 'event' is parent,
+		//				// so swap em
+		//				if (parent->parent) {
+		//					parent->parent->self_duration =
+		//						parent->parent->self_duration
+		//						+ parent->duration()
+		//						- event.duration();
+		//				}
+		//				event.self_duration -= parent->duration();
+
+		//				event.parent = parent->parent;
+		//				event.depth  = parent->depth;
+		//				parent->parent = &event;
+		//				parent->depth += 1;
+		//				event_stack.back() = &event;
+		//				event_stack.add(parent);
+		//			} else {
+		//				event.parent = parent;
+		//				event.depth = parent->depth + 1;
+		//				event_stack.add(&event);
+		//				parent->self_duration -= event.duration();
+		//			}
+		//			continue;
+		//		} else {
+		//			event_stack.pop();
+		//			parent = 0;
+		//			goto check_next_parent;
+		//		}
+		//	} else {
+		//		event_stack.add(&event);
+		//	}
 		}
 
 		for (auto &mark : events_to_draw.marks) {

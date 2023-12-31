@@ -280,6 +280,16 @@ struct BucketHashMap : Traits {
 		}
 		return 0;
 	}
+	Value erase(KeyValue *kv) {
+		if (buckets.count == 0)
+			return {};
+
+		umm hash = get_hash(kv->key);
+		auto &bucket = buckets[get_index_from_hash(hash, buckets.count)];
+		auto result = kv->value;
+		tl::erase(bucket, (HashKeyValue *)((u8 *)kv - offsetof(HashKeyValue, kv)));
+		return result;
+	}
 	Optional<Value> erase(Key const &key) {
 		if (buckets.count == 0)
 			return {};
@@ -489,14 +499,49 @@ struct ContiguousHashMap : Traits {
 		Value &value() { return key_value.value; }
 	};
 
+	struct Iterator {
+		ContiguousHashMap *map = 0;
+		Cell *cell = 0;
+
+		Iterator &operator++() {
+			do {
+				++cell; 
+				if (cell == map->cells.end()) {
+					cell = 0;
+					return *this;
+				}
+			} while (cell->state != CellState::occupied);
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return cell == that.cell; }
+		bool operator!=(Iterator const &that) { return cell != that.cell; }
+		auto &operator*() { return cell->key_value; }
+		auto *operator->() { return &cell->key_value; }
+	};
+
 	Span<Cell> cells;
 	umm count = 0;
 
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-	Value &get_or_insert(Key key TL_LP) {
-		defer { debug(); };
+	Iterator begin() { 
+		if (cells.count == 0)
+			return {this, 0};
 
+		Iterator it = {this, cells.begin()};
+		if (cells[0].state != CellState::occupied)
+			++it;
+
+		return it;
+	}
+	Iterator end() { return {this, 0}; }
+
+	Value &get_or_insert(Key key TL_LP) {
 		auto hash = get_hash(key);
 		u64 index = 0;
 		if (cells.count) {
@@ -546,8 +591,6 @@ struct ContiguousHashMap : Traits {
 	}
 
 	bool reserve(umm desired TL_LP) {
-		defer { debug(); };
-
 		if (desired <= cells.count)
 			return false;
 
@@ -580,8 +623,6 @@ struct ContiguousHashMap : Traits {
 	}
 
 	Value &insert_into(Span<Cell> cells, Key key, Value value) {
-		defer { debug(); };
-
 		auto hash = get_hash(key);
 		auto index = get_index_from_hash(hash, cells.count);
 
@@ -598,8 +639,6 @@ struct ContiguousHashMap : Traits {
 	}
 
 	KeyValue *find(Key key) const {
-		defer { debug(); };
-
 		if (cells.count == 0)
 			return 0;
 
@@ -628,12 +667,18 @@ struct ContiguousHashMap : Traits {
 		}
 		count = 0;
 	}
-
-	void erase(v3s key) {
-		defer { debug(); };
-
+	void erase(Iterator it) {
 		bounds_check(cells.count);
-		
+		it.cell->state = CellState::removed;
+	}
+	void erase(KeyValue *kv) {
+		bounds_check(cells.count);
+		auto cell = (Cell *)((u8 *)kv - offsetof(Cell, key_value));
+		cell->state = CellState::removed;
+	}
+	void erase(Key key) {
+		bounds_check(cells.count);
+
 		auto hash = get_hash(key);
 		auto index = get_index_from_hash(hash, cells.count);
 
@@ -649,53 +694,6 @@ struct ContiguousHashMap : Traits {
 			}
 			index = step(index, cells.count);
 		}
-	}
-
-	struct Iterator {
-		ContiguousHashMap *map = 0;
-		Cell *cell = 0;
-
-		Iterator &operator++() {
-			do {
-				++cell; 
-				if (cell == map->cells.end()) {
-					cell = 0;
-					return *this;
-				}
-			} while (cell->state != CellState::occupied);
-			return *this;
-		}
-		Iterator operator++(int) {
-			Iterator copy = *this;
-			++*this;
-			return copy;
-		}
-		bool operator==(Iterator const &that) { return cell == that.cell; }
-		bool operator!=(Iterator const &that) { return cell != that.cell; }
-		auto &operator*() { return cell->key_value; }
-		auto *operator->() { return &cell->key_value; }
-	};
-
-	Iterator begin() { 
-		if (cells.count == 0)
-			return {this, 0};
-
-		Iterator it = {this, cells.begin()};
-		if (cells[0].state != CellState::occupied)
-			++it;
-
-		return it;
-	}
-	Iterator end() { return {this, 0}; }
-
-	void debug() const {
-
-		for (auto cell : cells) {
-			if ((int)cell.state > 2) {
-				debug_break();
-			}
-		}
-
 	}
 };
 
@@ -718,7 +716,17 @@ template <CContiguousHashMap Map, class Fn>
 void for_each(Map map, Fn &&fn) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
 	for (auto &cell : map.cells) {
 		if (cell.state == ContiguousHashMapCellState::occupied) {
-			fn(cell.key_value);
+			using FnRet = decltype(fn(cell.key_value));
+			if constexpr (std::is_same_v<FnRet, void>) {
+				fn(cell.key_value);
+			} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
+				switch (fn(cell.key_value)) {
+					case ForEach_break: return;
+					case ForEach_erase: cell.state = Map::CellState::removed; break;
+				}
+			} else {
+				static_error_t(Map, "Invalid return type of for_each function");
+			}
 		}
 	}
 }

@@ -17,6 +17,7 @@
 #include <type_traits>
 #include <tuple>
 #include <source_location>
+#include <bit>
 
 #if COMPILER_MSVC
 	#pragma warning(pop)
@@ -160,19 +161,10 @@ template <class T> inline constexpr bool is_float = false;
 template <> inline constexpr bool is_float<f32> = true;
 template <> inline constexpr bool is_float<f64> = true;
 
-template <class ToFind, class First, class ...Rest>
-inline constexpr u32 type_index(u32 start = 0) {
-	if constexpr (std::is_same_v<ToFind, First>) {
-		return start;
-	} else {
-		return type_index<ToFind, Rest...>(start + 1);
-	}
-}
+struct Empty {};
 
 template <class ...T>
-inline constexpr umm type_count() {
-	return sizeof...(T);
-}
+inline constexpr umm type_count_of = sizeof...(T);
 
 template <u32 index, class ...Rest>
 struct TypeAtT;
@@ -185,6 +177,18 @@ struct TypeAtT<index, First, Rest...> { using Type = typename TypeAtT<index-1, R
 
 template <u32 index, class ...Rest>
 using TypeAt = typename TypeAtT<index, Rest...>::Type;
+
+template <typename T, typename... Rest>
+struct IndexOfT;
+
+template <typename T, typename... Rest>
+struct IndexOfT<T, T, Rest...> : std::integral_constant<std::size_t, 0> {};
+
+template <typename T, typename U, typename... Rest>
+struct IndexOfT<T, U, Rest...> : std::integral_constant<std::size_t, 1 + IndexOfT<T, Rest...>::value> {};
+
+template <typename T, typename... Rest>
+constexpr umm type_index_of = IndexOfT<T, Rest...>::value;
 
 template <class First, class ...Rest>
 concept AllSame = (std::is_same_v<First, Rest> && ...);
@@ -403,6 +407,16 @@ inline constexpr void Swap(T &a, T &b) {
 	T t = a;
 	a = b;
 	b = t;
+}
+
+template <class T, umm count>
+constexpr bool index_of(T (&array)[count], T *pointer) {
+	return pointer - array;
+}
+
+template <class T, umm count>
+constexpr bool owns(T (&array)[count], T *pointer) {
+	return index_of(array, pointer) < count;
 }
 
 // NOTE: have to use const & to pass arrays, otherwise they rot.
@@ -868,6 +882,7 @@ constexpr void for_each(T (&array)[count], Fn &&fn) {
 		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
 			switch (fn(*it)) {
 				case ForEach_break: return;
+				case ForEach_erase: invalid_code_path("Can't erase from an array.");
 			}
 		} else {
 			static_error_t(T, "Invalid return type of for_each function");
@@ -1034,8 +1049,14 @@ struct Optional {
 		_has_value = false;
 	}
 	constexpr Optional(T that) {
-		_value = that;
+		new (&_value) T(that);
 		_has_value = true;
+	}
+	constexpr Optional(Optional<T> const &that) {
+		if (that._has_value) {
+			new (&_value) T(that._value);
+		}
+		_has_value = that._has_value;
 	}
 	constexpr Optional(null_opt_t) {
 		_has_value = false;
@@ -1043,12 +1064,6 @@ struct Optional {
 	constexpr ~Optional() {
 		if (_has_value)
 			_value.~T();
-	}
-	constexpr Optional &operator=(T that) {
-		return *new(this) Optional(that);
-	}
-	constexpr Optional &operator=(null_opt_t) {
-		return *new(this) Optional();
 	}
 
 	constexpr void reset() {
@@ -1108,6 +1123,25 @@ template <class T> Optional<T> operator&(Optional<T> a, Optional<T> b) { return 
 template <class T> Optional<T> operator|(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() | b.value_unchecked()} : Optional<T>{}; }
 template <class T> Optional<T> operator<<(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() << b.value_unchecked()} : Optional<T>{}; }
 template <class T> Optional<T> operator>>(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() >> b.value_unchecked()} : Optional<T>{}; }
+
+template <class T> 
+bool operator==(Optional<T> a, Optional<T> b) { 
+	if (a) {
+		if (b) {
+			return a.value_unchecked() == b.value_unchecked();
+		} else {
+			return false;
+		}
+	} else {
+		return !b;
+	}
+}
+
+template <class T> bool operator!=(Optional<T> a, Optional<T> b) { return !(a == b); }
+template <class T> bool operator==(Optional<T> a, T b) { return a == Optional<T>(b); }
+template <class T> bool operator!=(Optional<T> a, T b) { return !(a == b); }
+template <class T> bool operator==(T a, Optional<T> b) { return Optional<T>(a) == b; }
+template <class T> bool operator!=(T a, Optional<T> b) { return !(a == b); }
 
 template <class Value, class Error> 
 struct Result {
@@ -1328,6 +1362,12 @@ struct Span {
 
 	constexpr explicit operator bool() const { return count; }
 
+	Span operator||(Span that) const {
+		if (count) 
+			return *this;
+		return that;
+	}
+
 	ValueType *data = 0;
 	Size count = 0;
 };
@@ -1484,6 +1524,11 @@ constexpr Span<T> value_as_span(T const &value) {
 
 template <class T, class Size>
 constexpr umm count_of(Span<T, Size> span) { return span.count; }
+
+template <class T>
+constexpr bool owns(Span<T> span, T *pointer) {
+	return (umm)(pointer - span.data) < span.count;
+}
 
 template <class T, class Size, class Fn>
 umm count(Span<T, Size> span, Fn &&fn) {
@@ -1721,6 +1766,16 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 	}
 
 	process_group(span.subspan(first_index, span.count - first_index));
+}
+
+template <class T>
+constexpr T dot(Span<T> a, Span<T> b) {
+	assert(a.count == b.count);
+	T result = {};
+	for (umm i = 0; i < a.count; ++i) {
+		result += a.data[i] * b.data[i];
+	}
+	return result;
 }
 
 inline constexpr bool is_whitespace(ascii c) {
@@ -2240,6 +2295,15 @@ bool find_and_erase_unordered(Collection &collection, T value) {
 	}
 	return false;
 }
+template <class Collection, class Predicate>
+bool find_if_and_erase_unordered(Collection &collection, Predicate predicate) {
+	auto found = find_if(collection, predicate);
+	if (found) {
+		erase_unordered(collection, found);
+		return true;
+	}
+	return false;
+}
 
 /*
 template <class ...Types>
@@ -2515,6 +2579,10 @@ Allocator make_allocator_from(CustomAllocator *allocator) {
 struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 
 	static DefaultAllocator current() { return {}; }
+
+	bool is_valid() {
+		return true;
+	}
 
 	AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
 		return {
@@ -2831,12 +2899,14 @@ void rotate(Span<T> span, smm to_be_first_index) {
 	}
 }
 
-template <class T>
-void quick_sort(Span<T> span, auto fn) {
-	if (span.count < 2)
-		return;
+enum class QuickSortPivot {
+	middle,
+	last,
+};
 
-	auto compare = [&] (T a, T b) {
+template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
+void quick_sort(Span<T> span, auto fn) {
+	auto less = [&] (T a, T b) {
 		if constexpr (std::is_invocable_r_v<bool, decltype(fn), T, T>) {
 			return fn(a, b);
 		} else {
@@ -2844,34 +2914,53 @@ void quick_sort(Span<T> span, auto fn) {
 		}
 	};
 
-	auto partition = [&](T *begin, T *end) {
-		auto pivot = end[-1];
-		auto mid = begin;
-		for (auto i = begin; i < end-1; i++)
-		{
-			if (compare(*i, pivot))
-			{
-				Swap(*i, *mid);
-				mid++;
+	switch (span.count) {
+		case 0:
+		case 1:
+			return;
+		case 2: {
+			if (!less(span[0], span[1])) {
+				Swap(span[0], span[1]);
 			}
+			return;
 		}
+	}
 
-		Swap(*mid, end[-1]);
+	T pivot = {};
+	T *mid = 0;
 
-		return mid;
-	};
+	switch (pivot_mode) {
+		case QuickSortPivot::middle: {
+			auto p = midpoint(span.begin(), span.end());
+			pivot = *p;
+			Swap(*p, span.end()[-1]);
+			break;
+		}
+		case QuickSortPivot::last: {
+			pivot = span.end()[-1];
+			break;
+		}
+	}
 
-	T *p = partition(span.begin(), span.end());
-	quick_sort(Span<T>{span.begin(), p}, fn);
-	quick_sort(Span<T>{p+1, span.end()}, fn);
+	mid = span.begin();
+	for (auto i = span.begin(); i < span.end() - 1; i++) {
+		if (less(*i, pivot)) {
+			Swap(*i, *mid);
+			mid++;
+		}
+	}
+	Swap(*mid, span.end()[-1]);
+
+	quick_sort(Span<T>{span.begin(), mid}, fn);
+	quick_sort(Span<T>{mid + 1, span.end()}, fn);
 }
-template <class T>
+template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span) {
-	quick_sort(span, [](T a, T b) { return a < b; });
+	quick_sort<pivot_mode>(span, [](T a, T b) { return a < b; });
 }
-template <class T, umm size>
+template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T, umm size>
 void quick_sort(T (&array)[size], auto ...args) {
-	quick_sort(array_as_span(array), args...);
+	quick_sort<pivot_mode>(array_as_span(array), args...);
 }
 
 #ifdef TL_IMPL

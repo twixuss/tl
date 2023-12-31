@@ -17,81 +17,48 @@ static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
 
 } // namespace Detail
 
+template <class Allocator = Allocator>
+struct StorableFunction {
+	Allocator allocator = {};
 
-struct FunctionStorage {
-	Allocator allocator;
+	void (*function)(void *param) = 0;
+	void *param = 0;
 
-	void (*function)(void *param);
-	void *param;
+	StorableFunction() = default;
 
-	void operator()() {
-		return function(param);
+	StorableFunction(void (*function)(void *param), void *param) {
+		this->function = function;
+		this->param = param;
 	}
 
-	struct Maker {
-		inline FunctionStorage operator>(void (*func)()) const {
-			FunctionStorage result = {};
-			result.function = (void (*)(void *))func;
-			return result;
-		}
-		template <class Fn>
-		inline FunctionStorage operator>(Fn &&fn) const {
-			if constexpr (std::is_convertible_v<Fn, void(*)()>) {
-				return operator>((void(*)())fn);
-			} else {
-				auto allocator = current_allocator;
+	StorableFunction(void (*function)()) {
+		this->function = autocast function;
+	}
 
-				auto params = allocator.allocate_uninitialized<Fn>();
-				new(params) Fn(std::forward<Fn>(fn));
-
-				FunctionStorage result = {};
-				result.allocator = allocator;
-				result.function = [](void *param) {
-					(*(Fn *)param)();
-				};
-				result.param = params;
-				return result;
-			}
-		}
-	};
-
-	inline static constexpr Maker make = {};
-};
-
-inline FunctionStorage create_function_storage(void (*func)(void *param), void *param) {
-	FunctionStorage result = {};
-	result.function = func;
-	result.param = param;
-	return result;
-}
-inline FunctionStorage create_function_storage(void (*func)()) {
-	FunctionStorage result = {};
-	result.function = (void (*)(void *))func;
-	return result;
-}
-template <class Fn, class ...Args>
-FunctionStorage create_function_storage(Fn &&fn, Args &&...args) {
-	if constexpr (std::is_convertible_v<Fn, void(*)()>) {
-		return create_function_storage((void(*)())fn);
-	} else {
-		auto allocator = current_allocator;
+	template <class Fn, class ...Args>
+	requires requires(Fn fn, Args ...args) { fn(args...); }
+	StorableFunction(Fn fn, Args ...args) {
+		allocator = Allocator::current();
 
 		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
 		auto params = allocator.allocate_uninitialized<Tuple>();
 		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
 
-		FunctionStorage result = {};
-		result.allocator = allocator;
-		result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-		result.param = params;
-		return result;
+		function = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+		param = params;
 	}
-}
-inline void free(FunctionStorage &function) {
-	if (function.allocator)
-		function.allocator.free(function.param);
-	function = {};
-}
+
+	void operator()() {
+		return function(param);
+	}
+
+	void free() {
+		if (param)
+			allocator.free(param);
+		*this = {};
+	}
+};
+
 
 
 template <class Ret, class ...Args>

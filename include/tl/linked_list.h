@@ -134,6 +134,16 @@ struct LinkedList {
 		return result;
 	}
 
+	umm count() {
+		umm result = 0;
+		auto node = head;
+		while (node) {
+			result += 1;
+			node = node->next;
+		}
+		return result;
+	}
+
 	T &front() { bounds_check(head); return head->value; }
 	T const &front() const { bounds_check(head); return head->value; }
 
@@ -208,13 +218,7 @@ void for_each(LinkedList<T> list, Fn &&fn) {
 
 template <class T>
 umm count_of(LinkedList<T> list) {
-	umm result = 0;
-	auto node = list.head;
-	while (node) {
-		result += 1;
-		node = node->next;
-	}
-	return result;
+	return list.count();
 }
 
 }

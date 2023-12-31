@@ -72,28 +72,21 @@ struct PlacedChar {
 	aabb<v2f> uv = {};
 };
 
-struct TextInfo {
-	List<PlacedChar> placed_chars;
+struct PlacedText {
+	List<PlacedChar> chars;
 	aabb<v2s> bounds = {};
 	u32 line_count = 0;
 };
 
-struct GetTextInfoParams {
-	bool place_chars = false;
-	bool bounds = false;
-	f32 line_alignment = -1; // -1 = left-aligned; 0 = centered; 1 = right-aligned
+struct PlaceTextParams {
+	f32 line_alignment = 0; // 0 = left-aligned; 0.5 = centered; 1 = right-aligned
+	u32 wrap_width = 100;
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
 TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 TL_API void free(FontCollection *collection);
-TL_API TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams params = {} TL_LP);
-inline List<PlacedChar> place_text(Span<utf8> text, SizedFont *font TL_LP) {
-	return calculate_text(text, font, {.place_chars=true} TL_LA).placed_chars;
-}
-inline aabb<v2s> get_text_bounds(Span<utf8> text, SizedFont *font TL_LP) {
-	return calculate_text(text, font, {.bounds=true} TL_LA).bounds;
-}
+TL_API PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params = {} TL_LP);
 
 }
 
@@ -319,16 +312,14 @@ FontChar get_char_info(u32 ch, SizedFont *font) {
 	return found->value;
 }
 
-TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams params TL_LPD) {
-	TextInfo info = {};
+PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params TL_LPD) {
+	PlacedText result = {};
 	v2s char_position = {};
 	char_position.y = font->ascender - font->line_spacing;
 
-	if (params.bounds) {
-		info.bounds.min = max_value<v2s>;
-		info.bounds.max = min_value<v2s>;
-	}
-	info.line_count = 1;
+	result.bounds.min = max_value<v2s>;
+	result.bounds.max = min_value<v2s>;
+	result.line_count = 1;
 
 	struct LineInfo {
 		umm begin_index;
@@ -338,72 +329,96 @@ TextInfo calculate_text(Span<utf8> text, SizedFont *font, GetTextInfoParams para
 	List<LineInfo, TemporaryAllocator> line_infos;
 
 	aabb<s32> line_x_bounds = {max_value<s32>, min_value<s32>};
-	umm begin_index = 0;
+	umm line_begin_index = 0;
 	
 	s32 max_line_width = 0;
 
 	auto current_char = text.data;
 
-	while (current_char < text.end()) {
-		auto got_char = get_char_and_advance_utf8(&current_char);
-		if (!got_char) {
-			invalid_code_path();
-		}
-		auto code_point = got_char.value();
+	utf8 *word_start = text.begin();
+	umm word_start_index = 0;
+	bool is_wrapping = false;
 
-		auto d = get_char_info(code_point, font);
+	while (current_char < text.end()) {
+		utf32 code_point = {};
+		FontChar d = {};
+
+		auto read_char = [&] {
+			auto got_char = get_char_and_advance_utf8(&current_char);
+			if (!got_char) {
+				invalid_code_path();
+			}
+			code_point = got_char.value();
+			d = get_char_info(code_point, font);
+		};
+
+		read_char();
+
+		if (is_whitespace(code_point)) {
+			word_start = current_char;
+			word_start_index = result.chars.count;
+			is_wrapping = false;
+		}
 
 		if (code_point == '\n') {
-			line_infos.add({.begin_index = begin_index, .end_index = info.placed_chars.count, .width = line_x_bounds.size()});
+			line_infos.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
 			max_line_width = max(max_line_width, line_x_bounds.size());
 			line_x_bounds = {max_value<s32>, min_value<s32>};
 			char_position.x = 0;
 			char_position.y += font->line_spacing;
-			info.line_count += 1;
-			begin_index = info.placed_chars.count;
-		}
-		if (params.place_chars) {
-			if (code_point != '\n') {
-				PlacedChar c;
+			result.line_count += 1;
+			line_begin_index = result.chars.count;
+		} else {
+			PlacedChar c;
 
+			auto place_char = [&] {
 				c.position.min = {char_position.x + d.offset.x, char_position.y + (s32)font->size - d.offset.y};
 				c.position.max = c.position.min + (v2s)d.size;
+			};
 
-				c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
-				c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
+			place_char();
 
-				info.placed_chars.add(c TL_LA);
+			if (!is_wrapping && c.position.max.x > params.wrap_width) {
+				is_wrapping = true;
 
-				line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
-				line_x_bounds.max = max(line_x_bounds.max, c.position.max.x);
+				current_char = word_start;
+				read_char();
+
+				result.chars.resize(word_start_index);
+
+				char_position.x = 0;
+				char_position.y += font->line_spacing;
+
+				place_char();
 			}
-		}
-		if (params.bounds) {
-			if (code_point != '\n') {
-				v2s position_min = {char_position.x + d.offset.x, char_position.y + font->size - d.offset.y};
-				v2s position_max = position_min + (v2s)d.size;
-				info.bounds.max = max(info.bounds.max, position_max);
-				info.bounds.min = min(info.bounds.min, position_min);
 
-			}
-		}
-		if (code_point != '\n') {
+			c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
+			c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
+
+			result.bounds.max = max(result.bounds.max, c.position.max);
+			result.bounds.min = min(result.bounds.min, c.position.min);
+
+			result.chars.add(c TL_LA);
+
+			line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
+			line_x_bounds.max = max(line_x_bounds.max, c.position.max.x);
+
 			char_position.x += d.advance.x;
 		}
 	}
 	
-	line_infos.add({.begin_index = begin_index, .end_index = info.placed_chars.count, .width = line_x_bounds.size()});
+	line_infos.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
 	max_line_width = max(max_line_width, line_x_bounds.size());
 
 	for (auto &line_info : line_infos) {
 		for (umm i = line_info.begin_index; i < line_info.end_index; ++i) {
-			s32 offset = round_to_int((max_line_width - line_info.width) * map_clamped<f32, f32>(params.line_alignment, -1, 1, 0, 1));
-			info.placed_chars[i].position.min.x += offset;
-			info.placed_chars[i].position.max.x += offset;
+			s32 offset = round_to_int((max_line_width - line_info.width) * params.line_alignment);
+			result.chars[i].position.min.x += offset;
+			result.chars[i].position.max.x += offset;
 		}
 	}
 
-	return info;
+	return result;
 }
 
 }

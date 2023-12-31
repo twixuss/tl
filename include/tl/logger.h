@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "console.h"
+#include "thread.h"
 
 namespace tl {
 
@@ -58,23 +59,26 @@ inline void log_error  (char const *format, auto ...args) { current_logger.error
 
 }
 
+extern TL_API OsLock stdout_mutex;
+
 inline void default_log_proc(Logger *logger, Logger::Severity severity, Span<utf8> message) {
 	scoped(temporary_allocator);
 
 	auto color = [&] {
 		switch (severity) {
-			case Logger::Severity::info:    return ConsoleColor::white;
+			case Logger::Severity::info:    return ConsoleColor::dark_gray;
 			case Logger::Severity::warning: return ConsoleColor::yellow;
 			case Logger::Severity::error:   return ConsoleColor::red;
 		}
 		return ConsoleColor::red;
 	}();
 
-	// TODO: make this safe for multiple threads
-	with(color, println("[{}] {}", (char *)logger->state, message));
+	with(stdout_mutex, with(color, println("[{}] {}", (char *)logger->state, message)));
 }
 
 #ifdef TL_IMPL
+
+OsLock stdout_mutex = {};
 
 Logger default_logger = {
 	.func = default_log_proc,
@@ -82,7 +86,7 @@ Logger default_logger = {
 };
 Logger tl_logger = {
 	.func = default_log_proc,
-	.state = (void *)"tl",
+	.state = (void *)"tl", 
 };
 thread_local Logger current_logger = {
 	.func = default_log_proc,
