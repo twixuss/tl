@@ -524,7 +524,7 @@ inline void free(StringBuilder &builder) {
 	builder.allocator = {};
 }
 
-template <class Allocator>
+template <class Allocator = Allocator>
 inline List<u8, Allocator> to_string(StringBuilder &builder, Allocator allocator = Allocator::current() TL_LP) {
 	List<u8, Allocator> result;
 	result.allocator = allocator;
@@ -532,14 +532,6 @@ inline List<u8, Allocator> to_string(StringBuilder &builder, Allocator allocator
 	builder.fill(result);
 	result.count = result.capacity;
 	return result;
-}
-
-inline List<u8> to_string(StringBuilder &builder, Allocator allocator TL_LP) {
-	return to_string<Allocator>(builder, allocator TL_LA);
-}
-
-inline List<u8> to_string(StringBuilder &builder TL_LP) {
-	return to_string(builder, current_allocator TL_LA);
 }
 
 forceinline umm append_bytes(StringBuilder &b, void const *_data, umm size TL_LP) {
@@ -1167,12 +1159,13 @@ template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...arg
 template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
 
-template <class T>
-List<utf8> to_string(T const &value) {
+template <class Allocator = Allocator, class T>
+List<utf8, Allocator> to_string(T const &value) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 	append(builder, value);
-	return (List<utf8>)to_string(builder, current_allocator);
+
+	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current());
 }
 
 struct FormattedBytes {

@@ -23,8 +23,9 @@ inline constexpr utf8 path_separator = u'\\';
 #endif
 
 struct OpenFileParams {
-	u8 read : 1;
-	u8 write : 1;
+	bool read   : 1 = false;
+	bool write  : 1 = false;
+	bool silent : 1 = false;
 };
 
 enum FileCursorOrigin {
@@ -95,6 +96,7 @@ inline Optional<u64> get_file_size(char const *path) {
 struct ReadEntireFileParams {
 	umm extra_space_before = 0;
 	umm extra_space_after = 0;
+	bool silent : 1 = false;
 };
 inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
 	auto old_cursor = get_cursor(file);
@@ -115,7 +117,7 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 
 template <class Char, class Size>
 inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
-	File file = open_file(path, {.read = true});
+	File file = open_file(path, {.read = true, .silent = params.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return read_entire_file(file, params TL_LA);
@@ -534,7 +536,9 @@ File open_file(ascii const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
-		tl_logger.error("Could not open file {}", path);
+		if (!params.silent) {
+			tl_logger.error("Could not open file {}", path);
+		}
 		handle = 0;
 	}
 	return {handle};
@@ -543,7 +547,9 @@ File open_file(pathchar const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
 	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
-		tl_logger.error("Could not open file {}", with(temporary_allocator, to_utf8(as_span((utf16 const *)path))));
+		if (!params.silent) {
+			tl_logger.error("Could not open file {}", with(temporary_allocator, to_utf8(as_span((utf16 const *)path))));
+		}
 		handle = 0;
 	}
 	return {handle};

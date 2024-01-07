@@ -464,6 +464,49 @@ O(<=);
 
 #undef O
 
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> min(Vector<Scalar, count> a, Vector<Scalar, count> b) {
+	Vector<Scalar, count> r;
+	for (umm i = 0; i < count; ++i) {
+		r.s[i] = min(a.s[i], b.s[i]);
+	}
+	return r;
+}
+
+template <class Scalar, umm count>
+forceinline Vector<Scalar, count> max(Vector<Scalar, count> a, Vector<Scalar, count> b) {
+	Vector<Scalar, count> r;
+	for (umm i = 0; i < count; ++i) {
+		r.s[i] = max(a.s[i], b.s[i]);
+	}
+	return r;
+}
+
+template <class Scalar, umm count>
+forceinline Scalar dot(Vector<Scalar, count> a, Vector<Scalar, count> b) {
+	Scalar r = {};
+	for (umm i = 0; i < count; ++i) {
+		r += a.s[i] * b.s[i];
+	}
+	return r;
+}
+
+template <class Scalar, std::integral Index, umm count>
+forceinline Vector<Scalar, count> gather(Scalar *s, Vector<Index, count> b) {
+	Vector<Scalar, count> r;
+	for (umm i = 0; i < count; ++i) {
+		r.s[i] = s[b.s[i]];
+	}
+	return r;
+}
+
+template <class Scalar, std::integral Index, umm count>
+forceinline void scatter(Vector<Scalar, count> s, Scalar *d, Vector<Index, count> b) {
+	for (umm i = 0; i < count; ++i) {
+		d[b.s[i]] = s.s[i];
+	}
+}
+
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool all(Vector<Scalar, count> a) { bool r = true; for (umm i = 0; i < count; ++i) r &= a.s[i] != 0; return r; }
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool any(Vector<Scalar, count> a) { bool r = false; for (umm i = 0; i < count; ++i) r |= a.s[i] != 0; return r; }
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool all(Vector<v2<Scalar>, count> a) { bool r = true; for (umm i = 0; i < count; ++i) for (umm j = 0; j < 2; ++j) r &= a.s[j].s[i] != 0; return r; }

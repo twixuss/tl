@@ -215,6 +215,13 @@ C(v4s, v4f, f32) C(v4s, v4u, u32)
 C(v4u, v4f, f32) C(v4u, v4s, s32)
 #undef C
 
+template <> forceinline constexpr v2f convert(f32 v) { return V2f(v); }
+template <> forceinline constexpr v3f convert(f32 v) { return V3f(v); }
+template <> forceinline constexpr v2f convert(s32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f convert(s32 v) { return V3f((f32)v); }
+template <> forceinline constexpr v2f convert(u32 v) { return V2f((f32)v); }
+template <> forceinline constexpr v3f convert(u32 v) { return V3f((f32)v); }
+
 #define SHUFFLE(a, s0, s1, b, s2, s3) _mm_shuffle_ps(a, b, _MM_SHUFFLE(s3, s2, s1, s0))
 
 forceinline v2f pack(v2f v) { return v; }
@@ -695,13 +702,17 @@ forceinline f32 atan2_approx(f32 y, f32 x) {
 }
 forceinline f32 atan2_approx(v2f v) { return atan2_approx(v.y, v.x); }
 
-template <class A, class B, class T, class S>
-forceinline constexpr auto lerp_wrapped(A a, B b, T t, S s) {
-	a = positive_modulo(a, s);
-	b = positive_modulo(b, s);
+template <class A, class T>
+forceinline constexpr auto lerp_wrapped(A a, A b, T t, A min, A max) {
+	auto s = max - min;
+	a -= min;
+	b -= min;
+
+	a = frac(a, s);
+	b = frac(b, s);
 	auto d = a - b;
-	return select(absolute(d) > half(s),
-				  positive_modulo(lerp(a, b+sign(d)*s, t), s),
+	return min + select(absolute(d) > half(s),
+				  frac(lerp(a, b+sign(d)*s, t), s),
 				  lerp(a, b, t));
 }
 
@@ -768,6 +779,14 @@ forceinline constexpr auto normalize(T a, T fallback = {1}) {
 template <class T>
 forceinline constexpr void normalize(T *a, T fallback = {1}) {
 	*a = normalize(*a, fallback);
+}
+template <class T>
+forceinline constexpr T clamp_length(T a, typename T::Scalar limit) {
+	auto lsq = length_squared(a);
+	if (lsq > limit*limit) {
+		return a * (limit / sqrt(lsq));
+	}
+	return a;
 }
 template <class T>
 forceinline constexpr auto distance_squared(T a, T b) {
@@ -1093,8 +1112,8 @@ struct aabb {
 	T center() const {
 		return half(max + min);
 	}
-	template <class U> aabb<T> operator*(U const &b) { return {min * b, max * b}; }
-	template <class U> aabb<T> operator/(U const &b) { return {min / b, max / b}; }
+	template <class U> requires requires(T t, U u) { t * u; } aabb<T> operator*(U const &b) { return {min * b, max * b}; }
+	template <class U> requires requires(T t, U u) { t / u; } aabb<T> operator/(U const &b) { return {min / b, max / b}; }
 	auto operator==(aabb const &that) const { return min == that.min && max == that.max; }
 	auto operator!=(aabb const &that) const { return min != that.min || max != that.max; }
 	template <class U>
@@ -1112,6 +1131,17 @@ struct aabb {
 	T maxmin() { return {max.x, min.y}; }
 	T maxmax() { return {max.x, max.y}; }
 
+	aabb<T> with_size(T new_size, T local_pivot = convert<T>(0.5f)) requires std::is_floating_point_v<typename T::Scalar> {
+		auto pivot = lerp(min, max, local_pivot);
+		return {
+			.min = pivot - new_size / 2,
+			.max = pivot + new_size / 2,
+		};
+	}
+
+	void set_size(T new_size, T local_pivot = convert<T>(0.5f)) requires std::is_floating_point_v<typename T::Scalar> {
+		*this = with_size(new_size, local_pivot);
+	}
 
 	struct Iterator {
 		aabb<T> range;
@@ -1623,17 +1653,16 @@ inline RaycastHit<v2f> raycast(ray<v2f> ray, line_segment<v2f> line) {
 template <class Vector>
 inline RaycastHit<Vector> raycast(ray<Vector> ray, sphere<Vector> sphere) {
 	normalize(&ray.direction);
-	auto to_sphere = sphere.center - ray.origin;
-	auto t = dot(to_sphere, ray.direction);
-	auto closest_to_center = ray.origin + t * ray.direction;
-	auto distance_to_center_sq = distance_squared(sphere.center, closest_to_center);
-	auto radius_sq = pow2(sphere.radius);
-	if (distance_to_center_sq > radius_sq) {
-		return {};
-	}
 
-	auto hcl = sqrt(distance_to_center_sq + radius_sq);
-	auto point = ray.origin + (t - hcl) * ray.direction;
+	auto oc = ray.origin - sphere.center;
+	auto b = 2 * dot(oc, ray.direction);
+	auto c = dot(oc,oc) - sphere.radius*sphere.radius;
+	auto d = b*b - 4*c;
+
+	if (d < 0)
+		return {};
+
+	auto point = ray.origin + ray.direction * ((-b - sqrt(d)) / 2);
 	return {
 		.hit = true,
 		.position = point,
@@ -2277,16 +2306,9 @@ umm append(StringBuilder &builder, ray<T> r) {
 	return append_format(builder, "(origin={}, direction={})", r.origin, r.direction);
 }
 
-template <> forceinline constexpr v2f convert(f32 v) { return V2f(v); }
-template <> forceinline constexpr v3f convert(f32 v) { return V3f(v); }
-template <> forceinline constexpr v2f convert(s32 v) { return V2f((f32)v); }
-template <> forceinline constexpr v3f convert(s32 v) { return V3f((f32)v); }
-template <> forceinline constexpr v2f convert(u32 v) { return V2f((f32)v); }
-template <> forceinline constexpr v3f convert(u32 v) { return V3f((f32)v); }
-
 template <class T>
 forceinline T saturate(T t) {
-	return clamp(t, cvt<T>(0), cvt<T>(1));
+	return clamp(t, convert<T>(0), convert<T>(1));
 }
 
 template <class T>

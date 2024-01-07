@@ -86,7 +86,7 @@ inline umm append(StringBuilder &builder, Key key) {
 	ALL_KEYS(K)
 #undef K
 	}
-	return append(builder, u8"none"s);
+	return 0;
 }
 
 }

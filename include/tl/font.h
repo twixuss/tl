@@ -80,7 +80,7 @@ struct PlacedText {
 
 struct PlaceTextParams {
 	f32 line_alignment = 0; // 0 = left-aligned; 0.5 = centered; 1 = right-aligned
-	u32 wrap_width = 100;
+	s32 wrap_width = max_value<s32>;
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
@@ -337,7 +337,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 
 	utf8 *word_start = text.begin();
 	umm word_start_index = 0;
-	bool is_wrapping = false;
+	bool can_wrap = false;
 
 	while (current_char < text.end()) {
 		utf32 code_point = {};
@@ -357,7 +357,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 		if (is_whitespace(code_point)) {
 			word_start = current_char;
 			word_start_index = result.chars.count;
-			is_wrapping = false;
+			can_wrap = true;
 		}
 
 		if (code_point == '\n') {
@@ -378,8 +378,8 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 
 			place_char();
 
-			if (!is_wrapping && c.position.max.x > params.wrap_width) {
-				is_wrapping = true;
+			if (can_wrap && c.position.max.x > params.wrap_width) {
+				can_wrap = false;
 
 				current_char = word_start;
 				read_char();

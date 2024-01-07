@@ -232,6 +232,15 @@ struct DefaultRandomizer {
 			random<f32>(-seed),
 		};
 	}
+	template <> forceinline v3u random(u32 seed) {
+		return {
+			random<u32>(seed + random_primes_u32[0]),
+			random<u32>(seed + random_primes_u32[1]),
+			random<u32>(seed + random_primes_u32[2]),
+		};
+	}
+	template <> forceinline v3u random(f32 seed) { return random<v3u>(*(u32 *)&seed); }
+	template <> forceinline v3f random(f32 seed) { return normalize_range_f32<v3f>(random<v3u>(seed)); }
 };
 
 static constexpr f32 voronoi_largest_possible_distance_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)

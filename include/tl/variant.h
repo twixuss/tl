@@ -19,30 +19,45 @@ struct Variant {
 		base = value;
 	}
 
-	auto visit(auto &&fn) {
-		return std::visit(fn, base);
+	auto visit(this auto &&self, auto &&fn) {
+		return std::visit(fn, self.base);
 	}
 
 	template <class U>
-	Optional<U> get() {
-		if (auto p = std::get_if<U>(&base)) {
+	bool is() const {
+		return std::holds_alternative<U>(base);
+	}
+
+	template <class U>
+	auto as_ptr(this auto &&self) {
+		return std::get_if<U>(&self.base);
+	}
+
+	template <class U>
+	Optional<U> as() const {
+		if (auto p = as_ptr<U>()) {
 			return *p;
 		}
 		return {};
 	}
 
-	template <class U>
-	bool is() {
-		return std::holds_alternative<U>(base);
-	}
-
-	template <class U>
-	U *as() {
-		return std::get_if<U>(&base);
-	}
-
-	umm index() {
+	umm index() const {
 		return base.index();
+	}
+
+	bool operator==(Variant const &that) const {
+		if (index() != that.index())
+			return false;
+
+		return visit([&](auto &this_inner) {
+			return that.visit([&](auto &that_inner) {
+				if constexpr (std::is_same_v<decltype(this_inner), decltype(that_inner)>) {
+					return this_inner == that_inner;
+				} else {
+					return false;
+				}
+			});
+		});
 	}
 };
 

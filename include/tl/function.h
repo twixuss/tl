@@ -1,6 +1,8 @@
 #pragma once
 #include "common.h"
 
+#include <type_traits>
+
 namespace tl {
 
 namespace Detail {
@@ -15,64 +17,83 @@ static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
 	return &invoke<Tuple, indices...>;
 }
 
+template <class State, class Param, umm... indices>
+static void invoke_separated(void *state, void *param) noexcept {
+	std::invoke(*(State *)state, std::move(std::get<indices>(*(Param *)param))...);
+}
+template <class State, class Param, umm... indices>
+static constexpr auto get_invoke_separated(std::index_sequence<indices...>) noexcept {
+	return &invoke_separated<State, Param, indices...>;
+}
+
 } // namespace Detail
 
-template <class Allocator = Allocator>
-struct StorableFunction {
+template <class ParameterlessFunction, class Allocator = Allocator>
+struct Function {
 	Allocator allocator = {};
 
-	void (*function)(void *param) = 0;
-	void *param = 0;
+	void (*function)(void *state) = 0;
+	void *state = 0;
 
-	StorableFunction() = default;
+	Function() = default;
 
-	StorableFunction(void (*function)(void *param), void *param) {
-		this->function = function;
-		this->param = param;
-	}
-
-	StorableFunction(void (*function)()) {
-		this->function = autocast function;
-	}
-
-	template <class Fn, class ...Args>
-	requires requires(Fn fn, Args ...args) { fn(args...); }
-	StorableFunction(Fn fn, Args ...args) {
+	template <class Fn>
+	Function(Fn fn) requires requires { fn(); } {
 		allocator = Allocator::current();
 
-		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
-		auto params = allocator.allocate_uninitialized<Tuple>();
-		new(params) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+		using Tuple = std::tuple<std::decay_t<Fn>>;
+		state = allocator.allocate_uninitialized<Tuple>();
+		new(state) Tuple(std::forward<Fn>(fn));
 
-		function = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
-		param = params;
+		function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
 	}
 
 	void operator()() {
-		return function(param);
+		return function(state);
 	}
 
 	void free() {
-		if (param)
-			allocator.free(param);
+		if (state)
+			allocator.free(state);
 		*this = {};
 	}
 };
 
+template <class ReturnType, class ...Args, class Allocator>
+struct Function<ReturnType(Args...), Allocator> {
+	Allocator allocator = {};
 
+	void (*function)(void *state, void *param) = 0;
+	void *state = 0;
 
-template <class Ret, class ...Args>
-struct Function {
-	Ret (*fn)(Args ...args);
+	Function() = default;
 
-	Ret operator()(Args ...args) {
-		return fn(args...);
+	template <class Fn>
+		requires requires (Fn fn, Args ...args) { fn(args...); }
+	Function(Fn fn) {
+		allocator = Allocator::current();
+
+		using Func = std::decay_t<Fn>;
+		state = allocator.allocate_uninitialized<Func>();
+		new(state) Func(std::forward<Fn>(fn));
+
+		function = Detail::get_invoke_separated<std::decay_t<Fn>, std::tuple<std::decay_t<Args>...>>(std::make_index_sequence<sizeof...(Args)>{});
+	}
+
+	void operator()(Args ...args) {
+		using Param = std::tuple<std::decay_t<Args>...>;
+		auto param = allocator.allocate_uninitialized<Param>();
+		new(param) Param(std::forward<Args>(args)...);
+		defer { allocator.free(param); };
+
+		return function(state, param);
+	}
+
+	void free() {
+		if (state)
+			allocator.free(state);
+		*this = {};
 	}
 };
-
-template <class Ret, class ...Args>
-Function<Ret, Args...> create_function(Ret (*fn)(Args ...args)) {
-	return {fn};
-}
 
 }

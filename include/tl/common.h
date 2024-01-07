@@ -162,6 +162,8 @@ template <> inline constexpr bool is_float<f32> = true;
 template <> inline constexpr bool is_float<f64> = true;
 
 struct Empty {};
+constexpr bool operator==(Empty a, Empty b) { return true; }
+constexpr bool operator!=(Empty a, Empty b) { return false; }
 
 template <class ...T>
 inline constexpr umm type_count_of = sizeof...(T);
@@ -853,6 +855,7 @@ enum ForEachDirective {
 	ForEach_continue,
 	ForEach_break,
 	ForEach_erase,
+	ForEach_erase_unordered,
 };
 
 using ForEachFlags = u8;
@@ -1046,47 +1049,45 @@ inline constexpr struct null_opt_t {} null_opt;
 template <class T>
 struct Optional {
 	constexpr Optional() {
-		_has_value = false;
+		count = false;
 	}
 	constexpr Optional(T that) {
 		new (&_value) T(that);
-		_has_value = true;
+		count = true;
 	}
 	constexpr Optional(Optional<T> const &that) {
-		if (that._has_value) {
+		if (that.count) {
 			new (&_value) T(that._value);
 		}
-		_has_value = that._has_value;
+		count = that.count;
 	}
 	constexpr Optional(null_opt_t) {
-		_has_value = false;
+		count = false;
 	}
 	constexpr ~Optional() {
-		if (_has_value)
+		if (count)
 			_value.~T();
 	}
 
 	constexpr void reset() {
-		_has_value = false;
+		count = false;
 	}
 
-	constexpr explicit operator bool() const { return _has_value; }
+	constexpr explicit operator bool() const { return count; }
 
-	constexpr bool has_value() const { return _has_value; }
-	constexpr T const &value() const { assert_always(_has_value); return _value; }
-	constexpr T       &value()       { assert_always(_has_value); return _value; }
-	constexpr T const &value_unchecked() const { return _value; }
-	constexpr T       &value_unchecked()       { return _value; }
+	constexpr bool has_value() const { return count; }
+	constexpr auto &value(this auto &&self) { assert_always(self.count); return self._value; }
+	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
 	constexpr T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
-		if (_has_value)
+		if (count)
 			return _value;
 		return fallback();
 	}
 
 	constexpr T value_or(T fallback) {
-		if (_has_value)
+		if (count)
 			return _value;
 		return fallback;
 	}
@@ -1094,22 +1095,27 @@ struct Optional {
 
 	template <class U>
 	constexpr Optional<U> map() {
-		if (_has_value) {
+		if (count) {
 			return (U)_value;
 		}
 		return null_opt;
 	}
 
 	constexpr void apply(auto &&fn) {
-		if (_has_value)
+		if (count)
 			fn(_value);
 	}
+
+	auto begin(this auto &&self) { return &self._value; }
+	auto end(this auto &&self) { return &self._value + self.count; }
 
 private:
 	union {
 		T _value;
 	};
-	bool _has_value;
+
+public:
+	bool count;
 #pragma warning(suppress: 4820)
 };
 
@@ -1246,15 +1252,21 @@ struct Span {
 		return lerp(a, b, frac(i));
 	}
 
-	constexpr ValueType sample_impl(auto i, SampleParams params) const {
+	constexpr ValueType sample(std::floating_point auto i, SampleParams params) const {
 		using I = decltype(i);
 		if (params.normalized) {
-			i *= count;
+			if (params.overflow == Overflow::clamp) {
+				i *= count - 1;
+			} else {
+				i *= count;
+			}
 		}
 		using SSize = std::make_signed_t<Size>;
 		switch (params.interpolation) {
+			default:
 			case Interpolation::linear: {
 				switch (params.overflow) {
+					default:
 					case Overflow::clamp: {
 						i = clamp<I>(i, 0, (I)(count-1));
 						auto a = at((SSize)floor_to_int(i));
@@ -1271,6 +1283,7 @@ struct Span {
 			}
 			case Interpolation::nearest: {
 				switch (params.overflow) {
+					default:
 					case Overflow::clamp: {
 						return at(clamp<SSize>(floor_to_int(i), 0, count - 1));
 					}
@@ -1282,8 +1295,6 @@ struct Span {
 			}
 		}
 	}
-	constexpr ValueType sample(f32 i, SampleParams params = {}) const { return sample_impl(i, params); }
-	constexpr ValueType sample(f64 i, SampleParams params = {}) const { return sample_impl(i, params); }
 
 	constexpr bool is_empty() const { return count == 0; }
 
@@ -1381,6 +1392,8 @@ inline constexpr bool is_span<Span<T, Size>> = true;
 
 template <class T>
 concept ASpan = is_span<T>;
+
+TL_DECLARE_CONCEPT(Span);
 
 template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
@@ -2832,6 +2845,28 @@ ScopedBlock(Thing) -> ScopedBlock<Thing>;
 // };
 #define withs(new_thing) ScopedBlock(new_thing) + [&]
 
+struct ValueChanger {
+	template <class Fn>
+	struct Impl {
+		Fn fn;
+
+		template <class T>
+		friend auto operator%(T it, Impl impl) {
+			impl.fn(it);
+			return it;
+		}
+	};
+
+	template <class Fn>
+	auto operator->*(Fn &&fn) {
+		return Impl{fn};
+	}
+};
+
+// Example use:
+// auto my_vector = get_vector() withx { it.x = sqrt(it.x); };
+#define withx % ValueChanger{} ->* [&](auto &it)
+
 template <>
 struct Scoped<Allocator> {
 	Allocator old_allocator;
@@ -2847,6 +2882,10 @@ struct Scoped<Allocator> {
 template <>
 struct Scoped<ArenaAllocator> : Scoped<Allocator> {
 	Scoped(ArenaAllocator &arena) : Scoped<Allocator>(arena) {}
+};
+template <>
+struct Scoped<DefaultAllocator> : Scoped<Allocator> {
+	Scoped(DefaultAllocator) : Scoped<Allocator>(default_allocator) {}
 };
 template <>
 struct Scoped<TemporaryAllocator> : Scoped<Allocator> {

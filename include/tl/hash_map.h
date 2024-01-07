@@ -18,7 +18,7 @@ struct DefaultHashTraits {
 
 	// These are templates because of situation where == operator is not defined, but are_equal is defined in derived class.
 	// In that case these functions will not be instantiated.
-	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return a == b; }
+	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return all(a == b); }
 	inline constexpr u64 get_hash(this auto &&self, Key const &key) { return ::get_hash(key); }
 
 	inline constexpr umm get_index_from_hash(this auto &&self, u64 hash, u64 capacity) {
@@ -148,8 +148,7 @@ struct KeyValue {
 	Value value;
 };
 
-// TODO: add Allocator parameter
-template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>>
+template <class Key_, class Value_, class Traits = DefaultHashTraits<Key_>, class Allocator = Allocator>
 struct BucketHashMap : Traits {
 	TL_USE_HASH_TRAITS_MEMBERS;
 
@@ -164,7 +163,7 @@ struct BucketHashMap : Traits {
 	};
 	using Bucket = LinkedList<HashKeyValue>;
 
-	[[no_unique_address]] Allocator allocator = current_allocator;
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Span<Bucket> buckets;
 	umm count = 0;
 	
@@ -394,8 +393,9 @@ struct BucketHashMap : Traits {
 	}
 };
 
-template <class Key, class Value, class Traits>
-void free(BucketHashMap<Key, Value, Traits> &map) {
+TL_DECLARE_CONCEPT(BucketHashMap);
+
+void free(CBucketHashMap auto &map) {
 	for (auto &bucket : map.buckets) {
 		free(bucket);
 	}
@@ -403,8 +403,7 @@ void free(BucketHashMap<Key, Value, Traits> &map) {
 	map.buckets = {};
 }
 
-template <class Key, class Value, class Traits>
-umm count_of(BucketHashMap<Key, Value, Traits> &map) {
+umm count_of(CBucketHashMap auto map) {
 	umm result = 0;
 	for (auto &bucket : map.buckets) {
 		result += bucket.size();
@@ -412,9 +411,9 @@ umm count_of(BucketHashMap<Key, Value, Traits> &map) {
 	return result;
 }
 
-template <ForEachFlags flags=0, class Key, class Value, class Traits, class Fn>
-void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
-	requires { fn(*(KeyValue<Key, Value> *)0); }
+template <ForEachFlags flags = 0, class Fn>
+void for_each(CBucketHashMap auto map, Fn &&fn) requires
+	requires { fn(*(typename decltype(map)::KeyValue *)0); }
 {
 	static_assert(flags == 0, "Only default flags supported");
 
@@ -425,15 +424,16 @@ void for_each(BucketHashMap<Key, Value, Traits> map, Fn &&fn) requires
 	}
 }
 
-template <class Key, class Value, class Traits, class Fn>
-auto map(BucketHashMap<Key, Value, Traits> map, Fn &&fn TL_LP) requires requires { fn(*(KeyValue<Key, Value> *)0); } {
-	using U = decltype(fn(*(KeyValue<Key, Value> *)0));
+template <class Fn>
+auto map(CBucketHashMap auto map, Fn &&fn TL_LP) requires requires { fn(*(typename decltype(map)::KeyValue *)0); } {
+	using U = decltype(fn(*(typename decltype(map)::KeyValue *)0));
 	List<U, Allocator> result;
 	result.reserve(count_of(map) TL_LA);
 	for_each(map, [&](auto &kv) { result.add(fn(kv)); });
 	return result;
 }
 
+// TODO: make all bucket hash map functions use allocator.
 
 template <class Key, class Value, class Traits>
 BucketHashMap<Key, Value, Traits> copy(BucketHashMap<Key, Value, Traits> const &source TL_LP) {
@@ -589,6 +589,9 @@ struct ContiguousHashMap : Traits {
 	void insert(Key const &key, Value value) {
 		get_or_insert(key) = value;
 	}
+	void insert(KeyValue const &kv) {
+		get_or_insert(kv.key) = kv.value;
+	}
 
 	bool reserve(umm desired TL_LP) {
 		if (desired <= cells.count)
@@ -740,11 +743,19 @@ auto map(Map map, Fn &&fn TL_LP) requires requires (Map &&map, Fn &&fn) { fn(map
 	return result;
 }
 
+template <class Allocator = Allocator, CContiguousHashMap Map>
+auto to_list(Map map TL_LP) {
+	List<typename Map::KeyValue, Allocator> result;
+	result.reserve(map.count TL_LA);
+	for_each(map, [&](auto &kv) { result.add(kv); });
+	return result;
+}
+
 #ifndef TL_DEFAULT_HASH_MAP
 #define TL_DEFAULT_HASH_MAP BucketHashMap
 #endif
 
-template <class Key, class Value, class Traits = DefaultHashTraits<Key>>
-using HashMap = TL_DEFAULT_HASH_MAP<Key, Value, Traits>;
+template <class Key, class Value, class Traits = DefaultHashTraits<Key>, class Allocator = Allocator>
+using HashMap = TL_DEFAULT_HASH_MAP<Key, Value, Traits, Allocator>;
 
 }

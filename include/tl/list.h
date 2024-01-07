@@ -22,6 +22,8 @@ struct List : Span<T, Size_> {
 	using Span::count;
 	using Span::begin;
 	using Span::end;
+	using Span::front;
+	using Span::back;
 
 	Size capacity = 0;
 	[[no_unique_address]] Allocator allocator = Allocator::current();
@@ -202,12 +204,16 @@ struct List : Span<T, Size_> {
 		memmove(where_.data, where_.data + where_.count, (count - where_.count + data - where_.data) * sizeof(T));
 		count -= where_.count;
 	}
-	void erase_at(Size where) {
-		bounds_check(where < count);
-		--count;
-		for (Size i = where; i < count; ++i) {
-			data[i] = data[i + 1];
+	Optional<T> erase_at(Size where) {
+		if (where < count) {
+			--count;
+			auto result = data[where];
+			for (Size i = where; i < count; ++i) {
+				data[i] = data[i + 1];
+			}
+			return result;
 		}
+		return {};
 	}
 
 	template <class Predicate>
@@ -223,6 +229,22 @@ struct List : Span<T, Size_> {
 			}
 		}
 	}
+
+	void erase(T *value) { 
+		erase_at(value - data);
+	}
+
+	void erase_unordered_at(umm index) {
+		bounds_check(index < count);
+		memcpy(data + index, &back(), sizeof(T));
+		--count;
+	}
+
+	void erase_unordered(T *at) {
+		*at = back();
+		count--;
+	}
+
 
 	void replace(Span where, T with_what) {
 		bounds_check(
@@ -275,22 +297,6 @@ struct List : Span<T, Size_> {
 	Span span() { return *this; }
 };
 #pragma pack(pop)
-
-template <class T, class Allocator, class Size>
-void erase(List<T, Allocator, Size> &list, T *value) { list.erase_at(value - list.data); }
-
-template <class T, class Allocator, class Size>
-void erase_unordered_at(List<T, Allocator, Size> &list, umm index) {
-	bounds_check(index < list.count);
-	memcpy(list.data + index, &list.back(), sizeof(T));
-	--list.count;
-}
-
-template <class T, class Allocator, class Size>
-void erase_unordered(List<T, Allocator, Size> &list, T *at) {
-	*at = list.back();
-	list.count--;
-}
 
 template <class T, class Allocator, class Size>
 void free(List<T, Allocator, Size> &list) {
@@ -380,14 +386,24 @@ constexpr T const *find_if(List<T, Allocator, Size> const &list, Predicate &&pre
 template <class T, class Allocator, class Size, class Fn>
 constexpr void for_each(List<T, Allocator, Size> list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
-	constexpr bool breakable = std::is_same_v<bool, ReturnType>;
-	for (auto &it : list) {
-		if constexpr (breakable) {
-			if (fn(it))
-				return;
+	for (auto it = list.begin(); it != list.end();) {
+		if constexpr (std::is_same_v<ReturnType, void>) {
+			fn(*it);
+		} else if constexpr (std::is_same_v<ReturnType, ForEachDirective>) {
+			switch (fn(*it)) {
+				case ForEach_continue: break;
+				case ForEach_break: return;
+				case ForEach_erase: 
+					list.erase(it);
+					continue;
+				case ForEach_erase_unordered: 
+					list.erase_unordered(it);
+					continue;
+			}
 		} else {
-			fn(it);
+			static_assert("Invalid return type in for_each iterator");
 		}
+		++it;
 	}
 }
 
