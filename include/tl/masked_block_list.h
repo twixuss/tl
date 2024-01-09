@@ -5,7 +5,7 @@
 
 namespace tl {
 
-template <class T, umm _values_per_block>
+template <class T, umm _values_per_block, class Allocator = Allocator>
 struct StaticMaskedBlockList {
 	using ValueType = T;
 
@@ -23,23 +23,72 @@ struct StaticMaskedBlockList {
 		};
 		Block() {}
 
-		bool get_mask(umm index) {
+		bool get_mask(umm index) const {
 			assert(index < values_per_block);
 			return masks[index / bits_in_mask] & ((Mask)1 << (index % bits_in_mask));
 		}
+
+		bool owns(T *value) const {
+			umm index = value - values;
+			if (index >= values_per_block)
+				return false;
+
+			return get_mask(index);
+		}
+		void clear() {
+			memset(masks, 0, sizeof(masks));
+			available_mask_count = count_of(masks);
+		}
 	};
 
-	Allocator allocator = current_allocator;
-	Block first;
-	Block *last = &first;
+	struct Iterator {
+		StaticMaskedBlockList *list = 0;
+		Block *block = 0;
+		umm index = 0;
 
-	StaticMaskedBlockList &operator=(StaticMaskedBlockList const &that) = delete;
-	StaticMaskedBlockList &operator=(StaticMaskedBlockList &&that) = delete;
+		T &operator*() { return block->values[index]; }
+		T *operator->() { return &block->values[index]; }
+
+		Iterator &operator++() {
+			do {
+				index++;
+				if (index == values_per_block) {
+					if (block == list->last) {
+						break;
+					} else {
+						block = block->next;
+						index = 0;
+					}
+				}
+			} while (!block->get_mask(index));
+			return *this;
+		}
+
+		Iterator operator++(int) { auto it = *this; ++*this; return it; }
+
+		bool operator==(Iterator const &that) const { return list == that.list && block == that.block && index == that.index; }
+		bool operator!=(Iterator const &that) const { return !(*this == that); }
+	};
 
 	struct Added {
 		T *pointer;
 		umm index;
 	};
+
+	Block first;
+	Block *last = &first;
+	umm count = 0;
+	[[no_unique_address]] Allocator allocator = Allocator::current();
+
+	Iterator begin() {
+		Iterator result = {this, &first, 0};
+		if (!first.get_mask(0))
+			++result;
+		return result;
+	}
+	Iterator end() { return {this, last, values_per_block}; }
+	StaticMaskedBlockList &operator=(StaticMaskedBlockList const &that) = delete;
+	StaticMaskedBlockList &operator=(StaticMaskedBlockList &&that) = delete;
 
 	Added add(T const &that = {}) {
 		auto block = &first;
@@ -71,6 +120,9 @@ struct StaticMaskedBlockList {
 						block->available_mask_count -= 1;
 
 					block->values[value_index] = that;
+
+					++count;
+
 					return {
 						.pointer = &block->values[value_index],
 						.index = block_index * values_per_block + value_index,
@@ -99,6 +151,7 @@ struct StaticMaskedBlockList {
 
 				block->masks[mask_index] &= ~((Mask)1 << bit_index);
 
+				--count;
 
 				return;
 			}
@@ -111,19 +164,34 @@ struct StaticMaskedBlockList {
 		auto block = &first;
 		while (block) {
 			if (block->values <= value && value < block->values + values_per_block) {
-				u32 value_index = value - block->values;
-				u32 mask_index = value_index / bits_in_mask;
-				u32 bit_index  = value_index % bits_in_mask;
+				umm value_index = value - block->values;
+				umm mask_index = value_index / bits_in_mask;
+				umm bit_index  = value_index % bits_in_mask;
 
 				bounds_check(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList");
 
 				block->masks[mask_index] &= ~((Mask)1 << bit_index);
+				
+				--count;
 
 				return;
 			}
 			block = block->next;
 		}
 		bounds_check(false, "attempt to remove non-existant value from StaticMaskedBlockList");
+	}
+	void erase(Iterator it) {
+		umm mask_index = it.index / bits_in_mask;
+		umm bit_index  = it.index % bits_in_mask;
+		it.block->masks[mask_index] &= ~((Mask)1 << bit_index);
+		--count;
+	}
+
+	void clear() {
+		for (auto block = &first; block; block = block->next) {
+			block->clear();
+		}
+		count = 0;
 	}
 
 	T &at(umm index) {
@@ -144,46 +212,19 @@ struct StaticMaskedBlockList {
 		return at(index);
 	}
 
-	struct Iterator {
-		StaticMaskedBlockList *list = 0;
-		Block *block = 0;
-		umm index = 0;
-
-		T &operator*() { return block->values[index]; }
-		T *operator->() { return &block->values[index]; }
-
-		Iterator &operator++() {
-			do {
-				index++;
-				if (index == values_per_block) {
-					if (block == list->last) {
-						break;
-					} else {
-						block = block->next;
-						index = 0;
-					}
-				}
-			} while (!block->get_mask(index));
-			return *this;
+	bool owns(T *value) const {
+		for (auto block = &first; block; block = block->next) {
+			if (block->owns(value)) {
+				return true;
+			}
 		}
-
-		Iterator operator++(int) { auto it = *this; ++*this; return it; }
-
-		bool operator==(Iterator const &that) { return list == that.list && block == that.block && index == that.index; }
-		bool operator!=(Iterator const &that) { return !(*this == that); }
-	};
-
-	Iterator begin() {
-		Iterator result = {this, &first, 0};
-		if (!first.get_mask(0))
-			++result;
-		return result;
+		return false;
 	}
-	Iterator end() { return {this, last, values_per_block}; }
 };
 
-template <class T, umm values_per_block>
-void free(StaticMaskedBlockList<T, values_per_block> &list) {
+TL_DECLARE_CONCEPT(StaticMaskedBlockList);
+
+void free(CStaticMaskedBlockList auto &list) {
 	auto block = list.first.next;
 	while (block) {
 		list.allocator.free(block);
@@ -191,11 +232,11 @@ void free(StaticMaskedBlockList<T, values_per_block> &list) {
 	}
 }
 
-template <class T, umm values_per_block>
-Optional<umm> index_of(StaticMaskedBlockList<T, values_per_block> const &list, T const *value) {
+template <CStaticMaskedBlockList StaticMaskedBlockList>
+Optional<umm> index_of(StaticMaskedBlockList const &list, typename StaticMaskedBlockList::ValueType const *value) {
 	auto block = &list.first;
 	while (block) {
-		if (block->values <= value && value < block->values + values_per_block) {
+		if (block->values <= value && value < block->values + StaticMaskedBlockList::values_per_block) {
 			return value - block->values;
 		}
 		block = block->next;
@@ -204,22 +245,57 @@ Optional<umm> index_of(StaticMaskedBlockList<T, values_per_block> const &list, T
 }
 
 
-template <class T, umm values_per_block, class Fn>
-void for_each(StaticMaskedBlockList<T, values_per_block> &list, Fn &&fn) {
-	using StaticMaskedBlockList = StaticMaskedBlockList<T, values_per_block>;
-	using Mask = StaticMaskedBlockList::Mask;
-	constexpr u32 bits_in_mask = StaticMaskedBlockList::bits_in_mask;
+//template <CStaticMaskedBlockList StaticMaskedBlockList>
+//void for_each(StaticMaskedBlockList &list, auto &&fn) requires requires { fn(*(typename StaticMaskedBlockList::ValueType *)0); } {
+//	using Mask = typename StaticMaskedBlockList::Mask;
+//	constexpr umm bits_in_mask = StaticMaskedBlockList::bits_in_mask;
+//	auto block = &list.first;
+//	while (block) {
+//		for (umm value_index = 0; value_index < StaticMaskedBlockList::values_per_block; ++value_index) {
+//			umm mask_index = value_index / bits_in_mask;
+//			umm bit_index  = value_index % bits_in_mask;
+//			if (block->masks[mask_index] & ((Mask)1 << bit_index)) {
+//				fn(block->values[value_index]);
+//			}
+//		}
+//		block = block->next;
+//	}
+//}
+
+template <class T, umm values_per_block, class Allocator>
+bool for_each(StaticMaskedBlockList<T, values_per_block, Allocator> &list, auto &&fn) requires requires { fn(*(T *)0); } {
+	using Mask = typename StaticMaskedBlockList<T, values_per_block, Allocator>::Mask;
+	constexpr umm bits_in_mask = list.bits_in_mask;
 	auto block = &list.first;
 	while (block) {
-		for (u32 value_index = 0; value_index < values_per_block; ++value_index) {
-			u32 mask_index = value_index / bits_in_mask;
-			u32 bit_index  = value_index % bits_in_mask;
+		for (umm value_index = 0; value_index < values_per_block; ++value_index) {
+			umm mask_index = value_index / bits_in_mask;
+			umm bit_index  = value_index % bits_in_mask;
 			if (block->masks[mask_index] & ((Mask)1 << bit_index)) {
-				fn(block->values[value_index]);
+				using Ret = decltype(fn(*(T *)0));
+				if constexpr (std::is_same_v<Ret, void>) {
+					fn(block->values[value_index]);
+				} else if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+					switch (fn(block->values[value_index])) {
+						case ForEach_continue: break;
+						case ForEach_break: return true;
+						case ForEach_erase: 
+						case ForEach_erase_unordered: 
+							block->masks[mask_index] &= ~((Mask)1 << bit_index);
+							--list.count;
+							break;
+						default: invalid_code_path("Bad for_each directive");
+					}
+
+				} else {
+					static_error_v(fn, "Invalid return type");
+				}
 			}
 		}
 		block = block->next;
 	}
+
+	return false;
 }
 
 }

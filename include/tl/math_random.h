@@ -222,10 +222,12 @@ struct DefaultRandomizer {
 	//	return result;
 	//}
 
-	template <> forceinline u32 random(v2s seed) { return random<u32>(seed.x) ^ random<u32>(seed.y); }
-	template <> forceinline u32 random(v3s seed) {
-		return dot((v3u)seed, *(v3u *)&random_primes_u32[0]);
-	}
+	template <> forceinline u32 random(v2u seed) { return random<u32>(dot(seed, *(v2u *)&random_primes_u32[0])); }
+	template <> forceinline u32 random(v3u seed) { return random<u32>(dot(seed, *(v3u *)&random_primes_u32[0])); }
+	template <> forceinline u32 random(v4u seed) { return random<u32>(dot(seed, *(v4u *)&random_primes_u32[0])); }
+	template <> forceinline u32 random(v2s seed) { return random<u32>((v2u)seed); }
+	template <> forceinline u32 random(v3s seed) { return random<u32>((v3u)seed); }
+	template <> forceinline u32 random(v4s seed) { return random<u32>((v4u)seed); }
 	template <> forceinline v2f random(f32 seed) {
 		return {
 			random<f32>(+seed),

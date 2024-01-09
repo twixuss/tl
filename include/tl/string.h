@@ -568,6 +568,9 @@ forceinline umm append_bytes(StringBuilder &b, List<T, Allocator, Size> list TL_
 	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
+inline umm append(StringBuilder &builder, Empty) {
+	return 0;
+}
 inline umm append(StringBuilder &b, ascii ch) { return append_bytes(b, ch); }
 inline umm append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
 inline umm append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }

@@ -165,6 +165,8 @@ struct Empty {};
 constexpr bool operator==(Empty a, Empty b) { return true; }
 constexpr bool operator!=(Empty a, Empty b) { return false; }
 
+inline void noop() {}
+
 template <class ...T>
 inline constexpr umm type_count_of = sizeof...(T);
 
@@ -302,12 +304,6 @@ template <class To, class From>
 forceinline constexpr To convert(From from) {
 	return (To)from;
 }
-namespace ce {
-template <class To, class From>
-constexpr To convert(From from) {
-	return (To)from;
-}
-} // namespace ce
 
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }
@@ -595,33 +591,33 @@ forceinline constexpr u64 floor_to_power_of_2(u64 v) { return v == 0 ? (u64)0 : 
 namespace ce {
 
 inline constexpr u8 floor_to_power_of_2(u8 x) {
-	x = (u8)(x | (u8)(x >> 1));
-	x = (u8)(x | (u8)(x >> 2));
-	x = (u8)(x | (u8)(x >> 4));
+	x |= (u8)(x >> 1);
+	x |= (u8)(x >> 2);
+	x |= (u8)(x >> 4);
 	return (u8)(x - (u8)(x >> 1));
 }
 inline constexpr u16 floor_to_power_of_2(u16 x) {
-	x = (u16)(x | (u16)(x >> 1));
-	x = (u16)(x | (u16)(x >> 2));
-	x = (u16)(x | (u16)(x >> 4));
-	x = (u16)(x | (u16)(x >> 8));
+	x |= (u16)(x >> 1);
+	x |= (u16)(x >> 2);
+	x |= (u16)(x >> 4);
+	x |= (u16)(x >> 8);
 	return (u16)(x - (u16)(x >> 1));
 }
 inline constexpr u32 floor_to_power_of_2(u32 x) {
-	x = (u32)(x | (u32)(x >> 1));
-	x = (u32)(x | (u32)(x >> 2));
-	x = (u32)(x | (u32)(x >> 4));
-	x = (u32)(x | (u32)(x >> 8));
-	x = (u32)(x | (u32)(x >> 16));
+	x |= (u32)(x >> 1);
+	x |= (u32)(x >> 2);
+	x |= (u32)(x >> 4);
+	x |= (u32)(x >> 8);
+	x |= (u32)(x >> 16);
 	return (u32)(x - (u32)(x >> 1));
 }
 inline constexpr u64 floor_to_power_of_2(u64 x) {
-	x = (u64)(x | (u64)(x >> 1));
-	x = (u64)(x | (u64)(x >> 2));
-	x = (u64)(x | (u64)(x >> 4));
-	x = (u64)(x | (u64)(x >> 8));
-	x = (u64)(x | (u64)(x >> 16));
-	x = (u64)(x | (u64)(x >> 32));
+	x |= (u64)(x >> 1);
+	x |= (u64)(x >> 2);
+	x |= (u64)(x >> 4);
+	x |= (u64)(x >> 8);
+	x |= (u64)(x >> 16);
+	x |= (u64)(x >> 32);
 	return (u64)(x - (u64)(x >> 1));
 }
 
@@ -784,6 +780,7 @@ constexpr T *midpoint(T *a, T *b) {
 
 template <class T>
 struct AutoCastable {
+#pragma warning(suppress: 4180) // const is meaningless for function types. No idea why and I don't care.
 	T const &value;
 	template <class U>
 	forceinline constexpr operator U() {

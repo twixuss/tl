@@ -64,9 +64,9 @@ inline bool send_all(Socket s, Span<u8> span) {
 struct TcpServer {
 	Socket listener = 0;
 	List<Socket> clients;
-	void (*on_client_connected)(TcpServer &server, void *context, Socket s, char *host, char *service, u16 port) = 0;
-	void (*on_client_disconnected)(TcpServer &server, void *context, Socket s) = 0;
-	void (*on_client_message_received)(TcpServer &server, void *context, Socket s, u8 *data, u32 size) = 0;
+	void (*on_client_connected)(TcpServer &server, void *context, Socket s, char *host, char *service, u16 port) = autocast noop;
+	void (*on_client_disconnected)(TcpServer &server, void *context, Socket s) = autocast noop;
+	void (*on_client_message_received)(TcpServer &server, void *context, Socket s, u8 *data, u32 size) = autocast noop;
 	bool running = false;
 };
 
@@ -81,7 +81,7 @@ struct NetStream : Stream {
 	umm write(Span<u8> source) { return net::send(socket, source); }
 };
 
-inline Stream *create_file_stream(net::Socket socket) {
+inline NetStream *create_stream(net::Socket socket) {
 	auto result = create_stream<NetStream>();
 	result->socket = socket;
 	return result;

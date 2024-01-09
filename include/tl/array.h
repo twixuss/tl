@@ -6,6 +6,8 @@ namespace tl {
 
 template <class T, umm count_>
 struct Array {
+	using ValueType = T;
+
 	inline static constexpr umm count = count_;
 
 	constexpr auto begin(this auto &&self) { return self.data; }
@@ -63,8 +65,29 @@ constexpr Array<T, count> to_array(T const (&array)[count]) {
 	return result;
 }
 
+template <class T, umm count>
+constexpr bool for_each(Array<T, count> &array, auto &&fn) {
+	for (auto &it : array.data) {
+		using Ret = decltype(fn(it));
+		if constexpr (std::is_same_v<Ret, void>) {
+			fn(it);
+		} else if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+			switch (fn(it)) {
+				case ForEach_continue: break;
+				case ForEach_break: return true;
+				default: invalid_code_path("Bad for_each directive");
+			}
+		} else {
+			static_error_v(fn, "Bad iteration function return type");
+		}
+	}
+	return false;
+}
+
 template <class T, umm _count_x, umm _count_y>
 struct Array2 {
+	using ValueType = T;
+
 	inline static constexpr umm count_x = _count_x;
 	inline static constexpr umm count_y = _count_y;
 	inline static constexpr umm flat_count = count_x * count_y;
@@ -116,6 +139,8 @@ constexpr bool owns(Array2<T, count_x, count_y> &array, T *pointer) {
 
 template <class T, umm _count_x, umm _count_y, umm _count_z>
 struct Array3 {
+	using ValueType = T;
+
 	inline static constexpr umm count_x = _count_x;
 	inline static constexpr umm count_y = _count_y;
 	inline static constexpr umm count_z = _count_z;

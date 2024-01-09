@@ -500,17 +500,8 @@ void ConditionVariable::unlock() {
 
 struct ThreadPool {
 	struct Task {
-		ThreadPool *pool = 0;
 		void (*fn)(void *param) = 0;
 		void *param = 0;
-
-		inline void run() {
-			assert(fn);
-			assert(pool);
-
-			fn(param);
-			atomic_increment(&pool->finished_task_count);
-		}
 	};
 
 	struct InitParams {
@@ -579,8 +570,7 @@ struct ThreadPool {
 		atomic_increment(&started_task_count);
 
 		new_work_notifier.section([&]{
-			tasks.push({
-				.pool = this,
+			tasks.add({
 				.fn = fn,
 				.param = param,
 			});
@@ -646,7 +636,6 @@ struct ThreadPool {
 				while (!pool->stopping) {
 					if (task = pool->tasks.pop()) {
 						assert(task.value_unchecked().fn);
-						assert(task.value_unchecked().pool);
 						break;
 					} else {
 						sleeper.sleep();
@@ -655,7 +644,7 @@ struct ThreadPool {
 			});
 
 			if (task) {
-				task.value_unchecked().run();
+				pool->run(task.value_unchecked());
 				pool->completion_notifier.wake();
 			} else {
 				break;
@@ -677,7 +666,7 @@ private:
 	SyncPoint start_sync_point;
 	u32 volatile stopped_thread_count = 0;
 	bool volatile stopping = true;
-	Queue<Task> tasks;
+	List<Task> tasks;
 	List<void *> data_to_free_on_main_thread;
 
 	u32 volatile started_task_count = 0;
@@ -685,6 +674,12 @@ private:
 
 	ConditionVariable new_work_notifier;
 	ConditionVariable completion_notifier;
+
+	inline void run(Task task) {
+		assert(task.fn);
+		task.fn(task.param);
+		atomic_increment(&finished_task_count);
+	}
 };
 
 } // namespace tl

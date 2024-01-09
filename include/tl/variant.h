@@ -61,4 +61,11 @@ struct Variant {
 	}
 };
 
+template <class ...T>
+inline umm append(StringBuilder &builder, Variant<T...> const &v) {
+	return v.visit([&](auto &inner) {
+		return append(builder, inner);
+	});
+}
+
 }
