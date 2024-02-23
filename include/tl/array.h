@@ -72,11 +72,11 @@ constexpr bool for_each(Array<T, count> &array, auto &&fn) {
 		if constexpr (std::is_same_v<Ret, void>) {
 			fn(it);
 		} else if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-			switch (fn(it)) {
-				case ForEach_continue: break;
-				case ForEach_break: return true;
-				default: invalid_code_path("Bad for_each directive");
-			}
+			auto d = fn(it);
+			if (d & ForEach_erase) invalid_code_path("not supported");
+			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
+			if (d & ForEach_break)
+				return true;
 		} else {
 			static_error_v(fn, "Bad iteration function return type");
 		}

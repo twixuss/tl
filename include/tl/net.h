@@ -3,6 +3,8 @@
 #include "common.h"
 #include "list.h"
 #include "stream.h"
+#include "logger.h"
+#include "function.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
@@ -29,56 +31,82 @@ enum ConnectionKind {
 	Connection_udp,
 };
 
+enum class ReceiveResult {
+	disconnected,
+	error,
+};
+
 typedef struct SocketImpl *Socket;
 
+extern TL_API Logger logger;
+
+TL_API bool init(Logger logger);
 TL_API bool init();
-TL_API void deinit();
+TL_API bool deinit();
 TL_API Socket create_socket(ConnectionKind kind);
-TL_API void close(Socket);
-TL_API void bind(Socket s, u16 port);
-TL_API void listen(Socket s, u32 n = 0x7fff'ffff);
+TL_API bool close(Socket);
+TL_API bool bind(Socket s, u16 port);
+TL_API bool listen(Socket s, u32 n = 0x7fff'ffff);
 TL_API Socket accept(Socket listener);
 TL_API bool connect(Socket s, u32 ip, u16 port);
 TL_API bool connect(Socket s, char const *ip, u16 port);
-TL_API umm send(Socket s, void const *data, u32 size);
-TL_API umm send(Socket s, sockaddr_in const &destination, void const *data, u32 size);
-TL_API umm receive(Socket socket, void *data, u32 size);
-
-inline umm send(Socket s, Span<u8> span) {
-	return send(s, span.data, (u32)span.count);
+inline bool connect(Socket s, Span<char> ip, u16 port) {
+	return connect(s, with(temporary_allocator, null_terminate(ip).data), port);
 }
-inline umm receive(Socket s, Span<u8> span) {
-	return receive(s, span.data, (u32)span.count);
+TL_API bool set_blocking(Socket s, bool blocking);
+TL_API umm send_some(Socket s, void const *data, u32 size);
+TL_API umm send_some(Socket s, sockaddr_in const &destination, void const *data, u32 size);
+
+inline umm send_some(Socket s, Span<u8> span) {
+	return send_some(s, span.data, (u32)span.count);
 }
 inline bool send_all(Socket s, Span<u8> span) {
 	umm bytes_sent = 0;
 	do {
-		int n = send(s, span.data + bytes_sent, (u32)(span.count - bytes_sent));
-		if (n < 0)
+		int n = send_some(s, span.data + bytes_sent, (u32)(span.count - bytes_sent));
+		if (n == 0)
 			return false;
 		bytes_sent += n;
 	} while (bytes_sent < span.count);
 	return true;
 }
 
-struct TcpServer {
+TL_API Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size);
+inline Result<umm, ReceiveResult> receive_some(Socket s, Span<u8> span) {
+	return receive_some(s, span.data, (u32)span.count);
+}
+
+inline Result<bool, ReceiveResult> receive_all(Socket s, Span<u8> span) {
+	umm bytes_received = 0;
+	do {
+		auto result = receive_some(s, span.data + bytes_received, (u32)(span.count - bytes_received));
+		if (result.is_error()) {
+			return result.error();
+		}
+		bytes_received += result.value();
+	} while (bytes_received < span.count);
+	return true;
+}
+
+struct TL_API TcpServer {
 	Socket listener = 0;
 	List<Socket> clients;
-	void (*on_client_connected)(TcpServer &server, void *context, Socket s, char *host, char *service, u16 port) = autocast noop;
-	void (*on_client_disconnected)(TcpServer &server, void *context, Socket s) = autocast noop;
-	void (*on_client_message_received)(TcpServer &server, void *context, Socket s, u8 *data, u32 size) = autocast noop;
+	void *user_data = 0;
+	Function<void(Socket socket, Span<char> host, Span<char> service, u16 port)> on_client_connected = {};
+	Function<void(Socket socket)>                                                on_client_disconnected = {};
+	Function<void(Socket socket, Span<u8> message)>                              on_client_message_received = {};
 	bool running = false;
+	
+	bool start(u16 port);
+	void update();
 };
-
-TL_API void run(TcpServer *server, void *context = 0);
-TL_API void run_udp(TcpServer *server, void *context = 0);
 
 }
 
 struct NetStream : Stream {
 	net::Socket socket;
-	umm read(Span<u8> destination) { return net::receive(socket, destination); }
-	umm write(Span<u8> source) { return net::send(socket, source); }
+	umm read(Span<u8> destination) { return net::receive_some(socket, destination).value_or(0); }
+	umm write(Span<u8> source) { return net::send_some(socket, source); }
 };
 
 inline NetStream *create_stream(net::Socket socket) {
@@ -94,6 +122,7 @@ inline NetStream *create_stream(net::Socket socket) {
 #if OS_WINDOWS
 
 #pragma warning(push, 0)
+#pragma warning(disable: 4005) // macro redefinition
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
 #pragma warning(pop)
@@ -101,37 +130,81 @@ inline NetStream *create_stream(net::Socket socket) {
 #pragma comment(lib, "iphlpapi")
 #pragma comment(lib, "ws2_32")
 
+#include "default_logger.h"
+#include "win32.h"
+#include "win32_error.h"
+
 namespace tl { namespace net {
 
+Logger logger;
+
+FormattedWin32Error wsa_error() {
+	return {(DWORD)WSAGetLastError()};
+}
+
+bool init(Logger logger) {
+	tl::net::logger = logger;
+
+	WSADATA wsa_data = {};
+	auto error = ::WSAStartup(MAKEWORD(2, 2), &wsa_data);
+	if (error != 0) {
+		logger.error("Failed to startup WSA: {}", FormattedWin32Error{(DWORD)error});
+		return false;
+	}
+	return true;
+}
 bool init() {
-	WSADATA wsaData = {};
-	return ::WSAStartup(MAKEWORD(2, 2), &wsaData) == 0;
+	static DefaultLogger default_logger = {.module = u8"tl::net"s};
+	return init(default_logger);
 }
-void deinit() {
-	::WSACleanup();
+bool deinit() {
+	if (WSACleanup() != 0) {
+		logger.error("Failed to cleanup WSA: {}", wsa_error());
+		return false;
+	}
+	return true;
+
 }
+
+static bool check_error_impl(int code, char const *function_name) {
+	if (code == SOCKET_ERROR) {
+		logger.error("{} failed: {}", function_name, wsa_error());
+		return false;
+	}
+	return true;
+}
+static bool check_socket_impl(SOCKET socket, char const *function_name) {
+	if (socket == INVALID_SOCKET) {
+		logger.error("{} failed: {}", function_name, wsa_error());
+		return false;
+	}
+	return true;
+}
+
+#define check_error(code) check_error_impl(code, __FUNCTION__)
+#define check_socket(code) check_socket_impl(code, __FUNCTION__)
 
 Socket create_socket(ConnectionKind kind) {
 	SOCKET s = ::socket(AF_INET, kind == Connection_tcp ? SOCK_STREAM : SOCK_DGRAM, 0);
-	if (s == INVALID_SOCKET) {
+	if (!check_socket(s)) {
 		return {};
 	}
 	return (Socket)s;
 }
-void close(Socket s) {
-	closesocket((SOCKET)s);
+bool close(Socket s) {
+	return check_error(closesocket((SOCKET)s));
 }
 
-void bind(Socket s, u16 port) {
+bool bind(Socket s, u16 port) {
 	SOCKADDR_IN addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = ::htons(port);
 	addr.sin_addr.S_un.S_addr = INADDR_ANY;
-	::bind((SOCKET)s, (SOCKADDR *)&addr, sizeof(addr));
+	return check_error(::bind((SOCKET)s, (SOCKADDR *)&addr, sizeof(addr)));
 }
 
-void listen(Socket s, u32 n) {
-	::listen((SOCKET)s, n);
+bool listen(Socket s, u32 n) {
+	return check_error(::listen((SOCKET)s, n));
 }
 
 bool connect(Socket s, u32 ip, u16 port) {
@@ -139,81 +212,136 @@ bool connect(Socket s, u32 ip, u16 port) {
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	addr.sin_addr.S_un.S_addr = ip;
-	return ::connect((SOCKET)s, (SOCKADDR*)& addr, sizeof(addr)) == 0;
+	return check_error(::connect((SOCKET)s, (SOCKADDR *)&addr, sizeof(addr)));
 }
 
 bool connect(Socket s, char const *ip, u16 port) {
 	return connect(s, inet_addr(ip), port);
 }
 
-umm send(Socket s, void const *data, u32 size) {
-	return ::send((SOCKET)s, (char *)data, (int)size, 0);
+#include <fcntl.h>
+
+bool set_blocking(Socket s, bool blocking) {
+	//  https://stackoverflow.com/a/1549344
+	unsigned long mode = blocking ? 0 : 1;
+	if (ioctlsocket((int)s, FIONBIO, &mode) != 0) {
+		logger.error("Failed to set blocking mode on socket.");
+		return false;
+	}
+	return true;
 }
 
-umm send(Socket s, sockaddr_in const &destination, void const *data, u32 size) {
-	return ::sendto((SOCKET)s, (char *)data, (int)size, 0, (sockaddr *)&destination, sizeof(destination));
+umm send_some(Socket s, void const *data, u32 size) {
+	auto result = ::send((SOCKET)s, (char *)data, (int)size, 0);
+	if (!check_error(result)) {
+		return 0;
+	}
+	assert(result > 0, "send returned negative bullshit");
+	return result;
 }
 
-umm receive(Socket socket, void *data, u32 size) {
-	return ::recv((SOCKET)socket, (char *)data, (int)size, 0);
+umm send_some(Socket s, sockaddr_in const &destination, void const *data, u32 size) {
+	auto result = ::sendto((SOCKET)s, (char *)data, (int)size, 0, (sockaddr *)&destination, sizeof(destination));
+	if (!check_error(result)) {
+		return 0;
+	}
+	assert(result > 0, "sendto returned negative bullshit");
+	return result;
+}
 
+Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size) {
+	int result = ::recv((SOCKET)socket, (char *)data, (int)size, 0);
+
+	if (result == 0) {
+		logger.info("receive: connection was closed");
+		return ReceiveResult::disconnected;
+	}
+
+	if (!check_error(result)) {
+		return ReceiveResult::error;
+	}
+
+	assert(result > 0, "recv returned negative bullshit");
+
+	return (umm)result;
 }
 
 Socket accept(Socket listener) {
 	SOCKADDR_IN client;
 	int clientSize = sizeof(client);
 	auto socket = accept((SOCKET)listener, (SOCKADDR*)&client, &clientSize);
-	if (socket == INVALID_SOCKET) {
+	if (!check_socket(socket)) {
 		return {};
 	}
 	return (Socket)socket;
 }
 
-void run(TcpServer &server, void *context) {
-	server.running = true;
-	while (server.running) {
-		fd_set fdSet;
-		fdSet.fd_count = (u_int)server.clients.count + 1;
-		fdSet.fd_array[0] = (SOCKET)server.listener;
-		for (u32 i = 0; i < server.clients.count; ++i) {
-			fdSet.fd_array[i + 1] = (SOCKET)server.clients[i];
-		}
+bool TcpServer::start(u16 port) {
+	listener = create_socket(Connection_tcp);
+	if (!listener)
+		return false;
+	if (!bind(listener, port))
+		return false;
+	if (!listen(listener))
+		return false;
 
-		timeval timeout = {};
-		timeout.tv_sec = 1;
-		int socketCount = ::select(0, &fdSet, nullptr, nullptr, &timeout);
-		for (int i = 0; i < socketCount; i++) {
-			SOCKET socket = fdSet.fd_array[i];
-			if (socket == (SOCKET)server.listener) {
-				SOCKADDR_IN client;
-				int clientSize = sizeof(client);
-				SOCKET clientSocket = ::accept((SOCKET)server.listener, (SOCKADDR *)&client, &clientSize);
-				if (clientSocket == INVALID_SOCKET) {
-					continue;
-				}
+	running = true;
+	return true;
+}
 
-				char host[NI_MAXHOST];
-				host[0] = 0;
-				char service[NI_MAXSERV];
-				service[0] = 0;
-				if (getnameinfo((SOCKADDR *)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0) != 0) {
-					inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-				}
-				server.clients.add((Socket)clientSocket);
-				server.on_client_connected(server, context, (Socket)clientSocket, host, service, ntohs(client.sin_port));
-			} else {
-				u8 buf[4096];
-				int bytesReceived = recv(socket, (char *)buf, sizeof(buf), 0);
-				if (bytesReceived <= 0) {
-					server.on_client_disconnected(server, context, (Socket)socket);
-					find_and_erase(server.clients, (Socket)socket);
-					continue;
-				}
-				server.on_client_message_received(server, context, (Socket)socket, buf, (u32)bytesReceived);
+void TcpServer::update() {
+	fd_set fdSet;
+	fdSet.fd_count = (u_int)clients.count + 1;
+	fdSet.fd_array[0] = (SOCKET)listener;
+	for (u32 i = 0; i < clients.count; ++i) {
+		fdSet.fd_array[i + 1] = (SOCKET)clients[i];
+	}
+
+	timeval timeout = {};
+	timeout.tv_sec = 1;
+	int socketCount = ::select(0, &fdSet, nullptr, nullptr, &timeout);
+
+	if (socketCount < 0) {
+		current_logger.error("select: {}", WSAGetLastError());
+	}
+
+	for (int i = 0; i < socketCount; i++) {
+		SOCKET socket = fdSet.fd_array[i];
+		if (socket == (SOCKET)listener) {
+			SOCKADDR_IN client;
+			int clientSize = sizeof(client);
+			SOCKET clientSocket = ::accept((SOCKET)listener, (SOCKADDR *)&client, &clientSize);
+			if (clientSocket == INVALID_SOCKET) {
+				continue;
 			}
+
+			char host[NI_MAXHOST];
+			host[0] = 0;
+			char service[NI_MAXSERV];
+			service[0] = 0;
+			if (getnameinfo((SOCKADDR *)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0) != 0) {
+				inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
+			}
+			clients.add((Socket)clientSocket);
+			if (on_client_connected)
+				on_client_connected((Socket)clientSocket, as_span(host), as_span(service), ntohs(client.sin_port));
+		} else {
+			u8 buf[4096];
+			int bytesReceived = recv(socket, (char *)buf, sizeof(buf), 0);
+			if (bytesReceived <= 0) {
+				if (on_client_disconnected)
+					on_client_disconnected((Socket)socket);
+				find_and_erase(clients, (Socket)socket);
+				continue;
+			}
+			if (on_client_message_received)
+				on_client_message_received((Socket)socket, Span{buf, (umm)bytesReceived});
 		}
 	}
 }
+
+#undef check_error
+#undef check_socket
 
 }}
 

@@ -40,6 +40,9 @@ inline Process execute(Span<utf16> path, ExecuteParams params = {}) {
 inline Process execute(Span<utf8> path, ExecuteParams params = {}) {
 	return execute(to_utf16(path, true).data, 0, params);
 }
+inline Process execute(Span<utf8> path, Span<utf8> arguments, ExecuteParams params = {}) {
+	return execute(to_utf16(path, true).data, to_utf16(arguments, true).data, params);
+}
 
 TL_API bool wait(Process process, u32 timeout = -1);
 TL_API bool is_running(Process process);

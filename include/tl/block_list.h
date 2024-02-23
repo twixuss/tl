@@ -235,7 +235,7 @@ StaticBlockListIterator<T, block_size> end(StaticBlockList<T, block_size> &list)
 }
 
 template <class T, umm block_size, class Fn>
-void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
+bool for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 	constexpr bool using_index = std::is_invocable_v<Fn, T&, BlockListIndex>;
 
 	if constexpr (using_index) {
@@ -247,8 +247,11 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 		do {
 			for (auto &it : *block) {
 				if constexpr (returns_directive) {
-					if (fn(it, index) == ForEach_break)
-						return;
+					auto d = fn(it, index);
+					if (d & ForEach_erase) not_implemented();
+					if (d & ForEach_erase_unordered) not_implemented();
+					if (d & ForEach_break)
+						return true;
 				} else {
 					fn(it, index);
 				}
@@ -266,8 +269,11 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 		do {
 			for (auto it : *block) {
 				if constexpr (returns_directive) {
-					if (fn(it) == ForEach_break)
-						return;
+					auto d = fn(it);
+					if (d & ForEach_erase) not_implemented();
+					if (d & ForEach_erase_unordered) not_implemented();
+					if (d & ForEach_break)
+						return true;
 				} else {
 					fn(it);
 				}
@@ -275,6 +281,7 @@ void for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 			block = block->next;
 		} while (block);
 	}
+	return false;
 }
 
 template <class T, umm block_size>

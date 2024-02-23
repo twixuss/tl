@@ -22,6 +22,7 @@
 #include "list.h"
 #include "hash_map.h"
 #include "thread.h"
+#include "math.h"
 
 #ifndef TL_PROFILER_SUBTRACT_SELF_TIME
 #define TL_PROFILER_SUBTRACT_SELF_TIME 0

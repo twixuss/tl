@@ -411,14 +411,15 @@ umm count_of(CBucketHashMap auto map) {
 	return result;
 }
 
-template <ForEachFlags flags = 0, class Fn>
-void for_each(CBucketHashMap auto map, Fn &&fn) requires
-	requires { fn(*(typename decltype(map)::KeyValue *)0); }
+template <ForEachFlags flags = 0, CBucketHashMap Map, class Fn>
+void for_each(Map &&map, Fn &&fn) requires
+	requires { fn(*map.begin()); }
 {
 	static_assert(flags == 0, "Only default flags supported");
 
 	for (u32 i = 0; i < map.buckets.count; ++i) {
 		for (auto &it : map.buckets[i]) {
+			static_assert(std::is_same_v<decltype(fn(it.kv)), void>, "ForEachDirective not implemented");
 			fn(it.kv);
 		}
 	}
@@ -716,22 +717,26 @@ umm count_of(CContiguousHashMap auto map) {
 }
 
 template <CContiguousHashMap Map, class Fn>
-void for_each(Map map, Fn &&fn) requires requires (Map &&map, Fn &&fn) { fn(map.cells[0].key_value); } {
+bool for_each(Map &&map, Fn &&fn) 
+	requires requires { fn(*map.begin()); }
+{
 	for (auto &cell : map.cells) {
 		if (cell.state == ContiguousHashMapCellState::occupied) {
 			using FnRet = decltype(fn(cell.key_value));
 			if constexpr (std::is_same_v<FnRet, void>) {
 				fn(cell.key_value);
 			} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-				switch (fn(cell.key_value)) {
-					case ForEach_break: return;
-					case ForEach_erase: cell.state = Map::CellState::removed; break;
-				}
+				auto d = fn(cell.key_value);
+				if (d & ForEach_erase) cell.state = Map::CellState::removed;
+				if (d & ForEach_erase_unordered) cell.state = Map::CellState::removed;
+				if (d & ForEach_break)
+					return true;
 			} else {
 				static_error_t(Map, "Invalid return type of for_each function");
 			}
 		}
 	}
+	return false;
 }
 
 template <class Allocator = Allocator, CContiguousHashMap Map, class Fn>

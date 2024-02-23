@@ -66,16 +66,30 @@ TL_API void free(FontCollection *collection);
 
 TL_API Font *add_font(FontCollection *collection, Span<utf8> path);
 
-
-struct PlacedChar {
-	aabb<v2s> position = {};
-	aabb<v2f> uv = {};
-};
-
 struct PlacedText {
-	List<PlacedChar> chars;
+	struct Char {
+		aabb<v2s> position = {};
+		aabb<v2f> uv = {};
+	};
+	struct Line {
+		umm begin_index = 0;
+		umm end_index = 0;
+		s32 width = 0;
+	};
+
+	List<Char> chars;
+	List<Line> lines;
 	aabb<v2s> bounds = {};
 	u32 line_count = 0;
+
+	inline Optional<umm> line_of(umm char_index) {
+		for (umm i = 0; i < lines.count; ++i) {
+			auto line = lines[i];
+			if ((char_index - line.begin_index) < (line.end_index - line.begin_index))
+				return i;
+		}
+		return {};
+	}
 };
 
 struct PlaceTextParams {
@@ -84,9 +98,17 @@ struct PlaceTextParams {
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
+
+// Returns true if new characters were added
 TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
+
 TL_API void free(FontCollection *collection);
 TL_API PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params = {} TL_LP);
+
+inline void free(PlacedText &text) {
+	free(text.chars);
+	free(text.lines);
+}
 
 }
 
@@ -113,9 +135,6 @@ void init_ft(FontFT *ft) {
 	ft->face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
 }
 
-//
-// Returns true if new characters were added
-//
 bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 	assert(sized_font);
 
@@ -133,7 +152,7 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 	new_chars.allocator = temporary_allocator;
 
 	while (current_char < text.end()) {
-		auto got_char = get_char_and_advance_utf8(&current_char);
+		auto got_char = decode_and_advance(&current_char);
 		if (!got_char.has_value()) {
 			invalid_code_path();
 		}
@@ -321,13 +340,6 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 	result.bounds.max = min_value<v2s>;
 	result.line_count = 1;
 
-	struct LineInfo {
-		umm begin_index;
-		umm end_index;
-		s32 width = 0;
-	};
-	List<LineInfo, TemporaryAllocator> line_infos;
-
 	aabb<s32> line_x_bounds = {max_value<s32>, min_value<s32>};
 	umm line_begin_index = 0;
 	
@@ -344,7 +356,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 		FontChar d = {};
 
 		auto read_char = [&] {
-			auto got_char = get_char_and_advance_utf8(&current_char);
+			auto got_char = decode_and_advance(&current_char);
 			if (!got_char) {
 				invalid_code_path();
 			}
@@ -361,7 +373,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 		}
 
 		if (code_point == '\n') {
-			line_infos.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
+			result.lines.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
 			max_line_width = max(max_line_width, line_x_bounds.size());
 			line_x_bounds = {max_value<s32>, min_value<s32>};
 			char_position.x = 0;
@@ -369,7 +381,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 			result.line_count += 1;
 			line_begin_index = result.chars.count;
 		} else {
-			PlacedChar c;
+			PlacedText::Char c;
 
 			auto place_char = [&] {
 				c.position.min = {char_position.x + d.offset.x, char_position.y + (s32)font->size - d.offset.y};
@@ -407,12 +419,12 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 		}
 	}
 	
-	line_infos.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
+	result.lines.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
 	max_line_width = max(max_line_width, line_x_bounds.size());
 
-	for (auto &line_info : line_infos) {
-		for (umm i = line_info.begin_index; i < line_info.end_index; ++i) {
-			s32 offset = round_to_int((max_line_width - line_info.width) * params.line_alignment);
+	for (auto &line : result.lines) {
+		for (umm i = line.begin_index; i < line.end_index; ++i) {
+			s32 offset = round_to_int((max_line_width - line.width) * params.line_alignment);
 			result.chars[i].position.min.x += offset;
 			result.chars[i].position.max.x += offset;
 		}

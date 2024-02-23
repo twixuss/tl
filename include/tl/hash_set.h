@@ -171,6 +171,7 @@ void for_each(HashSet<Value, Traits> set, Fn &&fn) {
 
 	for (u32 i = 0; i < set.buckets.count; ++i) {
 		for (auto &it : set.buckets[i]) {
+			static_assert(std::is_same_v<decltype(fn(it)), void>, "ForEachDirective not implemented");
 			fn(it);
 		}
 	}

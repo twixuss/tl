@@ -105,7 +105,7 @@
 #define TL_DECLARE_CONCEPT(name)                                                \
 	template <class T> struct S##name : std::false_type {};                     \
 	template <class ...Args> struct S##name<name<Args...>> : std::true_type {}; \
-	template <class T> concept C##name = S##name<T>::value
+	template <class T> concept C##name = S##name<std::remove_cvref_t<T>>::value
 
 #define TL_MAKE_FIXED(T)              \
 	T(const T &) = delete;            \
@@ -849,11 +849,13 @@ inline bool all_false(bool value) { return !value; }
 inline bool any_false(bool value) { return !value; }
 
 enum ForEachDirective {
-	ForEach_continue,
-	ForEach_break,
-	ForEach_erase,
-	ForEach_erase_unordered,
+	ForEach_continue        = 0x0,
+	ForEach_break           = 0x1,
+	ForEach_erase           = 0x2,
+	ForEach_erase_unordered = 0x4,
 };
+
+constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
 
 using ForEachFlags = u8;
 enum : ForEachFlags {
@@ -861,7 +863,7 @@ enum : ForEachFlags {
 };
 
 template <ForEachFlags flags=0, class T, umm count, class Fn>
-constexpr void for_each(T (&array)[count], Fn &&fn) {
+constexpr bool for_each(T (&array)[count], Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
 	T *start;
@@ -880,14 +882,16 @@ constexpr void for_each(T (&array)[count], Fn &&fn) {
 		if constexpr (std::is_same_v<FnRet, void>) {
 			fn(*it);
 		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			switch (fn(*it)) {
-				case ForEach_break: return;
-				case ForEach_erase: invalid_code_path("Can't erase from an array.");
-			}
+			auto d = fn(*it);
+			if (d & ForEach_erase) invalid_code_path("not supported");
+			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
+			if (d & ForEach_break)
+				return true;
 		} else {
 			static_error_t(T, "Invalid return type of for_each function");
 		}
 	}
+	return false;
 }
 
 bool all(auto x, auto predicate) {
@@ -924,7 +928,7 @@ struct ValueTypeOfT<T[count]> {
 };
 
 template <class T>
-using ValueTypeOf = ValueTypeOfT<T>::Type;
+using ValueTypeOf = ValueTypeOfT<std::remove_cvref_t<T>>::Type;
 
 template <class Container, class Predicate>
 constexpr auto find_if(Container &container, Predicate &&predicate) {
@@ -1170,6 +1174,18 @@ struct Result {
 
 	explicit operator bool() { return _is_value; }
 
+	constexpr Value value_or(Value fallback) {
+		if (_is_value)
+			return _value;
+		return fallback;
+	}
+
+	constexpr Error error_or(Error fallback) {
+		if (!_is_value)
+			return _error;
+		return fallback;
+	}
+
 private:
 	bool _is_value;
 	union {
@@ -1328,12 +1344,10 @@ struct Span {
 	}
 	constexpr Span skip(smm amount) const {
 		if (amount >= 0) {
-			if ((Size)amount >= count)
-				return {};
+			amount = clamp<smm>(amount, 0, count);
 			return {data + amount, (Size)((smm)count - amount)};
 		} else {
-			if ((Size)-amount >= count)
-				return {};
+			amount = clamp<smm>(amount, -(smm)count, 0);
 			return {data, (Size)(count + amount)};
 		}
 	}
@@ -1397,7 +1411,7 @@ template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y] 
 template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
 
 template <ForEachFlags flags=0, class T, class Fn>
-constexpr void for_each(Span<T> span, Fn &&fn) {
+constexpr bool for_each(Span<T> span, Fn &&fn) {
 	using FnRet = decltype(fn(*(T*)0));
 
 	T *start = 0;
@@ -1418,15 +1432,15 @@ constexpr void for_each(Span<T> span, Fn &&fn) {
 			fn(*it);
 		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
 			auto d = fn(*it);
-			if (d == ForEach_break) {
-				break;
-			} else if (d == ForEach_erase) {
-				invalid_code_path("Can't erase from a span.");
-			}
+			if (d & ForEach_erase) invalid_code_path("not supported");
+			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
+			if (d & ForEach_break)
+				return true;
 		} else {
 			static_error_v(fn, "Invalid return type of for_each function");
 		}
 	}
+	return false;
 }
 
 template <class Enumerable>
@@ -1830,6 +1844,19 @@ inline constexpr bool is_hex_digit(utf32 c) {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
+inline constexpr bool is_punctuation(utf32 c) {
+	bool result = false;
+
+	#define R(a, b) result |= ((c - a) <= (b - a));
+	R(33, 47);   // !"#$%&'()*+,-./
+	R(58, 64);   // :;<=>?@
+	R(91, 96);   // [\]^_`
+	R(123, 126); // {|}~
+	#undef R
+
+	return result;
+}
+
 inline constexpr ascii to_lower(ascii c) {
 	if (c >= 'A' && c <= 'Z')
 		return (ascii)(c + ('a' - 'A'));
@@ -2100,6 +2127,17 @@ struct StaticList {
 	}
 	forceinline T erase_unordered(T *where) { return erase_at_unordered(where - data); }
 
+	void erase_at(umm where, umm amount) {
+		if (amount == 0)
+			return;
+		bounds_check(where + amount <= count);
+		T *dst = data + where;
+		T *src = dst + amount;
+		umm cnt = end() - src;
+		memmove(dst, src, cnt * sizeof(T));
+		count -= amount;
+	}
+
 	constexpr void clear() {
 		count = 0;
 	}
@@ -2225,7 +2263,7 @@ struct BitSet {
 };
 
 template <ForEachFlags flags = 0, umm size>
-void for_each(BitSet<size> set, auto &&fn)
+bool for_each(BitSet<size> &set, auto &&fn)
 	requires requires { fn((umm)0); }
 {
 	using Word = typename decltype(set)::Word;
@@ -2242,8 +2280,11 @@ void for_each(BitSet<size> set, auto &&fn)
 					if (absolute_index >= size)
 						continue;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						if (fn(absolute_index) == ForEach_break)
-							return;
+						auto d = fn(absolute_index);
+						if (d & ForEach_erase) not_implemented();
+						if (d & ForEach_erase_unordered) not_implemented();
+						if (d & ForEach_break)
+							return true;
 					} else {
 						fn(absolute_index);
 					}
@@ -2262,8 +2303,11 @@ void for_each(BitSet<size> set, auto &&fn)
 					if (absolute_index >= size)
 						return;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						if (fn(absolute_index) == ForEach_break)
-							return;
+						auto d = fn(absolute_index);
+						if (d & ForEach_erase) not_implemented();
+						if (d & ForEach_erase_unordered) not_implemented();
+						if (d & ForEach_break)
+							return true;
 					} else {
 						fn(absolute_index);
 					}
@@ -2271,6 +2315,7 @@ void for_each(BitSet<size> set, auto &&fn)
 			}
 		}
 	}
+	return false;
 }
 
 template <class Collection, class T>
@@ -2285,6 +2330,11 @@ T *find_next(Collection collection, T value) {
 	auto found = find(collection, value);
 	if (found) return next(collection, found);
 	return 0;
+}
+
+template <class Collection>
+auto erase(Collection &collection, typename Collection::ValueType *value) {
+	return collection.erase(value);
 }
 
 template <class Collection, class T>

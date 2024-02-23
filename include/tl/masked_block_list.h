@@ -276,17 +276,14 @@ bool for_each(StaticMaskedBlockList<T, values_per_block, Allocator> &list, auto 
 				if constexpr (std::is_same_v<Ret, void>) {
 					fn(block->values[value_index]);
 				} else if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-					switch (fn(block->values[value_index])) {
-						case ForEach_continue: break;
-						case ForEach_break: return true;
-						case ForEach_erase: 
-						case ForEach_erase_unordered: 
-							block->masks[mask_index] &= ~((Mask)1 << bit_index);
-							--list.count;
-							break;
-						default: invalid_code_path("Bad for_each directive");
+					auto d = fn(block->values[value_index]);
+					if (d & (ForEach_erase | ForEach_erase_unordered)) {
+						block->masks[mask_index] &= ~((Mask)1 << bit_index);
+						--list.count;
 					}
-
+					if (d & ForEach_break) {
+						return true;
+					}
 				} else {
 					static_error_v(fn, "Invalid return type");
 				}

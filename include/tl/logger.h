@@ -44,44 +44,12 @@ inline umm append(StringBuilder &builder, LogSeverity severity) {
 		TL_ENUMERATE_LOGGER_SEVERITIES
 #undef x
 	}
+	return 0;
 }
 
-extern TL_API OsLock stdout_mutex;
 
-
-struct DefaultLogger : LoggerBase {
-	Span<utf8> module;
-	LogSeverity min_severity = TL_DEBUG ? LogSeverity::info : LogSeverity::warning;
-
-	inline static void proc(Logger *logger, LogSeverity severity, Span<utf8> message) {
-		return ((DefaultLogger *)logger->state)->impl(severity, message);
-	}
-
-	void impl(LogSeverity severity, Span<utf8> message) {
-		if ((int)severity < (int)min_severity)
-			return;
-
-		scoped(temporary_allocator);
-
-		auto color = [&] {
-			switch (severity) {
-				case LogSeverity::info:    return ConsoleColor::dark_gray;
-				case LogSeverity::warning: return ConsoleColor::yellow;
-				case LogSeverity::error:   return ConsoleColor::red;
-			}
-			return ConsoleColor::red;
-		}();
-
-		with(stdout_mutex, with(color, println("[{}] {}", module, message)));
-	}
-	operator Logger() {
-		return {.func = proc, .state = this};
-	}
-};
-
-extern TL_API DefaultLogger app_logger;
-extern TL_API DefaultLogger tl_logger;
-extern TL_API Logger default_logger;
+extern TL_API Logger app_logger;
+extern TL_API Logger tl_logger;
 extern TL_API thread_local Logger current_logger;
 
 namespace global_log {
@@ -97,12 +65,9 @@ inline void log_error  (char const *format, auto ...args) { current_logger.error
 
 #ifdef TL_IMPL
 
-OsLock stdout_mutex = {};
-
-DefaultLogger app_logger = { .module = u8"app"s };
-DefaultLogger tl_logger = { .module = u8"tl"s };
-Logger default_logger = app_logger;
-thread_local Logger current_logger = default_logger;
+Logger app_logger;
+Logger tl_logger;
+thread_local Logger current_logger;
 
 #endif
 

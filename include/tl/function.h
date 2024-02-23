@@ -57,6 +57,8 @@ struct Function {
 			allocator.free(state);
 		*this = {};
 	}
+
+	explicit operator bool() { return function; }
 };
 
 template <class ReturnType, class ...Args, class Allocator>
@@ -94,6 +96,8 @@ struct Function<ReturnType(Args...), Allocator> {
 			allocator.free(state);
 		*this = {};
 	}
+	
+	explicit operator bool() { return function; }
 };
 
 }

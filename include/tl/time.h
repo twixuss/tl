@@ -10,7 +10,7 @@ struct PreciseTimer {
 };
 
 TL_API PreciseTimer create_precise_timer();
-TL_API f64 get_time(PreciseTimer timer);
+TL_API f64 elapsed_time(PreciseTimer timer);
 TL_API f64 reset(PreciseTimer &timer);
 
 TL_API u64 read_timestamp_counter();
@@ -19,7 +19,7 @@ TL_API List<char> get_time_string();
 
 TL_API void make_os_timing_precise();
 
-TL_API void sync(u64 &frame_time_counter, f32 target_frame_time);
+TL_API void sync(PreciseTimer &timer, f32 target_delta_time);
 
 struct Date {
 	u16 year;        // 1601 - 30827
@@ -66,6 +66,8 @@ inline umm append(StringBuilder &b, Date d) {
 	);
 }
 
+TL_API f64 current_precise_time();
+
 }
 
 #ifdef TL_IMPL
@@ -79,10 +81,14 @@ inline umm append(StringBuilder &b, Date d) {
 
 namespace tl {
 
+f64 current_precise_time() {
+	return (f64)get_performance_counter() / performance_frequency;
+}
+
 PreciseTimer create_precise_timer() {
 	return {get_performance_counter()};
 }
-f64 get_time(PreciseTimer timer) {
+f64 elapsed_time(PreciseTimer timer) {
 	return (f64)(get_performance_counter() - timer.counter) / performance_frequency;
 }
 f64 reset(PreciseTimer &timer) {
@@ -106,8 +112,8 @@ void make_os_timing_precise() {
 	timeBeginPeriod(1);
 }
 
-void sync(u64 &frame_time_counter, f32 target_frame_time) {
-	auto target_counter = frame_time_counter + (u64)(performance_frequency * target_frame_time);
+void sync(PreciseTimer &timer, f32 target_delta_time) {
+	auto target_counter = timer.counter + (u64)(performance_frequency * target_delta_time);
 
 	auto now = get_performance_counter();
 
@@ -117,9 +123,9 @@ void sync(u64 &frame_time_counter, f32 target_frame_time) {
 
 		while (get_performance_counter() < target_counter) {}
 
-		frame_time_counter = target_counter;
+		timer.counter = target_counter;
 	} else {
-		frame_time_counter = now;
+		timer.counter = now;
 	}
 
 }

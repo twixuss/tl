@@ -384,27 +384,23 @@ constexpr T const *find_if(List<T, Allocator, Size> const &list, Predicate &&pre
 }
 
 template <class T, class Allocator, class Size, class Fn>
-constexpr void for_each(List<T, Allocator, Size> list, Fn &&fn) {
+constexpr bool for_each(List<T, Allocator, Size> &list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
-	for (auto it = list.begin(); it != list.end();) {
+	for (auto it = list.begin(); it != list.end(); ++it) {
 		if constexpr (std::is_same_v<ReturnType, void>) {
 			fn(*it);
 		} else if constexpr (std::is_same_v<ReturnType, ForEachDirective>) {
-			switch (fn(*it)) {
-				case ForEach_continue: break;
-				case ForEach_break: return;
-				case ForEach_erase: 
-					list.erase(it);
-					continue;
-				case ForEach_erase_unordered: 
-					list.erase_unordered(it);
-					continue;
-			}
+			auto d = fn(*it);
+
+			assert(!((d & ForEach_erase) && (d & ForEach_erase_unordered)));
+			if (d & ForEach_erase) list.erase(it--);
+			if (d & ForEach_erase_unordered) list.erase_unordered(it--);
+			if (d & ForEach_break) return true;
 		} else {
 			static_assert("Invalid return type in for_each iterator");
 		}
-		++it;
 	}
+	return false;
 }
 
 template <class T, class Allocator, class Size, class Fn>
@@ -509,12 +505,12 @@ template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size
 template <class T, class Allocator, class Size> T const &back(List<T, Allocator, Size> const &list) { return list.back(); }
 template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size> &list) { return list.back(); }
 
-template <class T>
+template <class T, class Allocator = Allocator>
 struct Queue : Span<T> {
 	using Span<T>::data;
 	using Span<T>::count;
 
-	Allocator allocator = current_allocator;
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	T *alloc_data = 0;
 	umm alloc_count = 0;
 
@@ -542,12 +538,11 @@ struct Queue : Span<T> {
 		data[count++] = value;
 	}
 
-	void push_front_unordered(T const &value TL_LP) {
-		_grow_if_needed(count + 1 TL_LA);
-		if (count != 0) {
-			data[count++] = data[0];
+	void push(Span<T> span TL_LP) {
+		_grow_if_needed(count + span.count TL_LA);
+		for (auto &value : span) {
+			data[count++] = value;
 		}
-		data[0] = value;
 	}
 
 	Optional<T> pop() {

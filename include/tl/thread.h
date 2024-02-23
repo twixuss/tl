@@ -177,12 +177,15 @@ void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
 
+void init_logger_thread();
+
 void run_thread(Thread *thread) {
 	thread->handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
 		auto thread = (Thread *)param;
 		init_allocator();
 		defer {deinit_allocator();};
 		current_printer = standard_output_printer;
+		init_logger_thread();
 		thread->function(thread);
 		return 0;
 	}, thread, 0, 0);
@@ -359,17 +362,25 @@ private:
 	T value;
 };
 
-#define locked_use(name) name * [&](auto &name)
+#define locked_use(name) name * [&](auto &name) -> decltype(auto)
 
-template <class T, class Lock>
-struct LockQueue : LockProtected<Queue<T>, Lock> {
+template <class T, class Lock, class Allocator = Allocator>
+struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 	void push(T const &value) {
-		this->use([&](Queue<T> &queue) {
+		this->use([&](auto &queue) {
 			queue.push(value);
 		});
 	}
+	void push(Span<T> values) {
+		this->use([&](auto &queue) {
+			// FIXME: use reserve
+			for (auto &value : values) {
+				queue.push(value);
+			}
+		});
+	}
 	Optional<T> pop() {
-		return this->use([&](Queue<T> &queue) {
+		return this->use([&](auto &queue) {
 			return queue.pop();
 		});
 	}
@@ -498,6 +509,46 @@ void ConditionVariable::unlock() {
 }
 #endif
 
+template <class T, class Allocator = Allocator>
+struct SignalQueue : private Queue<T, Allocator> {
+	using Base = Queue<T, Allocator>;
+
+	void push(T value) {
+		cv.section([&]{
+			Base::push(value);
+		});
+		cv.wake();
+	}
+
+	void push(Span<T> value) {
+		cv.section([&]{
+			Base::push(value);
+		});
+		cv.wake();
+	}
+
+	Optional<T> pop(auto cancelled) {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!cancelled()) {
+				if (result = Base::pop()) {
+					break;
+				} else {
+					sleeper.sleep();
+				}
+			}
+		});
+
+		return result;
+	}
+	T pop() {
+		return pop([] { return false; }).value();
+	}
+private:
+	ConditionVariable cv;
+};
+
 struct ThreadPool {
 	struct Task {
 		void (*fn)(void *param) = 0;
@@ -616,7 +667,7 @@ struct ThreadPool {
 				task = tasks.pop();
 			});
 			if (task) {
-				task.value_unchecked().run();
+				run(task.value_unchecked());
 			}
 			return finished_task_count < started_task_count;
 		}, spinner);

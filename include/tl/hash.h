@@ -12,7 +12,13 @@ template <class T>
 inline constexpr tl::u64 get_hash(T const &value);
 
 template <class T>
-inline constexpr tl::u64 get_hash(T *const &value) { return (tl::u64)value / alignof(T); }
+inline constexpr tl::u64 get_hash(T *const &value) { 
+	if constexpr (requires { alignof(T); }) {
+		return (tl::u64)value / alignof(T);
+	} else {
+		return (tl::u64)value;
+	}
+}
 
 template <> inline constexpr tl::u64 get_hash(void *const &value) { return (tl::u64)value / sizeof(void *); }
 

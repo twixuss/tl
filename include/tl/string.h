@@ -5,20 +5,20 @@
 //
 //     UTF8 READING
 //
-// If you want to read utf8 text, use get_char_and_advance_utf8.
+// If you want to read utf8 text, use decode_and_advance.
 //
-// You can get more throughput by using get_char_and_advance_utf8_fast, but there's a few things it assumes about input text:
+// You can get more throughput by using decode_and_advance_fast, but there's a few things it assumes about input text:
 // 1) ALL characters are VALID.
 // 2) There is 3 extra bytes available at the end of the text.
 
 
 // Tested on random 640 MiB text.
 // Generating only ascii ...
-// Testing get_char_and_advance_utf8 ... 449.927 ms
-// Testing get_char_and_advance_utf8_fast ... 503.598 ms // Strange. ascii handling is identical in both functions...
+// Testing decode_and_advance ... 449.927 ms
+// Testing decode_and_advance_fast ... 503.598 ms // Strange. ascii handling is identical in both functions...
 // Generating different sizes ... Octet count was equally likely.
-// Testing get_char_and_advance_utf8 ... 2438.868 ms
-// Testing get_char_and_advance_utf8_fast ... 1488.426 ms
+// Testing decode_and_advance ... 2438.868 ms
+// Testing decode_and_advance_fast ... 1488.426 ms
 //
 
 // 
@@ -238,44 +238,40 @@ inline u8 const *advance_utf8(u8 const *string) {
 template <class Ptr>
 inline Ptr advance_utf8(Ptr string) { return (Ptr)advance_utf8((u8 const *&)string); }
 
-inline Optional<utf32> get_char_utf8(utf8 const *ptr) {
-	if (*ptr < 0x80) {
-		return *ptr;
-	}
-
-	switch (count_leading_ones((u8)*ptr)) {
-		case 2: return ((ptr[0] & 0x1Fu) <<  6u) | ((ptr[1] & 0x3Fu));
-		case 3: return ((ptr[0] & 0x0Fu) << 12u) | ((ptr[1] & 0x3Fu) <<  6u) | ((ptr[2] & 0x3Fu));
-		case 4: return ((ptr[0] & 0x07u) << 18u) | ((ptr[1] & 0x3Fu) << 12u) | ((ptr[2] & 0x3Fu) << 6u) | ((ptr[3] & 0x3Fu));
-	}
-	return {};
-}
-
-inline Optional<utf32> get_char_and_advance_utf8(utf8 const **ptr) {
-	auto &text = *ptr;
+struct DecodedUtf8Char {
+	utf32 code;
+	u8 size;
+};
+inline Optional<DecodedUtf8Char> decode(utf8 const *text) {
 	if (*text < 0x80) {
-		return *text++;
+		return DecodedUtf8Char{.code = *text, .size = 1};
 	}
 
-	u32 byte_count = count_leading_ones((u8)*text);
-	if (byte_count == 1 || byte_count > 4)
-		return {};
-
-	defer { text += byte_count; };
-
-	switch (byte_count) {
-		case 2: return ((text[0] & 0x1Fu) <<  6u) | ((text[1] & 0x3Fu));
-		case 3: return ((text[0] & 0x0Fu) << 12u) | ((text[1] & 0x3Fu) <<  6u) | ((text[2] & 0x3Fu));
-		case 4: return ((text[0] & 0x07u) << 18u) | ((text[1] & 0x3Fu) << 12u) | ((text[2] & 0x3Fu) << 6u) | ((text[3] & 0x3Fu));
+	switch (count_leading_ones((u8)*text)) {
+		case 2: return DecodedUtf8Char{.code = ((text[0] & 0x1Fu) <<  6u) | ((text[1] & 0x3Fu)), .size = 2};
+		case 3: return DecodedUtf8Char{.code = ((text[0] & 0x0Fu) << 12u) | ((text[1] & 0x3Fu) <<  6u) | ((text[2] & 0x3Fu)), .size = 3};
+		case 4: return DecodedUtf8Char{.code = ((text[0] & 0x07u) << 18u) | ((text[1] & 0x3Fu) << 12u) | ((text[2] & 0x3Fu) << 6u) | ((text[3] & 0x3Fu)), .size = 4};
 	}
 	return {};
 }
 
-inline Optional<utf32> get_char_and_advance_utf8(utf8 **ptr) {
-	return get_char_and_advance_utf8((utf8 const **)ptr);
+inline Optional<utf32> decode_and_advance(utf8 const **ptr) {
+	if (auto decoded = decode(*ptr)) {
+		*ptr += decoded.value().size;
+		return decoded.value().code;
+	}
+	return {};
 }
 
-inline utf32 get_char_and_advance_utf8_fast(utf8 const **ptr) {
+inline Optional<utf32> decode_and_advance(utf8 **ptr) {
+	return decode_and_advance((utf8 const **)ptr);
+}
+
+#define RENAMED_API(old_name, new_name) [[deprecated("use " #new_name " instead")]] inline decltype(auto) old_name(auto &&...args) requires requires { new_name(args...); } { return new_name(args...); }
+
+RENAMED_API(get_char_and_advance_utf8, decode_and_advance)
+
+inline utf32 decode_and_advance_fast(utf8 const **ptr) {
 	auto &text = *ptr;
 	if (*text < 0x80) {
 		return *text++;
@@ -289,8 +285,20 @@ inline utf32 get_char_and_advance_utf8_fast(utf8 const **ptr) {
 	return result[byte_count-2];
 }
 
-inline utf32 get_char_and_advance_utf8_fast(utf8 **ptr) {
-	return get_char_and_advance_utf8_fast((utf8 const **)ptr);
+inline utf32 decode_and_advance_fast(utf8 **ptr) {
+	return decode_and_advance_fast((utf8 const **)ptr);
+}
+
+inline utf8 *get_prev_char(utf8 *ptr, utf8 *limit) {
+	while (1) {
+		--ptr;
+		if (ptr < limit) {
+			return limit;
+		}
+
+		if ((*ptr & 0xC0) != 0x80)
+			return ptr;
+	}
 }
 
 inline umm write_utf8(utf8 **dst, u32 ch) {

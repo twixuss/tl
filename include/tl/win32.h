@@ -21,7 +21,7 @@ TL_API bool init_rawinput(RawInputDevice deviceFlags);
 TL_API bool processRawInputMessage(MSG msg, bool mouseButtons[5], s32 *mouseWheel, v2s *mouseDelta);
 TL_API bool processKeyboardMessage(MSG message, bool keyboardButtons[256], bool handleRepeated);
 TL_API u64 get_performance_counter();
-TL_API bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT (*wndProc)(HWND, UINT, WPARAM, LPARAM));
+TL_API bool register_window_class(HINSTANCE instance, char const *name, UINT style, HCURSOR cursor, LRESULT(*wndProc)(HWND, UINT, WPARAM, LPARAM));
 TL_API void clampWindowToMonitor(HWND Window, bool move, HMONITOR monitor = (HMONITOR)INVALID_HANDLE_VALUE);
 TL_API LRESULT getBorderHit(s32 x, s32 y, s32 sizeX, s32 sizeY, s32 borderWidth, LRESULT centerHit);
 TL_API v2u get_window_size(v2u clientSize, DWORD style, bool menu = false);
@@ -41,7 +41,14 @@ TL_API v2s get_cursor_position(HWND relative_to = 0);
 TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
 TL_API f32 get_cursor_speed();
 
+}
+
 #ifdef TL_IMPL
+
+#include "win32_error.h"
+
+namespace tl {
+
 bool init_rawinput(RawInputDevice deviceFlags) {
 	StaticList<RAWINPUTDEVICE, 1> devices;
 	if (deviceFlags & RawInput_mouse) {
@@ -253,16 +260,38 @@ bool set_fullscreen(HWND window, bool fullscreen, DWORD window_style, WINDOWPLAC
 
 }
 
-struct FormattedLastError {
+List<utf8> describe_win32_error(DWORD error) {
+	LPWSTR error_text = NULL;
+
+	FormatMessageW(
+		FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_IGNORE_INSERTS|FORMAT_MESSAGE_MAX_WIDTH_MASK,
+		NULL,
+		HRESULT_FROM_WIN32(error),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPWSTR)&error_text,
+		0,
+		NULL);
+
+	if (!error_text)
+		return {};
+
+	defer { LocalFree(error_text); };
+
+	return to_utf8(as_span((utf16 *)error_text), true);
+}
+
+struct FormattedWin32Error {
 	DWORD value;
 };
 
-FormattedLastError last_error() {
+FormattedWin32Error win32_error() {
 	return {GetLastError()};
 }
 
-inline umm append(StringBuilder &b, FormattedLastError e) {
-	return append_format(b, "0x{} ({})", FormatInt{.value = e.value, .radix = 16}, e.value);
+inline umm append(StringBuilder &b, FormattedWin32Error e) {
+	auto description = describe_win32_error(e.value);
+	defer { free(description); };
+	return append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = e.value, .radix = 16, .leading_zero_count = 8}, description);
 }
 
 f32 get_cursor_speed() {
@@ -294,6 +323,6 @@ f32 get_cursor_speed() {
 	return speed_table[speed - 1];
 }
 
-#endif
-
 }
+
+#endif

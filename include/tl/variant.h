@@ -12,6 +12,10 @@ struct Variant {
 	template <class U>
 	static constexpr umm index_of = type_index_of<U, T...>;
 
+	static constexpr umm count = sizeof...(T);
+	
+	static constexpr umm sizes[] = {sizeof(T) ...};
+
 	Variant() = default;
 
 	template <OneOf<T...> U>
@@ -43,6 +47,10 @@ struct Variant {
 
 	umm index() const {
 		return base.index();
+	}
+
+	umm current_value_size() const {
+		return sizes[index()];
 	}
 
 	bool operator==(Variant const &that) const {

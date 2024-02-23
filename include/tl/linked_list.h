@@ -203,17 +203,21 @@ T *find_if(LinkedList<T> list, Predicate &&predicate) {
 }
 
 template <ForEachFlags flags, class T, class Fn>
-void for_each(LinkedList<T> list, Fn &&fn) {
+bool for_each(LinkedList<T> list, Fn &&fn) {
 	auto node = list.head;
 	while (node) {
 		if constexpr (std::is_same_v<decltype(fn(*(T*)0)), ForEachDirective>) {
-			if (fn(node->value) == ForEach_break)
-				return;
+			auto d = fn(node->value);
+			if (d & ForEach_erase) not_implemented();
+			if (d & ForEach_erase_unordered) not_implemented();
+			if (d & ForEach_break)
+				return true;
 		} else {
 			fn(node->value);
 		}
 		node = node->next;
 	}
+	return false;
 }
 
 template <class T>
