@@ -8,6 +8,10 @@
 #define TL_INITIAL_LIST_CAPACITY 4
 #endif
 
+#ifndef TL_INITIAL_QUEUE_CAPACITY
+#define TL_INITIAL_QUEUE_CAPACITY TL_INITIAL_LIST_CAPACITY
+#endif
+
 namespace tl {
 
 #pragma pack(push, 1)
@@ -127,8 +131,8 @@ struct List : Span<T, Size_> {
 
 	template <class U, class ThatSize>
 	explicit operator List<U, Allocator, ThatSize>() const {
-		assert((ThatSize)count == count);
-		assert((ThatSize)capacity == capacity);
+		assert_equal((ThatSize)count, count);
+		assert_equal((ThatSize)capacity, capacity);
 		List<U, Allocator, ThatSize> result;
 		result.allocator = allocator;
 		result.data = (U *)data;
@@ -149,8 +153,8 @@ struct List : Span<T, Size_> {
 
 	template <class ThatSize>
 	operator List<T, Allocator, ThatSize>() const {
-		assert((ThatSize)count == count);
-		assert((ThatSize)capacity == capacity);
+		assert_equal((ThatSize)count, count);
+		assert_equal((ThatSize)capacity, capacity);
 		List<T, Allocator, ThatSize> result;
 		result.data = data;
 		result.count = (ThatSize)count;
@@ -505,139 +509,117 @@ template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size
 template <class T, class Allocator, class Size> T const &back(List<T, Allocator, Size> const &list) { return list.back(); }
 template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size> &list) { return list.back(); }
 
+// Uses ring buffer for storage
+// Capacity is always power of 2 to replace mod with and
 template <class T, class Allocator = Allocator>
-struct Queue : Span<T> {
-	using Span<T>::data;
-	using Span<T>::count;
-
-	[[no_unique_address]] Allocator allocator = Allocator::current();
+struct Queue {
 	T *alloc_data = 0;
-	umm alloc_count = 0;
+	umm capacity = 0;
+	umm start = 0;
+	umm count = 0;
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-	Queue() = default;
-	Queue(Queue const &that) = default;
-	Queue(Queue &&that) = delete;
-	Queue &operator=(Queue const &that) = default;
-	Queue &operator=(Queue &&that) = delete;
+	struct Iterator {
+		Queue *queue;
+		umm index; // relative to alloc_data
+		#if TL_DEBUG_ITERATORS
+		umm initial_start = queue->start;
+		umm initial_count = queue->count;
+		umm initial_capacity = queue->capacity;
+		#endif
 
-	T *begin() { return data; }
-	T *end() { return data + count; }
-	T const *begin() const { return data; }
-	T const *end() const { return data + count; }
+		Iterator &operator++() {
+			debug_check(); 
+			++index;
+			return *this;
+		}
+		Iterator operator++(int) {
+			debug_check(); 
+			defer { ++*this; };
+			return *this;
+		}
 
-	umm space_back() const { return (umm)((alloc_data + alloc_count) - (data + count)); }
+		bool operator==(Iterator const &that) const { debug_check(); return index == that.index; }
+		bool operator!=(Iterator const &that) const { debug_check(); return index != that.index; }
 
-	bool empty() const { return count == 0; }
+		T &operator*() { debug_check(); return queue->get(index); }
+		T *operator->() { debug_check(); return &*this; }
 
-	T &front() { bounds_check(count); return data[0]; }
-	T &back() { bounds_check(count); return data[count - 1]; }
-	T &operator[](umm i) { bounds_check(count); return data[i]; }
+		void debug_check() const {
+			#if TL_DEBUG_ITERATORS
+			assert_equal(queue->start, initial_start);
+			assert_equal(queue->count, initial_count);
+			assert_equal(queue->capacity, initial_capacity);
+			#endif
+		}
+	};
 
-	void push(T const &value TL_LP) {
-		_grow_if_needed(count + 1 TL_LA);
-		data[count++] = value;
+	Iterator begin() { return {this, start}; }
+	Iterator end() { return {this, start + count}; }
+
+	bool is_empty() const { return count == 0; }
+
+
+	T &push(T const &value TL_LP) {
+		reserve(count + 1 TL_LA);
+		return *new(&get(start + count++)) T(value);
 	}
 
 	void push(Span<T> span TL_LP) {
-		_grow_if_needed(count + span.count TL_LA);
+		reserve(count + span.count TL_LA);
 		for (auto &value : span) {
-			data[count++] = value;
+			new(&get(start + count++)) T(value);
 		}
 	}
 
 	Optional<T> pop() {
 		if (!count)
 			return {};
+		T &result = get(start);
 		defer {
-			++data;
+			result.~T();
+			++start;
 			--count;
 		};
-		return *data;
+		return result;
 	}
-	//void resize(umm new_count) {
-	//	if (new_count > capacity())
-	//		_reallocate(new_count);
-	//	if (new_count > count()) {
-	//		for (T *t = _end; t < _begin + new_count; ++t)
-	//			new (t) T();
-	//		_end = _begin + new_count;
-	//	} else if (new_count < count()) {
-	//		for (T *t = _begin + new_count; t < _end; ++t)
-	//			t->~T();
-	//		_end = _begin + new_count;
-	//	}
-	//}
+
 	void clear() {
-		data = alloc_data;
+		for (T &it : *this) {
+			it.~T();
+		}
+		start = 0;
 		count = 0;
 	}
 
-	operator Span<T>() { return {data, count}; }
-
-	void _reallocate(umm new_capacity) {
-	}
-
-	void erase_at(umm where) {
-		assert(where < count, "value is not in container");
-
-		umm left_count = where;
-		umm right_count = count - where - 1;
-
-		--count;
-
-		if (left_count <= right_count) {
-			// move left half one to the right
-			for (umm i = where; i != 0; --i) {
-				data[i] = data[i - 1];
-			}
-			++data;
-		} else {
-			// move right half one to the left
-			for (umm i = where; i < count; ++i) {
-				data[i] = data[i + 1];
-			}
-		}
-	}
-	void erase(T *val) { erase_at(val - data); }
-	void erase(T &val) { erase(&val); }
-
-	void _grow_if_needed(umm required_count TL_LP) {
-		if (required_count <= space_back())
+	void reserve(umm required_count TL_LP) {
+		if (required_count <= capacity)
 			return;
-		umm new_capacity = space_back();
-		if (new_capacity == 0)
-			new_capacity = 1;
-		while (new_capacity < required_count) {
-			new_capacity *= 2;
-		}
+		umm new_capacity = max((umm)TL_INITIAL_QUEUE_CAPACITY, ceil_to_power_of_2(required_count));
+		reallocate(new_capacity TL_LA);
+	}
+private:
+	T &get(umm index) { return alloc_data[index & (capacity - 1)]; }
+
+	void reallocate(umm new_capacity TL_LP) {
+		assert(is_power_of_2(new_capacity));
 
 		T *new_data = allocator.allocate<T>(new_capacity TL_LA);
+
 		for (umm i = 0; i < count; ++i) {
-			new_data[i] = data[i];
+			auto &source = get(start + i);
+			auto &destination = new_data[i];
+
+			new(&destination) T(std::move(source));
+			source.~T();
 		}
+
 		if (alloc_data)
-			allocator.free_t(alloc_data, alloc_count);
+			allocator.free_t(alloc_data, capacity);
 
 		alloc_data = new_data;
-		data = new_data;
-		alloc_count = new_capacity;
-	}
-	T *insert(Span<T const> span, umm where TL_LP) {
-		bounds_check(where <= count);
-
-		_grow_if_needed(count + span.count TL_LA);
-
-		for (umm i = where; i < count; ++i) {
-			data[span.count + i] = data[i];
-		}
-		for (umm i = 0; i < span.count; ++i) {
-			data[where + i] = span[i];
-		}
-		count += span.count;
-		return data + where;
-	}
-	T *insert(Span<T const> span, T *where) {
-		return insert(span, where - data);
+		capacity = new_capacity;
+		start = 0;
 	}
 };
 
@@ -646,10 +628,10 @@ void free(Queue<T> &queue) {
 	if (queue.alloc_data == 0) return;
 
 	queue.allocator.free(queue.alloc_data);
-	queue.data = 0;
+	queue.start = 0;
 	queue.count = 0;
 	queue.alloc_data = 0;
-	queue.alloc_count = 0;
+	queue.capacity = 0;
 }
 
 template <class T, umm _capacity>

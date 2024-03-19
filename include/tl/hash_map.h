@@ -283,6 +283,7 @@ struct BucketHashMap : Traits {
 		if (buckets.count == 0)
 			return {};
 
+		--count;
 		umm hash = get_hash(kv->key);
 		auto &bucket = buckets[get_index_from_hash(hash, buckets.count)];
 		auto result = kv->value;
@@ -298,6 +299,7 @@ struct BucketHashMap : Traits {
 		for (auto &it : bucket) {
 			if (it.hash == hash) {
 				if (are_equal(it.kv.key, key)) {
+					--count;
 					auto result = it.kv.value;
 					tl::erase(bucket, &it);
 					return result;
@@ -317,8 +319,8 @@ struct BucketHashMap : Traits {
 		buckets.data = allocator.allocate<Bucket>(new_buckets_count TL_LA);
 		buckets.count = new_buckets_count;
 
-		for (umm bucket_index = 0; bucket_index < old_buckets.count; ++bucket_index) {
-			auto next_node = old_buckets[bucket_index].head;
+		for (auto old_bucket : old_buckets) {
+			auto next_node = old_bucket.head;
 			while (next_node) {
 				auto node = next_node;
 				next_node = next_node->next;
@@ -336,8 +338,9 @@ struct BucketHashMap : Traits {
 	}
 
 	void clear() {
-		for (umm bucket_index = 0; bucket_index < buckets.count; ++bucket_index) {
-			buckets[bucket_index].clear();
+		count = 0;
+		for (auto &bucket : buckets) {
+			bucket.clear();
 		}
 	}
 

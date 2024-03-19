@@ -188,7 +188,7 @@ CpuInfo get_cpu_info() {
 	DWORD processorInfoLength = 0;
 	if (!GetLogicalProcessorInformation(0, &processorInfoLength)) {
 		DWORD err = GetLastError();
-		assert(err == ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
+		assert_equal(err, ERROR_INSUFFICIENT_BUFFER, "GetLastError(): {}", err);
 	}
 
 	auto buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION *)malloc(processorInfoLength);
@@ -197,7 +197,7 @@ CpuInfo get_cpu_info() {
 	if (!GetLogicalProcessorInformation(buffer, &processorInfoLength))
 		invalid_code_path("GetLogicalProcessorInformation: {}", GetLastError());
 
-	assert(processorInfoLength % sizeof(buffer[0]) == 0);
+	assert_equal(processorInfoLength % sizeof(buffer[0]), 0);
 
 
 	auto convertCacheType = [](PROCESSOR_CACHE_TYPE v) -> CpuCacheType {

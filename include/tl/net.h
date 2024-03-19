@@ -71,9 +71,13 @@ inline bool send_all(Socket s, Span<u8> span) {
 	return true;
 }
 
-TL_API Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size);
-inline Result<umm, ReceiveResult> receive_some(Socket s, Span<u8> span) {
-	return receive_some(s, span.data, (u32)span.count);
+struct ReceiveSomeOptions {
+	u32 timeout_milliseconds = 1;
+};
+
+TL_API Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size, ReceiveSomeOptions options = {});
+inline Result<umm, ReceiveResult> receive_some(Socket s, Span<u8> span, ReceiveSomeOptions options = {}) {
+	return receive_some(s, span.data, (u32)span.count, options);
 }
 
 inline Result<bool, ReceiveResult> receive_all(Socket s, Span<u8> span) {
@@ -249,7 +253,28 @@ umm send_some(Socket s, sockaddr_in const &destination, void const *data, u32 si
 	return result;
 }
 
-Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size) {
+Result<umm, ReceiveResult> receive_some(Socket socket, void *data, u32 size, ReceiveSomeOptions options) {
+	if (options.timeout_milliseconds != 0) {
+
+		fd_set fdSet;
+		fdSet.fd_count = 1;
+		fdSet.fd_array[0] = (SOCKET)socket;
+
+		timeval timeout = {};
+		timeout.tv_usec = options.timeout_milliseconds * 1000;
+		int socketCount = ::select(0, &fdSet, nullptr, nullptr, &timeout);
+
+		if (socketCount < 0) {
+			current_logger.error("select: {}", WSAGetLastError());
+		}
+
+		if (socketCount == 0) {
+			return 0;
+		}
+
+		assert_equal(socketCount, 1);
+	}
+
 	int result = ::recv((SOCKET)socket, (char *)data, (int)size, 0);
 
 	if (result == 0) {

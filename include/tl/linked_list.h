@@ -77,7 +77,7 @@ struct LinkedList {
 	}
 
 	T &add_steal(Node *node) {
-		assert(node->next == 0);
+		assert_equal(node->next, 0);
 		if (head == 0) {
 			head = tail = node;
 		} else {

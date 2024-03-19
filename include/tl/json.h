@@ -13,14 +13,28 @@
 namespace tl {
 namespace Json {
 
-enum Type {
-	Type_null,
-	Type_object,
-	Type_array,
-	Type_number,
-	Type_string,
-	Type_boolean,
+#define TL_ENUMERATE_JSON_TYPES \
+	x(null) \
+	x(object) \
+	x(array) \
+	x(number) \
+	x(string) \
+	x(boolean) \
+
+enum class Type {
+	#define x(name) name,
+	TL_ENUMERATE_JSON_TYPES
+	#undef x
 };
+
+inline umm append(StringBuilder &builder, Type type) {
+	switch (type) {
+		#define x(name) case Type::name: return append(builder, #name);
+		TL_ENUMERATE_JSON_TYPES
+		#undef x
+	}
+	return 0;
+}
 
 struct Object {
 	struct MemberMap {
@@ -41,63 +55,63 @@ struct Object {
 	Object() {
 		memset(this, 0, sizeof(*this));
 	}
-	Object(f64 number) : type(Type_number), _number(number) {}
-	Object(Span<utf8> string) : type(Type_string), _string({string}) {}
+	Object(f64 number) : type(Type::number), _number(number) {}
+	Object(Span<utf8> string) : type(Type::string), _string({string}) {}
 	Object(Type type) {
 		this->type = type;
 		switch (type) {
-			case Type_object:  new (&_members) MemberMap(); break;
-			case Type_array:   new (&_array)   Array    (); break;
-			case Type_number:  new (&_number)  f64      (); break;
-			case Type_string:  new (&_string)  String   (); break;
-			case Type_boolean: new (&_boolean) bool     (); break;
+			case Type::object:  new (&_members) MemberMap(); break;
+			case Type::array:   new (&_array)   Array    (); break;
+			case Type::number:  new (&_number)  f64      (); break;
+			case Type::string:  new (&_string)  String   (); break;
+			case Type::boolean: new (&_boolean) bool     (); break;
 			default:
 				break;
 		}
 	}
 	~Object() = default;
 	Object &operator=(f64 value) {
-		if (type != Type_null)
-			assert(type == Type_number);
+		if (type != Type::null)
+			assert_equal(type, Type::number);
 		_number = value;
 		return *this;
 	}
 	Object &operator=(Span<utf8> value) {
-		if (type != Type_null)
-			assert(type == Type_string);
+		if (type != Type::null)
+			assert_equal(type, Type::string);
 		_string = value;
 		return *this;
 	}
 	Object &operator=(bool value) {
-		if (type != Type_null)
-			assert(type == Type_boolean);
+		if (type != Type::null)
+			assert_equal(type, Type::boolean);
 		_boolean = value;
 		return *this;
 	}
 	Object *member(Span<utf8> name) {
-		assert(type == Type_object);
+		assert_equal(type, Type::object);
 		auto found = find(_members.names, name);
 		if (found)
 			return &_members.values[index_of(_members.names, found)];
 		return 0;
 	}
 	Object *index(umm i) {
-		assert(type == Type_array);
+		assert_equal(type, Type::array);
 		return &_array[i];
 	}
 	f64 number() {
 		return _number;
 	}
 	Array &array() {
-		assert(type == Type_array);
+		assert_equal(type, Type::array);
 		return _array;
 	}
 	String &string() {
-		assert(type == Type_string);
+		assert_equal(type, Type::string);
 		return _string;
 	}
 	bool &boolean() {
-		assert(type == Type_boolean);
+		assert_equal(type, Type::boolean);
 		return _boolean;
 	}
 };
@@ -123,7 +137,7 @@ TL_API Object parse(Span<utf8> json);
 
 inline void free(Json::Object &obj) {
 	switch (obj.type) {
-		case Json::Type_object: {
+		case Json::Type::object: {
 			for (auto &member : obj._members.values) {
 				free(member);
 			}
@@ -131,7 +145,7 @@ inline void free(Json::Object &obj) {
 			free(obj._members.names);
 			break;
 		}
-		case Json::Type_array: {
+		case Json::Type::array: {
 			for (auto &element : obj._array) {
 				free(element);
 			}
@@ -140,22 +154,22 @@ inline void free(Json::Object &obj) {
 		}
 		default: break;
 	}
-	obj.type = Json::Type_null;
+	obj.type = Json::Type::null;
 }
 
 inline void append(StringBuilder &b, Json::Object obj) {
 	switch (obj.type) {
-		case Json::Type_number: {
+		case Json::Type::number: {
 			append(b, obj.number());
 			break;
 		}
-		case Json::Type_string: {
+		case Json::Type::string: {
 			append(b, '"');
 			append(b, obj._string);
 			append(b, '"');
 			break;
 		}
-		case Json::Type_array: {
+		case Json::Type::array: {
 			append(b, '[');
 			bool comma = false;
 			for (auto &e : obj._array) {
@@ -168,7 +182,7 @@ inline void append(StringBuilder &b, Json::Object obj) {
 			append(b, ']');
 			break;
 		}
-		case Json::Type_object: {
+		case Json::Type::object: {
 			append(b, '{');
 			bool comma = false;
 			for (u32 i = 0; i < obj._members.names.count; ++i) {
@@ -279,14 +293,14 @@ end:
 
 Object parse(Token *&t) {
 	if (t->type == '{') {
-		Object result = {Type_object};
+		Object result = {Type::object};
 		++t;
 		if (t->type != '}') {
 			while (1) {
 				if (t->type == '"') {
 					Span<utf8> member_name = t->view;
 					++t;
-					assert(t++->type == ':');
+					assert_equal(t++->type, ':');
 					result._members.names.add(member_name);
 					result._members.values.add(parse(t));
 				} else {
@@ -296,7 +310,7 @@ Object parse(Token *&t) {
 				if (t->type == '}') {
 					break;
 				} else {
-					assert(t->type == ',');
+					assert_equal(t->type, ',');
 					++t;
 					// Allow trailing comma ;)
 					if (t->type == '}') {
@@ -308,12 +322,12 @@ Object parse(Token *&t) {
 		++t;
 		return result;
 	} else if (t->type == '"') {
-		Object result = {Type_string};
+		Object result = {Type::string};
 		result._string = t->view;
 		++t;
 		return result;
 	} else if (t->type == Token_number) {
-		Object result = {Type_number};
+		Object result = {Type::number};
 		utf8 temp[256];
 		memcpy(temp, t->view.data, t->view.count);
 		temp[t->view.count] = 0;
@@ -321,12 +335,12 @@ Object parse(Token *&t) {
 		++t;
 		return result;
 	} else if (t->type == Token_true || t->type == Token_false) {
-		Object result = {Type_boolean};
+		Object result = {Type::boolean};
 		result._boolean = t->type == Token_true;
 		++t;
 		return result;
 	} else if (t->type == '[') {
-		Object result = {Type_array};
+		Object result = {Type::array};
 		++t;
 		if (t->type != ']') {
 			while (1) {
@@ -335,7 +349,7 @@ Object parse(Token *&t) {
 				if (t->type == ']') {
 					break;
 				} else {
-					assert(t->type == ',');
+					assert_equal(t->type, ',');
 					t++;
 				}
 			}
@@ -348,8 +362,8 @@ Object parse(Token *&t) {
 	}
 }
 Object parse(List<Token> tokens) {
-	assert(tokens.front().type == '{');
-	assert(tokens.back().type == '}');
+	assert_equal(tokens.front().type, '{');
+	assert_equal(tokens.back().type, '}');
 	Token *t = tokens.begin();
 	return parse(t);
 }

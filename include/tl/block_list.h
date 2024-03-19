@@ -616,7 +616,7 @@ struct BlockList {
 				break;
 			block = block->next;
 		}
-		assert(count == sum);
+		assert_equal(count, sum);
 	}
 
 	void copy_into(T *d) {
@@ -841,14 +841,14 @@ template <class T>
 void add_steal(BlockList<T> *destination, BlockList<T> *source) {
 	if (source->last) {
 		if (source->last->next) {
-			assert(source->last->next->count == 0);
+			assert_equal(source->last->next->count, 0);
 		}
 	}
 
 	assert(destination->allocator == source->allocator, "different allocator are not implemented");
 
 	if (!source->last) {
-		assert(source->count == 0);
+		assert_equal(source->count, 0);
 		return;
 	}
 
@@ -867,7 +867,7 @@ void add_steal(BlockList<T> *destination, BlockList<T> *source) {
 
 	if (destination_excess_blocks) {
 		if (!source_excess_blocks) {
-			assert(source->last == source->alloc_last);
+			assert_equal(source->last, source->alloc_last);
 		}
 
 		if (source_excess_blocks) {
@@ -969,7 +969,7 @@ void add(BlockList<T> *destination, BlockList<T> source TL_LP) {
 
 		dst_block->count = remaining_count;
 
-		assert(destination->last == destination->alloc_last);
+		assert_equal(destination->last, destination->alloc_last);
 		if (destination->first) {
 			destination->last =
 			destination->alloc_last =

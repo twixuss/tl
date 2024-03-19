@@ -13,10 +13,6 @@ struct TL_API DefaultLogger : LoggerBase {
 	File file = shared_file;
 	LogSeverity min_severity = TL_DEBUG ? LogSeverity::info : LogSeverity::warning;
 
-	inline static void proc(Logger *logger, LogSeverity severity, Span<utf8> message) {
-		return ((DefaultLogger *)logger->state)->impl(severity, message);
-	}
-
 	void impl(LogSeverity severity, Span<utf8> message) {
 		if ((int)severity < (int)min_severity)
 			return;
@@ -35,12 +31,17 @@ struct TL_API DefaultLogger : LoggerBase {
 		withs(stdout_mutex) {
 			with(color, println("[{}] {}", module, message));
 			if (is_valid(file)) {
-				write(file, as_bytes(tformat("[{}] ({}): {}\r\n", module, severity, message)));
+				write(file, as_bytes(tformat("[{}] ({}) {}\r\n", module, severity, message)));
 			}
 		};
 	}
 	operator Logger() {
-		return {.func = proc, .state = this};
+		return {
+			.func = [](Logger *logger, LogSeverity severity, Span<utf8> message) {
+				return ((DefaultLogger *)logger->state)->impl(severity, message);
+			}, 
+			.state = this
+		};
 	}
 
 	static void global_init(Span<utf8> shared_file_path);

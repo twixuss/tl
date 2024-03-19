@@ -20,25 +20,30 @@ struct Variant {
 
 	template <OneOf<T...> U>
 	Variant(U value) {
+		defer{debug_check();};
 		base = value;
 	}
 
 	auto visit(this auto &&self, auto &&fn) {
+		defer{self.debug_check();};
 		return std::visit(fn, self.base);
 	}
 
 	template <class U>
 	bool is() const {
+		defer{debug_check();};
 		return std::holds_alternative<U>(base);
 	}
 
 	template <class U>
 	auto as_ptr(this auto &&self) {
+		defer{self.debug_check();};
 		return std::get_if<U>(&self.base);
 	}
 
 	template <class U>
 	Optional<U> as() const {
+		defer{debug_check();};
 		if (auto p = as_ptr<U>()) {
 			return *p;
 		}
@@ -54,6 +59,7 @@ struct Variant {
 	}
 
 	bool operator==(Variant const &that) const {
+		defer{debug_check();};
 		if (index() != that.index())
 			return false;
 
@@ -66,6 +72,11 @@ struct Variant {
 				}
 			});
 		});
+	}
+
+	void debug_check() const {
+		assert((umm)this % alignof(decltype(*this)) == 0);
+		assert_less(index(), count);
 	}
 };
 

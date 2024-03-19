@@ -33,6 +33,13 @@
 #define assert(x, ...) assert_always(x, __VA_ARGS__)
 #endif
 
+#define assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#define assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#define assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#define assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#define assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}.", #a, a, #b, b)
+
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
 #define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "", __VA_ARGS__), __assume(0))
 
@@ -112,6 +119,10 @@
 	T(T &&) = delete;                 \
 	T &operator=(const T &) = delete; \
 	T &operator=(T &&) = delete
+
+#ifndef TL_DEBUG_ITERATORS
+#define TL_DEBUG_ITERATORS TL_DEBUG
+#endif
 
 namespace tl {
 
@@ -628,6 +639,7 @@ inline constexpr u64 rotate_left(u64 x, u64 bits) {
 }
 
 forceinline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
+forceinline constexpr u64 ceil_to_power_of_2(u64 v) { return v == 0 ? 0 : (u64)1 << (u64)(64 - count_leading_zeros(v - 1)); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u8  n) { s32 i = -(n == 0); S(2,100)S(1,10)return i; }
@@ -1223,7 +1235,7 @@ struct Span {
 	template <Size count>
 	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
 	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {
-		assert(count == (umm)(end - begin));
+		assert_equal(count, (umm)(end - begin));
 	}
 	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
 	constexpr Span(ValueType *begin, Size count) : data(begin), count(count) {}
@@ -1314,13 +1326,13 @@ struct Span {
 	template <class U, class ThatSize>
 	constexpr explicit operator Span<U, ThatSize>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		assert((ThatSize)count == count);
+		assert_equal((ThatSize)count, count);
 		return {(U *)data, (ThatSize)count};
 	}
 
 	template <class ThatSize>
 	constexpr operator Span<T, ThatSize>() const {
-		assert((ThatSize)count == count);
+		assert_equal((ThatSize)count, count);
 		return {data, (ThatSize)count};
 	}
 
@@ -1794,7 +1806,7 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 
 template <class T>
 constexpr T dot(Span<T> a, Span<T> b) {
-	assert(a.count == b.count);
+	assert_equal(a.count, b.count);
 	T result = {};
 	for (umm i = 0; i < a.count; ++i) {
 		result += a.data[i] * b.data[i];
@@ -2061,13 +2073,13 @@ struct StaticList {
 	template <class U, class ThatSize>
 	constexpr explicit operator Span<U, ThatSize>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		assert((ThatSize)count == count);
+		assert_equal((ThatSize)count, count);
 		return {(U *)data, (ThatSize)count};
 	}
 
 	template <class ThatSize>
 	constexpr operator Span<T, ThatSize>() const {
-		assert((ThatSize)count == count);
+		assert_equal((ThatSize)count, count);
 		return {data, (ThatSize)count};
 	}
 

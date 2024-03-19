@@ -128,13 +128,13 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 	using namespace Glb;
 
 	Header *header = (Header *)memory.data;
-	assert(header->magic == 'FTlg');
+	assert_equal(header->magic, 'FTlg');
 
 	constexpr u32 chunk_type_json = 'NOSJ';
 	constexpr u32 chunk_type_binary = '\0NIB';
 
 	Chunk *json_chunk = (Chunk *)(header + 1);
-	assert(json_chunk->type == chunk_type_json);
+	assert_equal(json_chunk->type, chunk_type_json);
 
 	auto json_chunk_data = chunk_data(json_chunk);
 	auto json_chunk_span = Span((utf8 *)json_chunk_data, (umm)json_chunk->length);
@@ -143,7 +143,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 	defer { free(json); };
 
 	Chunk *binary_chunk = (Chunk *)((char *)json_chunk_data + json_chunk->length);
-	assert(binary_chunk->type == chunk_type_binary);
+	assert_equal(binary_chunk->type, chunk_type_binary);
 
 	auto binary_chunk_data = chunk_data(binary_chunk);
 
@@ -164,7 +164,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 		auto index_buffer_view       = buffer_views->index(index_buffer_view_index->number());
 		u32 index_count              = (u32)index_accessor->member(u8"count"s)->number();
 
-		assert(index_accessor->member(u8"type"s)->string() == u8"SCALAR"s);
+		assert_equal(index_accessor->member(u8"type"s)->string(), u8"SCALAR"s);
 		ComponentType indexType = (ComponentType)index_accessor->member(u8"componentType"s)->number();
 
 		auto attributes = first_primitive->member(u8"attributes"s);

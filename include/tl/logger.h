@@ -65,9 +65,14 @@ inline void log_error  (char const *format, auto ...args) { current_logger.error
 
 #ifdef TL_IMPL
 
-Logger app_logger;
-Logger tl_logger;
-thread_local Logger current_logger;
+void _initial_logger_proc(Logger *logger, LogSeverity severity, Span<utf8> message) {
+	println("({}) {}", severity, message);
+}
+
+
+Logger app_logger = {.func = _initial_logger_proc};
+Logger tl_logger = {.func = _initial_logger_proc};
+thread_local Logger current_logger = {.func = _initial_logger_proc};
 
 #endif
 

@@ -239,7 +239,11 @@ inline FileState detect_change(File file, FileTime *last_write_time) {
 	*last_write_time = retrieved_time;
 	return {.changed = true};
 }
-inline FileState detect_change(char const *path, FileTime *last_write_time) {
+template <class Path>
+requires requires(Path path) {
+	open_file(path, {.read = true});
+}
+inline FileState detect_change(Path path, FileTime *last_write_time) {
 	auto file = open_file(path, {.read=true});
 	defer { close(file); };
 	return detect_change(file, last_write_time);

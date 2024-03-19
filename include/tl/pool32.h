@@ -37,7 +37,7 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 
 			umm full_offset = (u8 *)that - base;
 			offset = (u32)full_offset;
-			assert(offset == full_offset);
+			assert_equal(offset, full_offset);
 			assert(offset);
 			return *this;
 		}

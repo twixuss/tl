@@ -213,7 +213,7 @@ u32 get_thread_id(Thread *thread) {
 #endif // TL_IMPL
 
 template <class T>
-concept Spinner = requires(T t) { t.spin(); };
+concept ASpinner = requires(T t) { t.spin(); };
 
 struct BasicSpinner {
 	inline void spin() {
@@ -236,14 +236,14 @@ struct SleepySpinner {
 	}
 };
 
-template <class Predicate, class Spinner = SleepySpinner>
-void loop_while(Predicate &&predicate, Spinner spinner = {}) {
+template <ASpinner Spinner = SleepySpinner>
+void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {
 	while (predicate()) {
 		spinner.spin();
 	}
 }
-template <class Predicate, class Spinner = SleepySpinner>
-void loop_until(Predicate &&predicate, Spinner spinner = {}) {
+template <ASpinner Spinner = SleepySpinner>
+void loop_until(std::predicate<> auto &&predicate, Spinner spinner = {}) {
 	return loop_while([&]{return!predicate();}, spinner);
 }
 
@@ -259,7 +259,7 @@ inline SyncPoint create_sync_point(u32 thread_count) {
 	};
 }
 
-template <class Spinner = SleepySpinner>
+template <ASpinner Spinner = SleepySpinner>
 inline void sync(SyncPoint &point, Spinner spinner = {}) {
 	atomic_add(&point.synced_thread_count, 1);
 	loop_until([&] { return point.synced_thread_count == point.target_thread_count; }, spinner);
@@ -276,7 +276,7 @@ struct SpinLock {
 inline bool try_lock(SpinLock &m) {
 	return !atomic_compare_exchange(&m.in_use, true, false);
 }
-template <class Spinner = SleepySpinner>
+template <ASpinner Spinner = SleepySpinner>
 inline void lock(SpinLock &m, Spinner spinner = {}) {
 	loop_until([&] {
 		return try_lock(m);
@@ -337,7 +337,14 @@ struct Scoped<OsLock> {
 	}
 };
 
-template <class T, class Lock>
+template <class T>
+concept ALock = requires (T t) {
+	lock(t); 
+	{ try_lock(t) } -> std::same_as<bool>;
+	unlock(t); 
+};
+
+template <class T, ALock Lock>
 struct LockProtected {
 	TL_MAKE_FIXED(LockProtected);
 
@@ -364,7 +371,7 @@ private:
 
 #define locked_use(name) name * [&](auto &name) -> decltype(auto)
 
-template <class T, class Lock, class Allocator = Allocator>
+template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 	void push(T const &value) {
 		this->use([&](auto &queue) {
@@ -413,7 +420,7 @@ inline bool try_lock(RecursiveSpinLock &m, u32 *locked_by = 0) {
 		return false;
 	}
 }
-template <class Spinner = SleepySpinner>
+template <ASpinner Spinner = SleepySpinner>
 inline void lock(RecursiveSpinLock &m, Spinner spinner = {}) {
 	u32 thread_id = get_current_thread_id();
 	if (thread_id == m.thread_id) {
@@ -659,7 +666,7 @@ struct ThreadPool {
 		data_to_free_on_main_thread.clear();
 	}
 
-	template <class Spinner = SleepySpinner>
+	template <ASpinner Spinner = SleepySpinner>
 	inline void wait_for_completion_doing_tasks(Spinner spinner = {}) {
 		loop_while([&] {
 			Optional<Task> task;
