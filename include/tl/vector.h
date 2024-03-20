@@ -104,6 +104,7 @@ union v2 {
 	using Mask = v2<bool>;
 	DEFN_2
 	UNOP_2(-)
+	UNOP_2(~)
 	BINOP_2(+)
 	BINOP_2(-)
 	BINOP_2(*)
@@ -130,6 +131,7 @@ union v3 {
 	using Mask = v3<bool>;
 	DEFN_3
 	UNOP_3(-)
+	UNOP_3(~)
 	BINOP_3(+)
 	BINOP_3(-)
 	BINOP_3(*)
@@ -156,6 +158,7 @@ union v4 {
 	using Mask = v4<bool>;
 	DEFN_4
 	UNOP_4(-)
+	UNOP_4(~)
 	BINOP_4(+)
 	BINOP_4(-)
 	BINOP_4(*)
