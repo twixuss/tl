@@ -597,6 +597,11 @@ forceinline constexpr u32 absolute(u32 v) { return v; }
 
 forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v); }
 
+template <class T>
+forceinline constexpr auto approximately(T a, T b, T epsilon) {
+	return absolute(a - b) < epsilon;
+}
+
 forceinline f32 set_sign(f32 dst, f32 src) {
     *(u32*)&dst &= 0x7FFFFFFF;
     *(u32*)&dst |= *(u32*)&src & 0x80000000;
@@ -981,6 +986,11 @@ forceinline auto length_squared(line_segment<T> line) {
 template <class T>
 forceinline auto length(line_segment<T> line) {
 	return distance(line.a, line.b);
+}
+
+template <class T>
+forceinline auto center(line_segment<T> line) {
+	return (line.a + line.b) / 2;
 }
 
 template <class T>

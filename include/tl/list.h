@@ -975,10 +975,9 @@ struct StaticRingQueue : private StaticRingBuffer<T, _capacity> {
 };
 
 // Collection of unique elements, stored contiguously in order of addition.
-template <class T, class Size_ = umm>
+template <class T, class Allocator = Allocator, class Size_ = umm>
 struct LinearSet : Span<T, Size_> {
 	using ElementType = T;
-	using Allocator = Allocator;
 	using Size = Size_;
 	using Span = Span<T, Size>;
 
@@ -988,7 +987,7 @@ struct LinearSet : Span<T, Size_> {
 	using Span::end;
 
 	umm capacity = 0;
-	Allocator allocator = current_allocator;
+	Allocator allocator = Allocator::current();
 
 	T &add(T const &value TL_LP) {
 		for (auto &it : *this) {
@@ -998,6 +997,17 @@ struct LinearSet : Span<T, Size_> {
 		}
 		reserve_exponential(count + 1 TL_LA);
 		return data[count++] = value;
+	}
+
+	bool try_add(T const &value TL_LP) {
+		for (auto &it : *this) {
+			if (it == value) {
+				return false;
+			}
+		}
+		reserve_exponential(count + 1 TL_LA);
+		data[count++] = value;
+		return true;
 	}
 
 	void reallocate(umm desired_capacity TL_LP) {
