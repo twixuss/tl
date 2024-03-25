@@ -682,6 +682,8 @@ forceinline constexpr s32 log(u32 n, u32 base) {
 forceinline constexpr f32 floor(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f32)(s32)v : ((f32)(s32)v - 1)) : ::floorf(v); }
 forceinline constexpr f64 floor(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? (f64)(s64)v : ((f64)(s64)v - 1)) : ::floor (v); }
 
+forceinline constexpr f32 floor(f32 v, f32 s) { return floor(v / s) * s; }
+
 forceinline s32 floor_to_int(f32 v) { return (s32)floor(v); }
 forceinline s64 floor_to_int(f64 v) { return (s64)floor(v); }
 

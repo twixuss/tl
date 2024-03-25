@@ -721,6 +721,15 @@ forceinline constexpr auto lerp_wrapped(A a, A b, T t, A min, A max) {
 				  lerp(a, b, t));
 }
 
+forceinline constexpr f32 angular_size(f32 distance, f32 radius) {
+	f32 cos = radius / distance;
+	if (cos < 1) {
+		return pi - acos(cos)*2;
+	} else {
+		return tau;
+	}
+}
+
 forceinline constexpr f32 dot(f32 a, f32 b) { return a * b; }
 
 template <class T> forceinline constexpr T dot(v2<T> a, v2<T> b) { return a *= b, a.x + a.y; }
@@ -1216,6 +1225,11 @@ forceinline aabb<T> aabb_min_max(T min, T max) {
 	return {min, max};
 }
 template <class T>
+forceinline aabb<T> aabb_min_max_sorted(T min, T max) {
+	sort_values(min, max);
+	return {min, max};
+}
+template <class T>
 forceinline aabb<T> aabb_min_size(T min, T size) {
 	return {min, min + size};
 }
@@ -1337,6 +1351,13 @@ forceinline bool in_bounds(v4<Scalar> a, aabb<v4<Scalar>> b) {
 		(a.y < b.max.y) &&
 		(a.z < b.max.z) &&
 		(a.w < b.max.w);
+}
+
+forceinline bool in_bounds_angle(f32 angle, aabb<f32> bounds) {
+	angle = frac(angle, tau);
+	return 
+		in_bounds(angle + floor(bounds.min, tau), bounds) ||
+		in_bounds(angle + floor(bounds.max, tau), bounds);
 }
 
 template <class Scalar>
