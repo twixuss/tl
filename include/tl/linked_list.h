@@ -50,7 +50,7 @@ struct LinkedList {
 		while (index) {
 			--index;
 			node = node->next;
-			bounds_check(node);
+			bounds_check(assert(node));
 		}
 		return node->value;
 	}
@@ -62,7 +62,7 @@ struct LinkedList {
 			--index;
 			prev = node;
 			node = node->next;
-			bounds_check(node);
+			bounds_check(assert(node));
 		}
 
 		if (prev) {
@@ -144,11 +144,11 @@ struct LinkedList {
 		return result;
 	}
 
-	T &front() { bounds_check(head); return head->value; }
-	T const &front() const { bounds_check(head); return head->value; }
+	T &front() { bounds_check(assert(head); return head->value; )}
+	T const &front() const { bounds_check(assert(head); return head->value; )}
 
-	T &back() { bounds_check(head); return tail->value; }
-	T const &back() const { bounds_check(head); return tail->value; }
+	T &back() { bounds_check(assert(head); return tail->value; )}
+	T const &back() const { bounds_check(assert(head); return tail->value; )}
 
 	Iterator begin() { return head; }
 	Iterator end() { return {}; }
@@ -188,7 +188,7 @@ void erase(LinkedList<T> &list, T *value) {
 		prev_node = node;
 		node = node->next;
 	}
-	bounds_check(false);
+	bounds_check(assert(false));
 }
 
 template <class T, class Predicate>

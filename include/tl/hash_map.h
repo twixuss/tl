@@ -675,16 +675,16 @@ struct ContiguousHashMap : Traits {
 		count = 0;
 	}
 	void erase(Iterator it) {
-		bounds_check(cells.count);
+		bounds_check(assert(cells.count));
 		it.cell->state = CellState::removed;
 	}
 	void erase(KeyValue *kv) {
-		bounds_check(cells.count);
+		bounds_check(assert(cells.count));
 		auto cell = (Cell *)((u8 *)kv - offsetof(Cell, key_value));
 		cell->state = CellState::removed;
 	}
 	void erase(Key key) {
-		bounds_check(cells.count);
+		bounds_check(assert(cells.count));
 
 		auto hash = get_hash(key);
 		auto index = get_index_from_hash(hash, cells.count);

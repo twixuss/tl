@@ -29,19 +29,19 @@ struct Variant {
 		return std::visit(fn, self.base);
 	}
 
-	template <class U>
+	template <OneOf<T...> U>
 	bool is() const {
 		defer{debug_check();};
 		return std::holds_alternative<U>(base);
 	}
 
-	template <class U>
+	template <OneOf<T...> U>
 	auto as_ptr(this auto &&self) {
 		defer{self.debug_check();};
 		return std::get_if<U>(&self.base);
 	}
 
-	template <class U>
+	template <OneOf<T...> U>
 	Optional<U> as() const {
 		defer{debug_check();};
 		if (auto p = as_ptr<U>()) {

@@ -31,13 +31,13 @@ struct BlockListNoStack {
 	bool empty() const { return first == 0 || ((last == first) && (first->size == 0)); }
 
 	T &front() {
-		bounds_check(first && first->size);
+		bounds_check(assert(first && first->size));
 
 		return *first->data;
 	}
 
 	T &back() {
-		bounds_check(first && first->size);
+		bounds_check(assert(first && first->size));
 
 		return last->back();
 	}
@@ -124,7 +124,7 @@ struct BlockListNoStack {
 		if (!first)
 			return;
 
-		bounds_check(first.size());
+		bounds_check(assert(first.size()));
 
 		(last->end--)[-1].value.~T();
 		if (last->end == last->buffer && last != &first) {
@@ -154,10 +154,10 @@ struct BlockListNoStack {
 				}
 				block = block->next;
 			} while (block);
-			bounds_check(false);
+			bounds_check(assert(false));
 		check_value_index:
 
-			bounds_check(index.value_index < block->size());
+			bounds_check(assert(index.value_index < block->size()));
 		}
 #endif
 		return index.block->buffer[index.value_index].value;
@@ -166,9 +166,9 @@ struct BlockListNoStack {
 		auto block = &first;
 		while (index.block_index--) {
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
-		bounds_check(index.value_index < block->size());
+		bounds_check(assert(index.value_index < block->size()));
 		return block->buffer[index.value_index].value;
 	}
 	T &operator[](umm index) {
@@ -176,7 +176,7 @@ struct BlockListNoStack {
 		while (index >= block->size()) {
 			index -= block->size();
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
 		return block->buffer[index].value;
 	}

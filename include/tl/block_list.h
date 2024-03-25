@@ -111,7 +111,7 @@ struct StaticBlockList {
 
 	T pop_back() {
 		if (last == &first)
-			bounds_check(first.count);
+			bounds_check(assert(first.count));
 
 		T result = last->data[--last->count];
 		if (last->count == 0 && last != &first) {
@@ -142,10 +142,10 @@ struct StaticBlockList {
 				}
 				block = block->next;
 			} while (block);
-			bounds_check(false);
+			bounds_check(assert(false));
 		check_value_index:
 
-			bounds_check(index.value_index < block->count);
+			bounds_check(assert(index.value_index < block->count));
 		}
 #endif
 		return index.block->buffer[index.value_index].value;
@@ -154,9 +154,9 @@ struct StaticBlockList {
 		auto block = &first;
 		while (index.block_index--) {
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
-		bounds_check(index.value_index < block->count);
+		bounds_check(assert(index.value_index < block->count));
 		return block->data[index.value_index];
 	}
 	T &operator[](umm index) {
@@ -164,7 +164,7 @@ struct StaticBlockList {
 		while (index >= block->count) {
 			index -= block->count;
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
 		return block->data[index];
 	}
@@ -387,7 +387,7 @@ struct BlockList {
 
 		Span<T> span() { return {data(), count}; }
 
-		T &operator[](umm i) { bounds_check(i < count); return data()[i]; }
+		T &operator[](umm i) { bounds_check(assert(i < count); return data()[i]; )}
 	};
 	struct Index {
 		Block *block;
@@ -539,7 +539,7 @@ struct BlockList {
 
 	T pop_back() {
 		if (last == first)
-			bounds_check(first->count);
+			bounds_check(assert(first->count));
 
 		defer { debug_count_check(); };
 
@@ -573,10 +573,10 @@ struct BlockList {
 				}
 				block = block->next;
 			} while (block);
-			bounds_check(false);
+			bounds_check(assert(false));
 		check_value_index:
 
-			bounds_check(index.value_index < block->count);
+			bounds_check(assert(index.value_index < block->count));
 		}
 #endif
 		return index.block->buffer[index.value_index].value;
@@ -585,9 +585,9 @@ struct BlockList {
 		auto block = first;
 		while (index.block_index--) {
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
-		bounds_check(index.value_index < block->count);
+		bounds_check(assert(index.value_index < block->count));
 		return block->data()[index.value_index];
 	}
 	T &operator[](umm index) {
@@ -595,7 +595,7 @@ struct BlockList {
 		while (index >= block->count) {
 			index -= block->count;
 			block = block->next;
-			bounds_check(block);
+			bounds_check(assert(block));
 		}
 		return block->data()[index];
 	}
@@ -656,7 +656,7 @@ umm index_of(BlockList<T> const &list, T *value) {
 		index += block->count;
 		block = block->next;
 	}
-	bounds_check(false);
+	bounds_check(assert(false));
 	return (umm)~0;
 }
 

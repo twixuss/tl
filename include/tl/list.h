@@ -164,7 +164,7 @@ struct List : Span<T, Size_> {
 	}
 
 	T &insert_at(T value, Size where TL_LP) {
-		bounds_check(where <= count);
+		bounds_check(assert(where <= count));
 
 		reserve_exponential(count + 1 TL_LA);
 
@@ -175,7 +175,7 @@ struct List : Span<T, Size_> {
 		return data[where];
 	}
 	Span insert_at(Span span, Size where TL_LP) {
-		bounds_check(where <= count);
+		bounds_check(assert(where <= count));
 
 		reserve_exponential(count + span.count TL_LA);
 
@@ -199,11 +199,9 @@ struct List : Span<T, Size_> {
 	}
 
 	void erase(Span where_) {
-		bounds_check(
-			where_.count <= count &&
-			begin() <= where_.begin() && where_.begin() < end() &&
-			where_.end() <= end()
-		);
+		bounds_check(assert(where_.count <= count));
+		bounds_check(assert(begin() <= where_.begin() && where_.begin() < end()));
+		bounds_check(assert(where_.end() <= end()));
 
 		memmove(where_.data, where_.data + where_.count, (count - where_.count + data - where_.data) * sizeof(T));
 		count -= where_.count;
@@ -239,7 +237,7 @@ struct List : Span<T, Size_> {
 	}
 
 	void erase_unordered_at(umm index) {
-		bounds_check(index < count);
+		bounds_check(assert(index < count));
 		memcpy(data + index, &back(), sizeof(T));
 		--count;
 	}
@@ -251,11 +249,9 @@ struct List : Span<T, Size_> {
 
 
 	void replace(Span where, T with_what) {
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
+		bounds_check(assert(where.count <= count));
+		bounds_check(assert(begin() <= where.begin() && where.begin() < end()));
+		bounds_check(assert(where.end() <= end()));
 
 		memmove(where.data + 1, where.data + where.count, (end() - where.end()) * sizeof(T));
 		*where.data = with_what;
@@ -264,12 +260,10 @@ struct List : Span<T, Size_> {
 	}
 
 	void replace(Span where, Span with_what) {
-		assert(begin() <= where.begin());
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
+		bounds_check(assert(begin() <= where.begin()));
+		bounds_check(assert(where.count <= count));
+		bounds_check(assert(begin() <= where.begin() && where.begin() < end()));
+		bounds_check(assert(where.end() <= end()));
 
 		T *old_data = data;
 		reserve_exponential(count - where.count + with_what.count);
@@ -694,13 +688,13 @@ struct StaticRingBuffer {
 	}
 #endif
 	T &push_back(T value) {
-		bounds_check(count != capacity);
+		bounds_check(assert(count != capacity));
 		auto dst = data + count;
 		count += 1;
 		return *(dst - capacity * (dst >= storage + capacity)) = value;
 	}
 	void push_back(Span<T> span) {
-		bounds_check(count + span.count <= capacity);
+		bounds_check(assert(count + span.count <= capacity));
 		if (data + span.count > storage + capacity) {
 			auto first_count  = storage + capacity - data;
 			auto second_count = span.count - first_count;
@@ -713,7 +707,7 @@ struct StaticRingBuffer {
 		count += span.count;
 	}
 	T &push_front(T value) {
-		bounds_check(count != capacity);
+		bounds_check(assert(count != capacity));
 		count += 1;
 		data = sub_wrap(data, 1);
 		return *data = value;
@@ -736,18 +730,18 @@ struct StaticRingBuffer {
 	Iterator begin() { return Iterator(this, 0); }
 	Iterator end() { return Iterator(this, count); }
 
-	T &back() { bounds_check(count); return at(count - 1); }
-	T &front() { bounds_check(count); return at(0); }
+	T &back() { bounds_check(assert(count); return at(count - 1); )}
+	T &front() { bounds_check(assert(count); return at(0); )}
 
 	bool is_empty() const { return count == 0; }
 	bool is_full() const { return count == capacity; }
 
-	T &operator[](umm i) { bounds_check(i < count); return at(i); }
-	T const &operator[](umm i) const { bounds_check(i < count); return at(i); }
+	T &operator[](umm i) { bounds_check(assert(i < count); return at(i); )}
+	T const &operator[](umm i) const { bounds_check(assert(i < count); return at(i); )}
 #if 0
 	void erase(Iterator it) {
 		umm index = it.index;
-		bounds_check(index < count);
+		bounds_check(assert(index < count));
 		--count;
 		if (index > count / 2) {
 			for (;index < count; ++index) {
@@ -901,20 +895,20 @@ struct CircularBuffer {
 	Iterator begin() { return Iterator(this, 0); }
 	Iterator end() { return Iterator(this, _size); }
 
-	T &back() { bounds_check(_size); return _get(_size - 1); }
-	T &front() { bounds_check(_size); return _get(0); }
+	T &back() { bounds_check(assert(_size); return _get(_size - 1); )}
+	T &front() { bounds_check(assert(_size); return _get(0); )}
 
 	umm capacity() const { return (umm)(_allocEnd - _allocBegin); }
 	umm size() const { return _size; }
 	bool empty() const { return _size == 0; }
 	bool full() const { return _size == capacity(); }
 
-	T &operator[](umm i) { bounds_check(i < _size); return _get(i); }
-	T const &operator[](umm i) const { bounds_check(i < _size); return _get(i); }
+	T &operator[](umm i) { bounds_check(assert(i < _size); return _get(i); )}
+	T const &operator[](umm i) const { bounds_check(assert(i < _size); return _get(i); )}
 
 	void erase(Iterator it) {
 		umm index = it.index;
-		bounds_check(index < _size);
+		bounds_check(assert(index < _size));
 		--_size;
 		if (index > _size / 2) {
 			for (;index < _size; ++index) {
@@ -1066,17 +1060,15 @@ struct LinearSet : Span<T, Size_> {
 	}
 
 	void erase(Span where) {
-		bounds_check(
-			where.count <= count &&
-			begin() <= where.begin() && where.begin() < end() &&
-			where.end() <= end()
-		);
+		bounds_check(assert(where.count <= count));
+		bounds_check(assert(begin() <= where.begin() && where.begin() < end()));
+		bounds_check(assert(where.end() <= end()));
 
 		memmove(where.data, where.data + where.count, (count - where.count + data - where.data) * sizeof(T));
 		count -= where.count;
 	}
 	void erase_at(umm where) {
-		bounds_check(where < count);
+		bounds_check(assert(where < count));
 		--count;
 		for (umm i = where; i < count; ++i) {
 			data[i] = data[i + 1];

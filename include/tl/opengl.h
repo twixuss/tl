@@ -1196,12 +1196,12 @@ struct GrowingBuffer {
 	}
 	void add(std::initializer_list<T> list) { add(as_span(list)); }
 	void set(Index index, T value) {
-		bounds_check(index < size);
+		bounds_check(assert(index < size));
 		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
 		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
 	}
 	void set(Index start, Span<T> span) {
-		bounds_check(start + span.size - 1 < size);
+		bounds_check(assert(start + span.size - 1 < size));
 		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
 		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
 	}

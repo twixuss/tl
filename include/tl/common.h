@@ -44,7 +44,7 @@
 #define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "", __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
-#define bounds_check(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("bounds check", #x, __VA_ARGS__)), false))
+#define bounds_check(x) x
 #endif
 
 #define TL_DISABLED_WARNINGS \
@@ -1062,75 +1062,87 @@ struct ReverseIterator {
 inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
-struct Optional {
-	constexpr Optional() {
-		count = false;
+struct OptionalBase {
+protected:
+	union {
+		T _value;
+	};
+	bool _has_value;
+	constexpr OptionalBase() {
+		this->_has_value = false;
 	}
+};
+
+template <class T>
+struct OptionalBaseNonTrivial : OptionalBase<T> {
+	constexpr ~OptionalBaseNonTrivial() {
+		if (this->_has_value)
+			this->_value.~T();
+	}
+};
+
+template <class T>
+struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBase<T>, OptionalBaseNonTrivial<T>> {
+	constexpr Optional() {}
 	constexpr Optional(T that) {
-		new (&_value) T(that);
-		count = true;
+		new (&this->_value) T(that);
+		this->_has_value = true;
 	}
 	constexpr Optional(Optional<T> const &that) {
-		if (that.count) {
-			new (&_value) T(that._value);
+		if (that._has_value) {
+			new (&this->_value) T(that._value);
 		}
-		count = that.count;
+		this->_has_value = that._has_value;
 	}
 	constexpr Optional(null_opt_t) {
-		count = false;
-	}
-	constexpr ~Optional() {
-		if (count)
-			_value.~T();
+		this->_has_value = false;
 	}
 
 	constexpr void reset() {
-		count = false;
+		this->_has_value = false;
 	}
 
-	constexpr explicit operator bool() const { return count; }
+	constexpr explicit operator bool() const { return this->_has_value; }
 
-	constexpr bool has_value() const { return count; }
-	constexpr auto &value(this auto &&self) { assert_always(self.count); return self._value; }
+	constexpr bool has_value() const { return this->_has_value; }
+	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
 	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
 	constexpr T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
-		if (count)
-			return _value;
+		if (this->_has_value)
+			return this->_value;
 		return fallback();
 	}
 
 	constexpr T value_or(T fallback) {
-		if (count)
-			return _value;
+		if (this->_has_value)
+			return this->_value;
 		return fallback;
 	}
 
 
 	template <class U>
 	constexpr Optional<U> map() {
-		if (count) {
-			return (U)_value;
+		if (this->_has_value) {
+			return (U)this->_value;
+		}
+		return null_opt;
+	}
+
+	template <std::invocable<T> Fn>
+	constexpr auto map(Fn fn) const -> Optional<decltype(fn(std::declval<T>()))> {
+		if (this->_has_value) {
+			return fn(this->_value);
 		}
 		return null_opt;
 	}
 
 	constexpr void apply(auto &&fn) {
-		if (count)
-			fn(_value);
+		if (this->_has_value)
+			fn(this->_value);
 	}
 
-	auto begin(this auto &&self) { return &self._value; }
-	auto end(this auto &&self) { return &self._value + self.count; }
-
-private:
-	union {
-		T _value;
-	};
-
-public:
-	bool count;
 #pragma warning(suppress: 4820)
 };
 
@@ -1249,19 +1261,19 @@ struct Span {
 	constexpr ReverseIterator rend() const { return data - 1; }
 
 	constexpr ValueType &front() const {
-		bounds_check(count);
+		bounds_check(assert(count));
 		return *data;
 	}
 	constexpr ValueType &back() const {
-		bounds_check(count);
+		bounds_check(assert(count));
 		return data[count - 1];
 	}
 	constexpr ValueType &operator[](Size i) const {
-		bounds_check(i < count);
+		bounds_check(assert_less(i, count));
 		return data[i];
 	}
 	constexpr ValueType &at(Size i) const {
-		bounds_check(i < count);
+		bounds_check(assert_less(i, count));
 		return data[i];
 	}
 
@@ -2021,16 +2033,16 @@ struct StaticList {
 	forceinline constexpr bool empty() const { return count == 0; }
 	forceinline constexpr bool full() const { return count == capacity; }
 
-	forceinline constexpr T &front() { bounds_check(count); return data[0]; }
-	forceinline constexpr T &back() { bounds_check(count); return data[count - 1]; }
-	forceinline constexpr T &operator[](umm i) { bounds_check(count); return data[i]; }
+	forceinline constexpr T &front() { bounds_check(assert(count)); return data[0]; }
+	forceinline constexpr T &back() { bounds_check(assert(count)); return data[count - 1]; }
+	forceinline constexpr T &operator[](umm i) { bounds_check(assert(count)); return data[i]; }
 
-	forceinline constexpr T const &front() const { bounds_check(count); return data[0]; }
-	forceinline constexpr T const &back() const { bounds_check(count); return data[count - 1]; }
-	forceinline constexpr T const &operator[](umm i) const { bounds_check(count); return data[i]; }
+	forceinline constexpr T const &front() const { bounds_check(assert(count)); return data[0]; }
+	forceinline constexpr T const &back() const { bounds_check(assert(count)); return data[count - 1]; }
+	forceinline constexpr T const &operator[](umm i) const { bounds_check(assert(count)); return data[i]; }
 
 	constexpr void resize(umm new_count) {
-		bounds_check(new_count <= capacity);
+		bounds_check(assert(new_count <= capacity));
 		if (new_count > count) {
 			for (umm i = count; i < new_count; ++i) {
 				new (data + i) T();
@@ -2039,8 +2051,8 @@ struct StaticList {
 		count = new_count;
 	}
 	constexpr T &insert_at(T value, umm where) {
-		bounds_check(where <= count);
-		bounds_check(count < capacity);
+		bounds_check(assert(where <= count));
+		bounds_check(assert(count < capacity));
 
 		memmove(data + where + 1, data + where, (count - where) * sizeof(T));
 		memcpy(data + where, &value, sizeof(T));
@@ -2049,8 +2061,8 @@ struct StaticList {
 		return data[where];
 	}
 	constexpr Span<T> insert_at(Span<T> span, umm where) {
-		bounds_check(where <= count);
-		bounds_check(count + span.count <= capacity);
+		bounds_check(assert(where <= count));
+		bounds_check(assert(count + span.count <= capacity));
 
 		memmove(data + where + span.count, data + where, (count - where) * sizeof(T));
 		memcpy(data + where, span.data, span.count * sizeof(T));
@@ -2086,18 +2098,18 @@ struct StaticList {
 	}
 
 	forceinline constexpr T &add() {
-		bounds_check(!full());
+		bounds_check(assert(!full()));
 		return *new(data + count++) T();
 	}
 
 	forceinline constexpr T &add(T const &value) {
-		bounds_check(!full());
+		bounds_check(assert(!full()));
 		return data[count++] = value;
 	}
 
 	template <class Size>
 	forceinline constexpr Span<T> add(Span<T, Size> span) {
-		bounds_check(count + span.count <= capacity);
+		bounds_check(assert(count + span.count <= capacity));
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		defer { count += span.count; };
 		return {data + count, span.count};
@@ -2110,11 +2122,11 @@ struct StaticList {
 	}
 
 	constexpr T pop_back() {
-		bounds_check(count);
+		bounds_check(assert(count));
 		return data[--count];
 	}
 	constexpr T pop_front() {
-		bounds_check(count);
+		bounds_check(assert(count));
 		T popped = *data;
 		memmove(data, data + 1, --count * sizeof(T));
 		return popped;
@@ -2123,7 +2135,7 @@ struct StaticList {
 	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
 
 	T erase_at(umm where) {
-		bounds_check(where < count);
+		bounds_check(assert(where < count));
 		T erased = data[where];
 		memmove(data + where, data + where + 1, (--count - where) * sizeof(T));
 		return erased;
@@ -2131,7 +2143,7 @@ struct StaticList {
 	forceinline T erase(T *where) { return erase_at(where - data); }
 
 	T erase_at_unordered(umm where) {
-		bounds_check(where < count);
+		bounds_check(assert(where < count));
 		T erased = data[where];
 		--count;
 		if (count != where) {
@@ -2144,7 +2156,7 @@ struct StaticList {
 	void erase_at(umm where, umm amount) {
 		if (amount == 0)
 			return;
-		bounds_check(where + amount <= count);
+		bounds_check(assert(where + amount <= count));
 		T *dst = data + where;
 		T *src = dst + amount;
 		umm cnt = end() - src;

@@ -1216,7 +1216,11 @@ struct aabb {
 		return {aabb.min.x, aabb.min.y, aabb.max.z};
 	}
 
-	Iterator begin() { return {*this, min}; }
+	Iterator begin() {
+		if (all(min < max))
+			return {*this, min};
+		return {*this, sentinel(*this)};
+	}
 	Iterator end() { return {*this, sentinel(*this)}; }
 };
 
@@ -1242,6 +1246,72 @@ template <class T>
 forceinline aabb<T> aabb_center_radius(T center, T radius) {
 	return {center - radius, center + radius};
 }
+
+template <ForEachFlags flags = 0, std::integral T>
+forceinline bool for_each(aabb<v2<T>> b, auto fn) {
+	using Ret = decltype(fn(v2<T>{}));
+
+	auto start = b.min;
+	auto end = b.max;
+	auto step = v2<T>{1, 1};
+	if constexpr (flags & ForEach_reverse) {
+		start = b.max - 1;
+		end = b.min - 1;
+		step = -step;
+	}
+
+	v2<T> p;
+	for (p.y = start.y; p.y != end.y; p.y += step.y) {
+	for (p.x = start.x; p.x != end.x; p.x += step.x) {
+		if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+			switch (fn(p)) {
+				case ForEach_break:
+					return true;
+			}
+		} else {
+			fn(p);
+
+		}
+		}
+	}
+	return false;
+}
+
+template <ForEachFlags flags = 0, std::integral T>
+forceinline bool for_each(aabb<v3<T>> b, auto fn) {
+	using Ret = decltype(fn(v3<T>{}));
+
+	auto start = b.min;
+	auto end = b.max;
+	auto step = v3<T>{1, 1, 1};
+	if constexpr (flags & ForEach_reverse) {
+		start = b.max - 1;
+		end = b.min - 1;
+		step = -step;
+	}
+
+	v3<T> p;
+	for (p.z = start.z; p.z != end.z; p.z += step.z) {
+	for (p.y = start.y; p.y != end.y; p.y += step.y) {
+	for (p.x = start.x; p.x != end.x; p.x += step.x) {
+		if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+			switch (fn(p)) {
+				case ForEach_break:
+					return true;
+			}
+		} else {
+			fn(p);
+		}
+	}
+	}
+	}
+	return false;
+}
+
+#define for_aabb3(x, y, z, condition, box)           \
+for (auto z = box.min.z; z condition box.max.z; ++z) \
+for (auto y = box.min.y; y condition box.max.y; ++y) \
+for (auto x = box.min.x; x condition box.max.x; ++x)
 
 template <class T>
 forceinline aabb<T> include(aabb<T> box, T point) {
@@ -1310,11 +1380,6 @@ template <class T>
 forceinline aabb<T> constrain(aabb<T> box, aabb<T> bounds) {
 	return constrain(box, bounds.min, bounds.max);
 }
-
-#define for_aabb3(x, y, z, condition, box)           \
-for (auto z = box.min.z; z condition box.max.z; ++z) \
-for (auto y = box.min.y; y condition box.max.y; ++y) \
-for (auto x = box.min.x; x condition box.max.x; ++x)
 
 template <class Scalar>
 forceinline bool in_bounds(Scalar a, aabb<Scalar> b) {

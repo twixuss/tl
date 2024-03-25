@@ -20,7 +20,7 @@ struct Array {
 		return self.data[i];
 	}
 	constexpr auto &at(this auto &&self, umm i) {
-		bounds_check(i < self.count);
+		bounds_check(assert_less(i, self.count));
 		return self.at_unchecked(i);
 	}
 	constexpr auto &operator[](this auto &&self, umm i) { return self.at(i); }
@@ -29,7 +29,7 @@ struct Array {
 	constexpr auto &back(this auto &&self) { return self.data[self.count - 1]; }
 
 	constexpr Span<T> operator+(umm i) {
-		bounds_check(i <= count);
+		bounds_check(assert_less_equal(i, count));
 		return {data + i, count - i};
 	}
 
@@ -96,7 +96,8 @@ struct Array2 {
 		return data[y][x];
 	}
 	constexpr T& at(umm x, umm y) {
-		bounds_check(&data[y][x] < end());
+		bounds_check(assert_less(x, count_x));
+		bounds_check(assert_less(y, count_y));
 		return at_unchecked(x, y);
 	}
 	template <class Scalar>
@@ -153,7 +154,9 @@ struct Array3 {
 		return at_unchecked(i.x, i.y, i.z);
 	}
 	constexpr T& at(umm x, umm y, umm z) {
-		bounds_check(&data[z][y][x] < end());
+		bounds_check(assert_less(x, count_x));
+		bounds_check(assert_less(y, count_y));
+		bounds_check(assert_less(z, count_z));
 		return at_unchecked(x,y,z);
 	}
 	template <class Scalar>

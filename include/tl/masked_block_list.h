@@ -144,7 +144,7 @@ struct StaticMaskedBlockList {
 				u32 mask_index = index / bits_in_mask;
 				u32 bit_index  = index % bits_in_mask;
 
-				bounds_check(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList");
+				bounds_check(assert(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList"));
 
 				if (block->masks[mask_index] == ~0)
 					block->available_mask_count += 1;
@@ -158,7 +158,7 @@ struct StaticMaskedBlockList {
 			block = block->next;
 			index -= values_per_block;
 		}
-		bounds_check(false, "attempt to remove non-existant value from StaticMaskedBlockList");
+		bounds_check(assert(false, "attempt to remove non-existant value from StaticMaskedBlockList"));
 	}
 	void erase(T *value) {
 		auto block = &first;
@@ -168,7 +168,7 @@ struct StaticMaskedBlockList {
 				umm mask_index = value_index / bits_in_mask;
 				umm bit_index  = value_index % bits_in_mask;
 
-				bounds_check(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList");
+				bounds_check(assert(block->masks[mask_index] & ((Mask)1 << bit_index), "attempt to remove already deleted value from StaticMaskedBlockList"));
 
 				block->masks[mask_index] &= ~((Mask)1 << bit_index);
 				
@@ -178,7 +178,7 @@ struct StaticMaskedBlockList {
 			}
 			block = block->next;
 		}
-		bounds_check(false, "attempt to remove non-existant value from StaticMaskedBlockList");
+		bounds_check(assert(false, "attempt to remove non-existant value from StaticMaskedBlockList"));
 	}
 	void erase(Iterator it) {
 		umm mask_index = it.index / bits_in_mask;
@@ -204,7 +204,7 @@ struct StaticMaskedBlockList {
 			--block_index;
 		}
 
-		bounds_check(block->masks[value_index / bits_in_mask] & ((Mask)1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in StaticMaskedBlockList");
+		bounds_check(assert(block->masks[value_index / bits_in_mask] & ((Mask)1 << (value_index % bits_in_mask)), "attempt to index uninitialized value in StaticMaskedBlockList"));
 
 		return block->values[value_index];
 	}
