@@ -2191,6 +2191,41 @@ template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticLis
 template <class T, umm capacity>
 forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
 
+template <ForEachFlags flags = 0, class T, umm capacity>
+bool for_each(StaticList<T, capacity> &list, auto fn) {
+	using Ret = decltype(fn(std::declval<T&>()));
+	if constexpr (flags & ForEach_reverse) {
+		for (auto p = list.end() - 1; p != list.data - 1; ) {
+			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+				switch (fn(*p)) {
+					case ForEach_continue: break;
+					case ForEach_break: return true;
+					case ForEach_erase: list.erase(p); break;
+					case ForEach_erase_unordered: list.erase_unordered(p); break;
+				}
+			} else {
+				fn(*p);
+			}
+			--p;
+		}
+	} else {
+		for (auto p = list.data; p != list.end(); ) {
+			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
+				switch (fn(*p)) {
+					case ForEach_continue: break;
+					case ForEach_break: return true;
+					case ForEach_erase: list.erase(p); continue;
+					case ForEach_erase_unordered: list.erase_unordered(p); continue;
+				}
+			} else {
+				fn(*p);
+			}
+			++p;
+		}
+	}
+	return false;
+}
+
 template <class T, umm capacity>
 struct StaticSet {
 

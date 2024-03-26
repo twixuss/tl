@@ -170,27 +170,44 @@ struct Format {
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
 
+enum IntFormat {
+	IntFormat_full,
+	IntFormat_kmb,
+};
+
+extern thread_local IntFormat default_int_format_format;
+extern thread_local u32 default_int_format_radix;
+extern thread_local u32 default_int_format_leading_zero_count;
+extern thread_local u32 default_int_format_skip_digits;
+extern thread_local char const *default_int_format_char_set;
+
 template <class Int>
 struct FormatInt {
 	Int value;
-	u32 radix = 10;
-	u32 leading_zero_count = 0;
-	u32 skip_digits = 0;
-	char const *char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	IntFormat format = default_int_format_format;
+	u32 radix = default_int_format_radix;
+	u32 leading_zero_count = default_int_format_leading_zero_count;
+	u32 skip_digits = default_int_format_skip_digits;
+	char const *char_set = default_int_format_char_set;
 };
 
 enum FloatFormat {
 	FloatFormat_default,
 	FloatFormat_exponential,
 	FloatFormat_exponential_e,
+	FloatFormat_kmb,
 };
+
+extern thread_local u32 default_float_format_precision;
+extern thread_local FloatFormat default_float_format_format;
+extern thread_local bool default_float_format_trailing_zeros;
 
 template <class Float>
 struct FormatFloat {
 	Float value;
-	u32 precision = 3;
-	FloatFormat format = FloatFormat_default;
-	bool trailing_zeros = false;
+	u32 precision = default_float_format_precision;
+	FloatFormat format = default_float_format_format;
+	bool trailing_zeros = default_float_format_trailing_zeros;
 
 	template <class U>
 	FormatFloat<U> with_value(U new_value) const {
@@ -849,6 +866,22 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	auto charMap = f.char_set;
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
+	Span<char> suffix = {};
+
+	switch (f.format) {
+		case IntFormat_full:
+			break;
+		case IntFormat_kmb: {
+			if (v >= 1000) {
+				f64 f = (f64)v;
+				StringBuilder builder;
+				append(builder, FormatFloat{.value = f, .precision = 3, .format = FloatFormat_kmb});
+				buffer.add((Span<ascii>)builder.first.span());
+				return builder.first.span().count;
+			}
+			break;
+		}
+	}
 
 	bool negative = false;
 	if constexpr (is_signed<Int>) {
@@ -890,7 +923,8 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 			charsWritten = f.leading_zero_count;
 	}
 	buffer.add(Span(lsc + 1, charsWritten));
-	return charsWritten;
+	buffer.add(suffix);
+	return charsWritten + suffix.count;
 }
 template <class Int, umm capacity> requires is_integer<Int>
 umm write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
@@ -920,6 +954,8 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 	if (is_nan(value)) {
 		return append(builder, "NaN");
 	}
+
+	scoped_replace(default_int_format_format, IntFormat_full);
 
 	auto precision = format.precision;
 
@@ -977,13 +1013,15 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 				round_and_trim();
 			}
 		} else {
-			if (frac(f) != 0) {
-				buffer.add('.');
-				for (u32 i = 0; i < precision && f != 0; ++i) {
-					f = frac(f) * 10;
-					buffer.add((ascii)((u32)f + '0'));
+			if (precision) {
+				if (frac(f) != 0) {
+					buffer.add('.');
+					for (u32 i = 0; i < precision && f != 0; ++i) {
+						f = frac(f) * 10;
+						buffer.add((ascii)((u32)f + '0'));
+					}
+					round_and_trim();
 				}
-				round_and_trim();
 			}
 		}
 
@@ -1036,6 +1074,20 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 
 			write_as_string(buffer, exponent);
 
+			break;
+		}
+		case FloatFormat_kmb: {
+			Span<ascii> suffix = {};
+			if (value >= 1000) { value /= 1000; suffix = "k"s; }
+			if (value >= 1000) { value /= 1000; suffix = "m"s; }
+			if (value >= 1000) { value /= 1000; suffix = "b"s; }
+			if (value >= 1000) { value /= 1000; suffix = "t"s; }
+			if (value >= 1000) { value /= 1000; suffix = "q"s; }
+			if (value > 100) { precision = (u32)max((s32)precision - 3, 0); }
+			else if (value > 10) { precision = (u32)max((s32)precision - 2, 0); }
+			else if (value > 1) { precision = (u32)max((s32)precision - 1, 0); }
+			append_float(value);
+			buffer.add(suffix);
 			break;
 		}
 	}
@@ -1245,6 +1297,16 @@ String<Char, Allocator> formatAndTerminate(Char const *fmt, Args const &...args)
 //}
 
 #ifdef TL_IMPL
+
+thread_local IntFormat default_int_format_format = IntFormat_full;
+thread_local u32 default_int_format_radix = 10;
+thread_local u32 default_int_format_leading_zero_count = 0;
+thread_local u32 default_int_format_skip_digits = 0;
+thread_local char const *default_int_format_char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+thread_local u32 default_float_format_precision = 3;
+thread_local FloatFormat default_float_format_format = FloatFormat_default;
+thread_local bool default_float_format_trailing_zeros = false;
 
 List<utf8> to_utf8(Span<utf16> utf16, bool terminate TL_LPD) {
 	List<utf8> result;
