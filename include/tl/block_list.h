@@ -351,7 +351,7 @@ void add(StaticBlockList<T, destination_block_size> *destination, StaticBlockLis
 
 
 template <class T, umm block_size>
-List<T> to_list(StaticBlockList<T, block_size> list TL_LP) {
+List<T> to_list(StaticBlockList<T, block_size> const &list TL_LP) {
 	List<T> result;
 	result.reserve(count_of(list) TL_LA);
 	for_each(list, [&](T const &value) {

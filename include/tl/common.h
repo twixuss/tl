@@ -283,6 +283,12 @@ forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;ret
 forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
 
 template <class T>
+concept AFundamentalType = std::is_fundamental_v<T>;
+
+template <class T>
+concept APodType = std::is_pod_v<T>;
+
+template <class T>
 concept AnEnum = std::is_enum_v<T>;
 
 forceinline constexpr auto to_underlying(AnEnum auto e) { return (std::underlying_type_t<decltype(e)>)e; }
@@ -315,6 +321,7 @@ template <class To, class From>
 forceinline constexpr To convert(From from) {
 	return (To)from;
 }
+
 
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }

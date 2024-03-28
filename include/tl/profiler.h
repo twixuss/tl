@@ -10,11 +10,13 @@
 #define timed_block(profiler, name) timed_begin(profiler, name); defer{ timed_end(profiler); }
 //#define timed_function() timed_block(([](utf8 const *name){scoped(temporary_allocator); return demangle(name);})(__FUNCDNAME__))
 #define timed_function(profiler) timed_block(profiler, as_span(__FUNCTION__))
+#define timed_x(profiler, expression) ([&]() -> decltype(auto) { timed_block(profiler, #expression); return expression; }())
 #else
 #define timed_begin(profiler, name)
 #define timed_end(profiler)
 #define timed_block(profiler, name)
 #define timed_function(profiler)
+#define timed_x(profiler, expression)
 #endif
 
 #include "common.h"

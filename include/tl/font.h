@@ -99,8 +99,13 @@ struct PlaceTextParams {
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
 
+struct EnsureAllCharsPresentResult {
+	bool new_chars_added = false;
+	bool atlas_resized = false;
+};
+
 // Returns true if new characters were added
-TL_API bool ensure_all_chars_present(Span<utf8> text, SizedFont *font);
+TL_API EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont *font);
 
 TL_API void free(FontCollection *collection);
 TL_API PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params = {} TL_LP);
@@ -135,7 +140,7 @@ void init_ft(FontFT *ft) {
 	ft->face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
 }
 
-bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
+EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 	assert(sized_font);
 
 	auto font = (FontFT *)sized_font->font;
@@ -163,6 +168,8 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 	}
 
 	if (new_chars.count) {
+
+		bool atlas_was_resized = false;
 
 	redo_all:
 		while (new_chars.count) {
@@ -227,6 +234,8 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 					new_chars.add(code_point);
 				});
 
+				atlas_was_resized = true;
+
 				goto redo_all;
 			}
 
@@ -256,9 +265,15 @@ bool ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
 
 		sized_font->texture = collection->update_atlas(sized_font->texture, sized_font->atlas_data, sized_font->atlas_size);
 
-		return true;
+		return {
+			.new_chars_added = true,
+			.atlas_resized = atlas_was_resized,
+		};
 	}
-	return false;
+	return {
+		.new_chars_added = false,
+		.atlas_resized = false,
+	};
 }
 
 SizedFont *get_font_at_size(Font *font, u32 size) {
@@ -306,8 +321,7 @@ void free(FontCollection *collection) {
 		});
 		free(font->path);
 
-		// FIXME: implement free for HashMap
-		// free(font->size_to_font);
+		free(font->size_to_font);
 
 		free(font->file);
 		FT_Done_Face(font->face);
@@ -400,6 +414,7 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 
 				char_position.x = 0;
 				char_position.y += font->line_spacing;
+				result.line_count += 1;
 
 				place_char();
 			}

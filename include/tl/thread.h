@@ -534,7 +534,7 @@ struct SignalQueue : private Queue<T, Allocator> {
 		cv.wake();
 	}
 
-	Optional<T> pop(auto cancelled) {
+	Optional<T> pop(auto cancelled, u32 timeout = -1) {
 		Optional<T> result;
 
 		cv.section([&] (ConditionVariable::Sleeper sleeper) {
@@ -542,7 +542,7 @@ struct SignalQueue : private Queue<T, Allocator> {
 				if (result = Base::pop()) {
 					break;
 				} else {
-					sleeper.sleep();
+					sleeper.sleep(timeout);
 				}
 			}
 		});
@@ -696,7 +696,8 @@ struct ThreadPool {
 						assert(task.value_unchecked().fn);
 						break;
 					} else {
-						sleeper.sleep();
+						// NOTE: Arbitrary timeout
+						sleeper.sleep(1);
 					}
 				}
 			});
