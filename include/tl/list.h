@@ -445,6 +445,13 @@ List<Span<T>, Allocator, Size> split(Span<T, Size> what, T by TL_LP) {
 	return result;
 }
 
+template <class T, class Size>
+void replace_inplace(Span<T, Size> where, T what, T with) {
+	for (auto &v : where) {
+		v = v == what ? with : v;
+	}
+}
+
 template <class Allocator = Allocator, class T, class Size>
 List<T, Allocator, Size> replace(Span<T, Size> where, T what, T with TL_LP) {
 	List<T, Allocator, Size> result;

@@ -9,7 +9,7 @@ struct BlockListIndex {
 	umm value_index;
 };
 
-template <class T, umm block_capacity_>
+template <class T, umm block_capacity_, class Allocator = Allocator>
 struct StaticBlockList {
 	static constexpr umm block_capacity = block_capacity_;
 	struct Block : StaticList<T, block_capacity> {
@@ -24,16 +24,15 @@ struct StaticBlockList {
 	};
 
 	struct Iterator {
+		StaticBlockList *list;
 		Block *block;
 		umm value_index;
 
 		Iterator &operator++() {
 			++value_index;
-			if (value_index >= block->count) {
-				if (block->next) {
-					block = block->next;
-					value_index = 0;
-				}
+			if (value_index == block->capacity && block->next && block != list->last) {
+				block = block->next;
+				value_index = 0;
 			}
 			return *this;
 		}
@@ -69,7 +68,7 @@ struct StaticBlockList {
 		T &operator*() { return (*block)[value_index]; }
 	};
 
-	Allocator allocator = current_allocator;
+	Allocator allocator = Allocator::current();
 	Block first;
 	Block *last = &first;
 	Block *alloc_last = &first;
@@ -88,19 +87,24 @@ struct StaticBlockList {
 	}
 
 	T &add(T value TL_LP) {
-		auto dest_block = last;
-		while (dest_block && (dest_block->available_space() == 0)) {
-			assert(dest_block != dest_block->next);
-			dest_block = dest_block->next;
+		auto dest = last;
+		while (dest && dest->count == dest->capacity) {
+			assert(dest != dest->next);
+			dest = dest->next;
 		}
-		if (!dest_block) {
-			dest_block = allocator.allocate<Block>(TL_LAC);
-			dest_block->next = 0;
-			dest_block->previous = alloc_last;
-			alloc_last->next = dest_block;
-			last = alloc_last = dest_block;
+
+		if (!dest) {
+			assert(last == alloc_last);
+			dest = allocator.allocate<Block>(TL_LAC);
+			dest->previous = alloc_last;
+			dest->next = 0;
+			alloc_last->next = dest;
+			alloc_last = dest;
 		}
-		return dest_block->add(value);
+		
+		last = dest;
+
+		return dest->add(value);
 	}
 	T &add(TL_LPC) { return add({} TL_LA); }
 
@@ -170,15 +174,23 @@ struct StaticBlockList {
 	}
 
 	Iterator begin() {
-		return {&first, 0};
+		return {this, &first, 0};
 	}
 	Iterator end() {
-		return {last, last->count};
+		return {this, last, last->count};
 	}
 };
 
-template <class T, umm block_size>
-umm count_of(StaticBlockList<T, block_size> const &list) {
+template <class T>
+struct SStaticBlockList : std::false_type {};
+
+template <class T, umm values_per_block, class Allocator>
+struct SStaticBlockList<StaticBlockList<T, values_per_block, Allocator>> : std::true_type {};
+
+template <class T>
+concept CStaticBlockList = SStaticBlockList<T>::value;
+
+umm count_of(CStaticBlockList auto const &list) {
 	umm total_count = 0;
 	for (auto block = &list.first; block != 0; block = block->next) {
 		total_count += block->count;
@@ -186,8 +198,8 @@ umm count_of(StaticBlockList<T, block_size> const &list) {
 	return total_count;
 }
 
-template <class T, umm block_size>
-T *next(StaticBlockList<T, block_size> &list, T *source) {
+template <class T, umm block_size, class Allocator>
+T *next(StaticBlockList<T, block_size, Allocator> &list, T *source) {
 	auto block = &list.first;
 	while (block) {
 		if (&block->buffer->value <= source && source < &block->buffer->end()->value) {
@@ -206,36 +218,8 @@ T *next(StaticBlockList<T, block_size> &list, T *source) {
 	return 0;
 }
 
-template <class T, umm block_size>
-struct StaticBlockListIterator {
-	T *pointer;
-	typename StaticBlockList<T, block_size>::Block *block;
-	bool operator!=(StaticBlockListIterator that) { return pointer != that.pointer; }
-	StaticBlockListIterator &operator++() {
-		++pointer;
-		if (pointer >= block->end()) {
-			block = block->next;
-			pointer = &block->buffer->value;
-		}
-		return *this;
-	}
-	T &operator*() {
-		return *pointer;
-	}
-};
-
-template <class T, umm block_size>
-StaticBlockListIterator<T, block_size> begin(StaticBlockList<T, block_size> &list) {
-	return {&list.first.buffer->value, &list.first};
-}
-
-template <class T, umm block_size>
-StaticBlockListIterator<T, block_size> end(StaticBlockList<T, block_size> &list) {
-	return {};
-}
-
-template <class T, umm block_size, class Fn>
-bool for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
+template <class T, umm block_size, class Allocator, class Fn>
+bool for_each(StaticBlockList<T, block_size, Allocator> &list, Fn &&fn) {
 	constexpr bool using_index = std::is_invocable_v<Fn, T&, BlockListIndex>;
 
 	if constexpr (using_index) {
@@ -284,8 +268,8 @@ bool for_each(StaticBlockList<T, block_size> &list, Fn &&fn) {
 	return false;
 }
 
-template <class T, umm block_size>
-T *find(StaticBlockList<T, block_size> &list, T const &to_find, BlockListIndex *result_index = 0) {
+template <class T, umm block_size, class Allocator>
+T *find(StaticBlockList<T, block_size, Allocator> &list, T const &to_find, BlockListIndex *result_index = 0) {
 	BlockListIndex index = {};
 	auto block = &list.first;
 	do {
@@ -305,8 +289,8 @@ T *find(StaticBlockList<T, block_size> &list, T const &to_find, BlockListIndex *
 	return 0;
 }
 
-template <class T, umm block_size>
-T *find(StaticBlockList<T, block_size> &list, T const &to_find, typename StaticBlockList<T, block_size>::Index *result_index = 0) {
+template <class T, umm block_size, class Allocator>
+T *find(StaticBlockList<T, block_size, Allocator> &list, T const &to_find, typename StaticBlockList<T, block_size, Allocator>::Index *result_index = 0) {
 	typename StaticBlockList<T, block_size, Allocator>::Index index = {};
 	auto block = &list.first;
 	do {
@@ -327,8 +311,8 @@ T *find(StaticBlockList<T, block_size> &list, T const &to_find, typename StaticB
 	return 0;
 }
 
-template <class T, umm block_size, class Predicate>
-T *find_if(StaticBlockList<T, block_size> &list, Predicate &&predicate) {
+template <class T, umm block_size, class Allocator, class Predicate>
+T *find_if(StaticBlockList<T, block_size, Allocator> &list, Predicate &&predicate) {
 	auto block = &list.first;
 	do {
 		for (auto it = block->buffer; it != block->end; ++it) {
@@ -342,16 +326,16 @@ T *find_if(StaticBlockList<T, block_size> &list, Predicate &&predicate) {
 	return 0;
 }
 
-template <class T, umm destination_block_size, umm source_block_size>
-void add(StaticBlockList<T, destination_block_size> *destination, StaticBlockList<T, source_block_size> source TL_LP) {
+template <class T, umm destination_block_size, umm source_block_size, class AllocatorA, class AllocatorB>
+void add(StaticBlockList<T, destination_block_size, AllocatorA> *destination, StaticBlockList<T, source_block_size, AllocatorB> source TL_LP) {
 	for_each(source, [&](T const &value) {
 		destination->add(value TL_LA);
 	});
 }
 
 
-template <class T, umm block_size>
-List<T> to_list(StaticBlockList<T, block_size> const &list TL_LP) {
+template <class T, umm block_size, class Allocator>
+List<T> to_list(StaticBlockList<T, block_size, Allocator> const &list TL_LP) {
 	List<T> result;
 	result.reserve(count_of(list) TL_LA);
 	for_each(list, [&](T const &value) {

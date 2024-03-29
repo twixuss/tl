@@ -1229,9 +1229,11 @@ forceinline aabb<T> aabb_min_max(T min, T max) {
 	return {min, max};
 }
 template <class T>
-forceinline aabb<T> aabb_min_max_sorted(T min, T max) {
-	sort_values(min, max);
-	return {min, max};
+forceinline aabb<T> aabb_min_max_sorted(T a, T b) {
+	return {
+		min(a, b), 
+		max(a, b)
+	};
 }
 template <class T>
 forceinline aabb<T> aabb_min_size(T min, T size) {
