@@ -267,7 +267,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 					atlas.size = new_atlas_size;
 				} else {
 					#if TL_FONT_SHARED_ATLAS
-					auto new_atlas_size = V2u(64);
+					auto new_atlas_size = V2u(1024);
 					#else
 					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
 					#endif
