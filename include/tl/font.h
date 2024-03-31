@@ -18,7 +18,8 @@ namespace tl {
 struct FontChar {
 	v2u position;
 	v2u size;
-	v2s offset, advance;
+	v2s offset;
+	v2s advance;
 };
 
 struct FontCollection;
@@ -58,7 +59,9 @@ struct SizedFont {
 struct FontCollection {
 	Allocator allocator = current_allocator;
 	List<Font *> fonts;
-	TL_FONT_TEXTURE_HANDLE (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size);
+	TL_FONT_TEXTURE_HANDLE (*create_atlas)(v2u size);
+	void (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size);
+	void (*free_atlas)(TL_FONT_TEXTURE_HANDLE texture);
 };
 
 TL_API FontCollection *create_font_collection();
@@ -210,33 +213,48 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			}
 
 			if ((sized_font->next_char_position.y + char_size.y > sized_font->atlas_size.y) || !sized_font->atlas_data) {
-
-				//
-				// TODO:
-				// Do not reset the atlas, just extend it
-				//
-
 				if (sized_font->atlas_data) {
-					sized_font->atlas_size *= 2;
+					auto new_atlas_size = sized_font->atlas_size;
+					if (new_atlas_size.x == new_atlas_size.y) {
+						sized_font->next_char_position = {new_atlas_size.x, 0};
+
+						new_atlas_size.x *= 2;
+					} else {
+						sized_font->next_char_position = {0, new_atlas_size.y};
+
+						assert(new_atlas_size.x > new_atlas_size.y);
+						new_atlas_size.y *= 2;
+						assert(new_atlas_size.x == new_atlas_size.y);
+					}
+
+					u8 *new_atlas_data = current_allocator.allocate<u8>(new_atlas_size.x * new_atlas_size.y * 3);
+
+					for (umm y = 0; y < sized_font->atlas_size.y; ++y) {
+						for (umm x = 0; x < sized_font->atlas_size.x; ++x) {
+							new_atlas_data[y*new_atlas_size.x + x] = sized_font->atlas_data[y*sized_font->atlas_size.x + x];
+						}
+					}
+
+					collection->free_atlas(sized_font->texture);
+
+					sized_font->atlas_data = new_atlas_data;
+					sized_font->texture = collection->create_atlas(new_atlas_size);
+					sized_font->atlas_size = new_atlas_size;
+
 					current_allocator.free(sized_font->atlas_data);
 				} else {
-					sized_font->atlas_size = V2u(sized_font->size * 16);
+					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
+					u8 *new_atlas_data = current_allocator.allocate<u8>(new_atlas_size.x * new_atlas_size.y * 3);
+
+					sized_font->atlas_data = new_atlas_data;
+					sized_font->texture = collection->create_atlas(new_atlas_size);
+					sized_font->atlas_size = new_atlas_size;
 				}
-				sized_font->atlas_data = current_allocator.allocate<u8>(sized_font->atlas_size.x * sized_font->atlas_size.y * 3);
-				memset(sized_font->atlas_data, 0, sized_font->atlas_size.x * sized_font->atlas_size.y * 3);
 
 				sized_font->next_char_position = {};
 				sized_font->current_row_height = 0;
 
-				new_chars.add(new_char_code_point);
-				for_each(sized_font->chars, [&] (auto &kv) {
-					auto &[code_point, _] = kv;
-					new_chars.add(code_point);
-				});
-
 				atlas_was_resized = true;
-
-				goto redo_all;
 			}
 
 			//
@@ -263,7 +281,8 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			sized_font->current_row_height = max(sized_font->current_row_height, char_size.y);
 		}
 
-		sized_font->texture = collection->update_atlas(sized_font->texture, sized_font->atlas_data, sized_font->atlas_size);
+		assert(sized_font->texture);
+		collection->update_atlas(sized_font->texture, sized_font->atlas_data, sized_font->atlas_size);
 
 		return {
 			.new_chars_added = true,
