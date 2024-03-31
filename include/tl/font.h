@@ -235,10 +235,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 						}
 					}
 
-					collection->free_atlas(sized_font->texture);
-
 					sized_font->atlas_data = new_atlas_data;
-					sized_font->texture = collection->create_atlas(new_atlas_size);
 					sized_font->atlas_size = new_atlas_size;
 
 					current_allocator.free(sized_font->atlas_data);
@@ -247,7 +244,6 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 					u8 *new_atlas_data = current_allocator.allocate<u8>(new_atlas_size.x * new_atlas_size.y * 3);
 
 					sized_font->atlas_data = new_atlas_data;
-					sized_font->texture = collection->create_atlas(new_atlas_size);
 					sized_font->atlas_size = new_atlas_size;
 				}
 
@@ -281,7 +277,14 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			sized_font->current_row_height = max(sized_font->current_row_height, char_size.y);
 		}
 
-		assert(sized_font->texture);
+		if (sized_font->texture && atlas_was_resized) {
+			collection->free_atlas(sized_font->texture);
+			sized_font->texture = 0;
+		}
+
+		if (!sized_font->texture) {
+			sized_font->texture = collection->create_atlas(sized_font->atlas_size);
+		}
 		collection->update_atlas(sized_font->texture, sized_font->atlas_data, sized_font->atlas_size);
 
 		return {
