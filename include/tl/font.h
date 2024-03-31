@@ -12,7 +12,7 @@
 #endif
 
 #ifndef TL_FONT_SHARED_ATLAS
-#define TL_FONT_SHARED_ATLAS 0
+#define TL_FONT_SHARED_ATLAS 1
 #endif
 
 namespace tl {
@@ -231,7 +231,11 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			v2u char_size = {bitmap.width/3, bitmap.rows};
 
 			if (atlas.next_char_position.x + char_size.x >= atlas.size.x) {
-				atlas.next_char_position.x = 0;
+				if (atlas.size.x == atlas.size.y) {
+					atlas.next_char_position.x = 0;
+				} else {
+					atlas.next_char_position.x = atlas.size.x / 2;
+				}
 				atlas.next_char_position.y += atlas.current_row_height;
 				atlas.current_row_height = 0;
 			}
@@ -256,24 +260,29 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 					for (umm y = 0; y < atlas.size.y; ++y) {
 						memcpy(&new_atlas_data[y * new_atlas_size.x], &atlas.data[y * atlas.size.x], atlas.size.x * sizeof(atlas.data[0]));
 					}
+					
+					current_allocator.free(atlas.data);
 
 					atlas.data = new_atlas_data;
 					atlas.size = new_atlas_size;
-
-					current_allocator.free(atlas.data);
 				} else {
+					#if TL_FONT_SHARED_ATLAS
+					auto new_atlas_size = V2u(64);
+					#else
 					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
+					#endif
 					v3u8 *new_atlas_data = current_allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
 
 					atlas.data = new_atlas_data;
 					atlas.size = new_atlas_size;
 				}
 
-				atlas.next_char_position = {};
 				atlas.current_row_height = 0;
 
 				atlas_was_resized = true;
 			}
+
+			assert(all(atlas.next_char_position + char_size <= atlas.size));
 
 			//
 			// NOTE bitmap.width is in bytes not pixels
