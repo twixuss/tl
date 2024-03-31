@@ -7,10 +7,12 @@
 #include "hash_map.h"
 #include "math.h"
 
-#include <unordered_map>
-
 #ifndef TL_FONT_TEXTURE_HANDLE
 #define TL_FONT_TEXTURE_HANDLE void *
+#endif
+
+#ifndef TL_FONT_SHARED_ATLAS
+#define TL_FONT_SHARED_ATLAS 0
 #endif
 
 namespace tl {
@@ -36,33 +38,51 @@ struct Font {
 
 TL_API SizedFont *get_font_at_size(Font *font, u32 size);
 
+struct FontAtlas {
+	v3u8 *data = 0;
+	v2u size = {};
+	
+	TL_FONT_TEXTURE_HANDLE texture = {};
+
+	v2u next_char_position = {};
+	u32 current_row_height = 0;
+};
 
 struct SizedFont {
 	Font *font = {};
 
 	ContiguousHashMap<u32, FontChar> chars;
-	TL_FONT_TEXTURE_HANDLE texture = {};
 	u32 size = {};
 
-	u8 *atlas_data = 0;
-	v2u atlas_size = {};
-
-	v2u next_char_position = {};
-	u32 current_row_height = 0;
+	#if !TL_FONT_SHARED_ATLAS
+	FontAtlas atlas_ = {};
+	#endif
 
 	s32 line_spacing = 0;
 	s32 ascender     = 0;
 	s32 descender    = 0;
+
+
+	FontAtlas &atlas();
 };
 
 
 struct FontCollection {
 	Allocator allocator = current_allocator;
 	List<Font *> fonts;
+	#if TL_FONT_SHARED_ATLAS
+	FontAtlas atlas;
+	#endif
 	TL_FONT_TEXTURE_HANDLE (*create_atlas)(v2u size);
-	void (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size);
+	void (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, v3u8 *data, v2u size, aabb<v2u> updated_region);
 	void (*free_atlas)(TL_FONT_TEXTURE_HANDLE texture);
 };
+
+#if TL_FONT_SHARED_ATLAS
+inline FontAtlas &SizedFont::atlas() { return font->collection->atlas; }
+#else
+inline FontAtlas &SizedFont::atlas() { return atlas_; }
+#endif
 
 TL_API FontCollection *create_font_collection();
 TL_API void free(FontCollection *collection);
@@ -153,6 +173,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 
 	scoped(collection->allocator);
 
+	auto &atlas = sized_font->atlas();
 
 	auto current_char = text.data;
 
@@ -174,11 +195,14 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 
 		bool atlas_was_resized = false;
 
-	redo_all:
+		aabb<v2u> updated_region = {
+			V2u(-1),
+			V2u(0),
+		};
+
 		while (new_chars.count) {
 			auto new_char_code_point = new_chars.pop().value();
 
-		retry_glyph:
 			if (!font->face) {
 				init_ft(font);
 			}
@@ -206,49 +230,47 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 
 			v2u char_size = {bitmap.width/3, bitmap.rows};
 
-			if (sized_font->next_char_position.x + char_size.x >= sized_font->atlas_size.x) {
-				sized_font->next_char_position.x = 0;
-				sized_font->next_char_position.y += sized_font->current_row_height;
-				sized_font->current_row_height = 0;
+			if (atlas.next_char_position.x + char_size.x >= atlas.size.x) {
+				atlas.next_char_position.x = 0;
+				atlas.next_char_position.y += atlas.current_row_height;
+				atlas.current_row_height = 0;
 			}
 
-			if ((sized_font->next_char_position.y + char_size.y > sized_font->atlas_size.y) || !sized_font->atlas_data) {
-				if (sized_font->atlas_data) {
-					auto new_atlas_size = sized_font->atlas_size;
+			if ((atlas.next_char_position.y + char_size.y > atlas.size.y) || !atlas.data) {
+				if (atlas.data) {
+					auto new_atlas_size = atlas.size;
 					if (new_atlas_size.x == new_atlas_size.y) {
-						sized_font->next_char_position = {new_atlas_size.x, 0};
+						atlas.next_char_position = {new_atlas_size.x, 0};
 
 						new_atlas_size.x *= 2;
 					} else {
-						sized_font->next_char_position = {0, new_atlas_size.y};
+						atlas.next_char_position = {0, new_atlas_size.y};
 
 						assert(new_atlas_size.x > new_atlas_size.y);
 						new_atlas_size.y *= 2;
 						assert(new_atlas_size.x == new_atlas_size.y);
 					}
 
-					u8 *new_atlas_data = current_allocator.allocate<u8>(new_atlas_size.x * new_atlas_size.y * 3);
+					v3u8 *new_atlas_data = current_allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
 
-					for (umm y = 0; y < sized_font->atlas_size.y; ++y) {
-						for (umm x = 0; x < sized_font->atlas_size.x; ++x) {
-							new_atlas_data[y*new_atlas_size.x + x] = sized_font->atlas_data[y*sized_font->atlas_size.x + x];
-						}
+					for (umm y = 0; y < atlas.size.y; ++y) {
+						memcpy(&new_atlas_data[y * new_atlas_size.x], &atlas.data[y * atlas.size.x], atlas.size.x * sizeof(atlas.data[0]));
 					}
 
-					sized_font->atlas_data = new_atlas_data;
-					sized_font->atlas_size = new_atlas_size;
+					atlas.data = new_atlas_data;
+					atlas.size = new_atlas_size;
 
-					current_allocator.free(sized_font->atlas_data);
+					current_allocator.free(atlas.data);
 				} else {
 					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
-					u8 *new_atlas_data = current_allocator.allocate<u8>(new_atlas_size.x * new_atlas_size.y * 3);
+					v3u8 *new_atlas_data = current_allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
 
-					sized_font->atlas_data = new_atlas_data;
-					sized_font->atlas_size = new_atlas_size;
+					atlas.data = new_atlas_data;
+					atlas.size = new_atlas_size;
 				}
 
-				sized_font->next_char_position = {};
-				sized_font->current_row_height = 0;
+				atlas.next_char_position = {};
+				atlas.current_row_height = 0;
 
 				atlas_was_resized = true;
 			}
@@ -257,7 +279,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			// NOTE bitmap.width is in bytes not pixels
 			//
 			auto &info = sized_font->chars.get_or_insert(new_char_code_point);
-			info.position = sized_font->next_char_position;
+			info.position = atlas.next_char_position;
 			info.size = char_size;
 			info.offset = {slot->bitmap_left, slot->bitmap_top};
 			info.advance = {slot->advance.x >> 6, slot->advance.y >> 6};
@@ -268,24 +290,29 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 
 			for (u32 y = 0; y < bitmap.rows; ++y) {
 				memcpy(
-					sized_font->atlas_data + ((sized_font->next_char_position.y + y)*sized_font->atlas_size.x + sized_font->next_char_position.x) * 3,
+					atlas.data + (atlas.next_char_position.y + y)*atlas.size.x + atlas.next_char_position.x,
 					bitmap.buffer + y*bitmap.pitch,
 					bitmap.width
 				);
 			}
-			sized_font->next_char_position.x += char_size.x;
-			sized_font->current_row_height = max(sized_font->current_row_height, char_size.y);
+
+			updated_region.min = min(updated_region.min, atlas.next_char_position);
+			updated_region.max = max(updated_region.max, atlas.next_char_position + char_size);
+
+			atlas.next_char_position.x += char_size.x;
+			atlas.current_row_height = max(atlas.current_row_height, char_size.y);
 		}
 
-		if (sized_font->texture && atlas_was_resized) {
-			collection->free_atlas(sized_font->texture);
-			sized_font->texture = 0;
+		if (atlas.texture && atlas_was_resized) {
+			collection->free_atlas(atlas.texture);
+			atlas.texture = 0;
 		}
 
-		if (!sized_font->texture) {
-			sized_font->texture = collection->create_atlas(sized_font->atlas_size);
+		if (!atlas.texture) {
+			atlas.texture = collection->create_atlas(atlas.size);
+			updated_region = {{}, atlas.size};
 		}
-		collection->update_atlas(sized_font->texture, sized_font->atlas_data, sized_font->atlas_size);
+		collection->update_atlas(atlas.texture, atlas.data, atlas.size, updated_region);
 
 		return {
 			.new_chars_added = true,
@@ -339,7 +366,12 @@ void free(FontCollection *collection) {
 		auto font = (FontFT *)_font;
 		for_each(font->size_to_font, [&](auto &kv) {
 			auto &[size, sized_font] = kv;
-			collection->allocator.free(sized_font.atlas_data);
+			#if !TL_FONT_SHARED_ATLAS
+			collection->allocator.free(sized_font.atlas_.data);
+			if (sized_font.atlas_.texture) {
+				collection->free_atlas(sized_font.atlas_.texture);
+			}
+			#endif
 		});
 		free(font->path);
 
@@ -349,7 +381,12 @@ void free(FontCollection *collection) {
 		FT_Done_Face(font->face);
 
 		collection->allocator.free(font);
+
 	}
+	#if TL_FONT_SHARED_ATLAS
+	collection->allocator.free(collection->atlas.data);
+	collection->free_atlas(collection->atlas.texture);
+	#endif
 	free(collection->fonts);
 	collection->allocator.free(collection);
 }
@@ -441,8 +478,8 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 				place_char();
 			}
 
-			c.uv.min = (v2f)d.position / (v2f)font->atlas_size;
-			c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas_size;
+			c.uv.min = (v2f)d.position / (v2f)font->atlas().size;
+			c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas().size;
 
 			result.bounds.max = max(result.bounds.max, c.position.max);
 			result.bounds.min = min(result.bounds.min, c.position.min);

@@ -35,7 +35,7 @@ struct List : Span<T, Size_> {
 	void reallocate(Size desired_capacity TL_LP) {
 		T *new_data;
 		if (data) {
-			new_data = allocator.reallocate_uninitialized<T>(data, count, desired_capacity TL_LA);
+			new_data = allocator.reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
 		} else {
 			new_data = allocator.allocate_uninitialized<T>(desired_capacity TL_LA);
 		}
@@ -1014,7 +1014,7 @@ struct LinearSet : Span<T, Size_> {
 	void reallocate(umm desired_capacity TL_LP) {
 		T *new_data;
 		if (data) {
-			new_data = allocator.reallocate_uninitialized<T>(data, count, desired_capacity TL_LA);
+			new_data = allocator.reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
 		} else {
 			new_data = allocator.allocate_uninitialized<T>(desired_capacity TL_LA);
 		}

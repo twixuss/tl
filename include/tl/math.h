@@ -1323,6 +1323,11 @@ forceinline aabb<T> include(aabb<T> box, T point) {
 }
 
 template <class T>
+forceinline aabb<T> include(aabb<T> box, aabb<T> x) {
+	return include(include(box, x.min), x.max);
+}
+
+template <class T>
 forceinline aabb<T> aabb_including_points(Span<T> points) {
 	aabb<T> result = {points[0], points[0]};
 	for (auto point : points.skip(1)) {
