@@ -793,6 +793,9 @@ constexpr T midpoint(T a, T b) {
 	return a + (b - a) / 2;
 }
 
+template <umm count>
+using UintForCount = TypeAt<log2(log2(max(count, (umm)255))) - 2, u8, u16, u32, u64>;
+
 template <class T>
 constexpr T *midpoint(T *a, T *b) {
 	sort_values(a, b);
@@ -1997,6 +2000,7 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 template <class T, umm _capacity>
 struct StaticList {
 	using ValueType = T;
+	using Size = UintForCount<_capacity>;
 
 	inline static constexpr umm capacity = _capacity;
 
@@ -2004,7 +2008,8 @@ struct StaticList {
 
 	template <umm that_capacity>
 	constexpr StaticList(StaticList<T, that_capacity> const &that) {
-		count = that.count;
+		assert(that.count <= capacity);
+		count = (Size)that.count;
 		memcpy(data, that.data, count * sizeof(T));
 	}
 
@@ -2012,7 +2017,8 @@ struct StaticList {
 	constexpr StaticList(StaticList<T, that_capacity> &&that) = delete;
 
 	constexpr StaticList(std::initializer_list<T> that) {
-		count = that.size();
+		assert(that.size() <= capacity);
+		count = (Size)that.size();
 		memcpy(data, that.begin(), count * sizeof(T));
 	}
 
@@ -2074,7 +2080,7 @@ struct StaticList {
 		memmove(data + where + span.count, data + where, (count - where) * sizeof(T));
 		memcpy(data + where, span.data, span.count * sizeof(T));
 
-		count += span.count;
+		count = (Size)(count + span.count);
 		return {data + where, span.count};
 	}
 	constexpr Span<T> insert(Span<T> span, T *where) {
@@ -2118,7 +2124,7 @@ struct StaticList {
 	forceinline constexpr Span<T> add(Span<T, Size> span) {
 		bounds_check(assert(count + span.count <= capacity));
 		memcpy(data + count, span.data, span.count * sizeof(T));
-		defer { count += span.count; };
+		defer { count = (StaticList::Size)(count + span.count); };
 		return {data + count, span.count};
 	}
 
@@ -2175,7 +2181,7 @@ struct StaticList {
 		count = 0;
 	}
 
-	umm count = 0;
+	Size count = 0;
 	union {
 		T data[capacity];
 	};

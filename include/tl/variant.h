@@ -24,7 +24,7 @@ struct Variant {
 		base = value;
 	}
 
-	auto visit(this auto &&self, auto &&fn) {
+	auto visit(this auto &&self, auto &&fn) requires requires { std::visit(fn, self.base); } {
 		defer{self.debug_check();};
 		return std::visit(fn, self.base);
 	}

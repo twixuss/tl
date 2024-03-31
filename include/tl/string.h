@@ -318,7 +318,7 @@ inline utf8 *get_prev_char(utf8 *ptr, utf8 *limit) {
 	}
 }
 
-inline umm write_utf8(utf8 **dst, u32 ch) {
+inline u8 write_utf8(utf8 **dst, u32 ch) {
 	if (ch <= 0x80) {
 		*(*dst)++ = ch;
 		return 1;
@@ -340,7 +340,7 @@ inline umm write_utf8(utf8 **dst, u32 ch) {
 	}
 }
 
-inline umm write_utf8(utf8 *dst, u32 ch) {
+inline u8 write_utf8(utf8 *dst, u32 ch) {
 	return write_utf8(&dst, ch);
 }
 
