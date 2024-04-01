@@ -435,10 +435,10 @@ struct BlockList {
 			return *this;
 		}
 
-		bool operator==(Iterator that) {
+		bool operator==(Iterator that) const {
 			return block == that.block && value_index == that.value_index;
 		}
-		bool operator!=(Iterator that) {
+		bool operator!=(Iterator that) const {
 			return !(*this == that);
 		}
 
@@ -501,7 +501,7 @@ struct BlockList {
 		}
 
 
-		auto next_capacity = max(alloc_last ? alloc_last->count * 2 : 0, 16);
+		auto next_capacity = max<umm>(alloc_last ? alloc_last->count * 2 : 0, 16);
 		auto new_block = allocate_block(next_capacity TL_LA);
 
 		if (first) {
