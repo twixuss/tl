@@ -92,32 +92,32 @@ struct Array2 {
 	inline static constexpr umm count_y = _count_y;
 	inline static constexpr umm flat_count = count_x * count_y;
 
-	constexpr T& at_unchecked(umm x, umm y) {
-		return data[y][x];
+	constexpr auto &at_unchecked(this auto &&self, umm x, umm y) {
+		return self.data[y][x];
 	}
-	constexpr T& at(umm x, umm y) {
+	constexpr auto &at(this auto &&self, umm x, umm y) {
 		bounds_check(assert_less(x, count_x));
 		bounds_check(assert_less(y, count_y));
-		return at_unchecked(x, y);
+		return self.at_unchecked(x, y);
 	}
 	template <class Scalar>
-	constexpr T& at_unchecked(v2<Scalar> v) {
-		return at_unchecked(v.x, v.y);
+	constexpr auto &at_unchecked(this auto &&self, v2<Scalar> v) {
+		return self.at_unchecked(v.x, v.y);
 	}
 	template <class Scalar>
-	constexpr T& at(v2<Scalar> v) {
-		return at(v.x, v.y);
+	constexpr auto &at(this auto &&self, v2<Scalar> v) {
+		return self.at(v.x, v.y);
 	}
-	constexpr T& operator()(umm x, umm y) {
-		return at(x,y);
+	constexpr auto &operator()(this auto &&self, umm x, umm y) {
+		return self.at(x,y);
 	}
 	template <class Scalar>
-	constexpr T& operator[](v2<Scalar> v) { return at(v); }
+	constexpr auto &operator[](this auto &&self, v2<Scalar> v) { return self.at(v); }
 
-	constexpr T *begin() { return (T *)data; }
-	constexpr T *end() { return (T *)data + flat_count; }
+	constexpr auto begin(this auto &&self) { return &self.data[0][0]; }
+	constexpr auto end(this auto &&self) { return &self.data[0][0] + flat_count; }
 
-	constexpr Span<T> span() { return {begin(), end()}; }
+	constexpr Span<T> span() const { return {begin(), end()}; }
 
 	T data[count_y][count_x];
 };

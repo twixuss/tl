@@ -426,7 +426,7 @@ inline constexpr void Swap(T &a, T &b) {
 }
 
 template <class T, umm count>
-constexpr bool index_of(T (&array)[count], T *pointer) {
+constexpr umm index_of(T (&array)[count], T *pointer) {
 	return pointer - array;
 }
 
@@ -1590,13 +1590,20 @@ constexpr bool owns(Span<T> span, T *pointer) {
 	return (umm)(pointer - span.data) < span.count;
 }
 
+template <class T, class Size>
+T sum(Span<T, Size> span) {
+	T result = 0;
+	for (auto &v : span) {
+		result += v;
+	}
+	return result;
+}
+
 template <class T, class Size, class Fn>
 umm count(Span<T, Size> span, Fn &&fn) {
 	umm result = 0;
 	for (auto &v : span) {
-		if (fn(v)) {
-			result += 1;
-		}
+		result += (bool)fn(v);
 	}
 	return result;
 }
@@ -2287,7 +2294,7 @@ struct BitSet {
 	inline static constexpr auto bits_in_word = sizeof(Word) * 8;
 	Word words[ceil(size, bits_in_word) / bits_in_word] = {};
 
-	bool get(umm i) {
+	bool get(umm i) const {
 		return word(i) & bit(i);
 	}
 	void set(umm i) {
@@ -2300,14 +2307,14 @@ struct BitSet {
 		word(i) ^= bit(i);
 	}
 
-	umm &word(umm i) {
-		return words[i / bits_in_word];
+	auto &word(this auto &&self, umm i) {
+		return self.words[i / bits_in_word];
 	}
-	umm bit(umm i) {
+	umm bit(umm i) const {
 		return (Word)1 << (i % bits_in_word);
 	}
 
-	umm count() {
+	umm count() const {
 		umm result = 0;
 		for (auto word : words) {
 			result += count_bits(word);

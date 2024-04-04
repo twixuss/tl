@@ -564,6 +564,10 @@ forceinline v2s round_to_int(v2f v) { return {round_to_int(v.x), round_to_int(v.
 forceinline v3s round_to_int(v3f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z)}; }
 forceinline v4s round_to_int(v4f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z), round_to_int(v.w)}; }
 
+forceinline v2s round_to_int(v2f v, v2s step) { return round_to_int(v / (v2f)step) * step; }
+forceinline v3s round_to_int(v3f v, v3s step) { return round_to_int(v / (v3f)step) * step; }
+forceinline v4s round_to_int(v4f v, v4s step) { return round_to_int(v / (v4f)step) * step; }
+
 template <class Int, class T>
 forceinline constexpr auto lerp_int(Int a, Int b, T t) {
 	auto r = lerp((T)a, (T)b, t);
