@@ -426,7 +426,7 @@ Window *create_window(CreateWindowInfo info) {
 		c.hbrBackground = CreateSolidBrush(RGB(10,20,30));
 		c.style = 0;
 		if (!RegisterClassExW(&c)) {
-			print("RegisterClassExW failed with error code: {}\n", last_error());
+			print("RegisterClassExW failed with error code: {}\n", win32_error());
 			return 0;
 		}
 	}
@@ -472,7 +472,7 @@ Window *create_window(CreateWindowInfo info) {
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, info.parent ? (HWND)info.parent->handle : 0, 0, GetModuleHandleW(0), 0
 	);
 	if (!window->handle) {
-		print("CreateWindowExW failed with error code: {}\n", last_error());
+		print("CreateWindowExW failed with error code: {}\n", win32_error());
 		return 0;
 	}
 

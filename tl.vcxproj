@@ -37,6 +37,7 @@
     <ClCompile Include="src\tests\list.cpp" />
     <ClCompile Include="src\tests\math.cpp" />
     <ClCompile Include="src\tests\simd.cpp" />
+    <ClCompile Include="src\tests\sorted_list.cpp" />
     <ClCompile Include="src\tests\stream.cpp" />
     <ClCompile Include="src\tests\string.cpp" />
     <ClCompile Include="src\tests\utf8.cpp" />

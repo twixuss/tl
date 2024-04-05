@@ -645,8 +645,10 @@ inline constexpr u64 rotate_left(u64 x, u64 bits) {
 
 }
 
-forceinline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros(v - 1)); }
-forceinline constexpr u64 ceil_to_power_of_2(u64 v) { return v == 0 ? 0 : (u64)1 << (u64)(64 - count_leading_zeros(v - 1)); }
+forceinline constexpr u8  ceil_to_power_of_2(u8 v)  { return v == 0 ? 0 : (u8 )1 << (u8 )(8  - count_leading_zeros((u8 )(v - 1))); }
+forceinline constexpr u16 ceil_to_power_of_2(u16 v) { return v == 0 ? 0 : (u16)1 << (u16)(16 - count_leading_zeros((u16)(v - 1))); }
+forceinline constexpr u32 ceil_to_power_of_2(u32 v) { return v == 0 ? 0 : (u32)1 << (u32)(32 - count_leading_zeros((u32)(v - 1))); }
+forceinline constexpr u64 ceil_to_power_of_2(u64 v) { return v == 0 ? 0 : (u64)1 << (u64)(64 - count_leading_zeros((u64)(v - 1))); }
 
 #define S(k, m) if (n >= (decltype(n))m) { i += k; n /= (decltype(n))m; }
 forceinline constexpr s32 log10(u8  n) { s32 i = -(n == 0); S(2,100)S(1,10)return i; }
@@ -1741,36 +1743,22 @@ umm find_index_of_if(Collection &collection, Predicate predicate) {
 }
 
 template <class T>
-T *binary_search(Span<T> span, T value) {
-	auto begin = span.begin();
-	auto end   = span.end();
-	while (1) {
-		if (begin == end)
-			return 0;
-
-		auto mid = begin + (end - begin) / 2;
-		if (value == *mid)
-			return mid;
-
-		if (value < *mid) {
-			end = mid;
-		} else {
-			begin = mid + 1;
-		}
-	}
-}
+struct BinarySearchResult {
+	T *found = 0;
+	T *would_be_at = 0;
+};
 
 template <class T, class U, class Fn>
-T *binary_search(Span<T> span, U value, Fn get_value) {
+BinarySearchResult<T> binary_search(Span<T> span, U value, Fn get_value) {
 	auto begin = span.begin();
 	auto end   = span.end();
 	while (1) {
 		if (begin == end)
-			return 0;
+			return {.would_be_at = begin};
 
 		auto mid = begin + (end - begin) / 2;
 		if (value == get_value(*mid))
-			return mid;
+			return {.found = mid, .would_be_at = mid};
 
 		if (value < get_value(*mid)) {
 			end = mid;
@@ -1778,6 +1766,11 @@ T *binary_search(Span<T> span, U value, Fn get_value) {
 			begin = mid + 1;
 		}
 	}
+}
+
+template <class T>
+BinarySearchResult<T> binary_search(Span<T> span, T value) {
+	return binary_search(span, value, [](T &value) -> T & { return value; });
 }
 
 template <class T>

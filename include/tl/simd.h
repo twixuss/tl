@@ -1,4 +1,5 @@
 #include "common.h"
+#include "vector.h"
 #include <immintrin.h>
 
 namespace tl {

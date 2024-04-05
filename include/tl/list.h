@@ -546,6 +546,13 @@ struct Queue {
 		T &operator*() { debug_check(); return queue->get(index); }
 		T *operator->() { debug_check(); return &*this; }
 
+		T &operator[](smm i) {
+			umm x = index + i;
+			bounds_check(assert_less_equal(queue->start, x));
+			bounds_check(assert_less(x, queue->start + queue->count));
+			return queue->get(x);
+		}
+
 		void debug_check() const {
 			#if TL_DEBUG_ITERATORS
 			assert_equal(queue->start, initial_start);
@@ -583,6 +590,11 @@ struct Queue {
 			--count;
 		};
 		return result;
+	}
+
+	auto operator[](this auto &&self, umm i) {
+		bounds_check(assert_less(i, self.count));
+		return self.get(self.start + i);
 	}
 
 	void clear() {

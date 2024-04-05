@@ -52,28 +52,28 @@ __declspec(noinline) void utf8_test() {
             }
         }
 
-        print("Testing get_char_and_advance_utf8 ... ");
+        print("Testing decode_and_advance(utf8) ... ");
         f64 avg = 0;
         for (int i = 0; i < 11; ++i) {
             auto timer = create_precise_timer();
-            defer { if (i) avg += get_time(timer); };
+            defer { if (i) avg += elapsed_time(timer); };
             auto s = src;
             auto d = dst;
             while (*s) {
-                *d++ = get_char_and_advance_utf8(&s).value_unchecked();
+                *d++ = decode_and_advance(&s).value_unchecked();
             }
         }
         print("{} ms\n", avg/10*1000);
 
-        print("Testing get_char_and_advance_utf8_fast ... ");
+        print("Testing decode_and_advance_fast(utf8) ... ");
         avg = 0;
         for (int i = 0; i < 11; ++i) {
             auto timer = create_precise_timer();
-            defer { if (i) avg += get_time(timer); };
+            defer { if (i) avg += elapsed_time(timer); };
             auto s = src;
             auto d = dst;
             while (*s) {
-                *d++ = get_char_and_advance_utf8_fast(&s);
+                *d++ = decode_and_advance_fast(&s);
             }
         }
         print("{} ms\n", avg/10*1000);
