@@ -659,6 +659,14 @@ forceinline constexpr v2f sqrt(v2f v) { return {sqrt(v.x), sqrt(v.y)}; }
 forceinline constexpr v3f sqrt(v3f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z)}; }
 forceinline constexpr v4f sqrt(v4f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z), sqrt(v.w)}; }
 
+// https://suraj.sh/fast-square-root-approximation
+forceinline constexpr f32 fast_sqrt(f32 n) {
+	s32 i = std::bit_cast<s32>(n);
+	i = 0x1fbd3f7d + (i >> 1);
+	f32 y = std::bit_cast<f32>(i);
+	return (y * y + n) / y * 0.5f;
+}
+
 forceinline constexpr f32 reciprocal(f32 v) { return std::is_constant_evaluated() ? (1.0f / v) : _mm_cvtss_f32(_mm_rcp_ss(_mm_set_ss(v))); }
 forceinline constexpr v2f reciprocal(v2f v) { return {reciprocal(v.x), reciprocal(v.y)}; }
 forceinline constexpr v3f reciprocal(v3f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z)}; }
@@ -1672,6 +1680,39 @@ struct sphere {
 template <class T>
 sphere<T> sphere_center_radius(T center, typename T::Scalar radius) {
 	return {center, radius};
+}
+
+// https://paulbourke.net/geometry/circlesphere/
+inline StaticList<v2f, 2> intersection(sphere<v2f> a, sphere<v2f> b) {
+	v2f d = b.center - a.center;
+	f32 dl = length_squared(d);
+
+	if (dl > pow2(a.radius + b.radius)) {
+		/* no solution. circles do not intersect. */
+		return {};
+	}
+	if (dl <= pow2(fabs(a.radius - b.radius))) {
+		/* no solution. one circle is contained in the other */
+		// This includes identical circles case
+		// TODO: maybe reflect this in return type?
+		return {};
+	}
+
+	dl = tl::sqrt(dl);
+
+	f32 c = (pow2(a.radius) - pow2(b.radius) + pow2(dl)) / (dl * 2);
+
+	v2f j = a.center + (d * c / dl);
+
+	f32 h = tl::sqrt(pow2(a.radius) - pow2(c));
+
+	v2f r = perp(d * (h / dl));
+
+	if (all(r == v2f{})) {
+		return {j};
+	} else {
+		return {j - r, j + r};
+	}
 }
 
 #if 0

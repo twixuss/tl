@@ -545,7 +545,7 @@ struct ContiguousHashMap : Traits {
 	}
 	Iterator end() { return {this, 0}; }
 
-	Value &get_or_insert(Key key TL_LP) {
+	Value &get_or_insert(Key key, Value default_value = {} TL_LP) {
 		auto hash = get_hash(key);
 		u64 index = 0;
 		if (cells.count) {
@@ -587,7 +587,7 @@ struct ContiguousHashMap : Traits {
 
 		cell.state = CellState::occupied;
 		cell.key() = key;
-		cell.value() = {};
+		cell.value() = default_value;
 		return cell.value();
 	}
 	void insert(Key const &key, Value value) {
