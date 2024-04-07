@@ -51,104 +51,134 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
         }
     }();
 
-    // NOTE:
-    // offsets are likely too big to store in temporary memory.
-    List<v2u> offsets;
-    defer { free(offsets); };
+    auto dilate_impl = [&]<class Int>() {
+        using v2i = v2<Int>;
 
-    offsets.reserve(size.x*size.y);
+        // NOTE:
+        // offsets are likely too big to store in temporary memory.
+        List<v2i> offsets;
+        defer { free(offsets); };
 
-    for (u32 iy = 0; iy < size.y; ++iy) {
-        for (u32 ix = 0; ix < size.x; ++ix) {
-            auto offset = v2u{ix,iy} - size/2;
-            if (length(offset) <= options.radius)
-                offsets.add(offset);
+        offsets.reserve(size.x*size.y);
+
+        for (smm iy = 0; iy < size.y; ++iy) {
+            for (smm ix = 0; ix < size.x; ++ix) {
+                auto offset = (v2i)(V2u(ix, iy) - size / 2);
+                if (length(offset) <= options.radius)
+                    offsets.add(offset);
+            }
         }
-    }
 
-    quick_sort(offsets, [](auto x) { return length(x); });
+        quick_sort(offsets, [](auto x) { return length(x); });
 
-    for (u32 iy = 0; iy < size.y; ++iy) {
-        for (u32 ix = 0; ix < size.x; ++ix) {
+        //umm next_time_starting_from = 0;
+        //
+        //auto update_starting_index = [&] (umm current_index, smm radius_delta) {
+        //    f32 current_radius = tl::fast_sqrt((f32)current_index) / pi;
+        //    f32 smaller_radius = floor(max(0.0f, current_radius - radius_delta));
+        //    next_time_starting_from = floor_to_int(pi * pow2(smaller_radius));
+        //};
 
-            Pixel p = source_pixels[iy*source_stride + ix];
+        for (smm iy = 0; iy < size.y; ++iy) {
+            //next_time_starting_from = 0;
+            for (smm ix = 0; ix < size.x; ++ix) {
+                Pixel p = source_pixels[iy*source_stride + ix];
 
-            if (should_be_dilated(p)) {
-                struct FactoredPixel {
-                    Pixel pixel;
-                    f32 factor;
-                };
-                scoped(temporary_storage_checkpoint);
-                List<FactoredPixel, TemporaryAllocator> closest_pixels;
-                f32 closest_pixel_distance = 0;
-                if (options.smooth) {
-                    for (auto offset : offsets) {
-                        u32 jx = ix + offset.x;
-                        u32 jy = iy + offset.y;
+                if (should_be_dilated(p)) {
+                    struct FactoredPixel {
+                        Pixel pixel;
+                        f32 factor;
+                    };
+                    scoped(temporary_storage_checkpoint);
+                    List<FactoredPixel, TemporaryAllocator> closest_pixels;
+                    f32 closest_pixel_distance = 0;
+                    if (options.smooth) {
+                        for (auto offset : offsets/*.skip(next_time_starting_from)*/) {
+                            smm jx = ix + offset.x;
+                            smm jy = iy + offset.y;
 
-                        if (jx >= (u32)size.x) continue;
-                        if (jy >= (u32)size.y) continue;
+                            if ((umm)jx >= size.x) continue;
+                            if ((umm)jy >= size.y) continue;
 
-                        auto t = source_pixels[jy*source_stride + jx];
-                        if (!should_be_dilated(t)) {
-                            f32 distance = length(offset);
+                            auto t = source_pixels[jy*source_stride + jx];
+                            if (!should_be_dilated(t)) {
+                                f32 distance = length(offset);
 
-                            f32 const max_distance = sqrt2 - 1;
+                                f32 const max_distance = sqrt2 - 1;
 
-                            if (closest_pixels.count == 0) {
-                                closest_pixel_distance = distance;
-                                closest_pixels.add({t, 1});
-                            } else {
-                                if (distance >= closest_pixel_distance + max_distance) {
-                                    break;
+                                if (closest_pixels.count == 0) {
+                                    closest_pixel_distance = distance;
+                                    closest_pixels.add({t, 1});
+                                } else {
+                                    if (distance >= closest_pixel_distance + max_distance) {
+                                        //update_starting_index(index_of(offsets, &offset), 2);
+                                        break;
+                                    }
+                                    closest_pixels.add({t, (distance - closest_pixel_distance) / max_distance});
                                 }
-                                closest_pixels.add({t, (distance - closest_pixel_distance) / max_distance});
+                            }
+                        }
+
+                        v3f color_sum = {};
+                        f32 factor_sum = {};
+                        for (auto t : closest_pixels) {
+                            color_sum += (v3f)t.pixel.xyz * t.factor;
+                            factor_sum += t.factor;
+                        }
+
+                        p.xyz = autocast (color_sum / factor_sum);
+                        if (!options.keep_alpha) {
+                            p.w = full_alpha;
+                        }
+                    } else {
+                        // TODO: optimize starting offset here aswell
+                        for (auto offset : offsets) {
+                            smm jx = ix + offset.x;
+                            smm jy = iy + offset.y;
+
+                            if ((umm)jx >= size.x) continue;
+                            if ((umm)jy >= size.y) continue;
+
+                            auto t = source_pixels[jy*source_stride + jx];
+                            if (!should_be_dilated(t)) {
+                                p.xyz = t.xyz;
+                                if (!options.keep_alpha) {
+                                    p.w = full_alpha;
+                                }
+                                break;
                             }
                         }
                     }
-
-                    v3f color_sum = {};
-                    f32 factor_sum = {};
-                    for (auto t : closest_pixels) {
-                        color_sum += (v3f)t.pixel.xyz * t.factor;
-                        factor_sum += t.factor;
-                    }
-
-                    p.xyz = autocast (color_sum / factor_sum);
+                } else {
                     if (!options.keep_alpha) {
                         p.w = full_alpha;
                     }
-                } else {
-                    for (auto offset : offsets) {
-                        u32 jx = ix + offset.x;
-                        u32 jy = iy + offset.y;
-
-                        if (jx >= (u32)size.x) continue;
-                        if (jy >= (u32)size.y) continue;
-
-                        auto t = source_pixels[jy*source_stride + jx];
-                        if (!should_be_dilated(t)) {
-                            p.xyz = t.xyz;
-                            if (!options.keep_alpha) {
-                                p.w = full_alpha;
-                            }
-                            break;
-                        }
-                    }
                 }
-            } else {
-                if (!options.keep_alpha) {
-                    p.w = full_alpha;
-                }
+
+                destination_pixels[iy*destination_stride + ix] = p;
             }
-
-            destination_pixels[iy*destination_stride + ix] = p;
         }
+    };
+
+    // NOTE: For some reason this runs EXTREMELY slow, like 5 times slower that s32.
+    //       Hotspot was at `for (auto offset : offsets)`, assembly was not that much
+    //       different from s32, just two regular moves were replaced with movxz/movsx.
+    //       Have no idea why.
+    //       
+    //if (size.x <= (1<< 7) && size.y <= (1<< 7)) {
+    //    return dilate_impl.operator()<s8>();
+    //}
+    if (size.x <= (1<<15) && size.y <= (1<<15)) {
+        return dilate_impl.operator()<s16>();
     }
+    if (size.x <= (1<<31) && size.y <= (1<<31)) {
+        return dilate_impl.operator()<s32>();
+    }
+    return dilate_impl.operator()<s64>();
 }
 
 template <class Pixel>
-inline void dilate(Pixel *pixels, v2u size, u32 stride, DilateOptions options = {}) {
+inline void dilate(Pixel *pixels, v2u size, umm stride, DilateOptions options = {}) {
     // NOTE:
     // Images are likely too big to store in temporary memory.
     auto allocator = current_allocator;
