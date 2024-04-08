@@ -1399,7 +1399,10 @@ template <class T>
 forceinline aabb<T> constrain(aabb<T> box, aabb<T> bounds) {
 	return constrain(box, bounds.min, bounds.max);
 }
-
+template <class T>
+forceinline T clamp(T a, aabb<T> b) {
+	return clamp(a, b.min, b.max);
+}
 template <class Scalar>
 forceinline bool in_bounds(Scalar a, aabb<Scalar> b) {
 	return
@@ -1435,6 +1438,11 @@ forceinline bool in_bounds(v4<Scalar> a, aabb<v4<Scalar>> b) {
 		(a.y < b.max.y) &&
 		(a.z < b.max.z) &&
 		(a.w < b.max.w);
+}
+
+template <class T>
+forceinline bool in_bounds(aabb<T> inner, aabb<T> outer) {
+	return all(outer.min <= inner.min && inner.max <= outer.max);
 }
 
 forceinline bool in_bounds_angle(f32 angle, aabb<f32> bounds) {
@@ -1481,14 +1489,6 @@ forceinline bool intersects(aabb<v4<Scalar>> a, aabb<v4<Scalar>> b) {
 		(a.max.w > b.min.w);
 }
 
-template <class T>
-forceinline aabb<T> Union(aabb<T> const &a, aabb<T> const &b) {
-	aabb<T> result;
-	result.min = max(a.min, b.min);
-	result.max = min(a.max, b.max);
-	return result;
-}
-
 template <class Scalar>
 forceinline auto volume(aabb<v2<Scalar>> const &box) {
 	auto diameter = box.max - box.min;
@@ -1520,6 +1520,24 @@ forceinline aabb<Vector> floor_ceil(aabb<Vector> rect) {
 		floor(rect.min),
 		ceil (rect.max),
 	};
+}
+
+template <class Vector>
+forceinline aabb<Vector> floor_ceil(aabb<Vector> rect, Vector step) {
+	return {
+		floor(rect.min, step),
+		ceil (rect.max, step),
+	};
+}
+
+template <class S>
+Optional<aabb<v2<S>>> merge_into_one(aabb<v2<S>> a, aabb<v2<S>> b) {
+	using Result = aabb<v2<S>>;
+	if (all(a.maxmin() == b.minmin()) && all(a.maxmax() == b.minmax())) return Result{a.minmin(), b.maxmax()};
+	if (all(a.maxmax() == b.maxmin()) && all(a.minmax() == b.minmin())) return Result{a.minmin(), b.maxmax()};
+	if (all(a.minmax() == b.maxmax()) && all(a.minmin() == b.maxmin())) return Result{b.minmin(), a.maxmax()};
+	if (all(a.minmin() == b.minmax()) && all(a.maxmin() == b.maxmax())) return Result{b.minmin(), a.maxmax()};
+	return {};
 }
 
 // Axis aligned bounding box subrtacion routines

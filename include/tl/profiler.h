@@ -188,14 +188,14 @@ public:
 			u32 max_depth = 0;
 
 			for (auto &mark : events_to_draw.marks) {
-				mark.rect.min.x = mark.time / view_scale + scroll_amount;
+				mark.rect.min.x = mark.time * view_scale + scroll_amount;
 				mark.rect.max.x = mark.rect.min.x + 1;
 				mark.rect.min.y = 0;
 				mark.rect.max.y = button_height * 1;
 			}
 			for (auto &event : events_to_draw.events) {
-				event.rect.min.x = event.begin / view_scale + scroll_amount;
-				event.rect.max.x = max<f64>(event.end / view_scale + scroll_amount, event.rect.min.x + 1);
+				event.rect.min.x = event.begin * view_scale + scroll_amount;
+				event.rect.max.x = max<f64>(event.end * view_scale + scroll_amount, event.rect.min.x + 1);
 				event.rect.min.y = button_height * (event.depth + 0);
 				event.rect.max.y = button_height * (event.depth + 1);
 
