@@ -2,6 +2,10 @@
 #include "string.h"
 #include "hash_map.h"
 
+#ifndef TL_FLY_STRING_ALLOCATOR
+#define TL_FLY_STRING_ALLOCATOR DefaultAllocator
+#endif
+
 namespace tl {
 
 struct FlyString {
@@ -51,14 +55,14 @@ struct FlyString {
 
     utf8 const *data = 0;
 
-    static HashMap<Span<utf8>, umm> storage;
+    static HashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> storage;
     static void init() {
         construct(storage);
     }
 };
 
 #ifdef TL_IMPL
-HashMap<Span<utf8>, umm> FlyString::storage;
+HashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> FlyString::storage;
 #endif
 
 inline umm append(StringBuilder &builder, FlyString str) {

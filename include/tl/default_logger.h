@@ -52,7 +52,10 @@ struct TL_API DefaultLogger : LoggerBase {
 File DefaultLogger::shared_file;
 
 void DefaultLogger::global_init(Span<utf8> shared_file_path) {
-	shared_file = open_file(shared_file_path, {.write = true});
+	auto file = open_file(shared_file_path, {.write = true});
+	if (is_valid(file)) {
+		shared_file = file;
+	}
 }
 
 OsLock stdout_mutex = {};
