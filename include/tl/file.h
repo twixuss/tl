@@ -362,6 +362,10 @@ inline ParsedPath parse_path(Span<utf8> path) {
 		}
 	}
 
+	if (!result.directory.data) {
+		result.directory.data = result.name.data;
+	}
+
 	return result;
 }
 
