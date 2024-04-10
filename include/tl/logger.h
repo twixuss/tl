@@ -6,6 +6,7 @@
 namespace tl {
 
 #define TL_ENUMERATE_LOGGER_SEVERITIES \
+x(debug) \
 x(info) \
 x(warning) \
 x(error) \
@@ -20,10 +21,12 @@ struct LoggerBase {
 	inline void log(this auto &&self, LogSeverity severity, char const *format, auto ...args) {
 		self.impl(severity, with(temporary_allocator, tl::format(as_utf8(as_span(format)), args...)));
 	}
+	inline void debug  (this auto &&self, char const *format, auto ...args) { self.log(LogSeverity::debug,   format, args...); }
 	inline void info   (this auto &&self, char const *format, auto ...args) { self.log(LogSeverity::info,    format, args...); }
 	inline void warning(this auto &&self, char const *format, auto ...args) { self.log(LogSeverity::warning, format, args...); }
 	inline void error  (this auto &&self, char const *format, auto ...args) { self.log(LogSeverity::error,   format, args...); }
 
+	inline void debug  (this auto &&self, auto &&arg) { self.impl(LogSeverity::debug,   with(temporary_allocator, to_string(arg))); }
 	inline void info   (this auto &&self, auto &&arg) { self.impl(LogSeverity::info,    with(temporary_allocator, to_string(arg))); }
 	inline void warning(this auto &&self, auto &&arg) { self.impl(LogSeverity::warning, with(temporary_allocator, to_string(arg))); }
 	inline void error  (this auto &&self, auto &&arg) { self.impl(LogSeverity::error,   with(temporary_allocator, to_string(arg))); }
@@ -57,6 +60,7 @@ namespace global_log {
 inline void log(LogSeverity severity, char const *format, auto ...args) {
 	current_logger.log(severity, format, args...);
 }
+inline void log_debug  (char const *format, auto ...args) { current_logger.debug  (format, args...); }
 inline void log_info   (char const *format, auto ...args) { current_logger.info   (format, args...); }
 inline void log_warning(char const *format, auto ...args) { current_logger.warning(format, args...); }
 inline void log_error  (char const *format, auto ...args) { current_logger.error  (format, args...); }

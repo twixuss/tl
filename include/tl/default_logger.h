@@ -11,7 +11,7 @@ struct TL_API DefaultLogger : LoggerBase {
 
 	Span<utf8> module = {};
 	File file = shared_file;
-	LogSeverity min_severity = TL_DEBUG ? LogSeverity::info : LogSeverity::warning;
+	LogSeverity min_severity = TL_DEBUG ? LogSeverity::debug : LogSeverity::info;
 
 	void impl(LogSeverity severity, Span<utf8> message) {
 		if ((int)severity < (int)min_severity)
@@ -21,6 +21,7 @@ struct TL_API DefaultLogger : LoggerBase {
 
 		auto color = [&] {
 			switch (severity) {
+				case LogSeverity::debug:   return ConsoleColor::cyan;
 				case LogSeverity::info:    return ConsoleColor::dark_gray;
 				case LogSeverity::warning: return ConsoleColor::yellow;
 				case LogSeverity::error:   return ConsoleColor::red;

@@ -1,18 +1,25 @@
 #pragma once
 #include "string.h"
 #include "hash_map.h"
+#include "thread.h"
 
-#ifndef TL_FLY_STRING_ALLOCATOR
-#define TL_FLY_STRING_ALLOCATOR DefaultAllocator
+#ifndef TL_PROTECTED_FLY_STRING_ALLOCATOR
+#define TL_PROTECTED_FLY_STRING_ALLOCATOR DefaultAllocator
+#endif
+
+#ifndef TL_PROTECTED_FLY_STRING_LOCK
+#define TL_PROTECTED_FLY_STRING_LOCK OsLock
 #endif
 
 namespace tl {
 
-struct FlyString {
-    inline FlyString() = default;
+struct ProtectedFlyString {
+    inline ProtectedFlyString() = default;
 
     template <class Size>
-    inline FlyString(Span<utf8, Size> span) {
+    inline ProtectedFlyString(Span<utf8, Size> span) {
+        scoped(lock);
+
         auto found = storage.find(span);
         if (found) {
             found->value += 1;
@@ -26,7 +33,7 @@ struct FlyString {
         }
     }
 
-    inline bool operator==(FlyString that) const {
+    inline bool operator==(ProtectedFlyString that) const {
         return data == that.data;
     }
     inline bool operator==(char const *that) const {
@@ -55,23 +62,26 @@ struct FlyString {
 
     utf8 const *data = 0;
 
-    static ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> storage;
+    static ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_PROTECTED_FLY_STRING_ALLOCATOR> storage;
+    static TL_PROTECTED_FLY_STRING_LOCK lock;
+
     static void init() {
         construct(storage);
     }
 };
 
 #ifdef TL_IMPL
-ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> FlyString::storage;
+ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_PROTECTED_FLY_STRING_ALLOCATOR> ProtectedFlyString::storage;
+TL_PROTECTED_FLY_STRING_LOCK ProtectedFlyString::lock;
 #endif
 
-inline umm append(StringBuilder &builder, FlyString str) {
+inline umm append(StringBuilder &builder, ProtectedFlyString str) {
     return append(builder, as_span(str.data));
 }
 
 }
 
 template <>
-inline tl::u64 get_hash(tl::FlyString const &str) {
+inline tl::u64 get_hash(tl::ProtectedFlyString const &str) {
 	return get_hash(str.span());
 }
