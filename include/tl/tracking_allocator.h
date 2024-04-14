@@ -50,7 +50,7 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 	};
 
 	Allocator underlying_allocator;
-	LockProtected<Shared, SpinLock> shared;
+	LockProtected<Shared, RecursiveSpinLock> shared;
 
 	AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
 		auto result = underlying_allocator.allocate_impl(size, alignment, location);
@@ -80,7 +80,7 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 			counts.total_size   += new_size;
 
 			auto &new_meta = shared.allocation_metas.get_or_insert(result.data);
-			new_meta.this_size = new_size;
+			new_meta.this_size = new_size; 
 			new_meta.counts = &counts;
 		});
 		return result;

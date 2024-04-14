@@ -136,8 +136,6 @@ Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 	v4u8 *result_cursor = result.pixels;
 	v4u8 *end_of_result = result.pixels + (result.size.x * result.size.y);
 
-	current_logger.info("Loading qoi {}x{}", result.size.x, result.size.y);
-
 	while (result_cursor != end_of_result) {
 		read(u8, op);
 		switch (op) {

@@ -16,7 +16,7 @@
 #define timed_end(profiler)
 #define timed_block(profiler, name)
 #define timed_function(profiler)
-#define timed_x(profiler, expression)
+#define timed_x(profiler, expression) expression
 #endif
 
 #include "common.h"
@@ -362,7 +362,7 @@ List<u8> Profiler::output_for_timed() {
 	s64 const nanoseconds_in_second = 1'000'000'000;
 
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	defer { tl::free(builder); };
 	append_bytes(builder, (u32)recorded_time_spans.count);
 	for (auto span : recorded_time_spans) {
 		append_bytes(builder, (s64)(divide(multiply(span.begin - start_time, nanoseconds_in_second), performance_frequency)));

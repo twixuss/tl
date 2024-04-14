@@ -2857,11 +2857,13 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 		return arena.deallocate_impl(data, size, alignment TL_LA);
 	}
 
+	static AllocationResult func(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+		return ((TemporaryAllocator *)state)->execute(action, data, old_size, new_size, align TL_LA);
+	}
+
 	forceinline operator Allocator() {
 		return {
-			.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
-				return ((TemporaryAllocator *)state)->execute(action, data, old_size, new_size, align TL_LA);
-			},
+			.func = func,
 			.state = this
 		};
 	}

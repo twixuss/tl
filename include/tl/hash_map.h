@@ -528,11 +528,36 @@ struct ContiguousHashMap : Traits {
 		auto *operator->() { return &cell->key_value; }
 	};
 
+	struct IteratorConst {
+		const ContiguousHashMap *map = 0;
+		const Cell *cell = 0;
+
+		Iterator &operator++() {
+			do {
+				++cell; 
+				if (cell == map->cells.end()) {
+					cell = 0;
+					return *this;
+				}
+			} while (cell->state != CellState::occupied);
+			return *this;
+		}
+		Iterator operator++(int) {
+			Iterator copy = *this;
+			++*this;
+			return copy;
+		}
+		bool operator==(Iterator const &that) { return cell == that.cell; }
+		bool operator!=(Iterator const &that) { return cell != that.cell; }
+		auto &operator*() { return cell->key_value; }
+		auto *operator->() { return &cell->key_value; }
+	};
+
 	Span<Cell> cells;
 	umm count = 0;
 
 	[[no_unique_address]] Allocator allocator = Allocator::current();
-
+	
 	Iterator begin() { 
 		if (cells.count == 0)
 			return {this, 0};
@@ -543,7 +568,18 @@ struct ContiguousHashMap : Traits {
 
 		return it;
 	}
+	IteratorConst begin() const { 
+		if (cells.count == 0)
+			return {this, 0};
+
+		IteratorConst it = {this, cells.begin()};
+		if (cells[0].state != CellState::occupied)
+			++it;
+
+		return it;
+	}
 	Iterator end() { return {this, 0}; }
+	IteratorConst end() const { return {this, 0}; }
 
 	Value &get_or_insert(Key key, Value default_value = {} TL_LP) {
 		auto hash = get_hash(key);
@@ -757,6 +793,15 @@ auto to_list(Map map TL_LP) {
 	result.reserve(map.count TL_LA);
 	for_each(map, [&](auto &kv) { result.add(kv); });
 	return result;
+}
+
+template <class Key, class Value, class DstAllocator, class DstSize, class Traits, class SrcAllocator>
+void set(List<KeyValue<Key, Value>, DstAllocator, DstSize> &list, ContiguousHashMap<Key, Value, Traits, SrcAllocator> const &map) {
+	list.clear();
+	list.reserve(map.count);
+	for_each(map, [&](KeyValue<Key, Value> const &kv) {
+		list.data[list.count++] = kv;
+	});
 }
 
 #ifndef TL_DEFAULT_HASH_MAP

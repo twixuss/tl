@@ -23,6 +23,7 @@
     <ClCompile Include="src\tests\array.cpp" />
     <ClCompile Include="src\tests\simd.cpp" />
     <ClCompile Include="src\tests\sorted_list.cpp" />
+    <ClCompile Include="src\tests\thread_pool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />

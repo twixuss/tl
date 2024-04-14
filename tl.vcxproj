@@ -40,6 +40,7 @@
     <ClCompile Include="src\tests\sorted_list.cpp" />
     <ClCompile Include="src\tests\stream.cpp" />
     <ClCompile Include="src\tests\string.cpp" />
+    <ClCompile Include="src\tests\thread_pool.cpp" />
     <ClCompile Include="src\tests\utf8.cpp" />
   </ItemGroup>
   <ItemGroup>
