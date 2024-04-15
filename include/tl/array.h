@@ -6,7 +6,7 @@ namespace tl {
 
 template <class T, umm count_>
 struct Array {
-	using ValueType = T;
+	using ElementType = T;
 
 	inline static constexpr umm count = count_;
 
@@ -86,7 +86,7 @@ constexpr bool for_each(Array<T, count> &array, auto &&fn) {
 
 template <class T, umm _count_x, umm _count_y>
 struct Array2 {
-	using ValueType = T;
+	using ElementType = T;
 
 	inline static constexpr umm count_x = _count_x;
 	inline static constexpr umm count_y = _count_y;
@@ -140,7 +140,7 @@ constexpr bool owns(Array2<T, count_x, count_y> &array, T *pointer) {
 
 template <class T, umm _count_x, umm _count_y, umm _count_z>
 struct Array3 {
-	using ValueType = T;
+	using ElementType = T;
 
 	inline static constexpr umm count_x = _count_x;
 	inline static constexpr umm count_y = _count_y;

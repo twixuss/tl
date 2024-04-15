@@ -22,10 +22,17 @@ inline constexpr utf8 path_separator = u'\\';
 
 #endif
 
+template <class T>
+concept APathChar = OneOf<T, char, wchar, utf8, utf16, utf32>;
+
+template <class T>
+concept APathSpan = OneOf<T, Span<char>, Span<wchar>, Span<utf8>, Span<utf16>, Span<utf32>>;
+
 struct OpenFileParams {
-	bool read   : 1 = false;
-	bool write  : 1 = false;
-	bool silent : 1 = false;
+	bool read = false;
+	bool write = false;
+	bool silent = false;
+	bool create_directories = true;
 };
 
 enum FileCursorOrigin {
@@ -123,37 +130,22 @@ inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams param
 	return read_entire_file(file, params TL_LA);
 }
 
+struct WriteEntireFileOptions {
+	bool create_directories = true;
+};
 
 inline bool write_entire_file(File file, Span<u8> span) {
 	set_cursor(file, 0, File_begin);
 	defer { truncate_to_cursor(file); };
 	return write(file, span) != 0;
 }
-inline bool write_entire_file(pathchar const *path, Span<u8> span) {
-	File file = open_file(path, {.write = true});
+template <APathChar Char>
+inline bool write_entire_file(Span<Char> path, Span<u8> span, WriteEntireFileOptions options = {}) {
+	File file = open_file(path, {.write = true, .create_directories = options.create_directories});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
 	return write(file, span) != 0;
 }
-inline bool write_entire_file(Span<ascii> path, Span<u8> span) {
-	File file = open_file(path, {.write = true});
-	if (!is_valid(file)) return false;
-	defer { close(file); };
-	return write(file, span) != 0;
-}
-inline bool write_entire_file(Span<utf8> path, Span<u8> span) {
-	File file = open_file(path, {.write = true});
-	if (!is_valid(file)) return false;
-	defer { close(file); };
-	return write(file, span) != 0;
-}
-inline bool write_entire_file(Span<utf16> path, Span<u8> span) {
-	File file = open_file(path, {.write = true});
-	if (!is_valid(file)) return false;
-	defer { close(file); };
-	return write(file, span) != 0;
-}
-
 
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
 TL_API Optional<u64> get_file_write_time(File file);
@@ -542,6 +534,9 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 }
 File open_file(ascii const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
+	if (params.create_directories) {
+		create_directories(parse_path(as_utf8(as_span(path))).directory);
+	}
 	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
@@ -553,6 +548,10 @@ File open_file(ascii const *path, OpenFileParams params) {
 }
 File open_file(pathchar const *path, OpenFileParams params) {
 	auto win_params = get_open_file_params(params);
+	if (params.create_directories) {
+		scoped(temporary_storage_checkpoint);
+		create_directories(parse_path(to_utf8<TemporaryAllocator>(as_span((utf16 const *)path))).directory);
+	}
 	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {

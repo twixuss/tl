@@ -8,7 +8,7 @@ namespace tl {
 
 template <class T, umm _values_per_block, class Allocator = Allocator>
 struct StaticMaskedBlockList {
-	using ValueType = T;
+	using Element = T;
 
 	static constexpr umm values_per_block = _values_per_block;
 
@@ -275,7 +275,7 @@ struct StaticMaskedBlockList {
 		}
 	}
 
-	Optional<umm> index_of(ValueType const *value) const {
+	Optional<umm> index_of(T const *value) const {
 		auto block = &first;
 		while (block) {
 			if (block->values <= value && value < block->values + values_per_block) {

@@ -6,7 +6,7 @@ namespace tl {
 
 template <class T>
 struct LinkedList {
-	using ValueType = T;
+	using Element = T;
 
 	struct Node {
 		T value;

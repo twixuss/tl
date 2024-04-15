@@ -944,21 +944,26 @@ constexpr void for_each(Fn &&fn, Ts ...ts) {
 */
 
 template <class Container>
-struct ValueTypeOfT {
-	using Type = typename Container::ValueType;
+struct ElementOfT {
+	using Type = typename Container::Element;
 };
 
 template <class T, umm count>
-struct ValueTypeOfT<T[count]> {
+struct ElementOfT<T[count]> {
 	using Type = T;
 };
 
 template <class T>
-using ValueTypeOf = ValueTypeOfT<std::remove_cvref_t<T>>::Type;
+struct ElementOfT<T *> {
+	using Type = T;
+};
+
+template <class T>
+using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class Container, class Predicate>
 constexpr auto find_if(Container &container, Predicate &&predicate) {
-	ValueTypeOf<Container> *result = 0;
+	ElementOf<Container> *result = 0;
 	for_each(container, [&] (auto &it) {
 		if (predicate(it)) {
 			result = &it;
@@ -1058,7 +1063,7 @@ auto reversed(T x) {
 
 template <class Iterator>
 struct ReverseIterator {
-	using ValueType = decltype(*Iterator{});
+	using Element = decltype(*Iterator{});
 
 	Iterator it;
 	ReverseIterator(Iterator it) : it(it) {}
@@ -1066,7 +1071,7 @@ struct ReverseIterator {
 	ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
 	bool operator==(ReverseIterator that) const { return it == that.it; }
 	bool operator!=(ReverseIterator that) const { return it != that.it; }
-	ValueType &operator*() { return *it; }
+	Element &operator*() { return *it; }
 	Iterator operator->() { return it; }
 };
 
@@ -1251,59 +1256,59 @@ struct SampleParams {
 #pragma pack(push, 1)
 template <class T, class Size_ = umm>
 struct Span {
-	using ValueType = T;
+	using Element = T;
 	using Size = Size_;
 	using ReverseIterator = ReverseIterator<T *>;
 
-	constexpr Span(std::initializer_list<ValueType> list) : data((ValueType *)list.begin()), count(list.size()) {}
+	constexpr Span(std::initializer_list<Element> list) : data((Element *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
-	// constexpr Span(ValueType &value) : data(std::addressof(value)), count(1) {}
+	// constexpr Span(Element &value) : data(std::addressof(value)), count(1) {}
 	template <Size count>
-	constexpr Span(ValueType (&array)[count]) : data(array), count(count) {}
-	constexpr Span(ValueType *begin, ValueType *end) : data(begin), count(end - begin) {
+	constexpr Span(Element (&array)[count]) : data(array), count(count) {}
+	constexpr Span(Element *begin, Element *end) : data(begin), count(end - begin) {
 		assert_equal(count, (umm)(end - begin));
 	}
-	constexpr Span(ValueType const *begin, ValueType const *end) : data((ValueType *)begin), count(end - begin) {}
-	constexpr Span(ValueType *begin, Size count) : data(begin), count(count) {}
-	constexpr Span(ValueType const *begin, Size count) : data((ValueType *)begin), count(count) {}
-	constexpr ValueType *begin() const { return data; }
-	constexpr ValueType *end() const { return data + count; }
+	constexpr Span(Element const *begin, Element const *end) : data((Element *)begin), count(end - begin) {}
+	constexpr Span(Element *begin, Size count) : data(begin), count(count) {}
+	constexpr Span(Element const *begin, Size count) : data((Element *)begin), count(count) {}
+	constexpr Element *begin() const { return data; }
+	constexpr Element *end() const { return data + count; }
 
 	constexpr ReverseIterator rbegin() const { return data + count - 1; }
 	constexpr ReverseIterator rend() const { return data - 1; }
 
-	constexpr ValueType &front() const {
+	constexpr Element &front() const {
 		bounds_check(assert(count));
 		return *data;
 	}
-	constexpr ValueType &back() const {
+	constexpr Element &back() const {
 		bounds_check(assert(count));
 		return data[count - 1];
 	}
-	constexpr ValueType &operator[](Size i) const {
+	constexpr Element &operator[](Size i) const {
 		bounds_check(assert_less(i, count));
 		return data[i];
 	}
-	constexpr ValueType &at(Size i) const {
+	constexpr Element &at(Size i) const {
 		bounds_check(assert_less(i, count));
 		return data[i];
 	}
 
 	[[deprecated("use `sample` instead")]]
-	constexpr ValueType at_interpolated(f64 i) const {
+	constexpr Element at_interpolated(f64 i) const {
 		auto a = at(floor_to_int(i));
 		auto b = at(ceil_to_int(i));
 		return lerp(a, b, frac(i));
 	}
 
 	[[deprecated("use `sample` instead")]]
-	constexpr ValueType at_interpolated_clamped(f64 i) const {
+	constexpr Element at_interpolated_clamped(f64 i) const {
 		auto a = at(max((Size)0, (Size)floor_to_int(i)));
 		auto b = at(min(count - 1, (Size)ceil_to_int(i)));
 		return lerp(a, b, frac(i));
 	}
 
-	constexpr ValueType sample(std::floating_point auto i, SampleParams params) const {
+	constexpr Element sample(std::floating_point auto i, SampleParams params) const {
 		using I = decltype(i);
 		if (params.normalized) {
 			if (params.overflow == Overflow::clamp) {
@@ -1428,7 +1433,7 @@ struct Span {
 		return that;
 	}
 
-	ValueType *data = 0;
+	Element *data = 0;
 	Size count = 0;
 };
 #pragma pack(pop)
@@ -1545,13 +1550,13 @@ inline constexpr Span<T, Size> as_span_of(Span<u8, Size> span) {
 	};
 }
 
-template <class T, class Size>
-constexpr Span<utf8, Size> as_utf8(Span<T, Size> span) {
-	return {(utf8 *)span.begin(), span.count * sizeof(T)};
+template <class Size>
+constexpr Span<utf8, Size> as_utf8(Span<char, Size> span) {
+	return {(utf8 *)span.begin(), span.count};
 }
-template <class T>
-constexpr Span<utf8> as_utf8(T span_like) {
-	return as_utf8(as_span(span_like));
+template <class Size>
+constexpr Span<utf8, Size> as_utf8(Span<u8, Size> span) {
+	return {(utf8 *)span.begin(), span.count};
 }
 
 
@@ -1733,7 +1738,7 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 }
 
 template <class Collection>
-umm find_index_of(Collection &collection, const ValueTypeOf<Collection> &value) {
+umm find_index_of(Collection &collection, const ElementOf<Collection> &value) {
 	return index_of(collection, find(collection, value));
 }
 
@@ -1999,7 +2004,7 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 
 template <class T, umm _capacity>
 struct StaticList {
-	using ValueType = T;
+	using Element = T;
 	using Size = UintForCount<_capacity>;
 
 	inline static constexpr umm capacity = _capacity;
@@ -2407,7 +2412,7 @@ T *find_next(Collection collection, T value) {
 }
 
 template <class Collection>
-auto erase(Collection &collection, typename Collection::ValueType *value) {
+auto erase(Collection &collection, typename Collection::Element *value) {
 	return collection.erase(value);
 }
 

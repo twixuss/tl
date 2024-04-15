@@ -368,8 +368,9 @@ inline Span<utf8> to_utf8(Span<ascii> span) {
 	return Span((utf8 *)span.data, span.count);
 }
 
-inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
-	List<utf16> result;
+template <class Allocator = Allocator>
+inline List<utf16, Allocator> to_utf16(Span<ascii> span, bool terminate = false) {
+	List<utf16, Allocator> result;
 	result.reserve(span.count);
 	for (auto ch : span) {
 		result.add((utf16)ch);
@@ -380,8 +381,56 @@ inline List<utf16> to_utf16(Span<ascii> span, bool terminate = false) {
 	return result;
 }
 
-TL_API List<utf8> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP);
-TL_API List<utf16> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP);
+TL_API umm _utf8_size(Span<utf16> src);
+TL_API void _to_utf8(Span<utf16> src, Span<utf8> dst);
+
+TL_API umm _utf16_size(Span<utf8> src);
+TL_API void _to_utf16(Span<utf8> src, Span<utf16> dst);
+
+template <class Allocator = Allocator>
+List<utf8, Allocator> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP) {
+	List<utf8, Allocator> result;
+
+	if (utf16.count > max_value<int>)
+		return {};
+
+	auto bytes_required = _utf8_size(utf16);
+	if (!bytes_required)
+		return {};
+
+	result.reserve(bytes_required + terminate TL_LA);
+	result.count = bytes_required + terminate;
+
+	_to_utf8(utf16, result);
+
+	if (terminate)
+		result.back() = 0;
+
+	return result;
+}
+
+template <class Allocator = Allocator>
+List<utf16, Allocator> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP) {
+	List<utf16, Allocator> result;
+
+	if (utf8.count > max_value<int>)
+		return {};
+
+	auto chars_required = _utf16_size(utf8);
+	if (!chars_required)
+		return {};
+
+	result.reserve(chars_required + terminate TL_LA);
+	result.count = chars_required + terminate;
+
+	_to_utf16(utf8, result);
+
+	if (terminate) {
+		result.back() = {};
+	}
+
+	return result;
+}
 
 #ifndef TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY
 #define TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY 0x1000
@@ -1308,51 +1357,18 @@ thread_local u32 default_float_format_precision = 3;
 thread_local FloatFormat default_float_format_format = FloatFormat_default;
 thread_local bool default_float_format_trailing_zeros = false;
 
-List<utf8> to_utf8(Span<utf16> utf16, bool terminate TL_LPD) {
-	List<utf8> result;
-
-	if (utf16.count > max_value<int>)
-		return {};
-
-	auto bytes_required = (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, 0, 0, 0, 0);
-	if (!bytes_required)
-		return {};
-
-	result.reserve(bytes_required + terminate TL_LA);
-	result.count = bytes_required + terminate;
-
-	if (WideCharToMultiByte(CP_UTF8, 0, (wchar *)utf16.data, (int)utf16.count, (char *)result.data, (int)bytes_required, 0, 0) != (int)bytes_required) {
-		return {};
-	}
-
-	if (terminate)
-		result.back() = 0;
-
-	return result;
+umm _utf8_size(Span<utf16> src) {
+	return (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar *)src.data, (int)src.count, 0, 0, 0, 0);
+}
+void _to_utf8(Span<utf16> src, Span<utf8> dst) {
+	WideCharToMultiByte(CP_UTF8, 0, (wchar *)src.data, (int)src.count, (char *)dst.data, (int)dst.count, 0, 0);
 }
 
-List<utf16> to_utf16(Span<utf8> utf8, bool terminate TL_LPD) {
-	List<utf16> result;
-
-	if (utf8.count > max_value<int>)
-		return {};
-
-	auto chars_required = (umm)MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, 0, 0);
-	if (!chars_required)
-		return {};
-
-	result.reserve(chars_required + terminate TL_LA);
-	result.count = chars_required + terminate;
-
-	if (MultiByteToWideChar(CP_UTF8, 0, (char *)utf8.data, (int)utf8.count, (wchar *)result.data, (int)chars_required) != (int)chars_required) {
-		return {};
-	}
-
-	if (terminate) {
-		result.back() = {};
-	}
-
-	return result;
+umm _utf16_size(Span<utf8> src) {
+	return (umm)MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, 0, 0);
+}
+void _to_utf16(Span<utf8> src, Span<utf16> dst) {
+	MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, (wchar *)dst.data, (int)dst.count);
 }
 
 #endif

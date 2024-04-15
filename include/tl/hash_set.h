@@ -83,7 +83,7 @@ struct StaticHashSet {
 
 template <class Value, class Traits = DefaultHashTraits<Value>>
 struct HashSet {
-	using ValueType = Value;
+	using Element = Value;
 
 	using Bucket = LinkedList<Value>;
 

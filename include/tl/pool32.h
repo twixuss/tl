@@ -14,7 +14,7 @@ struct Pool32 : AllocatorBase<Pool32<Tag>> {
 	template <class T>
 	struct Ptr {
 		using Pool = Pool32;
-		using ValueType = T;
+		using Element = T;
 
 		u32 offset = 0;
 

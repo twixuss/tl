@@ -155,7 +155,7 @@ struct BucketHashMap : Traits {
 	using Key = Key_;
 	using Value = Value_;
 	using KeyValue = KeyValue<Key, Value>;
-	using ValueType = KeyValue;
+	using Element = KeyValue;
 
 	struct HashKeyValue {
 		u64 hash;
@@ -493,7 +493,7 @@ struct ContiguousHashMap : Traits {
 
 	using CellState = ContiguousHashMapCellState;
 	using KeyValue = KeyValue<Key, Value>;
-	using ValueType = KeyValue;
+	using Element = KeyValue;
 
 	// TODO: SOA, store hash
 	struct Cell {

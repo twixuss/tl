@@ -15,10 +15,10 @@ namespace tl {
 // stored in 'buffer'.
 // In writing mode 'data' represents an index into the 'buffer' where the element starts.
 //
-template <class T>
-struct ListOfLists : List<Span<T>> {
-	using Base = List<Span<T>>;
-	List<T> buffer;
+template <class T, class Allocator = Allocator, class Size = umm>
+struct ListOfLists : List<Span<T>, Allocator, Size> {
+	using Base = List<Span<T>, Allocator, Size>;
+	List<T, Allocator, Size> buffer;
 #if TL_DEBUG
 	bool is_reading = false;
 #endif
@@ -38,6 +38,7 @@ struct ListOfLists : List<Span<T>> {
 
 	void enable_reading() {
 #if TL_DEBUG
+		assert(!is_reading);
 		is_reading = true;
 #endif
 		for (auto &string : *this) {
@@ -46,6 +47,7 @@ struct ListOfLists : List<Span<T>> {
 	}
 	void enable_writing() {
 #if TL_DEBUG
+		assert(is_reading);
 		is_reading = false;
 #endif
 		for (auto &string : *this) {
@@ -60,8 +62,8 @@ struct ListOfLists : List<Span<T>> {
 	Base &base() { return *this; }
 };
 
-template <class T>
-void free(ListOfLists<T> &list) {
+template <class T, class Allocator, class Size>
+void free(ListOfLists<T, Allocator, Size> &list) {
 	free(list.base());
 	free(list.buffer);
 #if TL_DEBUG
