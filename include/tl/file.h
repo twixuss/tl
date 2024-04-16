@@ -32,7 +32,7 @@ struct OpenFileParams {
 	bool read = false;
 	bool write = false;
 	bool silent = false;
-	bool create_directories = true;
+	bool create_directories = write;
 };
 
 enum FileCursorOrigin {

@@ -2485,7 +2485,9 @@ extern TL_API Allocator os_allocator;
 extern TL_API Allocator page_allocator;
 extern TL_API Allocator default_allocator;
 
+#ifndef TL_USE_CONTEXT
 extern TL_API thread_local Allocator current_allocator;
+#endif
 
 struct AllocationResult {
 	void *data = 0;
@@ -2844,6 +2846,40 @@ public:
 #endif
 
 struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
+	#ifdef TL_USE_CONTEXT
+	ArenaAllocator arena;
+
+	forceinline void init() {
+		arena = ArenaAllocator::create(TL_TEMPORARY_STORAGE_CAPACITY);
+	}
+
+	forceinline static TemporaryAllocator current() { return Context::current->temporary_allocator(); }
+
+	forceinline AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
+		return arena.allocate_impl(size, alignment TL_LA);
+	}
+	forceinline AllocationResult reallocate_impl(void *old_data, umm old_size, umm new_size, umm alignment TL_LP) {
+		return arena.reallocate_impl(old_data, old_size, new_size, alignment TL_LA);
+	}
+	forceinline void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
+		return arena.deallocate_impl(data, size, alignment TL_LA);
+	}
+
+	static AllocationResult func(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+		return ((TemporaryAllocator *)state)->execute(action, data, old_size, new_size, align TL_LA);
+	}
+
+	forceinline operator Allocator() {
+		return {
+			.func = func,
+			.state = this
+		};
+	}
+
+	forceinline void clear() {
+		arena.clear();
+	}
+	#else
 	inline static thread_local ArenaAllocator arena;
 
 	forceinline static void init() {
@@ -2876,9 +2912,12 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 	forceinline static void clear() {
 		arena.clear();
 	}
+	#endif
 };
 
+#ifndef TL_USE_CONTEXT
 extern TL_API thread_local TemporaryAllocator temporary_allocator;
+#endif
 
 inline struct TemporaryStorageCheckpoint {} temporary_storage_checkpoint;
 inline struct TemporaryAllocatorAndCheckpoint {} temporary_allocator_and_checkpoint;

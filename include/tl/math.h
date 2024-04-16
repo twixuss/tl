@@ -1783,6 +1783,7 @@ template <class Vector>
 struct RaycastHit {
 	bool hit = false;
 	Vector position = {};
+	Vector position2 = {};
 	Vector normal = {};
 	f32 distance = {};
 	operator bool() {
@@ -1905,6 +1906,7 @@ inline RaycastHit<v2f> raycast(ray<v2f> ray, aabb<v2f> box, bool from_inside=fal
 	RaycastHit<v2f> hit = {};
 	hit.hit = true;
 	hit.position = ray.origin + ray.direction * tmin;
+	hit.position2 = ray.origin + ray.direction * tmax;
 	hit.distance = tmin;
 
 	       if (tmin == t1.x)   hit.normal = {-1, 0};
