@@ -1,23 +1,29 @@
 #pragma once
 #include "logger.h"
 #include "file.h"
+/*
+#define TL_DEFAULT_LOGGER_MAIN_CONTEXT_MEMBERS \
+	x(tl::File, default_logger_file) \
+	x(tl::OsLock, stdout_mutex) \
+*/
 
 namespace tl {
 
+#ifndef TL_USE_CONTEXT
 extern TL_API OsLock stdout_mutex;
+extern TL_API File default_logger_file;
+#endif
 
 struct TL_API DefaultLogger : LoggerBase {
-	static File shared_file;
-
 	Span<utf8> module = {};
-	File file = shared_file;
+	File file = TL_GET_GLOBAL(default_logger_file);
 	LogSeverity min_severity = TL_DEBUG ? LogSeverity::debug : LogSeverity::info;
 
 	void impl(LogSeverity severity, Span<utf8> message) {
 		if ((int)severity < (int)min_severity)
 			return;
 
-		scoped(temporary_allocator);
+		scoped(TL_GET_CURRENT(temporary_allocator));
 
 		auto color = [&] {
 			switch (severity) {
@@ -29,7 +35,7 @@ struct TL_API DefaultLogger : LoggerBase {
 			return ConsoleColor::red;
 		}();
 
-		withs(stdout_mutex) {
+		withs(TL_GET_GLOBAL(stdout_mutex)) {
 			with(color, println("[{}] {}", module, message));
 			if (is_valid(file)) {
 				write(file, as_bytes(tformat("[{}] ({}) {}\r\n", module, severity, message)));
@@ -50,16 +56,18 @@ struct TL_API DefaultLogger : LoggerBase {
 
 #ifdef TL_IMPL
 
-File DefaultLogger::shared_file;
+#ifndef TL_USE_CONTEXT
+File default_logger_file;
+OsLock stdout_mutex;
+#endif
 
 void DefaultLogger::global_init(Span<utf8> shared_file_path) {
 	auto file = open_file(shared_file_path, {.write = true});
 	if (is_valid(file)) {
-		shared_file = file;
+		TL_GET_GLOBAL(default_logger_file) = file;
 	}
 }
 
-OsLock stdout_mutex = {};
 
 #endif
 

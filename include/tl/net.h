@@ -51,7 +51,7 @@ TL_API Socket accept(Socket listener);
 TL_API bool connect(Socket s, u32 ip, u16 port);
 TL_API bool connect(Socket s, char const *ip, u16 port);
 inline bool connect(Socket s, Span<char> ip, u16 port) {
-	return connect(s, with(temporary_allocator, null_terminate(ip).data), port);
+	return connect(s, TL_TMP(null_terminate(ip).data), port);
 }
 TL_API bool set_blocking(Socket s, bool blocking);
 TL_API umm send_some(Socket s, void const *data, u32 size);

@@ -26,13 +26,13 @@ struct Printer {
 	inline umm write(Fmt fmt, T const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
-		builder.allocator = temporary_allocator;
+		builder.allocator = TL_GET_CURRENT(temporary_allocator);
 		if constexpr (sizeof...(T) > 0) {
 			append_format(builder, fmt, args...);
 		} else {
 			append(builder, fmt);
 		}
-		return (*this)((Span<utf8>)(to_string(builder, temporary_allocator)));
+		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
 
 	template <class Size> inline umm write(Span<char, Size> const &span) { return (*this)((Span<utf8>)span); }

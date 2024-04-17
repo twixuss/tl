@@ -35,7 +35,7 @@ TL_API StringizedCallStack resolve_names(Span<void *> call_stack);
 TL_API void free(StringizedCallStack &call_stack);
 
 inline StringizedCallStack get_stack_trace() {
-	return resolve_names(with(temporary_allocator, get_call_stack()));
+	return resolve_names(TL_TMP(get_call_stack()));
 }
 
 #ifdef CreateWindow
@@ -190,7 +190,7 @@ StringizedCallStack resolve_names(Span<void *> call_stack) {
 			name.data = name_buffer;
 			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
 #else
-			name = with(temporary_allocator, demangle(symbol->Name));
+			name = TL_TMP(demangle(symbol->Name));
 #endif
 
 			IMAGEHLP_LINE64 line = {};
@@ -221,7 +221,7 @@ StringizedCallStack resolve_names(Span<void *> call_stack) {
 }
 
 StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
-	auto call_stack = with(temporary_allocator, get_call_stack(context, frames_to_skip));
+	auto call_stack = TL_TMP(get_call_stack(context, frames_to_skip));
 	return resolve_names(call_stack);
 }
 

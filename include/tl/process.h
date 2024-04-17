@@ -56,10 +56,10 @@ void free(Process &process);
 
 TL_API Process start_process(utf16 const *command_line);
 inline Process start_process(Span<utf16> command_line) {
-	return start_process(with(temporary_allocator, null_terminate(command_line)).data);
+	return start_process(TL_TMP(null_terminate(command_line)).data);
 }
 inline Process start_process(Span<utf8> command_line) {
-	return start_process(with(temporary_allocator, to_utf16(command_line, true)).data);
+	return start_process(TL_TMP(to_utf16(command_line, true)).data);
 }
 
 inline List<u8> start_process_and_get_output(Span<utf8> command_line) {

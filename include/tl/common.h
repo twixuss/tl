@@ -124,6 +124,14 @@
 #define TL_DEBUG_ITERATORS TL_DEBUG
 #endif
 
+#ifdef TL_USE_CONTEXT
+#define TL_GET_CURRENT(x) ::current_##x()
+#define TL_GET_GLOBAL(x) ::global_##x()
+#else
+#define TL_GET_CURRENT(x) ::tl::current_##x
+#define TL_GET_GLOBAL(x) x
+#endif
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -2674,7 +2682,7 @@ struct Allocator : AllocatorBase<Allocator> {
 		func(Allocator_free, data, 0, size, alignment, state TL_LA);
 	}
 
-	inline static Allocator current() { return current_allocator; }
+	inline static Allocator current() { return TL_GET_CURRENT(allocator); }
 
 	inline bool is_valid() { return func != 0; }
 
@@ -2761,7 +2769,7 @@ public:
 
 	forceinline static ArenaAllocator create(umm size TL_LP) {
 		ArenaAllocator result = {};
-		result.parent_allocator = current_allocator;
+		result.parent_allocator = TL_GET_CURRENT(allocator);
 		result.buffer_size = size;
 		result.cursor = result.base = result.parent_allocator.allocate_uninitialized<u8>(size TL_LA);
 		return result;
@@ -2853,7 +2861,7 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 		arena = ArenaAllocator::create(TL_TEMPORARY_STORAGE_CAPACITY);
 	}
 
-	forceinline static TemporaryAllocator current() { return Context::current->temporary_allocator(); }
+	forceinline static TemporaryAllocator current() { return TL_GET_CURRENT(temporary_allocator); }
 
 	forceinline AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
 		return arena.allocate_impl(size, alignment TL_LA);
@@ -2916,11 +2924,13 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 };
 
 #ifndef TL_USE_CONTEXT
-extern TL_API thread_local TemporaryAllocator temporary_allocator;
+extern TL_API thread_local TemporaryAllocator current_temporary_allocator;
 #endif
 
 inline struct TemporaryStorageCheckpoint {} temporary_storage_checkpoint;
 inline struct TemporaryAllocatorAndCheckpoint {} temporary_allocator_and_checkpoint;
+
+#define TL_TMP(x) with(TL_GET_CURRENT(temporary_allocator), x)
 
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
 extern TL_API void deinit_allocator();
@@ -2930,7 +2940,7 @@ extern TL_API void deinit_allocator();
 
 template <class T>
 inline void allocate(T *&val) {
-	val = current_allocator.allocate<T>();
+	val = TL_GET_CURRENT(allocator).allocate<T>();
 }
 
 #define MAKE_ALLOCATOR_FROM_TYPE(type, name, ...) \
@@ -2949,28 +2959,16 @@ Allocator name = { \
 }
 
 
-// Specialize this function for custom current allocator
-template <class T>
-inline T get_current_allocator() {
-	return {};
-}
-
-template <>
-inline tl::Allocator get_current_allocator<tl::Allocator>() {
-	return tl::current_allocator;
-}
-
-
 namespace tl {
 
 struct AllocatorPusher {
 	Allocator old_allocator;
 	forceinline AllocatorPusher(Allocator new_allocator) {
-		old_allocator = current_allocator;
-		current_allocator = new_allocator;
+		old_allocator = TL_GET_CURRENT(allocator);
+		TL_GET_CURRENT(allocator) = new_allocator;
 	}
 	forceinline ~AllocatorPusher() {
-		current_allocator = old_allocator;
+		TL_GET_CURRENT(allocator) = old_allocator;
 	}
 	forceinline operator bool() { return true; }
 };
@@ -2984,9 +2982,9 @@ template <class Thing>
 Scoped(Thing) -> Scoped<Thing>;
 
 // Example use:
-// auto str = with(temporary_allocator, format("{}, {}", a, b));
-#define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=Scoped(new_thing);return __VA_ARGS__;}())
-#define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = Scoped(new_thing)
+// auto str = TL_TMP(format("{}, {}", a, b));
+#define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=::tl::Scoped(new_thing);return __VA_ARGS__;}())
+#define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = ::tl::Scoped(new_thing)
 
 template <class Thing>
 struct ScopedBlock {
@@ -3038,11 +3036,11 @@ template <>
 struct Scoped<Allocator> {
 	Allocator old_allocator;
 	Scoped(Allocator new_allocator) {
-		old_allocator = current_allocator;
-		current_allocator = new_allocator;
+		old_allocator = TL_GET_CURRENT(allocator);
+		TL_GET_CURRENT(allocator) = new_allocator;
 	}
 	~Scoped() {
-		current_allocator = old_allocator;
+		TL_GET_CURRENT(allocator) = old_allocator;
 	}
 };
 
@@ -3056,7 +3054,7 @@ struct Scoped<DefaultAllocator> : Scoped<Allocator> {
 };
 template <>
 struct Scoped<TemporaryAllocator> : Scoped<Allocator> {
-	Scoped(TemporaryAllocator) : Scoped<Allocator>(temporary_allocator) {}
+	Scoped(TemporaryAllocator) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)) {}
 };
 
 template <>
@@ -3064,16 +3062,16 @@ struct Scoped<TemporaryStorageCheckpoint> {
 	ArenaAllocator::Checkpoint checkpoint;
 
 	Scoped(TemporaryStorageCheckpoint) {
-		checkpoint = temporary_allocator.arena.checkpoint();
+		checkpoint = TL_GET_CURRENT(temporary_allocator).arena.checkpoint();
 	}
 	~Scoped() {
-		temporary_allocator.arena.reset(checkpoint);
+		TL_GET_CURRENT(temporary_allocator).arena.reset(checkpoint);
 	}
 };
 
 template <>
 struct Scoped<TemporaryAllocatorAndCheckpoint> : Scoped<Allocator>, Scoped<TemporaryStorageCheckpoint> {
-	Scoped(TemporaryAllocatorAndCheckpoint) : Scoped<Allocator>(temporary_allocator), Scoped<TemporaryStorageCheckpoint>({}) {}
+	Scoped(TemporaryAllocatorAndCheckpoint) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)), Scoped<TemporaryStorageCheckpoint>({}) {}
 };
 
 template <class T>
@@ -3084,12 +3082,12 @@ void rotate(Span<T> span, T *to_be_first) {
 	scoped(temporary_storage_checkpoint);
 
 	if (right_count < left_count) {
-		T *temp = temporary_allocator.allocate_uninitialized<T>(right_count);
+		T *temp = TL_GET_CURRENT(temporary_allocator).allocate_uninitialized<T>(right_count);
 		memcpy(temp, to_be_first, sizeof(T) * right_count);
 		memmove(span.data + right_count, span.data, sizeof(T) * left_count);
 		memcpy(span.data, temp, sizeof(T) * right_count);
 	} else {
-		T *temp = temporary_allocator.allocate_uninitialized<T>(left_count);
+		T *temp = TL_GET_CURRENT(temporary_allocator).allocate_uninitialized<T>(left_count);
 		memcpy(temp, span.data, sizeof(T) * left_count);
 		memmove(span.data, span.data + left_count, sizeof(T) * right_count);
 		memcpy(span.data + right_count, temp, sizeof(T) * left_count);
@@ -3231,14 +3229,15 @@ Allocator page_allocator = {
 };
 Allocator default_allocator = os_allocator;
 
-thread_local TemporaryAllocator temporary_allocator;
-
+#ifndef TL_USE_CONTEXT
+thread_local TemporaryAllocator current_temporary_allocator;
 thread_local Allocator current_allocator;
+#endif
 
 void init_allocator(Allocator temporary_allocator_backup) {
-	current_allocator = default_allocator;
+	TL_GET_CURRENT(allocator) = default_allocator;
 	withs (temporary_allocator_backup) {
-		TemporaryAllocator::init();
+		TL_GET_CURRENT(temporary_allocator).init();
 	};
 }
 

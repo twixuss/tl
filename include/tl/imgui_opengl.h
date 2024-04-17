@@ -531,7 +531,7 @@ void _draw_and_free_elements(Span<UIElement> elements) {
 					{
 						timed_block("vertex building"s);
 
-						List<PlacedChar> chars = with(temporary_allocator, place_text(text, font, true));
+						List<PlacedChar> chars = TL_TMP(place_text(text, font, true));
 
 						vertices.clear();
 						for (auto c : chars) {

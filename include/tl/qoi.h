@@ -17,7 +17,7 @@ namespace qoi {
 struct Image {
 	v4u8 *pixels = 0;
 	v2u size = {};
-	Allocator allocator = current_allocator;
+	Allocator allocator = TL_GET_CURRENT(allocator);
 };
 
 TL_API void free(Image &image);
@@ -97,13 +97,13 @@ static u32 hash(v4u8 p) {
 Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 	#define read(Type, name)                        \
 		if (bytes.count < sizeof(Type))             \
-			return DecodeError::not_enough_data;          \
+			return DecodeError::not_enough_data;    \
 		Type name = *(Type *)bytes.data;            \
 		bytes.set_begin(bytes.data + sizeof(Type)); \
 
 	#define read_into(name)                         \
 		if (bytes.count < sizeof(name))             \
-			return DecodeError::not_enough_data;          \
+			return DecodeError::not_enough_data;    \
 		name = *(decltype(name) *)bytes.data;       \
 		bytes.set_begin(bytes.data + sizeof(name)); \
 
@@ -121,7 +121,7 @@ Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 	}
 
 	if (header.channels != 4) {
-		current_logger.error("decoding images with {} channels is not implemented", header.channels);
+		TL_GET_CURRENT(logger).error("decoding images with {} channels is not implemented", header.channels);
 		return DecodeError::not_supported;
 	}
 

@@ -82,11 +82,14 @@ struct Thread {
 	void (*function)(Thread *self) = 0;
 	void *param = 0;
 	void *handle = 0;
+	#ifdef TL_USE_CONTEXT
+	Context *context = 0;
+	#endif
 };
 
 TL_API void run_thread(Thread *thread);
 inline Thread *create_thread(void (*function)(Thread *self), void *param) {
-	auto allocator = current_allocator;
+	auto allocator = TL_GET_CURRENT(allocator);
 	auto thread = allocator.allocate<Thread>();
 	thread->allocator = allocator;
 	thread->function = function;
@@ -109,7 +112,7 @@ static constexpr auto get_thread_invoke(std::index_sequence<indices...>) noexcep
 
 template <class Fn, class ...Args>
 inline Thread *create_thread(Fn &&fn, Args &&...args) {
-	auto allocator = current_allocator;
+	auto allocator = TL_GET_CURRENT(allocator);
 	auto thread = allocator.allocate<Thread>();
 	thread->allocator = allocator;
 
@@ -180,12 +183,19 @@ void switch_thread() { SwitchToThread(); }
 void init_logger_thread();
 
 void run_thread(Thread *thread) {
+	#ifdef TL_USE_CONTEXT
+	thread->context = clone_context();
+	#endif
 	thread->handle = CreateThread(0, 0, [](void *param) noexcept -> DWORD {
 		auto thread = (Thread *)param;
+		#ifdef TL_USE_CONTEXT
+		registrate(thread->context);
+		#else
 		init_allocator();
 		defer {deinit_allocator();};
 		current_printer = standard_output_printer;
 		init_logger_thread();
+		#endif
 		thread->function(thread);
 		return 0;
 	}, thread, 0, 0);
@@ -692,7 +702,7 @@ struct ThreadPool {
 		allocator =
 			threads.allocator =
 			tasks.allocator =
-			current_allocator;
+			TL_GET_CURRENT(allocator);
 		if (thread_count) {
 			threads.reserve(thread_count);
 
@@ -778,7 +788,7 @@ struct ThreadPool {
 	#endif
 
 private:
-	Allocator allocator = current_allocator;
+	Allocator allocator = TL_GET_CURRENT(allocator);
 	List<Thread *> threads;
 
 	SyncPoint start_sync_point;

@@ -4,7 +4,7 @@
 
 namespace tl {
 
-template <class T>
+template <class T, class Allocator = Allocator>
 struct LinkedList {
 	using Element = T;
 
@@ -153,13 +153,13 @@ struct LinkedList {
 	Iterator begin() { return head; }
 	Iterator end() { return {}; }
 
-	Allocator allocator = current_allocator;
+	Allocator allocator = Allocator::current();
 	Node *head = 0;
 	Node *tail = 0;
 };
 
-template <class T>
-void free(LinkedList<T> &list) {
+template <class T, class Allocator>
+void free(LinkedList<T, Allocator> &list) {
 	auto node = list.head;
 	while (node) {
 		auto next = node->next;
@@ -170,9 +170,9 @@ void free(LinkedList<T> &list) {
 	list.tail = 0;
 }
 
-template <class T>
-void erase(LinkedList<T> &list, T *value) {
-	using Node = typename LinkedList<T>::Node;
+template <class T, class Allocator>
+void erase(LinkedList<T, Allocator> &list, T *value) {
+	using Node = typename LinkedList<T, Allocator>::Node;
 	Node *node = list.head;
 	Node *prev_node = 0;
 	while (node) {
@@ -191,8 +191,8 @@ void erase(LinkedList<T> &list, T *value) {
 	bounds_check(assert(false));
 }
 
-template <class T, class Predicate>
-T *find_if(LinkedList<T> list, Predicate &&predicate) {
+template <class T, class Allocator, class Predicate>
+T *find_if(LinkedList<T, Allocator> list, Predicate &&predicate) {
 	auto node = list.head;
 	while (node) {
 		if (predicate(node->value))
@@ -202,8 +202,8 @@ T *find_if(LinkedList<T> list, Predicate &&predicate) {
 	return 0;
 }
 
-template <ForEachFlags flags, class T, class Fn>
-bool for_each(LinkedList<T> list, Fn &&fn) {
+template <ForEachFlags flags, class T, class Allocator, class Fn>
+bool for_each(LinkedList<T, Allocator> list, Fn &&fn) {
 	auto node = list.head;
 	while (node) {
 		if constexpr (std::is_same_v<decltype(fn(*(T*)0)), ForEachDirective>) {
@@ -220,8 +220,8 @@ bool for_each(LinkedList<T> list, Fn &&fn) {
 	return false;
 }
 
-template <class T>
-umm count_of(LinkedList<T> list) {
+template <class T, class Allocator>
+umm count_of(LinkedList<T, Allocator> list) {
 	return list.count();
 }
 

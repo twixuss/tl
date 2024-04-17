@@ -181,7 +181,7 @@ template <class Pixel>
 inline void dilate(Pixel *pixels, v2u size, umm stride, DilateOptions options = {}) {
     // NOTE:
     // Images are likely too big to store in temporary memory.
-    auto allocator = current_allocator;
+    auto allocator = TL_GET_CURRENT(allocator);
     auto copy = allocator.allocate<Pixel>(size.y*size.x);
     defer { allocator.free(copy); };
 

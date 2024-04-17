@@ -10,7 +10,7 @@ struct Buffer : Span<u8> {
 
 inline Buffer create_buffer_uninitialized(umm size, umm alignment TL_LP) {
 	Buffer result;
-	result.allocator = current_allocator;
+	result.allocator = TL_GET_CURRENT(allocator);
 	result.data = result.allocator.allocate_uninitialized<u8>(size, alignment TL_LA);
 	result.count = size;
 	return result;

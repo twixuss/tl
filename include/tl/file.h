@@ -52,8 +52,8 @@ inline bool is_valid(File file) {
 TL_API File open_file(ascii const *path, OpenFileParams params);
 TL_API File open_file(utf16 const *path, OpenFileParams params);
 
-inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(with(temporary_allocator, null_terminate(path)).data, params); }
-inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(with(temporary_allocator, null_terminate(path)).data, params); }
+inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(TL_TMP(null_terminate(path)).data, params); }
+inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(TL_TMP(null_terminate(path)).data, params); }
 inline File open_file(Span<utf8> path, OpenFileParams params) { return with(temporary_allocator_and_checkpoint, open_file(to_utf16(path, true).data, params)); }
 
 TL_API void close(File file);
@@ -70,19 +70,19 @@ TL_API bool file_exists(ascii const *path);
 TL_API bool file_exists(utf16 const *path);
 
 inline bool file_exists(Span<ascii> path) {
-	return file_exists(with(temporary_allocator, null_terminate(path)).data);
+	return file_exists(TL_TMP(null_terminate(path)).data);
 }
 inline bool file_exists(Span<utf8> path) {
 	return with(temporary_allocator_and_checkpoint, file_exists(to_utf16(path, true).data));
 }
 inline bool file_exists(Span<utf16> path) {
-	return file_exists(with(temporary_allocator, null_terminate(path)).data);
+	return file_exists(TL_TMP(null_terminate(path)).data);
 }
 
 TL_API bool directory_exists(ascii const *path);
 TL_API bool directory_exists(utf16 const *path);
 inline bool directory_exists(Span<utf16> path) {
-	return directory_exists(with(temporary_allocator, null_terminate(path)).data);
+	return directory_exists(TL_TMP(null_terminate(path)).data);
 }
 inline bool directory_exists(Span<utf8> path) {
 	return with(temporary_allocator_and_checkpoint, directory_exists(to_utf16(path, true).data));
@@ -156,7 +156,7 @@ inline Optional<u64> get_file_write_time(pathchar const *path) {
 	return get_file_write_time(file);
 }
 inline Optional<u64> get_file_write_time(Span<pathchar> path) {
-	return get_file_write_time(with(temporary_allocator, null_terminate(path)).data);
+	return get_file_write_time(TL_TMP(null_terminate(path)).data);
 }
 inline Optional<u64> get_file_write_time(Span<utf8> path) {
 	return with(temporary_allocator_and_checkpoint, get_file_write_time(to_pathchars(path, true).data));
@@ -193,12 +193,12 @@ TL_API FileItemList get_items_in_directory(Span<utf8> directory);
 
 TL_API void create_file(pathchar const *path);
 inline void create_file(Span<pathchar> path) {
-	return create_file(with(temporary_allocator, null_terminate(path)).data);
+	return create_file(TL_TMP(null_terminate(path)).data);
 }
 
 TL_API void delete_file(pathchar const *path);
 inline void delete_file(Span<pathchar> path) {
-	return delete_file(with(temporary_allocator, null_terminate(path)).data);
+	return delete_file(TL_TMP(null_terminate(path)).data);
 }
 inline void delete_file(Span<utf8> path) {
 	return with(temporary_allocator_and_checkpoint, delete_file(to_utf16(path, true).data));
@@ -273,7 +273,7 @@ TL_API Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<
 TL_API List<utf8> get_current_directory();
 TL_API void set_current_directory(pathchar const *path);
 inline void set_current_directory(Span<pathchar> path) {
-	return set_current_directory(with(temporary_allocator, null_terminate(path)).data);
+	return set_current_directory(TL_TMP(null_terminate(path)).data);
 }
 inline void set_current_directory(Span<utf8> path) {
 	return with(temporary_allocator_and_checkpoint, set_current_directory(to_utf16(path, true).data));
@@ -386,7 +386,7 @@ inline List<utf8> make_absolute_path(Span<utf8> path) {
 			return to_list(path);
 	}
 	scoped(temporary_storage_checkpoint);
-	return (List<utf8>)concatenate(with(temporary_allocator, get_current_directory()), path_separator, path);
+	return (List<utf8>)concatenate(TL_TMP(get_current_directory()), path_separator, path);
 }
 
 template <class Size>
@@ -398,7 +398,7 @@ inline bool is_absolute_path(Span<utf8, Size> path) {
 
 inline bool create_directories(Span<utf8> path) {
 	List<Span<utf8>> directories_to_create;
-	directories_to_create.allocator = temporary_allocator;
+	directories_to_create.allocator = TL_GET_CURRENT(temporary_allocator);
 	while (1) {
 		if (directory_exists(path)) {
 			break;
@@ -419,15 +419,15 @@ TL_API bool copy_file(pathchar const *source, pathchar const *destination);
 inline bool copy_file(Span<utf8> source, Span<utf8> destination) {
 	scoped(temporary_storage_checkpoint);
 	return copy_file(
-		with(temporary_allocator, to_pathchars(source, true).data), 
-		with(temporary_allocator, to_pathchars(destination, true).data)
+		TL_TMP(to_pathchars(source, true).data), 
+		TL_TMP(to_pathchars(destination, true).data)
 	);
 }
 
 template <class Fn>
 void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
-	auto original_allocator = current_allocator;
-	scoped(temporary_allocator);
+	auto original_allocator = TL_GET_CURRENT(allocator);
+	scoped(TL_GET_CURRENT(temporary_allocator));
 
 	auto items = get_items_in_directory(directory);
 	for (auto &item : items) {
@@ -452,16 +452,16 @@ TL_API bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams 
 inline bool move_file(Span<utf8> old, Span<utf8> _new, MoveFileParams params = {}) {
 	scoped(temporary_storage_checkpoint);
 	return move_file(
-		with(temporary_allocator, to_pathchars(old, true).data), 
-		with(temporary_allocator, to_pathchars(_new, true).data),
+		TL_TMP(to_pathchars(old, true).data), 
+		TL_TMP(to_pathchars(_new, true).data),
 		params
 	);
 }
 
 template <class T>
 inline void visit_files(Span<utf8> directory, T &&process_file) requires requires(T x) { { x(Span<utf8>{}) } -> std::convertible_to<ForEachDirective>; } {
-	auto outer_allocator = current_allocator;
-	scoped(temporary_allocator);
+	auto outer_allocator = TL_GET_CURRENT(allocator);
+	scoped(TL_GET_CURRENT(temporary_allocator));
 
 	auto list = get_items_in_directory(directory);
 
@@ -540,7 +540,7 @@ File open_file(ascii const *path, OpenFileParams params) {
 	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
-			tl_logger.error("Could not open file {}", path);
+			TL_GET_GLOBAL(tl_logger).error("Could not open file {}", path);
 		}
 		handle = 0;
 	}
@@ -555,7 +555,7 @@ File open_file(pathchar const *path, OpenFileParams params) {
 	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
-			tl_logger.error("Could not open file {}", with(temporary_allocator, to_utf8(as_span((utf16 const *)path))));
+			TL_GET_GLOBAL(tl_logger).error("Could not open file {}", TL_TMP(to_utf8(as_span((utf16 const *)path))));
 		}
 		handle = 0;
 	}
@@ -664,7 +664,7 @@ Optional<u64> get_file_write_time(File file) {
 }
 
 static wchar *append_star(Span<utf16> directory) {
-	auto allocator = temporary_allocator;
+	auto allocator = TL_GET_CURRENT(temporary_allocator);
 	wchar *directory_with_star;
 
 	if (directory.count == 0) {
@@ -719,7 +719,7 @@ ListOfLists<pathchar> get_file_names_in_directory(Span<pathchar> directory) {
 }
 
 FileItemList get_items_in_directory(Span<utf8> directory_) {
-	auto directory = with(temporary_allocator, to_utf16(directory_));
+	auto directory = TL_TMP(to_utf16(directory_));
 	auto directory_with_star = append_star(directory);
 
 	WIN32_FIND_DATAW find_data;
@@ -758,7 +758,7 @@ FileItemList get_items_in_directory(Span<utf8> directory_) {
 		}
 
 		result.add(item);
-		result.buffer.add(with(temporary_allocator, to_utf8(name)));
+		result.buffer.add(TL_TMP(to_utf8(name)));
 
 	} while (FindNextFileW(handle, &find_data));
 	FindClose(handle);
@@ -847,7 +847,7 @@ HRESULT CDialogEventHandler_CreateInstance(REFIID riid, void **ppv) {
 }
 
 Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<utf8>> allowed_extensions) {
-	auto allocator = current_allocator;
+	auto allocator = TL_GET_CURRENT(allocator);
 	scoped(temporary_allocator_and_checkpoint);
 
 	IFileOpenDialog *dialog = NULL;
@@ -943,7 +943,7 @@ Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<ut
 
 List<utf8> get_current_directory() {
 	List<utf16> temp;
-	temp.allocator = temporary_allocator;
+	temp.allocator = TL_GET_CURRENT(temporary_allocator);
 	temp.resize(GetCurrentDirectoryW(0, 0));
 	GetCurrentDirectoryW((DWORD)temp.count, (wchar *)temp.data);
 	temp.count--;
@@ -982,7 +982,7 @@ bool copy_file(pathchar const *source, pathchar const *destination) {
 
 List<utf8> get_executable_path(bool null_terminated TL_LPD) {
 	List<utf16> temp;
-	temp.allocator = temporary_allocator;
+	temp.allocator = TL_GET_CURRENT(temporary_allocator);
 	temp.reserve(512);
 	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, (DWORD)temp.capacity);
 	return to_utf8(temp, null_terminated TL_LA);

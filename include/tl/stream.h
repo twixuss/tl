@@ -20,7 +20,7 @@ struct Stream {
 
 template <class T>
 T *create_stream() {
-	auto allocator = current_allocator;
+	auto allocator = TL_GET_CURRENT(allocator);
 	auto result = allocator.allocate<T>();
 	result->allocator = allocator;
 	result->_read = [](Stream *stream, Span<u8> destination) {

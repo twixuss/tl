@@ -457,7 +457,7 @@ struct StringBuilder {
 
 	StringBuilder() {
 		static_assert(offsetof(StringBuilder, first) + sizeof(Block) == offsetof(StringBuilder, initial_buffer));
-		allocator = current_allocator;
+		allocator = TL_GET_CURRENT(allocator);
 		first.capacity = TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY;
 	}
 	StringBuilder(StringBuilder const &that) = delete;
@@ -893,13 +893,13 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 			return appended_char_count;
 		} else {
 			StringBuilder temp;
-			temp.allocator = temporary_allocator;
+			temp.allocator = TL_GET_CURRENT(temporary_allocator);
 
 			umm appended_char_count = append(temp, format.value);
 			while (appended_char_count < format.align.count) {
 				appended_char_count += append(builder, format.align.fill);
 			}
-			append(builder, to_string(temp, temporary_allocator));
+			append(builder, to_string(temp, TL_GET_CURRENT(temporary_allocator)));
 			return 0;
 		}
 	} else {
@@ -1201,23 +1201,23 @@ inline auto concatenate(Args const &...args) {
 	int _ = ((append(builder, args), ...), 0);
 	(void)_;
 	if constexpr (are_utf8<Args...>) {
-		return (List<utf8>)to_string(builder, current_allocator);
+		return (List<utf8>)to_string(builder, TL_GET_CURRENT(allocator));
 	} else if constexpr (are_utf16<Args...>) {
-		return (List<utf16>)to_string(builder, current_allocator);
+		return (List<utf16>)to_string(builder, TL_GET_CURRENT(allocator));
 	} else {
-		return (List<u8>)to_string(builder, current_allocator);
+		return (List<u8>)to_string(builder, TL_GET_CURRENT(allocator));
 	}
 }
 
 template <class ...Args>
 inline auto tconcatenate(Args &&...args) {
-	return with(temporary_allocator, concatenate(args...));
+	return TL_TMP(concatenate(args...));
 }
 
 template <class Allocator = Allocator, class ...Args>
 List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const &...args) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.allocator = TL_GET_CURRENT(temporary_allocator);
 	append_format(builder, fmt, args...);
 	return (List<ascii, Allocator>)to_string<Allocator>(builder, allocator);
 }
@@ -1225,7 +1225,7 @@ List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const 
 template <class Allocator = Allocator, class ...Args>
 List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &...args) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.allocator = TL_GET_CURRENT(temporary_allocator);
 	append_format(builder, fmt, args...);
 	return (List<utf8, Allocator>)to_string<Allocator>(builder, allocator);
 }
@@ -1233,7 +1233,7 @@ List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &.
 template <class Allocator = Allocator, class ...Args>
 List<utf16, Allocator> aformat(Allocator allocator, Span<utf16> fmt, Args const &...args) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.allocator = TL_GET_CURRENT(temporary_allocator);
 	append_format(builder, fmt, args...);
 	return (List<utf16, Allocator>)to_string<Allocator>(builder, allocator);
 }
@@ -1261,20 +1261,20 @@ template <class Allocator = Allocator, class ...Args> List<ascii, Allocator> for
 template <class Allocator = Allocator, class ...Args> List<utf8 , Allocator> format(utf8  const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
 template <class Allocator = Allocator, class ...Args> List<utf16, Allocator> format(utf16 const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
 
-template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
-template <class ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
-template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return with(temporary_allocator, format(fmt, args...)); }
+template <class ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
 template <class Allocator = Allocator, class T>
 List<utf8, Allocator> to_string(T const &value) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.allocator = TL_GET_CURRENT(temporary_allocator);
 	append(builder, value);
 
 	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current());

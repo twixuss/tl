@@ -5,11 +5,13 @@
 
 #ifdef TL_USE_CONTEXT
 
+#include "context.h"
+
 extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 int wmain(int argc, wchar_t **argv) {
 	using namespace tl;
 
-	auto context = Context::create();
+	auto context = main_context();
 
 	init_allocator();
 	defer { deinit_allocator(); };
@@ -24,10 +26,10 @@ int wmain(int argc, wchar_t **argv) {
 	DefaultLogger::global_init(tformat(u8"{}.log", arguments[0]));
 
 	DefaultLogger app_logger = {.module = u8"app"s};
-	tl::app_logger = app_logger;
-
 	DefaultLogger tl_logger = {.module = u8"tl"s};
-	tl::tl_logger = tl_logger;
+	
+	context->app_logger() = app_logger;
+	context->tl_logger() = tl_logger;
 
 	return tl_main(arguments);
 }

@@ -952,7 +952,7 @@ void APIENTRY default_debug_proc(GLenum source, GLenum type, GLuint id, GLenum s
 	}
 
 	if (do_print) {
-		auto time = with(temporary_allocator, get_time_string());
+		auto time = TL_TMP(get_time_string());
 		print("{} ---------------\nDebug message ({}): {}\nSource: ", time, id, message);
 		switch (source) {
 			case GL_DEBUG_SOURCE_API:             print("API");             break;

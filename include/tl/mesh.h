@@ -88,7 +88,7 @@ inline void free(Scene3D &scene) {
 TL_API Scene3D parse_glb_from_memory(Span<u8> memory);
 
 inline Optional<Scene3D> parse_glb_from_file(Span<utf8> path) {
-	auto memory = with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
+	auto memory = TL_TMP(read_entire_file(to_pathchars(path, true)));
 	if (memory.data) {
 		return parse_glb_from_memory(memory);
 	}

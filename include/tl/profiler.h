@@ -324,10 +324,10 @@ void Profiler::reset() {
 
 List<ascii> Profiler::output_for_chrome() {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	defer { tl::free(builder); };
+
 	append(builder, R"({"otherData":{},"traceEvents":[
 )"s);
-
 
 	if (!recorded_time_spans.is_empty()) {
 		bool needComma = false;

@@ -1,32 +1,27 @@
 #pragma once
+#include "context_fwd.h"
 #include "hash_map.h"
 
-#ifndef TL_ENUMERATE_CONTEXT_MEMBERS
 namespace tl {
-struct Allocator;
-struct TemporaryAllocator;
-struct Logger;
-}
-/*
-#define x(Type, name)
-*/
-#define TL_ENUMERATE_CONTEXT_MEMBERS \
-    x(Allocator, allocator) \
-    x(TemporaryAllocator, temporary_allocator) \
-    x(Logger, logger) \
 
-#endif
-
-int wmain(int argc, wchar_t **argv);
-
-namespace tl {
+struct MainContext;
 
 struct Context {
-private:
-
     struct Shared {
-        ContiguousHashMap<u32, Context *> thread_contexts;
-        ContiguousHashMap<Span<char>, umm> member_offsets;
+        template <class K, class V>
+        using HashMap = ContiguousHashMap<K, V, DefaultHashTraits<K>, DefaultAllocator>;
+        template <class T>
+        using List = List<T, DefaultAllocator>;
+
+        struct Member {
+            umm offset;
+            void (*copy_construct)(void *dst, void *src);
+        };
+
+        MainContext *main_context;
+        HashMap<u32, Context *> thread_contexts;
+        HashMap<Span<char>, Member> members;
+        List<void (*)()> initters;
         umm size;
         umm alignment;
     };
@@ -34,14 +29,9 @@ private:
     Shared *shared;
 
 
+protected:
     Context() = default;
 
-    friend struct FullContext;
-    friend int ::wmain(int argc, wchar_t **argv);
-
-    static Context *create();
-
-    void registrate();
 
 public:
     Context(Context const &that) = delete;
@@ -51,6 +41,7 @@ public:
     
     static thread_local Context *current;
 
+    static MainContext *create();
     static Context *create(Context *that) {
         auto result = (Context *)tl_allocate(that->shared->size, that->shared->alignment);
         memcpy(result, that, that->shared->size);
@@ -59,56 +50,52 @@ public:
     static void free(Context *context) {
         tl_free(context);
     }
+    void registrate();
     void registrate_dll();
 
     forceinline void *get_member(Span<char> name) {
-        auto found = shared->member_offsets.find(name);
+        auto found = shared->members.find(name);
         assert(found, "Context does not contain member \"{}\"", name);
-        return (u8 *)this + found->value;
+        if (this != (Context *)shared->main_context) {
+            assert(found->value.offset < shared->size, "Member \"{}\" is only present in the main context", name);
+        }
+        return (u8 *)this + found->value.offset;
     }
 
     #define x(Type, name) Type &name() { return *(Type *)get_member(#name##s); }
     TL_ENUMERATE_CONTEXT_MEMBERS
     #undef x
 };
-}
-
-#ifdef TL_IMPL
-#include "thread.h"
-namespace tl {
-
-#define NEW(T) &construct(*(T *)tl_allocate(sizeof(T), alignof(T)))
-
-void Context::registrate() {
-    auto thread_id = get_current_thread_id();
-    assert(!shared->thread_contexts.find(thread_id), "Cannot create a second context for the same thread");
-    shared->thread_contexts.get_or_insert(thread_id) = this;
-    current = this;
-}
-
-void Context::registrate_dll() {
-    current = this;
-}
-
-struct FullContext : Context {
-    #define x(Type, name) Type name;
-    TL_ENUMERATE_CONTEXT_MEMBERS
+struct MainContext : Context {
+    #define x(Type, name) Type &name() { return *(Type *)get_member(#name##s); }
+    TL_ENUMERATE_MAIN_CONTEXT_MEMBERS
     #undef x
 };
 
-Context *Context::create() {
-    auto result = NEW(Context);
-
-    result->shared = NEW(Context::Shared);
-    result->shared->size = sizeof(FullContext);
-    result->shared->alignment = alignof(FullContext);
-    result->registrate();
-
-    #define x(Type, name) result->shared->member_offsets.get_or_insert(#name##s) = offsetof(FullContext, name);
-    TL_ENUMERATE_CONTEXT_MEMBERS;
-    #undef x
-
-    return result;
+inline Context *clone_context() {
+    return Context::create(Context::current);
 }
+
+inline void registrate(Context *context) {
+    return context->registrate();
 }
-#endif
+
+inline void registrate_dll(Context *context) {
+    return context->registrate_dll();
+}
+inline MainContext *main_context() { 
+    if (!Context::current || !Context::current->shared->main_context)
+        return Context::create();
+    return Context::current->shared->main_context; 
+}
+
+}
+
+
+#define x(Type, name) inline Type &current_##name() { return tl::Context::current->name(); }
+TL_ENUMERATE_CONTEXT_MEMBERS
+#undef x
+#define x(Type, name) inline Type &global_##name() { return tl::main_context()->name(); }
+TL_ENUMERATE_CONTEXT_MEMBERS
+TL_ENUMERATE_MAIN_CONTEXT_MEMBERS
+#undef x

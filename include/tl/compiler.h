@@ -272,7 +272,7 @@ List<ascii> demangle(Span<ascii> function_name) {
 		return to_list(function_name);
 	}
 
-	auto old_allocator = current_allocator;
+	auto old_allocator = TL_GET_CURRENT(allocator);
 	scoped(temporary_allocator_and_checkpoint);
 
 	StringBuilder builder;

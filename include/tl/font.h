@@ -68,7 +68,7 @@ struct SizedFont {
 
 
 struct FontCollection {
-	Allocator allocator = current_allocator;
+	Allocator allocator = TL_GET_CURRENT(allocator);
 	List<Font *> fonts;
 	#if TL_FONT_SHARED_ATLAS
 	FontAtlas atlas;
@@ -177,8 +177,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 
 	auto current_char = text.data;
 
-	List<utf32> new_chars;
-	new_chars.allocator = temporary_allocator;
+	List<utf32, TemporaryAllocator> new_chars;
 
 	while (current_char < text.end()) {
 		auto got_char = decode_and_advance(&current_char);
@@ -190,6 +189,8 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 			new_chars.add(code_point);
 		}
 	}
+
+	auto allocator = collection->allocator;
 
 	if (new_chars.count) {
 
@@ -255,13 +256,13 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 						assert(new_atlas_size.x == new_atlas_size.y);
 					}
 
-					v3u8 *new_atlas_data = current_allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
+					v3u8 *new_atlas_data = allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
 
 					for (umm y = 0; y < atlas.size.y; ++y) {
 						memcpy(&new_atlas_data[y * new_atlas_size.x], &atlas.data[y * atlas.size.x], atlas.size.x * sizeof(atlas.data[0]));
 					}
 					
-					current_allocator.free(atlas.data);
+					allocator.free(atlas.data);
 
 					atlas.data = new_atlas_data;
 					atlas.size = new_atlas_size;
@@ -271,7 +272,7 @@ EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont 
 					#else
 					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
 					#endif
-					v3u8 *new_atlas_data = current_allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
+					v3u8 *new_atlas_data = allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
 
 					atlas.data = new_atlas_data;
 					atlas.size = new_atlas_size;
@@ -354,7 +355,7 @@ SizedFont *get_font_at_size(Font *font, u32 size) {
 }
 
 FontCollection *create_font_collection() {
-	auto allocator = current_allocator;
+	auto allocator = TL_GET_CURRENT(allocator);
 	auto result = allocator.allocate<FontCollectionFT>();
 	result->allocator = allocator;
 
