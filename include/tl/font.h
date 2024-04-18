@@ -15,6 +15,34 @@
 #define TL_FONT_SHARED_ATLAS 1
 #endif
 
+// Set TL_FONT_USE_SPECIAL_CODES to 1 to be able to use special 
+// codes to modify the appearance of a single text string.
+// 
+// Start the code with TL_FONT_SPECIAL_CODE_PREFIX ('$' by default, so it will be used for the rest of this comment)
+// 
+// Escape the $ with $$
+// 
+// Color:
+//             $fff
+//             ||||
+//     prefix -+|||
+//         red -+||
+//        green -+|
+//          blue -+
+//     
+//     Each component is defined by a single hex digit (4 bits),
+//     so the total number of representable colors is 16^3 = 4096
+//
+// TODO: add bold flag
+// TODO: add italic flag
+//
+#ifndef TL_FONT_USE_SPECIAL_CODES
+#define TL_FONT_USE_SPECIAL_CODES 0
+#endif
+#ifndef TL_FONT_SPECIAL_CODE_PREFIX
+#define TL_FONT_SPECIAL_CODE_PREFIX '$'
+#endif
+
 namespace tl {
 
 struct FontChar {
@@ -93,6 +121,26 @@ struct PlacedText {
 	struct Char {
 		aabb<v2s> position = {};
 		aabb<v2f> uv = {};
+		#if TL_FONT_USE_SPECIAL_CODES
+		union Color {
+			struct {
+				u16 r : 4;
+				u16 g : 4;
+				u16 b : 4;
+			};
+			u16 flat;
+
+			Color &operator=(v3f c) {
+				auto i = floor_to_int(c * 15.999999f);
+				r = i.x;
+				g = i.y;
+				b = i.z;
+				return *this;
+			}
+			operator v3f() const { return V3f(r,g,b) / 15.0f; }
+		};
+		Color color;
+		#endif
 	};
 	struct Line {
 		umm begin_index = 0;
@@ -118,6 +166,9 @@ struct PlacedText {
 struct PlaceTextParams {
 	f32 line_alignment = 0; // 0 = left-aligned; 0.5 = centered; 1 = right-aligned
 	s32 wrap_width = max_value<s32>;
+	#if TL_FONT_USE_SPECIAL_CODES
+	v3f default_color = {1,1,1};
+	#endif
 };
 
 TL_API FontChar get_char_info(u32 ch, SizedFont *font);
@@ -433,21 +484,52 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 	utf8 *word_start = text.begin();
 	umm word_start_index = 0;
 	bool can_wrap = false;
+	
+	PlacedText::Char c = {};
+	#if TL_FONT_USE_SPECIAL_CODES
+	c.color = params.default_color;
+	#endif
 
 	while (current_char < text.end()) {
 		utf32 code_point = {};
 		FontChar d = {};
 
-		auto read_char = [&] {
-			auto got_char = decode_and_advance(&current_char);
-			if (!got_char) {
-				invalid_code_path();
+		#define read_char()                                        \
+			{                                                      \
+				auto got_char = decode_and_advance(&current_char); \
+				if (!got_char) {                                   \
+					break;                                         \
+				}                                                  \
+				code_point = got_char.value();                     \
+				d = get_char_info(code_point, font);               \
 			}
-			code_point = got_char.value();
-			d = get_char_info(code_point, font);
-		};
 
 		read_char();
+
+		#if TL_FONT_USE_SPECIAL_CODES
+		if (code_point == TL_FONT_SPECIAL_CODE_PREFIX) {
+			read_char();
+
+			if (code_point == TL_FONT_SPECIAL_CODE_PREFIX) {
+				// Escaped $
+			} else {
+				auto hex_digit_to_int = [](utf32 c) {
+					u8 result = 0;
+					result += (c <= '9') * (c - '0');
+					result += ((c > '9') & (c <= 'F')) * (c - 'A' + 10);
+					result += ((c > 'F') & (c <= 'f')) * (c - 'a' + 10);
+					return result;
+				};
+
+				c.color.r = hex_digit_to_int(code_point); 
+				read_char();
+				c.color.g = hex_digit_to_int(code_point); 
+				read_char();
+				c.color.b = hex_digit_to_int(code_point); 
+				read_char();
+			}
+		}
+		#endif
 
 		if (is_whitespace(code_point)) {
 			word_start = current_char;
@@ -464,8 +546,6 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 			result.line_count += 1;
 			line_begin_index = result.chars.count;
 		} else {
-			PlacedText::Char c;
-
 			auto place_char = [&] {
 				c.position.min = {char_position.x + d.offset.x, char_position.y + (s32)font->size - d.offset.y};
 				c.position.max = c.position.min + (v2s)d.size;
@@ -501,6 +581,8 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 
 			char_position.x += d.advance.x;
 		}
+
+		#undef read_char
 	}
 	
 	result.lines.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
