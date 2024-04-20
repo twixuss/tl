@@ -511,7 +511,7 @@ forceinline constexpr T frac(T v, T s) {
 }
 
 forceinline f32 log(f32 x, f32 base) {
-	return ::logf(x) / ::logf(base);
+	return ::log2f(x) / ::log2f(base);
 }
 
 template <class Base, class Exponent>
