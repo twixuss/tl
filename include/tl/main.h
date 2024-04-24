@@ -55,14 +55,6 @@ int wmain(int argc, wchar_t **argv) {
 	
 	init_printer();
 
-	DefaultLogger::global_init(tformat(u8"{}.log", arguments[0]));
-
-	DefaultLogger app_logger = {.module = u8"app"s};
-	tl::app_logger = app_logger;
-
-	DefaultLogger tl_logger = {.module = u8"tl"s};
-	tl::tl_logger = tl_logger;
-
 	tl::init_logger_thread();
 
 	return tl_main(arguments);

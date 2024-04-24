@@ -712,12 +712,16 @@ struct ContiguousHashMap : Traits {
 	}
 	void erase(Iterator it) {
 		bounds_check(assert(cells.count));
+		assert(it.cell.state == CellState::occupied);
 		it.cell->state = CellState::removed;
+		--count;
 	}
 	void erase(KeyValue *kv) {
 		bounds_check(assert(cells.count));
 		auto cell = (Cell *)((u8 *)kv - offsetof(Cell, key_value));
+		assert(cell->state == CellState::occupied);
 		cell->state = CellState::removed;
+		--count;
 	}
 	void erase(Key key) {
 		bounds_check(assert(cells.count));
@@ -733,6 +737,7 @@ struct ContiguousHashMap : Traits {
 			if (cell.state == CellState::occupied) {
 				if (are_equal(cell.key(), key)) {
 					cell.state = CellState::removed;
+					--count;
 				}
 			}
 			index = step(index, cells.count);
