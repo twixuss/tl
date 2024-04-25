@@ -584,7 +584,11 @@ forceinline constexpr auto bezier(T a, T b, T c, Float t) {
 }
 template <class T, class Float>
 forceinline constexpr auto bezier(T a, T b, T c, T d, Float t) {
-	return a + t * (-3*a + 3*b + t * (a - 6*b + 3*c + t * (a + 3*b - 3*c + d)));
+	return a + t * (-3*a + 3*b + t * (3*a - 6*b + 3*c + t * (-a + 3*b - 3*c + d)));
+}
+template <class T, class Float>
+forceinline constexpr auto bezier_derivative(T a, T b, T c, T d, Float t) {
+	return -3*a + 3*b + t * (6*a - 12*b + 6*c + 3 * t * (-a + 3*b - 3*c + d));
 }
 
 forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
@@ -604,6 +608,11 @@ forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() 
 template <class T>
 forceinline constexpr auto approximately(T a, T b, T epsilon) {
 	return absolute(a - b) < epsilon;
+}
+
+template <class T>
+forceinline constexpr auto relatively_equal(T a, T b, T relative_epsilon) {
+	return absolute(a - b) < relative_epsilon * max(absolute(a), absolute(b));
 }
 
 forceinline f32 set_sign(f32 dst, f32 src) {
@@ -2479,18 +2488,10 @@ forceinline T saturate(T t) {
 	return clamp(t, convert<T>(0), convert<T>(1));
 }
 
-template <class T>
-forceinline auto smoothstep3(T x) {
-	return (3 - 2 * x) * x * x;
-}
-template <class T>
-forceinline auto smoothstep5(T x) {
-	return x*x*x*(x*(6*x - 15) + 10);
-}
-template <class T>
-forceinline auto smoothstep(T x) {
-	return smoothstep3(x);
-}
+forceinline auto smoothstep3_unclamped(auto x) { return (3 - 2 * x) * x * x; }
+forceinline auto smoothstep5_unclamped(auto x) { return x*x*x*(x*(6*x - 15) + 10); }
+template <class T> forceinline auto smoothstep3(T x) { return smoothstep3_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
+template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 
 } // namespace tl
 

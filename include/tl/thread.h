@@ -379,7 +379,8 @@ private:
 	T value;
 };
 
-#define locked_use(name) name * [&](auto &name) -> decltype(auto)
+#define locked_use_ret(name) name * [&](auto &name)
+#define locked_use(name) locked_use_ret(name) -> decltype(auto)
 
 template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
