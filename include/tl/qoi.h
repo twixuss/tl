@@ -50,18 +50,10 @@ struct DecodeOptions {
 
 TL_API Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options = {});
 
-enum class EncodeError {
-};
-
-inline umm append(StringBuilder &builder, EncodeError error) {
-	switch (error) {
-	}
-	return append(builder, "(unknown tl::qoi::EncodeError)");
-}
 struct EncodeOptions {
 };
 
-TL_API Result<List<u8>, EncodeError> encode(v4u8 *pixels, v2u size, EncodeOptions options = {});
+TL_API List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options = {});
 
 }
 }
@@ -209,7 +201,7 @@ Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 
 	#undef read
 }
-Result<List<u8>, EncodeError> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
+List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
 	StringBuilder builder;
 	defer { free(builder); };
 

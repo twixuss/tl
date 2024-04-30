@@ -1098,6 +1098,15 @@ protected:
 	}
 };
 
+template <>
+struct OptionalBase<void> {
+protected:
+	bool _has_value;
+	constexpr OptionalBase() {
+		this->_has_value = false;
+	}
+};
+
 template <class T>
 struct OptionalBaseNonTrivial : OptionalBase<T> {
 	constexpr ~OptionalBaseNonTrivial() {
@@ -1108,14 +1117,15 @@ struct OptionalBaseNonTrivial : OptionalBase<T> {
 
 template <class T>
 struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBase<T>, OptionalBaseNonTrivial<T>> {
+	using Element = T;
 	constexpr Optional() {}
-	constexpr Optional(T that) {
-		new (&this->_value) T(that);
+	constexpr Optional(Element that) {
+		new (&this->_value) Element(that);
 		this->_has_value = true;
 	}
-	constexpr Optional(Optional<T> const &that) {
+	constexpr Optional(Optional<Element> const &that) {
 		if (that._has_value) {
-			new (&this->_value) T(that._value);
+			new (&this->_value) Element(that._value);
 		}
 		this->_has_value = that._has_value;
 	}
@@ -1134,13 +1144,13 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
-	constexpr T value_or(Fallback &&fallback) requires requires { (T)fallback(); } {
+	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
 		if (this->_has_value)
 			return this->_value;
 		return fallback();
 	}
 
-	constexpr T value_or(T fallback) {
+	constexpr Element value_or(Element fallback) {
 		if (this->_has_value)
 			return this->_value;
 		return fallback;
@@ -1155,8 +1165,8 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 		return null_opt;
 	}
 
-	template <std::invocable<T> Fn>
-	constexpr auto map(Fn fn) const -> Optional<decltype(fn(std::declval<T>()))> {
+	template <std::invocable<Element> Fn>
+	constexpr auto map(Fn fn) const -> Optional<decltype(fn(std::declval<Element>()))> {
 		if (this->_has_value) {
 			return fn(this->_value);
 		}
@@ -1167,6 +1177,47 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 		if (this->_has_value)
 			fn(this->_value);
 	}
+
+#pragma warning(suppress: 4820)
+};
+
+template <>
+struct Optional<void> : OptionalBase<void> {
+	using Element = void;
+	constexpr Optional() {}
+	constexpr Optional(Optional<Element> const &that) {
+		this->_has_value = that._has_value;
+	}
+	constexpr Optional(null_opt_t) {
+		this->_has_value = false;
+	}
+
+	constexpr void reset() {
+		this->_has_value = false;
+	}
+
+	constexpr explicit operator bool() const { return this->_has_value; }
+
+	constexpr bool has_value() const { return this->_has_value; }
+	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
+	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
+
+	template <class Fallback>
+	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
+		if (this->_has_value)
+			return void();
+		return fallback();
+	}
+
+	template <std::invocable<Element> Fn>
+	constexpr auto map(Fn fn) const -> Optional<decltype(fn(std::declval<Element>()))> {
+		if (this->_has_value) {
+			return fn();
+		}
+		return null_opt;
+	}
+
+	void _set_has_value(bool x) { this->_has_value = x; }
 
 #pragma warning(suppress: 4820)
 };
@@ -1235,6 +1286,30 @@ struct Result {
 		if (!_is_value)
 			return _error;
 		return fallback;
+	}
+	
+	constexpr auto map(auto fn) requires requires(Value v) { fn(v); } {
+		using R = decltype(fn(_value));
+		Optional<R> result;
+		if constexpr (std::is_same_v<R, void>) {
+			if (_is_value) {
+				fn(_value);
+				result._set_has_value(true);
+			}
+		} else {
+			if (_is_value) {
+				result = fn(_value);
+			}
+		}
+		return result;
+	}
+
+	constexpr auto or_else(auto fn) requires requires { fn(); } {
+		using R = decltype(fn());
+		if (_is_value) {
+			return Optional<R>{};
+		}
+		return Optional<R>{ fn() };
 	}
 
 private:
