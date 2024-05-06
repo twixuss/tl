@@ -1793,6 +1793,16 @@ constexpr T *find_if(Span<T> span, Predicate &&predicate) {
 	return 0;
 }
 
+template <class T, class Predicate>
+constexpr T *find_last_if(Span<T> span, Predicate &&predicate) {
+	for (auto i = span.end() - 1; i >= span.begin(); --i) {
+		if (predicate(*i)) {
+			return i;
+		}
+	}
+	return 0;
+}
+
 template <class T>
 constexpr T *find_any(Span<T> where, Span<T> what) {
 	for (auto &a : where) {

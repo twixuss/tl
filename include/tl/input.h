@@ -124,7 +124,7 @@ namespace tl {
 
 #endif
 
-enum Key {
+enum Key : u16 {
 #define K(key, value) Key_##key = value,
 	ALL_KEYS(K)
 #undef K
