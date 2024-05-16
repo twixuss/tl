@@ -2388,11 +2388,12 @@ struct BitSet {
 	bool get(umm i) const {
 		return word(i) & bit(i);
 	}
-	void set(umm i) {
-		word(i) |= bit(i);
-	}
-	void unset(umm i) {
-		word(i) &= ~bit(i);
+	void set(umm i, bool value) {
+		if (value) {
+			word(i) |= bit(i);
+		} else {
+			word(i) &= ~bit(i);
+		}
 	}
 	void flip(umm i) {
 		word(i) ^= bit(i);
