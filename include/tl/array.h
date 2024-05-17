@@ -36,6 +36,15 @@ struct Array {
 	T data[count];
 };
 
+template <umm count, class T>
+constexpr Array<T, count> broadcast_to_array(T value) {
+	Array<T, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = value;
+	}
+	return result;
+}
+
 template <class T, umm count>
 constexpr umm count_of(Array<T, count> const &arr) {
 	return count;
@@ -82,6 +91,25 @@ constexpr bool for_each(Array<T, count> &array, auto &&fn) {
 		}
 	}
 	return false;
+}
+
+template <class T, umm count>
+constexpr auto operator==(Array<T, count> const &a, Array<T, count> const &b) {
+	Array<decltype(a.data[0] == b.data[0]), count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = a.data[i] == b.data[i];
+	}
+	return result;
+}
+
+template <class T, umm count>
+constexpr bool all(Array<T, count> const &a) {
+	for (umm i = 0; i < count; ++i) {
+		if (!all(a.data[i])) {
+			return false;
+		}
+	}
+	return true;
 }
 
 template <class T, umm _count_x, umm _count_y>

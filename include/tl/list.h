@@ -1141,9 +1141,9 @@ struct LinearSet : Span<T, Size_> {
 	Span span() { return *this; }
 };
 
-template <class T>
-void free(LinearSet<T> &set) {
-	free((List<T> &)set);
+template <class T, class Allocator>
+void free(LinearSet<T, Allocator> &set) {
+	free((List<T, Allocator> &)set);
 }
 
 template <class T>
