@@ -51,6 +51,9 @@ forceinline s64 atomic_decrement(s64 volatile *a) { return (s64)atomic_decrement
 #endif
 
 template <class T>
+concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
+
+template <AInterlockExchangeable T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
 	     if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
@@ -61,7 +64,7 @@ forceinline T atomic_set(T volatile *dst, T src) {
 	return *(T *)&result;
 }
 
-template <class T>
+template <AInterlockExchangeable T>
 forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
 	s64 result;
 	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&new_value, *(long long*)&comparand);
@@ -72,7 +75,7 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 	return *(T *)&result;
 }
 
-template <class T>
+template <AInterlockExchangeable T>
 forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
 	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
@@ -245,6 +248,21 @@ struct SleepySpinner {
 		}
 	}
 };
+
+template <AInterlockExchangeable T, ASpinner Spinner = BasicSpinner>
+forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requires requires { { fn(*(T *)0) } -> std::same_as<T>; } {
+	using Int = TypeAt<log2(sizeof(T)), u8, u16, u32, u64>;
+	while (1) {
+		auto old_value = *a;
+		auto new_value = fn(old_value);
+		if (atomic_compare_exchange((Int volatile *)a, *(Int *)&new_value, *(Int *)&old_value) == *(Int *)&old_value) {
+			return old_value;
+		}
+		spinner.spin();
+	}
+}
+
+#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&, _b = b](auto _a) { return _a + _b; }, __VA_ARGS__))
 
 template <ASpinner Spinner = SleepySpinner>
 void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {
