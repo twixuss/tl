@@ -226,6 +226,10 @@ union v4<f32> {
 #undef EQ_3
 #undef EQ_4
 
+template <class T> v2(T, T) -> v2<T>;
+template <class T> v3(T, T, T) -> v3<T>;
+template <class T> v4(T, T, T, T) -> v4<T>;
+
 using v2b = v2<bool>; using v3b = v3<bool>; using v4b = v4<bool>;
 
 using v2s8 = v2<s8>; using v3s8 = v3<s8>; using v4s8 = v4<s8>;
