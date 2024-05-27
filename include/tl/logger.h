@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 #include "console.h"
-#include "thread.h"
 
 /*
 #define TL_LOGGER_CONTEXT_MEMBERS \

@@ -66,22 +66,22 @@ namespace tl {
 	forceinline constexpr v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
 	forceinline constexpr v2 operator o(Scalar b) const { return {x o b, y o b}; } \
 	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
-	forceinline constexpr v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
-	forceinline constexpr v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
+	forceinline constexpr v2 &operator o##=(v2 b) { return x o##= b.x, y o##= b.y, *this;} \
+	forceinline constexpr v2 &operator o##=(Scalar b) { return x o##= b, y o##= b, *this;}
 
 #define BINOP_3(o) \
 	forceinline constexpr v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
 	forceinline constexpr v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
 	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
-	forceinline constexpr v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
-	forceinline constexpr v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
+	forceinline constexpr v3 &operator o##=(v3 b) { return x o##= b.x, y o##= b.y, z o##= b.z, *this;} \
+	forceinline constexpr v3 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, *this;}
 
 #define BINOP_4(o) \
 	forceinline constexpr v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
 	forceinline constexpr v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
 	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
-	forceinline constexpr v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
-	forceinline constexpr v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
+	forceinline constexpr v4 &operator o##=(v4 b) { return x o##= b.x, y o##= b.y, z o##= b.z, w o##= b.w, *this;} \
+	forceinline constexpr v4 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, w o##= b, *this;}
 
 #define CMPOP_2(o) \
 	forceinline constexpr Mask operator o(v2 b) const { return {x o b.x, y o b.y}; } \

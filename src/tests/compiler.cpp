@@ -128,7 +128,7 @@ u8 const volatile & __vectorcall fn49(){mangled_name=__FUNCDNAME__;return X;}
 u8 const volatile & __vectorcall fn50(){mangled_name=__FUNCDNAME__;return X;}
 
 void compiler_test() {
-	scoped(temporary_allocator);
+	scoped(current_temporary_allocator);
 
 	bool failed = false;
 

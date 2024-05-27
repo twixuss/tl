@@ -27,21 +27,45 @@
 #define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
 
 #ifndef assert
-#define assert(x, ...) assert_always(x, __VA_ARGS__)
+#define assert(x, ...) assert_always(x __VA_OPT__(,) __VA_ARGS__)
 #endif
 
-#define assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#if 1
+// Tried to make these work with custom message, both old and new preprocessors are shit, don't work.
+#define TL_assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
-#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "", __VA_ARGS__), __assume(0))
+#define TL_assert_equal_fmt(a, b, c, ...)         assert((a) == (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_not_equal_fmt(a, b, c, ...)     assert((a) != (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_less_fmt(a, b, c, ...)          assert((a) <  (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_greater_fmt(a, b, c, ...)       assert((a) >  (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_less_equal_fmt(a, b, c, ...)    assert((a) <= (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_greater_equal_fmt(a, b, c, ...) assert((a) >= (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+
+#define assert_equal(a, b, ...)         CONCAT(TL_assert_equal,         __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_not_equal(a, b, ...)     CONCAT(TL_assert_not_equal,     __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_less(a, b, ...)          CONCAT(TL_assert_less,          __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_greater(a, b, ...)       CONCAT(TL_assert_greater,       __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_less_equal(a, b, ...)    CONCAT(TL_assert_less_equal,    __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_greater_equal(a, b, ...) CONCAT(TL_assert_greater_equal, __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#else
+#define assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#endif
+
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
 #define bounds_check(x) x
@@ -106,8 +130,8 @@
 #define REDECLARE_REF(name, expr) auto &_##name = expr; auto &name = _##name;
 
 // static_assert(false) is ill-formed in removed branch of constexpr if...
-#define static_error_t(t, ...) static_assert(!sizeof(t*), __VA_ARGS__)
-#define static_error_v(v, ...) static_error_t(decltype(v), __VA_ARGS__)
+#define static_error_t(t, ...) static_assert(!sizeof(t*) __VA_OPT__(,) __VA_ARGS__)
+#define static_error_v(v, ...) static_error_t(decltype(v) __VA_OPT__(,) __VA_ARGS__)
 
 #define TL_DECLARE_CONCEPT(name)                                                \
 	template <class T> struct S##name : std::false_type {};                     \

@@ -1,6 +1,7 @@
 #pragma once
 #include "logger.h"
 #include "file.h"
+#include "thread.h"
 /*
 #define TL_DEFAULT_LOGGER_MAIN_CONTEXT_MEMBERS \
 	x(tl::File, default_logger_file) \

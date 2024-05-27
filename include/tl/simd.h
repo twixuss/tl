@@ -454,17 +454,17 @@ template <class Scalar, umm count> requires requires(Scalar s) { --s; } forceinl
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v4<Scalar>, count> b) { return broadcast<count>(a) op b; } \
 
 #define A(op) \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, Vector<Scalar, count> b) { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, std::type_identity_t<Scalar> b) { return a op= broadcast<count>(b); } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, Vector<v2<Scalar>, count> b)    { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, Vector<v3<Scalar>, count> b)    { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, Vector<v4<Scalar>, count> b)    { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op= broadcast<count>(b); } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op= broadcast<count>(b); } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<Scalar, count> &operator op##=(Vector<Scalar, count> &a, Vector<Scalar, count> b) { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<Scalar, count> &operator op##=(Vector<Scalar, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, Vector<v2<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, Vector<v3<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, Vector<v4<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
 
 #define OPERATION(op) O(op) A(op)
 
@@ -808,7 +808,7 @@ template <> inline Vector<f32, 4> reciprocal(Vector<f32, 4> v) { return {.m = _m
 template <> inline Vector<f32, 4> floor(Vector<f32, 4> v) { return {.m = _mm_floor_ps(v.m)}; }
 template <> inline Vector<f32, 4> ceil(Vector<f32, 4> v) { return {.m = _mm_ceil_ps(v.m)}; }
 template <> inline Vector<f32, 4> frac(Vector<f32, 4> v) { return {.m = _mm_sub_ps(v.m, _mm_floor_ps(v.m))}; }
-inline Vector<f32, 4> set_sign(Vector<f32, 4> d, Vector<f32, 4> s) { return {.m = vec16_or(vec16_and(d.m, s32x4_set1(0x7fff'ffff)), vec16_and(s.m, s32x4_set1(0x8000'0000)))}; }
+inline Vector<f32, 4> set_sign(Vector<f32, 4> d, Vector<f32, 4> s) { return {.m = _mm_or_ps(_mm_and_ps(d.m, _mm_castsi128_ps(_mm_set1_epi32(0x7fff'ffff))), _mm_and_ps(s.m, _mm_castsi128_ps(_mm_set1_epi32(0x8000'0000))))}; }
 inline Vector<f32, 4> sign(Vector<f32, 4> v) { return set_sign(broadcast<4>(1.0f), v); }
 
 template <> inline bool all(Vector<Mask32, 4> v) { return _mm_movemask_ps(_mm_castsi128_ps(v.m)) == 15; }

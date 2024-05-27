@@ -22,7 +22,7 @@ umm append(StringBuilder &builder, Token token) {
 }
 
 s32 tl_main(Span<Span<utf8>> args) {
-	current_allocator = temporary_allocator;
+	current_allocator = current_temporary_allocator;
 
 	auto signature_path = tl_file_string("../data/opengl.h"ts);
 	auto signature_file = read_entire_file(signature_path);

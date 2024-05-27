@@ -247,8 +247,7 @@ Scene3D parse_glb_from_memory(Span<u8> memory) {
 					case Glb::ComponentType_u16: {
 						auto source_colors = (u16 *)colors_data;
 
-						List<v4f> colors_list;
-						colors_list.allocator = temporary_allocator;
+						List<v4f, TemporaryAllocator> colors_list;
 						colors_list.reserve(color_count);
 
 						for (u32 i = 0; i < color_count; ++i) {

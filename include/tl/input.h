@@ -132,9 +132,9 @@ enum Key : u16 {
 
 inline umm append(StringBuilder &builder, Key key) {
 	switch (key) {
-#define K(key, value) case Key_##key: return append(builder, u8#key##s);
-	ALL_KEYS(K)
-#undef K
+		#define K(key, value) case Key_##key: return append(builder, u8###key##s);
+		ALL_KEYS(K)
+		#undef K
 	}
 	return append_format(builder, "Key {}", (u32)key);
 }

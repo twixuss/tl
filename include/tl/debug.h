@@ -74,6 +74,8 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 #if OS_WINDOWS
 
 #include "compiler.h"
+#include "logger.h"
+#include "win32.h"
 
 #pragma warning(push, 0)
 #pragma push_macro("OS_WINDOWS")

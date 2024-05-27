@@ -12,7 +12,7 @@ void allocator_test(Allocator allocator) {
 
 void common_test() {
 	allocator_test(default_allocator);
-	allocator_test(temporary_allocator);
+	allocator_test(current_temporary_allocator);
 	static_assert(tl::floor(-4, 3) == -6);
 	static_assert(tl::floor(-3, 3) == -3);
 	static_assert(tl::floor(-2, 3) == -3);

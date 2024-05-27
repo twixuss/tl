@@ -580,7 +580,7 @@ static GLuint compile_shader(GLuint shader) {
 		GLint maxLength;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = temporary_allocator.allocate<char>(maxLength);
+		auto message = current_temporary_allocator.allocate<char>(maxLength);
 		glGetShaderInfoLog(shader, maxLength, &maxLength, message);
 
 		glDeleteShader(shader);
@@ -593,7 +593,7 @@ static GLuint compile_shader(GLuint shader) {
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
 	StringBuilder version_builder;
-	version_builder.allocator = temporary_allocator;
+	version_builder.allocator = current_temporary_allocator;
 	append(version_builder, "#version "s);
 	append(version_builder, version);
 
@@ -658,7 +658,7 @@ GLuint create_program(ProgramStages stages) {
 		GLint maxLength;
 		glGetProgramiv(result, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = temporary_allocator.allocate<char>(maxLength);
+		auto message = current_temporary_allocator.allocate<char>(maxLength);
 		glGetProgramInfoLog(result, maxLength, &maxLength, message);
 
 		glDeleteProgram(result);

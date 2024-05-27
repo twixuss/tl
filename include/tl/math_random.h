@@ -632,9 +632,9 @@ forceinline Result value_noise(v3s coordinate, s32 step, Interpolate interpolate
 template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(f32 position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
 template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(v2f position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
 template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_linear(v3f position) { return value_noise<Result, Randomizer>(floor(position), frac(position)); }
-template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(f32 position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
-template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v2f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
-template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v3f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep(frac(position))); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(f32 position) { return value_noise<Result, Randomizer>(floor(position), smoothstep3(frac(position))); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v2f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep3(frac(position))); }
+template <class Result, class Randomizer = DefaultRandomizer> forceinline Result value_noise_smooth(v3f position) { return value_noise<Result, Randomizer>(floor(position), smoothstep3(frac(position))); }
 
 template <class Randomizer = DefaultRandomizer>
 forceinline f32 gradient_noise(f32 coordinate) {
@@ -653,7 +653,7 @@ forceinline f32 gradient_noise(f32 coordinate) {
 	f32 v0 = d0 * t0;
 	f32 v1 = d1 * t1;
 
-	f32 t = smoothstep(local);
+	f32 t = smoothstep3(local);
 	return lerp(v0, v1, t) + 0.5f;
 }
 
@@ -687,7 +687,7 @@ forceinline f32 gradient_noise(v2f coordinate) {
 	f32 v01 = g01.x * t0.x + g01.y * t1.y;
 	f32 v11 = g11.x * t1.x + g11.y * t1.y;
 
-	v2f t = smoothstep(local);
+	v2f t = smoothstep3(local);
 	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
 
@@ -711,7 +711,7 @@ forceinline f32 gradient_noise(v3f coordinate) {
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 
-	v3f t = smoothstep(local);
+	v3f t = smoothstep3(local);
 
 	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v3f g000 = get_direction({0, 0, 0});
@@ -770,7 +770,7 @@ forceinline f32 gradient_noise(v2s coordinate, s32 step) {
 	f32 v01 = dot(g01, v2f{t0.x, t1.y});
 	f32 v11 = dot(g11, v2f{t1.x, t1.y});
 
-	v2f t = smoothstep(local);
+	v2f t = smoothstep3(local);
 	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
 }
 
@@ -801,7 +801,7 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 	};
 	static_assert(is_power_of_2(count_of(directions)));
 
-	v3f t = smoothstep(local);
+	v3f t = smoothstep3(local);
 
 	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
     v3f g000 = get_direction({0, 0, 0});
