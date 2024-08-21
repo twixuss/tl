@@ -601,10 +601,14 @@ struct Queue {
 		};
 		return result;
 	}
-
-	auto operator[](this auto &&self, umm i) {
-		bounds_check(assert_less(i, self.count));
-		return self.get(self.start + i);
+	
+	auto &operator[](umm i) {
+		bounds_check(assert_less(i, count));
+		return get(start + i);
+	}
+	auto &operator[](umm i) const {
+		bounds_check(assert_less(i, count));
+		return get(start + i);
 	}
 
 	void clear() {

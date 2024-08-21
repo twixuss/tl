@@ -2217,6 +2217,27 @@ forceinline m4 transpose(m4 const& m) {
 	return result;
 }
 
+inline m3 inverse(m3 const &m) {
+	// computes the inverse of a matrix m
+	f32 det = m.i.x * (m.j.y * m.k.z - m.k.y * m.j.z) -
+	          m.i.y * (m.j.x * m.k.z - m.j.z * m.k.x) +
+	          m.i.z * (m.j.x * m.k.y - m.j.y * m.k.x);
+
+	f32 invdet = 1 / det;
+
+	return {
+		(m.j.y * m.k.z - m.k.y * m.j.z) * invdet,
+		(m.i.z * m.k.y - m.i.y * m.k.z) * invdet,
+		(m.i.y * m.j.z - m.i.z * m.j.y) * invdet,
+		(m.j.z * m.k.x - m.j.x * m.k.z) * invdet,
+		(m.i.x * m.k.z - m.i.z * m.k.x) * invdet,
+		(m.j.x * m.i.z - m.i.x * m.j.z) * invdet,
+		(m.j.x * m.k.y - m.k.x * m.j.y) * invdet,
+		(m.k.x * m.i.y - m.i.x * m.k.y) * invdet,
+		(m.i.x * m.j.y - m.j.x * m.i.y) * invdet,
+	};
+}
+
 inline m4 inverse(m4 const &m) {
 	f32 A2323 = m.k.z * m.l.w - m.k.w * m.l.z;
 	f32 A1323 = m.k.y * m.l.w - m.k.w * m.l.y;

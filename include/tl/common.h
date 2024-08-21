@@ -1164,8 +1164,10 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
+	constexpr auto &value() { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() { return this->_value; }
+	constexpr auto &value() const { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() const { return this->_value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -1223,8 +1225,6 @@ struct Optional<void> : OptionalBase<void> {
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -2423,9 +2423,9 @@ struct BitSet {
 		word(i) ^= bit(i);
 	}
 
-	auto &word(this auto &&self, umm i) {
-		return self.words[i / bits_in_word];
-	}
+	auto &word(umm i) { return words[i / bits_in_word]; }
+	auto &word(umm i) const { return words[i / bits_in_word]; }
+
 	umm bit(umm i) const {
 		return (Word)1 << (i % bits_in_word);
 	}

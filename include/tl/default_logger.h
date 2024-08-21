@@ -15,7 +15,7 @@ extern TL_API OsLock stdout_mutex;
 extern TL_API File default_logger_file;
 #endif
 
-struct TL_API DefaultLogger : LoggerBase {
+struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 	Span<utf8> module = {};
 	File file = TL_GET_GLOBAL(default_logger_file);
 	LogSeverity min_severity = TL_DEBUG ? LogSeverity::debug : LogSeverity::info;

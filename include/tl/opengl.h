@@ -34,7 +34,9 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_BLEND_EQUATION                        0x8009
 #define GL_FUNC_SUBTRACT                         0x800A
 #define GL_FUNC_REVERSE_SUBTRACT                 0x800B
+#define GL_CLAMP_TO_BORDER                       0x812D
 #define GL_CLAMP_TO_EDGE                         0x812F
+#define GL_TEXTURE_BASE_LEVEL                    0x813C
 #define GL_TEXTURE_MAX_LEVEL                     0x813D
 #define GL_DEPTH_COMPONENT16                     0x81A5
 #define GL_DEPTH_COMPONENT32                     0x81A7
