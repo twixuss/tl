@@ -666,7 +666,7 @@ GLuint create_program(ProgramStages stages) {
 		glDeleteProgram(result);
 		result = 0;
 
-		print(message);
+		print(Span(message, maxLength));
 	}
 	return result;
 }
@@ -1166,7 +1166,8 @@ inline void scissor(v2f position, v2f size) { ::glScissor((GLsizei)position.x, (
 inline void scissor(v2s position, v2s size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 inline void scissor(v2u position, v2u size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 
-inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1ui(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, s32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }
