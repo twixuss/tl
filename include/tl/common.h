@@ -240,6 +240,12 @@ constexpr umm type_index_of = IndexOfT<T, Rest...>::value;
 template <class First, class ...Rest>
 concept AllSame = (std::is_same_v<First, Rest> && ...);
 
+template <class First, class ...Rest>
+struct RequireAllSame {
+	static_assert(AllSame<First, Rest...>);
+	using Type = First;
+};
+
 template <class T, class ...Types>
 concept OneOf = (std::is_same_v<T, Types> || ...);
 

@@ -44,6 +44,9 @@ struct Array {
 	T data[count];
 };
 
+template <class T, class... Rest>
+Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof...(Rest)>;
+
 template <umm count, class T>
 constexpr Array<T, count> broadcast_to_array(T value) {
 	Array<T, count> result = {};
