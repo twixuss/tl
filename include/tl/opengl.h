@@ -34,6 +34,8 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_BLEND_EQUATION                        0x8009
 #define GL_FUNC_SUBTRACT                         0x800A
 #define GL_FUNC_REVERSE_SUBTRACT                 0x800B
+#define GL_TEXTURE_3D                            0x806F
+#define GL_TEXTURE_WRAP_R                        0x8072
 #define GL_CLAMP_TO_BORDER                       0x812D
 #define GL_CLAMP_TO_EDGE                         0x812F
 #define GL_TEXTURE_BASE_LEVEL                    0x813C
@@ -154,6 +156,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_DEPTH24_STENCIL8                      0x88F0
 #define GL_SRC1_COLOR                            0x88F9
 #define GL_ONE_MINUS_SRC1_COLOR                  0x88FA
+#define GL_MAX_ARRAY_TEXTURE_LAYERS              0x88FF
 #define GL_UNIFORM_BUFFER                        0x8A11
 #define GL_VERTEX_SHADER                         0x8B31
 #define GL_FRAGMENT_SHADER                       0x8B30
@@ -161,6 +164,13 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_LINK_STATUS                           0x8B82
 #define GL_INFO_LOG_LENGTH                       0x8B84
 #define GL_ACTIVE_UNIFORMS                       0x8B86
+#define GL_TEXTURE_1D_ARRAY                      0x8C18
+#define GL_PROXY_TEXTURE_1D_ARRAY                0x8C19
+#define GL_TEXTURE_2D_ARRAY                      0x8C1A
+#define GL_PROXY_TEXTURE_2D_ARRAY                0x8C1B
+#define GL_TEXTURE_BINDING_1D_ARRAY              0x8C1C
+#define GL_TEXTURE_BINDING_2D_ARRAY              0x8C1D
+#define GL_SRGB8                                 0x8C41
 #define GL_FRAMEBUFFER_COMPLETE                  0x8CD5
 #define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT     0x8CD6
 #define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
@@ -172,6 +182,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_FRAMEBUFFER                           0x8D40
 #define GL_RENDERBUFFER                          0x8D41
 #define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE    0x8D56
+#define GL_FRAMEBUFFER_SRGB                      0x8DB9
 #define GL_COPY_READ_BUFFER                      0x8F36
 #define GL_COPY_WRITE_BUFFER                     0x8F37
 #define GL_SHADER_STORAGE_BUFFER                 0x90D2
@@ -594,16 +605,15 @@ static GLuint compile_shader(GLuint shader) {
 }
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
-	StringBuilder version_builder;
-	version_builder.allocator = current_temporary_allocator;
-	append(version_builder, "#version "s);
-	append(version_builder, version);
+	StaticList<char, 64> version_string;
+
+	version_string.add("#version "s);
+	write_as_string(version_string, version);
 
 	if (core) {
-		append(version_builder, " core"s);
+		version_string.add(" core"s);
 	}
-	append(version_builder, "\n"s);
-	auto version_string = (List<char>)to_string(version_builder);
+	version_string.add("\n"s);
 
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;
@@ -757,11 +767,22 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 	for (u32 function_index = 0; function_index < function_count; ++function_index) {
 		char const *name = function_names[function_index];
 		void *function = wglGetProcAddress(name);
-		if (!function) {
+		if (function) {
+			functions.data[function_index] = function;
+		} else {
 			print("Failed to query '{}'\n", name);
 		}
-		functions.data[function_index] = function;
 	}
+
+	#define D(ret, name, args, params)                                    \
+		if (!functions._##name) {                                         \
+			functions._##name = autocast +[]() {                          \
+				println("OpenGL function '{}' is not supported.", #name); \
+				abort();                                                  \
+			};                                                            \
+		}
+	EXT_AND_OS_FUNCS
+	#undef D
 
 
 	if (functions._wglCreateContextAttribsARB) {

@@ -923,6 +923,23 @@ forceinline f32 angle(v3f a, v3f b) {
 
 forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
 
+v3f rotate_around(v3f v, v3f axis, f32 angle) {
+    v3f a = normalize(axis);
+
+    v2f cs = cos_sin(angle);
+    f32 ic = 1.0f - cs.x;
+	v3f as = a * cs.y;
+	v3f aic = a * ic;
+
+    m3 r = {
+        a.x * aic.x + cs.x,  a.x * aic.y - as.z,  a.x * aic.z + as.y,
+        a.y * aic.x + as.z,  a.y * aic.y + cs.x,  a.y * aic.z - as.x,
+        a.z * aic.x - as.y,  a.z * aic.y + as.x,  a.z * aic.z + cs.x,
+    };
+
+    return r * v;
+}
+
 forceinline v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
 	h = frac(h);
 	f32 c = v * s;
@@ -1553,7 +1570,8 @@ Optional<aabb<v2<S>>> merge_into_one(aabb<v2<S>> a, aabb<v2<S>> b) {
 // a - b
 // subtract b from a
 //
-// subtract_volume treats a and b as volumes
+// subtract_volume treats a and b as volumes.
+// Returned adjacent aabbs have the same min and max
 //
 // subtract_points treats a and b as sets of points;
 // Every aabb in result contains unique set of points.

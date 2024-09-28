@@ -1478,6 +1478,54 @@ struct Span {
 	constexpr bool operator==(Span<T, ThatSize> that) const {
 		if (count != that.count)
 			return false;
+
+		if constexpr (std::is_integral_v<T>) {
+			u8 *ap = (u8 *)data;
+			u8 *bp = (u8 *)that.data;
+
+			u8 *endp = (u8 *)end();
+			
+			#if TL_USE_SIMD
+			while (endp - ap >= 16) {
+				__m128i a = _mm_loadu_epi32(ap); ap += 16;
+				__m128i b = _mm_loadu_epi32(bp); bp += 16;
+				__m128i c = _mm_cmpeq_epi32(a, b);
+				int m = _mm_movemask_ps(_mm_castsi128_ps(c));
+				if (m != 0xF) {
+					return false;
+				}
+			}
+			#endif
+			while (endp - ap >= 8) {
+				u64 a = *(u64 *)ap; ap += 8;
+				u64 b = *(u64 *)bp; bp += 8;
+				if (a != b) {
+					return false;
+				}
+			}
+			while (endp - ap) {
+				if (*ap++ != *bp++) {
+					return false;
+				}
+			}
+			return true;
+		}
+		#if TL_USE_SIMD
+		if constexpr (std::is_same_v<T, f32>) {
+			umm remaining_count = count;
+			f32 *ap = data;
+			f32 *bp = that.data;
+			while (remaining_count >= 4) {
+				__m128 a = _mm_loadu_ps(ap); ap += 16;
+				__m128 b = _mm_loadu_ps(bp); bp += 16;
+				__m128 c = _mm_cmpeq_ps(a, b);
+				int m = _mm_movemask_epi32(c);
+				if (m != 0xFFFF) {
+					return false;
+				}
+			}
+		}
+		#endif
 		for (Size i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
@@ -1766,7 +1814,16 @@ constexpr T *find(Span<T, Size> where, T const &what) {
 
 template <class T, class SizeA, class SizeB>
 constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
-	return find(where.begin(), where.end(), what.begin(), what.end());
+	if ((smm)(where.count - what.count + 1) <= 0)
+		return 0;
+
+	for (umm i = 0; i < where.count - what.count + 1; ++i) {
+		auto where_part = Span(where.data + i, what.count);
+		if (where_part == what) {
+			return where_part.data;
+		}
+	}
+	return 0;
 }
 
 template <class T>
@@ -1948,6 +2005,18 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 	}
 
 	process_group(span.subspan(first_index, span.count - first_index));
+}
+
+template <class T, class Size>
+Span<T, Size> strip(Span<T, Size> span, auto &&predicate) {
+	while (span.count && predicate(span.data[0])) {
+		span.data++;
+		span.count--;
+	}
+	while (span.count && predicate(span.data[span.count - 1])) {
+		span.count--;
+	}
+	return span;
 }
 
 template <class T>

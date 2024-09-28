@@ -31,6 +31,7 @@ struct Scene3D {
 	struct Node {
 		Span<utf8> name;
 		CommonMesh *mesh;
+		v3f position;
 	};
 
 	List<CommonMesh> meshes;

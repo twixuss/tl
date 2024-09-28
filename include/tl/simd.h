@@ -336,7 +336,7 @@ struct MaskVectorT<v4<Scalar>, count> {
 };
 
 template <class Scalar, umm count>
-using MaskVector = typename MaskVectorT<Scalar, count>::Type; // FIXME: compiler error when two last u64's are not provided. wtf
+using MaskVector = typename MaskVectorT<Scalar, count>::Type;
 
 template <umm count, class Scalar>
 forceinline Vector<Scalar, count> broadcast(Scalar s) {

@@ -32,11 +32,15 @@ forceinline u8 *chunk_data(Chunk *chunk) {
 
 TL_API Scene3D parse_from_memory(Span<u8> memory);
 
-inline Optional<Scene3D> parse_from_file(Span<utf8> path) {
+struct ParseFromFileResult {
+	Buffer file_contents;
+	Scene3D scene;
+};
+
+inline Optional<ParseFromFileResult> parse_from_file(Span<utf8> path) {
 	auto memory = read_entire_file(to_pathchars(path, true));
 	if (memory.data) {
-		defer { free(memory); };
-		return parse_from_memory(memory);
+		return ParseFromFileResult{memory, parse_from_memory(memory)};
 	}
 	return {};
 }
@@ -282,12 +286,22 @@ Scene3D parse_from_memory(Span<u8> memory) {
 		scene.meshes.add(mesh);
 	}
 
+	auto to_v3f = [](Json::Object::Array &array) {
+		assert(array.count == 3);
+		return v3f{
+			(f32)array[0].number(),
+			(f32)array[1].number(),
+			(f32)array[2].number(),
+		};
+	};
 
 	auto nodes = json.member(u8"nodes"s);
 	for (auto &node : nodes->array()) {
+		auto translation = node.member(u8"translation"s);
 		scene.nodes.add({
 			.name = node.member(u8"name"s)->string(),
 			.mesh = &scene.meshes[(u32)node.member(u8"mesh"s)->number()],
+			.position = translation ? to_v3f(translation->array()) : v3f{},
 		});
 	}
 
