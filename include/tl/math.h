@@ -394,33 +394,26 @@ forceinline v4fx8 unpack(v4fx8 v) {
 
 #endif
 
-#define MINMAX(t, c) PART(t, c, min) PART(t, c, max)
 
-#define PART(v2f, V2f, min)                                                          \
-	forceinline auto min(v2f a) { return min(a.x, a.y); }                            \
-	forceinline auto min(v2f a, v2f b) { return V2f(min(a.x, b.x), min(a.y, b.y)); }
-MINMAX(v2f, V2f)
-MINMAX(v2s, V2s)
-MINMAX(v2u, V2u)
-#undef PART
+#define VECTOR_REDUCE_FUNC(func) \
+	template <class Scalar> forceinline auto func(v2<Scalar> a) { return func(a.x, a.y); } \
+	template <class Scalar> forceinline auto func(v3<Scalar> a) { return func(a.x, a.y, a.z); } \
+	template <class Scalar> forceinline auto func(v4<Scalar> a) { return func(a.x, a.y, a.z, a.w); }
 
-#define PART(v3f, V3f, min)                                                                         \
-	forceinline auto min(v3f a) { return min(a.x, a.y, a.z); }                                      \
-	forceinline auto min(v3f a, v3f b) { return V3f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z)); }
-MINMAX(v3f, V3f)
-MINMAX(v3s, V3s)
-MINMAX(v3u, V3u)
-#undef PART
+#define VECTOR_COMPONENTWISE_FUNC_V(func) \
+	template <class Scalar> forceinline v2<Scalar> func(v2<Scalar> a) { return {func(a.x), func(a.y)}; } \
+	template <class Scalar> forceinline v3<Scalar> func(v3<Scalar> a) { return {func(a.x), func(a.y), func(a.z)}; } \
+	template <class Scalar> forceinline v4<Scalar> func(v4<Scalar> a) { return {func(a.x), func(a.y), func(a.z), func(a.w)}; }
 
-#define PART(v4f, V4f, min)                                                                                        \
-	forceinline auto min(v4f a) { return min(a.x, a.y, a.z, a.w); }                                                \
-	forceinline auto min(v4f a, v4f b) { return V4f(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }
-MINMAX(v4f, V4f)
-MINMAX(v4s, V4s)
-MINMAX(v4u, V4u)
-#undef PART
+#define VECTOR_COMPONENTWISE_FUNC_VV(func) \
+	template <class Scalar> forceinline v2<Scalar> func(v2<Scalar> a, v2<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y)}; } \
+	template <class Scalar> forceinline v3<Scalar> func(v3<Scalar> a, v3<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y), func(a.z, b.z)}; } \
+	template <class Scalar> forceinline v4<Scalar> func(v4<Scalar> a, v4<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y), func(a.z, b.z), func(a.w, b.w)}; }
 
-#undef MINMAX
+VECTOR_REDUCE_FUNC(min);
+VECTOR_REDUCE_FUNC(max);
+VECTOR_COMPONENTWISE_FUNC_VV(min);
+VECTOR_COMPONENTWISE_FUNC_VV(max);
 
 #define HALF(f32) forceinline f32 half(f32 v) { return v * 0.5f; }
 HALF(f32)
@@ -443,16 +436,11 @@ HALF(v3u)
 HALF(v4u)
 #undef HALF
 
-forceinline v2f floor(v2f v) { return { floor(v.x), floor(v.y) }; }
-forceinline v3f floor(v3f v) { return { floor(v.x), floor(v.y), floor(v.z) }; }
-forceinline v4f floor(v4f v) { return { floor(v.x), floor(v.y), floor(v.z), floor(v.w) }; }
+VECTOR_COMPONENTWISE_FUNC_V(floor);
+VECTOR_COMPONENTWISE_FUNC_V(floor_to_power_of_2);
+VECTOR_COMPONENTWISE_FUNC_V(frac);
 
-forceinline v2u floor_to_power_of_2(v2u v) { return {floor_to_power_of_2(v.x), floor_to_power_of_2(v.y)}; }
-
-forceinline v2f frac(v2f v) { return { frac(v.x), frac(v.y) }; }
-forceinline v3f frac(v3f v) { return { frac(v.x), frac(v.y), frac(v.z) }; }
-forceinline v4f frac(v4f v) { return { frac(v.x), frac(v.y), frac(v.z), frac(v.w) }; }
-
+// 2.8x faster in a simple benchmark
 forceinline v2s frac(v2s v, v2s s) {
 	__m128i vm = _mm_setr_epi32(v.x, v.y, 0, 0);
 	__m128i sm = _mm_setr_epi32(s.x, s.y, 0, 0);
@@ -461,21 +449,6 @@ forceinline v2s frac(v2s v, v2s s) {
 	__m128i result = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(vlo, slo)));
 	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
 	return *(v2s *)&result;
-}
-forceinline v3s frac(v3s v, v3s s) {
-	return {
-		frac(v.x, s.x),
-		frac(v.y, s.y),
-		frac(v.z, s.z),
-	};
-}
-forceinline v4s frac(v4s v, v4s step) {
-	return {
-		frac(v.x, step.x),
-		frac(v.y, step.y),
-		frac(v.z, step.z),
-		frac(v.w, step.w),
-	};
 }
 forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
 forceinline v3s frac(v3s v, s32 s) { return frac(v, V3s(s)); }
@@ -591,19 +564,18 @@ forceinline constexpr auto bezier_derivative(T a, T b, T c, T d, Float t) {
 	return -3*a + 3*b + t * (6*a - 12*b + 6*c + 3 * t * (-a + 3*b - 3*c + d));
 }
 
+template <std::unsigned_integral T> 
+forceinline constexpr T absolute(T v) { return v; }
+
+template <std::signed_integral T> 
+forceinline constexpr T absolute(T v) { return v < 0 ? -v :v; }
+
 forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
-forceinline constexpr v2f absolute(v2f v) { return {absolute(v.x), absolute(v.y)}; }
-forceinline constexpr v3f absolute(v3f v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
-forceinline constexpr v4f absolute(v4f v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
-
-forceinline constexpr s32 absolute(s32 v) { return v < 0 ? -v :v; }
-forceinline constexpr v2s absolute(v2s a) { return {absolute(a.x), absolute(a.y)}; }
-forceinline constexpr v3s absolute(v3s a) { return {absolute(a.x), absolute(a.y), absolute(a.z)}; }
-forceinline constexpr v4s absolute(v4s a) { return {absolute(a.x), absolute(a.y), absolute(a.z), absolute(a.w)}; }
-
-forceinline constexpr u32 absolute(u32 v) { return v; }
-
 forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v); }
+
+template <class Scalar> forceinline constexpr v2<Scalar> absolute(v2<Scalar> v) { return {absolute(v.x), absolute(v.y)}; }
+template <class Scalar> forceinline constexpr v3<Scalar> absolute(v3<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
+template <class Scalar> forceinline constexpr v4<Scalar> absolute(v4<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
 
 template <class T>
 forceinline constexpr auto approximately(T a, T b, T epsilon) {
@@ -835,7 +807,7 @@ template <> forceinline constexpr auto distance(f32 a, f32 b) { return absolute(
 template <> forceinline constexpr auto distance(f64 a, f64 b) { return absolute(a - b); }
 template <class T>
 forceinline constexpr auto manhattan(T a, T b) {
-	return sum(abs(a - b));
+	return sum(absolute(a - b));
 }
 forceinline s32 maxDistance(v3s a, v3s b) {
 	a = absolute(a - b);

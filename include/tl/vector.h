@@ -77,9 +77,9 @@ namespace tl {
 	forceinline constexpr v3 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, *this;}
 
 #define BINOP_4(o) \
-	forceinline constexpr v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
-	forceinline constexpr v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
-	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
+	forceinline constexpr v4 operator o(v4 b) const { return {Scalar(x o b.x), Scalar(y o b.y), Scalar(z o b.z), Scalar(w o b.w)}; } \
+	forceinline constexpr v4 operator o(Scalar b) const { return {Scalar(x o b), Scalar(y o b), Scalar(z o b), Scalar(w o b)}; } \
+	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {Scalar(a o b.x), Scalar(a o b.y), Scalar(a o b.z), Scalar(a o b.w)};} \
 	forceinline constexpr v4 &operator o##=(v4 b) { return x o##= b.x, y o##= b.y, z o##= b.z, w o##= b.w, *this;} \
 	forceinline constexpr v4 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, w o##= b, *this;}
 
