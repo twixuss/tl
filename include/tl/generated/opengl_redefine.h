@@ -91,6 +91,7 @@
 #define glGenSamplers tl::gl::_glGenSamplers
 #define glFramebufferTextureLayer tl::gl::_glFramebufferTextureLayer
 #define glNamedFramebufferTextureLayer tl::gl::_glNamedFramebufferTextureLayer
+#define glDeleteFramebuffers tl::gl::_glDeleteFramebuffers
 #define glBindSampler tl::gl::_glBindSampler
 #define glSamplerParameterf tl::gl::_glSamplerParameterf
 #define glSamplerParameteri tl::gl::_glSamplerParameteri
@@ -213,6 +214,7 @@
 #define glGenSamplers tl::gl::functions._glGenSamplers
 #define glFramebufferTextureLayer tl::gl::functions._glFramebufferTextureLayer
 #define glNamedFramebufferTextureLayer tl::gl::functions._glNamedFramebufferTextureLayer
+#define glDeleteFramebuffers tl::gl::functions._glDeleteFramebuffers
 #define glBindSampler tl::gl::functions._glBindSampler
 #define glSamplerParameterf tl::gl::functions._glSamplerParameterf
 #define glSamplerParameteri tl::gl::functions._glSamplerParameteri

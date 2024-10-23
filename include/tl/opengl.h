@@ -3,6 +3,7 @@
 #include "console.h"
 #include "math.h"
 #include "time.h"
+#include "includer.h"
 
 #pragma warning(push, 0)
 #define NOMINMAX
@@ -563,6 +564,96 @@ struct ProgramStages {
 
 TL_API GLuint create_program(ProgramStages stages);
 
+struct ProgramFile {
+	struct SourceFile : includer::SourceFileBase {
+		FileTime last_write_time = 0;
+			
+		void init() {
+			last_write_time = get_file_write_time(path).value_or(0);;
+		}
+		bool was_modified() {
+			return last_write_time < get_file_write_time(path).value_or(0);
+		}
+	};
+
+	struct Macro {
+		Span<utf8> name, value;
+	};
+
+	Span<utf8> path;
+	List<utf8> source;
+
+	GLenum vs = 0;
+	GLenum fs = 0;
+	GLuint program = 0;
+	includer::Includer<SourceFile> includer;
+
+	struct LoadOptions {
+		Span<Macro> macros = {};
+	};
+
+	void load(LoadOptions options = {}) {
+		current_logger.info("Recompiling {}", path);
+		
+		includer.load(path, &source, includer::LoadOptions{.append_location_info = [](StringBuilder &builder, Span<utf8> path, u32 line) {
+			append_format(builder, "\n#line {} \"", line);
+			for (auto c : path) {
+				append(builder, (char)(c == '\\' ? '/' : c));
+			}
+			append(builder, "\"\n");
+
+		}});
+
+		List<utf8> preprocessed;
+		defer { 
+			tl::free(preprocessed);
+		};
+
+		auto cursor = source.span();
+
+		while (cursor.count) {
+			for (auto &macro : options.macros) {
+				if (starts_with(cursor, macro.name)) {
+					preprocessed.add(macro.value);
+					cursor.set_begin(cursor.begin() + macro.name.count);
+					goto replaced_macro;
+				}
+			}
+
+			preprocessed.add(cursor[0]);
+			cursor.set_begin(cursor.begin() + 1);
+
+		replaced_macro:;
+		}
+
+		vs = gl::create_shader(GL_VERTEX_SHADER, 430, true, as_chars(preprocessed));
+		fs = gl::create_shader(GL_FRAGMENT_SHADER, 430, true, as_chars(preprocessed));
+		program = gl::create_program({.vertex = vs, .fragment = fs});
+
+		if (!vs || !fs || !program) {
+			//println("Preprocessed shader code:\n{}", preprocessed);
+		}
+	}
+
+	void unload() {
+		glDeleteProgram(program);
+		glDeleteShader(fs);
+		glDeleteShader(vs);
+	}
+	void free() {
+		includer.free();
+	}
+	bool needs_reload() {
+		for (auto &source_file : includer.source_files) {
+			if (source_file.was_modified()) {
+				return true;
+			}
+		}
+		return false;
+	}
+};
+
+
 #ifdef TL_IMPL
 
 #ifndef TL_OPENGL_DEBUG_BREAK_LEVEL
@@ -586,20 +677,19 @@ TL_API GLuint create_program(ProgramStages stages);
 static GLuint compile_shader(GLuint shader) {
 	glCompileShader(shader);
 
+	GLint maxLength;
+	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+	auto message = current_temporary_allocator.allocate<char>(maxLength);
+	glGetShaderInfoLog(shader, maxLength, &maxLength, message);
+
+	print(message);
+
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-
 	if (!status) {
-		GLint maxLength;
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-		auto message = current_temporary_allocator.allocate<char>(maxLength);
-		glGetShaderInfoLog(shader, maxLength, &maxLength, message);
-
 		glDeleteShader(shader);
 		shader = 0;
-
-		print(message);
 	}
 	return shader;
 }

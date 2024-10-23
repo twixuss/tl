@@ -93,6 +93,7 @@ void glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbu
 void glGenSamplers(GLsizei n, GLuint *samplers);
 void glFramebufferTextureLayer(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer);
 void glNamedFramebufferTextureLayer(GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer);
+void glDeleteFramebuffers(GLsizei n, GLuint *framebuffers);
 void glBindSampler(GLuint unit, GLuint sampler);
 void glSamplerParameterf(GLuint sampler, GLenum pname, GLfloat param);
 void glSamplerParameteri(GLuint sampler, GLenum pname, GLint param);

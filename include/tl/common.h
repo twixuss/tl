@@ -1113,7 +1113,6 @@ struct ReverseIterator {
 	Iterator operator->() { return it; }
 };
 
-
 inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
@@ -2192,6 +2191,13 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 		}
 	}
 	return span;
+}
+
+template <class T>
+void reverse_in_place(Span<T> span) {
+	for (umm i = 0; i < span.count / 2; ++i) {
+		Swap(span.data[i], span.data[span.count - i - 1]);
+	}
 }
 
 template <class T, umm _capacity>

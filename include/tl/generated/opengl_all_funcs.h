@@ -93,6 +93,7 @@ D(void, glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum ren
 D(void, glGenSamplers, (GLsizei n, GLuint * samplers), (n, samplers))\
 D(void, glFramebufferTextureLayer, (GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer), (target, attachment, texture, level, layer))\
 D(void, glNamedFramebufferTextureLayer, (GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer), (framebuffer, attachment, texture, level, layer))\
+D(void, glDeleteFramebuffers, (GLsizei n, GLuint * framebuffers), (n, framebuffers))\
 D(void, glBindSampler, (GLuint unit, GLuint sampler), (unit, sampler))\
 D(void, glSamplerParameterf, (GLuint sampler, GLenum pname, GLfloat param), (sampler, pname, param))\
 D(void, glSamplerParameteri, (GLuint sampler, GLenum pname, GLint param), (sampler, pname, param))\

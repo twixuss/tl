@@ -522,11 +522,16 @@ struct StringBuilder {
 	Span<u8> fill(Span<u8> dst_string) {
 		u8 *dst_char = dst_string.data;
 		Block *block = &first;
-		do {
-			memcpy(dst_char, block->data(), block->count);
+
+		umm remaining_count = dst_string.count;
+		while (block && remaining_count) {
+			umm bytes_to_copy = min(remaining_count, block->count);
+			memcpy(dst_char, block->data(), bytes_to_copy);
 			dst_char += block->count;
 			block = block->next;
-		} while (block);
+			remaining_count -= bytes_to_copy;
+		}
+
 		return Span<u8>(dst_string.begin(), dst_char);
 	}
 	List<u8> get_null_terminated() {
@@ -603,8 +608,8 @@ inline List<u8, Allocator> to_string(StringBuilder &builder, Allocator allocator
 	List<u8, Allocator> result;
 	result.allocator = allocator;
 	result.reserve(builder.count() TL_LA);
-	builder.fill(result);
 	result.count = result.capacity;
+	builder.fill(result);
 	return result;
 }
 
