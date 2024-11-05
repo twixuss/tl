@@ -30,7 +30,8 @@ D(void, glGenBuffers, (GLsizei n, GLuint * buffers), (n, buffers))\
 D(void, glCreateBuffers, (GLsizei n, GLuint * buffers), (n, buffers))\
 D(void, glBindBuffer, (GLenum target, GLuint buffer), (target, buffer))\
 D(void, glDeleteBuffers, (GLsizei n, const GLuint * buffers), (n, buffers))\
-D(void, glBufferData, (GLenum target, GLsizeiptr size, const void * data, GLenum usage), (target, size, data, usage))\
+D(void, glBufferData, (GLenum target, GLsizeiptr size, const GLvoid * data, GLenum usage), (target, size, data, usage))\
+D(void, glNamedBufferData, (GLuint buffer, GLsizeiptr size, const void * data, GLenum usage), (buffer, size, data, usage))\
 D(void, glBufferSubData, (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid * data), (target, offset, size, data))\
 D(void, glNamedBufferStorage, (GLuint buffer, GLsizeiptr size, const void * data, GLbitfield flags), (buffer, size, data, flags))\
 D(void, glCopyBufferSubData, (GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size), (readtarget, writetarget, readoffset, writeoffset, size))\

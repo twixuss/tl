@@ -680,10 +680,12 @@ static GLuint compile_shader(GLuint shader) {
 	GLint maxLength;
 	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
 
+	scoped(temporary_storage_checkpoint);
+
 	auto message = current_temporary_allocator.allocate<char>(maxLength);
 	glGetShaderInfoLog(shader, maxLength, &maxLength, message);
 
-	print(message);
+	print(Span(message, maxLength));
 
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);

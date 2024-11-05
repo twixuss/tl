@@ -34,14 +34,37 @@ template <class T> forceinline constexpr auto pow2(T v) { return v * v; }
 template <class T> forceinline constexpr auto pow3(T v) { return v * v * v; }
 template <class T> forceinline constexpr auto pow4(T v) { return pow2(v * v); }
 
+namespace cpp_workarounds {
+
+// You can't just specialize the function, you have to do this integral_constant shit.
+template <smm power, class T> 
+forceinline constexpr auto pow(T v, std::integral_constant<smm, power>) {
+	if constexpr (power / 2 * 2 == power) {
+		return pow<2>(pow<power/2>(v));
+	} else {
+		return pow<2>(pow<power/2>(v)) * v;
+	}
+}
+
+template <class T> forceinline constexpr auto pow(T v, std::integral_constant<smm, 0>) { return convert<T>(1); }
+template <class T> forceinline constexpr auto pow(T v, std::integral_constant<smm, 1>) { return v; }
+template <class T> forceinline constexpr auto pow(T v, std::integral_constant<smm, 2>) { return v*v; }
+
+}
+
+template <smm power, class T> 
+forceinline constexpr auto pow(T v) {
+	return cpp_workarounds::pow<power>(v, {});
+}
+
 template <class T>
-inline constexpr T smooth_min(T a, T b, f32 k) {
+forceinline constexpr T smooth_min(T a, T b, f32 k) {
 	f32 h = clamp<f32>((b - a) / k + .5f, 0, 1);
 	return b + h * (a - b + k * 0.5f * (h - 1));
 }
 
 template <class T>
-inline constexpr T smooth_max(T a, T b, f32 k) {
+forceinline constexpr T smooth_max(T a, T b, f32 k) {
 	return smooth_min(a, b, -k);
 }
 
@@ -437,10 +460,13 @@ HALF(v4u)
 #undef HALF
 
 VECTOR_COMPONENTWISE_FUNC_V(floor);
+VECTOR_COMPONENTWISE_FUNC_VV(floor);
 VECTOR_COMPONENTWISE_FUNC_V(floor_to_power_of_2);
 VECTOR_COMPONENTWISE_FUNC_V(frac);
 
+#if 1
 // 2.8x faster in a simple benchmark
+// Change `#if 1` above to 0 to use default version.
 forceinline v2s frac(v2s v, v2s s) {
 	__m128i vm = _mm_setr_epi32(v.x, v.y, 0, 0);
 	__m128i sm = _mm_setr_epi32(s.x, s.y, 0, 0);
@@ -450,45 +476,26 @@ forceinline v2s frac(v2s v, v2s s) {
 	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
 	return *(v2s *)&result;
 }
+#endif
+
 forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
 forceinline v3s frac(v3s v, s32 s) { return frac(v, V3s(s)); }
 forceinline v4s frac(v4s v, s32 s) { return frac(v, V4s(s)); }
 
 #define FLOOR(v2s, s32, V2s) 		   \
-forceinline v2s floor(v2s v, v2s s) {  \
-	return { 						   \
-		floor(v.x, s.x), 			   \
-		floor(v.y, s.y), 			   \
-	}; 								   \
-} 									   \
-forceinline v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
+	forceinline v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
 FLOOR(v2s, s32, V2s)
 FLOOR(v2u, u32, V2u)
 #undef FLOOR
 
 #define FLOOR(v3s, s32, V3s) 		  \
-forceinline v3s floor(v3s v, v3s s) { \
-	return { 						  \
-		floor(v.x, s.x), 			  \
-		floor(v.y, s.y), 			  \
-		floor(v.z, s.z), 			  \
-	}; 								  \
-} 									  \
-forceinline v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
+	forceinline v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
 FLOOR(v3s, s32, V3s)
 FLOOR(v3u, u32, V3u)
 #undef FLOOR
 
 #define FLOOR(v4s, s32, V4s) 		  \
-forceinline v4s floor(v4s v, v4s s) { \
-	return {						  \
-		floor(v.x, s.x),			  \
-		floor(v.y, s.y),			  \
-		floor(v.z, s.z),			  \
-		floor(v.w, s.w),			  \
-	};								  \
-}									  \
-forceinline v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
+	forceinline v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
 FLOOR(v4s, s32, V4s)
 FLOOR(v4u, u32, V4u)
 #undef FLOOR
@@ -570,8 +577,8 @@ forceinline constexpr T absolute(T v) { return v; }
 template <std::signed_integral T> 
 forceinline constexpr T absolute(T v) { return v < 0 ? -v :v; }
 
-forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u32*)&v &= 0x7FFFFFFF, v); }
-forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : (*(u64*)&v &= 0x7FFFFFFFFFFFFFFF, v); }
+forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabsf(v); }
+forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabs(v); }
 
 template <class Scalar> forceinline constexpr v2<Scalar> absolute(v2<Scalar> v) { return {absolute(v.x), absolute(v.y)}; }
 template <class Scalar> forceinline constexpr v3<Scalar> absolute(v3<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
@@ -587,16 +594,8 @@ forceinline constexpr auto relatively_equal(T a, T b, T relative_epsilon) {
 	return absolute(a - b) < relative_epsilon * max(absolute(a), absolute(b));
 }
 
-forceinline f32 set_sign(f32 dst, f32 src) {
-    *(u32*)&dst &= 0x7FFFFFFF;
-    *(u32*)&dst |= *(u32*)&src & 0x80000000;
-    return dst;
-}
-forceinline f64 set_sign(f64 dst, f64 src) {
-    *(u64*)&dst &= 0x7FFFFFFFFFFFFFFF;
-    *(u64*)&dst |= *(u64*)&src & 0x8000000000000000;
-    return dst;
-}
+forceinline f32 set_sign(f32 dst, f32 src) { return copysignf(dst, src); }
+forceinline f64 set_sign(f64 dst, f64 src) { return copysign(dst, src); }
 
 forceinline s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
@@ -631,11 +630,6 @@ forceinline v2f frac(v2f a, v2f b) { return {frac(a.x, b.x), frac(a.y, b.y)}; }
 forceinline v3f frac(v3f a, v3f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z)}; }
 forceinline v4f frac(v4f a, v4f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z), frac(a.w, b.w)}; }
 
-constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
-    return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
-};
-
-forceinline constexpr f32 sqrt(f32 v) { return std::is_constant_evaluated() ? sqrt_newton_raphson(v, v, 0) : sqrtf(v); }
 forceinline constexpr v2f sqrt(v2f v) { return {sqrt(v.x), sqrt(v.y)}; }
 forceinline constexpr v3f sqrt(v3f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z)}; }
 forceinline constexpr v4f sqrt(v4f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z), sqrt(v.w)}; }
@@ -677,15 +671,70 @@ forceinline void cos_sin(f32 v, v2f &result) { result.x = cos(v); result.y = sin
 
 forceinline v2f cos_sin(f32 v) { return {cos(v), sin(v)}; }
 
-forceinline f32 sin_bhaskara(f32 v) {
+namespace approximations {
+
+namespace quadratic {
+
+// Pretty bad but simple.
+
+// Max  error: 0.056
+// Mean error: 0.030
+forceinline f32 sin(f32 x) {
+	x = (frac(x * (1 / pi) + 1, 2) - 1) * 2;
+	return (1 - pow2(1 - absolute(x))) * sign(x);
+}
+forceinline f32 cos(f32 x) {
+	return sin(x + pi/2);
+}
+
+// Max  error: 0.066
+// Mean error: 0.047
+forceinline f32 asin(f32 x) {
+	return (1 - sqrt(1 - absolute(x))) * sign(x) * (pi/2);
+}
+forceinline f32 acos(f32 x) {
+	return asin(-x) + pi/2;
+}
+
+// Max error: infinity :)
+//     1     on [0; 1.4]
+//     0.1   on [0; 1  ]
+//     0.052 on [0; 0.9]
+forceinline f32 tan(f32 x) {
+	return sin(x) / cos(x);
+}
+
+// Max error: 0.071
+//forceinline f32 atan(f32 x) {
+//	return (1 - 1 / (absolute(x) + 1)) * (pi/2) * sign(x);
+//}
+
+// Max error: 0.034
+// Half the error for two extra muls
+forceinline f32 atan(f32 x) {
+	return (1 - 1 / pow2(absolute(x * 0.39193398f) + 1)) * (pi/2) * sign(x);
+}
+
+}
+
+namespace bhaskara {
+
+// Max  error: 0.018
+// Mean error: todo
+forceinline f32 sin(f32 v) {
 	v = frac(v, pi * 2);
 	auto mask = v >= pi;
 	v = select(mask, v - pi, v);
 	return (16 * v * (pi - v)) * reciprocal(5 * pi * pi - 4 * v * (pi - v)) * select(mask, -1.0f, 1.0f);
 }
-forceinline f32 cos_bhaskara(f32 v) { return sin_bhaskara(v + pi*0.5f); }
+forceinline f32 cos(f32 v) { return sin(v + pi*0.5f); }
 
-forceinline v2f cos_sin_bhaskara(f32 v) { return {cos_bhaskara(v), sin_bhaskara(v)}; }
+forceinline v2f cos_sin(f32 v) { return {cos(v), sin(v)}; }
+
+}
+
+}
+
 
 forceinline f32 atan2(f32 y, f32 x) { return ::atan2f(y, x); }
 forceinline f32 atan2(v2f v) { return atan2(v.y, v.x); }
@@ -741,11 +790,7 @@ forceinline constexpr f32 cross(v2f a, v2f b) {
 	return a.x * b.y - a.y * b.x;
 }
 forceinline constexpr v3f cross(v3f a, v3f b) {
-	return {
-		a.y * b.z - a.z * b.y,
-		a.z * b.x - a.x * b.z,
-		a.x * b.y - a.y * b.x
-	};
+	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
 }
 
 template <class T>
@@ -877,6 +922,11 @@ forceinline constexpr T project_on_plane(T vector, T normal) {
 	return vector - project_on_line(vector, normal);
 }
 
+template <class T>
+forceinline constexpr T face_toward(T vector, T normal) {
+	return vector * sign(dot(vector, normal));
+}
+
 forceinline f32 signed_angle(v2f a, v2f b) {
 	return atan2(a.x*b.y - a.y*b.x, dot(a, b));
 }
@@ -930,7 +980,7 @@ forceinline v4f hsv_to_rgb(f32 h, f32 s, f32 v, f32 a) { return V4f(hsv_to_rgb(h
 forceinline v3f hsv_to_rgb(v3f hsv) { return hsv_to_rgb(hsv.x, hsv.y, hsv.z); }
 forceinline v4f hsv_to_rgb(v4f hsv) { hsv.xyz = hsv_to_rgb(hsv.xyz); return hsv; }
 
-inline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
+forceinline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
 	f32 cMax = max(max(r, g), b);
 	f32 cMin = min(min(r, g), b);
 	f32 delta = cMax - cMin;
@@ -1083,22 +1133,20 @@ forceinline auto distance(line_segment<T> line, T point) {
 	return distance(point, line);
 }
 
+// NOTE: `direction` is assumed to be normalized
 template<class T>
 struct ray {
 	T origin, direction;
-	explicit operator line<T>() {
-		return {origin, origin + direction};
-	}
 };
 
 template <class T>
 forceinline ray<T> ray_origin_end(T origin, T end) {
-	return {origin, end - origin};
+	return {origin, normalize(end - origin)};
 }
 
 template <class T>
 forceinline ray<T> ray_origin_direction(T origin, T direction) {
-	return {origin, direction};
+	return {origin, normalize(direction)};
 }
 
 template <class T>
@@ -1107,8 +1155,8 @@ forceinline line<T> as_line(ray<T> r) {
 }
 
 template <class T>
-forceinline ray<T> normalize(ray<T> r) {
-	return {r.origin, normalize(r.direction)};
+forceinline line<T> as_line(ray<T> r, auto length) {
+	return {r.origin, r.origin + r.direction * length};
 }
 
 template <class T>
@@ -1130,9 +1178,30 @@ T intersect(ray<T> ray, plane<T> plane) {
 }
 
 template <class T>
-struct triangle {
-	T a, b, c;
+union triangle {
+	struct {
+		T a, b, c;
+	};
+	T array[3];
 };
+
+template <class T>
+forceinline constexpr T normal_of(triangle<T> t) {
+	return normalize(cross(t.a - t.b, t.a - t.c));
+}
+
+template <class Scalar>
+v3<Scalar> barycentric(triangle<v2<Scalar>> t, v2<Scalar> p)
+{
+	v2<Scalar> ac = t.a - t.c;
+	v2<Scalar> bc = t.b - t.c;
+	v3<Scalar> result = {};
+	Scalar determinant = ac.x * bc.y - bc.x * ac.y;
+	result.x = bc.y * (p.x - t.c.x) + bc.x * (t.c.y - p.y);
+	result.y = ac.y * (t.c.x - p.x) + ac.x * (p.y - t.c.y);
+	result.z = determinant - result.x - result.y;
+	return result / determinant;
+}
 
 template<class T>
 struct aabb {
@@ -1154,11 +1223,6 @@ struct aabb {
 	friend aabb operator+(T a, aabb<T> b) { return {a + b.min, a + b.max}; }
 	aabb &operator-=(T b) { return min -= b, max -= b, *this; }
 	aabb &operator+=(T b) { return min += b, max += b, *this; }
-
-	T minmin() { return {min.x, min.y}; }
-	T minmax() { return {min.x, max.y}; }
-	T maxmin() { return {max.x, min.y}; }
-	T maxmax() { return {max.x, max.y}; }
 
 	aabb<T> with_size(T new_size, T local_pivot = convert<T>(0.5f)) requires std::is_floating_point_v<typename T::Scalar> {
 		auto pivot = lerp(min, max, local_pivot);
@@ -1551,7 +1615,7 @@ Optional<aabb<v2<S>>> merge_into_one(aabb<v2<S>> a, aabb<v2<S>> b) {
 // In both cases result's max point is inclusive
 //
 
-inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
+forceinline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 	b.min = clamp(b.min, a.min, a.max);
 	b.max = clamp(b.max, a.min, a.max);
 	StaticList<aabb<v2s>, 8> boxes = {
@@ -1571,7 +1635,7 @@ inline StaticList<aabb<v2s>, 8> subtract_volumes(aabb<v2s> a, aabb<v2s> b) {
 	}
 	return boxes;
 }
-inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
+forceinline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
 	b.min = clamp(b.min, a.min, a.max);
 	b.max = clamp(b.max, a.min, a.max);
 	StaticList<aabb<v3s>, 26> boxes = {
@@ -1614,7 +1678,7 @@ inline StaticList<aabb<v3s>, 26> subtract_volumes(aabb<v3s> a, aabb<v3s> b) {
 	}
 	return boxes;
 }
-inline StaticList<aabb<v2s>, 8> subtract_points(aabb<v2s> a, aabb<v2s> b) {
+forceinline StaticList<aabb<v2s>, 8> subtract_points(aabb<v2s> a, aabb<v2s> b) {
 	aabb<v2s> original_b = b;
 	b.min = clamp(b.min, a.min, a.max);
 	b.max = clamp(b.max, a.min, a.max);
@@ -1627,7 +1691,7 @@ inline StaticList<aabb<v2s>, 8> subtract_points(aabb<v2s> a, aabb<v2s> b) {
 	}
 	return boxes;
 }
-inline StaticList<aabb<v3s>, 26> subtract_points(aabb<v3s> a, aabb<v3s> b) {
+forceinline StaticList<aabb<v3s>, 26> subtract_points(aabb<v3s> a, aabb<v3s> b) {
 	aabb<v3s> original_b = b;
 	b.min = clamp(b.min, a.min, a.max);
 	b.max = clamp(b.max, a.min, a.max);
@@ -1643,22 +1707,22 @@ inline StaticList<aabb<v3s>, 26> subtract_points(aabb<v3s> a, aabb<v3s> b) {
 	return boxes;
 }
 
-inline StaticList<aabb<v2s>, 9> combine_volumes(aabb<v2s> const &a, aabb<v2s> const &b) {
+forceinline StaticList<aabb<v2s>, 9> combine_volumes(aabb<v2s> const &a, aabb<v2s> const &b) {
 	StaticList<aabb<v2s>, 9> result = { a };
 	result += subtract_volumes(b, a);
 	return result;
 }
-inline StaticList<aabb<v3s>, 27> combine_volumes(aabb<v3s> const &a, aabb<v3s> const &b) {
+forceinline StaticList<aabb<v3s>, 27> combine_volumes(aabb<v3s> const &a, aabb<v3s> const &b) {
 	StaticList<aabb<v3s>, 27> result = { a };
 	result += subtract_volumes(b, a);
 	return result;
 }
-inline StaticList<aabb<v2s>, 9> combine_points(aabb<v2s> const &a, aabb<v2s> const &b) {
+forceinline StaticList<aabb<v2s>, 9> combine_points(aabb<v2s> const &a, aabb<v2s> const &b) {
 	StaticList<aabb<v2s>, 9> result = { a };
 	result += subtract_points(b, a);
 	return result;
 }
-inline StaticList<aabb<v3s>, 27> combine_points(aabb<v3s> const &a, aabb<v3s> const &b) {
+forceinline StaticList<aabb<v3s>, 27> combine_points(aabb<v3s> const &a, aabb<v3s> const &b) {
 	StaticList<aabb<v3s>, 27> result = { a };
 	result += subtract_points(b, a);
 	return result;
@@ -1688,6 +1752,32 @@ forceinline bool intersects(line<v3f> line, aabb<v3f> aabb) {
 	return tMax > 0 && tMin < tMax;
 }
 
+template <class Scalar>
+Array<triangle<v3<Scalar>>, 12> to_triangles(aabb<v3<Scalar>> box) {
+	v3<Scalar> a = {box.min.x, box.min.y, box.min.z};
+	v3<Scalar> b = {box.max.x, box.min.y, box.min.z};
+	v3<Scalar> c = {box.min.x, box.max.y, box.min.z};
+	v3<Scalar> d = {box.max.x, box.max.y, box.min.z};
+	v3<Scalar> e = {box.min.x, box.min.y, box.max.z};
+	v3<Scalar> f = {box.max.x, box.min.y, box.max.z};
+	v3<Scalar> g = {box.min.x, box.max.y, box.max.z};
+	v3<Scalar> h = {box.max.x, box.max.y, box.max.z};
+	return {
+		triangle<v3<Scalar>>{a, b, d},
+		triangle<v3<Scalar>>{a, d, c},
+		triangle<v3<Scalar>>{e, h, f},
+		triangle<v3<Scalar>>{e, g, h},
+		triangle<v3<Scalar>>{a, c, g},
+		triangle<v3<Scalar>>{a, g, e},
+		triangle<v3<Scalar>>{b, f, h},
+		triangle<v3<Scalar>>{b, h, d},
+		triangle<v3<Scalar>>{c, d, h},
+		triangle<v3<Scalar>>{c, h, g},
+		triangle<v3<Scalar>>{a, e, f},
+		triangle<v3<Scalar>>{a, f, b},
+	};
+}
+
 template <class T>
 struct sphere {
 	T center;
@@ -1700,7 +1790,7 @@ sphere<T> sphere_center_radius(T center, typename T::Scalar radius) {
 }
 
 // https://paulbourke.net/geometry/circlesphere/
-inline StaticList<v2f, 2> intersection(sphere<v2f> a, sphere<v2f> b) {
+forceinline StaticList<v2f, 2> intersection(sphere<v2f> a, sphere<v2f> b) {
 	v2f d = b.center - a.center;
 	f32 dl = length_squared(d);
 
@@ -1780,18 +1870,34 @@ forceinline bool raycastPlane(v3f a, v3f b, v3f p1, v3f p2, v3f p3, v3f& point, 
 #endif
 template <class Vector>
 struct RaycastHit {
-	bool hit = false;
 	Vector position = {};
-	Vector position2 = {};
 	Vector normal = {};
 	f32 distance = {};
-	operator bool() {
-		return hit;
-	}
 };
 
-inline RaycastHit<v2f> raycast(ray<v2f> ray, line_segment<v2f> line) {
-	normalize(&ray.direction);
+template <class Vector>
+RaycastHit<Vector> min(RaycastHit<Vector> a, RaycastHit<Vector> b) {
+	return a.distance < b.distance ? a : b;
+}
+
+template <class Vector>
+Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<RaycastHit<Vector>> b) {
+	if (a) {
+		if (b) {
+			return a.value().distance < b.value().distance ? a : b;
+		} else {
+			return a;
+		}
+	} else {
+		if (b) {
+			return b;
+		} else {
+			return {};
+		}
+	}
+}
+
+forceinline Optional<RaycastHit<v2f>> raycast(ray<v2f> ray, line_segment<v2f> line) {
 	auto v1 = ray.origin - line.a;
 	auto v2 = line.b - line.a;
 	auto v3 = perp(ray.direction);
@@ -1808,8 +1914,7 @@ inline RaycastHit<v2f> raycast(ray<v2f> ray, line_segment<v2f> line) {
 
 	auto n = perp(normalize(line.a - line.b));
 
-	return {
-		.hit = true,
+	return RaycastHit<v2f>{
 		.position = ray.origin + t1 * ray.direction,
 		.normal = n * -sign(dot(n, ray.direction)),
 		.distance = t1,
@@ -1817,9 +1922,7 @@ inline RaycastHit<v2f> raycast(ray<v2f> ray, line_segment<v2f> line) {
 }
 
 template <class Vector>
-inline RaycastHit<Vector> raycast(ray<Vector> ray, sphere<Vector> sphere) {
-	normalize(&ray.direction);
-
+forceinline Optional<RaycastHit<Vector>> raycast(ray<Vector> ray, sphere<Vector> sphere) {
 	auto oc = ray.origin - sphere.center;
 	auto b = 2 * dot(oc, ray.direction);
 	auto c = dot(oc,oc) - sphere.radius*sphere.radius;
@@ -1829,135 +1932,138 @@ inline RaycastHit<Vector> raycast(ray<Vector> ray, sphere<Vector> sphere) {
 		return {};
 
 	auto point = ray.origin + ray.direction * ((-b - sqrt(d)) / 2);
-	return {
-		.hit = true,
+	return RaycastHit<Vector>{
 		.position = point,
 		.normal = normalize(point - sphere.center),
 		.distance = distance(ray.origin, point),
 	};
 }
 
-inline RaycastHit<v2f> raycast(ray<v2f> ray, triangle<v2f> tri) {
-	RaycastHit<v2f> result = {.distance = infinity<f32>};
-	if (auto hit = raycast(ray, line_segment_begin_end(tri.a, tri.b)); hit && hit.distance < result.distance) result = hit;
-	if (auto hit = raycast(ray, line_segment_begin_end(tri.b, tri.c)); hit && hit.distance < result.distance) result = hit;
-	if (auto hit = raycast(ray, line_segment_begin_end(tri.c, tri.a)); hit && hit.distance < result.distance) result = hit;
-	return result;
+forceinline Optional<RaycastHit<v2f>> raycast(ray<v2f> ray, triangle<v2f> tri) {
+	return min(
+		raycast(ray, line_segment_begin_end(tri.a, tri.b)),
+		raycast(ray, line_segment_begin_end(tri.b, tri.c)),
+		raycast(ray, line_segment_begin_end(tri.c, tri.a))
+	);
 }
 
-inline RaycastHit<v3f> raycast(ray<v3f> ray, triangle<v3f> tri) {
-	normalize(&ray.direction);
+struct RaycastTriangleOptions {
+	f32 planar_epsilon = 1e-6f;
+	f32 edge_epsilon = 1e-6f;
+	f32 min_distance = 1e-6f;
+};
+
+forceinline Optional<RaycastHit<v3f>> raycast(ray<v3f> ray, triangle<v3f> tri, RaycastTriangleOptions options = {}) {
 	v3f e1 = tri.b - tri.a;
     v3f e2 = tri.c - tri.a;
-    // Вычисление вектора нормали к плоскости
+
     v3f pvec = cross(ray.direction, e2);
     f32 det = dot(e1, pvec);
 
-    // Луч параллелен плоскости
-    if (absolute(det) < 1e-8) {
+    if (absolute(det) < options.planar_epsilon) {
 		return {};
     }
 
     f32 inv_det = 1 / det;
     v3f tvec = ray.origin - tri.a;
     f32 u = dot(tvec, pvec) * inv_det;
-    if (u < 0 || u > 1) {
+	if (u < options.edge_epsilon || u > 1 - options.edge_epsilon) {
 		return {};
-    }
+	}
 
     v3f qvec = cross(tvec, e1);
     f32 v = dot(ray.direction, qvec) * inv_det;
-    if (v < 0 || u + v > 1) {
+	if (v < options.edge_epsilon || u + v > 1 - options.edge_epsilon) {
 		return {};
-    }
+	}
     f32 t = dot(e2, qvec) * inv_det;
 
-	if (t < 0)
+	if (t < options.min_distance)
 		return {};
 
 	RaycastHit<v3f> hit;
-	hit.hit = true;
 	hit.distance = t;
 	hit.position = ray.origin + ray.direction* t;
 	hit.normal = normalize(cross(e1, e2));
 	return hit;
 }
 
-inline RaycastHit<v2f> raycast(ray<v2f> ray, aabb<v2f> box, bool from_inside=false) {
-	normalize(&ray.direction);
-	v2f dirfrac = 1.0f / ray.direction;
-	v2f t1 = (box.min - ray.origin)*dirfrac;
-	v2f t2 = (box.max - ray.origin)*dirfrac;
+struct RaycastAABBOptions {
+	bool from_inside = true;
+};
 
-	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y));
-	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y));
+// result[0] is the closest one
+// If ray intersects box from inside then result.count is 1
+forceinline StaticList<RaycastHit<v2f>, 2> raycast(ray<v2f> ray, aabb<v2f> box, RaycastAABBOptions options = {}) {
+	v2f inv_dir = 1.0f / ray.direction;
+	v2f t1 = (box.min - ray.origin) * inv_dir;
+	v2f t2 = (box.max - ray.origin) * inv_dir;
+	
+	f32 tmin = max(min(t1, t2));
+	f32 tmax = min(max(t1, t2));
 
-	if (from_inside) {
-		if (tmax < 0 || tmin > tmax) {
-			return {};
-		}
-	} else {
-		if (tmin < 0 || tmax < 0 || tmin > tmax) {
-			return {};
-		}
+	if (tmax < 0 || tmin > tmax) {
+		return {};
 	}
 
-	RaycastHit<v2f> hit = {};
-	hit.hit = true;
-	hit.position = ray.origin + ray.direction * tmin;
-	hit.position2 = ray.origin + ray.direction * tmax;
-	hit.distance = tmin;
+	auto get_hit = [&] (f32 t) {
+		RaycastHit<v2f> hit = {};
 
-	       if (tmin == t1.x)   hit.normal = {-1, 0};
-	else   if (tmin == t2.x)   hit.normal = { 1, 0};
-	else   if (tmin == t1.y)   hit.normal = { 0,-1};
-	else /*if (tmin == t2.y)*/ hit.normal = { 0, 1};
+		hit.position = ray.origin + ray.direction * t;
 
-	return hit;
+		hit.distance = t;
+
+		       if (t == t1.x)   hit.normal = {-1, 0};
+		else   if (t == t2.x)   hit.normal = { 1, 0};
+		else   if (t == t1.y)   hit.normal = { 0,-1};
+		else /*if (t == t2.y)*/ hit.normal = { 0, 1};
+
+		return hit;
+	};
+
+	StaticList<RaycastHit<v2f>, 2> result;
+	if (tmin >= 0) {
+		result.add(get_hit(tmin));
+	}
+	result.add(get_hit(tmax));
+	return result;
 }
 
-inline RaycastHit<v3f> raycast(ray<v3f> ray, aabb<v3f> box, bool from_inside=false) {
-	normalize(&ray.direction);
-	v3f dirfrac = 1.0f / ray.direction;
-	v3f t1 = (box.min - ray.origin)*dirfrac;
-	v3f t2 = (box.max - ray.origin)*dirfrac;
+// result[0] is the closest one
+// If ray intersects box from inside then result.count is 1
+forceinline StaticList<RaycastHit<v3f>, 2> raycast(ray<v3f> ray, aabb<v3f> box, RaycastAABBOptions options = {}) {
+	v3f inv_dir = 1.0f / ray.direction;
+	v3f t1 = (box.min - ray.origin) * inv_dir;
+	v3f t2 = (box.max - ray.origin) * inv_dir;
+	
+	f32 tmin = max(min(t1, t2));
+	f32 tmax = min(max(t1, t2));
 
-	f32 tmin = max(min(t1.x, t2.x), min(t1.y, t2.y), min(t1.z, t2.z));
-	f32 tmax = min(max(t1.x, t2.x), max(t1.y, t2.y), max(t1.z, t2.z));
-
-	if (from_inside) {
-		if (tmax < 0 || tmin > tmax) {
-			return {};
-		}
-	} else {
-		if (tmin < 0 || tmax < 0 || tmin > tmax) {
-			return {};
-		}
+	if (tmax < 0 || tmin > tmax) {
+		return {};
 	}
 
-	RaycastHit<v3f> hit = {};
-	hit.hit = true;
-	hit.position = ray.origin + ray.direction * tmin;
-	hit.distance = tmin;
+	auto get_hit = [&] (f32 t) {
+		RaycastHit<v3f> hit = {};
+		hit.position = ray.origin + ray.direction * t;
+		hit.distance = t;
 
-	if (tmin == t1.x)   hit.normal = {-1, 0, 0};
-	else   if (tmin == t2.x)   hit.normal = { 1, 0, 0};
-	else   if (tmin == t1.y)   hit.normal = { 0,-1, 0};
-	else   if (tmin == t2.y)   hit.normal = { 0, 1, 0};
-	else   if (tmin == t1.z)   hit.normal = { 0, 0,-1};
-	else /*if (tmin == t2.z)*/ hit.normal = { 0, 0, 1};
+		       if (t == t1.x)   hit.normal = {-1, 0, 0};
+		else   if (t == t2.x)   hit.normal = { 1, 0, 0};
+		else   if (t == t1.y)   hit.normal = { 0,-1, 0};
+		else   if (t == t2.y)   hit.normal = { 0, 1, 0};
+		else   if (t == t1.z)   hit.normal = { 0, 0,-1};
+		else /*if (t == t2.z)*/ hit.normal = { 0, 0, 1};
 
-	return hit;
-}
-
-template <class T, umm size>
-forceinline constexpr T linearSample(const T (&arr)[size], f32 t) noexcept {
-	f32 f = frac(t) * size;
-	s32 a = (s32)f;
-	s32 b = a + 1;
-	if (b == size)
-		b = 0;
-	return lerp(arr[a], arr[b], frac(f));
+		return hit;
+	};
+		
+	StaticList<RaycastHit<v3f>, 2> result;
+	if (tmin >= 0) {
+		result.add(get_hit(tmin));
+	}
+	result.add(get_hit(tmax));
+	return result;
 }
 
 union m4 {
@@ -2207,7 +2313,7 @@ forceinline m4 transpose(m4 const& m) {
 	return result;
 }
 
-inline m3 inverse(m3 const &m) {
+forceinline m3 inverse(m3 const &m) {
 	// computes the inverse of a matrix m
 	f32 det = m.i.x * (m.j.y * m.k.z - m.k.y * m.j.z) -
 	          m.i.y * (m.j.x * m.k.z - m.j.z * m.k.x) +
@@ -2228,7 +2334,7 @@ inline m3 inverse(m3 const &m) {
 	};
 }
 
-inline m4 inverse(m4 const &m) {
+forceinline m4 inverse(m4 const &m) {
 	f32 A2323 = m.k.z * m.l.w - m.k.w * m.l.z;
 	f32 A1323 = m.k.y * m.l.w - m.k.w * m.l.y;
 	f32 A1223 = m.k.y * m.l.z - m.k.z * m.l.y;
@@ -2473,14 +2579,14 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace ce
 
-inline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
+forceinline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
 	return append_format(builder, "({}, {})",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
 }
 
-inline umm append(StringBuilder &builder, m4 m) {
+forceinline umm append(StringBuilder &builder, m4 m) {
 	return append_format(builder, "({}, {}, {}, {})", m.i, m.j, m.k, m.l);
 }
 

@@ -29,6 +29,7 @@
 #define glBindBuffer tl::gl::_glBindBuffer
 #define glDeleteBuffers tl::gl::_glDeleteBuffers
 #define glBufferData tl::gl::_glBufferData
+#define glNamedBufferData tl::gl::_glNamedBufferData
 #define glBufferSubData tl::gl::_glBufferSubData
 #define glNamedBufferStorage tl::gl::_glNamedBufferStorage
 #define glCopyBufferSubData tl::gl::_glCopyBufferSubData
@@ -152,6 +153,7 @@
 #define glBindBuffer tl::gl::functions._glBindBuffer
 #define glDeleteBuffers tl::gl::functions._glDeleteBuffers
 #define glBufferData tl::gl::functions._glBufferData
+#define glNamedBufferData tl::gl::functions._glNamedBufferData
 #define glBufferSubData tl::gl::functions._glBufferSubData
 #define glNamedBufferStorage tl::gl::functions._glNamedBufferStorage
 #define glCopyBufferSubData tl::gl::functions._glCopyBufferSubData

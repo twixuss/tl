@@ -763,7 +763,6 @@ struct TaskQueueThreadPool {
 	}
 	#endif
 
-private:
 	Allocator allocator = TL_GET_CURRENT(allocator);
 	List<Thread *> threads;
 

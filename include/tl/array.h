@@ -36,11 +36,6 @@ struct Array {
 	constexpr auto &back()       { return data[count - 1]; }
 	constexpr auto &back() const { return data[count - 1]; }
 
-	constexpr Span<T> operator+(umm i) {
-		bounds_check(assert_less_equal(i, count));
-		return {data + i, count - i};
-	}
-
 	T data[count];
 };
 
@@ -122,6 +117,25 @@ constexpr bool all(Array<T, count> const &a) {
 	}
 	return true;
 }
+
+template <class T, umm count>
+auto dot(Array<T, count> const &a, Array<T, count> const &b) {
+	T result = 0;
+	for (umm i = 0; i < count; ++i) {
+		result += a.data[i] * b.data[i];
+	}
+	return result;
+}
+
+#define TL_ARRAY_DEFINE_APPLY_1(function)                                             \
+	template <class T, umm count>                                                     \
+	forceinline constexpr auto function(Array<T, count> input) {                      \
+		Array<std::remove_cvref_t<decltype(function(v.data[0]))>, count> result = {}; \
+		for (umm i = 0; i < count; ++i) {                                             \
+			result.data[i] = function(input.data[i]);                                 \
+		}                                                                             \
+		return result;                                                                \
+	}
 
 template <class T, umm _count_x, umm _count_y>
 struct Array2 {
@@ -236,14 +250,5 @@ struct Array3 {
 
 	T data[count_z][count_y][count_x];
 };
-
-template <class T, umm count>
-auto dot(Array<T, count> const &a, Array<T, count> const &b) {
-	T result = 0;
-	for (umm i = 0; i < count; ++i) {
-		result += a.data[i] * b.data[i];
-	}
-	return result;
-}
 
 }

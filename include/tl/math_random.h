@@ -10,6 +10,9 @@
 
 namespace tl {
 
+constexpr u32 next_prime_after_2_to_power_of_7_point_5 = 181;
+constexpr u32 next_prime_after_2_to_power_of_31_point_5 = 3037000507;
+
 inline constexpr u32 random_primes_u32[] = {
 	3282017723,
 	351133033,
@@ -850,6 +853,23 @@ template <class T>
 forceinline void interpolate(Smoothed<T> &smoothed, f32 delta) {
 	smoothed.factor = clamp(smoothed.factor + delta, 0, 1);
 	smoothed.interpolated = lerp(smoothed.base, smoothed.target, smoothed.factor);
+}
+
+template <class Generator>
+v3f random_unit_v3f(Generator &generator) {
+    f32 u1 = next_f32(generator);
+    f32 u2 = next_f32(generator);
+
+    // Convert to spherical coordinates
+    f32 theta = 2 * pi * u1; // azimuthal angle
+    f32 phi = acosf(2 * u2 - 1); // polar angle
+
+    // Convert to Cartesian coordinates
+	return {
+		sinf(phi) * cosf(theta),
+		sinf(phi) * sinf(theta),
+		cosf(phi),
+	};
 }
 
 }

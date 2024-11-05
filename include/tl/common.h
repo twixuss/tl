@@ -27,7 +27,7 @@
 #define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)(!!(x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
 
 #ifndef assert
 #define assert(x, ...) assert_always(x __VA_OPT__(,) __VA_ARGS__)
@@ -249,6 +249,24 @@ struct RequireAllSame {
 template <class T, class ...Types>
 concept OneOf = (std::is_same_v<T, Types> || ...);
 
+template <class Container>
+struct ElementOfT {
+	using Type = typename Container::Element;
+};
+
+template <class T, umm count>
+struct ElementOfT<T[count]> {
+	using Type = T;
+};
+
+template <class T>
+struct ElementOfT<T *> {
+	using Type = T;
+};
+
+template <class T>
+using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
+
 template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
 	return *new(std::addressof(val)) T(std::forward<Args>(args)...);
@@ -353,7 +371,8 @@ forceinline constexpr auto enum_values() {
 
 
 // This function exists because C++ does not provide a way to convert
-// fundamental types to structs without adding a constructor to a struct.
+// fundamental types to structs without adding a constructor to a struct, 
+// which will break designated initialization.
 // If there's a need to do that, specialize this function.
 template <class To, class From>
 forceinline constexpr To convert(From from) {
@@ -788,9 +807,16 @@ constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
 constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
+constexpr f32 golden_ratio = f32(1.6180339887498948482045868343656L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+
+constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
+    return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
+};
+
+forceinline constexpr f32 sqrt(f32 v) { return std::is_constant_evaluated() ? sqrt_newton_raphson(v, v, 0) : sqrtf(v); }
 
 // Does not check if min_bound is greater than max_bound
 // There is `clamp_checked` for that.
@@ -926,39 +952,87 @@ enum : ForEachFlags {
 	ForEach_reverse = 0x1,
 };
 
-template <ForEachFlags flags=0, class T, umm count, class Fn>
-constexpr bool for_each(T (&array)[count], Fn &&fn) {
-	using FnRet = decltype(fn(*(T*)0));
+template <class T>
+concept Collection = requires(T collection) {
+	for_each(collection, [](auto item) {});
+};
 
-	T *start;
-	T *end;
-	umm step;
-	if constexpr (flags & ForEach_reverse) {
-		start = array + count - 1;
-		end = array - 1;
-		step = -1;
+template <class Fn, class Item>
+auto for_each_default_action(Fn &&fn, Item &&item) {
+	if constexpr (std::is_same_v<decltype(fn(item)), ForEachDirective>) {
+		return ForEach_continue;
 	} else {
-		start = array;
-		end = array + count;
-		step = 1;
+		return;
 	}
-	for (auto it = start; it != end; it += step) {
-		if constexpr (std::is_same_v<FnRet, void>) {
-			fn(*it);
-		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			auto d = fn(*it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_t(T, "Invalid return type of for_each function");
-		}
-	}
-	return false;
 }
 
-bool all(auto x, auto predicate) {
+template <class Inner, class Mapper>
+struct MappedCollection {
+	using Element = decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Mapper mapper;
+};
+
+template <class Inner, class Mapper>
+MappedCollection<Inner, Mapper> mapped(Inner &&inner, Mapper &&mapper) {
+	return MappedCollection<Inner, Mapper>{inner, mapper};
+}
+
+template <class Inner, std::invocable<ElementOf<Inner>> Mapper>
+bool for_each(MappedCollection<Inner, Mapper> c, std::invocable<decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()))> auto fn) {
+	return for_each(c.inner, [&](auto item) {
+		return fn(c.mapper(item));
+	});
+}
+
+template <class Inner, class Mapper>
+bool count_of(MappedCollection<Inner, Mapper> c) {
+	return count_of(c.inner);
+}
+
+#define for_each_default_action(fn, item) for_each_default_action_<decltype(fn(item))>();
+
+template <class Inner, class Predicate>
+struct PredicatedCollection {
+	using Element = decltype(std::declval<Predicate>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Predicate predicate;
+};
+
+template <class Inner, class Predicate>
+bool for_each(PredicatedCollection<Inner, Predicate> c, auto fn) {
+	return ::for_each(c.inner, [&](auto item) {
+		if (c.predicate(item)) {
+			return fn(item);
+		}
+		return for_each_default_action(fn, item);
+	});
+}
+
+template <class Inner, class Predicate>
+PredicatedCollection<Inner, Predicate> predicated(Inner &&inner, Predicate &&predicate) {
+	return PredicatedCollection<Inner, Predicate>{inner, predicate};
+}
+
+template <class Collection>
+auto stddev(Collection const &collection) {
+	using Element = ElementOf<Collection>;
+
+	auto count = count_of(collection);
+	Element average = {};
+
+	for_each(collection, [&](Element x) { average += x; });
+	average /= count;
+
+	Element variance = {};
+	for_each(collection, [&](Element x) { variance += pow2(x - average); });
+	variance /= count;
+
+	return tl::sqrt(variance);
+}
+
+template <class Predicate = decltype([](auto x) { return x; })>
+bool all(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (!predicate(v))
 			return false;
@@ -966,7 +1040,8 @@ bool all(auto x, auto predicate) {
 	return true;
 }
 
-bool any(auto x, auto predicate) {
+template <class Predicate = decltype([](auto x) { return x; })>
+bool any(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (predicate(v))
 			return true;
@@ -980,24 +1055,6 @@ constexpr void for_each(Fn &&fn, Ts ...ts) {
 	(fn(ts), ...);
 }
 */
-
-template <class Container>
-struct ElementOfT {
-	using Type = typename Container::Element;
-};
-
-template <class T, umm count>
-struct ElementOfT<T[count]> {
-	using Type = T;
-};
-
-template <class T>
-struct ElementOfT<T *> {
-	using Type = T;
-};
-
-template <class T>
-using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class Container, class Predicate>
 constexpr auto find_if(Container &container, Predicate &&predicate) {
@@ -1593,6 +1650,13 @@ struct Span {
 		return that;
 	}
 
+	void set(Span that) const {
+		assert(count == that.count);
+		for (umm i = 0; i < count; ++i) {
+			data[i] = that.data[i];
+		}
+	}
+
 	Element *data = 0;
 	Size count = 0;
 };
@@ -1644,6 +1708,16 @@ constexpr bool for_each(Span<T> span, Fn &&fn) {
 		}
 	}
 	return false;
+}
+
+template <ForEachFlags flags=0, class T, umm count, class Fn>
+constexpr bool for_each(T (&array)[count], Fn &&fn) {
+	return for_each(Span(array, count), fn);
+}
+
+template <ForEachFlags flags=0, class T>
+constexpr bool for_each(std::initializer_list<T> list, auto &&fn) {
+	return for_each(Span(list.begin(), list.size()), fn);
 }
 
 template <class Enumerable>
@@ -2329,6 +2403,9 @@ struct StaticList {
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		defer { count = (StaticList::Size)(count + span.count); };
 		return {data + count, span.count};
+	}
+	forceinline constexpr Span<T> add(std::initializer_list<T> list) {
+		return add(as_span(list));
 	}
 
 	constexpr Optional<T> pop() {
