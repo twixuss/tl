@@ -156,6 +156,10 @@
 #define TL_GET_GLOBAL(x) x
 #endif
 
+#ifndef TL_ALIGN_RW_OPS
+#define TL_ALIGN_RW_OPS 0
+#endif
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -1577,15 +1581,41 @@ struct Span {
 			umm remaining_count = count;
 			f32 *ap = data;
 			f32 *bp = that.data;
+
+			#if TL_ALIGN_RW_OPS
+			// Align `ap` to 16 bytes.
+			while (remaining_count && (((umm)ap & 15) != 0)) {
+				if (*ap != *bp)
+					return false;
+				++ap;
+				++bp;
+				--remaining_count;
+			}
+			#endif
 			while (remaining_count >= 4) {
-				__m128 a = _mm_loadu_ps(ap); ap += 16;
-				__m128 b = _mm_loadu_ps(bp); bp += 16;
+				#if TL_ALIGN_RW_OPS
+				__m128 a = _mm_load_ps(ap);
+				#else
+				__m128 a = _mm_loadu_ps(ap);
+				#endif
+				__m128 b = _mm_loadu_ps(bp);
 				__m128 c = _mm_cmpeq_ps(a, b);
-				int m = _mm_movemask_epi32(c);
-				if (m != 0xFFFF) {
+				int m = _mm_movemask_ps(c);
+				if (m != 0xF) {
 					return false;
 				}
+				ap += 4;
+				bp += 4;
+				remaining_count -= 4;
 			}
+			while (remaining_count) {
+				if (*ap != *bp)
+					return false;
+				++ap;
+				++bp;
+				--remaining_count;
+			}
+			return true;
 		}
 		#endif
 		for (Size i = 0; i < count; ++i) {
@@ -2391,10 +2421,17 @@ struct StaticList {
 		bounds_check(assert(!full()));
 		return *new(data + count++) T();
 	}
-
+	
 	forceinline constexpr T &add(T const &value) {
 		bounds_check(assert(!full()));
 		return data[count++] = value;
+	}
+
+	forceinline constexpr void add(Optional<T> value) {
+		if (value) {
+			bounds_check(assert(!full()));
+			data[count++] = value.value();
+		}
 	}
 
 	template <class Size>

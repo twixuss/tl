@@ -3,6 +3,7 @@
 #include "math.h"
 #include "common.h"
 #include "vector.h"
+#include "logger.h"
 #define NOMINMAX
 #pragma warning(push, 0)
 #include <Windows.h>
@@ -134,8 +135,8 @@ HWND create_class_and_window(Span<utf8> class_name, WNDPROC wnd_proc, Span<utf8>
 	WNDCLASSEXW c {
 		.cbSize = sizeof c,
 		.lpfnWndProc = wnd_proc,
-		.hInstance = GetModuleHandleA(0),
-		.hCursor = LoadCursorW(0, IDC_ARROW),
+		.hInstance = GetModuleHandle(0),
+		.hCursor = LoadCursor(0, IDC_ARROW),
 		.lpszClassName = to_wstr(class_name),
 	};
 

@@ -945,7 +945,7 @@ forceinline f32 angle(v3f a, v3f b) {
 
 forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
 
-v3f rotate_around(v3f v, v3f axis, f32 angle) {
+forceinline v3f rotate_around(v3f v, v3f axis, f32 angle) {
     v3f a = normalize(axis);
 
     v2f cs = cos_sin(angle);
@@ -1750,6 +1750,16 @@ forceinline bool intersects(line<v3f> line, aabb<v3f> aabb) {
 	f32 tMax = min(max(vMin.x, vMax.x), max(vMin.y, vMax.y), max(vMin.z, vMax.z));
 
 	return tMax > 0 && tMin < tMax;
+}
+
+template <class Scalar>
+Array<line_segment<v2<Scalar>>, 4> to_lines(aabb<v2<Scalar>> box) {
+	return {
+		line_segment<v2<Scalar>>{box.min.x, box.min.y, box.min.x, box.max.y},
+		line_segment<v2<Scalar>>{box.min.x, box.min.y, box.max.x, box.min.y},
+		line_segment<v2<Scalar>>{box.max.x, box.max.y, box.min.x, box.max.y},
+		line_segment<v2<Scalar>>{box.max.x, box.max.y, box.max.x, box.min.y},
+	};
 }
 
 template <class Scalar>
