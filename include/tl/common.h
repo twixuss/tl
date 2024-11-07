@@ -1054,6 +1054,10 @@ private:
 	if (condition) { CONCAT(old_, __LINE__) = dst; dst = src; } \
 	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); };
 
+#define scoped_exchange(dst, src) \
+	Swap(dst, src);               \
+	defer { Swap(dst, src); };
+
 template <class T>
 auto reversed(T x) {
 	using Iter = decltype(x.rbegin());
@@ -1087,28 +1091,74 @@ struct ReverseIterator {
 inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
-struct OptionalBase {
+struct OptionalBaseTrivial {
 protected:
 	union {
 		T _value;
 	};
 	bool _has_value;
-	constexpr OptionalBase() {
+	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
 	}
 };
 
 template <>
-struct OptionalBase<void> {
+struct OptionalBaseTrivial<void> {
 protected:
 	bool _has_value;
-	constexpr OptionalBase() {
+	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
 	}
 };
 
 template <class T>
-struct OptionalBaseNonTrivial : OptionalBase<T> {
+struct OptionalBaseNonTrivial {
+protected:
+	union {
+		T _value;
+	};
+	bool _has_value;
+	constexpr OptionalBaseNonTrivial() {}
+	constexpr OptionalBaseNonTrivial(OptionalBaseNonTrivial const &that) {
+		if (that._has_value) {
+			new (&this->_value) T(that._value);
+		}
+		this->_has_value = that._has_value;
+	}
+	constexpr OptionalBaseNonTrivial& operator=(OptionalBaseNonTrivial const &that) {
+		if (this->_has_value) {
+			if (that._has_value) {
+				this->_value = that._value;
+			} else {
+				this->_has_value = false;
+				this->_value.~T();
+			}
+		} else {
+			if (that._has_value) {
+				new(&this->_value) T(that._value);
+				this->_has_value = true;
+			} else {
+			}
+		}
+		return *this;
+	}
+	constexpr OptionalBaseNonTrivial& operator=(OptionalBaseNonTrivial &&that) {
+		if (this->_has_value) {
+			if (that._has_value) {
+				this->_value = std::move(that._value);
+			} else {
+				this->_has_value = false;
+				this->_value.~T();
+			}
+		} else {
+			if (that._has_value) {
+				new(&this->_value) T(std::move(that._value));
+				this->_has_value = true;
+			} else {
+			}
+		}
+		return *this;
+	}
 	constexpr ~OptionalBaseNonTrivial() {
 		if (this->_has_value)
 			this->_value.~T();
@@ -1116,18 +1166,12 @@ struct OptionalBaseNonTrivial : OptionalBase<T> {
 };
 
 template <class T>
-struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBase<T>, OptionalBaseNonTrivial<T>> {
+struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBaseTrivial<T>, OptionalBaseNonTrivial<T>> {
 	using Element = T;
 	constexpr Optional() {}
 	constexpr Optional(Element that) {
 		new (&this->_value) Element(that);
 		this->_has_value = true;
-	}
-	constexpr Optional(Optional<Element> const &that) {
-		if (that._has_value) {
-			new (&this->_value) Element(that._value);
-		}
-		this->_has_value = that._has_value;
 	}
 	constexpr Optional(null_opt_t) {
 		this->_has_value = false;
@@ -1182,12 +1226,9 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 };
 
 template <>
-struct Optional<void> : OptionalBase<void> {
+struct Optional<void> : OptionalBaseTrivial<void> {
 	using Element = void;
 	constexpr Optional() {}
-	constexpr Optional(Optional<Element> const &that) {
-		this->_has_value = that._has_value;
-	}
 	constexpr Optional(null_opt_t) {
 		this->_has_value = false;
 	}
@@ -2438,7 +2479,7 @@ template <ForEachFlags flags = 0, umm size>
 bool for_each(BitSet<size> &set, auto &&fn)
 	requires requires { fn((umm)0); }
 {
-	using Word = typename decltype(set)::Word;
+	using Word = typename BitSet<size>::Word;
 
 	if constexpr (flags & ForEach_reverse) {
 		for (umm word_index = count_of(set.words) - 1; word_index != -1; --word_index) {
@@ -2446,9 +2487,9 @@ bool for_each(BitSet<size> &set, auto &&fn)
 			if (!word)
 				continue;
 
-			for (u64 bit = set.bits_in_word - 1; bit != -1; --bit) {
-				if (word & ((Word)1 << bit)) {
-					auto absolute_index = word_index * set.bits_in_word + bit;
+			for (u64 bit_index = set.bits_in_word - 1; bit_index != -1; --bit_index) {
+				if (word & ((Word)1 << bit_index)) {
+					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
 						continue;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
@@ -2469,11 +2510,11 @@ bool for_each(BitSet<size> &set, auto &&fn)
 			if (!word)
 				continue;
 
-			for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
-				if (word & ((Word)1 << bit)) {
-					auto absolute_index = word_index * set.bits_in_word + bit;
+			for (u64 bit_index = 0; bit_index < set.bits_in_word; ++bit_index) {
+				if (word & ((Word)1 << bit_index)) {
+					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
-						return;
+						return false;
 					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
 						auto d = fn(absolute_index);
 						if (d & ForEach_erase) not_implemented();
