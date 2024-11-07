@@ -63,46 +63,36 @@
 #if COMPILER_MSVC || COMPILER_GCC
 	#ifndef ARCH_AVX
 		#ifdef __AVX__
-			#undef ARCH_AVX
 			#define ARCH_AVX 1
 		#else
-			#undef ARCH_AVX
 			#define ARCH_AVX 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX2
 		#ifdef __AVX2__
-			#undef ARCH_AVX2
 			#define ARCH_AVX2 1
 		#else
-			#undef ARCH_AVX2
 			#define ARCH_AVX2 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512F
 		#ifdef __AVX512F__
-			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 1
 		#else
-			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512VL
 		#ifdef __AVX512VL__
-			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 1
 		#else
-			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512DQ
 		#ifdef __AVX512DQ__
-			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 1
 		#else
-			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 0
 		#endif
 	#endif
@@ -221,10 +211,6 @@ using utf16 = char16_t;
 using utf32 = char32_t;
 
 
-
-//
-// Really?
-//
 using slong = signed long;
 using ulong = unsigned long;
 using wchar = wchar_t;
@@ -258,7 +244,7 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 		#undef OS_WINDOWS
 		#define NOMINMAX
 			#pragma warning(push, 0)
-				#pragma warning(disable: 5039 4668)
+				#pragma warning(disable: 5039 4668 5105)
 				#include <Windows.h>
 			#pragma warning(pop)
 		#pragma pop_macro("OS_WINDOWS")

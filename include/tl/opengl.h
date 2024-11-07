@@ -3,6 +3,7 @@
 #include "console.h"
 #include "math.h"
 #include "time.h"
+#include "includer.h"
 
 #pragma warning(push, 0)
 #define NOMINMAX
@@ -34,7 +35,11 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_BLEND_EQUATION                        0x8009
 #define GL_FUNC_SUBTRACT                         0x800A
 #define GL_FUNC_REVERSE_SUBTRACT                 0x800B
+#define GL_TEXTURE_3D                            0x806F
+#define GL_TEXTURE_WRAP_R                        0x8072
+#define GL_CLAMP_TO_BORDER                       0x812D
 #define GL_CLAMP_TO_EDGE                         0x812F
+#define GL_TEXTURE_BASE_LEVEL                    0x813C
 #define GL_TEXTURE_MAX_LEVEL                     0x813D
 #define GL_DEPTH_COMPONENT16                     0x81A5
 #define GL_DEPTH_COMPONENT32                     0x81A7
@@ -152,6 +157,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_DEPTH24_STENCIL8                      0x88F0
 #define GL_SRC1_COLOR                            0x88F9
 #define GL_ONE_MINUS_SRC1_COLOR                  0x88FA
+#define GL_MAX_ARRAY_TEXTURE_LAYERS              0x88FF
 #define GL_UNIFORM_BUFFER                        0x8A11
 #define GL_VERTEX_SHADER                         0x8B31
 #define GL_FRAGMENT_SHADER                       0x8B30
@@ -159,6 +165,13 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_LINK_STATUS                           0x8B82
 #define GL_INFO_LOG_LENGTH                       0x8B84
 #define GL_ACTIVE_UNIFORMS                       0x8B86
+#define GL_TEXTURE_1D_ARRAY                      0x8C18
+#define GL_PROXY_TEXTURE_1D_ARRAY                0x8C19
+#define GL_TEXTURE_2D_ARRAY                      0x8C1A
+#define GL_PROXY_TEXTURE_2D_ARRAY                0x8C1B
+#define GL_TEXTURE_BINDING_1D_ARRAY              0x8C1C
+#define GL_TEXTURE_BINDING_2D_ARRAY              0x8C1D
+#define GL_SRGB8                                 0x8C41
 #define GL_FRAMEBUFFER_COMPLETE                  0x8CD5
 #define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT     0x8CD6
 #define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
@@ -170,6 +183,7 @@ typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum
 #define GL_FRAMEBUFFER                           0x8D40
 #define GL_RENDERBUFFER                          0x8D41
 #define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE    0x8D56
+#define GL_FRAMEBUFFER_SRGB                      0x8DB9
 #define GL_COPY_READ_BUFFER                      0x8F36
 #define GL_COPY_WRITE_BUFFER                     0x8F37
 #define GL_SHADER_STORAGE_BUFFER                 0x90D2
@@ -550,6 +564,96 @@ struct ProgramStages {
 
 TL_API GLuint create_program(ProgramStages stages);
 
+struct ProgramFile {
+	struct SourceFile : includer::SourceFileBase {
+		FileTime last_write_time = 0;
+			
+		void init() {
+			last_write_time = get_file_write_time(path).value_or(0);;
+		}
+		bool was_modified() {
+			return last_write_time < get_file_write_time(path).value_or(0);
+		}
+	};
+
+	struct Macro {
+		Span<utf8> name, value;
+	};
+
+	Span<utf8> path;
+	List<utf8> source;
+
+	GLenum vs = 0;
+	GLenum fs = 0;
+	GLuint program = 0;
+	includer::Includer<SourceFile> includer;
+
+	struct LoadOptions {
+		Span<Macro> macros = {};
+	};
+
+	void load(LoadOptions options = {}) {
+		current_logger.info("Recompiling {}", path);
+		
+		includer.load(path, &source, includer::LoadOptions{.append_location_info = [](StringBuilder &builder, Span<utf8> path, u32 line) {
+			append_format(builder, "\n#line {} \"", line);
+			for (auto c : path) {
+				append(builder, (char)(c == '\\' ? '/' : c));
+			}
+			append(builder, "\"\n");
+
+		}});
+
+		List<utf8> preprocessed;
+		defer { 
+			tl::free(preprocessed);
+		};
+
+		auto cursor = source.span();
+
+		while (cursor.count) {
+			for (auto &macro : options.macros) {
+				if (starts_with(cursor, macro.name)) {
+					preprocessed.add(macro.value);
+					cursor.set_begin(cursor.begin() + macro.name.count);
+					goto replaced_macro;
+				}
+			}
+
+			preprocessed.add(cursor[0]);
+			cursor.set_begin(cursor.begin() + 1);
+
+		replaced_macro:;
+		}
+
+		vs = gl::create_shader(GL_VERTEX_SHADER, 430, true, as_chars(preprocessed));
+		fs = gl::create_shader(GL_FRAGMENT_SHADER, 430, true, as_chars(preprocessed));
+		program = gl::create_program({.vertex = vs, .fragment = fs});
+
+		if (!vs || !fs || !program) {
+			//println("Preprocessed shader code:\n{}", preprocessed);
+		}
+	}
+
+	void unload() {
+		glDeleteProgram(program);
+		glDeleteShader(fs);
+		glDeleteShader(vs);
+	}
+	void free() {
+		includer.free();
+	}
+	bool needs_reload() {
+		for (auto &source_file : includer.source_files) {
+			if (source_file.was_modified()) {
+				return true;
+			}
+		}
+		return false;
+	}
+};
+
+
 #ifdef TL_IMPL
 
 #ifndef TL_OPENGL_DEBUG_BREAK_LEVEL
@@ -573,35 +677,35 @@ TL_API GLuint create_program(ProgramStages stages);
 static GLuint compile_shader(GLuint shader) {
 	glCompileShader(shader);
 
+	GLint maxLength;
+	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+	scoped(temporary_storage_checkpoint);
+
+	auto message = current_temporary_allocator.allocate<char>(maxLength);
+	glGetShaderInfoLog(shader, maxLength, &maxLength, message);
+
+	print(Span(message, maxLength));
+
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-
 	if (!status) {
-		GLint maxLength;
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-		auto message = temporary_allocator.allocate<char>(maxLength);
-		glGetShaderInfoLog(shader, maxLength, &maxLength, message);
-
 		glDeleteShader(shader);
 		shader = 0;
-
-		print(message);
 	}
 	return shader;
 }
 
 GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source) {
-	StringBuilder version_builder;
-	version_builder.allocator = temporary_allocator;
-	append(version_builder, "#version "s);
-	append(version_builder, version);
+	StaticList<char, 64> version_string;
+
+	version_string.add("#version "s);
+	write_as_string(version_string, version);
 
 	if (core) {
-		append(version_builder, " core"s);
+		version_string.add(" core"s);
 	}
-	append(version_builder, "\n"s);
-	auto version_string = (List<char>)to_string(version_builder);
+	version_string.add("\n"s);
 
 	StaticList<char, 64> stage_string;
 	stage_string += "#define "s;
@@ -658,13 +762,13 @@ GLuint create_program(ProgramStages stages) {
 		GLint maxLength;
 		glGetProgramiv(result, GL_INFO_LOG_LENGTH, &maxLength);
 
-		auto message = temporary_allocator.allocate<char>(maxLength);
+		auto message = current_temporary_allocator.allocate<char>(maxLength);
 		glGetProgramInfoLog(result, maxLength, &maxLength, message);
 
 		glDeleteProgram(result);
 		result = 0;
 
-		print(message);
+		print(Span(message, maxLength));
 	}
 	return result;
 }
@@ -755,11 +859,22 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 	for (u32 function_index = 0; function_index < function_count; ++function_index) {
 		char const *name = function_names[function_index];
 		void *function = wglGetProcAddress(name);
-		if (!function) {
+		if (function) {
+			functions.data[function_index] = function;
+		} else {
 			print("Failed to query '{}'\n", name);
 		}
-		functions.data[function_index] = function;
 	}
+
+	#define D(ret, name, args, params)                                    \
+		if (!functions._##name) {                                         \
+			functions._##name = autocast +[]() {                          \
+				println("OpenGL function '{}' is not supported.", #name); \
+				abort();                                                  \
+			};                                                            \
+		}
+	EXT_AND_OS_FUNCS
+	#undef D
 
 
 	if (functions._wglCreateContextAttribsARB) {
@@ -1164,7 +1279,8 @@ inline void scissor(v2f position, v2f size) { ::glScissor((GLsizei)position.x, (
 inline void scissor(v2s position, v2s size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 inline void scissor(v2u position, v2u size) { ::glScissor((GLsizei)position.x, (GLsizei)position.y, (GLsizei)size.x, (GLsizei)size.y); }
 
-inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, u32 value) { glUniform1ui(glGetUniformLocation(shader, name), value); }
+inline void set_uniform(GLuint shader, char const *name, s32 value) { glUniform1i(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, f32 value) { glUniform1f(glGetUniformLocation(shader, name), value); }
 inline void set_uniform(GLuint shader, char const *name, v2f value) { glUniform2fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3fv(glGetUniformLocation(shader, name), 1, value.s); }

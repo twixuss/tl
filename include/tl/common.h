@@ -27,21 +27,45 @@
 #define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x, __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)(!!(x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
 
 #ifndef assert
-#define assert(x, ...) assert_always(x, __VA_ARGS__)
+#define assert(x, ...) assert_always(x __VA_OPT__(,) __VA_ARGS__)
 #endif
 
-#define assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}.", #a, a, #b, b)
-#define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}.", #a, a, #b, b)
+#if 1
+// Tried to make these work with custom message, both old and new preprocessors are shit, don't work.
+#define TL_assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define TL_assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "", __VA_ARGS__), __assume(0))
-#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "", __VA_ARGS__), __assume(0))
+#define TL_assert_equal_fmt(a, b, c, ...)         assert((a) == (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_not_equal_fmt(a, b, c, ...)     assert((a) != (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_less_fmt(a, b, c, ...)          assert((a) <  (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_greater_fmt(a, b, c, ...)       assert((a) >  (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_less_equal_fmt(a, b, c, ...)    assert((a) <= (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+#define TL_assert_greater_equal_fmt(a, b, c, ...) assert((a) >= (b), "{} = {}; {} = {}. " c, #a, a, #b, b __VA_OPT__(,) __VA_ARGS__)
+
+#define assert_equal(a, b, ...)         CONCAT(TL_assert_equal,         __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_not_equal(a, b, ...)     CONCAT(TL_assert_not_equal,     __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_less(a, b, ...)          CONCAT(TL_assert_less,          __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_greater(a, b, ...)       CONCAT(TL_assert_greater,       __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_less_equal(a, b, ...)    CONCAT(TL_assert_less_equal,    __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#define assert_greater_equal(a, b, ...) CONCAT(TL_assert_greater_equal, __VA_OPT__(_fmt))(a, b __VA_OPT__(,) __VA_ARGS__)
+#else
+#define assert_equal(a, b)         assert((a) == (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_not_equal(a, b)     assert((a) != (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_less(a, b)          assert((a) <  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_greater(a, b)       assert((a) >  (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_less_equal(a, b)    assert((a) <= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
+#endif
+
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
 
 #ifndef bounds_check
 #define bounds_check(x) x
@@ -106,8 +130,8 @@
 #define REDECLARE_REF(name, expr) auto &_##name = expr; auto &name = _##name;
 
 // static_assert(false) is ill-formed in removed branch of constexpr if...
-#define static_error_t(t, ...) static_assert(!sizeof(t*), __VA_ARGS__)
-#define static_error_v(v, ...) static_error_t(decltype(v), __VA_ARGS__)
+#define static_error_t(t, ...) static_assert(!sizeof(t*) __VA_OPT__(,) __VA_ARGS__)
+#define static_error_v(v, ...) static_error_t(decltype(v) __VA_OPT__(,) __VA_ARGS__)
 
 #define TL_DECLARE_CONCEPT(name)                                                \
 	template <class T> struct S##name : std::false_type {};                     \
@@ -130,6 +154,10 @@
 #else
 #define TL_GET_CURRENT(x) ::tl::current_##x
 #define TL_GET_GLOBAL(x) x
+#endif
+
+#ifndef TL_ALIGN_RW_OPS
+#define TL_ALIGN_RW_OPS 0
 #endif
 
 namespace tl {
@@ -216,8 +244,32 @@ constexpr umm type_index_of = IndexOfT<T, Rest...>::value;
 template <class First, class ...Rest>
 concept AllSame = (std::is_same_v<First, Rest> && ...);
 
+template <class First, class ...Rest>
+struct RequireAllSame {
+	static_assert(AllSame<First, Rest...>);
+	using Type = First;
+};
+
 template <class T, class ...Types>
 concept OneOf = (std::is_same_v<T, Types> || ...);
+
+template <class Container>
+struct ElementOfT {
+	using Type = typename Container::Element;
+};
+
+template <class T, umm count>
+struct ElementOfT<T[count]> {
+	using Type = T;
+};
+
+template <class T>
+struct ElementOfT<T *> {
+	using Type = T;
+};
+
+template <class T>
+using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
@@ -323,7 +375,8 @@ forceinline constexpr auto enum_values() {
 
 
 // This function exists because C++ does not provide a way to convert
-// fundamental types to structs without adding a constructor to a struct.
+// fundamental types to structs without adding a constructor to a struct, 
+// which will break designated initialization.
 // If there's a need to do that, specialize this function.
 template <class To, class From>
 forceinline constexpr To convert(From from) {
@@ -758,9 +811,16 @@ constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
 constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
+constexpr f32 golden_ratio = f32(1.6180339887498948482045868343656L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+
+constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
+    return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
+};
+
+forceinline constexpr f32 sqrt(f32 v) { return std::is_constant_evaluated() ? sqrt_newton_raphson(v, v, 0) : sqrtf(v); }
 
 // Does not check if min_bound is greater than max_bound
 // There is `clamp_checked` for that.
@@ -896,39 +956,87 @@ enum : ForEachFlags {
 	ForEach_reverse = 0x1,
 };
 
-template <ForEachFlags flags=0, class T, umm count, class Fn>
-constexpr bool for_each(T (&array)[count], Fn &&fn) {
-	using FnRet = decltype(fn(*(T*)0));
+template <class T>
+concept Collection = requires(T collection) {
+	for_each(collection, [](auto item) {});
+};
 
-	T *start;
-	T *end;
-	umm step;
-	if constexpr (flags & ForEach_reverse) {
-		start = array + count - 1;
-		end = array - 1;
-		step = -1;
+template <class Fn, class Item>
+auto for_each_default_action(Fn &&fn, Item &&item) {
+	if constexpr (std::is_same_v<decltype(fn(item)), ForEachDirective>) {
+		return ForEach_continue;
 	} else {
-		start = array;
-		end = array + count;
-		step = 1;
+		return;
 	}
-	for (auto it = start; it != end; it += step) {
-		if constexpr (std::is_same_v<FnRet, void>) {
-			fn(*it);
-		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			auto d = fn(*it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_t(T, "Invalid return type of for_each function");
-		}
-	}
-	return false;
 }
 
-bool all(auto x, auto predicate) {
+template <class Inner, class Mapper>
+struct MappedCollection {
+	using Element = decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Mapper mapper;
+};
+
+template <class Inner, class Mapper>
+MappedCollection<Inner, Mapper> mapped(Inner &&inner, Mapper &&mapper) {
+	return MappedCollection<Inner, Mapper>{inner, mapper};
+}
+
+template <class Inner, std::invocable<ElementOf<Inner>> Mapper>
+bool for_each(MappedCollection<Inner, Mapper> c, std::invocable<decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()))> auto fn) {
+	return for_each(c.inner, [&](auto item) {
+		return fn(c.mapper(item));
+	});
+}
+
+template <class Inner, class Mapper>
+bool count_of(MappedCollection<Inner, Mapper> c) {
+	return count_of(c.inner);
+}
+
+#define for_each_default_action(fn, item) for_each_default_action_<decltype(fn(item))>();
+
+template <class Inner, class Predicate>
+struct PredicatedCollection {
+	using Element = decltype(std::declval<Predicate>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Predicate predicate;
+};
+
+template <class Inner, class Predicate>
+bool for_each(PredicatedCollection<Inner, Predicate> c, auto fn) {
+	return ::for_each(c.inner, [&](auto item) {
+		if (c.predicate(item)) {
+			return fn(item);
+		}
+		return for_each_default_action(fn, item);
+	});
+}
+
+template <class Inner, class Predicate>
+PredicatedCollection<Inner, Predicate> predicated(Inner &&inner, Predicate &&predicate) {
+	return PredicatedCollection<Inner, Predicate>{inner, predicate};
+}
+
+template <class Collection>
+auto stddev(Collection const &collection) {
+	using Element = ElementOf<Collection>;
+
+	auto count = count_of(collection);
+	Element average = {};
+
+	for_each(collection, [&](Element x) { average += x; });
+	average /= count;
+
+	Element variance = {};
+	for_each(collection, [&](Element x) { variance += pow2(x - average); });
+	variance /= count;
+
+	return tl::sqrt(variance);
+}
+
+template <class Predicate = decltype([](auto x) { return x; })>
+bool all(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (!predicate(v))
 			return false;
@@ -936,7 +1044,8 @@ bool all(auto x, auto predicate) {
 	return true;
 }
 
-bool any(auto x, auto predicate) {
+template <class Predicate = decltype([](auto x) { return x; })>
+bool any(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (predicate(v))
 			return true;
@@ -950,24 +1059,6 @@ constexpr void for_each(Fn &&fn, Ts ...ts) {
 	(fn(ts), ...);
 }
 */
-
-template <class Container>
-struct ElementOfT {
-	using Type = typename Container::Element;
-};
-
-template <class T, umm count>
-struct ElementOfT<T[count]> {
-	using Type = T;
-};
-
-template <class T>
-struct ElementOfT<T *> {
-	using Type = T;
-};
-
-template <class T>
-using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class Container, class Predicate>
 constexpr auto find_if(Container &container, Predicate &&predicate) {
@@ -1087,7 +1178,6 @@ struct ReverseIterator {
 	Iterator operator->() { return it; }
 };
 
-
 inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
@@ -1184,8 +1274,10 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
+	constexpr auto &value() { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() { return this->_value; }
+	constexpr auto &value() const { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() const { return this->_value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -1240,8 +1332,6 @@ struct Optional<void> : OptionalBaseTrivial<void> {
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -1495,6 +1585,80 @@ struct Span {
 	constexpr bool operator==(Span<T, ThatSize> that) const {
 		if (count != that.count)
 			return false;
+
+		if constexpr (std::is_integral_v<T>) {
+			u8 *ap = (u8 *)data;
+			u8 *bp = (u8 *)that.data;
+
+			u8 *endp = (u8 *)end();
+			
+			#if TL_USE_SIMD
+			while (endp - ap >= 16) {
+				__m128i a = _mm_loadu_epi32(ap); ap += 16;
+				__m128i b = _mm_loadu_epi32(bp); bp += 16;
+				__m128i c = _mm_cmpeq_epi32(a, b);
+				int m = _mm_movemask_ps(_mm_castsi128_ps(c));
+				if (m != 0xF) {
+					return false;
+				}
+			}
+			#endif
+			while (endp - ap >= 8) {
+				u64 a = *(u64 *)ap; ap += 8;
+				u64 b = *(u64 *)bp; bp += 8;
+				if (a != b) {
+					return false;
+				}
+			}
+			while (endp - ap) {
+				if (*ap++ != *bp++) {
+					return false;
+				}
+			}
+			return true;
+		}
+		#if TL_USE_SIMD
+		if constexpr (std::is_same_v<T, f32>) {
+			umm remaining_count = count;
+			f32 *ap = data;
+			f32 *bp = that.data;
+
+			#if TL_ALIGN_RW_OPS
+			// Align `ap` to 16 bytes.
+			while (remaining_count && (((umm)ap & 15) != 0)) {
+				if (*ap != *bp)
+					return false;
+				++ap;
+				++bp;
+				--remaining_count;
+			}
+			#endif
+			while (remaining_count >= 4) {
+				#if TL_ALIGN_RW_OPS
+				__m128 a = _mm_load_ps(ap);
+				#else
+				__m128 a = _mm_loadu_ps(ap);
+				#endif
+				__m128 b = _mm_loadu_ps(bp);
+				__m128 c = _mm_cmpeq_ps(a, b);
+				int m = _mm_movemask_ps(c);
+				if (m != 0xF) {
+					return false;
+				}
+				ap += 4;
+				bp += 4;
+				remaining_count -= 4;
+			}
+			while (remaining_count) {
+				if (*ap != *bp)
+					return false;
+				++ap;
+				++bp;
+				--remaining_count;
+			}
+			return true;
+		}
+		#endif
 		for (Size i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
@@ -1557,6 +1721,13 @@ struct Span {
 		return that;
 	}
 
+	void set(Span that) const {
+		assert(count == that.count);
+		for (umm i = 0; i < count; ++i) {
+			data[i] = that.data[i];
+		}
+	}
+
 	Element *data = 0;
 	Size count = 0;
 };
@@ -1608,6 +1779,16 @@ constexpr bool for_each(Span<T> span, Fn &&fn) {
 		}
 	}
 	return false;
+}
+
+template <ForEachFlags flags=0, class T, umm count, class Fn>
+constexpr bool for_each(T (&array)[count], Fn &&fn) {
+	return for_each(Span(array, count), fn);
+}
+
+template <ForEachFlags flags=0, class T>
+constexpr bool for_each(std::initializer_list<T> list, auto &&fn) {
+	return for_each(Span(list.begin(), list.size()), fn);
 }
 
 template <class Enumerable>
@@ -1783,7 +1964,16 @@ constexpr T *find(Span<T, Size> where, T const &what) {
 
 template <class T, class SizeA, class SizeB>
 constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
-	return find(where.begin(), where.end(), what.begin(), what.end());
+	if ((smm)(where.count - what.count + 1) <= 0)
+		return 0;
+
+	for (umm i = 0; i < where.count - what.count + 1; ++i) {
+		auto where_part = Span(where.data + i, what.count);
+		if (where_part == what) {
+			return where_part.data;
+		}
+	}
+	return 0;
 }
 
 template <class T>
@@ -1967,6 +2157,18 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 	process_group(span.subspan(first_index, span.count - first_index));
 }
 
+template <class T, class Size>
+Span<T, Size> strip(Span<T, Size> span, auto &&predicate) {
+	while (span.count && predicate(span.data[0])) {
+		span.data++;
+		span.count--;
+	}
+	while (span.count && predicate(span.data[span.count - 1])) {
+		span.count--;
+	}
+	return span;
+}
+
 template <class T>
 constexpr T dot(Span<T> a, Span<T> b) {
 	assert_equal(a.count, b.count);
@@ -2136,6 +2338,13 @@ inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip
 	return span;
 }
 
+template <class T>
+void reverse_in_place(Span<T> span) {
+	for (umm i = 0; i < span.count / 2; ++i) {
+		Swap(span.data[i], span.data[span.count - i - 1]);
+	}
+}
+
 template <class T, umm _capacity>
 struct StaticList {
 	using Element = T;
@@ -2253,10 +2462,17 @@ struct StaticList {
 		bounds_check(assert(!full()));
 		return *new(data + count++) T();
 	}
-
+	
 	forceinline constexpr T &add(T const &value) {
 		bounds_check(assert(!full()));
 		return data[count++] = value;
+	}
+
+	forceinline constexpr void add(Optional<T> value) {
+		if (value) {
+			bounds_check(assert(!full()));
+			data[count++] = value.value();
+		}
 	}
 
 	template <class Size>
@@ -2265,6 +2481,9 @@ struct StaticList {
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		defer { count = (StaticList::Size)(count + span.count); };
 		return {data + count, span.count};
+	}
+	forceinline constexpr Span<T> add(std::initializer_list<T> list) {
+		return add(as_span(list));
 	}
 
 	constexpr Optional<T> pop() {
@@ -2429,19 +2648,20 @@ struct BitSet {
 	bool get(umm i) const {
 		return word(i) & bit(i);
 	}
-	void set(umm i) {
-		word(i) |= bit(i);
-	}
-	void unset(umm i) {
-		word(i) &= ~bit(i);
+	void set(umm i, bool value) {
+		if (value) {
+			word(i) |= bit(i);
+		} else {
+			word(i) &= ~bit(i);
+		}
 	}
 	void flip(umm i) {
 		word(i) ^= bit(i);
 	}
 
-	auto &word(this auto &&self, umm i) {
-		return self.words[i / bits_in_word];
-	}
+	auto &word(umm i) { return words[i / bits_in_word]; }
+	auto &word(umm i) const { return words[i / bits_in_word]; }
+
 	umm bit(umm i) const {
 		return (Word)1 << (i % bits_in_word);
 	}

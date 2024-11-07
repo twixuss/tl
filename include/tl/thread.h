@@ -51,6 +51,9 @@ forceinline s64 atomic_decrement(s64 volatile *a) { return (s64)atomic_decrement
 #endif
 
 template <class T>
+concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
+
+template <AInterlockExchangeable T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
 	     if constexpr (sizeof(T) == 1) result = _InterlockedExchange8 ((char     *)dst, *(char     *)&src);
@@ -61,7 +64,7 @@ forceinline T atomic_set(T volatile *dst, T src) {
 	return *(T *)&result;
 }
 
-template <class T>
+template <AInterlockExchangeable T>
 forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
 	s64 result;
 	     if constexpr (sizeof(T) == 8) result = _InterlockedCompareExchange64((long long*)dst, *(long long*)&new_value, *(long long*)&comparand);
@@ -72,7 +75,7 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 	return *(T *)&result;
 }
 
-template <class T>
+template <AInterlockExchangeable T>
 forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
 	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
@@ -245,6 +248,21 @@ struct SleepySpinner {
 		}
 	}
 };
+
+template <AInterlockExchangeable T, ASpinner Spinner = BasicSpinner>
+forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requires requires { { fn(*(T *)0) } -> std::same_as<T>; } {
+	using Int = TypeAt<log2(sizeof(T)), u8, u16, u32, u64>;
+	while (1) {
+		auto old_value = *a;
+		auto new_value = fn(old_value);
+		if (atomic_compare_exchange((Int volatile *)a, *(Int *)&new_value, *(Int *)&old_value) == *(Int *)&old_value) {
+			return old_value;
+		}
+		spinner.spin();
+	}
+}
+
+#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&, _b = b](auto _a) { return _a + _b; } __VA_OPT__(,) __VA_ARGS__))
 
 template <ASpinner Spinner = SleepySpinner>
 void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {
@@ -573,7 +591,222 @@ enum WaitForCompletionOption {
 	do_any_task,
 };
 
-struct ThreadPool {
+// Simple thread pool.
+// Intended usage cycle:
+//     1. Push some amount of tasks, heavy first.
+//     2. Wait for them to complete.
+//
+// Only one thread may push tasks.
+
+struct TaskQueueThreadPool {
+	struct Task {
+		TaskQueueThreadPool *pool = 0;
+		void (*fn)(void *param) = 0;
+		void *param = 0;
+		void (*free)(void *param) = 0;
+	};
+
+	struct InitParams {
+		void (*worker_initter)() = [](){};
+		void (*worker_proc)(TaskQueueThreadPool *pool) = TaskQueueThreadPool::default_worker_proc;
+	};
+
+	inline bool init(u32 thread_count, InitParams params = {}) {
+		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
+		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
+		stopped_thread_count = 0;
+		stopping = false;
+		allocator =
+			threads.allocator =
+			tasks.allocator =
+			TL_GET_CURRENT(allocator);
+		if (thread_count) {
+			threads.reserve(thread_count);
+
+			struct StartInfo {
+				TaskQueueThreadPool *pool;
+				void (*init)();
+				void (*proc)(TaskQueueThreadPool *pool);
+			};
+			StartInfo info;
+			info.pool = this;
+			info.init = params.worker_initter;
+			info.proc = params.worker_proc;
+
+			auto start_proc = [](Thread *thread) {
+				StartInfo *info = (StartInfo *)thread->param;
+				(*info->init)();
+				(*info->proc)(info->pool);
+			};
+
+			for (u32 i = 0; i < thread_count; ++i) {
+				auto thread = create_thread(+start_proc, (void *)&info);
+				if (!valid(thread)) {
+					stopping = true;
+					for (auto t : threads) {
+						free(t);
+					}
+					threads.clear();
+					return false;
+				}
+				threads.add(thread);
+			}
+
+			sync(start_sync_point);
+
+		} else {
+			threads.clear();
+		}
+
+		return true;
+	}
+	inline void deinit() {
+		assert(tasks.count == 0, "Wait for all the tasks to complete before calling TaskQueueThreadPool::deinit");
+		stopping = true;
+		sync(end_sync_point);
+		threads.clear();
+	}
+
+	inline static void default_worker_proc(TaskQueueThreadPool *pool) {
+
+		sync(pool->start_sync_point);
+
+		while (1) {
+			Optional<TaskQueueThreadPool::Task> task;
+			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+				while (!pool->stopping) {
+					if (task = pool->tasks.pop()) {
+						assert(task.value_unchecked().fn);
+						break;
+					} else {
+						// NOTE: Arbitrary timeout
+						sleeper.sleep(1);
+					}
+				}
+			});
+
+			if (task) {
+				pool->run(task.value_unchecked());
+				pool->completion_notifier.wake();
+			} else {
+				break;
+			}
+		}
+		atomic_add(&pool->stopped_thread_count, 1);
+		sync(pool->end_sync_point);
+	}
+	
+	inline void add_task(void (*fn)(void *param), void *param) {
+		atomic_increment(&started_task_count);
+
+		add_task({this, fn, param, [](void *){}});
+	}
+	template <class Fn, class ...Args>
+	void add_task(Fn &&fn, Args &&...args) {
+		using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+
+		// TODO: Figure out a way to use custom allocator without race conditions.
+		//       Using DefaultAllocator for now.
+
+		auto fnParams = DefaultAllocator{}.allocate_uninitialized<Tuple>();
+		new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+
+		constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+		constexpr auto freer = [](void *param) {
+			auto tuple = (Tuple *)param;
+			tuple->~Tuple(); 
+			DefaultAllocator{}.free_t(tuple, 1);
+		};
+
+		atomic_increment(&started_task_count);
+
+		add_task({this, invokerProc, fnParams, freer});
+	}
+	template <class Fn>
+	auto &operator+=(Fn &&fn) {
+		add_task(std::forward<Fn>(fn));
+		return *this;
+	}
+
+	inline void wait_for_completion(WaitForCompletionOption option = WaitForCompletionOption::just_wait) {
+		switch (option) {
+			case WaitForCompletionOption::just_wait: {
+				while (started_task_count > finished_task_count) {
+					completion_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+						sleeper.sleep(1);
+					});
+				}
+				break;
+			}
+			case WaitForCompletionOption::do_my_task:
+			case WaitForCompletionOption::do_any_task: {
+				while (started_task_count > finished_task_count) {
+					Optional<Task> task;
+					new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+						task = tasks.pop();
+						if (!task) {
+							sleeper.sleep(1);
+						}
+					});
+					if (task) {
+						run(task.value_unchecked());
+					}
+				}
+				break;
+			}
+		}
+	}
+	#if TL_DEBUG
+	~TaskQueueThreadPool() {
+		assert(started_task_count == finished_task_count, "TaskQueueThreadPool::wait_for_completion must be called before TaskQueueThreadPool's destructor is called");
+		assert(stopping, "TaskQueueThreadPool was not properly deinitted. Call TaskQueueThreadPool::deinit.");
+	}
+	#endif
+
+	Allocator allocator = TL_GET_CURRENT(allocator);
+	List<Thread *> threads;
+
+	SyncPoint start_sync_point;
+	SyncPoint end_sync_point;
+	u32 volatile stopped_thread_count = 0;
+	bool volatile stopping = true;
+	Queue<Task> tasks;
+	
+	u32 volatile started_task_count = 0;
+	u32 volatile finished_task_count = 0;
+
+	ConditionVariable new_work_notifier;
+	ConditionVariable completion_notifier;
+	
+	#if TL_DEBUG
+	u32 producer_id;
+	#endif
+
+	inline void add_task(Task task) {
+		new_work_notifier.section([&]{
+			#if TL_DEBUG
+			if (tasks.count == 0) {
+				producer_id = get_current_thread_id();
+			} else {
+				assert_equal(producer_id, get_current_thread_id());
+			}
+			#endif
+			tasks.push(task);
+		});
+
+		new_work_notifier.wake();
+	}
+	inline void run(Task task) {
+		assert(task.fn);
+		task.fn(task.param);
+		task.free(task.param);
+		atomic_increment(&finished_task_count);
+	}
+
+};
+
+// Runs the latest pushed tasks 
+struct TaskListsThreadPool {
 	struct TaskList;
 
 	struct Task {
@@ -585,16 +818,16 @@ struct ThreadPool {
 
 	struct TaskList {
 	private:
-		friend struct ThreadPool;
+		friend struct TaskListsThreadPool;
 
-		ThreadPool *pool = 0;
+		TaskListsThreadPool *pool = 0;
 
 		u32 volatile started_task_count = 0;
 		u32 volatile finished_task_count = 0;
 
 	public:
 		TaskList() = default;
-		TaskList(ThreadPool *pool) : pool(pool) {}
+		TaskList(TaskListsThreadPool *pool) : pool(pool) {}
 		TaskList(const TaskList &that) = delete;
 		TaskList(TaskList &&that) = delete;
 		TaskList &operator=(const TaskList &that) = delete;
@@ -693,11 +926,12 @@ struct ThreadPool {
 
 	struct InitParams {
 		void (*worker_initter)() = [](){};
-		void (*worker_proc)(ThreadPool *pool) = ThreadPool::default_worker_proc;
+		void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool::default_worker_proc;
 	};
 
 	inline bool init(u32 thread_count, InitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
+		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
 		stopping = false;
 		allocator =
@@ -708,9 +942,9 @@ struct ThreadPool {
 			threads.reserve(thread_count);
 
 			struct StartInfo {
-				ThreadPool *pool;
+				TaskListsThreadPool *pool;
 				void (*init)();
-				void (*proc)(ThreadPool *pool);
+				void (*proc)(TaskListsThreadPool *pool);
 			};
 			StartInfo info;
 			info.pool = this;
@@ -745,17 +979,18 @@ struct ThreadPool {
 		return true;
 	}
 	inline void deinit() {
-		assert(tasks.count == 0, "Wait for all the tasks to complete before calling ThreadPool::deinit");
+		assert(tasks.count == 0, "Wait for all the tasks to complete before calling TaskListsThreadPool::deinit");
 		stopping = true;
+		sync(end_sync_point);
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(ThreadPool *pool) {
+	inline static void default_worker_proc(TaskListsThreadPool *pool) {
 
 		sync(pool->start_sync_point);
 
 		while (1) {
-			Optional<ThreadPool::Task> task;
+			Optional<TaskListsThreadPool::Task> task;
 			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
 				while (!pool->stopping) {
 					if (task = pool->tasks.pop()) {
@@ -776,6 +1011,7 @@ struct ThreadPool {
 			}
 		}
 		atomic_add(&pool->stopped_thread_count, 1);
+		sync(pool->end_sync_point);
 	}
 
 	TaskList create_task_list() {
@@ -783,8 +1019,8 @@ struct ThreadPool {
 	}
 
 	#if TL_DEBUG
-	~ThreadPool() {
-		assert(stopping, "ThreadPool was not properly deinitted. Call ThreadPool::deinit.");
+	~TaskListsThreadPool() {
+		assert(stopping, "TaskListsThreadPool was not properly deinitted. Call TaskListsThreadPool::deinit.");
 	}
 	#endif
 
@@ -793,6 +1029,7 @@ private:
 	List<Thread *> threads;
 
 	SyncPoint start_sync_point;
+	SyncPoint end_sync_point;
 	u32 volatile stopped_thread_count = 0;
 	bool volatile stopping = true;
 	List<Task> tasks;
@@ -812,6 +1049,286 @@ private:
 		task.fn(task.param);
 		task.free(task.param);
 		atomic_increment(&task.list->finished_task_count);
+	}
+};
+
+// Runs tasks in order of addition.
+struct TaskQueuesThreadPool {
+	struct TaskQueue;
+
+	struct Task {
+		TaskQueue *queue = 0;
+		void (*fn)(void *param) = 0;
+		void *param = 0;
+		void (*free)(void *param) = 0;
+	};
+
+	struct TaskQueue {
+	private:
+		friend struct TaskQueuesThreadPool;
+
+		TaskQueuesThreadPool *pool = 0;
+		Queue<Task> tasks;
+
+		u32 volatile started_task_count = 0;
+		u32 volatile finished_task_count = 0;
+		
+		ConditionVariable completion_notifier;
+
+		bool initted = false;
+		bool freed = false;
+		
+		#if TL_DEBUG
+		u32 producer_id = -1;
+		#endif
+
+	public:
+		TaskQueue() = default;
+		TaskQueue(TaskQueuesThreadPool &pool) {
+			init(pool);
+		}
+		TaskQueue(const TaskQueue &that) = delete;
+		TaskQueue(TaskQueue &&that) = delete;
+		TaskQueue &operator=(const TaskQueue &that) = delete;
+		TaskQueue &operator=(TaskQueue &&that) = delete;
+
+		void init(TaskQueuesThreadPool &pool) {
+			assert(!initted, "you must `wait_for_completion` before calling `init` a second time on a TaskQueue");
+			initted = true;
+			freed = false;
+			this->pool = &pool;
+			auto &shared = pool.shared;
+			locked_use(shared) {
+				//tasks = shared.unused_task_queues.pop().value_or({.allocator = pool.allocator});
+				tasks = {.allocator = pool.allocator};
+				shared.task_queues.add(this);
+			};
+			#if TL_DEBUG
+			assert(producer_id == -1);
+			producer_id = get_current_thread_id();
+			#endif
+		}
+
+		~TaskQueue() {
+			assert(!initted, "`wait_for_completion` must be called on a TaskQueue before destruction");
+		}
+
+		inline void push_task(void (*fn)(void *param), void *param) {
+			push_task_and_notify({this, fn, param, [](void *){}});
+		}
+		template <class Fn, class ...Args>
+		void push_task(Fn &&fn, Args &&...args) {
+			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
+
+			// TODO: Figure out a way to use custom allocator without race conditions.
+			//       Using DefaultAllocator for now.
+
+			auto fnParams = DefaultAllocator{}.allocate_uninitialized<Tuple>();
+			new(fnParams) Tuple(std::forward<Fn>(fn), std::forward<Args>(args)...);
+			//print("allocating {}\n", fnParams);
+
+			constexpr auto invokerProc = Detail::get_invoke<Tuple>(std::make_index_sequence<1 + sizeof...(Args)>{});
+			constexpr auto freer = [](void *param) {
+				auto tuple = (Tuple *)param;
+				tuple->~Tuple();
+				//print("freeing {}\n", param);
+				DefaultAllocator{}.free_t(tuple, 1);
+			};
+
+			push_task_and_notify({this, invokerProc, fnParams, freer});
+		}
+		template <class Fn>
+		auto &operator+=(Fn &&fn) {
+			push_task(std::forward<Fn>(fn));
+			return *this;
+		}
+
+		inline void wait_for_completion(WaitForCompletionOption option = WaitForCompletionOption::just_wait) {
+			switch (option) {
+				case WaitForCompletionOption::do_my_task: // not implemented, fall through
+				case WaitForCompletionOption::do_any_task: // not implemented, fall through
+				case WaitForCompletionOption::just_wait: {
+					while (started_task_count > finished_task_count) {
+						completion_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+							sleeper.sleep(1);
+						});
+					}
+					break;
+				}
+			}
+			assert(initted);
+			initted = false;
+			assert(started_task_count == finished_task_count, "TaskQueue::wait_for_completion must be called before `~TaskQueue` or `free` is called");
+			auto &shared = pool->shared;
+			locked_use(shared) {
+				bool erased = find_and_erase(shared.task_queues, this);
+				assert(erased);
+				assert_equal(tasks.count, 0);
+				if (tasks.capacity) {
+					//shared.unused_task_queues.add(tasks);
+					tasks = {};
+				}
+			};
+			#if TL_DEBUG
+			producer_id = -1;
+			#endif
+		}
+	private:
+		inline void push_task_and_notify(Task task) {
+			#if TL_DEBUG
+			assert(producer_id != -1);
+			assert_equal(producer_id, get_current_thread_id(), "Only one thread may operate on a TaskQueue");
+			#endif
+			atomic_increment(&started_task_count);
+			auto &shared = pool->shared;
+			locked_use(shared) {
+				tasks.push(task);
+			};
+			pool->new_work_notifier.wake();
+		}
+	};
+
+	struct InitParams {
+		void (*worker_initter)() = [](){};
+		void (*worker_proc)(TaskQueuesThreadPool *pool) = TaskQueuesThreadPool::default_worker_proc;
+	};
+
+	inline bool init(u32 thread_count, InitParams params = {}) {
+		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
+		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
+		stopped_thread_count = 0;
+		stopping = false;
+		allocator =
+			threads.allocator =
+			shared.use_unprotected().task_queues.allocator =
+			//shared.use_unprotected().unused_task_queues.allocator =
+			TL_GET_CURRENT(allocator);
+		if (thread_count) {
+			threads.reserve(thread_count);
+
+			struct StartInfo {
+				TaskQueuesThreadPool *pool;
+				void (*init)();
+				void (*proc)(TaskQueuesThreadPool *pool);
+			};
+			StartInfo info;
+			info.pool = this;
+			info.init = params.worker_initter;
+			info.proc = params.worker_proc;
+
+			auto start_proc = [](Thread *thread) {
+				StartInfo *info = (StartInfo *)thread->param;
+				(*info->init)();
+				(*info->proc)(info->pool);
+			};
+
+			for (u32 i = 0; i < thread_count; ++i) {
+				auto thread = create_thread(+start_proc, (void *)&info);
+				if (!valid(thread)) {
+					stopping = true;
+					for (auto t : threads) {
+						free(t);
+					}
+					threads.clear();
+					return false;
+				}
+				threads.add(thread);
+			}
+
+			sync(start_sync_point);
+
+		} else {
+			threads.clear();
+		}
+
+		return true;
+	}
+	inline void deinit() {
+		locked_use(shared) {
+			assert(shared.task_queues.count == 0, "Wait for all the tasks to complete before calling TaskQueuesThreadPool::deinit");
+		};
+		stopping = true;
+		sync(end_sync_point);
+		threads.clear();
+	}
+
+	inline static void default_worker_proc(TaskQueuesThreadPool *pool) {
+
+		sync(pool->start_sync_point);
+		
+		auto &shared = pool->shared;
+
+		while (1) {
+			Optional<TaskQueuesThreadPool::Task> task;
+			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+				while (!pool->stopping) {
+					locked_use(shared) {
+						for (umm i = shared.task_queues.count - 1; i != -1; --i) {
+							task = shared.task_queues[i]->tasks.pop();
+							if (task) {
+								assert(task.value_unchecked().fn != (void *)0xdddddddddddddddd);
+								break;
+							}
+						}
+					};
+					if (task) {
+						assert(task.value_unchecked().fn);
+						break;
+					} else {
+						// NOTE: Arbitrary timeout
+						sleeper.sleep(1);
+					}
+				}
+			});
+
+			if (task) {
+				REDECLARE_VAL(task, task.value_unchecked());
+				pool->run(task);
+				task.queue->completion_notifier.wake();
+			} else {
+				break;
+			}
+		}
+		atomic_add(&pool->stopped_thread_count, 1);
+		sync(pool->end_sync_point);
+	}
+
+	#if TL_DEBUG
+	~TaskQueuesThreadPool() {
+		assert(stopping, "TaskQueuesThreadPool was not properly deinitted. Call TaskQueuesThreadPool::deinit.");
+	}
+	#endif
+
+private:
+	Allocator allocator = TL_GET_CURRENT(allocator);
+	List<Thread *> threads;
+
+	SyncPoint start_sync_point;
+	SyncPoint end_sync_point;
+	u32 volatile stopped_thread_count = 0;
+	bool volatile stopping = true;
+
+	struct Shared {
+		List<TaskQueue *> task_queues;
+		//List<Queue<Task>> unused_task_queues;
+
+		Shared() = default;
+		Shared(Shared const &) = delete;
+		Shared(Shared &&) = delete;
+		Shared &operator=(Shared const &) = delete;
+		Shared &operator=(Shared &&) = delete;
+	};
+
+	LockProtected<Shared, OsLock> shared;
+
+	ConditionVariable new_work_notifier;
+	
+	inline void run(Task task) {
+		//print("running {}\n", task.param);
+		assert(task.fn);
+		task.fn(task.param);
+		task.free(task.param);
+		atomic_increment(&task.queue->finished_task_count);
 	}
 };
 

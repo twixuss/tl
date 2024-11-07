@@ -10,31 +10,46 @@ struct Array {
 
 	inline static constexpr umm count = count_;
 
-	constexpr auto begin(this auto &&self) { return self.data; }
-	constexpr auto end(this auto &&self) { return self.data + self.count; }
+	constexpr auto begin()       { return data; }
+	constexpr auto begin() const { return data; }
+	constexpr auto end()       { return data + count; }
+	constexpr auto end() const { return data + count; }
 
 	inline operator Span<T>() const { return {(T *)data, count}; }
 	constexpr Span<T> span() const { return {begin(), end()}; }
 
-	constexpr auto &at_unchecked(this auto &&self, umm i) {
-		return self.data[i];
+	constexpr auto &at_unchecked(umm i)       { return data[i]; }
+	constexpr auto &at_unchecked(umm i) const { return data[i]; }
+	constexpr auto &at(umm i) {
+		bounds_check(assert_less(i, count));
+		return at_unchecked(i);
 	}
-	constexpr auto &at(this auto &&self, umm i) {
-		bounds_check(assert_less(i, self.count));
-		return self.at_unchecked(i);
+	constexpr auto &at(umm i) const {
+		bounds_check(assert_less(i, count));
+		return at_unchecked(i);
 	}
-	constexpr auto &operator[](this auto &&self, umm i) { return self.at(i); }
+	constexpr auto &operator[](umm i)       { return at(i); }
+	constexpr auto &operator[](umm i) const { return at(i); }
 
-	constexpr auto &front(this auto &&self) { return self.data[0]; }
-	constexpr auto &back(this auto &&self) { return self.data[self.count - 1]; }
-
-	constexpr Span<T> operator+(umm i) {
-		bounds_check(assert_less_equal(i, count));
-		return {data + i, count - i};
-	}
+	constexpr auto &front()       { return data[0]; }
+	constexpr auto &front() const { return data[0]; }
+	constexpr auto &back()       { return data[count - 1]; }
+	constexpr auto &back() const { return data[count - 1]; }
 
 	T data[count];
 };
+
+template <class T, class... Rest>
+Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof...(Rest)>;
+
+template <umm count, class T>
+constexpr Array<T, count> broadcast_to_array(T value) {
+	Array<T, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = value;
+	}
+	return result;
+}
 
 template <class T, umm count>
 constexpr umm count_of(Array<T, count> const &arr) {
@@ -84,6 +99,44 @@ constexpr bool for_each(Array<T, count> &array, auto &&fn) {
 	return false;
 }
 
+template <class T, umm count>
+constexpr auto operator==(Array<T, count> const &a, Array<T, count> const &b) {
+	Array<decltype(a.data[0] == b.data[0]), count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = a.data[i] == b.data[i];
+	}
+	return result;
+}
+
+template <class T, umm count>
+constexpr bool all(Array<T, count> const &a) {
+	for (umm i = 0; i < count; ++i) {
+		if (!all(a.data[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <class T, umm count>
+auto dot(Array<T, count> const &a, Array<T, count> const &b) {
+	T result = 0;
+	for (umm i = 0; i < count; ++i) {
+		result += a.data[i] * b.data[i];
+	}
+	return result;
+}
+
+#define TL_ARRAY_DEFINE_APPLY_1(function)                                             \
+	template <class T, umm count>                                                     \
+	forceinline constexpr auto function(Array<T, count> input) {                      \
+		Array<std::remove_cvref_t<decltype(function(v.data[0]))>, count> result = {}; \
+		for (umm i = 0; i < count; ++i) {                                             \
+			result.data[i] = function(input.data[i]);                                 \
+		}                                                                             \
+		return result;                                                                \
+	}
+
 template <class T, umm _count_x, umm _count_y>
 struct Array2 {
 	using ElementType = T;
@@ -92,30 +145,49 @@ struct Array2 {
 	inline static constexpr umm count_y = _count_y;
 	inline static constexpr umm flat_count = count_x * count_y;
 
-	constexpr auto &at_unchecked(this auto &&self, umm x, umm y) {
-		return self.data[y][x];
-	}
-	constexpr auto &at(this auto &&self, umm x, umm y) {
+	constexpr auto &at_unchecked(umm x, umm y)       { return data[y][x]; }
+	constexpr auto &at_unchecked(umm x, umm y) const { return data[y][x]; }
+	constexpr auto &at(umm x, umm y) {
 		bounds_check(assert_less(x, count_x));
 		bounds_check(assert_less(y, count_y));
-		return self.at_unchecked(x, y);
+		return at_unchecked(x, y);
+	}
+	constexpr auto &at(umm x, umm y) const {
+		bounds_check(assert_less(x, count_x));
+		bounds_check(assert_less(y, count_y));
+		return at_unchecked(x, y);
 	}
 	template <class Scalar>
-	constexpr auto &at_unchecked(this auto &&self, v2<Scalar> v) {
-		return self.at_unchecked(v.x, v.y);
+	constexpr auto &at_unchecked(v2<Scalar> v) {
+		return at_unchecked(v.x, v.y);
 	}
 	template <class Scalar>
-	constexpr auto &at(this auto &&self, v2<Scalar> v) {
-		return self.at(v.x, v.y);
-	}
-	constexpr auto &operator()(this auto &&self, umm x, umm y) {
-		return self.at(x,y);
+	constexpr auto &at_unchecked(v2<Scalar> v) const {
+		return at_unchecked(v.x, v.y);
 	}
 	template <class Scalar>
-	constexpr auto &operator[](this auto &&self, v2<Scalar> v) { return self.at(v); }
+	constexpr auto &at(v2<Scalar> v) {
+		return at(v.x, v.y);
+	}
+	template <class Scalar>
+	constexpr auto &at(v2<Scalar> v) const {
+		return at(v.x, v.y);
+	}
+	constexpr auto &operator()(umm x, umm y) {
+		return at(x,y);
+	}
+	constexpr auto &operator()(umm x, umm y) const {
+		return at(x,y);
+	}
+	template <class Scalar>
+	constexpr auto &operator[](v2<Scalar> v) { return at(v); }
+	template <class Scalar>
+	constexpr auto &operator[](v2<Scalar> v) const { return at(v); }
 
-	constexpr auto begin(this auto &&self) { return &self.data[0][0]; }
-	constexpr auto end(this auto &&self) { return &self.data[0][0] + flat_count; }
+	constexpr auto begin()       { return &data[0][0]; }
+	constexpr auto begin() const { return &data[0][0]; }
+	constexpr auto end()       { return &data[0][0] + flat_count; }
+	constexpr auto end() const { return &data[0][0] + flat_count; }
 
 	constexpr Span<T> span() const { return {begin(), end()}; }
 
@@ -178,14 +250,5 @@ struct Array3 {
 
 	T data[count_z][count_y][count_x];
 };
-
-template <class T, umm count>
-auto dot(Array<T, count> const &a, Array<T, count> const &b) {
-	T result = 0;
-	for (umm i = 0; i < count; ++i) {
-		result += a.data[i] * b.data[i];
-	}
-	return result;
-}
 
 }

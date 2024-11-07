@@ -1,3 +1,4 @@
+#include <tl/console.h>
 #include <tl/thread.h>
 #include <tl/default_logger.h>
 #include <tl/hash_map.h>
@@ -17,8 +18,9 @@ static u32 get_thread_index() {
 	};
 }
 
-void thread_pool_test() {
-	ThreadPool pool;
+void test_TaskListsThreadPool() {
+	println("==== test_TaskListsThreadPool ====");
+	TaskListsThreadPool pool;
 	add_thread_index();
 	pool.init(4, {.worker_initter = [] {
 		add_thread_index();
@@ -42,10 +44,35 @@ void thread_pool_test() {
 			inner_tasks += [i] { current_logger.info("[{}] inner {}", get_thread_index(), i); };
 		}
 
-		inner_tasks.wait_for_completion({.do_tasks = false});
+		inner_tasks.wait_for_completion(WaitForCompletionOption::just_wait);
 		current_logger.info("[{}] inner tasks completed", get_thread_index());
 	};
 
-	outer_tasks.wait_for_completion({.do_tasks = true});
+	outer_tasks.wait_for_completion(WaitForCompletionOption::do_any_task);
 	current_logger.info("[{}] outer tasks completed", get_thread_index());
+}
+
+void test_TaskQueuesThreadPool() {
+	println("==== test_TaskQueuesThreadPool ====");
+	TaskQueuesThreadPool pool;
+	add_thread_index();
+	pool.init(4, {.worker_initter = [] {
+		add_thread_index();
+	}});
+	defer { pool.deinit(); };
+
+	TaskQueuesThreadPool::TaskQueue tasks = {pool};
+
+	for (int i = 0; i < 10; ++i) {
+		tasks += [i] { current_logger.info("[{}] {}", get_thread_index(), i); };
+	}
+
+	current_logger.info("[{}] waiting for completion", get_thread_index());
+	tasks.wait_for_completion();
+	current_logger.info("[{}] tasks completed", get_thread_index());
+}
+
+void thread_pool_test() {
+	test_TaskListsThreadPool();
+	test_TaskQueuesThreadPool();
 }

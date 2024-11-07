@@ -1,55 +1,75 @@
 #pragma once
+// Generic fixed-dimension vectors.
+// 
+// Defines aliases for fundamental types. E.g. v3f64 = v3<f64> = 3d vector of 64-bit floats.
+// Also has short aliases for vectors with 32bit elements. E.g. v2s = v2s32 = v2<s32> = 2d vector of 32-bit signed ints.
+//
+// NOTE on alignment:
+//     Note that all of these vectors are aligned to their scalars. This means that there is no __m128 member for v4f and u32 member for v4u8.
+// It would be nice to have them while keeping the alignment consistent, but sadly c++ does not allow making struct alignment less
+// that alignment of its members.
+// I tried to make v4f with __m128 4-byte aligned:
+// It's possible on gcc and clang with #pragma pack(push, 4), but that does not work on msvc.
+// alignas(4) is ignored or produces an error.
+// That's one problem. Another one is that #pragma pack works on structs, not on aliases.
+// https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIM6SuADJ4DJgAcj4ARpjEEgCcpAAOqAqETgwe3r7%2ByanpAiFhkSwxcVyJdpgOGUIETMQEWT5%2BAVU1AnUNBEUR0bEJtvWNzTltwz2hfaUDFQCUtqhexMjsHOYAzKHI3lgA1CYbbgQAnkmYAPoExEyECofYJhoAgpvbu5gHR3gsLKHXoQAdAgHk9Xi8CJgWEkDJCvm4dkwFAo9gAVUEvLxpIx7ZRMZAAa0w6C%2BABE9l4GGlgGF0IcrC8wZskjdgCwmHskviCRAkliEKQ9lw5mDIdDYZ9DgiDMi0RjnpSMnshAcAOwM557LV7BTXLwONUWVF7VSkE6kABepAA7vSTKrSXaXtrcdziVL0RtsHsWE7Xg6/czWezOdzeagkiLGZjscAtWI8DSkRBJHM9gA3SReAAcZOVUsp1Npe2QCAaoI2GrB/z2kN1EBrTDT9o1LuImAIywYewTNNQVAgmZzIsrTIdHAWtE4AFZeH5uLxUJw3NZrDqlitJWYNjxSARNBOFgSEoDp9mzGZJNPJBsNNmNPFpFOOJJeCwJBoNKR51pSEuOLwCggF%2B%2B4cFoCxwLAMBQNBEBIGg0J0LE5CUAhSRIXEiJGBUXBfjQtCQsQQEQFEB6kFEoQNCcnC7hRzDECcADyUTaNUoG7ghbCCIxDC0NRYG8FgUReMAbhiLQQELqQWDskY4gCdJeDtjU6aYJJv6YKo1ReJCNG8P8mDPr%2BtB4FENwMR4WBkQC75SapxBRKkmCklChjACZRgHgsVAGMACgAGp4Jg1qMec867vwggiGI7BSDIgiKCo6gKboGz6G5KCrpY%2BimUBkALBGjgCJJAC0up0hspKmJY1hmBoewlYxGwNVQVBIgQJXsgQCANSwyKYJIgK7qg9nEHgWB5RACztEVfgQK4ox%2BFwgQMOgvQlGUegpGks2LVt%2BSzet/TlLYhlsbUEx7ctM0Xd0R0zCdurdFdQx3VMG2zNNG6rBIk4znOZH/ia2YAGwlSDkglgYOIVENgL1RAuCECQBzbsKvCgeBCwIJgTBYHEU2kMeZjTvonCvqQ74g9mgLZnT9MM/TiQ/ounCAcBe5eaQkGICASwEHyBAoRAaEYeErBrKooPg5DWFxrDXDw7wxLI2N6B6JFwiiOIcWa4lahkalNo3Ekel/Rws7foDnCMTpgt7P2wNgxDUNuUK8RwwjHiIfQxCoxsGxzBjXnY7j%2BOUObFPvjuQ1cHH8cJ/HVsKf%2B7MgSHRMgDHqrTiDF7ZtOd4bGYqqSIkz4bADKds5zAkQbBsHwagPvIRQIvN%2BhvsgMAUgBPhhHEaRCl0VRenkZRDHMaxDhj5xjAEDxfFkUJIlibQEljzJbnyb%2B%2BDKY4qnqcrWnIDpay7gZRm8CZZlUZZ58Y2Ntm7vZjlKC5snuaEoB13wvkBUFEKYUx6a2ijraQeslAGxSnoaGxgso2BvpNCAzA2AgBiAwUs7JiAElIPZGikgsZ/iSLNUq5VDhVQQXVBqTUWptV1J1Jg3Ver9UGsNUa401LwGmmdDoc0FqeBaHoYI71jr7R2hkF620CgMHupta6vDZpdBGIInICj7BKImHI2Yr0VHZCWroyYxQxHCkWMsH6pjnyWxZn%2BTgTsZZ7GAMgZAQpBpmD2IjfARA/abHRrXIhxNBrnniBsacXBpyhOzBsEGXBVTZjJi%2BN8IBS7J1/KnWwHNMYTm5o3PmdsdLC1Fr7cWaCOAg0LmYEq1UrCWCFIrRWGkvEkHGhrWQYDYoQNkPrZKv5dDLWtCbM2CTrHWw4LbAWOkHZUHsS7JxLipCAncRAb2ndYj%2Bz8VkuYoc8YDEJs%2BKO/gQapNZgBDJ6c65HizhoRZETomxJLhoEG8QKjxIrlXNJNdNk5PgDzOCKAO4YUKQCru6ZkBJCSBcdMFQLiEIuP5IQsSLi4QuKoCGfA6AD0oEPX8I8GJj1xUxFibFZ7Ny4gvXi/Fd6YGEqJcSkldxbzkmsXeSlzqHzIppbSukpKXzIjfcyJx77WSfmPV%2BTkP7b2/lzHyTA/KBWCqFRgIC2naw6fFeQUCek6FyHAzKNVspIO4cQ0hnAAD05U9U1IsNQ01jF3GmqoKbehBBFwcImkam6zh5qrReiI4xD1xEyKkQdDI2jHqKNunooR6jzqdC0aIgN11LqqIMU9RoYbfpmM3Jmqx7yTkmhdn1UFGZYaEL2PC2JQ0EZI28esoO/jDykBxjsgmlzC5DVVI8yQ2ZJAQy4CDDY54EkHNVBsWmjMJ3ZmZqMtODb64/KQPzQWQKW7EBKZLaWsznGuMWcrJpatWlRVVRITpCVNWG1yAMpgpsFzmxGdXMZ%2BSCBTILZDItLioUezLRW1UVaPErIwv7Mw9bNnbPDns8mSSzAg1jonODGhVTHNsacoC5yAlZ1/fEeIGhCHxFVBDEGGgA5xTeUh9JoHM73kBJIWJOcrxPIqI8hJZgkm4S/DY8jGdnwsbI58jO9k0jOEkEAA%3D%3D%3D
 
 #include "common.h"
 #include "string.h"
 #include "hash.h"
 
 #pragma warning(push)
-#pragma warning(disable: 4201) // anonymous struct
+#pragma warning(disable: 4201) // nonstandard extension: nameless struct
 
 namespace tl {
 
-#define DEFN_2 \
-	struct { Scalar x, y; }; \
-	Scalar s[2];\
-	template <class U>\
+#define DEFN_2                                                                                       \
+	union {                                                                                          \
+		struct { Scalar x, y; };                                                                     \
+		Scalar s[2];                                                                                 \
+	};                                                                                               \
+	template <class U>                                                                               \
 	forceinline constexpr explicit operator v2<U>() const { return {convert<U>(x), convert<U>(y)}; } \
-	forceinline constexpr v2 operator+() const { return *this; } \
-	forceinline constexpr v2 xx() const { return {x, x}; } \
-	forceinline constexpr v2 xy() const { return {x, y}; } \
-	forceinline constexpr v2 yx() const { return {y, x}; } \
-	forceinline constexpr v2 yy() const { return {y, y}; } \
+	forceinline constexpr v2 operator+() const { return *this; }                                     \
+	forceinline constexpr v2 xx() const { return {x, x}; }                                           \
+	forceinline constexpr v2 xy() const { return {x, y}; }                                           \
+	forceinline constexpr v2 yx() const { return {y, x}; }                                           \
+	forceinline constexpr v2 yy() const { return {y, y}; }                                           \
 
 
-#define DEFN_3 \
-	using v2 = v2<Scalar>; \
-	struct { Scalar x, y, z; }; \
-	v2 xy; \
-	struct { Scalar _pad; v2 yz; }; \
-	Scalar s[3];\
-	template <class U>\
+#define DEFN_3                                                                                                      \
+	using v2 = v2<Scalar>;                                                                                          \
+	union {                                                                                                         \
+		struct { Scalar x, y, z; };                                                                                 \
+		v2 xy;                                                                                                      \
+		struct { Scalar _pad; v2 yz; };                                                                             \
+		Scalar s[3];                                                                                                \
+	};                                                                                                              \
+	template <class U>                                                                                              \
 	forceinline constexpr explicit operator v3<U>() const { return {convert<U>(x), convert<U>(y), convert<U>(z)}; } \
-	forceinline constexpr v3 operator+() const { return *this; } \
-	forceinline constexpr v2 xz() const { return {x,z}; } \
-	forceinline constexpr v2 yx() const { return {y,x}; } \
-	forceinline constexpr v2 zx() const { return {z,x}; } \
-	forceinline constexpr v2 zy() const { return {z,y}; } \
-	forceinline constexpr v3 yzx() const { return {y,z,x}; } \
-	forceinline constexpr v3 zxy() const { return {z,x,y}; } \
-	forceinline constexpr v3 xzy() const { return {x,z,y}; } \
-	forceinline constexpr v3 zyx() const { return {z,y,x}; } \
+	forceinline constexpr v3 operator+() const { return *this; }                                                    \
+	forceinline constexpr v2 xz() const { return {x,z}; }                                                           \
+	forceinline constexpr v2 yx() const { return {y,x}; }                                                           \
+	forceinline constexpr v2 zx() const { return {z,x}; }                                                           \
+	forceinline constexpr v2 zy() const { return {z,y}; }                                                           \
+	forceinline constexpr v3 yzx() const { return {y,z,x}; }                                                        \
+	forceinline constexpr v3 zxy() const { return {z,x,y}; }                                                        \
+	forceinline constexpr v3 xzy() const { return {x,z,y}; }                                                        \
+	forceinline constexpr v3 zyx() const { return {z,y,x}; }                                                        \
 
 
-#define DEFN_4 \
-	using v2 = v2<Scalar>; \
-	using v3 = v3<Scalar>; \
-	struct { Scalar x, y, z, w; }; \
-	struct { v2 xy; v2 zw; }; \
-	v3 xyz; \
-	struct { Scalar _; v2 yz; }; \
-	struct { Scalar _; v3 yzw; }; \
-	Scalar s[4];\
-	template <class U>\
+#define DEFN_4                                                                                                                     \
+	using v2 = v2<Scalar>;                                                                                                         \
+	using v3 = v3<Scalar>;                                                                                                         \
+	union {                                                                                                                        \
+		struct { Scalar x, y, z, w; };                                                                                             \
+		struct { v2 xy; v2 zw; };                                                                                                  \
+		v3 xyz;                                                                                                                    \
+		struct { Scalar _; v2 yz; };                                                                                               \
+		struct { Scalar _; v3 yzw; };                                                                                              \
+		Scalar s[4];                                                                                                               \
+	};                                                                                                                             \
+	template <class U>                                                                                                             \
 	forceinline constexpr explicit operator v4<U>() const { return {convert<U>(x), convert<U>(y), convert<U>(z), convert<U>(w)}; } \
 	forceinline constexpr v4 operator+() const { return *this; }
 
@@ -66,22 +86,22 @@ namespace tl {
 	forceinline constexpr v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
 	forceinline constexpr v2 operator o(Scalar b) const { return {x o b, y o b}; } \
 	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
-	forceinline constexpr v2 &operator o=(v2 b) { return x o= b.x, y o= b.y, *this;} \
-	forceinline constexpr v2 &operator o=(Scalar b) { return x o= b, y o= b, *this;}
+	forceinline constexpr v2 &operator o##=(v2 b) { return x o##= b.x, y o##= b.y, *this;} \
+	forceinline constexpr v2 &operator o##=(Scalar b) { return x o##= b, y o##= b, *this;}
 
 #define BINOP_3(o) \
 	forceinline constexpr v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
 	forceinline constexpr v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
 	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
-	forceinline constexpr v3 &operator o=(v3 b) { return x o= b.x, y o= b.y, z o= b.z, *this;} \
-	forceinline constexpr v3 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, *this;}
+	forceinline constexpr v3 &operator o##=(v3 b) { return x o##= b.x, y o##= b.y, z o##= b.z, *this;} \
+	forceinline constexpr v3 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, *this;}
 
 #define BINOP_4(o) \
-	forceinline constexpr v4 operator o(v4 b) const { return {x o b.x, y o b.y, z o b.z, w o b.w}; } \
-	forceinline constexpr v4 operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
-	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
-	forceinline constexpr v4 &operator o=(v4 b) { return x o= b.x, y o= b.y, z o= b.z, w o= b.w, *this;} \
-	forceinline constexpr v4 &operator o=(Scalar b) { return x o= b, y o= b, z o= b, w o= b, *this;}
+	forceinline constexpr v4 operator o(v4 b) const { return {Scalar(x o b.x), Scalar(y o b.y), Scalar(z o b.z), Scalar(w o b.w)}; } \
+	forceinline constexpr v4 operator o(Scalar b) const { return {Scalar(x o b), Scalar(y o b), Scalar(z o b), Scalar(w o b)}; } \
+	forceinline constexpr friend v4 operator o(Scalar a, v4 b) { return {Scalar(a o b.x), Scalar(a o b.y), Scalar(a o b.z), Scalar(a o b.w)};} \
+	forceinline constexpr v4 &operator o##=(v4 b) { return x o##= b.x, y o##= b.y, z o##= b.z, w o##= b.w, *this;} \
+	forceinline constexpr v4 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, w o##= b, *this;}
 
 #define CMPOP_2(o) \
 	forceinline constexpr Mask operator o(v2 b) const { return {x o b.x, y o b.y}; } \
@@ -98,8 +118,33 @@ namespace tl {
 	forceinline constexpr Mask operator o(Scalar b) const { return {x o b, y o b, z o b, w o b}; } \
 	forceinline constexpr friend Mask operator o(Scalar a, v4 b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
 
+#define CMPOP_2_G(Mask, o) \
+	template <class T> forceinline constexpr Mask operator o(v2<T> a, v2<T> b) { return {a.x o b.x, a.y o b.y}; } \
+	template <class T> forceinline constexpr Mask operator o(v2<T> a, T b) { return {a.x o b, a.y o b}; } \
+	template <class T> forceinline constexpr Mask operator o(T a, v2<T> b) { return {a o b.x, a o b.y};} \
+
+#define CMPOP_3_G(Mask, o) \
+	template <class T> forceinline constexpr Mask operator o(v3<T> a, v3<T> b) { return {a.x o b.x, a.y o b.y, a.z o b.z}; } \
+	template <class T> forceinline constexpr Mask operator o(v3<T> a, T b) { return {a.x o b, a.y o b, a.z o b}; } \
+	template <class T> forceinline constexpr Mask operator o(T a, v3<T> b) { return {a o b.x, a o b.y, a o b.z};} \
+
+#define CMPOP_4_G(Mask, o) \
+	template <class T> forceinline constexpr Mask operator o(v4<T> a, v4<T> b) { return {a.x o b.x, a.y o b.y, a.z o b.z, a.w o b.w}; } \
+	template <class T> forceinline constexpr Mask operator o(v4<T> a, T b) { return {a.x o b, a.y o b, a.z o b, a.w o b}; } \
+	template <class T> forceinline constexpr Mask operator o(T a, v4<T> b) { return {a o b.x, a o b.y, a o b.z, a o b.w};} \
+
+template <class T>
+struct ToBoolUsingAll : T {
+	forceinline constexpr explicit operator bool() const { return all(*this); }
+};
+
+template <class T>
+struct ToBoolUsingAny : T {
+	forceinline constexpr explicit operator bool() const { return any(*this); }
+};
+
 template <class _Scalar>
-union v2 {
+struct v2 {
 	using Scalar = _Scalar;
 	using Mask = v2<bool>;
 	DEFN_2
@@ -117,16 +162,17 @@ union v2 {
 	BINOP_2(>>)
 	CMPOP_2(&&)
 	CMPOP_2(||)
-	CMPOP_2(==)
-	CMPOP_2(!=)
 	CMPOP_2(<)
 	CMPOP_2(>)
 	CMPOP_2(<=)
 	CMPOP_2(>=)
 };
 
+CMPOP_2_G(ToBoolUsingAll<typename v2<T>::Mask>, ==)
+CMPOP_2_G(ToBoolUsingAny<typename v2<T>::Mask>, !=)
+
 template <class _Scalar>
-union v3 {
+struct v3 {
 	using Scalar = _Scalar;
 	using Mask = v3<bool>;
 	DEFN_3
@@ -144,16 +190,17 @@ union v3 {
 	BINOP_3(>>)
 	CMPOP_3(&&)
 	CMPOP_3(||)
-	CMPOP_3(==)
-	CMPOP_3(!=)
 	CMPOP_3(<)
 	CMPOP_3(>)
 	CMPOP_3(<=)
 	CMPOP_3(>=)
 };
 
+CMPOP_3_G(ToBoolUsingAll<typename v3<T>::Mask>, ==)
+CMPOP_3_G(ToBoolUsingAny<typename v3<T>::Mask>, !=)
+
 template <class _Scalar>
-union v4 {
+struct v4 {
 	using Scalar = _Scalar;
 	using Mask = v4<bool>;
 	DEFN_4
@@ -171,13 +218,14 @@ union v4 {
 	BINOP_4(>>)
 	CMPOP_4(&&)
 	CMPOP_4(||)
-	CMPOP_4(==)
-	CMPOP_4(!=)
 	CMPOP_4(<)
 	CMPOP_4(>)
 	CMPOP_4(<=)
 	CMPOP_4(>=)
 };
+
+CMPOP_4_G(ToBoolUsingAll<typename v4<T>::Mask>, ==)
+CMPOP_4_G(ToBoolUsingAny<typename v4<T>::Mask>, !=)
 
 /*
 #ifdef TL_ENABLE_VEC4_SIMD
@@ -225,6 +273,10 @@ union v4<f32> {
 #undef EQ_2
 #undef EQ_3
 #undef EQ_4
+
+template <class T> v2(T, T) -> v2<T>;
+template <class T> v3(T, T, T) -> v3<T>;
+template <class T> v4(T, T, T, T) -> v4<T>;
 
 using v2b = v2<bool>; using v3b = v3<bool>; using v4b = v4<bool>;
 

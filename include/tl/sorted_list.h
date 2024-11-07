@@ -4,7 +4,7 @@
 
 namespace tl {
 
-template <class T, class Allocator = Allocator, class Size = umm>
+template <class T, auto sort_by = [](auto x) { return x; }, class Allocator = Allocator, class Size = umm>
 struct SortedList : private List<T, Allocator, Size> {
 	using Base = List<T, Allocator, Size>;
 
@@ -13,6 +13,7 @@ struct SortedList : private List<T, Allocator, Size> {
 	using Base::data;
 	using Base::count;
 	using Base::capacity;
+	using Base::allocator;
 	using Base::span;
 	using Base::clear;
 	using Base::pop;
@@ -20,7 +21,7 @@ struct SortedList : private List<T, Allocator, Size> {
 
 	void add(T value TL_LP) {
 		Base::reserve_exponential(count + 1);
-		Base::insert(value, binary_search(Base::span(), value).would_be_at);
+		Base::insert(value, binary_search(Base::span(), value, sort_by).would_be_at);
 	}
 };
 

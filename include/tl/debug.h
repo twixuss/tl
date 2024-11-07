@@ -28,19 +28,21 @@ struct StringizedCallStack {
 
 TL_API bool debug_init();
 TL_API void debug_deinit();
+TL_API bool debug_add_module(void *module, Span<char> path);
 
-TL_API List<void *> get_call_stack(umm frames_to_skip = 0);
+// 0 context is current
+TL_API List<void *> get_call_stack(void *context = 0, umm frames_to_skip = 0);
 
-TL_API StringizedCallStack resolve_names(Span<void *> call_stack);
+struct ResolveStackTraceNamesOptions {
+	bool cleanup = false;
+};
+
+TL_API StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options = {});
 TL_API void free(StringizedCallStack &call_stack);
 
 inline StringizedCallStack get_stack_trace() {
 	return resolve_names(TL_TMP(get_call_stack()));
 }
-
-#ifdef CreateWindow
-TL_API StringizedCallStack get_stack_trace(CONTEXT context, umm frames_to_skip);
-#endif
 
 TL_API bool debugger_attached();
 
@@ -72,6 +74,8 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 #if OS_WINDOWS
 
 #include "compiler.h"
+#include "logger.h"
+#include "win32.h"
 
 #pragma warning(push, 0)
 #pragma push_macro("OS_WINDOWS")
@@ -88,8 +92,10 @@ static HANDLE debug_process;
 
 bool debug_init() {
 	debug_process = GetCurrentProcess();
-	if (!SymInitialize(debug_process, 0, true))
+	if (!SymInitialize(debug_process, 0, true)) {
+		TL_GET_CURRENT(logger).error("SymInitialize failed: {}", win32_error());
 		return false;
+	}
 
 	DWORD options = SymGetOptions();
 	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
@@ -101,7 +107,35 @@ void debug_deinit() {
 	SymCleanup(debug_process);
 }
 
-static List<void *> get_call_stack(CONTEXT context, u32 frames_to_skip) {
+bool debug_add_module(void *module, Span<char> path) {
+	// I wasted way too much time on this function...
+	// I thought module handle would be enough.
+	// And SymLoadModuleEx was succeeding but SymFromAddr was failing with ERROR_MOD_NOT_FOUND ??? Like wtf.
+	MODULEINFO mi;
+	if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)module, &mi, sizeof(mi))) {
+		TL_GET_CURRENT(logger).error("debug_add_module({}, \"{}\"): GetModuleInformation failed: {}", module, path, win32_error());
+		return false;
+	}
+	if (!SymLoadModuleEx(GetCurrentProcess(), NULL, with(current_temporary_allocator, null_terminate(path).data), NULL, (DWORD64)mi.lpBaseOfDll, mi.SizeOfImage, NULL, 0)) {
+		auto error = win32_error();
+		if (error.value != ERROR_SUCCESS) {
+			TL_GET_CURRENT(logger).error("debug_add_module({}, \"{}\"): SymLoadModuleEx failed: {}", module, path, win32_error());
+			return false;
+		}
+	}
+	return true;
+}
+
+List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
+	CONTEXT context;
+	
+	if (context_opaque) {
+		context = *(CONTEXT *)context_opaque;
+	} else {
+		context.ContextFlags = CONTEXT_CONTROL;
+		RtlCaptureContext(&context);
+	}
+
 	STACKFRAME64 frame = {};
 #if ARCH_X64
 	frame.AddrPC.Offset    = context.Rip;
@@ -138,15 +172,8 @@ static List<void *> get_call_stack(CONTEXT context, u32 frames_to_skip) {
 
 	return call_stack;
 }
-List<void *> get_call_stack(umm frames_to_skip) {
-	CONTEXT context = {};
-	context.ContextFlags = CONTEXT_CONTROL;
-	RtlCaptureContext(&context);
 
-	return get_call_stack(context, 1 + frames_to_skip);
-}
-
-StringizedCallStack resolve_names(Span<void *> call_stack) {
+StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options) {
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
 
@@ -155,8 +182,8 @@ StringizedCallStack resolve_names(Span<void *> call_stack) {
 		Span<char> name = "unknown"s;
 
         if (call == 0) {
-			file = "NULL"s;
-			name = "ATTEMPT TO EXECUTE AT ADDRESS 0"s;
+			file = "nullptr"s;
+			name = "nullptr"s;
 		} else {
 			constexpr u32 maxNameLength = MAX_SYM_NAME;
 			DWORD64 displacement;
@@ -166,41 +193,56 @@ StringizedCallStack resolve_names(Span<void *> call_stack) {
 			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 			symbol->MaxNameLen = maxNameLength;
 
-			if (!SymFromAddr(debug_process, (DWORD64)call, &displacement, symbol)) {
+			if (SymFromAddr(debug_process, (DWORD64)call, &displacement, symbol)) {
+				#if 1
+				DWORD const flags = UNDNAME_NO_MS_KEYWORDS
+					| UNDNAME_NO_ACCESS_SPECIFIERS 
+					| UNDNAME_NO_CV_THISTYPE 
+					| UNDNAME_NO_FUNCTION_RETURNS 
+					| UNDNAME_NO_MEMBER_TYPE 
+					| UNDNAME_NO_ALLOCATION_LANGUAGE 
+					| UNDNAME_NO_ALLOCATION_MODEL 
+					| UNDNAME_NO_MS_THISTYPE 
+					| UNDNAME_NO_RETURN_UDT_MODEL
+					| UNDNAME_NO_SPECIAL_SYMS
+					| UNDNAME_NO_THISTYPE
+					| UNDNAME_NO_THROW_SIGNATURES
+				;
+				char name_buffer[256];
+				name.data = name_buffer;
+				name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
+
+				if (options.cleanup) {
+					replace_inplace(name, "struct "s, ""s);
+					replace_inplace(name, "unsigned __int8"s, "u8"s);
+					replace_inplace(name, "unsigned __int16"s, "u16"s);
+					replace_inplace(name, "unsigned __int32"s, "u32"s);
+					replace_inplace(name, "unsigned __int64"s, "u64"s);
+					replace_inplace(name, "__int8"s, "s8"s);
+					replace_inplace(name, "__int16"s, "s16"s);
+					replace_inplace(name, "__int32"s, "s32"s);
+					replace_inplace(name, "__int64"s, "s64"s);
+				}
+
+				#else
+				name = TL_TMP(demangle(symbol->Name));
+				#endif
+
+				IMAGEHLP_LINE64 line = {};
+				line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+				DWORD line_displacement;
+
+				if (SymGetLineFromAddr64(debug_process, (ULONG64)call, &line_displacement, &line)) {
+					entry.line = line.LineNumber;
+					file = as_span(line.FileName);
+				}
+			} else {
 				auto error = GetLastError();
-				print("SymFromAddr failed with code: 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
-				break;
+				TL_GET_CURRENT(logger).error("SymFromAddr failed: {}\n", win32_error());
+				file = "SymFromAddr failed"s;
+				name = "SymFromAddr failed"s;
 			}
 
-#if 1
-			DWORD const flags = UNDNAME_NO_MS_KEYWORDS
-				| UNDNAME_NO_ACCESS_SPECIFIERS 
-				| UNDNAME_NO_CV_THISTYPE 
-				| UNDNAME_NO_FUNCTION_RETURNS 
-				| UNDNAME_NO_MEMBER_TYPE 
-				| UNDNAME_NO_ALLOCATION_LANGUAGE 
-				| UNDNAME_NO_ALLOCATION_MODEL 
-				| UNDNAME_NO_MS_THISTYPE 
-				| UNDNAME_NO_RETURN_UDT_MODEL
-				| UNDNAME_NO_SPECIAL_SYMS
-				| UNDNAME_NO_THISTYPE
-				| UNDNAME_NO_THROW_SIGNATURES
-			;
-			char name_buffer[256];
-			name.data = name_buffer;
-			name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
-#else
-			name = TL_TMP(demangle(symbol->Name));
-#endif
-
-			IMAGEHLP_LINE64 line = {};
-			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-			DWORD line_displacement;
-
-			if (SymGetLineFromAddr64(debug_process, (ULONG64)call, &line_displacement, &line)) {
-				entry.line = line.LineNumber;
-				file = as_span(line.FileName);
-			}
 		}
 
 		entry.name.data = (char *)result.string_buffer.count;
@@ -218,11 +260,6 @@ StringizedCallStack resolve_names(Span<void *> call_stack) {
 		call.file.data = result.string_buffer.data + (umm)call.file.data;
 	}
 	return result;
-}
-
-StringizedCallStack get_stack_trace(CONTEXT context, u32 frames_to_skip) {
-	auto call_stack = TL_TMP(get_call_stack(context, frames_to_skip));
-	return resolve_names(call_stack);
 }
 
 void free(StringizedCallStack &call_stack) {

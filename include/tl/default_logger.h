@@ -1,6 +1,7 @@
 #pragma once
 #include "logger.h"
 #include "file.h"
+#include "thread.h"
 /*
 #define TL_DEFAULT_LOGGER_MAIN_CONTEXT_MEMBERS \
 	x(tl::File, default_logger_file) \
@@ -14,7 +15,7 @@ extern TL_API OsLock stdout_mutex;
 extern TL_API File default_logger_file;
 #endif
 
-struct TL_API DefaultLogger : LoggerBase {
+struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 	Span<utf8> module = {};
 	File file = TL_GET_GLOBAL(default_logger_file);
 	LogSeverity min_severity = TL_DEBUG ? LogSeverity::debug : LogSeverity::info;

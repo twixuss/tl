@@ -21,14 +21,16 @@ template <class T>
 using DefaultShouldBeDilated = DefaultShouldBeDilatedT<T>::value;
 
 struct DilateOptions {
+    static constexpr f32 RADIUS_FULL_IMAGE = 0;
+
     bool keep_alpha : 1 = false;
     bool smooth : 1 = true;
-    f32 radius = 0;
+    f32 radius = RADIUS_FULL_IMAGE;
 };
 
 template <class Pixel>
-inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u32 source_stride, u32 destination_stride, DilateOptions options = {}) {
-    if (options.radius == 0)
+inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u32 source_stride_in_pixels, u32 destination_stride_in_pixels, DilateOptions options = {}) {
+    if (options.radius == DilateOptions::RADIUS_FULL_IMAGE)
         options.radius = max(size.x, size.y) * 1.5f;
 
     auto should_be_dilated = [](Pixel p) {
@@ -59,17 +61,32 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
         List<v2i> offsets;
         defer { free(offsets); };
 
-        offsets.reserve(size.x*size.y);
+        offsets.reserve(min((u32)pow2(options.radius*2 + 1), size.x*size.y));
+        
+        for (s32 i = 1; i <= options.radius; ++i) {
+            auto add_offset = [&](v2s o) {
+                if (length_squared(o) <= pow2(options.radius)) {
+                    offsets.add((v2i)o);
+                }
+            };
 
-        for (smm iy = 0; iy < size.y; ++iy) {
-            for (smm ix = 0; ix < size.x; ++ix) {
-                auto offset = (v2i)(V2u(ix, iy) - size / 2);
-                if (length(offset) <= options.radius)
-                    offsets.add(offset);
+            if (i < size.x) {
+                s32 lim = min(i - 1, (s32)size.y);
+                for (s32 j = -lim; j <= lim; ++j) {
+                    add_offset({-i, j});
+                    add_offset({+i, j});
+                }
+            }
+            if (i < size.y) {
+                s32 lim = min(i, (s32)size.x);
+                for (s32 j = -lim; j <= lim; ++j) {
+                    add_offset({j, -i});
+                    add_offset({j, +i});
+                }
             }
         }
 
-        quick_sort(offsets, [](auto x) { return length(x); });
+        quick_sort(offsets, [](auto o) { return o.x*o.x + o.y*o.y; });
 
         //umm next_time_starting_from = 0;
         //
@@ -78,21 +95,19 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
         //    f32 smaller_radius = floor(max(0.0f, current_radius - radius_delta));
         //    next_time_starting_from = floor_to_int(pi * pow2(smaller_radius));
         //};
+        if (options.smooth) {
+        
+            for (smm iy = 0; iy < size.y; ++iy) {
+                //next_time_starting_from = 0;
+                for (smm ix = 0; ix < size.x; ++ix) {
+                    Pixel p = source_pixels[iy*source_stride_in_pixels + ix];
 
-        for (smm iy = 0; iy < size.y; ++iy) {
-            //next_time_starting_from = 0;
-            for (smm ix = 0; ix < size.x; ++ix) {
-                Pixel p = source_pixels[iy*source_stride + ix];
+                    if (should_be_dilated(p)) {
+                        
+                        v3f color_sum = {};
+                        f32 factor_sum = {};
 
-                if (should_be_dilated(p)) {
-                    struct FactoredPixel {
-                        Pixel pixel;
-                        f32 factor;
-                    };
-                    scoped(temporary_storage_checkpoint);
-                    List<FactoredPixel, TemporaryAllocator> closest_pixels;
-                    f32 closest_pixel_distance = 0;
-                    if (options.smooth) {
+                        f32 closest_pixel_distance = 0;
                         for (auto offset : offsets/*.skip(next_time_starting_from)*/) {
                             smm jx = ix + offset.x;
                             smm jy = iy + offset.y;
@@ -100,30 +115,26 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                             if ((umm)jx >= size.x) continue;
                             if ((umm)jy >= size.y) continue;
 
-                            auto t = source_pixels[jy*source_stride + jx];
+                            auto t = source_pixels[jy*source_stride_in_pixels + jx];
                             if (!should_be_dilated(t)) {
                                 f32 distance = length(offset);
 
-                                f32 const max_distance = sqrt2 - 1;
+                                f32 const max_distance = 1;
 
-                                if (closest_pixels.count == 0) {
+                                if (factor_sum == 0) {
                                     closest_pixel_distance = distance;
-                                    closest_pixels.add({t, 1});
+                                    color_sum += (v3f)t.xyz;
+                                    factor_sum += 1;
                                 } else {
                                     if (distance >= closest_pixel_distance + max_distance) {
                                         //update_starting_index(index_of(offsets, &offset), 2);
                                         break;
                                     }
-                                    closest_pixels.add({t, (distance - closest_pixel_distance) / max_distance});
+                                    f32 f = (distance - closest_pixel_distance) / max_distance;
+                                    color_sum += (v3f)t.xyz * f;
+                                    factor_sum += f;
                                 }
                             }
-                        }
-
-                        v3f color_sum = {};
-                        f32 factor_sum = {};
-                        for (auto t : closest_pixels) {
-                            color_sum += (v3f)t.pixel.xyz * t.factor;
-                            factor_sum += t.factor;
                         }
 
                         p.xyz = autocast (color_sum / factor_sum);
@@ -131,6 +142,25 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                             p.w = full_alpha;
                         }
                     } else {
+                        if (!options.keep_alpha) {
+                            p.w = full_alpha;
+                        }
+                    }
+
+                    destination_pixels[iy*destination_stride_in_pixels + ix] = p;
+                }
+            }
+
+        } else {
+            for (smm iy = 0; iy < size.y; ++iy) {
+                //next_time_starting_from = 0;
+                for (smm ix = 0; ix < size.x; ++ix) {
+                    Pixel p = source_pixels[iy*source_stride_in_pixels + ix];
+
+                    if (should_be_dilated(p)) {
+
+                        f32 closest_pixel_distance = 0;
+
                         // TODO: optimize starting offset here aswell
                         for (auto offset : offsets) {
                             smm jx = ix + offset.x;
@@ -139,7 +169,7 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                             if ((umm)jx >= size.x) continue;
                             if ((umm)jy >= size.y) continue;
 
-                            auto t = source_pixels[jy*source_stride + jx];
+                            auto t = source_pixels[jy*source_stride_in_pixels + jx];
                             if (!should_be_dilated(t)) {
                                 p.xyz = t.xyz;
                                 if (!options.keep_alpha) {
@@ -148,15 +178,16 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
                                 break;
                             }
                         }
+                    } else {
+                        if (!options.keep_alpha) {
+                            p.w = full_alpha;
+                        }
                     }
-                } else {
-                    if (!options.keep_alpha) {
-                        p.w = full_alpha;
-                    }
-                }
 
-                destination_pixels[iy*destination_stride + ix] = p;
+                    destination_pixels[iy*destination_stride_in_pixels + ix] = p;
+                }
             }
+
         }
     };
 
@@ -178,7 +209,7 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
 }
 
 template <class Pixel>
-inline void dilate(Pixel *pixels, v2u size, umm stride, DilateOptions options = {}) {
+inline void dilate(Pixel *pixels, v2u size, umm stride_in_pixels, DilateOptions options = {}) {
     // NOTE:
     // Images are likely too big to store in temporary memory.
     auto allocator = TL_GET_CURRENT(allocator);
@@ -186,10 +217,10 @@ inline void dilate(Pixel *pixels, v2u size, umm stride, DilateOptions options = 
     defer { allocator.free(copy); };
 
     for (u32 y = 0; y < size.y; ++y) {
-        memcpy(copy + y*size.x, pixels + y*stride, sizeof(Pixel)*size.x);
+        memcpy(copy + y*size.x, pixels + y*stride_in_pixels, sizeof(Pixel)*size.x);
     }
 
-    return dilate(copy, pixels, size, size.x, stride, options);
+    return dilate(copy, pixels, size, size.x, stride_in_pixels, options);
 }
 
 }

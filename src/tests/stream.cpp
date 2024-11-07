@@ -37,7 +37,7 @@ static void memory_stream_test() {
 }
 
 static void file_stream_test() {
-	auto path = tl_file_string("stream_test.txt");
+	auto path = tl_file_string("stream_test.txt"s);
 
 	write_entire_file(path, as_bytes("01234567"));
 

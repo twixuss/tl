@@ -45,6 +45,10 @@ void init_logger_thread() {
 extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 int wmain(int argc, wchar_t **argv) {
 	using namespace tl;
+
+	constexpr int DENORMALS_ARE_ZERO_ON = 0x8040;
+	_mm_setcsr(_mm_getcsr() | (_MM_FLUSH_ZERO_ON | DENORMALS_ARE_ZERO_ON));
+
 	init_allocator();
 	defer { deinit_allocator(); };
 

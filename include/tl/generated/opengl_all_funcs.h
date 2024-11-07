@@ -21,17 +21,34 @@ D(void, glLinkProgram, (GLuint program), (program))\
 D(void, glGetProgramiv, (GLuint program, GLenum pname, GLint * params), (program, pname, params))\
 D(void, glGetProgramInfoLog, (GLuint program, GLsizei maxLength, GLsizei * length, GLchar * infoLog), (program, maxLength, length, infoLog))\
 D(void, glGenVertexArrays, (GLsizei n, GLuint * arrays), (n, arrays))\
+D(void, glCreateVertexArrays, (GLsizei n, GLuint * arrays), (n, arrays))\
 D(void, glDeleteVertexArrays, (GLsizei n, const GLuint * arrays), (n, arrays))\
 D(void, glBindVertexArray, (GLuint array), (array))\
+D(void, glVertexArrayVertexBuffer, (GLuint vaobj, GLuint bindingindex, GLuint buffer, GLintptr offset, GLsizei stride), (vaobj, bindingindex, buffer, offset, stride))\
+D(void, glVertexArrayElementBuffer, (GLuint vaobj, GLuint buffer), (vaobj, buffer))\
 D(void, glGenBuffers, (GLsizei n, GLuint * buffers), (n, buffers))\
+D(void, glCreateBuffers, (GLsizei n, GLuint * buffers), (n, buffers))\
 D(void, glBindBuffer, (GLenum target, GLuint buffer), (target, buffer))\
 D(void, glDeleteBuffers, (GLsizei n, const GLuint * buffers), (n, buffers))\
-D(void, glBufferData, (GLenum target, GLsizeiptr size, const void * data, GLenum usage), (target, size, data, usage))\
+D(void, glBufferData, (GLenum target, GLsizeiptr size, const GLvoid * data, GLenum usage), (target, size, data, usage))\
+D(void, glNamedBufferData, (GLuint buffer, GLsizeiptr size, const void * data, GLenum usage), (buffer, size, data, usage))\
 D(void, glBufferSubData, (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid * data), (target, offset, size, data))\
+D(void, glNamedBufferStorage, (GLuint buffer, GLsizeiptr size, const void * data, GLbitfield flags), (buffer, size, data, flags))\
 D(void, glCopyBufferSubData, (GLenum readtarget, GLenum writetarget, GLintptr readoffset, GLintptr writeoffset, GLsizeiptr size), (readtarget, writetarget, readoffset, writeoffset, size))\
 D(void, glVertexAttribPointer, (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void * pointer), (index, size, type, normalized, stride, pointer))\
 D(void, glVertexAttribIPointer, (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer), (index, size, type, stride, pointer))\
 D(void, glEnableVertexAttribArray, (GLuint index), (index))\
+D(void, glDisableVertexAttribArray, (GLuint index), (index))\
+D(void, glEnableVertexArrayAttrib, (GLuint vaobj, GLuint index), (vaobj, index))\
+D(void, glDisableVertexArrayAttrib, (GLuint vaobj, GLuint index), (vaobj, index))\
+D(void, glVertexAttribFormat, (GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset), (attribindex, size, type, normalized, relativeoffset))\
+D(void, glVertexAttribIFormat, (GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset), (attribindex, size, type, relativeoffset))\
+D(void, glVertexAttribLFormat, (GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset), (attribindex, size, type, relativeoffset))\
+D(void, glVertexArrayAttribFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset), (vaobj, attribindex, size, type, normalized, relativeoffset))\
+D(void, glVertexArrayAttribIFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset), (vaobj, attribindex, size, type, relativeoffset))\
+D(void, glVertexArrayAttribLFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset), (vaobj, attribindex, size, type, relativeoffset))\
+D(void, glVertexAttribBinding, (GLuint attribindex, GLuint bindingindex), (attribindex, bindingindex))\
+D(void, glVertexArrayAttribBinding, (GLuint vaobj, GLuint attribindex, GLuint bindingindex), (vaobj, attribindex, bindingindex))\
 D(void, glUseProgram, (GLuint program), (program))\
 D(void, glUniform1f, (GLint location, GLfloat v0), (location, v0))\
 D(void, glUniform2f, (GLint location, GLfloat v0, GLfloat v1), (location, v0, v1))\
@@ -65,18 +82,30 @@ D(void, glGetActiveUniform, (GLuint program, GLuint index, GLsizei bufSize, GLsi
 D(void, glGenFramebuffers, (GLsizei n, GLuint * ids), (n, ids))\
 D(void, glBindFramebuffer, (GLenum target, GLuint framebuffer), (target, framebuffer))\
 D(GLenum, glCheckFramebufferStatus, (GLenum target), (target))\
+D(void, glFramebufferTexture, (GLenum target, GLenum attachment, GLuint texture, GLint level), (target, attachment, texture, level))\
+D(void, glFramebufferTexture1D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level), (target, attachment, textarget, texture, level))\
 D(void, glFramebufferTexture2D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level), (target, attachment, textarget, texture, level))\
+D(void, glFramebufferTexture3D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint layer), (target, attachment, textarget, texture, level, layer))\
+D(void, glNamedFramebufferTexture, (GLuint framebuffer, GLenum attachment, GLuint texture, GLint level), (framebuffer, attachment, texture, level))\
 D(void, glGenRenderbuffers, (GLsizei n, GLuint * renderbuffers), (n, renderbuffers))\
 D(void, glBindRenderbuffer, (GLenum target, GLuint renderbuffer), (target, renderbuffer))\
 D(void, glRenderbufferStorage, (GLenum target, GLenum internalformat, GLsizei width, GLsizei height), (target, internalformat, width, height))\
 D(void, glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer), (target, attachment, renderbuffertarget, renderbuffer))\
 D(void, glGenSamplers, (GLsizei n, GLuint * samplers), (n, samplers))\
+D(void, glFramebufferTextureLayer, (GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer), (target, attachment, texture, level, layer))\
+D(void, glNamedFramebufferTextureLayer, (GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer), (framebuffer, attachment, texture, level, layer))\
+D(void, glDeleteFramebuffers, (GLsizei n, GLuint * framebuffers), (n, framebuffers))\
 D(void, glBindSampler, (GLuint unit, GLuint sampler), (unit, sampler))\
 D(void, glSamplerParameterf, (GLuint sampler, GLenum pname, GLfloat param), (sampler, pname, param))\
 D(void, glSamplerParameteri, (GLuint sampler, GLenum pname, GLint param), (sampler, pname, param))\
+D(void, glSamplerParameterfv, (GLuint sampler, GLenum pname, const GLfloat * params), (sampler, pname, params))\
+D(void, glSamplerParameteriv, (GLuint sampler, GLenum pname, const GLint * params), (sampler, pname, params))\
+D(void, glSamplerParameterIiv, (GLuint sampler, GLenum pname, const GLint * params), (sampler, pname, params))\
+D(void, glSamplerParameterIuiv, (GLuint sampler, GLenum pname, const GLuint * params), (sampler, pname, params))\
 D(void, glGenerateMipmap, (GLenum target), (target))\
 D(void, glGenerateTextureMipmap, (GLuint texture), (texture))\
 D(void, glTexStorage2D, (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height), (target, levels, internalformat, width, height))\
+D(void, glTexImage3D, (GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid * data), (target, level, internalFormat, width, height, depth, border, format, type, data))\
 D(void, glBlendFuncSeparate, (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha), (srcRGB, dstRGB, srcAlpha, dstAlpha))\
 D(void, glActiveTexture, (GLenum texture), (texture))\
 D(GLuint, glGetUniformBlockIndex, (GLuint program, const GLchar * uniformBlockName), (program, uniformBlockName))\

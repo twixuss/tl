@@ -452,6 +452,16 @@ void replace_inplace(Span<T, Size> where, T what, T with) {
 	}
 }
 
+template <class T, class Size>
+void replace_inplace(Span<T, Size> &where, Span<T> what, Span<T> with) {
+	T *found = where.begin();
+	while (found = find(Span(found, where.end()), what)) {
+		memcpy(found, with.data, with.count * sizeof(T));
+		memmove(found + with.count, found + what.count, (where.end() - (found + what.count)) * sizeof(T));
+		where.count += with.count - what.count;
+	}
+}
+
 template <class Allocator = Allocator, class T, class Size>
 List<T, Allocator, Size> replace(Span<T, Size> where, T what, T with TL_LP) {
 	List<T, Allocator, Size> result;
@@ -591,10 +601,14 @@ struct Queue {
 		};
 		return result;
 	}
-
-	auto operator[](this auto &&self, umm i) {
-		bounds_check(assert_less(i, self.count));
-		return self.get(self.start + i);
+	
+	auto &operator[](umm i) {
+		bounds_check(assert_less(i, count));
+		return get(start + i);
+	}
+	auto &operator[](umm i) const {
+		bounds_check(assert_less(i, count));
+		return get(start + i);
 	}
 
 	void clear() {
@@ -1131,9 +1145,9 @@ struct LinearSet : Span<T, Size_> {
 	Span span() { return *this; }
 };
 
-template <class T>
-void free(LinearSet<T> &set) {
-	free((List<T> &)set);
+template <class T, class Allocator>
+void free(LinearSet<T, Allocator> &set) {
+	free((List<T, Allocator> &)set);
 }
 
 template <class T>

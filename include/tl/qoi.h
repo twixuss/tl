@@ -44,16 +44,11 @@ inline umm append(StringBuilder &builder, DecodeError error) {
 	}
 	return append(builder, "(unknown tl::qoi::DecodeError)");
 }
-struct DecodeOptions {
-	bool ignore_extra_data = false;
-};
 
-TL_API Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options = {});
+TL_API Result<Image, DecodeError> decode(Span<u8> bytes);
 
-struct EncodeOptions {
-};
-
-TL_API List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options = {});
+TL_API List<u8> encode(v3u8 *pixels, v2u size);
+TL_API List<u8> encode(v4u8 *pixels, v2u size);
 
 }
 }
@@ -86,7 +81,7 @@ static u32 hash(v4u8 p) {
 	return (p.x*3 + p.y*5 + p.z*7 + p.w*11) & 63;
 }
 
-Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
+Result<Image, DecodeError> decode(Span<u8> bytes) {
 	#define read(Type, name)                        \
 		if (bytes.count < sizeof(Type))             \
 			return DecodeError::not_enough_data;    \
@@ -112,8 +107,8 @@ Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 		return DecodeError::dimensions_too_big;
 	}
 
-	if (header.channels != 4) {
-		TL_GET_CURRENT(logger).error("decoding images with {} channels is not implemented", header.channels);
+	if (header.channels != 4 && header.channels != 3) {
+		TL_GET_CURRENT(logger).error("Decoding QOI images with {} channels is not supported. Allowed number of channels is 3 or 4.", header.channels);
 		return DecodeError::not_supported;
 	}
 
@@ -191,17 +186,17 @@ Result<Image, DecodeError> decode(Span<u8> bytes, DecodeOptions options) {
 		return DecodeError::bad_end_padding;
 	}
 
-	if (!options.ignore_extra_data) {
-		if (bytes.count != 0) {
-			return DecodeError::too_much_data;
-		}
+	if (bytes.count != 0) {
+		return DecodeError::too_much_data;
 	}
 
 	return result;
 
 	#undef read
 }
-List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
+List<u8> encode(u8 *pixels, u8 channels, v2u size) {
+	assert(channels == 3 || channels == 4);
+
 	StringBuilder builder;
 	defer { free(builder); };
 
@@ -216,7 +211,7 @@ List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
 		.magic = 0x66696f71,
 		.width = reverse_bytes(size.x),
 		.height = reverse_bytes(size.y),
-		.channels = 4,
+		.channels = channels,
 		.colorspace = 1,
 	};
 
@@ -225,14 +220,21 @@ List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
 	v4u8 seen[64] = {};
 
 	auto cursor = pixels;
-	auto end = pixels + size.x * size.y;
+	auto end = pixels + size.x * size.y * channels;
 
 	v4u8 p = {0,0,0,255};
 
 	u32 run = 0;
 
 	while (cursor != end) {
-		v4u8 c = *cursor++;
+		v4u8 c;
+		if (channels == 3) {
+			c.xyz = *(v3u8 *)cursor;
+			c.w = 255;
+		} else {
+			c = *(v4u8 *)cursor;
+		}
+		cursor += channels;
 
 		if (all(c == p)) {
 			++run;
@@ -297,6 +299,9 @@ List<u8> encode(v4u8 *pixels, v2u size, EncodeOptions options) {
 
 	#undef write
 }
+List<u8> encode(v3u8 *pixels, v2u size) { return encode((u8 *)pixels, 3, size); }
+List<u8> encode(v4u8 *pixels, v2u size) { return encode((u8 *)pixels, 4, size); }
+
 void free(Image &image) {
 	image.allocator.free(image.pixels, image.size.x * image.size.y);
 	image = {};

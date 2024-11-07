@@ -1,3 +1,4 @@
+#pragma once
 #include "common.h"
 #include "vector.h"
 #include <immintrin.h>
@@ -97,21 +98,69 @@ struct Converter {
 	Vector<ToScalar, count> operator()(Vector<FromScalar, count> from);
 };
 
+#define VECTOR_BASE(count_)                               \
+	using Scalar = Scalar_;                               \
+	inline static constexpr umm count = count_;           \
+	                                                      \
+	Scalar s[count];                                      \
+	SimdType<Scalar, count> m;                            \
+	                                                      \
+	Scalar &operator[](umm i) { return s[i]; }            \
+	Scalar const &operator[](umm i) const { return s[i]; }\
+	                                                      \
+	template <class U>                                    \
+		requires requires(Scalar s) { (U)s; }             \
+	forceinline explicit operator Vector<U, count>() const { return Converter<U, Scalar, count>{}(*this); }
+
 template <class Scalar_, umm count_>
 union Vector {
-	using Scalar = Scalar_;
-	inline static constexpr umm count = count_;
-
-	Scalar s[count];
-	SimdType<Scalar, count> m;
-
-	Scalar &operator[](umm i) { return s[i]; }
-	Scalar const &operator[](umm i) const { return s[i]; }
-
-	template <class U>
-		requires requires(Scalar s) { (U)s; }
-	forceinline explicit operator Vector<U, count>() const { return Converter<U, Scalar, count>{}(*this); }
+	VECTOR_BASE(count_);
+	Scalar x;
 };
+
+template <class Scalar_>
+union Vector<Scalar_, 2> {
+	VECTOR_BASE(2);
+	struct {
+		Scalar x, y;
+	};
+};
+
+template <class Scalar_>
+union Vector<Scalar_, 3> {
+	VECTOR_BASE(3);
+	struct {
+		Scalar x, y, z;
+	};
+	Vector<Scalar, 2> xy;
+	struct {
+		Scalar _dummy0;
+		Vector<Scalar, 2> yz;
+	};
+};
+
+template <class Scalar_>
+union Vector<Scalar_, 4> {
+	VECTOR_BASE(4);
+	struct {
+		Scalar x, y, z, w;
+	};
+	Vector<Scalar, 2> xy;
+	Vector<Scalar, 3> xyz;
+	struct {
+		Scalar _dummy0;
+		union {
+			Vector<Scalar, 2> yz;
+			Vector<Scalar, 3> yzw;
+		};
+	};
+	struct {
+		Vector<Scalar, 2> _dummy1;
+		Vector<Scalar, 2> zw;
+	};
+};
+
+#undef VECTOR_BASE
 
 template <class ToScalar, class FromScalar, umm count>
 Vector<ToScalar, count> Converter<ToScalar, FromScalar, count>::operator()(Vector<FromScalar, count> from) {
@@ -287,7 +336,7 @@ struct MaskVectorT<v4<Scalar>, count> {
 };
 
 template <class Scalar, umm count>
-using MaskVector = typename MaskVectorT<Scalar, count>::Type; // FIXME: compiler error when two last u64's are not provided. wtf
+using MaskVector = typename MaskVectorT<Scalar, count>::Type;
 
 template <umm count, class Scalar>
 forceinline Vector<Scalar, count> broadcast(Scalar s) {
@@ -397,25 +446,25 @@ template <class Scalar, umm count> requires requires(Scalar s) { --s; } forceinl
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, Vector<Scalar, count> b)        { for (umm j = 0; j < 2; ++j) { a.s[j] = a.s[j] op b; } return a; } \
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, Vector<Scalar, count> b)        { for (umm j = 0; j < 3; ++j) { a.s[j] = a.s[j] op b; } return a; } \
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, Vector<Scalar, count> b)        { for (umm j = 0; j < 4; ++j) { a.s[j] = a.s[j] op b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 2; ++j) { a.s[j] = a.s[j] op b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 3; ++j) { a.s[j] = a.s[j] op b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 4; ++j) { a.s[j] = a.s[j] op b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v2<Scalar>, count> b) { for (umm j = 0; j < 2; ++j) { b.s[j] = a op b.s[j]; } return b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v3<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v3<Scalar>, count> b) { for (umm j = 0; j < 3; ++j) { b.s[j] = a op b.s[j]; } return b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v4<Scalar>, count> b) { for (umm j = 0; j < 4; ++j) { b.s[j] = a op b.s[j]; } return b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, std::type_identity_t<Scalar> b) { return a op broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, std::type_identity_t<Scalar> b) { return a op broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, std::type_identity_t<Scalar> b) { return a op broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v2<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v2<Scalar>, count> b) { return broadcast<count>(a) op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v3<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v3<Scalar>, count> b) { return broadcast<count>(a) op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr Vector<v4<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v4<Scalar>, count> b) { return broadcast<count>(a) op b; } \
 
 #define A(op) \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, Vector<Scalar, count> b) { return a = a op b; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<Scalar, count> &operator op=(Vector<Scalar, count> &a, std::type_identity_t<Scalar> b) { return a op= broadcast<count>(b); } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, Vector<v2<Scalar>, count> b)    { for (umm j = 0; j < 2; ++j) { a.s[j] op= b.s[j]; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, Vector<v3<Scalar>, count> b)    { for (umm j = 0; j < 3; ++j) { a.s[j] op= b.s[j]; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, Vector<v4<Scalar>, count> b)    { for (umm j = 0; j < 4; ++j) { a.s[j] op= b.s[j]; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, Vector<Scalar, count> b)        { for (umm j = 0; j < 2; ++j) { a.s[j] op= b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, Vector<Scalar, count> b)        { for (umm j = 0; j < 3; ++j) { a.s[j] op= b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, Vector<Scalar, count> b)        { for (umm j = 0; j < 4; ++j) { a.s[j] op= b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op=(Vector<v2<Scalar>, count> &a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 2; ++j) { a.s[j] op= b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op=(Vector<v3<Scalar>, count> &a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 3; ++j) { a.s[j] op= b; } return a; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op=(Vector<v4<Scalar>, count> &a, std::type_identity_t<Scalar> b) { for (umm j = 0; j < 4; ++j) { a.s[j] op= b; } return a; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<Scalar, count> &operator op##=(Vector<Scalar, count> &a, Vector<Scalar, count> b) { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<Scalar, count> &operator op##=(Vector<Scalar, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, Vector<v2<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, Vector<v3<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, Vector<v4<Scalar>, count> b)    { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, Vector<Scalar, count> b)        { return a = a op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v2<Scalar>, count> &operator op##=(Vector<v2<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v3<Scalar>, count> &operator op##=(Vector<v3<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op##= s; } forceinline constexpr Vector<v4<Scalar>, count> &operator op##=(Vector<v4<Scalar>, count> &a, std::type_identity_t<Scalar> b) { return a op##= broadcast<count>(b); } \
 
 #define OPERATION(op) O(op) A(op)
 
@@ -444,17 +493,17 @@ O(||);
 
 #define O(op) \
 	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, Vector<Scalar, count> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a.s[i] op b.s[i]); return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, std::type_identity_t<Scalar> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a.s[i] op b); return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<Scalar, count> operator op(std::type_identity_t<Scalar> a, Vector<Scalar, count> b) { MaskVector<Scalar, count> r; for (umm i = 0; i < count; ++i) r.s[i] = -1 * (a op b.s[i]); return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, Vector<v2<Scalar>, count> b)    { MaskVector<v2<Scalar>, count> r; for (umm j = 0; j < 2; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b.s[j].s[i]); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, Vector<v3<Scalar>, count> b)    { MaskVector<v3<Scalar>, count> r; for (umm j = 0; j < 3; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b.s[j].s[i]); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, Vector<v4<Scalar>, count> b)    { MaskVector<v4<Scalar>, count> r; for (umm j = 0; j < 4; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b.s[j].s[i]); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v2<Scalar>, count> r; for (umm j = 0; j < 2; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v3<Scalar>, count> r; for (umm j = 0; j < 3; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v4<Scalar>, count> r; for (umm j = 0; j < 4; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a.s[j].s[i] op b); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v2<Scalar>, count> b) { MaskVector<v2<Scalar>, count> r; for (umm j = 0; j < 2; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a op b.s[j].s[i]); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v3<Scalar>, count> b) { MaskVector<v3<Scalar>, count> r; for (umm j = 0; j < 3; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a op b.s[j].s[i]); } } return r; } \
-	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v4<Scalar>, count> b) { MaskVector<v4<Scalar>, count> r; for (umm j = 0; j < 4; ++j) { for (umm i = 0; i < count; ++i) { r.s[j].s[i] = -1 * (a op b.s[j].s[i]); } } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<Scalar, count> operator op(Vector<Scalar, count> a, std::type_identity_t<Scalar> b) { return a op broadcast<count>(b); } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<Scalar, count> operator op(std::type_identity_t<Scalar> a, Vector<Scalar, count> b) { return broadcast<count>(a) op b; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, Vector<v2<Scalar>, count> b)    { MaskVector<v2<Scalar>, count> r; for (umm i = 0; i < 2; ++i) { r.s[i] = -1 * (a.s[i] op b.s[i]); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, Vector<v3<Scalar>, count> b)    { MaskVector<v3<Scalar>, count> r; for (umm i = 0; i < 3; ++i) { r.s[i] = -1 * (a.s[i] op b.s[i]); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, Vector<v4<Scalar>, count> b)    { MaskVector<v4<Scalar>, count> r; for (umm i = 0; i < 4; ++i) { r.s[i] = -1 * (a.s[i] op b.s[i]); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(Vector<v2<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v2<Scalar>, count> r; for (umm i = 0; i < 2; ++i) { r.s[i] = -1 * (a.s[i] op b); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(Vector<v3<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v3<Scalar>, count> r; for (umm i = 0; i < 3; ++i) { r.s[i] = -1 * (a.s[i] op b); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(Vector<v4<Scalar>, count> a, std::type_identity_t<Scalar> b) { MaskVector<v4<Scalar>, count> r; for (umm i = 0; i < 4; ++i) { r.s[i] = -1 * (a.s[i] op b); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v2<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v2<Scalar>, count> b) { MaskVector<v2<Scalar>, count> r; for (umm i = 0; i < 2; ++i) { r.s[i] = -1 * (a op b.s[i]); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v3<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v3<Scalar>, count> b) { MaskVector<v3<Scalar>, count> r; for (umm i = 0; i < 3; ++i) { r.s[i] = -1 * (a op b.s[i]); } return r; } \
+	template <class Scalar, umm count> requires requires(Scalar s) { s op s; } forceinline constexpr MaskVector<v4<Scalar>, count> operator op(std::type_identity_t<Scalar> a, Vector<v4<Scalar>, count> b) { MaskVector<v4<Scalar>, count> r; for (umm i = 0; i < 4; ++i) { r.s[i] = -1 * (a op b.s[i]); } return r; } \
 
 O(==);
 O(!=);
@@ -516,6 +565,69 @@ template <CMaskScalar Scalar, umm count> forceinline constexpr bool all(Vector<v
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool any(Vector<v3<Scalar>, count> a) { bool r = false; for (umm i = 0; i < count; ++i) for (umm j = 0; j < 3; ++j) r |= a.s[j].s[i] != 0; return r; }
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool all(Vector<v4<Scalar>, count> a) { bool r = true; for (umm i = 0; i < count; ++i) for (umm j = 0; j < 4; ++j) r &= a.s[j].s[i] != 0; return r; }
 template <CMaskScalar Scalar, umm count> forceinline constexpr bool any(Vector<v4<Scalar>, count> a) { bool r = false; for (umm i = 0; i < count; ++i) for (umm j = 0; j < 4; ++j) r |= a.s[j].s[i] != 0; return r; }
+
+template <class Scalar, umm count>
+constexpr Vector<Scalar, count> sign(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = v.s[i] == 0 ? 0 : v.s[i] < 0 ? -1 : 1;
+	}
+	return v;
+}
+
+template <class Scalar, umm count>
+constexpr Vector<Scalar, count> absolute(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = v.s[i] < 0 ? -v.s[i] : v.s[i];
+	}
+	return v;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> reciprocal(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = 1 / v.s[i];
+	}
+	return v;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> floor(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = floor(v.s[i]);
+	}
+	return v;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> ceil(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = ceil(v.s[i]);
+	}
+	return v;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> frac(Vector<Scalar, count> v) {
+	for (umm i = 0; i < count; ++i) {
+		v.s[i] = frac(v.s[i]);
+	}
+	return v;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> floor(Vector<Scalar, count> v, Vector<Scalar, count> b) {
+	return floor(v / b) * b;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> ceil(Vector<Scalar, count> v, Vector<Scalar, count> b) {
+	return ceil(v / b) * b;
+}
+
+template <std::floating_point Scalar, umm count>
+constexpr Vector<Scalar, count> frac(Vector<Scalar, count> v, Vector<Scalar, count> b) {
+	return frac(v / b) * b;
+}
 
 #define SA(Scalar, count, op, intrinsic) \
 	template <>  \
@@ -689,6 +801,18 @@ C(f,32, <=, _mm_castps_si128(_mm_cmple_ps(a.m, b.m)));
 C(f,32, >=, _mm_castps_si128(_mm_cmpge_ps(a.m, b.m)));
 C(f,32, <, _mm_castps_si128(_mm_cmplt_ps(a.m, b.m)));
 C(f,32, >, _mm_castps_si128(_mm_cmpgt_ps(a.m, b.m)));
+
+template <> inline Vector<f32, 4> select(Vector<Mask32, 4> m, Vector<f32, 4> a, Vector<f32, 4> b) { return {.m = _mm_blendv_ps(b.m, a.m, _mm_castsi128_ps(m.m))}; }
+template <> inline Vector<f32, 4> absolute(Vector<f32, 4> v) { return {.m = _mm_and_ps(v.m, _mm_castsi128_ps(_mm_set1_epi32(0x7fff'ffff)))}; }
+template <> inline Vector<f32, 4> reciprocal(Vector<f32, 4> v) { return {.m = _mm_rcp_ps(v.m)}; }
+template <> inline Vector<f32, 4> floor(Vector<f32, 4> v) { return {.m = _mm_floor_ps(v.m)}; }
+template <> inline Vector<f32, 4> ceil(Vector<f32, 4> v) { return {.m = _mm_ceil_ps(v.m)}; }
+template <> inline Vector<f32, 4> frac(Vector<f32, 4> v) { return {.m = _mm_sub_ps(v.m, _mm_floor_ps(v.m))}; }
+inline Vector<f32, 4> set_sign(Vector<f32, 4> d, Vector<f32, 4> s) { return {.m = _mm_or_ps(_mm_and_ps(d.m, _mm_castsi128_ps(_mm_set1_epi32(0x7fff'ffff))), _mm_and_ps(s.m, _mm_castsi128_ps(_mm_set1_epi32(0x8000'0000))))}; }
+inline Vector<f32, 4> sign(Vector<f32, 4> v) { return set_sign(broadcast<4>(1.0f), v); }
+
+template <> inline bool all(Vector<Mask32, 4> v) { return _mm_movemask_ps(_mm_castsi128_ps(v.m)) == 15; }
+template <> inline bool any(Vector<Mask32, 4> v) { return _mm_movemask_ps(_mm_castsi128_ps(v.m)) != 0; }
 
 #undef noti
 #undef notf

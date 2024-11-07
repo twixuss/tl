@@ -648,7 +648,18 @@ float pow2(float a) {
 	return a * a;
 }
 
+DefaultLogger logger = {.module = u8"tests"s};
+
+__declspec(dllexport) char *found;
+
+no_inline void test_find() {
+	found = find("Hello world! I have a present for you!Hello world! I have a present for you!Hello world! I have a present for you!"s, "lo world! I have a present for you!"s);
+}
 s32 tl_main(Span<Span<utf8>> args) {
+	test_find();
+	assert(found);
+	assert(Span(found, 5) == "lo wo"s);
+
 	powf(1, 2);
 	::pow2(2);
 
@@ -658,6 +669,9 @@ s32 tl_main(Span<Span<utf8>> args) {
 	init_printer();
 	defer { deinit_printer(); };
 
+	DefaultLogger::global_init(u8"log.txt"s);
+	current_logger = logger;
+	app_logger = logger;
 
 	print_floats(0.f);
 	print_floats(5.87747175411e-39f);
