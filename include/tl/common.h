@@ -1586,79 +1586,81 @@ struct Span {
 		if (count != that.count)
 			return false;
 
-		if constexpr (std::is_integral_v<T>) {
-			u8 *ap = (u8 *)data;
-			u8 *bp = (u8 *)that.data;
+		if (!std::is_constant_evaluated()) {
+			if constexpr (std::is_integral_v<T>) {
+				u8 *ap = (u8 *)data;
+				u8 *bp = (u8 *)that.data;
 
-			u8 *endp = (u8 *)end();
+				u8 *endp = (u8 *)end();
 			
-			#if TL_USE_SIMD
-			while (endp - ap >= 16) {
-				__m128i a = _mm_loadu_epi32(ap); ap += 16;
-				__m128i b = _mm_loadu_epi32(bp); bp += 16;
-				__m128i c = _mm_cmpeq_epi32(a, b);
-				int m = _mm_movemask_ps(_mm_castsi128_ps(c));
-				if (m != 0xF) {
-					return false;
+				#if TL_USE_SIMD
+				while (endp - ap >= 16) {
+					__m128i a = _mm_loadu_epi32(ap); ap += 16;
+					__m128i b = _mm_loadu_epi32(bp); bp += 16;
+					__m128i c = _mm_cmpeq_epi32(a, b);
+					int m = _mm_movemask_ps(_mm_castsi128_ps(c));
+					if (m != 0xF) {
+						return false;
+					}
 				}
-			}
-			#endif
-			while (endp - ap >= 8) {
-				u64 a = *(u64 *)ap; ap += 8;
-				u64 b = *(u64 *)bp; bp += 8;
-				if (a != b) {
-					return false;
-				}
-			}
-			while (endp - ap) {
-				if (*ap++ != *bp++) {
-					return false;
-				}
-			}
-			return true;
-		}
-		#if TL_USE_SIMD
-		if constexpr (std::is_same_v<T, f32>) {
-			umm remaining_count = count;
-			f32 *ap = data;
-			f32 *bp = that.data;
-
-			#if TL_ALIGN_RW_OPS
-			// Align `ap` to 16 bytes.
-			while (remaining_count && (((umm)ap & 15) != 0)) {
-				if (*ap != *bp)
-					return false;
-				++ap;
-				++bp;
-				--remaining_count;
-			}
-			#endif
-			while (remaining_count >= 4) {
-				#if TL_ALIGN_RW_OPS
-				__m128 a = _mm_load_ps(ap);
-				#else
-				__m128 a = _mm_loadu_ps(ap);
 				#endif
-				__m128 b = _mm_loadu_ps(bp);
-				__m128 c = _mm_cmpeq_ps(a, b);
-				int m = _mm_movemask_ps(c);
-				if (m != 0xF) {
-					return false;
+				while (endp - ap >= 8) {
+					u64 a = *(u64 *)ap; ap += 8;
+					u64 b = *(u64 *)bp; bp += 8;
+					if (a != b) {
+						return false;
+					}
 				}
-				ap += 4;
-				bp += 4;
-				remaining_count -= 4;
+				while (endp - ap) {
+					if (*ap++ != *bp++) {
+						return false;
+					}
+				}
+				return true;
 			}
-			while (remaining_count) {
-				if (*ap != *bp)
-					return false;
-				++ap;
-				++bp;
-				--remaining_count;
+			#if TL_USE_SIMD
+			if constexpr (std::is_same_v<T, f32>) {
+				umm remaining_count = count;
+				f32 *ap = data;
+				f32 *bp = that.data;
+
+				#if TL_ALIGN_RW_OPS
+				// Align `ap` to 16 bytes.
+				while (remaining_count && (((umm)ap & 15) != 0)) {
+					if (*ap != *bp)
+						return false;
+					++ap;
+					++bp;
+					--remaining_count;
+				}
+				#endif
+				while (remaining_count >= 4) {
+					#if TL_ALIGN_RW_OPS
+					__m128 a = _mm_load_ps(ap);
+					#else
+					__m128 a = _mm_loadu_ps(ap);
+					#endif
+					__m128 b = _mm_loadu_ps(bp);
+					__m128 c = _mm_cmpeq_ps(a, b);
+					int m = _mm_movemask_ps(c);
+					if (m != 0xF) {
+						return false;
+					}
+					ap += 4;
+					bp += 4;
+					remaining_count -= 4;
+				}
+				while (remaining_count) {
+					if (*ap != *bp)
+						return false;
+					++ap;
+					++bp;
+					--remaining_count;
+				}
+				return true;
 			}
-			return true;
+			#endif
 		}
-		#endif
 		for (Size i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
