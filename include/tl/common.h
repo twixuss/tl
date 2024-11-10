@@ -373,6 +373,12 @@ forceinline constexpr auto enum_values() {
 }
 
 
+template <class Fn, class Ret, class ...Args>
+concept Callable = requires(Fn fn) { { fn(std::declval<Args>()...) } -> std::same_as<Ret>; };
+
+template <class Fn, class ...Args>
+concept CallableAnyRet = requires(Fn fn) { fn(std::declval<Args>()...); };
+
 
 // This function exists because C++ does not provide a way to convert
 // fundamental types to structs without adding a constructor to a struct, 
@@ -863,6 +869,9 @@ constexpr T midpoint(T a, T b) {
 	return a + (b - a) / 2;
 }
 
+template <umm bits>
+using UintWithBits = TypeAt<log2(ceil_to_power_of_2(bits) / 8), u8, u16, u32, u64>;
+
 template <umm count>
 using UintForCount = TypeAt<log2(log2(max(count, (umm)255))) - 2, u8, u16, u32, u64>;
 
@@ -1150,11 +1159,11 @@ private:
 	defer { Swap(dst, src); };
 
 template <class T>
-auto reversed(T x) {
+constexpr auto reversed(T x) {
 	using Iter = decltype(x.rbegin());
 	struct Range {
-		Iter begin() { return {_begin}; }
-		Iter end() { return {_end}; }
+		constexpr Iter begin() { return {_begin}; }
+		constexpr Iter end() { return {_end}; }
 		Iter _begin, _end;
 	};
 	Range r = {
@@ -1169,13 +1178,13 @@ struct ReverseIterator {
 	using Element = decltype(*Iterator{});
 
 	Iterator it;
-	ReverseIterator(Iterator it) : it(it) {}
-	ReverseIterator &operator++() { return --it, *this; }
-	ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
-	bool operator==(ReverseIterator that) const { return it == that.it; }
-	bool operator!=(ReverseIterator that) const { return it != that.it; }
-	Element &operator*() { return *it; }
-	Iterator operator->() { return it; }
+	constexpr ReverseIterator(Iterator it) : it(it) {}
+	constexpr ReverseIterator &operator++() { return --it, *this; }
+	constexpr ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
+	constexpr bool operator==(ReverseIterator that) const { return it == that.it; }
+	constexpr bool operator!=(ReverseIterator that) const { return it != that.it; }
+	constexpr Element &operator*() { return *it; }
+	constexpr Iterator operator->() { return it; }
 };
 
 inline constexpr struct null_opt_t {} null_opt;
@@ -1208,7 +1217,9 @@ protected:
 		T _value;
 	};
 	bool _has_value;
-	constexpr OptionalBaseNonTrivial() {}
+	constexpr OptionalBaseNonTrivial() {
+		this->_has_value = false;
+	}
 	constexpr OptionalBaseNonTrivial(OptionalBaseNonTrivial const &that) {
 		if (that._has_value) {
 			new (&this->_value) T(that._value);

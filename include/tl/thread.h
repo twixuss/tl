@@ -250,7 +250,7 @@ struct SleepySpinner {
 };
 
 template <AInterlockExchangeable T, ASpinner Spinner = BasicSpinner>
-forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requires requires { { fn(*(T *)0) } -> std::same_as<T>; } {
+forceinline T atomic_update(T volatile *a, Callable<T, T> auto fn, Spinner spinner = {}) {
 	using Int = TypeAt<log2(sizeof(T)), u8, u16, u32, u64>;
 	while (1) {
 		auto old_value = *a;
@@ -261,8 +261,6 @@ forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requir
 		spinner.spin();
 	}
 }
-
-#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&, _b = b](auto _a) { return _a + _b; } __VA_OPT__(,) __VA_ARGS__))
 
 template <ASpinner Spinner = SleepySpinner>
 void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {
