@@ -316,6 +316,17 @@ List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
 	return result;
 }
 
+template <class Allocator = Allocator, class T>
+List<T, Allocator> to_list(std::initializer_list<T> that, Allocator allocator = Allocator::current() TL_LP) {
+	List<T, Allocator> result;
+	result.data = allocator.allocate<T>(that.size() TL_LA);
+	result.count = that.size();
+	result.capacity = that.size();
+	result.allocator = allocator;
+	memcpy(result.data, that.begin(), that.size() * sizeof(T));
+	return result;
+}
+
 template <class Allocator = Allocator, class Size, class T>
 List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator, Size> result;

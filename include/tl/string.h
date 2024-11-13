@@ -670,11 +670,20 @@ forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b,
 forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
 
 template <class T>
-umm append(struct StringBuilder &builder, Optional<T> v) {
+umm append(StringBuilder &builder, Optional<T> v) {
 	if (v.has_value())
 		return append(builder, v.value_unchecked());
 	return append(builder, "empty");
 }
+
+
+template <class Value, class Error>
+umm append(StringBuilder &builder, Result<Value, Error> r) {
+	if (r.is_value())
+		return append(builder, r.value());
+	return append(builder, r.error());
+}
+
 
 template <class T, class Size=umm, class Format=void>
 [[deprecated("Use FormattedSpan instead")]]

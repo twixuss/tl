@@ -1462,6 +1462,12 @@ private:
 	};
 };
 
+#define TRY(name, expression)           \
+	auto name##_or_error = expression;  \
+	if (name##_or_error.is_error())     \
+		return name##_or_error.error(); \
+	auto name = name##_or_error.value()
+
 enum class Overflow {
 	clamp,
 	wrap,
@@ -2171,7 +2177,7 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 }
 
 template <class T, class Size>
-Span<T, Size> strip(Span<T, Size> span, auto &&predicate) {
+Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
 	while (span.count && predicate(span.data[0])) {
 		span.data++;
 		span.count--;
@@ -2191,6 +2197,8 @@ constexpr T dot(Span<T> a, Span<T> b) {
 	}
 	return result;
 }
+
+#define passthrough(function) ([&](auto ...args){ return function(args...); })
 
 inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
@@ -3275,6 +3283,13 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 			.state = this
 		};
 	}
+	
+	forceinline ArenaAllocator::Checkpoint checkpoint() { 
+		return arena.checkpoint();
+	}
+	forceinline void reset(ArenaAllocator::Checkpoint checkpoint) { 
+		arena.reset(checkpoint);
+	}
 
 	forceinline static void clear() {
 		arena.clear();
@@ -3421,10 +3436,10 @@ struct Scoped<TemporaryStorageCheckpoint> {
 	ArenaAllocator::Checkpoint checkpoint;
 
 	Scoped(TemporaryStorageCheckpoint) {
-		checkpoint = TL_GET_CURRENT(temporary_allocator).arena.checkpoint();
+		checkpoint = TL_GET_CURRENT(temporary_allocator).checkpoint();
 	}
 	~Scoped() {
-		TL_GET_CURRENT(temporary_allocator).arena.reset(checkpoint);
+		TL_GET_CURRENT(temporary_allocator).reset(checkpoint);
 	}
 };
 
