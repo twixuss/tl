@@ -2188,6 +2188,11 @@ Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
 	return span;
 }
 
+template <class T, class Size>
+Span<T, Size> trim(Span<T, Size> span, T &&value) {
+	return trim(span, [&](T const &it) { return it == value; });
+}
+
 template <class T>
 constexpr T dot(Span<T> a, Span<T> b) {
 	assert_equal(a.count, b.count);
