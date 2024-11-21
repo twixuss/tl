@@ -19,36 +19,33 @@ TL_API void sleep_seconds(u32 seconds);
 TL_API void switch_thread();
 forceinline void yield_smt() { _mm_pause(); }
 
+forceinline s16 atomic_increment(s16 volatile *a) { return _InterlockedIncrement16((short *)a); }
+forceinline s32 atomic_increment(s32 volatile *a) { return _InterlockedIncrement((long *)a); }
+forceinline s64 atomic_increment(s64 volatile *a) { return _InterlockedIncrement64((long long *)a); }
+
+forceinline s16 atomic_decrement(s16 volatile *a) { return _InterlockedDecrement16((short *)a); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return _InterlockedDecrement((long *)a); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return _InterlockedDecrement64((long long *)a); }
+
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
 forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
-#if ARCH_X64
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
-#endif
 
-forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((short *)a); }
-forceinline u32 atomic_increment(u32 volatile *a) { return (u32)_InterlockedIncrement((long *)a); }
-#if ARCH_X64
-forceinline u64 atomic_increment(u64 volatile *a) { return (u64)_InterlockedIncrement64((long long *)a); }
-#endif
+forceinline s8  atomic_and(s8  volatile *a, s8  b) { return _InterlockedAnd8((char *)a, (char)b); }
+forceinline s16 atomic_and(s16 volatile *a, s16 b) { return _InterlockedAnd16((short *)a, (short)b); }
+forceinline s32 atomic_and(s32 volatile *a, s32 b) { return _InterlockedAnd((long *)a, (long)b); }
+forceinline s64 atomic_and(s64 volatile *a, s64 b) { return _InterlockedAnd64((long long *)a, (long long)b); }
 
-forceinline s16 atomic_increment(s16 volatile *a) { return (s16)atomic_increment((u16 *)a); }
-forceinline s32 atomic_increment(s32 volatile *a) { return (s32)atomic_increment((u32 *)a); }
-#if ARCH_X64
-forceinline s64 atomic_increment(s64 volatile *a) { return (s64)atomic_increment((u64 *)a); }
-#endif
+forceinline s8  atomic_or(s8  volatile *a, s8  b) { return _InterlockedOr8((char *)a, (char)b); }
+forceinline s16 atomic_or(s16 volatile *a, s16 b) { return _InterlockedOr16((short *)a, (short)b); }
+forceinline s32 atomic_or(s32 volatile *a, s32 b) { return _InterlockedOr((long *)a, (long)b); }
+forceinline s64 atomic_or(s64 volatile *a, s64 b) { return _InterlockedOr64((long long *)a, (long long)b); }
 
-forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)_InterlockedDecrement16((short *)a); }
-forceinline u32 atomic_decrement(u32 volatile *a) { return (u32)_InterlockedDecrement((long *)a); }
-#if ARCH_X64
-forceinline u64 atomic_decrement(u64 volatile *a) { return (u64)_InterlockedDecrement64((long long *)a); }
-#endif
-
-forceinline s16 atomic_decrement(s16 volatile *a) { return (s16)atomic_decrement((u16 *)a); }
-forceinline s32 atomic_decrement(s32 volatile *a) { return (s32)atomic_decrement((u32 *)a); }
-#if ARCH_X64
-forceinline s64 atomic_decrement(s64 volatile *a) { return (s64)atomic_decrement((u64 *)a); }
-#endif
+forceinline s8  atomic_xor(s8  volatile *a, s8  b) { return _InterlockedXor8((char *)a, (char)b); }
+forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return _InterlockedXor16((short *)a, (short)b); }
+forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return _InterlockedXor((long *)a, (long)b); }
+forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return _InterlockedXor64((long long *)a, (long long)b); }
 
 template <class T>
 concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
@@ -168,12 +165,37 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 }
 #endif
 
+forceinline u16 atomic_increment(u16 volatile *a) { return (u16)atomic_increment((s16 *)a); }
+forceinline u32 atomic_increment(u32 volatile *a) { return (u32)atomic_increment((s32 *)a); }
+forceinline u64 atomic_increment(u64 volatile *a) { return (u64)atomic_increment((s64 *)a); }
+
+forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)atomic_decrement((s16 *)a); }
+forceinline u32 atomic_decrement(u32 volatile *a) { return (u32)atomic_decrement((s32 *)a); }
+forceinline u64 atomic_decrement(u64 volatile *a) { return (u64)atomic_decrement((s64 *)a); }
+
 forceinline u8  atomic_add(u8  volatile *a, u8  b) { return (u8 )atomic_add((s8  *)a, (s8 )b); }
 forceinline u16 atomic_add(u16 volatile *a, u16 b) { return (u16)atomic_add((s16 *)a, (s16)b); }
 forceinline u32 atomic_add(u32 volatile *a, u32 b) { return (u32)atomic_add((s32 *)a, (s32)b); }
-#if ARCH_X64
 forceinline u64 atomic_add(u64 volatile *a, u64 b) { return (u64)atomic_add((s64 *)a, (s64)b); }
-#endif
+
+forceinline u8  atomic_and(u8  volatile *a, u8  b) { return (u8 )atomic_and((s8  *)a, (s8 )b); }
+forceinline u16 atomic_and(u16 volatile *a, u16 b) { return (u16)atomic_and((s16 *)a, (s16)b); }
+forceinline u32 atomic_and(u32 volatile *a, u32 b) { return (u32)atomic_and((s32 *)a, (s32)b); }
+forceinline u64 atomic_and(u64 volatile *a, u64 b) { return (u64)atomic_and((s64 *)a, (s64)b); }
+
+forceinline u8  atomic_or(u8  volatile *a, u8  b) { return (u8 )atomic_or((s8  *)a, (s8 )b); }
+forceinline u16 atomic_or(u16 volatile *a, u16 b) { return (u16)atomic_or((s16 *)a, (s16)b); }
+forceinline u32 atomic_or(u32 volatile *a, u32 b) { return (u32)atomic_or((s32 *)a, (s32)b); }
+forceinline u64 atomic_or(u64 volatile *a, u64 b) { return (u64)atomic_or((s64 *)a, (s64)b); }
+
+forceinline u8  atomic_xor(u8  volatile *a, u8  b) { return (u8 )atomic_xor((s8  *)a, (s8 )b); }
+forceinline u16 atomic_xor(u16 volatile *a, u16 b) { return (u16)atomic_xor((s16 *)a, (s16)b); }
+forceinline u32 atomic_xor(u32 volatile *a, u32 b) { return (u32)atomic_xor((s32 *)a, (s32)b); }
+forceinline u64 atomic_xor(u64 volatile *a, u64 b) { return (u64)atomic_xor((s64 *)a, (s64)b); }
+
+forceinline bool atomic_and(bool volatile *a, bool b) { return (bool)atomic_and((u8 *)a, (u8)b); }
+forceinline bool atomic_or (bool volatile *a, bool b) { return (bool)atomic_or ((u8 *)a, (u8)b); }
+forceinline bool atomic_xor(bool volatile *a, bool b) { return (bool)atomic_xor((u8 *)a, (u8)b); }
 
 #ifdef TL_IMPL
 
