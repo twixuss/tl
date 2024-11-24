@@ -28,6 +28,34 @@ static constexpr auto get_invoke_separated(std::index_sequence<indices...>) noex
 
 } // namespace Detail
 
+struct FatFunctionPointer {
+	void (*function)(void *);
+	void *parameter;
+	
+	void operator()() {
+		return function(parameter);
+	}
+};
+
+template <class Allocator = Allocator, class Fn>
+FatFunctionPointer create_fat_function_pointer(Fn &&fn, Allocator allocator = Allocator::current()) {
+	FatFunctionPointer result = {};
+	allocator = Allocator::current();
+
+	using Tuple = std::tuple<std::decay_t<Fn>>;
+	result.parameter = allocator.allocate_uninitialized<Tuple>();
+	new(result.parameter) Tuple(std::forward<Fn>(fn));
+
+	result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
+	return result;
+}
+template <class Allocator = Allocator>
+void free(FatFunctionPointer &fn, Allocator allocator) {
+	if (fn.parameter)
+		allocator.free(fn.parameter);
+	fn = {};
+}
+
 template <class ParameterlessFunction, class Allocator = Allocator>
 struct Function {
 	Allocator allocator = {};
