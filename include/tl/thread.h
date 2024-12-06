@@ -417,7 +417,7 @@ private:
 	T value;
 };
 
-#define locked_use_ret(name) name * [&](auto &name)
+#define locked_use_ret(name) name * [&](typename std::remove_cvref_t<decltype(name)>::Value &name)
 #define locked_use(name) locked_use_ret(name) -> decltype(auto)
 
 template <class T, ALock Lock, class Allocator = Allocator>
