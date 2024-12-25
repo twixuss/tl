@@ -2,6 +2,7 @@
 #include "file.h"
 #include "list.h"
 #include "block_list.h"
+#include "string.h"
 
 //
 // Solution for including files, for example preprocessing opengl shaders.
@@ -127,7 +128,7 @@ struct Includer {
 				}
 				current.remaining.set_begin(line_end);
 
-				auto relative_include_path = strip(Span(found + options.include_directive.count, line_end), [&](utf8 c) { return is_whitespace((ascii)c); });
+				auto relative_include_path = trim(Span(found + options.include_directive.count, line_end), [&](utf8 c) { return is_whitespace((ascii)c); });
 
 				auto full_include_path = format<PathAllocator>(u8"{}/{}"s, parse_path(current.path).directory, relative_include_path);
 

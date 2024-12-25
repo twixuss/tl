@@ -64,8 +64,14 @@
 #define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
 #endif
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
-#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
+#if COMPILER_MSVC
+#define TL_ASSUME(x) __assume(x)
+#else
+#define TL_ASSUME(x) 0
+#endif
+
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), TL_ASSUME(0))
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), TL_ASSUME(0))
 
 #ifndef bounds_check
 #define bounds_check(x) x
