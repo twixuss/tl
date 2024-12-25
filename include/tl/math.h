@@ -571,6 +571,36 @@ forceinline constexpr auto bezier_derivative(T a, T b, T c, T d, Float t) {
 	return -3*a + 3*b + t * (6*a - 12*b + 6*c + 3 * t * (-a + 3*b - 3*c + d));
 }
 
+// ax^3 + bx^2 + cx + d
+template <class T>
+struct Cubic {
+	T a, b, c, d;
+};
+
+template <class T>
+forceinline constexpr T evaluate(Cubic<T> c, T x) {
+	T x2 = x*x;
+	T x3 = x2*x;
+	return c.a*x3 + c.b*x2 + c.c*x + c.d;
+}
+
+template <class T>
+forceinline constexpr T derivative(Cubic<T> c, T x) {
+	T x2 = x*x;
+	return 3*c.a*x2 + 2*c.b*x + c.c;
+}
+
+template <class T>
+Cubic<T> cubic_2y2d(T y0, T y1, T d0, T d1) {
+    T r1 = y1 - y0 - convert<T>(0);
+    T r2 = d1 - d0;
+    T a = r2 - convert<T>(2) * r1;
+    T b = r1 - a;
+    T c = d0;
+    T d = y0;
+	return {a,b,c,d};
+}
+
 template <std::unsigned_integral T> 
 forceinline constexpr T absolute(T v) { return v; }
 
