@@ -5,19 +5,21 @@
 #include "time.h"
 #include "includer.h"
 
+#if OS_WINDOWS
 #pragma warning(push, 0)
 #define NOMINMAX
 #include <Windows.h>
 #include <gl/GL.h>
 #pragma warning(pop)
 
-#pragma warning(push)
-#pragma warning(disable: 4820)
-
 #pragma comment(lib, "opengl32")
 #ifdef TL_IMPL
 #pragma comment(lib, "gdi32")
 #endif
+#endif
+
+#pragma warning(push)
+#pragma warning(disable: 4820)
 
 using GLchar = char;
 using GLsizeiptr = tl::umm;

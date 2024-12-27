@@ -18,7 +18,6 @@
 #include <tl/profiler.h>
 #include <tl/random.h>
 #include <tl/simd.h>
-#include <tl/std_hash.h>
 #include <tl/string.h>
 #include <tl/system.h>
 #include <tl/thread.h>
@@ -39,7 +38,6 @@ using namespace tl;
 #pragma warning(push, 0)
 #include <stdio.h>
 #include <assert.h>
-#include <excpt.h>
 #if COMPILER_GCC
 #include <cxxabi.h>
 #endif
@@ -655,7 +653,34 @@ __declspec(dllexport) char *found;
 no_inline void test_find() {
 	found = find("Hello world! I have a present for you!Hello world! I have a present for you!Hello world! I have a present for you!"s, "lo world! I have a present for you!"s);
 }
+
+float fog(float distance, float density) {
+	// return 1 - exp2f(distance * log2f(1 - density)); // If want density in range [0; 1]; determines fog opacity at distance = 1
+	return 1 - exp2f(distance * log2f(1 - density)); // If want density in range [0; 1]; determines fog opacity at distance = 1
+}
+float fog(float distance, float start_density, float end_density) {
+    // this is good when t is 0 or 1, pretty bad otherwise
+    return lerp(
+        1 - expf(-distance*distance * end_density * 0.5f),
+        1 - expf(-distance * end_density),
+        start_density / end_density);
+}
+
 s32 tl_main(Span<Span<utf8>> args) {
+	int N = 256;
+	for (int i = 0; i < N; ++ i) {
+		double b = 0;
+		for (int j = 0; j <= i; ++j) {
+			double K = 4;
+			b = lerp(b, 1.0, 1 - expf(-K / N));
+		}
+		print("{} ", FormatFloat{.value=b, .precision=6});
+	}
+	return 0;
+
+	Span<bool> s = {1, 0, 0, 1};
+	all(s);
+
 	test_find();
 	assert(found);
 	assert(Span(found, 5) == "lo wo"s);

@@ -9,7 +9,9 @@
 	#include <intrin.h>
 	#include <vcruntime_new.h>
 #elif COMPILER_GCC
+	#include <x86gprintrin.h>
 	#include <malloc.h>
+	#include <math.h>
 #endif
 
 #include <string.h>
@@ -335,9 +337,21 @@ template <class T> inline constexpr T epsilon = {};
 template<> inline constexpr f32 epsilon<f32> = 1.175494351e-38f;
 template<> inline constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
-template <class T> inline constexpr T infinity = {};
+constexpr struct {
+	template <class T>
+	constexpr operator T() const { 
+		static_error_t(T, "value for this type is undefined");
+	}
+} undefined_constexpr_value;
+
+template <class T> inline constexpr T infinity = undefined_constexpr_value;
+#if COMPILER_MSVC
 template<> inline constexpr f32 infinity<f32> = 1e300 * 1e300;
 template<> inline constexpr f64 infinity<f64> = 1e300 * 1e300;
+#else
+template<> inline constexpr f32 infinity<f32> = (__builtin_inff ());
+template<> inline constexpr f64 infinity<f64> = (__builtin_inff ());
+#endif
 
 template <class T> inline constexpr T nan = infinity<T> * 0;
 
@@ -399,18 +413,32 @@ forceinline constexpr To convert(From from) {
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }
 
-forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (0, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(0, a, b, result); }
-forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(0, a, b, result); }
-#if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(0, a, b, result); }
-#endif
-
+#if COMPILER_MSVC
 forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (carry_in, a, b, result); }
 forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(carry_in, a, b, result); }
+#elif COMPILER_GCC
+forceinline void add_carry(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
+	int c = a + b + carry_in;
+	*result = (u8)c;
+	*carry_out = c & 0x100;
+}
+forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	int c = a + b + carry_in;
+	*result = (u16)c;
+	*carry_out = c & 0x10000;
+}
+#endif
+
 forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(carry_in, a, b, result); }
 #if ARCH_X64
 forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, result); }
+#endif
+
+forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+#if ARCH_X64
+forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
 #endif
 
 forceinline constexpr bool is_nan(f32 v) {
@@ -627,10 +655,10 @@ constexpr u32 count_leading_zeros(u64 v) {
 
 #if COMPILER_MSVC
 #if ARCH_LZCNT
-forceinline constexpr u32 count_leading_zeros(u8  val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val) - 8; }
-forceinline constexpr u32 count_leading_zeros(u16 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val); }
-forceinline constexpr u32 count_leading_zeros(u32 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(val); }
-forceinline constexpr u32 count_leading_zeros(u64 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(val); }
+forceinline constexpr u32 count_leading_zeros(u8  v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v) - 8; }
+forceinline constexpr u32 count_leading_zeros(u16 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(v); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(v); }
 #else
 forceinline constexpr u32 count_leading_zeros(u8  v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
 forceinline constexpr u32 count_leading_zeros(u16 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
@@ -639,6 +667,11 @@ forceinline constexpr u32 count_leading_zeros(u32 v) { ulong r; return (std::is_
 forceinline constexpr u32 count_leading_zeros(u64 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
 #endif
 #endif
+#elif COMPILER_GCC
+forceinline constexpr u32 count_leading_zeros(u8  v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v) - 8; }
+forceinline constexpr u32 count_leading_zeros(u16 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(v); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(v); }
 #endif
 
 forceinline constexpr u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
@@ -657,11 +690,11 @@ forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zer
 #endif
 
 
-forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
-forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
-forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (31 - count_leading_zeros(v))); }
 #if ARCH_X64
-forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (_BitScanReverse64(&r, v), r)); }
+forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (63 - count_leading_zeros(v))); }
 #endif
 
 forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
@@ -1009,8 +1042,6 @@ bool count_of(MappedCollection<Inner, Mapper> c) {
 	return count_of(c.inner);
 }
 
-#define for_each_default_action(fn, item) for_each_default_action_<decltype(fn(item))>();
-
 template <class Inner, class Predicate>
 struct PredicatedCollection {
 	using Element = decltype(std::declval<Predicate>()(std::declval<ElementOf<Inner>>()));
@@ -1020,7 +1051,7 @@ struct PredicatedCollection {
 
 template <class Inner, class Predicate>
 bool for_each(PredicatedCollection<Inner, Predicate> c, auto fn) {
-	return ::for_each(c.inner, [&](auto item) {
+	return for_each(c.inner, [&](auto item) {
 		if (c.predicate(item)) {
 			return fn(item);
 		}
@@ -1050,7 +1081,11 @@ auto stddev(Collection const &collection) {
 	return tl::sqrt(variance);
 }
 
-template <class Predicate = decltype([](auto x) { return x; })>
+constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
+	return x;
+};
+
+template <class Predicate = decltype(identity_value)>
 bool all(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (!predicate(v))
@@ -1059,7 +1094,7 @@ bool all(Collection auto x, Predicate predicate = {}) {
 	return true;
 }
 
-template <class Predicate = decltype([](auto x) { return x; })>
+template <class Predicate = decltype(identity_value)>
 bool any(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (predicate(v))
@@ -1773,10 +1808,27 @@ template <class T, umm x>               inline Span<T> flatten(T (&array)[x]    
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
 template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
 
-template <ForEachFlags flags=0, class T, class Fn>
-constexpr bool for_each(Span<T> span, Fn &&fn) {
-	using FnRet = decltype(fn(*(T*)0));
+template <class T>
+decltype(auto) useless_0() { return ; }
 
+// TODO: use this in all of for_each functions, DRY
+template <class ...Args, class Fn>
+auto wrap_foreach_fn(Fn &&fn) {
+	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
+	if constexpr (std::is_same_v<FnRet, void>) {
+		return [&] (auto &&...args) {
+			fn(args...);
+			return ForEach_continue;
+		};
+	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
+		return fn;
+	} else {
+		static_error_v(fn, "Invalid return type of for_each function");
+	}
+}
+
+template <ForEachFlags flags=0, class T, class Fn>
+constexpr bool for_each(Span<T> span, Fn &&in_fn) {
 	T *start = 0;
 	T *end = 0;
 	umm step = 0;
@@ -1790,18 +1842,14 @@ constexpr bool for_each(Span<T> span, Fn &&fn) {
 		step = (umm)1;
 	}
 
+	auto fn = wrap_foreach_fn<T &>(in_fn);
+
 	for (auto it = start; it != end; it += step) {
-		if constexpr (std::is_same_v<FnRet, void>) {
-			fn(*it);
-		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			auto d = fn(*it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_v(fn, "Invalid return type of for_each function");
-		}
+		auto d = fn(*it);
+		if (d & ForEach_erase) invalid_code_path("not supported");
+		if (d & ForEach_erase_unordered) invalid_code_path("not supported");
+		if (d & ForEach_break)
+			return true;
 	}
 	return false;
 }

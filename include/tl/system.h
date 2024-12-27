@@ -182,12 +182,17 @@ using b16 = s16;
 using b32 = s32;
 using b64 = s64;
 
+#if COMPILER_GCC
+using umm = __SIZE_TYPE__;
+using smm = __SIZE_TYPE__;
+#else
 #if ARCH_X64
 using umm = u64;
 using smm = s64;
 #else
 using umm = u32;
 using smm = s32;
+#endif
 #endif
 
 static_assert(sizeof(s8)  == 1);
