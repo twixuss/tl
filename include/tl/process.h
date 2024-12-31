@@ -109,8 +109,8 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
 	ShExecInfo.hwnd = NULL;
 	ShExecInfo.lpVerb = NULL;
-	ShExecInfo.lpFile = (wchar *)path;
-	ShExecInfo.lpParameters = (wchar *)arguments;
+	ShExecInfo.lpFile = (wchar_t *)path;
+	ShExecInfo.lpParameters = (wchar_t *)arguments;
 	ShExecInfo.lpDirectory = NULL;
 	ShExecInfo.nShow = params.visible ? SW_SHOW : SW_HIDE;
 	ShExecInfo.hInstApp = NULL;
@@ -194,7 +194,7 @@ Process start_process(utf16 const *command_line) {
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
 	if (!CreateProcessW(NULL,
-		(wchar *)command_line,
+		(wchar_t *)command_line,
 		NULL,          // process security attributes
 		NULL,          // primary thread security attributes
 		TRUE,          // handles are inherited
