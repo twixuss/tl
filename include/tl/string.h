@@ -353,12 +353,12 @@ inline StaticList<utf8, 4> encode_utf8(u32 ch) {
 // NOTE: TODO: surrogate pairs ate not supported
 inline List<ascii> to_ascii(Span<utf16> span, bool terminate = false, ascii unfound = '?') {
 	List<ascii> result;
-	result.reserve(span.count);
+	result.reserve(span.count + terminate);
 	for (auto u16 : span) {
 		result.add(u16 > 0xFF ? unfound : (ascii)u16);
 	}
 	if (terminate) {
-		result.add(0);
+		*result.end() = 0;
 	}
 	return result;
 }
@@ -370,12 +370,12 @@ inline Span<utf8> to_utf8(Span<ascii> span) {
 template <class Allocator = Allocator>
 inline List<utf16, Allocator> to_utf16(Span<ascii> span, bool terminate = false) {
 	List<utf16, Allocator> result;
-	result.reserve(span.count);
+	result.reserve(span.count + terminate);
 	for (auto ch : span) {
 		result.add((utf16)ch);
 	}
 	if (terminate) {
-		result.add(0);
+		*result.end() = 0;
 	}
 	return result;
 }
@@ -403,7 +403,7 @@ List<utf8, Allocator> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP) {
 	_to_utf8(utf16, result);
 
 	if (terminate)
-		result.back() = 0;
+		*result.end() = 0;
 
 	return result;
 }
@@ -425,7 +425,7 @@ List<utf16, Allocator> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP) {
 	_to_utf16(utf8, result);
 
 	if (terminate) {
-		result.back() = {};
+		*result.end() = 0;
 	}
 
 	return result;

@@ -221,8 +221,6 @@ begin_parse:
 	append_format(builder, "\n#define WINDOWS_FUNCS \\\n");
 	append_ds(windows_funcs);
 
-	append(builder, "\n#if OS_WINDOWS\n#define EXT_AND_OS_FUNCS EXTENSION_FUNCS WINDOWS_FUNCS\n#endif\n");
-
 	write_entire_file(u8"../include/tl/generated/opengl_all_funcs.h"s, as_bytes(to_string(builder)));
 
 	print("Done\n");

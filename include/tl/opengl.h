@@ -9,7 +9,6 @@
 #pragma warning(push, 0)
 #define NOMINMAX
 #include <Windows.h>
-#include <gl/GL.h>
 #pragma warning(pop)
 
 #pragma comment(lib, "opengl32")
@@ -18,16 +17,25 @@
 #endif
 #endif
 
+#include <GL/gl.h>
+
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
+#if OS_WINDOWS
+// These are not defined on windows
 using GLchar = char;
 using GLsizeiptr = tl::umm;
 using GLintptr = tl::smm;
-#if OS_LINUX
-#error not implemented
 #endif
-typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
+
+#if OS_WINDOWS
+#define GLAPI __stdcall
+#elif OS_LINUX
+#define GLAPI
+#endif
+
+typedef void (GLAPI *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
 #define GL_CONSTANT_COLOR                        0x8001
 #define GL_ONE_MINUS_CONSTANT_COLOR              0x8002
@@ -484,7 +492,14 @@ namespace gl {
 
 #include "generated/opengl_all_funcs.h"
 
-#define D(ret, name, args, params) using name##_t=ret(__stdcall*)args;
+#if OS_WINDOWS
+#define EXT_AND_OS_FUNCS EXTENSION_FUNCS WINDOWS_FUNCS
+#else
+#define EXT_AND_OS_FUNCS EXTENSION_FUNCS
+#endif
+
+
+#define D(ret, name, args, params) using name##_t=ret(GLAPI*)args;
 EXT_AND_OS_FUNCS
 #undef D
 
@@ -569,6 +584,16 @@ struct ProgramStages {
 
 TL_API GLuint create_program(ProgramStages stages);
 
+struct Macro {
+	Span<utf8> name, value;
+};
+
+// :NestedOptionsStruct:
+// This could have been a nested struct of ProgramFile, but gcc has a bug which does not allow that.
+struct ProgramFileLoadOptions {
+	Span<Macro> macros = {};
+};
+
 struct ProgramFile {
 	struct SourceFile : includer::SourceFileBase {
 		FileTime last_write_time = 0;
@@ -581,10 +606,6 @@ struct ProgramFile {
 		}
 	};
 
-	struct Macro {
-		Span<utf8> name, value;
-	};
-
 	Span<utf8> path;
 	List<utf8> source;
 
@@ -593,11 +614,7 @@ struct ProgramFile {
 	GLuint program = 0;
 	includer::Includer<SourceFile> includer;
 
-	struct LoadOptions {
-		Span<Macro> macros = {};
-	};
-
-	void load(LoadOptions options = {}) {
+	void load(ProgramFileLoadOptions options = {}) {
 		current_logger.info("Recompiling {}", path);
 		
 		includer.load(path, &source, includer::LoadOptions{.append_location_info = [](StringBuilder &builder, Span<utf8> path, u32 line) {

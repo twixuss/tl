@@ -396,6 +396,7 @@ TL_API void lock(OsLock &m);
 TL_API void unlock(OsLock &m);
 
 #ifdef TL_IMPL
+#if OS_WINDOWS
 OsLock::OsLock() {
 	handle = DefaultAllocator{}.allocate<CRITICAL_SECTION>();
 	InitializeCriticalSection((CRITICAL_SECTION *)handle);
@@ -409,6 +410,7 @@ void lock(OsLock &m) {
 void unlock(OsLock &m) {
 	LeaveCriticalSection((CRITICAL_SECTION *)m.handle);
 }
+#endif
 #endif
 
 
@@ -574,7 +576,7 @@ private:
 };
 
 #ifdef TL_IMPL
-
+#if OS_WINDOWS
 struct ConditionVariableImpl {
 	CONDITION_VARIABLE c = {};
 	CRITICAL_SECTION s = {};
@@ -601,6 +603,7 @@ void ConditionVariable::lock() {
 void ConditionVariable::unlock() {
 	LeaveCriticalSection(&impl().s);
 }
+#endif
 #endif
 
 template <class T, class Allocator = Allocator>
@@ -656,6 +659,16 @@ enum WaitForCompletionOption {
 //
 // Only one thread may push tasks.
 
+// :NestedOptionsStruct:
+// This could have been a nested struct of TaskQueueThreadPool, but gcc has a bug which does not allow that.
+// Because of that I have to pull out default_worker_proc as well.
+struct TaskQueueThreadPool;
+inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool);
+struct TaskQueueThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskQueueThreadPool *pool) = TaskQueueThreadPool_default_worker_proc;
+};
+
 struct TaskQueueThreadPool {
 	struct Task {
 		TaskQueueThreadPool *pool = 0;
@@ -664,12 +677,7 @@ struct TaskQueueThreadPool {
 		void (*free)(void *param) = 0;
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskQueueThreadPool *pool) = TaskQueueThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskQueueThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
@@ -725,35 +733,6 @@ struct TaskQueueThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskQueueThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-
-		while (1) {
-			Optional<TaskQueueThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					if (task = pool->tasks.pop()) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				pool->run(task.value_unchecked());
-				pool->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-	
 	inline void add_task(void (*fn)(void *param), void *param) {
 		atomic_increment(&started_task_count);
 
@@ -862,6 +841,38 @@ struct TaskQueueThreadPool {
 	}
 
 };
+
+inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool) {
+
+	sync(pool->start_sync_point);
+
+	while (1) {
+		Optional<TaskQueueThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				if (task = pool->tasks.pop()) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			pool->run(task.value_unchecked());
+			pool->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
+	
+#if !OS_LINUX
+// :NotImplemented: for linux because gcc is buggy and I don't want to deal with that right now
 
 // Runs the latest pushed tasks 
 struct TaskListsThreadPool {
@@ -1389,6 +1400,8 @@ private:
 		atomic_increment(&task.queue->finished_task_count);
 	}
 };
+
+#endif
 
 } // namespace tl
 #pragma warning(pop)
