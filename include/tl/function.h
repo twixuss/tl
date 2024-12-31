@@ -2,6 +2,7 @@
 #include "common.h"
 
 #include <type_traits>
+#include <functional>
 
 namespace tl {
 
@@ -43,7 +44,7 @@ FatFunctionPointer create_fat_function_pointer(Fn &&fn, Allocator allocator = Al
 	allocator = Allocator::current();
 
 	using Tuple = std::tuple<std::decay_t<Fn>>;
-	result.parameter = allocator.allocate_uninitialized<Tuple>();
+	result.parameter = allocator.template allocate_uninitialized<Tuple>();
 	new(result.parameter) Tuple(std::forward<Fn>(fn));
 
 	result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
@@ -70,7 +71,7 @@ struct Function {
 		allocator = Allocator::current();
 
 		using Tuple = std::tuple<std::decay_t<Fn>>;
-		state = allocator.allocate_uninitialized<Tuple>();
+		state = allocator.template allocate_uninitialized<Tuple>();
 		new(state) Tuple(std::forward<Fn>(fn));
 
 		function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
@@ -104,7 +105,7 @@ struct Function<ReturnType(Args...), Allocator> {
 		allocator = Allocator::current();
 
 		using Func = std::decay_t<Fn>;
-		state = allocator.allocate_uninitialized<Func>();
+		state = allocator.template allocate_uninitialized<Func>();
 		new(state) Func(std::forward<Fn>(fn));
 
 		function = Detail::get_invoke_separated<std::decay_t<Fn>, std::tuple<std::decay_t<Args>...>>(std::make_index_sequence<sizeof...(Args)>{});
@@ -112,7 +113,7 @@ struct Function<ReturnType(Args...), Allocator> {
 
 	void operator()(Args ...args) {
 		using Param = std::tuple<std::decay_t<Args>...>;
-		auto param = allocator.allocate_uninitialized<Param>();
+		auto param = allocator.template allocate_uninitialized<Param>();
 		new(param) Param(std::forward<Args>(args)...);
 		defer { allocator.free(param); };
 

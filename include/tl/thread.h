@@ -3,6 +3,8 @@
 #include "optional.h"
 #include "list.h"
 
+#include <emmintrin.h>
+
 #pragma warning(push)
 #pragma warning(disable: TL_DISABLED_WARNINGS)
 #pragma warning(disable: 4582)
@@ -15,9 +17,15 @@ namespace tl {
 
 TL_API void sleep_milliseconds(u32 milliseconds);
 TL_API void sleep_seconds(u32 seconds);
-#if OS_WINDOWS
-TL_API void switch_thread();
+
+template <class T>
+concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
+
 forceinline void yield_smt() { _mm_pause(); }
+
+#if OS_WINDOWS
+
+TL_API void switch_thread();
 
 forceinline s16 atomic_increment(s16 volatile *a) { return _InterlockedIncrement16((short *)a); }
 forceinline s32 atomic_increment(s32 volatile *a) { return _InterlockedIncrement((long *)a); }
@@ -47,9 +55,6 @@ forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return _InterlockedXor16((s
 forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return _InterlockedXor((long *)a, (long)b); }
 forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return _InterlockedXor64((long long *)a, (long long)b); }
 
-template <class T>
-concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
-
 template <AInterlockExchangeable T>
 forceinline T atomic_set(T volatile *dst, T src) {
 	s64 result;
@@ -71,6 +76,51 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 	else static_error_t(T, "atomic_compare_exchange is not available for this size");
 	return *(T *)&result;
 }
+
+#elif OS_LINUX
+
+forceinline void switch_thread() {}
+
+forceinline s8  atomic_increment(s8  volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s16 atomic_increment(s16 volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s32 atomic_increment(s32 volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s64 atomic_increment(s64 volatile *a) { return __sync_fetch_and_add(a, 1); }
+
+forceinline s8  atomic_decrement(s8  volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s16 atomic_decrement(s16 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+
+forceinline s8  atomic_add(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
+forceinline s16 atomic_add(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
+forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
+forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
+
+forceinline s8  atomic_sub(s8  volatile *a, s8  b) { return __sync_fetch_and_sub(a, b); }
+forceinline s16 atomic_sub(s16 volatile *a, s16 b) { return __sync_fetch_and_sub(a, b); }
+forceinline s32 atomic_sub(s32 volatile *a, s32 b) { return __sync_fetch_and_sub(a, b); }
+forceinline s64 atomic_sub(s64 volatile *a, s64 b) { return __sync_fetch_and_sub(a, b); }
+
+forceinline s8  atomic_and(s8  volatile *a, s8  b) { return __sync_fetch_and_and(a, b); }
+forceinline s16 atomic_and(s16 volatile *a, s16 b) { return __sync_fetch_and_and(a, b); }
+forceinline s32 atomic_and(s32 volatile *a, s32 b) { return __sync_fetch_and_and(a, b); }
+forceinline s64 atomic_and(s64 volatile *a, s64 b) { return __sync_fetch_and_and(a, b); }
+
+forceinline s8  atomic_or(s8  volatile *a, s8  b) { return __sync_fetch_and_or(a, b); }
+forceinline s16 atomic_or(s16 volatile *a, s16 b) { return __sync_fetch_and_or(a, b); }
+forceinline s32 atomic_or(s32 volatile *a, s32 b) { return __sync_fetch_and_or(a, b); }
+forceinline s64 atomic_or(s64 volatile *a, s64 b) { return __sync_fetch_and_or(a, b); }
+
+forceinline s8  atomic_xor(s8  volatile *a, s8  b) { return __sync_fetch_and_xor(a, b); }
+forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return __sync_fetch_and_xor(a, b); }
+forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return __sync_fetch_and_xor(a, b); }
+forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return __sync_fetch_and_xor(a, b); }
+
+template <class T>
+forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
+	return __sync_val_compare_and_swap(dst, comparand, new_value);
+}
+#endif
 
 template <AInterlockExchangeable T>
 forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
@@ -152,18 +202,6 @@ inline void join_and_free(Thread *thread) {
 	join(thread);
 	free(thread);
 }
-
-#else
-forceinline s8  atomic_add(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
-forceinline s16 atomic_add(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
-forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
-forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
-
-template <class T>
-forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
-	return __sync_val_compare_and_swap(dst, comparand, new_value);
-}
-#endif
 
 forceinline u16 atomic_increment(u16 volatile *a) { return (u16)atomic_increment((s16 *)a); }
 forceinline u32 atomic_increment(u32 volatile *a) { return (u32)atomic_increment((s32 *)a); }

@@ -176,45 +176,17 @@ inline constexpr umm string_unit_count(ascii const *str) { umm result = 0; while
 inline constexpr umm string_unit_count(utf8  const *str) { umm result = 0; while (*str++) ++result; return result; }
 inline constexpr umm string_unit_count(utf16 const *str) { umm result = 0; while (*str++) ++result; return result;}
 inline constexpr umm string_unit_count(utf32 const *str) { umm result = 0; while (*str++) ++result; return result;}
-inline constexpr umm string_unit_count(wchar const *str) { umm result = 0; while (*str++) ++result; return result;}
 
 inline constexpr umm string_byte_count(ascii const *str) { return string_unit_count(str) * sizeof(ascii); }
 inline constexpr umm string_byte_count(utf8  const *str) { return string_unit_count(str) * sizeof(utf8 ); }
 inline constexpr umm string_byte_count(utf16 const *str) { return string_unit_count(str) * sizeof(utf16);}
 inline constexpr umm string_byte_count(utf32 const *str) { return string_unit_count(str) * sizeof(utf32);}
-inline constexpr umm string_byte_count(wchar const *str) { return string_unit_count(str) * sizeof(wchar);}
 
-template <class T> inline constexpr bool is_integer = false;
-template <> inline constexpr bool is_integer<u8 > = true;
-template <> inline constexpr bool is_integer<u16> = true;
-template <> inline constexpr bool is_integer<u32> = true;
-template <> inline constexpr bool is_integer<u64> = true;
-template <> inline constexpr bool is_integer<s8 > = true;
-template <> inline constexpr bool is_integer<s16> = true;
-template <> inline constexpr bool is_integer<s32> = true;
-template <> inline constexpr bool is_integer<s64> = true;
-template <> inline constexpr bool is_integer<slong> = true;
-template <> inline constexpr bool is_integer<ulong> = true;
-
+template <class T> inline constexpr bool is_integer = std::is_integral_v<T>;
 template <class T> inline constexpr bool is_integer_like = is_integer<T>;
-
-template <class T> inline constexpr bool is_signed = false;
-template <> inline constexpr bool is_signed<s8   > = true;
-template <> inline constexpr bool is_signed<s16  > = true;
-template <> inline constexpr bool is_signed<s32  > = true;
-template <> inline constexpr bool is_signed<s64  > = true;
-template <> inline constexpr bool is_signed<slong> = true;
-
-template <class T> inline constexpr bool is_unsigned = false;
-template <> inline constexpr bool is_unsigned<u8   > = true;
-template <> inline constexpr bool is_unsigned<u16  > = true;
-template <> inline constexpr bool is_unsigned<u32  > = true;
-template <> inline constexpr bool is_unsigned<u64  > = true;
-template <> inline constexpr bool is_unsigned<ulong> = true;
-
-template <class T> inline constexpr bool is_float = false;
-template <> inline constexpr bool is_float<f32> = true;
-template <> inline constexpr bool is_float<f64> = true;
+template <class T> inline constexpr bool is_signed = std::is_signed_v<T>;
+template <class T> inline constexpr bool is_unsigned = std::is_unsigned_v<T>;
+template <class T> inline constexpr bool is_float = std::is_floating_point_v<T>;
 
 struct Empty {};
 constexpr bool operator==(Empty a, Empty b) { return true; }
@@ -321,12 +293,6 @@ template<> inline constexpr s32 max_value<s32> = 0x7FFFFFFF;
 template<> inline constexpr s64 min_value<s64> = 0x8000000000000000;
 template<> inline constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
 
-template<> inline constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
-template<> inline constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
-
-template<> inline constexpr slong min_value<slong> = (slong)min_value<slong_s>;
-template<> inline constexpr slong max_value<slong> = (slong)max_value<slong_s>;
-
 template<> inline constexpr f32 min_value<f32> = -3.402823466e+38f;
 template<> inline constexpr f32 max_value<f32> = +3.402823466e+38f;
 
@@ -431,7 +397,7 @@ forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry
 
 forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(carry_in, a, b, result); }
 #if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, (unsigned long long *)result); }
 #endif
 
 forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
@@ -466,8 +432,8 @@ forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; 
 forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
 forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
 #elif COMPILER_MSVC
-forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (ulong)val) ? (u32)result : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (ulong)val) ? (u32)result : ~0; }
+forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0; }
 forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
 forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
 #if ARCH_X64
@@ -660,11 +626,11 @@ forceinline constexpr u32 count_leading_zeros(u16 v) { return std::is_constant_e
 forceinline constexpr u32 count_leading_zeros(u32 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(v); }
 forceinline constexpr u32 count_leading_zeros(u64 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(v); }
 #else
-forceinline constexpr u32 count_leading_zeros(u8  v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
-forceinline constexpr u32 count_leading_zeros(u16 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
-forceinline constexpr u32 count_leading_zeros(u32 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 32 : (_BitScanReverse(&r, v), 31 - r))); }
+forceinline constexpr u32 count_leading_zeros(u8  v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
+forceinline constexpr u32 count_leading_zeros(u16 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 32 : (_BitScanReverse(&r, v), 31 - r))); }
 #if ARCH_X64
-forceinline constexpr u32 count_leading_zeros(u64 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
 #endif
 #endif
 #elif COMPILER_GCC
@@ -690,11 +656,11 @@ forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zer
 #endif
 
 
-forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
-forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
-forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (31 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u8  v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u16 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u32 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (31 - count_leading_zeros(v))); }
 #if ARCH_X64
-forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (63 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u64 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (63 - count_leading_zeros(v))); }
 #endif
 
 forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
@@ -1891,14 +1857,12 @@ forceinline constexpr auto enumerate(Enumerable &&enumerable) {
 	return IndexedEnumerable{enumerable};
 }
 
-forceinline constexpr Span<char > operator""s(char  const *string, umm count) { return Span((char  *)string, count); }
+forceinline constexpr Span<ascii> operator""s(ascii const *string, umm count) { return Span((ascii *)string, count); }
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm count) { return Span((utf8  *)string, count); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm count) { return Span((utf16 *)string, count); }
-forceinline constexpr Span<wchar> operator""s(wchar const *string, umm count) { return Span((wchar *)string, count); }
-forceinline constexpr Span<char > operator""ts(char  const *string, umm count) { return Span((char  *)string, count + 1); }
+forceinline constexpr Span<ascii> operator""ts(ascii const *string, umm count) { return Span((ascii *)string, count + 1); }
 forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm count) { return Span((utf8  *)string, count + 1); }
 forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) { return Span((utf16 *)string, count + 1); }
-forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm count) { return Span((wchar *)string, count + 1); }
 forceinline constexpr Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
 forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }
@@ -1909,8 +1873,7 @@ inline constexpr Span<T> array_as_span(T const (&arr)[count]) { return Span((T *
 template <class T>
 inline constexpr Span<T> as_span(std::initializer_list<T> list) { return Span((T *)list.begin(), list.size()); }
 
-inline constexpr Span<char > as_span(char  const *str) { return Span((char  *)str, string_unit_count(str)); }
-inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)str, string_unit_count(str)); }
+inline constexpr Span<ascii> as_span(ascii const *str) { return Span((ascii *)str, string_unit_count(str)); }
 inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)str, string_unit_count(str)); }
 inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
 inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
@@ -1929,7 +1892,7 @@ inline constexpr Span<T, Size> as_span_of(Span<u8, Size> span) {
 }
 
 template <class Size>
-constexpr Span<utf8, Size> as_utf8(Span<char, Size> span) {
+constexpr Span<utf8, Size> as_utf8(Span<ascii, Size> span) {
 	return {(utf8 *)span.begin(), span.count};
 }
 template <class Size>
@@ -1949,11 +1912,11 @@ constexpr Span<u8, Size> as_bytes(Span<T, Size> span) {
 }
 
 template <class T, class Size>
-constexpr Span<char, Size> as_chars(Span<T, Size> span) {
-	return {(char *)span.begin(), span.count * sizeof(T)};
+constexpr Span<ascii, Size> as_chars(Span<T, Size> span) {
+	return {(ascii *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
-constexpr Span<char> as_chars(T span_like) {
+constexpr Span<ascii> as_chars(T span_like) {
 	return as_chars(as_span(span_like));
 }
 
@@ -2404,16 +2367,14 @@ inline constexpr bool is_any_of(T &value, Span<T> span) {
 	return is_any_of(value, span, [](T &a, T &b) { return a == b; });
 }
 
-inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip) {
+template <class T>
+inline constexpr Span<T> skip_front(Span<T> span, Span<T> to_skip) {
 	if (span.count == 0) {
 		return span;
 	}
-	while (is_any_of(span.front(), chars_to_skip)) {
+	while (span.count && is_any_of(span.front(), to_skip)) {
 		++span.data;
 		--span.count;
-		if (span.count == 0) {
-			break;
-		}
 	}
 	return span;
 }
@@ -3139,19 +3100,7 @@ Allocator make_allocator_from(CustomAllocator *allocator) {
 	};
 }
 
-#if OS_WINDOWS
-#if COMPILER_MSVC
-#define tl_allocate(size, align)         ::_aligned_malloc(size, align)
-#define tl_reallocate(data, size, align) ::_aligned_realloc(data, size, align)
-#define tl_free(data)                    ::_aligned_free(data)
-#elif COMPILER_GCC
-#define tl_allocate(size, align)         ::__mingw_aligned_malloc(size, align)
-#define tl_reallocate(data, size, align) ::__mingw_aligned_realloc(data, size, align)
-#define tl_free(data)                    ::__mingw_aligned_free(data)
-#endif
-#endif
-
-struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
+struct TL_API DefaultAllocator : AllocatorBase<DefaultAllocator> {
 
 	static DefaultAllocator current() { return {}; }
 
@@ -3159,26 +3108,9 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 		return true;
 	}
 
-	AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
-		return {
-			.data = tl_allocate(size, alignment),
-			.count = size,
-			.is_zeroed = false,
-		};
-	}
-	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP) {
-		(void)old_size;
-		return {
-			.data = tl_reallocate(data, new_size, alignment),
-			.count = new_size,
-			.is_zeroed = false,
-		};
-	}
-	void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-		(void)size;
-		(void)alignment;
-		tl_free(data);
-	}
+	AllocationResult allocate_impl(umm size, umm alignment TL_LP);
+	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP);
+	void deallocate_impl(void *data, umm size, umm alignment TL_LP);
 };
 
 struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
@@ -3600,8 +3532,91 @@ void quick_sort(T (&array)[size], auto ...args) {
 	quick_sort<pivot_mode>(array_as_span(array), args...);
 }
 
+}
+
 #ifdef TL_IMPL
 
+namespace tl {
+
+#if OS_WINDOWS
+	#if COMPILER_MSVC
+		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+			return {
+				.data = ::_aligned_malloc(size, alignment),
+				.count = size,
+				.is_zeroed = false,
+			};
+		}
+		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			return {
+				.data = ::_aligned_realloc(data, new_size, alignment),
+				.count = new_size,
+				.is_zeroed = false,
+			};
+		}
+		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			::_aligned_free(data);
+		}
+	#elif COMPILER_GCC
+		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+			return {
+				.data = ::__mingw_aligned_malloc(size, alignment),
+				.count = size,
+				.is_zeroed = false,
+			};
+		}
+		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			(void)old_size;
+			return {
+				.data = ::__mingw_aligned_realloc(data, new_size, alignment),
+				.count = new_size,
+				.is_zeroed = false,
+			};
+		}
+		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			(void)size;
+			(void)alignment;
+			::__mingw_aligned_free(data);
+		}
+
+	#endif
+#elif OS_LINUX
+	AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+		// I could not find existing aligned realloc, so I have to implement it myself.
+		// realloc needs to know old size so it can memcpy the data. Store it before the data.
+		umm extra_storage = max(sizeof(size), alignment);
+		void *result; 
+		::posix_memalign(&result, alignment, size + extra_storage);
+		result = ((u8 *)result) + extra_storage;
+		((umm *)result)[-1] = size;
+		return {
+			.data = result,
+			.count = size,
+			.is_zeroed = false,
+		};
+	}
+	AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+		if (old_size == 0) {
+			old_size = ((umm *)data)[-1];
+		}
+		void *result; 
+		::posix_memalign(&result, alignment, new_size);
+		memcpy(result, data, old_size);
+		free(data);
+		return {
+			.data = result,
+			.count = new_size,
+			.is_zeroed = false,
+		};
+	}
+	void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+		(void)size;
+		(void)alignment;
+		::free(data);
+	}
+#endif
+
+#if OS_WINDOWS
 AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
 	(void)state;
 #if TL_PARENT_SOURCE_LOCATION
@@ -3654,6 +3669,13 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 	}
 	return {};
 }
+#elif OS_LINUX
+
+AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+	not_implemented();
+	return {};
+}
+#endif
 
 Allocator os_allocator = make_allocator_from<DefaultAllocator>(0);
 Allocator page_allocator = {
@@ -3677,9 +3699,9 @@ void init_allocator(Allocator temporary_allocator_backup) {
 void deinit_allocator() {
 }
 
-#endif
-
 } // namespace tl
+
+#endif
 
 #if COMPILER_MSVC
 #pragma warning(pop)

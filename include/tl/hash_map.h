@@ -316,7 +316,7 @@ struct BucketHashMap : Traits {
 
 		auto old_buckets = buckets;
 
-		buckets.data = allocator.allocate<Bucket>(new_buckets_count TL_LA);
+		buckets.data = allocator.template allocate<Bucket>(new_buckets_count TL_LA);
 		buckets.count = new_buckets_count;
 
 		for (auto old_bucket : old_buckets) {
@@ -644,7 +644,7 @@ struct ContiguousHashMap : Traits {
 		}
 		assert(is_power_of_2(new_cells.count));
 
-		new_cells.data = allocator.allocate_uninitialized<Cell>(new_cells.count TL_LA);
+		new_cells.data = allocator.template allocate_uninitialized<Cell>(new_cells.count TL_LA);
 		for (auto &new_cell : new_cells) {
 			new_cell.state = CellState::empty;
 		}

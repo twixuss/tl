@@ -47,7 +47,7 @@ template <class T, class Size>
 List<T, Allocator, Size> null_terminate(Span<T, Size> span) {
 	List<T, Allocator, Size> result;
 	result.count = span.count + 1;
-	result.data = result.allocator.allocate<T>(result.count);
+	result.data = result.allocator.template allocate<T>(result.count);
 	result.capacity = result.count;
 	memcpy(result.data, span.data, span.count * sizeof(T));
 	result.data[result.count - 1] = {};
@@ -179,7 +179,7 @@ extern thread_local IntFormat default_int_format_format;
 extern thread_local u32 default_int_format_radix;
 extern thread_local u32 default_int_format_leading_zero_count;
 extern thread_local u32 default_int_format_skip_digits;
-extern thread_local char const *default_int_format_char_set;
+extern thread_local ascii const *default_int_format_char_set;
 
 template <class Int>
 struct FormatInt {
@@ -188,7 +188,7 @@ struct FormatInt {
 	u32 radix = default_int_format_radix;
 	u32 leading_zero_count = default_int_format_leading_zero_count;
 	u32 skip_digits = default_int_format_skip_digits;
-	char const *char_set = default_int_format_char_set;
+	ascii const *char_set = default_int_format_char_set;
 };
 
 enum FloatFormat {
@@ -229,11 +229,10 @@ enum class Encoding {
 };
 
 template <class Char> inline constexpr Encoding encoding_from_type = Encoding::unknown;
-template <> inline constexpr Encoding encoding_from_type<char > = Encoding::ascii;
+template <> inline constexpr Encoding encoding_from_type<ascii> = Encoding::ascii;
 template <> inline constexpr Encoding encoding_from_type<utf8 > = Encoding::utf8;
 template <> inline constexpr Encoding encoding_from_type<utf16> = Encoding::utf16;
 template <> inline constexpr Encoding encoding_from_type<utf32> = Encoding::utf32;
-template <> inline constexpr Encoding encoding_from_type<wchar> = (sizeof(wchar) == sizeof(utf16)) ? Encoding::utf16 : Encoding::utf32;
 
 inline u32 char_byte_count(utf8 const *ch) {
 	auto byte_count = count_leading_ones((u8)*ch);
@@ -399,7 +398,7 @@ List<utf8, Allocator> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP) {
 		return {};
 
 	result.reserve(bytes_required + terminate TL_LA);
-	result.count = bytes_required + terminate;
+	result.count = bytes_required;
 
 	_to_utf8(utf16, result);
 
@@ -421,7 +420,7 @@ List<utf16, Allocator> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP) {
 		return {};
 
 	result.reserve(chars_required + terminate TL_LA);
-	result.count = chars_required + terminate;
+	result.count = chars_required;
 
 	_to_utf16(utf8, result);
 
@@ -657,7 +656,6 @@ inline umm append(StringBuilder &b, utf32 ch) { return append_bytes(b, ch); }
 
 template <class Size> inline umm append(StringBuilder &b, Span<u8   , Size> string) { return append_bytes(b, string); }
 template <class Size> inline umm append(StringBuilder &b, Span<ascii, Size> string) { return append_bytes(b, string); }
-template <class Size> inline umm append(StringBuilder &b, Span<wchar, Size> string) { return append_bytes(b, string); }
 template <class Size> inline umm append(StringBuilder &b, Span<utf8 , Size> string) { return append_bytes(b, string); }
 template <class Size> inline umm append(StringBuilder &b, Span<utf16, Size> string) { return append_bytes(b, string); }
 template <class Size> inline umm append(StringBuilder &b, Span<utf32, Size> string) { return append_bytes(b, string); }
@@ -667,7 +665,6 @@ forceinline umm append(StringBuilder &b, ascii const *string) { return append(b,
 forceinline umm append(StringBuilder &b, utf8  const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf16 const *string) { return append(b, as_span(string)); }
 forceinline umm append(StringBuilder &b, utf32 const *string) { return append(b, as_span(string)); }
-forceinline umm append(StringBuilder &b, wchar const *string) { return append(b, as_span(string)); }
 
 template <class T>
 umm append(StringBuilder &builder, Optional<T> v) {
@@ -790,7 +787,6 @@ forceinline umm append(StringBuilder &b, LinearSet<T, Size> set) { return append
 
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<u8   , Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<ascii, Allocator, Size> list) { return append(b, as_span(list)); }
-template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<wchar, Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<utf8 , Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<utf16, Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<utf32, Allocator, Size> list) { return append(b, as_span(list)); }
@@ -804,7 +800,10 @@ inline umm append(StringBuilder &b, StringBuilder const &that) {
 }
 
 template <class T>
-concept AChar = OneOf<T, ascii, utf8, utf16, utf32, wchar>;
+concept AChar = OneOf<T, ascii, utf8, utf16, utf32>;
+
+template <class T>
+concept ACharSpan = OneOf<T, Span<ascii>, Span<utf8>, Span<utf16>, Span<utf32>>;
 
 template <AChar Char>
 inline umm append_format(StringBuilder &b, Span<Char> format_string) {
@@ -924,16 +923,24 @@ umm append(StringBuilder &builder, Format<T, Char> format) {
 		return append(builder, format.value);
 	}
 }
+
+// :appendFormatFloat: 
+// gcc requires this specifically in this project. I did a simplified version of this in Compiler Explorer and
+// it compiled successfully WITHOUT forward declaration, so I don't know what's up with that.
+// https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGEgMykrgAyeAyYAHI%2BAEaYxCBmgQAOqAqETgwe3r4BpClpjgKh4VEssfGJtpj2hQxCBEzEBFk%2BflyBdpgOGfWNBMWRMXEJHQ1NLTnttmP9YYNlw4kAlLaoXsTI7BwEmCxJBjsA1Cb%2BbsgGCgqHACon2CYaAIIKBMReDocAYqioxwDsVieh2BN0OBBOgMeJj%2BABEIQ8oU8dnsDphjqdzkxLjc7giXm8PhZGv9ISDQeD/JDoXDKQiEQA3VB4dCHJhJJKuCDRH60JYk6l0pG7fZMI4nM4XK63fz3J6M5mHADuxEImAA%2Bli1fiwsAIN9UOLpdhDlQ%2BdDSSC2RyGOgIETiOaqAA6cGwpbwp4Cz1ClGitHizHYo0Mpksq2c%2B2Gu6HaJmgEIsl02GCx5hAiHFhMMIQOMW4HK1UahRa146vU/c1canu2me2EcFa0TgAVl4fg4WlIqE4bms1kOCjWG39iR4pAImgbKwA1iB/H8nf5583JH8AByJMwATj%2BXC4zf0nEkvBYEg0GlI7c73Y4vAUIAvE47DdIcFgMEQKFQezocXIlDQH96HiYApDMPg6B2Yh7y5SdSGiMJGgAT04McEOYYgkIAeWibQuifMdALYQQsIYWgUOfUgsGiLxgDcMRaHvbheCwTMjHESj8GIfC8HpTAmM7TBVC6LwdlQ3g02qODaDwaJiGQjwsDg0tT2Y0g%2BOIbklBhXZDGAGSjEnFYqAMYAFAANTwTBFSw61xJkQQRDEdgpAc%2BQlDUODdC4fQ9JQPtLH0WT70gFZUCSWomIAWhedAThhUxLGsRJeFQDSVSwEKcyqGoMhcG0JjaIIbQGUpyj0fJ0gEQqKtSKqGFKoZ4h8zpugEXpxk8Vo9Fa2oOtmEomp6mYapamZGoWZqVkHdZNgkRsWzbOCb0OVQ1wANii9bJEOYBkGQQ4pCdMxDggXBCBIY5RyWXgny0JYZwSA8mw4Y9SFPZsLyvVLODvB9xyM18PwgJA1gIJJRP/CBAKSX9iAiVgtjWzbtt2/bDskY7eEwfAiAyvR%2BEc0RxFcwn3JUdRKO80hlTZcSFo4VtL2WzgsNEiH01QKhVo2radr2g6jpOiAPCAuIrv8LgboB58HtIBBMCYLB4myl63o%2Br6WdvWx/ruqdSFnMw10XSRJDXDQzb%2BMxmytrhKhe/wlsom9bsBt8oGBpAYbhqHveAkB6WQdk1XpLgtzVSQNDVcyhC4P41S4KPVG2iDaCgmDojg9DkPs7PMJwvCHHsojGAIUjyLg6jaPo2hGPs1i9I4zsuJ4viBOx4TkFErYx0kl7OxkuSFIwLZOxU%2ByNK0zAdLY/SdUBkymDMyzrNsxh7LJpySekMnFApryEl8wzEqsQLB6ysKIoyJiAHpYv8pLLFRF5UvS5l%2BPgabqh45wIFcUbiroAmuVHylVagALARkYBwwWrfzanUEaXVJg5R/ggvo0DmrTD6AAl46C5hlRgdNIcc0paHkZk7a8nBVqoxYAoQOhxQ5bidJHQ4Mc45OkTqdc6eMJZS1drLFYCslbDGyobdaToLZmFNs2fwGgbaSC3M9I8J4QCfWZs7X6OtHxu09iAMGHNfbflhsBBGbBODJx2rQ%2BhjDmEaFYbHBcidsa4xIMyAmsgt4uR3rIPenkqaH1pkkemZCmbfS7KzdmolDhc2oZYuhB0bEsLYY4uxIsjFwwlmYaWes5ZCOVpQBm6tVGaw0dre82iBEGznJjSWfxtp/FkZIdoGg6lkMduoyh2sckMzMBQn6XSjIrA0mkZwkggA%3D%3D
+template <class Float>
+inline umm append(StringBuilder &builder, FormatFloat<Float> format);
+
 template <class Int, umm capacity>
 umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	Int v = f.value;
 	auto radix = convert<Int>(f.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
-	char buf[maxDigits];
+	ascii buf[maxDigits];
 	auto charMap = f.char_set;
-	char *lsc = buf + maxDigits - 1;
+	ascii *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
-	Span<char> suffix = {};
+	Span<ascii> suffix = {};
 
 	switch (f.format) {
 		case IntFormat_full:
@@ -941,7 +948,9 @@ umm write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 		case IntFormat_kmb: {
 			if (v >= 1000) {
 				f64 f = (f64)v;
+				scoped(temporary_allocator_and_checkpoint);
 				StringBuilder builder;
+				// :appendFormatFloat:
 				append(builder, FormatFloat{.value = f, .precision = 3, .format = FloatFormat_kmb});
 				buffer.add((Span<ascii>)builder.first.span());
 				return builder.first.span().count;
@@ -1048,7 +1057,7 @@ inline umm append_float(StringBuilder &builder, FormatFloat<Float> format) {
 					auto it = buffer.end() - 1;
 					while (1) {
 						*it += 1;
-						if (*it == (char)('9' + 1)) {
+						if (*it == (ascii)('9' + 1)) {
 							buffer.pop_back();
 							--it;
 							if (*it == '.') {
@@ -1326,7 +1335,7 @@ inline FormattedBytes format_bytes(auto byte_count, FormatBytesParams params = {
 }
 
 inline umm append(StringBuilder &builder, FormattedBytes bytes) {
-	static constexpr Span<char> unit_strings[2][7] = {
+	static constexpr Span<ascii> unit_strings[2][7] = {
 		{
 			"B"s,
 			"KB"s,
@@ -1354,25 +1363,42 @@ thread_local IntFormat default_int_format_format = IntFormat_full;
 thread_local u32 default_int_format_radix = 10;
 thread_local u32 default_int_format_leading_zero_count = 0;
 thread_local u32 default_int_format_skip_digits = 0;
-thread_local char const *default_int_format_char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+thread_local ascii const *default_int_format_char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 thread_local u32 default_float_format_precision = 3;
 thread_local FloatFormat default_float_format_format = FloatFormat_default;
 thread_local bool default_float_format_trailing_zeros = false;
 
+#if OS_WINDOWS
 umm _utf8_size(Span<utf16> src) {
-	return (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar *)src.data, (int)src.count, 0, 0, 0, 0);
+	return (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar_t *)src.data, (int)src.count, 0, 0, 0, 0);
 }
 void _to_utf8(Span<utf16> src, Span<utf8> dst) {
-	WideCharToMultiByte(CP_UTF8, 0, (wchar *)src.data, (int)src.count, (char *)dst.data, (int)dst.count, 0, 0);
+	WideCharToMultiByte(CP_UTF8, 0, (wchar_t *)src.data, (int)src.count, (char *)dst.data, (int)dst.count, 0, 0);
 }
 
 umm _utf16_size(Span<utf8> src) {
 	return (umm)MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, 0, 0);
 }
 void _to_utf16(Span<utf8> src, Span<utf16> dst) {
-	MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, (wchar *)dst.data, (int)dst.count);
+	MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, (wchar_t *)dst.data, (int)dst.count);
 }
+
+#elif OS_LINUX
+umm _utf8_size(Span<utf16> src) {
+	not_implemented();
+}
+void _to_utf8(Span<utf16> src, Span<utf8> dst) {
+	not_implemented();
+}
+
+umm _utf16_size(Span<utf8> src) {
+	not_implemented();
+}
+void _to_utf16(Span<utf8> src, Span<utf16> dst) {
+	not_implemented();
+}
+#endif
 
 #endif
 

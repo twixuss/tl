@@ -36,12 +36,12 @@ void file_test() {
 		}
 	}
 
-	File file = open_file(tl_file_string("../test/test.txt"), {.write=true});
+	File file = open_file(u8"../test/test.txt"s, {.write=true});
 	assert(is_valid(file));
 	write(file, value_as_bytes((u32)1337));
 	close(file);
 
-	file = open_file(tl_file_string("../test/test.txt"), {.read=true});
+	file = open_file(u8"../test/test.txt"s, {.read=true});
 	assert(is_valid(file));
 	assert(remaining_bytes(file) == 4);
 	u32 value;

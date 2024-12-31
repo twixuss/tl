@@ -18,12 +18,12 @@ namespace tl {
 //
 
 template <class Allocator = Allocator>
-inline wchar *to_wstr(Span<utf8> str) {
-	return (wchar *)to_utf16<Allocator>(str, true).data;
+inline wchar_t *to_wstr(Span<utf8> str) {
+	return (wchar_t *)to_utf16<Allocator>(str, true).data;
 }
 
-inline wchar *tmp_to_wstr(Span<utf8> str) {
-	return (wchar *)to_utf16<TemporaryAllocator>(str, true).data;
+inline wchar_t *tmp_to_wstr(Span<utf8> str) {
+	return (wchar_t *)to_utf16<TemporaryAllocator>(str, true).data;
 }
 
 

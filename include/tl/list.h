@@ -35,9 +35,9 @@ struct List : Span<T, Size_> {
 	void reallocate(Size desired_capacity TL_LP) {
 		T *new_data;
 		if (data) {
-			new_data = allocator.reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
+			new_data = allocator.template reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
 		} else {
-			new_data = allocator.allocate_uninitialized<T>(desired_capacity TL_LA);
+			new_data = allocator.template allocate_uninitialized<T>(desired_capacity TL_LA);
 		}
 		data = new_data;
 		capacity = desired_capacity;
@@ -311,7 +311,7 @@ List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
 	List<T, Allocator, Size> result;
 	result.count = that.count;
 	result.capacity = result.count;
-	result.data = result.allocator.allocate<T>(result.count TL_LA);
+	result.data = result.allocator.template allocate<T>(result.count TL_LA);
 	memcpy(result.data, that.data, result.count * sizeof(T));
 	return result;
 }
@@ -319,7 +319,7 @@ List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
 template <class Allocator = Allocator, class T>
 List<T, Allocator> to_list(std::initializer_list<T> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator> result;
-	result.data = allocator.allocate<T>(that.size() TL_LA);
+	result.data = allocator.template allocate<T>(that.size() TL_LA);
 	result.count = that.size();
 	result.capacity = that.size();
 	result.allocator = allocator;
@@ -330,7 +330,7 @@ List<T, Allocator> to_list(std::initializer_list<T> that, Allocator allocator = 
 template <class Allocator = Allocator, class Size, class T>
 List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator, Size> result;
-	result.data = allocator.allocate<T>(that.count TL_LA);
+	result.data = allocator.template allocate<T>(that.count TL_LA);
 	result.count = that.count;
 	result.capacity = result.count;
 	result.allocator = allocator;
@@ -642,7 +642,7 @@ private:
 	void reallocate(umm new_capacity TL_LP) {
 		assert(is_power_of_2(new_capacity));
 
-		T *new_data = allocator.allocate<T>(new_capacity TL_LA);
+		T *new_data = allocator.template allocate<T>(new_capacity TL_LA);
 
 		for (umm i = 0; i < count; ++i) {
 			auto &source = get(start + i);
@@ -1051,9 +1051,9 @@ struct LinearSet : Span<T, Size_> {
 	void reallocate(umm desired_capacity TL_LP) {
 		T *new_data;
 		if (data) {
-			new_data = allocator.reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
+			new_data = allocator.template reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
 		} else {
-			new_data = allocator.allocate_uninitialized<T>(desired_capacity TL_LA);
+			new_data = allocator.template allocate_uninitialized<T>(desired_capacity TL_LA);
 		}
 		data = new_data;
 		capacity = desired_capacity;
@@ -1194,7 +1194,7 @@ LinearSet<T, Size> copy(LinearSet<T, Size> that TL_LP) {
 	LinearSet<T, Size> result;
 	result.count = that.count;
 	result.capacity = result.count;
-	result.data = result.allocator.allocate<T>(result.count TL_LA);
+	result.data = result.allocator.template allocate<T>(result.count TL_LA);
 	memcpy(result.data, that.data, result.count * sizeof(T));
 	return result;
 }

@@ -167,11 +167,11 @@ using u64 = unsigned __int64;
 using s8  = signed char;
 using s16 = signed short;
 using s32 = signed int;
-using s64 = signed long long;
+using s64 = signed long;
 using u8  = unsigned char;
 using u16 = unsigned short;
 using u32 = unsigned int;
-using u64 = unsigned long long;
+using u64 = unsigned long;
 #endif
 
 using f32 = float;
@@ -182,17 +182,12 @@ using b16 = s16;
 using b32 = s32;
 using b64 = s64;
 
-#if COMPILER_GCC
-using umm = __SIZE_TYPE__;
-using smm = __SIZE_TYPE__;
-#else
 #if ARCH_X64
 using umm = u64;
 using smm = s64;
 #else
 using umm = u32;
 using smm = s32;
-#endif
 #endif
 
 static_assert(sizeof(s8)  == 1);
@@ -214,20 +209,6 @@ using ascii = char;
 using utf8  = char8_t;
 using utf16 = char16_t;
 using utf32 = char32_t;
-
-
-using slong = signed long;
-using ulong = unsigned long;
-using wchar = wchar_t;
-
-using slong_s = Conditional<sizeof(slong) == 4, s32, s64>;
-using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
-using wchar_s = Conditional<sizeof(wchar) == 2, utf16, utf32>;
-
-
-#if OS_WINDOWS
-static_assert(sizeof(utf16) == sizeof(wchar));
-#endif
 
 }
 

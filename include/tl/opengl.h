@@ -24,6 +24,9 @@
 using GLchar = char;
 using GLsizeiptr = tl::umm;
 using GLintptr = tl::smm;
+#if OS_LINUX
+#error not implemented
+#endif
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
 
 #define GL_CONSTANT_COLOR                        0x8001

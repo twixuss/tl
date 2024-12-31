@@ -3,7 +3,10 @@
 #include <tl/time.h>
 #include <tl/random.h>
 #define NOMINMAX
+
+#if OS_WINDOWS
 #include <WINDOWs.h>
+#endif
 
 using namespace tl;
 
@@ -12,6 +15,7 @@ bool junk = true;
 // get_char_and_advance_utf8:   3658.184 ms  3655.398 ms  3617.65 ms
 // get_char_and_advance_utf8_2: 1993.767 ms  1990.212 ms  1996.991 ms
 
+#if OS_WINDOWS
 __declspec(noinline) void utf8_test() {
     umm size = 1024*1024*64;
     auto src = (utf8 *)VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
@@ -79,3 +83,6 @@ __declspec(noinline) void utf8_test() {
         print("{} ms\n", avg/10*1000);
     }
 }
+#else
+void utf8_test() {}
+#endif

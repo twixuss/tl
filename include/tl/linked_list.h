@@ -88,12 +88,12 @@ struct LinkedList {
 	}
 
 	T &add(T value TL_LP) {
-		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
+		auto &result = add_steal(allocator.template allocate<Node>(TL_LAC));
 		memcpy(&result, &value, sizeof(value));
 		return result;
 	}
 	T &add(TL_LPC) {
-		auto &result = add_steal(allocator.allocate<Node>(TL_LAC));
+		auto &result = add_steal(allocator.template allocate<Node>(TL_LAC));
 		new (&result) T();
 		return result;
 	}

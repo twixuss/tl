@@ -468,7 +468,7 @@ Window *create_window(CreateWindowInfo info) {
 
 	currently_creating_window = window;
 	CreateWindowExW(
-		extended_window_style, class_name, TL_TMP((wchar *)to_utf16(info.title, true).data),
+		extended_window_style, class_name, tmp_to_wstr(info.title),
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, window_size.x, window_size.y, info.parent ? (HWND)info.parent->handle : 0, 0, GetModuleHandleW(0), 0
 	);
 	if (!window->handle) {
@@ -579,7 +579,7 @@ bool update(Window *window) {
 }
 
 void set_title(Window *window, Span<utf8> title) {
-	SetWindowTextW((HWND)window->handle, (wchar *)TL_TMP(to_utf16(title, true)).data);
+	SetWindowTextW((HWND)window->handle, tmp_to_wstr(title));
 }
 
 void show(Window *window) {

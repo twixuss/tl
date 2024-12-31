@@ -2185,46 +2185,31 @@ union m4 {
 	}
 	forceinline m4& operator*=(m4 b) { return *this = *this * b; }
 	static forceinline m4 scale(f32 x, f32 y, f32 z) {
-		return {
+		return {.s = {
 			x, 0, 0, 0,
 			0, y, 0, 0,
 			0, 0, z, 0,
-			0, 0, 0, 1
-		};
+			0, 0, 0, 1,
+		}};
 	}
 	static forceinline m4 identity() {
-		m4 m;
-		m.s[0] = 1;
-		m.s[1] = 0;
-		m.s[2] = 0;
-		m.s[3] = 0;
-
-		m.s[4] = 0;
-		m.s[5] = 1;
-		m.s[6] = 0;
-		m.s[7] = 0;
-
-		m.s[8] = 0;
-		m.s[9] = 0;
-		m.s[10] = 1;
-		m.s[11] = 0;
-
-		m.s[12] = 0;
-		m.s[13] = 0;
-		m.s[14] = 0;
-		m.s[15] = 1;
-		return m;
+		return {.s = {
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			0, 0, 0, 1,
+		}};
 	}
 	static forceinline m4 scale(v3f v) { return scale(v.x, v.y, v.z); }
 	static forceinline m4 scale(v2f xy, f32 z) { return scale(xy.x, xy.y, z); }
 	static forceinline m4 scale(f32 v) { return scale(v, v, v); }
 	static forceinline m4 translation(f32 x, f32 y, f32 z) {
-		return {
+		return {.s = {
 			1, 0, 0, 0,
 			0, 1, 0, 0,
 			0, 0, 1, 0,
 			x, y, z, 1,
-		};
+		}};
 	}
 	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
 	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
@@ -2233,12 +2218,12 @@ union m4 {
 		f32 h	   = 1.0f / tanf(fov * 0.5f);
 		f32 w	   = h / aspect;
 		f32 fzdfmn = fz / (fz - nz);
-		return {
+		return {.s = {
 			w, 0, 0, 0,
 			0, h, 0, 0,
 			0, 0, fzdfmn, 1,
-			0, 0, -fzdfmn * nz, 0
-		};
+			0, 0, -fzdfmn * nz, 0,
+		}};
 	}
 	static forceinline m4 perspective_right_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 xymax = nz * tan(fov * 0.5f);
@@ -2248,95 +2233,95 @@ union m4 {
 		f32 h = nz / xymax;
 		f32 w = h / aspect;
 
-		return {
+		return {.s = {
 			w, 0, 0, 0,
 			0, h, 0, 0,
 			0, 0, q, -1,
 			0, 0, qn, 0,
-		};
+		}};
 	}
 	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
 		f32 h = 1.0f / (height * 0.5f);
 		f32 rz = fz - nz;
-		return {
+		return {.s = {
 			h / aspect, 0, 0, 0,
 			0, h, 0, 0,
 			0, 0, 1.0f / rz, 0,
 			0, 0, -nz / rz, 1,
-		};
+		}};
 	}
 	static forceinline m4 rotation_r_x(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
-		return {
+		return {.s = {
 			1, 0, 0, 0,
 			0, c, s, 0,
 			0,-s, c, 0,
-			0, 0, 0, 1
-		};
+			0, 0, 0, 1,
+		}};
 	}
 	static forceinline m4 rotation_r_y(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
-		return {
+		return {.s = {
 			c, 0,-s, 0,
 			0, 1, 0, 0,
 			s, 0, c, 0,
-			0, 0, 0, 1
-		};
+			0, 0, 0, 1,
+		}};
 	}
 	static forceinline m4 rotation_r_z(f32 a) {
 		f32 s, c;
 		cos_sin(a, c, s);
-		return {
+		return {.s = {
 			 c, s, 0, 0,
 			-s, c, 0, 0,
 			 0, 0, 1, 0,
-			 0, 0, 0, 1
-		};
+			 0, 0, 0, 1,
+		}};
 	}
 	static forceinline m4 rotation_r_zxy(v3f a) {
 		v3f s;
 		v3f c;
 		cos_sin(a, c, s);
-		return {
+		return {.s = {
 			 c.z*c.y + s.z*s.x*s.y, s.z*c.x,  c.z*-s.y + s.z*s.x*c.y, 0,
 			-s.z*c.y + c.z*s.x*s.y, c.z*c.x, -s.z*-s.y + c.z*s.x*c.y, 0,
 			               c.x*s.y,    -s.x,                 c.x*c.y, 0,
 			                     0,       0,                       0, 1,
-		};
+		}};
 	}
 	static forceinline m4 rotation_r_zxy(f32 x, f32 y, f32 z) { return rotation_r_zxy({x, y, z}); }
 	static forceinline m4 rotation_r_yxz(v3f a) {
 		v3f s;
 		v3f c;
 		cos_sin(a, c, s);
-		return {
+		return {.s = {
 			c.y*c.z + -s.y*-s.x*-s.z, c.y*s.z + -s.y*-s.x*c.z, -s.y*c.x, 0,
 			                c.x*-s.z,                 c.x*c.z,      s.x, 0,
 			 s.y*c.z + c.y*-s.x*-s.z,  s.y*s.z + c.y*-s.x*c.z,  c.y*c.x, 0,
 			                       0,                       0,        0, 1,
-		};
+		}};
 	}
 	static forceinline m4 rotation_r_yxz(f32 x, f32 y, f32 z) { return rotation_r_yxz({x, y, z}); }
 };
 
 
 forceinline m4 to_m4(m3 m) {
-	return {
+	return {.s = {
 		m.i.x, m.i.y, m.i.z, 0,
 		m.j.x, m.j.y, m.j.z, 0,
 		m.k.x, m.k.y, m.k.z, 0,
 			0,     0,     0, 1,
-	};
+	}};
 }
 
 forceinline constexpr m3 transpose(m3 const& m) {
-	return {
+	return {.s = {
 		m.i.x, m.j.x, m.k.x,
 		m.i.y, m.j.y, m.k.y,
 		m.i.z, m.j.z, m.k.z,
-	};
+	}};
 }
 forceinline m4 transpose(m4 const& m) {
 	using namespace simd;
@@ -2400,11 +2385,11 @@ forceinline m4 inverse(m4 const &m) {
 		    - m.i.w * (m.j.x * A1223 - m.j.y * A0223 + m.j.z * A0123);
 
 	if (det == 0)
-		return {};
+		return m4{}; // gcc does not understand `return {};`
 
 	det = 1 / det;
 
-	return m4 {
+	return m4 {.s = {
 		det *  (m.j.y * A2323 - m.j.z * A1323 + m.j.w * A1223),
 		det * -(m.i.y * A2323 - m.i.z * A1323 + m.i.w * A1223),
 		det *  (m.i.y * A2313 - m.i.z * A1313 + m.i.w * A1213),
@@ -2421,7 +2406,7 @@ forceinline m4 inverse(m4 const &m) {
 		det *  (m.i.x * A1223 - m.i.y * A0223 + m.i.z * A0123),
 		det * -(m.i.x * A1213 - m.i.y * A0213 + m.i.z * A0113),
 		det *  (m.i.x * A1212 - m.i.y * A0212 + m.i.z * A0112),
-	};
+	}};
 }
 
 forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
@@ -2433,21 +2418,21 @@ forceinline constexpr m4 M4(
 	f32 kx, f32 ky, f32 kz, f32 kw,
 	f32 lx, f32 ly, f32 lz, f32 lw
 ) {
-	return {
+	return {.s = {
 		ix, iy, iz, iw,
 		jx, jy, jz, jw,
 		kx, ky, kz, kw,
 		lx, ly, lz, lw
-	};
+	}};
 }
 
 forceinline m4 M4(m3 v) {
-	return M4(
+	return m4{.vectors = {
 		V4f(v.i, 0),
 		V4f(v.j, 0),
 		V4f(v.k, 0),
 		V4f(0, 0, 0, 1)
-	);
+	}};
 }
 
 using FrustumPlanes = Array<v4f, 6>;

@@ -22,15 +22,15 @@ struct Printer {
 		return span.count;
 	}
 
-	template <class Fmt, class ...T>
-	inline umm write(Fmt fmt, T const &...args) {
+	template <Appendable FmtOrObj, Appendable ...T>
+	inline umm write(FmtOrObj fmt_or_obj, T const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = TL_GET_CURRENT(temporary_allocator);
 		if constexpr (sizeof...(T) > 0) {
-			append_format(builder, fmt, args...);
+			append_format(builder, fmt_or_obj, args...);
 		} else {
-			append(builder, fmt);
+			append(builder, fmt_or_obj);
 		}
 		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
@@ -265,8 +265,14 @@ void init_printer() {
 }
 
 bool is_stdout_console() {
+#if OS_WINDOWS
 	DWORD temp;
 	return GetConsoleMode(std_out, &temp) != 0;
+#elif OS_LINUX
+	not_implemented();
+#else
+	static_assert(false, "not implemented");
+#endif
 }
 
 #endif
