@@ -42,7 +42,7 @@ namespace tl {
 	union {                                                                                                         \
 		struct { Scalar x, y, z; };                                                                                 \
 		v2 xy;                                                                                                      \
-		struct { Scalar _pad; v2 yz; };                                                                             \
+		struct { Scalar _unused; v2 yz; };                                                                          \
 		Scalar s[3];                                                                                                \
 	};                                                                                                              \
 	template <class U>                                                                                              \
@@ -65,8 +65,8 @@ namespace tl {
 		struct { Scalar x, y, z, w; };                                                                                             \
 		struct { v2 xy; v2 zw; };                                                                                                  \
 		v3 xyz;                                                                                                                    \
-		struct { Scalar _; v2 yz; };                                                                                               \
-		struct { Scalar _; v3 yzw; };                                                                                              \
+		struct { Scalar _unused0; v2 yz; };                                                                                        \
+		struct { Scalar _unused1; v3 yzw; };                                                                                       \
 		Scalar s[4];                                                                                                               \
 	};                                                                                                                             \
 	template <class U>                                                                                                             \

@@ -681,26 +681,6 @@ umm append(StringBuilder &builder, Result<Value, Error> r) {
 	return append(builder, r.error());
 }
 
-
-template <class T, class Size=umm, class Format=void>
-[[deprecated("Use FormattedSpan instead")]]
-struct FormatSpan {
-	Span<T, Size> value;
-	Format format;
-	Span<u8> before = "{"b;
-	Span<u8> separator = ", "b;
-	Span<u8> after = "}"b;
-};
-
-template <class T, class Size>
-[[deprecated("Use FormattedSpan instead")]]
-struct FormatSpan<T, Size, void> {
-	Span<T, Size> value;
-	Span<u8> before = "{"b;
-	Span<u8> separator = ", "b;
-	Span<u8> after = "}"b;
-};
-
 struct SpanFormat {
 	Span<u8> before;
 	Span<u8> separator;
@@ -726,38 +706,6 @@ FormattedSpan<T, Size> format_span(Span<T, Size> span, SpanFormat format) {
 	return result;
 }
 
-
-template <class T, class Size, class Format>
-[[deprecated("Use FormattedSpan instead")]]
-forceinline umm append(StringBuilder &b, FormatSpan<T, Size, Format> format) {
-	if constexpr (std::is_same_v<Format, void>) {
-		umm count = 0;
-		count += append_bytes(b, format.before);
-		if (format.value.count) {
-			count += append(b, *format.value.data);
-		}
-		for (auto &val : format.value.skip(1)) {
-			count += append_bytes(b, format.separator);
-			count += append(b, val);
-		}
-		count += append_bytes(b, format.after);
-		return count;
-	} else {
-		umm count = 0;
-		count += append_bytes(b, format.before);
-		if (format.value.count) {
-			format.format.value = *format.value.data;
-			count += append(b, format.format);
-		}
-		for (auto &val : format.value.skip(1)) {
-			count += append_bytes(b, format.separator);
-			format.format.value = val;
-			count += append(b, format.format);
-		}
-		count += append_bytes(b, format.after);
-		return count;
-	}
-}
 
 template <class T, class Size>
 forceinline umm append(StringBuilder &b, FormattedSpan<T, Size> formatted) {

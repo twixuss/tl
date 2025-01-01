@@ -128,7 +128,12 @@ struct Scoped<Printer> {
 	}
 };
 
+}
+
 #ifdef TL_IMPL
+#if OS_WINDOWS
+
+namespace tl {
 
 thread_local Printer current_printer = {[](Span<utf8>, void *) {}};
 
@@ -136,18 +141,17 @@ void deinit_printer() {
 
 }
 
-#if OS_WINDOWS
-
-static HANDLE std_out;
-static HANDLE std_err;
-static HWND console_window;
-
 Printer console_printer = {
 	[](Span<utf8> span, void *) {
 		print_to_console(span);
 	},
 	0
 };
+
+
+static HANDLE std_out;
+static HANDLE std_err;
+static HWND console_window;
 
 Printer standard_output_printer = {
 	[](Span<utf8> span, void *) {
@@ -252,9 +256,64 @@ void toggle_console_window() {
 		show_console_window();
 	}
 }
+}
+#elif OS_LINUX
+#include <unistd.h>
+namespace tl {
+Printer standard_output_printer = {
+	[](Span<utf8> span, void *) {
+	not_implemented();
+		write(1, span.data, span.count);
+	},
+	0
+};
+
+Printer standard_error_printer = {
+	[](Span<utf8> span, void *) {
+	not_implemented();
+		write(2, span.data, span.count);
+	},
+	0
+};
+
+void print_to_console(Span<ascii> span) {
+	not_implemented();
+	write(1, span.data, span.count);
+}
+void print_to_console(Span<utf8> span) {
+	not_implemented();
+	write(1, span.data, span.count);
+}
+void print_to_console(Span<utf16> span) {
+	not_implemented();
+	write(1, span.data, span.count);
+}
+
+void clear_console() {
+	not_implemented();
+}
+
+void set_console_encoding(Encoding encoding) {
+	not_implemented();
+}
+
+void set_console_color(ConsoleColor foreground, ConsoleColor background) {
+	not_implemented();
+}
+
+void hide_console_window() {
+	not_implemented();
+}
+void show_console_window() {
+	not_implemented();
+}
+void toggle_console_window() {
+	not_implemented();
+}
+} // namespace tl
 
 #endif
-
+namespace tl {
 void init_printer() {
 	current_printer = standard_output_printer;
 #if OS_WINDOWS
@@ -275,7 +334,8 @@ bool is_stdout_console() {
 #endif
 }
 
+} // namespace tl
+
 #endif
 
-} // namespace tl
 

@@ -427,10 +427,10 @@ forceinline constexpr bool is_nan(f64 v) {
 }
 
 #if COMPILER_GCC
-forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
-forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
-forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
+forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ffs(val) : ~0; }
+forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ffsll(val) : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { return val ? 32 - __builtin_clz(val) : ~0; }
+forceinline u32 find_highest_one_bit(u64 val) { return val ? 64 - __builtin_clzll(val) : ~0; }
 #elif COMPILER_MSVC
 forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0; }
 forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0; }

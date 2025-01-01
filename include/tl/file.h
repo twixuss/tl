@@ -365,7 +365,7 @@ inline bool create_directories(Span<utf8> path) {
 
 TL_API bool copy_file(Span<utf8> source, Span<utf8> destination);
 template <AChar SChar, AChar DChar>
-inline bool copy_file(Span<SChar> source, Span<DChar> destination) { scoped(temporary_allocator_and_checkpoint); copy_file(to_utf8(source), to_utf8(destination)); }
+inline bool copy_file(Span<SChar> source, Span<DChar> destination) { scoped(temporary_allocator_and_checkpoint); return copy_file(to_utf8(source), to_utf8(destination)); }
 
 template <class Fn>
 void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
@@ -395,7 +395,7 @@ TL_API bool move_file(Span<utf8> source, Span<utf8> destination, MoveFileParams 
 template <AChar SChar, AChar DChar>
 inline bool move_file(Span<SChar> source, Span<DChar> destination, MoveFileParams params = {}) {
 	scoped(temporary_allocator_and_checkpoint);
-	move_file(to_utf8(source), to_utf8(destination), params);
+	return move_file(to_utf8(source), to_utf8(destination), params);
 }
 
 template <class T>
@@ -424,9 +424,9 @@ inline void for_each_file(Span<utf8> directory, T &&process_file) requires requi
 }
 
 #ifdef TL_IMPL
+#if OS_WINDOWS
 
 #if TL_FILE_INCLUDE_DIALOG
-#if OS_WINDOWS
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
 #pragma warning(push, 0)
@@ -441,11 +441,9 @@ inline void for_each_file(Span<utf8> directory, T &&process_file) requires requi
 
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #endif
-#endif
 
 namespace tl {
 
-#if OS_WINDOWS
 struct WinOpenFileParams {
 	DWORD access;
 	DWORD share;
@@ -882,9 +880,150 @@ bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams param
 	return MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags);
 }
 
-#else
-#endif
 
 }
+
+#else
+
+#include <sys/stat.h>
+#include <dirent.h>
+
+namespace tl {
+
+File open_file(Span<utf8> path, OpenFileParams params) {
+	scoped(temporary_allocator_and_checkpoint);
+
+	assert(!params.create_directories, "not implemented");
+
+	StaticList<char, 8> mode;
+
+	if (params.read) mode.add('r');
+	if (params.write) mode.add('w');
+	mode.add('b');
+	mode.add(0);
+
+	FILE *file = fopen(null_terminate(path).data, mode.data);
+
+	if (!file && !params.silent) {
+		TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path);
+	}
+
+	return {file};
+}
+
+int convert_origin(FileCursorOrigin origin) {
+	switch (origin) {
+		case File_begin: return SEEK_SET;
+		case File_cursor: return SEEK_CUR;
+		case File_end: return SEEK_END;
+	}
+	return -1;
+}
+
+void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
+	fseek((FILE *)file.handle, offset, convert_origin(origin));
+}
+s64 get_cursor(File file) {
+	return ftell((FILE *)file.handle);
+}
+umm read(File file, Span<u8> span) {
+	return fread(span.data, 1, span.count, (FILE *)file.handle);
+}
+umm write(File file, Span<u8> span) {
+	return fwrite(span.data, 1, span.count, (FILE *)file.handle);
+}
+void truncate_to_cursor(File file) {
+	ftruncate(fileno((FILE *)file.handle), get_cursor(file));
+}
+void close(File file) {
+	fclose((FILE *)file.handle);
+}
+
+
+/*
+implement this c++ function using c standatd library
+```
+FileItemList get_items_in_directory(Span<utf8> directory8);
+```
+*/
+
+bool file_exists(Span<utf8> path) {
+	scoped(temporary_allocator_and_checkpoint);
+    FILE *file = fopen(null_terminate(path).data, "r");
+    if (file) {
+        fclose(file);
+        return true;
+    }
+    return false;
+}
+bool directory_exists(Span<utf8> path) {
+	scoped(temporary_allocator_and_checkpoint);
+    struct stat statbuf;
+
+    if (stat(null_terminate(path).data, &statbuf) != 0) {
+        return false;
+    }
+
+    return S_ISDIR(statbuf.st_mode);
+}
+Optional<u64> get_file_write_time(File file) {
+	scoped(temporary_allocator_and_checkpoint);
+	struct stat statbuf;
+    if (fstat(fileno((FILE*)file.handle), &statbuf) != 0) {
+		return {};
+    }
+	return (u64)statbuf.st_mtime;
+}
+FileItemList get_items_in_directory(Span<utf8> directory) {
+	FileItemList result = {};
+	
+	scoped(temporary_allocator_and_checkpoint);
+
+    DIR *dir = opendir(null_terminate(directory).data);
+    if (dir == NULL) {
+        current_logger.error("opendir({}) failed", directory);
+		return result;
+    }
+
+    struct dirent *entry;
+	int i = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip the current (.) and parent (..) directories
+		defer { ++i; };
+		if (i <= 1)
+			continue;
+
+		auto name = (Span<utf8>)as_span(entry->d_name);
+
+		auto name_in_buffer_start = result.buffer.count;
+		result.buffer.add(name);
+
+		result.add(FileItem{
+			.kind = entry->d_type == DT_REG ? FileItem_file : FileItem_directory,
+			.name = {(utf8 *)name_in_buffer_start, name.count},
+		});
+    }
+
+	for (auto &item : result) {
+		item.name.data = result.buffer.data + (u64)item.name.data;
+	}
+
+    closedir(dir);
+    return result;
+}
+void create_file(Span<utf8> path8);
+void delete_file(Span<utf8> path8);
+bool create_directory(Span<utf8> path8);
+List<utf8> get_current_directory();
+void set_current_directory(Span<utf8> path8);
+MappedFile map_file(File file);
+void unmap_file(MappedFile &file);
+bool copy_file(Span<utf8> source8, Span<utf8> destination8);
+List<utf8> get_executable_path(bool null_terminated TL_LPD);
+bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams params);
+
+}
+
+#endif
 
 #endif

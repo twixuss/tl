@@ -116,6 +116,11 @@ forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return __sync_fetch_and_xor
 forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return __sync_fetch_and_xor(a, b); }
 forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return __sync_fetch_and_xor(a, b); }
 
+template <AInterlockExchangeable T>
+forceinline T atomic_set(T volatile *dst, T src) {
+	return __atomic_exchange_n(dst, src, __ATOMIC_ACQ_REL);
+}
+
 template <class T>
 forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
 	return __sync_val_compare_and_swap(dst, comparand, new_value);
