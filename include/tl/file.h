@@ -367,23 +367,6 @@ TL_API bool copy_file(Span<utf8> source, Span<utf8> destination);
 template <AChar SChar, AChar DChar>
 inline bool copy_file(Span<SChar> source, Span<DChar> destination) { scoped(temporary_allocator_and_checkpoint); return copy_file(to_utf8(source), to_utf8(destination)); }
 
-template <class Fn>
-void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
-	auto original_allocator = TL_GET_CURRENT(allocator);
-	scoped(TL_GET_CURRENT(temporary_allocator));
-
-	auto items = get_items_in_directory(directory);
-	for (auto &item : items) {
-		auto item_path = concatenate(directory, u8'/', item.name);
-		if (item.kind == FileItem_directory) {
-			for_each_file_recursive(item_path, std::forward<Fn>(fn));
-		} else {
-			scoped(original_allocator);
-			fn(item_path);
-		}
-	}
-}
-
 TL_API List<utf8> get_executable_path(bool null_terminated = false TL_LP);
 
 struct MoveFileParams {
@@ -398,27 +381,48 @@ inline bool move_file(Span<SChar> source, Span<DChar> destination, MoveFileParam
 	return move_file(to_utf8(source), to_utf8(destination), params);
 }
 
-template <class T>
-inline void for_each_file(Span<utf8> directory, T &&process_file) requires requires(T x) { { x(Span<utf8>{}) } -> std::convertible_to<ForEachDirective>; } {
+struct ForEachFileOptions {
+	bool recursive = true;
+};
+
+template <ForEachIterator<Span<utf8>> T>
+inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, T &&process_file_) {
 	auto outer_allocator = TL_GET_CURRENT(allocator);
 	scoped(TL_GET_CURRENT(temporary_allocator));
 
 	auto list = get_items_in_directory(directory);
 
+	auto process_file = wrap_foreach_fn<Span<utf8>>(process_file_);
+
 	for (auto item : list) {
 		auto item_path = format(u8"{}\\{}", directory, item.name);
 		switch (item.kind) {
 			case FileItem_file: {
-				scoped(outer_allocator);
-				process_file(item_path);
+				auto directive = with(outer_allocator, process_file(item_path));
+				switch (directive) {
+					case ForEach_break: 
+						return true;
+					case ForEach_continue: 
+						break;
+					case ForEach_erase:
+					case ForEach_erase_unordered:
+						delete_file(item_path);
+						break;
+				}
 				break;
 			}
 			case FileItem_directory: {
-				for_each_file(item_path, process_file);
+				if (options.recursive) {
+					bool broken = for_each_file(item_path, options, process_file);
+					if (broken) {
+						return true;
+					}
+				}
 				break;
 			}
 		}
 	}
+	return false;
 }
 
 }

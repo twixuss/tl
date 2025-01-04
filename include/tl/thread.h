@@ -359,22 +359,25 @@ inline void sync(SyncPoint &point, Spinner spinner = {}) {
 struct SpinLock {
 	TL_MAKE_FIXED(SpinLock);
 
-	bool volatile in_use = false;
+	u32 volatile locker_id = 0;
 
 	SpinLock() = default;
 };
 
 inline bool try_lock(SpinLock &m) {
-	return !atomic_compare_exchange(&m.in_use, true, false);
+	auto current = get_current_thread_id();
+	return !atomic_compare_exchange(&m.locker_id, current, (u32)0);
 }
 template <ASpinner Spinner = SleepySpinner>
 inline void lock(SpinLock &m, Spinner spinner = {}) {
-	loop_until([&] {
-		return try_lock(m);
-	}, spinner);
+	auto current = get_current_thread_id();
+	assert(m.locker_id != current, "single thread deadlock");
+	while (!atomic_replace(&m.locker_id, current, (u32)0)) {
+		spinner.spin();
+	}
 }
 inline void unlock(SpinLock &m) {
-	m.in_use = false;
+	atomic_set(&m.locker_id, (u32)0);
 }
 
 template <>

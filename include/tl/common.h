@@ -965,6 +965,27 @@ enum ForEachDirective {
 
 constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
 
+// TODO: use this in all of for_each functions, DRY
+template <class ...Args, class Fn>
+auto wrap_foreach_fn(Fn &&fn) {
+	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
+	if constexpr (std::is_same_v<FnRet, void>) {
+		return [&] (auto &&...args) {
+			fn(args...);
+			return ForEach_continue;
+		};
+	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
+		return fn;
+	} else {
+		static_error_v(fn, "Invalid return type of for_each function");
+	}
+}
+
+template <class T, class ...Args>
+concept ForEachIterator = requires(T fn, Args ...args) {
+	requires OneOf<decltype(fn(args...)), void, ForEachDirective>;
+};
+
 using ForEachFlags = u8;
 enum : ForEachFlags {
 	ForEach_reverse = 0x1,
@@ -1773,25 +1794,6 @@ TL_DECLARE_CONCEPT(Span);
 template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
 template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
-
-template <class T>
-decltype(auto) useless_0() { return ; }
-
-// TODO: use this in all of for_each functions, DRY
-template <class ...Args, class Fn>
-auto wrap_foreach_fn(Fn &&fn) {
-	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
-	if constexpr (std::is_same_v<FnRet, void>) {
-		return [&] (auto &&...args) {
-			fn(args...);
-			return ForEach_continue;
-		};
-	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-		return fn;
-	} else {
-		static_error_v(fn, "Invalid return type of for_each function");
-	}
-}
 
 template <ForEachFlags flags=0, class T, class Fn>
 constexpr bool for_each(Span<T> span, Fn &&in_fn) {
@@ -2723,7 +2725,10 @@ struct BitSet {
 			if (bit_index == ~0)
 				continue;
 			word &= ~(1 << bit_index);
-			return word_index * bits_in_word + bit_index;
+			auto index = word_index * bits_in_word + bit_index;
+			if (index >= size)
+				return {};
+			return index;
 		}
 		return {};
 	}
