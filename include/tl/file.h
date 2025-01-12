@@ -337,6 +337,54 @@ inline List<utf8> make_absolute_path(Span<utf8> path) {
 	return (List<utf8>)concatenate(TL_TMP(get_current_directory()), u8'/', path);
 }
 
+inline ListOfLists<utf8> split_path(Span<utf8> path) {
+	ListOfLists<utf8> result;
+
+	split_by_any(path, Span{u8'\\', u8'/'}, [&](Span<utf8> part) {
+		if (part.count) {
+			result.add(part);
+		}
+	});
+
+	result.enable_reading();
+
+	return result;
+}
+
+// Returns original path on error
+inline List<utf8> normalize_path(Span<utf8> path, utf8 separator = u8'/') {
+	List<utf8> result;
+
+	scoped(temporary_allocator_and_checkpoint);
+
+	List<Span<utf8>> result_parts;
+
+	auto parts = split_path(path);
+
+	for (auto part : parts) {
+		if (part == u8"."s) {
+			continue;
+		} else if (part == u8".."s) {
+			if (!result_parts.count) {
+				return to_list(path);
+			}
+			result_parts.pop();
+		} else {
+			result_parts.add(part);
+		}
+	}
+
+	for (auto &part : result_parts) {
+		if (&part != result_parts.begin()) {
+			result.add(separator);
+		}
+		result.add(part);
+	}
+
+	return result;
+}
+
+
 template <class Size>
 inline bool is_absolute_path(Span<utf8, Size> path) {
 	if (path.count < 2)

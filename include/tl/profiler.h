@@ -131,10 +131,11 @@ struct TL_API Profiler {
 template <>
 struct Scoped<Profiler::ScopeMeasurer> {
 	Profiler *profiler;
-	Scoped(Profiler::ScopeMeasurer measurer) : profiler(measurer.profiler) {
+	void enter(Profiler::ScopeMeasurer measurer) {
+		this->profiler = measurer.profiler;
 		measurer.profiler->begin(measurer.name, measurer.file, measurer.line);
 	}
-	~Scoped() {
+	void exit() {
 		profiler->end();
 	}
 };

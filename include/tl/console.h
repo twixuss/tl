@@ -105,12 +105,12 @@ template <>
 struct Scoped<ConsoleColor> {
 	inline static ConsoleColor current = ConsoleColor::dark_gray;
 	ConsoleColor old;
-	Scoped(ConsoleColor _new) {
+	void enter(ConsoleColor _new) {
 		old = current;
 		current = _new;
 		set_console_color(_new);
 	}
-	~Scoped() {
+	void exit() {
 		current = old;
 		set_console_color(old);
 	}
@@ -119,11 +119,11 @@ struct Scoped<ConsoleColor> {
 template <>
 struct Scoped<Printer> {
 	Printer old_printer;
-	Scoped(Printer new_printer) {
+	void enter(Printer new_printer) {
 		old_printer = current_printer;
 		current_printer = new_printer;
 	}
-	~Scoped() {
+	void exit() {
 		current_printer = old_printer;
 	}
 };

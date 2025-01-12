@@ -424,32 +424,21 @@ umm count(List<T, Allocator, Size> list, Fn &&fn) {
 }
 
 template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> split(Span<T> what, Span<T> by TL_LP) {
+List<Span<T>, Allocator, Size> split_by_seq(Span<T> what, Span<T> by TL_LP) {
 	List<Span<T>, Allocator, Size> result;
-
-	umm start = 0;
-	umm what_start = 0;
-
-	for (; what_start < what.count - by.count + 1;) {
-		if (what.subspan(what_start, by.count) == by) {
-			result.add(what.subspan(start, what_start - start));
-			what_start += by.count;
-			start = what_start;
-		} else {
-			++what_start;
-		}
-	}
-
-	result.add(Span(what.data + start, what.end()) TL_LA);
+	
+	split_by_seq(what, by, [&] (Span<T> part) {
+		result.add(part);
+	});
 
 	return result;
 }
 
 template <class Allocator = Allocator, class T, class Size>
-List<Span<T>, Allocator, Size> split(Span<T, Size> what, T by TL_LP) {
+List<Span<T>, Allocator, Size> split_by_one(Span<T, Size> what, T by TL_LP) {
 	List<Span<T>, Allocator, Size> result;
 
-	split(what, by, [&](auto part) {
+	split_by_one(what, by, [&](auto part) {
 		result.add(part TL_LA);
 	});
 

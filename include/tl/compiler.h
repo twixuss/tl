@@ -57,7 +57,7 @@ static void parse_one_type(StringBuilder &builder, char const *&c, char const *e
 			char const *at3 = find(Span(c, end), "@@@"s);
 			auto name = Span(c, at3);
 
-			auto parts = split(name, '@');
+			auto parts = split_by_one(name, '@');
 			append(parts.back());
 			for (auto part : reversed(parts.skip(-1))) {
 				append("::");
@@ -286,7 +286,7 @@ List<ascii> demangle(Span<ascii> function_name) {
 	auto name_start = function_name.begin() + 1;
 	auto name_end = find(function_name, "@@"s);
 
-	auto parts = split(Span(name_start, name_end), '@');
+	auto parts = split_by_one(Span(name_start, name_end), '@');
 	append(builder, parts.back());
 	for (auto part : reversed(parts.skip(-1))) {
 		append_format(builder, "::{}", part);

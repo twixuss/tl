@@ -1175,16 +1175,16 @@ private:
 #define scoped_replace(dst, src) \
 	auto CONCAT(old_, __LINE__) = dst; \
 	dst = src; \
-	defer { dst = CONCAT(old_, __LINE__); };
+	defer { dst = CONCAT(old_, __LINE__); }
 
 #define scoped_replace_if(dst, src, condition) \
 	Optional<decltype(dst)> CONCAT(old_, __LINE__); \
 	if (condition) { CONCAT(old_, __LINE__) = dst; dst = src; } \
-	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); };
+	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); }
 
 #define scoped_exchange(dst, src) \
 	Swap(dst, src);               \
-	defer { Swap(dst, src); };
+	defer { Swap(dst, src); }
 
 template <class T>
 constexpr auto reversed(T x) {
@@ -2148,7 +2148,7 @@ void flip_order(Span<T> span) {
 }
 
 template <class T, class Size, class Fn>
-void split(Span<T, Size> what, T by, Fn &&callback) {
+void split_by_one(Span<T, Size> what, T by, Fn &&callback) {
 	umm start = 0;
 	umm what_start = 0;
 
@@ -2156,6 +2156,38 @@ void split(Span<T, Size> what, T by, Fn &&callback) {
 		if (what.data[what_start] == by) {
 			callback(what.subspan(start, what_start - start));
 			start = what_start + 1;
+		}
+		++what_start;
+	}
+
+	callback(Span(what.data + start, what.end()));
+}
+
+template <class T, class Size, class Fn>
+void split_by_any(Span<T, Size> what, Span<T> by, Fn &&callback) {
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.count;) {
+		if (find(by, what.data[what_start])) {
+			callback(what.subspan(start, what_start - start));
+			start = what_start + 1;
+		}
+		++what_start;
+	}
+
+	callback(Span(what.data + start, what.end()));
+}
+
+template <class T, class Size, class Fn>
+void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&callback) {
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.count;) {
+		if (starts_with(what.skip(what_start), by)) {
+			callback(what.subspan(start, what_start - start));
+			start = what_start + by.count;
 		}
 		++what_start;
 	}
@@ -2689,9 +2721,11 @@ struct BitSet {
 	Word words[ceil(size, bits_in_word) / bits_in_word] = {};
 
 	bool get(umm i) const {
+		bounds_check(assert(i < size));
 		return word(i) & bit(i);
 	}
 	void set(umm i, bool value) {
+		bounds_check(assert(i < size));
 		if (value) {
 			word(i) |= bit(i);
 		} else {
@@ -2699,6 +2733,7 @@ struct BitSet {
 		}
 	}
 	void flip(umm i) {
+		bounds_check(assert(i < size));
 		word(i) ^= bit(i);
 	}
 
@@ -2711,8 +2746,23 @@ struct BitSet {
 
 	umm count() const {
 		umm result = 0;
-		for (auto word : words) {
-			result += count_bits(word);
+		if constexpr (size % bits_in_word == 0) {
+			// All words are popcountable
+			for (auto word : words) {
+				result += count_bits(word);
+			}
+		} else {
+			// Last word should be trimmed
+			auto words_span = array_as_span(words);
+			for (auto word : words_span.skip(-1)) {
+				result += count_bits(word);
+			}
+
+			Word last_word = words_span.back();
+			
+			Word mask = ((Word)1 << (size % bits_in_word)) - 1;
+
+			result += count_bits(last_word & mask);
 		}
 		return result;
 	}
@@ -3353,8 +3403,17 @@ Scoped(Thing) -> Scoped<Thing>;
 
 // Example use:
 // auto str = TL_TMP(format("{}, {}", a, b));
-#define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=::tl::Scoped(new_thing);return __VA_ARGS__;}())
-#define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = ::tl::Scoped(new_thing)
+#define scoped(new_thing) \
+	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
+	CONCAT(_scoped_, __LINE__).enter(new_thing); \
+	defer { CONCAT(_scoped_, __LINE__).exit(); }
+#define scoped_if(new_thing, condition) \
+	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
+	bool CONCAT(_scoped_enabled, __LINE__) = condition; \
+	if (CONCAT(_scoped_enabled, __LINE__)) \
+		CONCAT(_scoped_, __LINE__).enter(new_thing); \
+	defer { if (CONCAT(_scoped_enabled, __LINE__)) CONCAT(_scoped_, __LINE__).exit(); }
+#define with(new_thing, ...) ([&]()->decltype(auto){scoped(new_thing);return __VA_ARGS__;}())
 
 template <class Thing>
 struct ScopedBlock {
@@ -3405,43 +3464,65 @@ struct ValueChanger {
 template <>
 struct Scoped<Allocator> {
 	Allocator old_allocator;
-	Scoped(Allocator new_allocator) {
+	void enter(Allocator new_allocator) {
 		old_allocator = TL_GET_CURRENT(allocator);
 		TL_GET_CURRENT(allocator) = new_allocator;
 	}
-	~Scoped() {
+	void exit() {
 		TL_GET_CURRENT(allocator) = old_allocator;
 	}
 };
 
 template <>
 struct Scoped<ArenaAllocator> : Scoped<Allocator> {
-	Scoped(ArenaAllocator &arena) : Scoped<Allocator>(arena) {}
+	void enter(ArenaAllocator &arena) {
+		Scoped<Allocator>::enter(arena);
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 template <>
 struct Scoped<DefaultAllocator> : Scoped<Allocator> {
-	Scoped(DefaultAllocator) : Scoped<Allocator>(default_allocator) {}
+	void enter(DefaultAllocator) {
+		Scoped<Allocator>::enter(default_allocator);
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 template <>
 struct Scoped<TemporaryAllocator> : Scoped<Allocator> {
-	Scoped(TemporaryAllocator) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)) {}
+	void enter(TemporaryAllocator) {
+		Scoped<Allocator>::enter(TL_GET_CURRENT(temporary_allocator));
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 
 template <>
 struct Scoped<TemporaryStorageCheckpoint> {
 	ArenaAllocator::Checkpoint checkpoint;
 
-	Scoped(TemporaryStorageCheckpoint) {
+	void enter(TemporaryStorageCheckpoint) {
 		checkpoint = TL_GET_CURRENT(temporary_allocator).checkpoint();
 	}
-	~Scoped() {
+	void exit() {
 		TL_GET_CURRENT(temporary_allocator).reset(checkpoint);
 	}
 };
 
 template <>
 struct Scoped<TemporaryAllocatorAndCheckpoint> : Scoped<Allocator>, Scoped<TemporaryStorageCheckpoint> {
-	Scoped(TemporaryAllocatorAndCheckpoint) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)), Scoped<TemporaryStorageCheckpoint>({}) {}
+	void enter(TemporaryAllocatorAndCheckpoint) {
+		Scoped<Allocator>::enter(TL_GET_CURRENT(temporary_allocator));
+		Scoped<TemporaryStorageCheckpoint>::enter({});
+	}
+	void exit() {
+	    Scoped<TemporaryStorageCheckpoint>::exit();
+		Scoped<Allocator>::exit();
+	}
 };
 
 template <class T>

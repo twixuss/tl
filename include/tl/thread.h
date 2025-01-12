@@ -382,12 +382,13 @@ inline void unlock(SpinLock &m) {
 
 template <>
 struct Scoped<SpinLock> {
-	SpinLock &mutex;
-	Scoped(SpinLock &mutex) : mutex(mutex) {
+	SpinLock *mutex;
+	void enter(SpinLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
-		unlock(mutex);
+	void exit() {
+		unlock(*mutex);
 	}
 };
 
@@ -424,12 +425,13 @@ void unlock(OsLock &m) {
 
 template <>
 struct Scoped<OsLock> {
-	OsLock &mutex;
-	Scoped(OsLock &mutex) : mutex(mutex) {
+	OsLock *mutex;
+	void enter(OsLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
-		unlock(mutex);
+	void exit() {
+		unlock(*mutex);
 	}
 };
 
@@ -539,10 +541,11 @@ inline void unlock(RecursiveSpinLock &m) {
 template <>
 struct Scoped<RecursiveSpinLock> {
 	RecursiveSpinLock *mutex;
-	Scoped(RecursiveSpinLock &mutex) : mutex(&mutex) {
+	void enter(RecursiveSpinLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
+	void exit() {
 		unlock(*mutex);
 	}
 };
