@@ -967,6 +967,11 @@ umm append(StringBuilder &builder, Int v) {
 	return append(builder, FormatInt{.value = v});
 }
 
+template <class Int>  requires is_integer<Int>
+auto format_hex(Int value) {
+	return FormatInt{.value = value, .radix = 16, .leading_zero_count = sizeof(Int) * 2};
+}
+
 forceinline umm append(StringBuilder &builder, void const *p) {
 	return append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zero_count = sizeof(void *) * 2});
 }
