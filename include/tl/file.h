@@ -161,6 +161,14 @@ TL_API bool create_directory(Span<utf8> path);
 template <AChar Char>
 inline bool create_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return create_directory(to_utf8(path)); }
 
+struct DeleteDirectoryOptions {
+	bool recursive = false;
+};
+
+TL_API void delete_directory(Span<utf8> path, DeleteDirectoryOptions options = {});
+template <AChar Char>
+inline void delete_directory(Span<Char> path, DeleteDirectoryOptions options = {}) { scoped(temporary_allocator_and_checkpoint); return delete_directory(to_utf8(path), options); }
+
 struct FileState {
 	bool changed : 1;
 	bool failed  : 1;
@@ -355,7 +363,7 @@ inline ListOfLists<utf8> split_path(Span<utf8> path) {
 inline List<utf8> normalize_path(Span<utf8> path, utf8 separator = u8'/') {
 	List<utf8> result;
 
-	scoped(temporary_allocator_and_checkpoint);
+	scoped(current_temporary_allocator);
 
 	List<Span<utf8>> result_parts;
 
@@ -431,37 +439,71 @@ inline bool move_file(Span<SChar> source, Span<DChar> destination, MoveFileParam
 
 struct ForEachFileOptions {
 	bool recursive = true;
+	bool files = false;
+	bool directories = false;
 };
 
-template <ForEachIterator<Span<utf8>> T>
-inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, T &&process_file_) {
+// NOTE: Almost redundant with FileItem.
+// Only difference is full path instead of just name.
+// But it makes it clearer.
+struct ForEachFileItemValue {
+	FileItemKind kind;
+	Span<utf8> path;
+};
+
+template <ForEachIterator<ForEachFileItemValue> Fn>
+inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options, Fn &&process_item_) {
 	auto outer_allocator = TL_GET_CURRENT(allocator);
 	scoped(TL_GET_CURRENT(temporary_allocator));
 
 	auto list = get_items_in_directory(directory);
 
-	auto process_file = wrap_foreach_fn<Span<utf8>>(process_file_);
+	auto process_item = wrap_foreach_fn<ForEachFileItemValue>(process_item_);
 
 	for (auto item : list) {
 		auto item_path = format(u8"{}\\{}", directory, item.name);
+
+		ForEachFileItemValue item_to_process = {
+			.kind = item.kind,
+			.path = item_path
+		};
+
 		switch (item.kind) {
 			case FileItem_file: {
-				auto directive = with(outer_allocator, process_file(item_path));
-				switch (directive) {
-					case ForEach_break: 
+				if (options.files) {
+					auto d = with(outer_allocator, process_item(item_to_process));
+
+					switch (d & ForEach_erase_mask) {
+						case ForEach_erase:
+						case ForEach_erase_unordered:
+							delete_file(item_path);
+							break;
+					}
+
+					if (d & ForEach_break)
 						return true;
-					case ForEach_continue: 
-						break;
-					case ForEach_erase:
-					case ForEach_erase_unordered:
-						delete_file(item_path);
-						break;
 				}
 				break;
 			}
 			case FileItem_directory: {
+				if (options.directories) {
+					auto d = with(outer_allocator, process_item(item_to_process));
+
+					switch (d & ForEach_erase_mask) {
+						case ForEach_erase:
+						case ForEach_erase_unordered:
+							delete_directory(item_path, {.recursive = true});
+							break;
+					}
+
+					if (d & ForEach_dont_recurse)
+						options.recursive = false;
+
+					if (d & ForEach_break)
+						return true;
+				}
 				if (options.recursive) {
-					bool broken = for_each_file(item_path, options, process_file);
+					bool broken = with(outer_allocator, for_each_file_item(item_path, options, process_item_));
 					if (broken) {
 						return true;
 					}
@@ -471,6 +513,13 @@ inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, T &&
 		}
 	}
 	return false;
+}
+
+template <ForEachIterator<Span<utf8>> Fn>
+inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &&process_item_) {
+	options.files = true;
+	options.directories = false;
+	return for_each_file_item(directory, options, [&] (ForEachFileItemValue item) { return process_item_(item.path); });
 }
 
 }
@@ -528,7 +577,6 @@ File open_file(Span<utf8> path8, OpenFileParams params) {
 
 	auto win_params = get_open_file_params(params);
 	if (params.create_directories) {
-		scoped(temporary_storage_checkpoint);
 		create_directories(parse_path(path8).directory);
 	}
 	auto handle = CreateFileW((wchar_t *)path16.data, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
@@ -654,7 +702,8 @@ static List<wchar_t> make_wildcard(Span<utf8> directory8) {
 FileItemList get_items_in_directory(Span<utf8> directory8) {
 	FileItemList result;
 
-	scoped(temporary_allocator_and_checkpoint);
+	// NOTE: no checkpoint because result.allocator may be temporary.
+	scoped(current_temporary_allocator);
 
 	auto directory_wildcard = make_wildcard(directory8);
 
@@ -669,10 +718,6 @@ FileItemList get_items_in_directory(Span<utf8> directory8) {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
 		}
-		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) {
-			continue;
-		}
-
 
 		auto name = as_span((utf16 *)find_data.cFileName);
 
@@ -716,6 +761,29 @@ bool create_directory(Span<utf8> path8) {
 	scoped(temporary_allocator_and_checkpoint);
 	auto path16 = to_utf16(path8, true);
 	return (bool)CreateDirectoryW((wchar_t *)path16.data, 0);
+}
+
+void delete_directory(Span<utf8> path8, DeleteDirectoryOptions options) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	if (options.recursive) {
+		for_each_file_item(path8, {.recursive = true, .files = true, .directories = true}, [&](ForEachFileItemValue item) {
+			switch (item.kind) {
+				case FileItem_file: 
+					delete_file(item.path);
+					return ForEach_continue;
+				case FileItem_directory:
+					delete_directory(item.path, {.recursive = true});
+					return ForEach_dont_recurse;
+				default:
+					return ForEach_continue;
+
+			}
+		});
+	}
+	if (!RemoveDirectoryW((wchar_t *)path16.data)) {
+		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path8);
+	}
 }
 
 #if TL_FILE_INCLUDE_DIALOG
@@ -1029,7 +1097,8 @@ Optional<u64> get_file_write_time(File file) {
 FileItemList get_items_in_directory(Span<utf8> directory) {
 	FileItemList result = {};
 	
-	scoped(temporary_allocator_and_checkpoint);
+	// NOTE: no checkpoint because result.allocator may be temporary.
+	scoped(temporary_allocator);
 
     DIR *dir = opendir(null_terminate(directory).data);
     if (dir == NULL) {

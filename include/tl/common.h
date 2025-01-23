@@ -959,8 +959,10 @@ inline bool any_false(bool value) { return !value; }
 enum ForEachDirective {
 	ForEach_continue        = 0x0,
 	ForEach_break           = 0x1,
-	ForEach_erase           = 0x2,
+	ForEach_erase           = 0x2, // ordered
 	ForEach_erase_unordered = 0x4,
+	ForEach_erase_mask      = 0x6,
+	ForEach_dont_recurse    = 0x8,
 };
 
 constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
@@ -1814,8 +1816,10 @@ constexpr bool for_each(Span<T> span, Fn &&in_fn) {
 
 	for (auto it = start; it != end; it += step) {
 		auto d = fn(*it);
-		if (d & ForEach_erase) invalid_code_path("not supported");
-		if (d & ForEach_erase_unordered) invalid_code_path("not supported");
+
+		constexpr ForEachFlags allowed_flags = ForEach_break;
+		assert(!(d & ~allowed_flags), "not supported");
+
 		if (d & ForEach_break)
 			return true;
 	}
@@ -2638,36 +2642,44 @@ template <class T, umm capacity>
 forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
 
 template <ForEachFlags flags = 0, class T, umm capacity>
-bool for_each(StaticList<T, capacity> &list, auto fn) {
-	using Ret = decltype(fn(std::declval<T&>()));
+bool for_each(StaticList<T, capacity> &list, auto in_fn) {
+	auto fn = wrap_foreach_fn<T &>(in_fn);
+
+	T *begin;
+	T *end;
+
 	if constexpr (flags & ForEach_reverse) {
-		for (auto p = list.end() - 1; p != list.data - 1; ) {
-			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-				switch (fn(*p)) {
-					case ForEach_continue: break;
-					case ForEach_break: return true;
-					case ForEach_erase: list.erase(p); break;
-					case ForEach_erase_unordered: list.erase_unordered(p); break;
-				}
-			} else {
-				fn(*p);
-			}
-			--p;
-		}
+		begin = list.end() - 1;
+		end = list.begin() - 1;
 	} else {
-		for (auto p = list.data; p != list.end(); ) {
-			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-				switch (fn(*p)) {
-					case ForEach_continue: break;
-					case ForEach_break: return true;
-					case ForEach_erase: list.erase(p); continue;
-					case ForEach_erase_unordered: list.erase_unordered(p); continue;
-				}
-			} else {
-				fn(*p);
-			}
-			++p;
+		begin = list.begin();
+		end = list.end();
+	}
+
+	for (auto p = begin; p != end; ) {
+		auto d = fn(*p);
+
+		constexpr ForEachFlags allowed_flags = ForEach_break | ForEach_erase | ForEach_erase_unordered;
+		assert(!(d & ~allowed_flags), "not supported");
+
+		switch (d & ForEach_erase_mask) {
+			case 0: 
+				if constexpr (!(flags & ForEach_reverse))
+					p += 1;
+				break;
+			case ForEach_erase:
+				list.erase(p);
+				break;
+			case ForEach_erase_unordered:
+				list.erase_unordered(p);
+				break;
 		}
+		
+		if (d & ForEach_break)
+			return true;
+
+		if constexpr (flags & ForEach_reverse)
+			p -= 1;
 	}
 	return false;
 }
@@ -2792,10 +2804,14 @@ struct BitSet {
 };
 
 template <ForEachFlags flags = 0, umm size>
-bool for_each(BitSet<size> &set, auto &&fn)
-	requires requires { fn((umm)0); }
+bool for_each(BitSet<size> &set, auto &&in_fn)
+	requires requires { in_fn((umm)0); }
 {
 	using Word = typename BitSet<size>::Word;
+
+	auto fn = wrap_foreach_fn<umm>(in_fn);
+					
+	constexpr ForEachFlags allowed_flags = ForEach_break;
 
 	if constexpr (flags & ForEach_reverse) {
 		for (umm word_index = count_of(set.words) - 1; word_index != -1; --word_index) {
@@ -2808,15 +2824,13 @@ bool for_each(BitSet<size> &set, auto &&fn)
 					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
 						continue;
-					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						auto d = fn(absolute_index);
-						if (d & ForEach_erase) not_implemented();
-						if (d & ForEach_erase_unordered) not_implemented();
-						if (d & ForEach_break)
-							return true;
-					} else {
-						fn(absolute_index);
-					}
+
+					auto d = fn(absolute_index);
+					
+					assert(!(d & ~allowed_flags), "not supported");
+
+					if (d & ForEach_break)
+						return true;
 				}
 			}
 		}
@@ -2831,15 +2845,13 @@ bool for_each(BitSet<size> &set, auto &&fn)
 					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
 						return false;
-					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						auto d = fn(absolute_index);
-						if (d & ForEach_erase) not_implemented();
-						if (d & ForEach_erase_unordered) not_implemented();
-						if (d & ForEach_break)
-							return true;
-					} else {
-						fn(absolute_index);
-					}
+					
+					auto d = fn(absolute_index);
+					
+					assert(!(d & ~allowed_flags), "not supported");
+
+					if (d & ForEach_break)
+						return true;
 				}
 			}
 		}
@@ -3169,13 +3181,11 @@ struct TL_API DefaultAllocator : AllocatorBase<DefaultAllocator> {
 };
 
 struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
-private:
 	Allocator parent_allocator;
 	umm buffer_size = 0;
 	u8 *base = 0;
 	u8 *cursor = 0;
 
-public:
 	struct Checkpoint {
 		u8 *cursor;
 	};

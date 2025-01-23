@@ -81,20 +81,19 @@ constexpr Array<T, count> to_array(T const (&array)[count]) {
 }
 
 template <class T, umm count>
-constexpr bool for_each(Array<T, count> &array, auto &&fn) {
+constexpr bool for_each(Array<T, count> &array, auto &&in_fn) {
+
+	auto fn = wrap_foreach_fn<T &>(in_fn);
+	
+	constexpr ForEachFlags allowed_flags = ForEach_break;
+
 	for (auto &it : array.data) {
-		using Ret = decltype(fn(it));
-		if constexpr (std::is_same_v<Ret, void>) {
-			fn(it);
-		} else if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-			auto d = fn(it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_v(fn, "Bad iteration function return type");
-		}
+		auto d = fn(it);
+		
+		assert(!(d & ~allowed_flags), "not supported");
+
+		if (d & ForEach_break)
+			return true;
 	}
 	return false;
 }
