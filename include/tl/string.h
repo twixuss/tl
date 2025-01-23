@@ -381,10 +381,10 @@ inline List<utf16, Allocator> to_utf16(Span<ascii> span, bool terminate = false)
 }
 
 TL_API umm _utf8_size(Span<utf16> src);
-TL_API void _to_utf8(Span<utf16> src, Span<utf8> dst);
+TL_API umm _to_utf8(Span<utf16> src, Span<utf8> dst);
 
 TL_API umm _utf16_size(Span<utf8> src);
-TL_API void _to_utf16(Span<utf8> src, Span<utf16> dst);
+TL_API umm _to_utf16(Span<utf8> src, Span<utf16> dst);
 
 template <class Allocator = Allocator>
 List<utf8, Allocator> to_utf8(Span<utf16> utf16, bool terminate = false TL_LP) {
@@ -1326,29 +1326,29 @@ thread_local bool default_float_format_trailing_zeros = false;
 umm _utf8_size(Span<utf16> src) {
 	return (umm)WideCharToMultiByte(CP_UTF8, 0, (wchar_t *)src.data, (int)src.count, 0, 0, 0, 0);
 }
-void _to_utf8(Span<utf16> src, Span<utf8> dst) {
-	WideCharToMultiByte(CP_UTF8, 0, (wchar_t *)src.data, (int)src.count, (char *)dst.data, (int)dst.count, 0, 0);
+umm _to_utf8(Span<utf16> src, Span<utf8> dst) {
+	return WideCharToMultiByte(CP_UTF8, 0, (wchar_t *)src.data, (int)src.count, (char *)dst.data, (int)dst.count, 0, 0);
 }
 
 umm _utf16_size(Span<utf8> src) {
 	return (umm)MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, 0, 0);
 }
-void _to_utf16(Span<utf8> src, Span<utf16> dst) {
-	MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, (wchar_t *)dst.data, (int)dst.count);
+umm _to_utf16(Span<utf8> src, Span<utf16> dst) {
+	return MultiByteToWideChar(CP_UTF8, 0, (char *)src.data, (int)src.count, (wchar_t *)dst.data, (int)dst.count);
 }
 
 #elif OS_LINUX
 umm _utf8_size(Span<utf16> src) {
 	not_implemented();
 }
-void _to_utf8(Span<utf16> src, Span<utf8> dst) {
+umm _to_utf8(Span<utf16> src, Span<utf8> dst) {
 	not_implemented();
 }
 
 umm _utf16_size(Span<utf8> src) {
 	not_implemented();
 }
-void _to_utf16(Span<utf8> src, Span<utf16> dst) {
+umm _to_utf16(Span<utf8> src, Span<utf16> dst) {
 	not_implemented();
 }
 #endif

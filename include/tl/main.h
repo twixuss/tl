@@ -36,15 +36,17 @@ int wmain(int argc, wchar_t **argv) {
 
 	init_printer();
 
-	#ifdef TL_USE_CONTEXT
-		DefaultLogger::global_init(tformat(u8"{}.log", arguments[0]));
+	DefaultLogger::global_init(tformat(u8"{}.log", arguments[0]));
 
-		DefaultLogger app_logger = {.module = u8"app"s};
-		DefaultLogger tl_logger = {.module = u8"tl"s};
+	DefaultLogger app_logger = {.module = u8"app"s};
+	DefaultLogger tl_logger = {.module = u8"tl"s};
 	
+	#ifdef TL_USE_CONTEXT
 		context->app_logger() = app_logger;
 		context->tl_logger() = tl_logger;
 	#else
+		tl::app_logger = app_logger;
+		tl::tl_logger = tl_logger;
 		tl::init_logger_thread();
 	#endif
 

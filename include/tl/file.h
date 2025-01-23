@@ -161,13 +161,9 @@ TL_API bool create_directory(Span<utf8> path);
 template <AChar Char>
 inline bool create_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return create_directory(to_utf8(path)); }
 
-struct DeleteDirectoryOptions {
-	bool recursive = false;
-};
-
-TL_API void delete_directory(Span<utf8> path, DeleteDirectoryOptions options = {});
+TL_API void delete_directory(Span<utf8> path);
 template <AChar Char>
-inline void delete_directory(Span<Char> path, DeleteDirectoryOptions options = {}) { scoped(temporary_allocator_and_checkpoint); return delete_directory(to_utf8(path), options); }
+inline void delete_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return delete_directory(to_utf8(path)); }
 
 struct FileState {
 	bool changed : 1;
@@ -278,16 +274,18 @@ inline ParsedPath parse_path(Span<utf8> path) {
 				}
 				if (result.name.count == 0) {
 					result.name = result.extension;
-					result.extension = {};
+					result.extension = Span(result.extension.end(), 0);
 					result.name.data --;
 					result.name.count ++;
 				}
 			} else {
 				result.directory = {path.data, last_slash};
 				result.name      = {last_slash + 1, path.end()};
+				result.extension = Span(path.end(), 0);
 			}
 
 		} else {
+			result.directory = Span(path.data, 0);
 			result.name      = {path.data, last_dot};
 			result.extension = {last_dot + 1, path.end()};
 			// Include the dot into the name because the extension is empty
@@ -296,7 +294,7 @@ inline ParsedPath parse_path(Span<utf8> path) {
 			}
 			if (result.name.count == 0) {
 				result.name = result.extension;
-				result.extension = {};
+				result.extension = Span(result.extension.end(), 0);
 				result.name.data --;
 				result.name.count ++;
 			}
@@ -305,13 +303,12 @@ inline ParsedPath parse_path(Span<utf8> path) {
 		if (last_slash) {
 			result.directory = {path.data, last_slash};
 			result.name      = {last_slash + 1, path.end()};
+			result.extension = Span(path.end(), 0);
 		} else {
-			result.name = path;
+			result.directory = Span(path.data, 0);
+			result.name      = path;
+			result.extension = Span(path.end(), 0);
 		}
-	}
-
-	if (!result.directory.data) {
-		result.directory.data = result.name.data;
 	}
 
 	return result;
@@ -453,15 +450,14 @@ struct ForEachFileItemValue {
 
 template <ForEachIterator<ForEachFileItemValue> Fn>
 inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options, Fn &&process_item_) {
-	auto outer_allocator = TL_GET_CURRENT(allocator);
-	scoped(TL_GET_CURRENT(temporary_allocator));
-
 	auto list = get_items_in_directory(directory);
+	defer { free(list); };
 
 	auto process_item = wrap_foreach_fn<ForEachFileItemValue>(process_item_);
 
 	for (auto item : list) {
 		auto item_path = format(u8"{}\\{}", directory, item.name);
+		defer { free(item_path); };
 
 		ForEachFileItemValue item_to_process = {
 			.kind = item.kind,
@@ -471,7 +467,7 @@ inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options,
 		switch (item.kind) {
 			case FileItem_file: {
 				if (options.files) {
-					auto d = with(outer_allocator, process_item(item_to_process));
+					auto d = process_item(item_to_process);
 
 					switch (d & ForEach_erase_mask) {
 						case ForEach_erase:
@@ -487,12 +483,12 @@ inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options,
 			}
 			case FileItem_directory: {
 				if (options.directories) {
-					auto d = with(outer_allocator, process_item(item_to_process));
+					auto d = process_item(item_to_process);
 
 					switch (d & ForEach_erase_mask) {
 						case ForEach_erase:
 						case ForEach_erase_unordered:
-							delete_directory(item_path, {.recursive = true});
+							delete_directory(item_path);
 							break;
 					}
 
@@ -503,7 +499,7 @@ inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options,
 						return true;
 				}
 				if (options.recursive) {
-					bool broken = with(outer_allocator, for_each_file_item(item_path, options, process_item_));
+					bool broken = for_each_file_item(item_path, options, process_item_);
 					if (broken) {
 						return true;
 					}
@@ -699,11 +695,53 @@ static List<wchar_t> make_wildcard(Span<utf8> directory8) {
 	return directory_wildcard;
 }
 
+using PathBuffer = StaticList<wchar_t, MAX_PATH>;
+using PathBuffer8 = StaticList<utf8, MAX_PATH>;
+
+PathBuffer8 path_buffer_to_utf8(PathBuffer const &buf) {
+	PathBuffer8 result;
+	result.count = _to_utf8((Span<utf16>)buf, Span(result.data, result.data + result.capacity));
+	return result;
+}
+
+static bool win32_for_each_item_in_directory(PathBuffer &directory_buffer, auto &&fn) {
+	WIN32_FIND_DATAW find_data;
+	HANDLE handle = FindFirstFileW(directory_buffer.data, &find_data);
+	if (handle == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer { FindClose(handle); };
+	
+	directory_buffer.pop(); // \0
+	directory_buffer.pop(); // *
+
+	u32 file_index = 0;
+	do {
+		if (file_index++ < 2) {
+			continue; // Skip . and ..
+		}
+
+		auto name = (Span<wchar_t>)as_span((utf16 *)find_data.cFileName);
+		FileItemKind kind;
+
+		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			kind = FileItem_directory;
+		} else {
+			kind = FileItem_file;
+		}
+
+		fn(kind, name);
+
+	} while (FindNextFileW(handle, &find_data));
+
+	return true;
+}
+
 FileItemList get_items_in_directory(Span<utf8> directory8) {
 	FileItemList result;
 
-	// NOTE: no checkpoint because result.allocator may be temporary.
-	scoped(current_temporary_allocator);
+	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
+	scoped(TL_GET_CURRENT(temporary_allocator));
 
 	auto directory_wildcard = make_wildcard(directory8);
 
@@ -763,27 +801,52 @@ bool create_directory(Span<utf8> path8) {
 	return (bool)CreateDirectoryW((wchar_t *)path16.data, 0);
 }
 
-void delete_directory(Span<utf8> path8, DeleteDirectoryOptions options) {
-	scoped(temporary_allocator_and_checkpoint);
-	auto path16 = to_utf16(path8, true);
-	if (options.recursive) {
-		for_each_file_item(path8, {.recursive = true, .files = true, .directories = true}, [&](ForEachFileItemValue item) {
-			switch (item.kind) {
-				case FileItem_file: 
-					delete_file(item.path);
-					return ForEach_continue;
-				case FileItem_directory:
-					delete_directory(item.path, {.recursive = true});
-					return ForEach_dont_recurse;
-				default:
-					return ForEach_continue;
 
+
+// Expects NOT null terminated path that DOES NOT end in a slash.
+static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
+	path_buffer.add(u'\\');
+	path_buffer.add(u'*');
+	path_buffer.add(u'\0');
+
+	// NOTE: win32_for_each_item_in_directory pops terminator and star.
+	win32_for_each_item_in_directory(path_buffer, [&](FileItemKind kind, Span<wchar_t> name) {
+		scoped_replace(path_buffer.count, path_buffer.count);
+
+		path_buffer.add(name);
+
+		switch (kind) {
+			case FileItem_file: {
+				path_buffer.add(u'\0');
+				if (!DeleteFileW(path_buffer.data)) {
+					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer_to_utf8(path_buffer).span());
+				}
+				break;
 			}
-		});
+			case FileItem_directory: {
+				win32_delete_directory_recursive(path_buffer);
+				break;
+			}
+		}
+	});
+	
+	path_buffer.pop();
+
+	if (!RemoveDirectoryW(path_buffer.data)) {
+		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer_to_utf8(path_buffer).span());
 	}
-	if (!RemoveDirectoryW((wchar_t *)path16.data)) {
-		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path8);
+}
+
+void delete_directory(Span<utf8> path8) {
+	PathBuffer path_buffer;
+
+	while (path8.count && (path8.back() == '\\' || path8.back() == '/')) {
+		--path8.count;
 	}
+
+	path_buffer.count = _to_utf16(path8, (Span<utf16>)Span(path_buffer.data, path_buffer.data + path_buffer.capacity));
+
+	win32_delete_directory_recursive(path_buffer);
 }
 
 #if TL_FILE_INCLUDE_DIALOG
@@ -1059,14 +1122,6 @@ void close(File file) {
 	fclose((FILE *)file.handle);
 }
 
-
-/*
-implement this c++ function using c standatd library
-```
-FileItemList get_items_in_directory(Span<utf8> directory8);
-```
-*/
-
 bool file_exists(Span<utf8> path) {
 	scoped(temporary_allocator_and_checkpoint);
     FILE *file = fopen(null_terminate(path).data, "r");
@@ -1097,8 +1152,8 @@ Optional<u64> get_file_write_time(File file) {
 FileItemList get_items_in_directory(Span<utf8> directory) {
 	FileItemList result = {};
 	
-	// NOTE: no checkpoint because result.allocator may be temporary.
-	scoped(temporary_allocator);
+	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
+	scoped(TL_GET_CURRENT(temporary_allocator));
 
     DIR *dir = opendir(null_terminate(directory).data);
     if (dir == NULL) {
