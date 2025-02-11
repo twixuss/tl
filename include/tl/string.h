@@ -543,11 +543,20 @@ struct StringBuilder {
 	}
 
 	template <class Fn>
-	void for_each_block(Fn &&fn) const {
+	void for_each_block(Fn &&in_fn) const {
 		Block *block = (Block *)&first;
+
+		auto fn = wrap_foreach_fn<Block *>(in_fn);
+
 		do {
-			if (block->count)
-				fn(block);
+			if (block->count) {
+				auto d = fn(block);
+				switch (d) {
+					case ForEach_continue: break;
+					case ForEach_break: return;
+					default: invalid_code_path("not supported");
+				}
+			}
 			block = block->next;
 		} while (block);
 	}
@@ -967,9 +976,42 @@ umm append(StringBuilder &builder, Int v) {
 	return append(builder, FormatInt{.value = v});
 }
 
+struct FormatHexOptions {
+	bool upper_case = false;
+};
+
 template <class Int>  requires is_integer<Int>
-auto format_hex(Int value) {
-	return FormatInt{.value = value, .radix = 16, .leading_zero_count = sizeof(Int) * 2};
+auto format_hex(Int value, FormatHexOptions options = {}) {
+	return FormatInt{
+		.value = (std::make_unsigned_t<Int>)value,
+		.radix = 16, 
+		.leading_zero_count = sizeof(Int) * 2,
+		.char_set = options.upper_case ?
+			"0123456789ABCDEF" :
+			"0123456789abcdef"
+	};
+}
+
+// TODO: I need to come up with something thats more modular than this.
+//       Formatting nested elements is annoying currently because it 
+//       requires all these specializations
+template <class T>
+struct HexSpan {
+	Span<T> span;
+};
+
+template <class Int>  requires is_integer<Int>
+auto format_hex(Span<Int> value) {
+	return HexSpan{value};
+}
+
+template <class T>
+inline umm append(StringBuilder &builder, HexSpan<T> hex_span) {
+	umm result = 0;
+	for (auto &t : hex_span.span) {
+		result += append(builder, format_hex(t));
+	}
+	return result;
 }
 
 forceinline umm append(StringBuilder &builder, void const *p) {

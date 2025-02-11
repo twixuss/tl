@@ -2152,51 +2152,61 @@ void flip_order(Span<T> span) {
 }
 
 template <class T, class Size, class Fn>
-void split_by_one(Span<T, Size> what, T by, Fn &&callback) {
+void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
 	umm start = 0;
 	umm what_start = 0;
 
 	for (; what_start < what.count;) {
 		if (what.data[what_start] == by) {
-			callback(what.subspan(start, what_start - start));
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
+
 			start = what_start + 1;
 		}
 		++what_start;
 	}
 
-	callback(Span(what.data + start, what.end()));
+	fn(Span(what.data + start, what.end()));
 }
 
 template <class T, class Size, class Fn>
-void split_by_any(Span<T, Size> what, Span<T> by, Fn &&callback) {
+void split_by_any(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
 	umm start = 0;
 	umm what_start = 0;
 
 	for (; what_start < what.count;) {
 		if (find(by, what.data[what_start])) {
-			callback(what.subspan(start, what_start - start));
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
 			start = what_start + 1;
 		}
 		++what_start;
 	}
 
-	callback(Span(what.data + start, what.end()));
+	fn(Span(what.data + start, what.end()));
 }
 
 template <class T, class Size, class Fn>
-void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&callback) {
+void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
 	umm start = 0;
 	umm what_start = 0;
 
 	for (; what_start < what.count;) {
 		if (starts_with(what.skip(what_start), by)) {
-			callback(what.subspan(start, what_start - start));
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
 			start = what_start + by.count;
 		}
 		++what_start;
 	}
 
-	callback(Span(what.data + start, what.end()));
+	fn(Span(what.data + start, what.end()));
 }
 
 template <class T, class Size, class Selector, class GroupProcessor>
@@ -2300,6 +2310,12 @@ inline constexpr bool is_digit(utf32 c) {
 
 inline constexpr bool is_hex_digit(utf32 c) {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+inline constexpr u8 hex_digit_to_int(utf32 c) {
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return c;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {

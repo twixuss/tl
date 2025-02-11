@@ -100,17 +100,34 @@ struct WriteEntireFileOptions {
 	bool create_directories = true;
 };
 
-inline bool write_entire_file(File file, Span<u8> span) {
+template <class T>
+concept WritableToFile = std::is_same_v<T, StringBuilder> || std::is_convertible_v<T, Span<u8>>;
+
+inline umm write(File file, StringBuilder const &builder) {
 	set_cursor(file, 0, File_begin);
 	defer { truncate_to_cursor(file); };
-	return write(file, span) != 0;
+	umm bytes_written = 0;
+	builder.for_each_block([&](StringBuilder::Block *block) {
+		umm block_bytes_written = write(file, block->span());
+		bytes_written += block_bytes_written;
+		if (block_bytes_written != block->count)
+			return ForEach_break;
+		return ForEach_continue;
+	});
+	return bytes_written;
 }
-template <AChar Char>
-inline bool write_entire_file(Span<Char> path, Span<u8> span, WriteEntireFileOptions options = {}) {
+template <WritableToFile Data>
+inline bool write_entire_file(File file, Data const &data) {
+	set_cursor(file, 0, File_begin);
+	defer { truncate_to_cursor(file); };
+	return write(file, data) != 0;
+}
+template <AChar Char, WritableToFile Data>
+inline bool write_entire_file(Span<Char> path, Data const &data, WriteEntireFileOptions options = {}) {
 	File file = open_file(path, {.write = true, .create_directories = options.create_directories});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span) != 0;
+	return write(file, data) != 0;
 }
 
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
@@ -682,26 +699,25 @@ Optional<u64> get_file_write_time(File file) {
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
 
-// Appends /* to directory. Result is null terminated.
-static List<wchar_t> make_wildcard(Span<utf8> directory8) {
-	auto directory_wildcard = (List<wchar_t>)to_utf16(directory8, false);
-	if (directory_wildcard.count) {
-		if (directory_wildcard.back() != u'\\' && directory_wildcard.back() != u'/') {
-			directory_wildcard.add(u'\\');
-		}
-	}
-	directory_wildcard.add(u'*');
-	directory_wildcard.add(u'\0');
-	return directory_wildcard;
-}
-
 using PathBuffer = StaticList<wchar_t, MAX_PATH>;
 using PathBuffer8 = StaticList<utf8, MAX_PATH>;
 
-PathBuffer8 path_buffer_to_utf8(PathBuffer const &buf) {
+static PathBuffer8 path_buffer8_from_utf16(Span<wchar_t> buf) {
 	PathBuffer8 result;
-	result.count = _to_utf8((Span<utf16>)buf, Span(result.data, result.data + result.capacity));
+	result.count = autocast _to_utf8((Span<utf16>)buf, Span(result.data, result.data + result.capacity));
 	return result;
+}
+
+static PathBuffer path_buffer_from_utf8(Span<utf8> path8) {
+	PathBuffer path_buffer;
+
+	while (path8.count && (path8.back() == '\\' || path8.back() == '/')) {
+		--path8.count;
+	}
+
+	path_buffer.count = autocast _to_utf16(path8, (Span<utf16>)Span(path_buffer.data, path_buffer.data + path_buffer.capacity));
+
+	return path_buffer;
 }
 
 static bool win32_for_each_item_in_directory(PathBuffer &directory_buffer, auto &&fn) {
@@ -740,41 +756,25 @@ static bool win32_for_each_item_in_directory(PathBuffer &directory_buffer, auto 
 FileItemList get_items_in_directory(Span<utf8> directory8) {
 	FileItemList result;
 
-	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
-	scoped(TL_GET_CURRENT(temporary_allocator));
+	auto path_buffer = path_buffer_from_utf8(directory8);
 
-	auto directory_wildcard = make_wildcard(directory8);
+	path_buffer.add(u'\\');
+	path_buffer.add(u'*');
+	path_buffer.add(u'\0');
 
-	WIN32_FIND_DATAW find_data;
-	HANDLE handle = FindFirstFileW(directory_wildcard.data, &find_data);
-	if (handle == INVALID_HANDLE_VALUE) {
-		return {};
-	}
+	PathBuffer8 name_buffer;
 
-	u32 file_index = 0;
-	do {
-		if (file_index++ < 2) {
-			continue; // Skip . and ..
-		}
-
-		auto name = as_span((utf16 *)find_data.cFileName);
-
+	win32_for_each_item_in_directory(path_buffer, [&](FileItemKind kind, Span<wchar_t> name) {
+		name_buffer = path_buffer8_from_utf16(name);
+		
 		FileItem item;
-		item.name.count = name.count;
+		item.kind = kind;
+		item.name.count = name_buffer.count;
 		item.name.data = (utf8 *)result.buffer.count;
 
-		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			item.kind = FileItem_directory;
-		} else {
-			item.kind = FileItem_file;
-		}
-
 		result.add(item);
-		result.buffer.add(TL_TMP(to_utf8(name)));
-
-	} while (FindNextFileW(handle, &find_data));
-
-	FindClose(handle);
+		result.buffer.add(name_buffer.span());
+	});
 
 	for (auto &item : result) {
 		item.name.data = result.buffer.data + (umm)item.name.data;
@@ -819,7 +819,7 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 			case FileItem_file: {
 				path_buffer.add(u'\0');
 				if (!DeleteFileW(path_buffer.data)) {
-					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer_to_utf8(path_buffer).span());
+					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer8_from_utf16(path_buffer).span());
 				}
 				break;
 			}
@@ -833,18 +833,12 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 	path_buffer.pop();
 
 	if (!RemoveDirectoryW(path_buffer.data)) {
-		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer_to_utf8(path_buffer).span());
+		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer8_from_utf16(path_buffer).span());
 	}
 }
 
 void delete_directory(Span<utf8> path8) {
-	PathBuffer path_buffer;
-
-	while (path8.count && (path8.back() == '\\' || path8.back() == '/')) {
-		--path8.count;
-	}
-
-	path_buffer.count = _to_utf16(path8, (Span<utf16>)Span(path_buffer.data, path_buffer.data + path_buffer.capacity));
+	auto path_buffer = path_buffer_from_utf8(path8);
 
 	win32_delete_directory_recursive(path_buffer);
 }
