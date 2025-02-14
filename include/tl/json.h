@@ -1,8 +1,6 @@
 #pragma once
 #include "system.h"
 #include "list.h"
-#include "std_hash.h"
-#include <unordered_map>
 
 #pragma warning(push)
 #pragma warning(disable: 4820) // padding after struct

@@ -831,7 +831,10 @@ inline umm append_format(StringBuilder &b, Span<Char> format_string) {
 	return appended_char_count;
 }
 
-template <class Arg, class ...Args, AChar Char>
+template <class T>
+concept Appendable = requires { append(*(StringBuilder *)0, *(T *)0); };
+
+template <Appendable Arg, Appendable ...Args, AChar Char>
 umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
 	Char previous = {};
 	auto start = format_string.data;
@@ -873,7 +876,7 @@ umm append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Ar
 	invalid_code_path("Too many arguments provided for this format string");
 	return {};
 }
-template <class ...Args, AChar Char>
+template <Appendable ...Args, AChar Char>
 umm append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
 	return append_format(b, as_span(format_string), args...);
 }
@@ -1195,7 +1198,7 @@ template <class ...Args>
 inline constexpr bool are_utf16 = are_utf16_t<Args...>::value;
 
 
-template <class ...Args>
+template <Appendable ...Args>
 inline auto concatenate(Args const &...args) {
 	StringBuilder builder;
 	int _ = ((append(builder, args), ...), 0);
@@ -1209,12 +1212,12 @@ inline auto concatenate(Args const &...args) {
 	}
 }
 
-template <class ...Args>
+template <Appendable ...Args>
 inline auto tconcatenate(Args &&...args) {
 	return TL_TMP(concatenate(args...));
 }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = TL_GET_CURRENT(temporary_allocator);
@@ -1222,7 +1225,7 @@ List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const 
 	return (List<ascii, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = TL_GET_CURRENT(temporary_allocator);
@@ -1230,7 +1233,7 @@ List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &.
 	return (List<utf8, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<utf16, Allocator> aformat(Allocator allocator, Span<utf16> fmt, Args const &...args) {
 	StringBuilder builder;
 	builder.allocator = TL_GET_CURRENT(temporary_allocator);
@@ -1238,40 +1241,40 @@ List<utf16, Allocator> aformat(Allocator allocator, Span<utf16> fmt, Args const 
 	return (List<utf16, Allocator>)to_string<Allocator>(builder, allocator);
 }
 
-template <class Allocator = Allocator, class ...Args> List<ascii, Allocator> aformat(Allocator allocator, ascii const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
-template <class Allocator = Allocator, class ...Args> List<utf8 , Allocator> aformat(Allocator allocator, utf8  const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
-template <class Allocator = Allocator, class ...Args> List<utf16, Allocator> aformat(Allocator allocator, utf16 const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<ascii, Allocator> aformat(Allocator allocator, ascii const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<utf8 , Allocator> aformat(Allocator allocator, utf8  const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<utf16, Allocator> aformat(Allocator allocator, utf16 const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<ascii, Allocator> format(Span<ascii> fmt, Args const &...args) {
 	return aformat<Allocator>(Allocator::current(), fmt, args...);
 }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<utf8, Allocator> format(Span<utf8> fmt, Args const &...args) {
 	return aformat<Allocator>(Allocator::current(), fmt, args...);
 }
 
-template <class Allocator = Allocator, class ...Args>
+template <class Allocator = Allocator, Appendable ...Args>
 List<utf16, Allocator> format(Span<utf16> fmt, Args const &...args) {
 	return aformat<Allocator>(Allocator::current(), fmt, args...);
 }
 
-template <class Allocator = Allocator, class ...Args> List<ascii, Allocator> format(ascii const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
-template <class Allocator = Allocator, class ...Args> List<utf8 , Allocator> format(utf8  const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
-template <class Allocator = Allocator, class ...Args> List<utf16, Allocator> format(utf16 const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<ascii, Allocator> format(ascii const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<utf8 , Allocator> format(utf8  const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
+template <class Allocator = Allocator, Appendable ...Args> List<utf16, Allocator> format(utf16 const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
 
-template <class ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
-template <class ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <class ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
+template <Appendable ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
-template <class Allocator = Allocator, class T>
+template <class Allocator = Allocator, Appendable T>
 List<utf8, Allocator> to_string(T const &value) {
 	StringBuilder builder;
 	builder.allocator = TL_GET_CURRENT(temporary_allocator);

@@ -262,7 +262,7 @@ forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requir
 	}
 }
 
-#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&, _b = b](auto _a) { return _a + _b; } __VA_OPT__(,) __VA_ARGS__))
+#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&](auto value) { return b; } __VA_OPT__(,) __VA_ARGS__))
 
 template <ASpinner Spinner = SleepySpinner>
 void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {

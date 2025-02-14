@@ -161,7 +161,7 @@ struct BucketHashMap : Traits {
 		u64 hash;
 		KeyValue kv;
 	};
-	using Bucket = LinkedList<HashKeyValue>;
+	using Bucket = LinkedList<HashKeyValue, Allocator>;
 
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Span<Bucket> buckets;
@@ -318,6 +318,9 @@ struct BucketHashMap : Traits {
 
 		buckets.data = allocator.allocate<Bucket>(new_buckets_count TL_LA);
 		buckets.count = new_buckets_count;
+		for (auto &bucket : buckets) {
+			bucket.allocator = allocator;
+		}
 
 		for (auto old_bucket : old_buckets) {
 			auto next_node = old_bucket.head;
@@ -742,6 +745,14 @@ struct ContiguousHashMap : Traits {
 			}
 			index = step(index, cells.count);
 		}
+	}
+	ContiguousHashMap copy() {
+		ContiguousHashMap result { .allocator = current_allocator };
+		result.cells.data = result.allocator.allocate<Cell>(cells.count);
+		result.cells.count = cells.count;
+		memcpy(result.cells.data, cells.data, cells.count * sizeof(Cell));
+		result.count = count;
+		return result;
 	}
 };
 

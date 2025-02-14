@@ -3219,15 +3219,7 @@ enum class QuickSortPivot {
 };
 
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
-void quick_sort(Span<T> span, auto fn) {
-	auto less = [&] (T a, T b) {
-		if constexpr (std::is_invocable_r_v<bool, decltype(fn), T, T>) {
-			return fn(a, b);
-		} else {
-			return fn(a) < fn(b);
-		}
-	};
-
+void quick_sort(Span<T> span, auto less) requires requires(T a, T b) { { less(a, b) } -> std::same_as<bool>; } {
 	switch (span.count) {
 		case 0:
 		case 1:
@@ -3265,8 +3257,12 @@ void quick_sort(Span<T> span, auto fn) {
 	}
 	Swap(*mid, span.end()[-1]);
 
-	quick_sort(Span<T>{span.begin(), mid}, fn);
-	quick_sort(Span<T>{mid + 1, span.end()}, fn);
+	quick_sort(Span<T>{span.begin(), mid}, less);
+	quick_sort(Span<T>{mid + 1, span.end()}, less);
+}
+template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
+void quick_sort(Span<T> span, auto selector) requires requires(T a) { selector(a) < selector(a); } {
+	return quick_sort(span, [&](T a, T b) { return selector(a) < selector(b); });
 }
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span) {
