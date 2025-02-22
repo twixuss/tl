@@ -261,8 +261,9 @@ void free(FontCollection *collection) {
 	free(collection->fonts);
 }
 
-void render_glyph(FontCollection *collection_, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point) {
+void render_glyph(FontCollection *collection_, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point, List<v3u8, TemporaryAllocator> &temp_pixels) {
 	auto collection = (FontCollectionFT *)collection_;
+	auto &atlas = collection->atlas;
 	auto &font = *(FontFT *)&font_;
 	if (!font.face) {
 		auto error = FT_New_Memory_Face(collection->ft_library, font.buffer.data, font.buffer.count, 0, &font.face);
@@ -288,7 +289,7 @@ void render_glyph(FontCollection *collection_, Font &font_, u32 font_size, Sized
 	error = FT_Render_Glyph(font.face->glyph, FT_RENDER_MODE_LCD);
 	if (error) {
 		collection->chars.get_or_insert({new_char_code_point, font_size}) = 0;
-		continue;
+		return;
 	}
 
 	auto slot = font.face->glyph;
@@ -392,7 +393,7 @@ static void _ensure_all_chars_present(FontCollection *collection, auto reader, u
 			for (auto &font : collection->fonts) {
 				auto &sized_font = font.sized.get_or_insert(font_size);
 
-				render_glyph(collection, font, font_size, sized_font, new_char_code_point);
+				render_glyph(collection, font, font_size, sized_font, new_char_code_point, temp_pixels);
 			}
 		}
 	}
