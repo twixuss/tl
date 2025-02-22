@@ -30,7 +30,7 @@ SourceLocation get_source_location(Span<utf8> location, Span<utf8> source) {
 		while (combined_lines.end() < source.end() && *combined_lines.end() != '\n')
 			++combined_lines.count;
 
-		split(combined_lines, u8'\n', [&](Span<utf8> line){ result.lines.add({ line }); });
+		split_by_one(combined_lines, u8'\n', [&](Span<utf8> line){ result.lines.add({ line }); });
 	}
 
 	assert(result.lines.front().begin() <= location.begin());

@@ -5,7 +5,7 @@ namespace tl {
 
 inline List<utf8> bin2cpp(Span<u8> data, Span<utf8> name) {
 	StringBuilder builder;
-	builder.allocator = temporary_allocator;
+	builder.allocator = current_temporary_allocator;
 
 	append(builder, "unsigned char const ");
 	append(builder, name);

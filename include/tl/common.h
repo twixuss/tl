@@ -903,6 +903,9 @@ struct AutoCaster {
 	}
 };
 
+// NOTE: MSVC breaks when this is used in initial value of a struct member.
+// This makes the struct not default-constructible, and when you try to default-construct it
+// the error is not about that, but a syntax one about unexpected '(' or something. It's strange.
 #define autocast AutoCaster{} ->* 
 
 template <class... Callables>
@@ -1866,9 +1869,11 @@ forceinline constexpr auto enumerate(Enumerable &&enumerable) {
 forceinline constexpr Span<ascii> operator""s(ascii const *string, umm count) { return Span((ascii *)string, count); }
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm count) { return Span((utf8  *)string, count); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm count) { return Span((utf16 *)string, count); }
+forceinline constexpr Span<utf32> operator""s(utf32 const *string, umm count) { return Span((utf32 *)string, count); }
 forceinline constexpr Span<ascii> operator""ts(ascii const *string, umm count) { return Span((ascii *)string, count + 1); }
 forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm count) { return Span((utf8  *)string, count + 1); }
 forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) { return Span((utf16 *)string, count + 1); }
+forceinline constexpr Span<utf32> operator""ts(utf32 const *string, umm count) { return Span((utf32 *)string, count + 1); }
 forceinline constexpr Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
 forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }

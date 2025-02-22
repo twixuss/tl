@@ -123,6 +123,15 @@ D(void *, glMapNamedBuffer, (GLuint buffer, GLenum access), (buffer, access))\
 D(GLboolean, glUnmapBuffer, (GLenum target), (target))\
 D(GLboolean, glUnmapNamedBuffer, (GLuint buffer), (buffer))\
 D(void, glBlitFramebuffer, (GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter), (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter))\
+D(void, glClearTexImage, (GLuint texture, GLint level, GLenum format, GLenum type, const void * data), (texture, level, format, type, data))\
+D(void, glClearBufferiv, (GLenum buffer, GLint drawbuffer, const GLint * value), (buffer, drawbuffer, value))\
+D(void, glClearBufferuiv, (GLenum buffer, GLint drawbuffer, const GLuint * value), (buffer, drawbuffer, value))\
+D(void, glClearBufferfv, (GLenum buffer, GLint drawbuffer, const GLfloat * value), (buffer, drawbuffer, value))\
+D(void, glClearBufferfi, (GLenum buffer, GLint drawbuffer, GLfloat depth, GLint stencil), (buffer, drawbuffer, depth, stencil))\
+D(void, glClearNamedFramebufferiv, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLint * value), (framebuffer, buffer, drawbuffer, value))\
+D(void, glClearNamedFramebufferuiv, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLuint * value), (framebuffer, buffer, drawbuffer, value))\
+D(void, glClearNamedFramebufferfv, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLfloat * value), (framebuffer, buffer, drawbuffer, value))\
+D(void, glClearNamedFramebufferfi, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLfloat depth, GLint stencil), (framebuffer, buffer, drawbuffer, depth, stencil))\
 
 #define WINDOWS_FUNCS \
 D(BOOL, wglSwapIntervalEXT, (int interval), (interval))\

@@ -70,6 +70,8 @@ TL_API v2s get_cursor_position(HWND relative_to = 0);
 TL_API bool set_fullscreen(HWND window, bool enable, DWORD window_style, WINDOWPLACEMENT &placement);
 TL_API f32 get_cursor_speed();
 
+TL_API f32 get_monitor_refresh_time(HMONITOR hm);
+TL_API f32 get_monitor_refresh_time(HWND hw);
 
 //
 // Raw Input
@@ -390,6 +392,22 @@ f32 get_cursor_speed() {
 	};
 
 	return speed_table[speed - 1];
+}
+
+f32 get_monitor_refresh_time(HMONITOR hm) {
+	MONITORINFOEXW mi;
+	mi.cbSize = sizeof(mi);
+	if (GetMonitorInfoW(hm, &mi)) {
+		DEVMODEW mode;
+		mode.dmSize = sizeof(mode);
+		if (EnumDisplaySettingsW(mi.szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
+			return 1.0f / mode.dmDisplayFrequency;
+		}
+	}
+	return 1.0f / 60;
+}
+f32 get_monitor_refresh_time(HWND hw) {
+	return get_monitor_refresh_time(MonitorFromWindow(hw, MONITOR_DEFAULTTONEAREST));
 }
 
 }

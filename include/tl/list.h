@@ -199,9 +199,8 @@ struct List : Span<T, Size_> {
 	}
 
 	void erase(Span where_) {
-		bounds_check(assert(where_.count <= count));
-		bounds_check(assert(begin() <= where_.begin() && where_.begin() < end()));
-		bounds_check(assert(where_.end() <= end()));
+		bounds_check(assert(begin() <= where_.begin() && where_.begin() <= end()));
+		bounds_check(assert(begin() <= where_.end() && where_.end() <= end()));
 
 		memmove(where_.data, where_.data + where_.count, (count - where_.count + data - where_.data) * sizeof(T));
 		count -= where_.count;
@@ -260,10 +259,8 @@ struct List : Span<T, Size_> {
 	}
 
 	void replace(Span where, Span with_what) {
-		bounds_check(assert(begin() <= where.begin()));
-		bounds_check(assert(where.count <= count));
-		bounds_check(assert(begin() <= where.begin() && where.begin() < end()));
-		bounds_check(assert(where.end() <= end()));
+		bounds_check(assert(begin() <= where.begin() && where.begin() <= end()));
+		bounds_check(assert(begin() <= where.end()   && where.end()   <= end()));
 
 		T *old_data = data;
 		reserve_exponential(count - where.count + with_what.count);
@@ -309,32 +306,23 @@ void free(List<T, Allocator, Size> &list) {
 template <class T, class Allocator, class Size>
 List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
 	List<T, Allocator, Size> result;
-	result.count = that.count;
-	result.capacity = result.count;
-	result.data = result.allocator.template allocate<T>(result.count TL_LA);
-	memcpy(result.data, that.data, result.count * sizeof(T));
+	result.set(as_span(that));
 	return result;
 }
 
 template <class Allocator = Allocator, class T>
 List<T, Allocator> to_list(std::initializer_list<T> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator> result;
-	result.data = allocator.template allocate<T>(that.size() TL_LA);
-	result.count = that.size();
-	result.capacity = that.size();
 	result.allocator = allocator;
-	memcpy(result.data, that.begin(), that.size() * sizeof(T));
+	result.set(as_span(that));
 	return result;
 }
 
 template <class Allocator = Allocator, class Size, class T>
 List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Allocator::current() TL_LP) {
 	List<T, Allocator, Size> result;
-	result.data = allocator.template allocate<T>(that.count TL_LA);
-	result.count = that.count;
-	result.capacity = result.count;
 	result.allocator = allocator;
-	memcpy(result.data, that.data, result.count * sizeof(T));
+	result.set(as_span(that));
 	return result;
 }
 

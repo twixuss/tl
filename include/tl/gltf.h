@@ -32,19 +32,6 @@ forceinline u8 *chunk_data(Chunk *chunk) {
 
 TL_API Scene3D parse_from_memory(Span<u8> memory);
 
-struct ParseFromFileResult {
-	Buffer file_contents;
-	Scene3D scene;
-};
-
-inline Optional<ParseFromFileResult> parse_from_file(Span<utf8> path) {
-	auto memory = read_entire_file(to_pathchars(path, true));
-	if (memory.data) {
-		return ParseFromFileResult{memory, parse_from_memory(memory)};
-	}
-	return {};
-}
-
 }
 }
 

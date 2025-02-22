@@ -121,6 +121,15 @@
 #define glUnmapBuffer tl::gl::_glUnmapBuffer
 #define glUnmapNamedBuffer tl::gl::_glUnmapNamedBuffer
 #define glBlitFramebuffer tl::gl::_glBlitFramebuffer
+#define glClearTexImage tl::gl::_glClearTexImage
+#define glClearBufferiv tl::gl::_glClearBufferiv
+#define glClearBufferuiv tl::gl::_glClearBufferuiv
+#define glClearBufferfv tl::gl::_glClearBufferfv
+#define glClearBufferfi tl::gl::_glClearBufferfi
+#define glClearNamedFramebufferiv tl::gl::_glClearNamedFramebufferiv
+#define glClearNamedFramebufferuiv tl::gl::_glClearNamedFramebufferuiv
+#define glClearNamedFramebufferfv tl::gl::_glClearNamedFramebufferfv
+#define glClearNamedFramebufferfi tl::gl::_glClearNamedFramebufferfi
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::_wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::_wglCreateContextAttribsARB
@@ -245,6 +254,15 @@
 #define glUnmapBuffer tl::gl::functions._glUnmapBuffer
 #define glUnmapNamedBuffer tl::gl::functions._glUnmapNamedBuffer
 #define glBlitFramebuffer tl::gl::functions._glBlitFramebuffer
+#define glClearTexImage tl::gl::functions._glClearTexImage
+#define glClearBufferiv tl::gl::functions._glClearBufferiv
+#define glClearBufferuiv tl::gl::functions._glClearBufferuiv
+#define glClearBufferfv tl::gl::functions._glClearBufferfv
+#define glClearBufferfi tl::gl::functions._glClearBufferfi
+#define glClearNamedFramebufferiv tl::gl::functions._glClearNamedFramebufferiv
+#define glClearNamedFramebufferuiv tl::gl::functions._glClearNamedFramebufferuiv
+#define glClearNamedFramebufferfv tl::gl::functions._glClearNamedFramebufferfv
+#define glClearNamedFramebufferfi tl::gl::functions._glClearNamedFramebufferfi
 #if OS_WINDOWS
 #define wglSwapIntervalEXT tl::gl::functions._wglSwapIntervalEXT
 #define wglCreateContextAttribsARB tl::gl::functions._wglCreateContextAttribsARB

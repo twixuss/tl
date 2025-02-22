@@ -30,12 +30,31 @@ static constexpr auto get_invoke_separated(std::index_sequence<indices...>) noex
 } // namespace Detail
 
 struct FatFunctionPointer {
-	void (*function)(void *);
-	void *parameter;
+	void (*function)(void *) = 0;
+	void *parameter = 0;
 	
 	void operator()() {
 		return function(parameter);
 	}
+	#ifndef TL_FAT_FUNCTION_POINTER_NO_CONSTRUCTORS
+	FatFunctionPointer() = default;
+	FatFunctionPointer(void (*fn)()) {
+		function = (void(*)(void*))fn;
+		parameter = 0;
+	}
+	FatFunctionPointer(void (*fn)(void *param), void *param) {
+		function = fn;
+		parameter = param;
+	}
+	template <class Fn>
+	FatFunctionPointer(Fn &&fn) requires requires { fn(); } {
+		parameter = default_allocator.allocate_uninitialized<Fn>();
+		new(parameter) Fn(std::move(fn));
+		function = [](void *parameter) {
+			(*(Fn *)parameter)();
+		};
+	}
+	#endif
 };
 
 template <class Allocator = Allocator, class Fn>

@@ -41,7 +41,7 @@ struct Printer {
 	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
 	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
 
-	template <class Fmt, class ...T>
+	template <class Fmt, Appendable ...T>
 	inline umm writeln(Fmt fmt, T const &...args) {
 		auto a = write(fmt, args...);
 		auto b = write('\n');
@@ -89,11 +89,11 @@ inline void set_console_color(ConsoleColor foreground) {
 	set_console_color(foreground, ConsoleColor::black);
 }
 
-inline umm print(auto const &...args) { return current_printer.write(args...); }
+inline umm print(Appendable auto const &...args) { return current_printer.write(args...); }
 inline umm println() { return print('\n'); }
-inline umm println(auto const &...args) { return current_printer.writeln(args...); }
+inline umm println(Appendable auto const &...args) { return current_printer.writeln(args...); }
 
-inline umm errln(auto const &...args) { return standard_error_printer.writeln(args...); }
+inline umm errln(Appendable auto const &...args) { return standard_error_printer.writeln(args...); }
 
 TL_API void hide_console_window();
 TL_API void show_console_window();

@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "console.h"
+#include "string.h"
 
 /*
 #define TL_LOGGER_CONTEXT_MEMBERS \
@@ -23,6 +24,15 @@ enum class LogSeverity {
 	TL_ENUMERATE_LOGGER_SEVERITIES
 	#undef x
 };
+
+inline umm append(StringBuilder &builder, LogSeverity s) {
+	switch (s) {
+		#define x(name) case LogSeverity::name: return append(builder, u8###name##s);
+		TL_ENUMERATE_LOGGER_SEVERITIES
+		#undef x
+	}
+	return append_format(builder, "LogSeverity({})", (int)s);
+}
 
 template <class Derived>
 struct LoggerBase {
@@ -54,16 +64,6 @@ struct Logger : LoggerBase<Logger> {
 		func(this, severity, message);
 	}
 };
-
-inline umm append(StringBuilder &builder, LogSeverity severity) {
-	switch (severity) {
-#define x(name) case LogSeverity::name: return append(builder, #name ## s);
-		TL_ENUMERATE_LOGGER_SEVERITIES
-#undef x
-	}
-	return 0;
-}
-
 
 #ifndef TL_USE_CONTEXT
 extern TL_API Logger app_logger;

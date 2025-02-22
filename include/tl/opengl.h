@@ -22,6 +22,28 @@
 #pragma warning(push)
 #pragma warning(disable: 4820)
 
+#ifndef TL_GL_PROFILE
+	#ifdef TL_GL_ENABLE_PROFILE
+		namespace tl {
+			inline static umm gl_profile_level;
+		}
+		#define TL_GL_PROFILE(name)                                \
+			auto CONCAT(_timer,__LINE__) = create_precise_timer(); \
+			++gl_profile_level;                                    \
+			defer {                                                \
+				--gl_profile_level;                                \
+				current_logger.info(                               \
+					"{}{} took {}ms",                              \
+					Repeat{"  ", gl_profile_level},                \
+					name,                                          \
+					elapsed_time(CONCAT(_timer, __LINE__)) * 1000  \
+				);                                                 \
+			}
+	#else
+		#define TL_GL_PROFILE(name)
+	#endif
+#endif
+
 #if OS_WINDOWS
 // These are not defined on windows
 using GLchar = char;
@@ -844,47 +866,68 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 		print("GetDC failed\n");
 		return false;
 	}
+	
+	{
+		TL_GL_PROFILE("Selecting pixel format");
 
-	PIXELFORMATDESCRIPTOR dp = {};
-	dp.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-	dp.nVersion = 1;
-	dp.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-	dp.cColorBits = 32;
-	dp.cAlphaBits = 8;
-	dp.cDepthBits = depth_bits;
-	dp.cStencilBits = stencil_bits;
-	dp.iPixelType = PFD_TYPE_RGBA;
-	dp.iLayerType = PFD_MAIN_PLANE;
+		PIXELFORMATDESCRIPTOR dp = {};
+		dp.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+		dp.nVersion = 1;
+		dp.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+		dp.cColorBits = 32;
+		dp.cAlphaBits = 8;
+		dp.cDepthBits = depth_bits;
+		dp.cStencilBits = stencil_bits;
+		dp.iPixelType = PFD_TYPE_RGBA;
+		dp.iLayerType = PFD_MAIN_PLANE;
 
-	int index = ChoosePixelFormat(client_dc, &dp);
-	if (!index) {
-		auto error = GetLastError();
-		print("ChoosePixelFormat failed with code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
-		return false;
+		int index = [&] {
+			TL_GL_PROFILE("ChoosePixelFormat");
+			return ChoosePixelFormat(client_dc, &dp);
+		}();
+		if (!index) {
+			auto error = GetLastError();
+			print("ChoosePixelFormat failed with code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
+			return false;
+		}
+
+		PIXELFORMATDESCRIPTOR sp = {};
+		{
+			TL_GL_PROFILE("DescribePixelFormat");
+			DescribePixelFormat(client_dc, index, sizeof(sp), &sp);
+		}
+		
+		{
+			TL_GL_PROFILE("SetPixelFormat");
+			SetPixelFormat(client_dc, index, &sp);
+		}
 	}
+	
+	{
+		TL_GL_PROFILE("Creating OpenGL context");
 
-	PIXELFORMATDESCRIPTOR sp = {};
-	DescribePixelFormat(client_dc, index, sizeof(sp), &sp);
+		context = wglCreateContext(client_dc);
+		if (!wglMakeCurrent(client_dc, context)) {
+			print("wglMakeCurrent failed");
+			return false;
+		}
 
-	SetPixelFormat(client_dc, index, &sp);
-
-	context = wglCreateContext(client_dc);
-	if (!wglMakeCurrent(client_dc, context)) {
-		print("wglMakeCurrent failed");
-		return false;
+		assert(wglGetCurrentContext());
 	}
-
-	assert(wglGetCurrentContext());
 
 	static constexpr u32 function_count = sizeof(functions) / sizeof(void *);
 
-	for (u32 function_index = 0; function_index < function_count; ++function_index) {
-		char const *name = function_names[function_index];
-		void *function = wglGetProcAddress(name);
-		if (function) {
-			functions.data[function_index] = function;
-		} else {
-			print("Failed to query '{}'\n", name);
+	{
+		TL_GL_PROFILE("Loading OpenGL extensions");
+
+		for (u32 function_index = 0; function_index < function_count; ++function_index) {
+			char const *name = function_names[function_index];
+			void *function = wglGetProcAddress(name);
+			if (function) {
+				functions.data[function_index] = function;
+			} else {
+				print("Failed to query '{}'\n", name);
+			}
 		}
 	}
 
@@ -1309,6 +1352,13 @@ inline void set_uniform(GLuint shader, char const *name, v3f value) { glUniform3
 inline void set_uniform(GLuint shader, char const *name, v4f value) { glUniform4fv(glGetUniformLocation(shader, name), 1, value.s); }
 inline void set_uniform(GLuint shader, char const *name, m4  value) { glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, false, value.s); }
 
+inline void bind_texture(GLuint program, u32 slot, char const *name, GLuint texture, GLuint sampler = 0, GLenum target = GL_TEXTURE_2D) {
+	glActiveTexture(GL_TEXTURE0 + slot); 
+	glBindTexture(target, texture); 
+	gl::set_uniform(program, name, (int)slot); 
+	glBindSampler(slot, sampler);
+}
+
 inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 index) {
 	glActiveTexture(GL_TEXTURE0 + index);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -1409,5 +1459,5 @@ void free(GrowingBuffer<T> &buffer) {
 #undef WINDOWS_FUNCS
 #undef EXT_AND_OS_FUNCS
 #undef ALL_FUNCS
-
+#undef TL_GL_PROFILE
 #pragma warning(pop)

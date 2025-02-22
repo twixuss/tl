@@ -431,6 +431,42 @@ List<utf16, Allocator> to_utf16(Span<utf8> utf8, bool terminate = false TL_LP) {
 	return result;
 }
 
+template <class Allocator = Allocator>
+List<utf32, Allocator> to_utf32(Span<utf8> utf8, bool terminate = false, utf32 unfound = '?' TL_LP) {
+	List<utf32, Allocator> result;
+	auto c = utf8.data;
+	while (1) {
+		if (c >= utf8.end())
+			break;
+		auto code = decode_and_advance(&c);
+		if (code.has_value()) {
+			result.add(code.value());
+		} else {
+			result.add(unfound);
+			++c;
+		}
+	}
+	if (terminate) {
+		result.add(0);
+		result.count--;
+	}
+	return result;
+}
+
+template <class Allocator = Allocator>
+List<utf8, Allocator> to_utf8(Span<utf32> str, bool terminate = false TL_LP) {
+	List<utf8, Allocator> result;
+	auto c = str.data;
+	for (auto code : str) {
+		result.add(encode_utf8(code).span());
+	}
+	if (terminate) {
+		result.add(0);
+		result.count--;
+	}
+	return result;
+}
+
 #ifndef TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY
 #define TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY 0x1000
 #endif
@@ -1180,6 +1216,102 @@ inline umm append(StringBuilder &builder, OnlyFileAndLine location) {
 	return append_format(builder, "{}:{}", location.file_name(), location.line());
 }
 
+
+inline StaticList<char, 4> escape_c_character(char ch) {
+	StaticList<char, 4> result;
+	switch (ch) {
+		case '\x0': result.add("\\x0"s); break;
+		case '\x1': result.add("\\x1"s); break;
+		case '\x2': result.add("\\x2"s); break;
+		case '\x3': result.add("\\x3"s); break;
+		case '\x4': result.add("\\x4"s); break;
+		case '\x5': result.add("\\x5"s); break;
+		case '\x6': result.add("\\x6"s); break;
+		case '\a': result.add("\\a"s); break;
+		case '\b': result.add("\\b"s); break;
+		case '\t': result.add("\\t"s); break;
+		case '\n': result.add("\\n"s); break;
+		case '\v': result.add("\\v"s); break;
+		case '\f': result.add("\\f"s); break;
+		case '\r': result.add("\\r"s); break;
+		case '\x0e': result.add("\\x0e"s); break;
+		case '\x0f': result.add("\\x0f"s); break;
+		case '\x10': result.add("\\x10"s); break;
+		case '\x11': result.add("\\x11"s); break;
+		case '\x12': result.add("\\x12"s); break;
+		case '\x13': result.add("\\x13"s); break;
+		case '\x14': result.add("\\x14"s); break;
+		case '\x15': result.add("\\x15"s); break;
+		case '\x16': result.add("\\x16"s); break;
+		case '\x17': result.add("\\x17"s); break;
+		case '\x18': result.add("\\x18"s); break;
+		case '\x19': result.add("\\x19"s); break;
+		case '\x1a': result.add("\\x1a"s); break;
+		case '\x1b': result.add("\\x1b"s); break;
+		case '\x1c': result.add("\\x1c"s); break;
+		case '\x1d': result.add("\\x1d"s); break;
+		case '\x1e': result.add("\\x1e"s); break;
+		case '\x1f': result.add("\\x1f"s); break;
+		case '\\': result.add("\\\\"s); break;
+		default:
+			result.add(ch);
+			break;
+	}
+	return result;
+}
+
+inline umm escape_c_string(Span<utf8> string, auto write) {
+	StaticList<utf8, 4096> buffer;
+	umm count = 0;
+	for (auto ch : string) {
+		auto escaped = escape_c_character((char)ch);
+		for (auto ch : escaped) {
+			buffer.add(ch); 
+			if (buffer.count == buffer.capacity) {
+				write(buffer.span());
+				count += buffer.count;
+				buffer.clear();
+			}
+		}
+	}
+	write(buffer.span());
+	count += buffer.count;
+	return count;
+}
+
+struct EscapedCString {
+	Span<utf8> unescaped_string;
+};
+
+inline umm append(StringBuilder &builder, EscapedCString string) {
+	return escape_c_string(string.unescaped_string, [&](auto s) { append(builder, s); });
+}
+
+struct HexCString {
+	Span<utf8> string;
+};
+
+inline umm append(StringBuilder &builder, HexCString string) {
+	for (auto c : string.string) {
+		append(builder, "\\x"s);
+		append(builder, format_hex(c));
+	}
+	return string.string.count * 4;
+}
+
+template <class T>
+struct Repeat {
+	T value;
+	umm count;
+};
+
+template <class T>
+inline umm append(StringBuilder &builder, Repeat<T> r) {
+	umm result = 0;
+	for (umm i = 0; i < r.count; ++i)
+		result += append(builder, r.value);
+	return result;
+}
 
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };
