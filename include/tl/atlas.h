@@ -14,7 +14,7 @@ struct Atlas {
 	void (*on_modify)(Atlas *atlas, void *user_data, aabb<v2u> modified_area) = autocast noop;
 	void (*on_resize)(Atlas *atlas, void *user_data, v2u new_size) = autocast noop;
 	
-	Allocator allocator = Allocator::current();
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	v2u cursor = {};
 	u32 row_height = {};
 	u32 cursor_min_x = {};

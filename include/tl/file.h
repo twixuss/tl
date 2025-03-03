@@ -556,6 +556,8 @@ inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #endif
 
+#include "static_list.h"
+
 namespace tl {
 
 struct WinOpenFileParams {

@@ -235,7 +235,7 @@ void Profiler::init(ArenaAllocator _allocator) {
 ArenaAllocator Profiler::switch_arena(ArenaAllocator new_arena) {
 	tl::free(marks);
 	tl::free(recorded_time_spans);
-	tl::free(thread_infos);
+	thread_infos.free();
 	defer {
 		allocator = new_arena;
 	};
@@ -244,7 +244,7 @@ ArenaAllocator Profiler::switch_arena(ArenaAllocator new_arena) {
 void Profiler::free() {
 	tl::free(marks);
 	tl::free(recorded_time_spans);
-	tl::free(thread_infos);
+	thread_infos.free();
 	allocator.free();
 }
 void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
@@ -283,7 +283,7 @@ void Profiler::end() {
 	auto found = with(thread_infos_lock, thread_infos.find(thread_id));
 	assert(found);
 
-	auto info = &found->value;
+	auto info = found.value;
 	auto &list = info->time_spans;
 
 	TimeSpan span = list.back();
@@ -309,7 +309,7 @@ void Profiler::mark(Span<utf8> name, u32 color) {
 	scoped(marks_lock);
 	auto found = thread_infos.find(get_current_thread_id());
 	assert(found);
-	auto info = &found->value;
+	auto info = found.value;
 #if TL_PROFILER_SUBTRACT_SELF_TIME
 	marks.add({get_performance_counter() - info->self_time, color, get_current_thread_id()});
 #else
@@ -423,7 +423,9 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 
 	events_duration = events_end - events_begin;
 
-	for (auto &[thread_id, events_to_draw] : thread_id_to_events_to_draw) {
+	thread_id_to_events_to_draw.for_each([&](auto kv) {
+		auto &thread_id = *kv.key;
+		auto &events_to_draw = *kv.value;
 		quick_sort(events_to_draw.events, [](Event const &a, Event const &b) {
 			if (a.begin != b.begin) {
 				return a.begin < b.begin;
@@ -511,9 +513,9 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 		for (auto &mark : events_to_draw.marks) {
 			mark.time -= events_begin;
 		}
-	}
+	});
 
-	all_events_to_draw = map(thread_id_to_events_to_draw, [](auto kv) { return kv.value; });
+	thread_id_to_events_to_draw.set_to(all_events_to_draw);
 	quick_sort(all_events_to_draw, [](ThreadDrawList t) { return t.id; });
 }
 

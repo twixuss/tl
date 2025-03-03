@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "static_list.h"
 
 namespace tl {
 
@@ -68,7 +69,7 @@ struct StaticBlockList {
 		T &operator*() { return (*block)[value_index]; }
 	};
 
-	Allocator allocator = Allocator::current();
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Block first;
 	Block *last = &first;
 	Block *alloc_last = &first;

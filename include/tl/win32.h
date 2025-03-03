@@ -4,6 +4,7 @@
 #include "common.h"
 #include "vector.h"
 #include "logger.h"
+#include "static_list.h"
 #define NOMINMAX
 #pragma warning(push, 0)
 #include <Windows.h>

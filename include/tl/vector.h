@@ -315,6 +315,14 @@ template <class T> inline constexpr u32 dimension_of<v2<T>> = 2;
 template <class T> inline constexpr u32 dimension_of<v3<T>> = 3;
 template <class T> inline constexpr u32 dimension_of<v4<T>> = 4;
 
+template <class T>
+struct Is_v2 : std::false_type {};
+template <class T>
+struct Is_v2<v2<T>> : std::true_type {};
+
+template <class T>
+concept v2Int = Is_v2<T>::value && std::integral<typename T::Scalar>;
+
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
 	forceinline constexpr v2f V2f(f32 v = 0) { return {v, v}; }

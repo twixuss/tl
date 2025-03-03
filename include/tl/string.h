@@ -35,7 +35,7 @@ umm append(StringBuilder &builder, YourType t) {
 
 #include "common.h"
 #include "list.h"
-#include "optional.h"
+#include "static_list.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
@@ -775,9 +775,6 @@ inline umm append(StringBuilder &b, Span<T, Size> span) {
 template <class T, class Allocator, class Size>
 forceinline umm append(StringBuilder &b, List<T, Allocator, Size> list) { return append(b, format_span(list, default_span_format)); }
 
-template <class T, class Size>
-forceinline umm append(StringBuilder &b, LinearSet<T, Size> set) { return append(b, format_span(set, default_span_format)); }
-
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<u8   , Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<ascii, Allocator, Size> list) { return append(b, as_span(list)); }
 template <class Allocator, class Size> forceinline umm append(StringBuilder &b, List<utf8 , Allocator, Size> list) { return append(b, as_span(list)); }
@@ -1298,12 +1295,6 @@ inline umm append(StringBuilder &builder, HexCString string) {
 	}
 	return string.string.count * 4;
 }
-
-template <class T>
-struct Repeat {
-	T value;
-	umm count;
-};
 
 template <class T>
 inline umm append(StringBuilder &builder, Repeat<T> r) {

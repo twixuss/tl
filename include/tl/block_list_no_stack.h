@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "static_list.h"
 
 namespace tl {
 

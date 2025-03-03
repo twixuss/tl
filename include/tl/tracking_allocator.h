@@ -31,13 +31,13 @@ struct AllocationMeta {
 
 struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 	struct SourceLocationHashTraits : DefaultHashTraits<std::source_location> {
-		constexpr u64 get_hash(std::source_location value) {
+		constexpr u64 get_hash(std::source_location value) const {
 			return 
 				(u64)value.column() * (u64)1153663161 + 
 				(u64)value.line() * (u64)722716341 + 
 				(u64)::get_hash(as_span(value.file_name())) * (u64)834696729;
 		}
-		constexpr bool are_equal(std::source_location a, std::source_location b) {
+		constexpr bool are_equal(std::source_location a, std::source_location b) const {
 			return 
 				a.column() == b.column() &&
 				a.line() == b.line() &&
@@ -71,7 +71,7 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		auto result = underlying_allocator.reallocate_impl(data, old_size, new_size, alignment, location);
 
 		shared.use([&] (auto &shared) {
-			auto &old_meta = shared.allocation_metas.find(data)->value;
+			auto &old_meta = *shared.allocation_metas.find(data).value;
 			old_meta.counts->current_size -= old_meta.this_size;
 			shared.allocation_metas.erase(data);
 
@@ -94,7 +94,7 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		shared.use([&] (auto &shared) {
 			auto found = shared.allocation_metas.find(data);
 			assert(found, "Attempt to free unallocated / double free at {}", data);
-			auto &old_meta = found->value;
+			auto &old_meta = *found.value;
 			old_meta.counts->current_size -= old_meta.this_size;
 			shared.allocation_metas.erase(data);
 		});
@@ -108,11 +108,11 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 
 	List<AllocationInfo> get_tracked_allocations() {
 		return shared.use([&] (auto &shared) {
-			return map(shared.tracked_allocations, [](auto &kv){
+			return shared.tracked_allocations.map([](auto kv){
 				return AllocationInfo {
-					.location = kv.key,
-					.current_size = kv.value.current_size,
-					.total_size = kv.value.total_size
+					.location = *kv.key,
+					.current_size = kv.value->current_size,
+					.total_size = kv.value->total_size
 				};
 			});
 		});

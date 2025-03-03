@@ -1,6 +1,8 @@
 #pragma once
 #include "list.h"
 #include "variant.h"
+#include "hash_map.h"
+#include "hash_set.h"
 
 namespace tl {
 
@@ -29,6 +31,17 @@ struct TextInputField {
 	List<Action> actions;
 	u32 undoable_actions_count = 0;
 
+	// If inserted text contains a banned char, it is replaced.
+	// If replacement is zero, it is not inserted.
+	// For example you might ban new lines, but replace tabs with spaces.
+	HashMap<utf32, utf32> banned_chars;
+
+	// If empty, all chars are allowed.
+	HashSet<utf32> allowed_chars;
+
+	// Temporary reusable storage.
+	List<utf32> sanitized_string;
+
 	void set_cursor(u32 cursor, bool keep_selection = false) {
 		this->cursor = cursor;
 		if (!keep_selection)
@@ -50,6 +63,40 @@ struct TextInputField {
 		auto end   = cursor;
 		sort_values(begin, end);
 		return Span(text.data + begin, end - begin);
+	}
+	Span<utf32> selection_or_all() {
+		if (cursor == selection_start) {
+			return text;
+		} else {
+			return selection();
+		}
+	}
+
+	void select_all() {
+		selection_start = 0;
+		cursor = text.count;
+	}
+
+	void sanitize(Span<utf32> &string) {
+		sanitized_string.set(string);
+
+		if (banned_chars.count) {
+			sanitized_string.here_map([&](utf32 c) -> Optional<utf32> {
+				if (auto found = banned_chars.find(c)) {
+					if (*found.value) {
+						return *found.value;
+					} 
+					return {};
+				}
+				return c;
+			});
+		}
+
+		if (allowed_chars.count) {
+			sanitized_string.erase_all([&](utf32 c) { return !allowed_chars.find(c); });
+		}
+
+		string = sanitized_string;
 	}
 
 	void add_action(Action action) {
@@ -83,7 +130,10 @@ struct TextInputField {
 		actions.add(action);
 		undoable_actions_count += 1;
 	}
+
 	void insert(Span<utf32> string, bool mergeable = false) {
+		sanitize(string);
+
 		if (!string.count)
 			return;
 
@@ -97,6 +147,33 @@ struct TextInputField {
 		});
 		text.replace(selection(), string);
 		set_cursor(selection_min() + string.count);
+	}
+
+	void erase(Span<utf32> string) {
+		// Bounds checks are performed in text.erase(string), no need to repeat them.
+		u32 string_start = string.data - text.data;
+		add_action(Erase{
+			.text = to_list(string),
+			.selection_start_before = selection_start,
+			.cursor_before = cursor,
+			.cursor_after = string_start,
+		});
+
+		text.erase(string);
+		
+		set_cursor(string_start);
+	}
+	void erase_all() {
+		add_action(Erase{
+			.text = to_list(text),
+			.selection_start_before = selection_start,
+			.cursor_before = cursor,
+			.cursor_after = 0,
+		});
+
+		text.clear();
+		
+		set_cursor(0);
 	}
 	void erase_selection() {
 		add_action(Erase{
@@ -117,7 +194,7 @@ struct TextInputField {
 				return;
 	
 			add_action(Erase{
-				.text = to_list(Span(&text[cursor], 1)),
+				.text = to_list(Span(&text[cursor], (umm)1)),
 				.selection_start_before = cursor,
 				.cursor_before = cursor,
 				.cursor_after = cursor,
@@ -134,7 +211,7 @@ struct TextInputField {
 				return;
 
 			add_action(Erase{
-				.text = to_list(Span(&text[cursor - 1], 1)),
+				.text = to_list(Span(&text[cursor - 1], (umm)1)),
 				.selection_start_before = cursor,
 				.cursor_before = cursor,
 				.cursor_after = cursor - 1,
@@ -192,43 +269,59 @@ struct TextInputField {
 			erase_selection();
 		}
 	}
+
+	void set_text(Span<utf32> string) {
+		sanitize(string);
+
+		add_action(Insert{
+			.inserted_text = to_list(string),
+			.erased_text = to_list(text),
+			.selection_start_before = selection_start,
+			.cursor_before = cursor,
+			.cursor_after = (u32)string.count,
+		});
+
+		text.set(string);
+	
+		set_cursor(text.count);
+	}
+
 	void move_char_back(bool keep_selection) {
-		if (cursor != 0)
-			cursor -= 1;
+		if (selection_min() != 0)
+			cursor = selection_min() - 1;
 
 		if (!keep_selection)
 			selection_start = cursor;
 	}
 	void move_char_forward(bool keep_selection) {
-		if (cursor != text.count)
-			cursor += 1;
+		if (selection_max() != text.count)
+			cursor = selection_max() + 1;
 		
 		if (!keep_selection)
 			selection_start = cursor;
 	}
 	void move_word_back(bool keep_selection) {
-		if (cursor == 0)
-			return;
+		if (cursor != 0) {
+			if (is_whitespace(text[cursor - 1])) {
+				while (1) {
+					if (cursor - 1 > text.count)
+						break;
+					--cursor;
+					if (!is_whitespace(text[cursor])) {
+						++cursor;
+						break;
+					}
+				}
+			}
 
-		if (is_whitespace(text[cursor - 1])) {
 			while (1) {
 				if (cursor - 1 > text.count)
 					break;
 				--cursor;
-				if (!is_whitespace(text[cursor])) {
+				if (is_whitespace(text[cursor])) {
 					++cursor;
 					break;
 				}
-			}
-		}
-
-		while (1) {
-			if (cursor - 1 > text.count)
-				break;
-			--cursor;
-			if (is_whitespace(text[cursor])) {
-				++cursor;
-				break;
 			}
 		}
 		
@@ -247,27 +340,28 @@ struct TextInputField {
 				}
 			}
 			
-			if (cursor >= text.count)
-				return;
-
-			while (1) {
-				++cursor;
-				if (cursor >= text.count)
-					break;
-				if (!is_whitespace(text[cursor]))
-					break;
+			if (cursor < text.count) {
+				while (1) {
+					++cursor;
+					if (cursor >= text.count)
+						break;
+					if (!is_whitespace(text[cursor]))
+						break;
+				}
 			}
 		}
 		
 		if (!keep_selection)
 			selection_start = cursor;
 	}
+
 	Span<utf32> inserted_text(Insert insert) {
 		return Span(text.data + insert.cursor_after - insert.inserted_text.count, insert.inserted_text.count);
 	}
 	Span<utf32> erased_text(Insert insert) {
 		return Span(text.data + insert.cursor_after - insert.inserted_text.count, insert.erased_text.count);
 	}
+
 	void undo() {
 		if (undoable_actions_count == 0)
 			return;

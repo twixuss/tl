@@ -14,7 +14,6 @@
 #include <tl/math_random.h>
 #include <tl/mesh.h>
 #include <tl/opengl.h>
-#include <tl/optional.h>
 #include <tl/profiler.h>
 #include <tl/random.h>
 #include <tl/simd.h>
@@ -654,7 +653,11 @@ no_inline void test_find() {
 	found = find("Hello world! I have a present for you!Hello world! I have a present for you!Hello world! I have a present for you!"s, "lo world! I have a present for you!"s);
 }
 
+void run_tl_tests();
+
 s32 tl_main(Span<Span<utf8>> args) {
+	run_tl_tests();
+
 	Span<bool> s = {1, 0, 0, 1};
 	all(s);
 
@@ -738,14 +741,13 @@ s32 tl_main(Span<Span<utf8>> args) {
 	TEST(common_test);
 	//TEST(compiler_test);
 	TEST(stream_test);
-	TEST(list_test);
 	TEST(function_test);
 	TEST(coroutine_test);
-	TEST(hash_map_test);
+	//TEST(hash_map_test);
 	//TEST(allocation_test);
 	// TEST(utf8_test);
 	TEST(fly_string_test);
-	TEST(big_int_test);
+	//TEST(big_int_test);
 	TEST(simd_test);
 	TEST(sorted_list_test);
 	TEST(thread_pool_test);

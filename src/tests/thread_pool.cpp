@@ -5,6 +5,9 @@
 
 using namespace tl;
 
+#pragma warning(push)
+#pragma warning(disable: 4459) // global shadowing
+
 static LockProtected<HashMap<u32, u32, DefaultHashTraits<u32>, DefaultAllocator>, OsLock> thread_id_to_index;
 static u32 thread_index_counter;
 void add_thread_index() {
@@ -14,7 +17,7 @@ void add_thread_index() {
 }
 static u32 get_thread_index() {
 	return locked_use(thread_id_to_index) {
-		return thread_id_to_index.find(get_current_thread_id())->value;
+		return *thread_id_to_index.find(get_current_thread_id()).value;
 	};
 }
 

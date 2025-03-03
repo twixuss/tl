@@ -1,3 +1,4 @@
+#define TL_ENABLE_TESTS
 #ifdef _WIN32
 #define NOMINMAX
 #include <WinSock2.h>
@@ -14,8 +15,11 @@
 #endif
 
 #include <tl/array.h>
+#include <tl/array2.h>
+#include <tl/array3.h>
 #include <tl/atlas.h>
 #include <tl/big_int.h>
+#include <tl/big_rational.h>
 #include <tl/bin2cpp.h>
 #include <tl/bits.h>
 #include <tl/block_list.h>
@@ -46,6 +50,11 @@
 #include <tl/function.h>
 #include <tl/gltf.h>
 #include <tl/hash.h>
+#include <tl/contiguous_hash_map.h>
+#include <tl/contiguous_hash_set.h>
+#include <tl/bucket_hash_map.h>
+#include <tl/bucket_hash_set.h>
+#include <tl/static_bucket_hash_map.h>
 #include <tl/hash_map.h>
 #include <tl/hash_set.h>
 #include <tl/image_filters.h>
@@ -66,7 +75,6 @@
 #include <tl/msvc.h>
 #include <tl/net.h>
 #include <tl/opengl.h>
-#include <tl/optional.h>
 #include <tl/pointer.h>
 #include <tl/pool32.h>
 #include <tl/process.h>
@@ -91,3 +99,13 @@
 #include <tl/variant.h>
 #include <tl/vector.h>
 #include <tl/window.h>
+
+
+void run_tl_tests() {
+	using namespace tl;
+	for (int i = 0; i < tests_to_run_count; i++) {
+		println(tests_to_run[i].name);
+		tests_to_run[i].func();
+	}
+
+}

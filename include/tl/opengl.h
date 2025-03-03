@@ -4,6 +4,7 @@
 #include "math.h"
 #include "time.h"
 #include "includer.h"
+#include "static_list.h"
 
 #if OS_WINDOWS
 #pragma warning(push, 0)

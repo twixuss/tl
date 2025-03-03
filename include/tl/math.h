@@ -4,6 +4,7 @@
 #include "simd_macros.h"
 #include "string.h"
 #include "vector.h"
+#include "static_list.h"
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)

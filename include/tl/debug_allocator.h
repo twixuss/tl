@@ -47,7 +47,7 @@ AllocationResult DebugAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
 AllocationResult DebugAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
 	(void)old_size;
 	auto result = allocate_impl(new_size, alignment);
-	memcpy(result.data, data, with(allocation_lock, allocation_sizes.find(data)->value));
+	memcpy(result.data, data, with(allocation_lock, *allocation_sizes.find(data).value));
 	deallocate_impl(data, old_size, alignment);
 	return result;
 }
@@ -56,7 +56,7 @@ void DebugAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD)
 		return;
 	(void)size;
 	(void)alignment;
-	size = with(allocation_lock, allocation_sizes.find(data)->value);
+	size = with(allocation_lock, *allocation_sizes.find(data).value);
 	auto base = (u8 *)data - check_space;
 	for (umm i = 0; i < check_space; ++i) {
 		assert(base[i] == pre_byte);

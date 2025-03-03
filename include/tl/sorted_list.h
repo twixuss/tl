@@ -20,7 +20,7 @@ struct SortedList : private List<T, Allocator, Size> {
 	using Base::operator[];
 
 	void add(T value TL_LP) {
-		Base::reserve_exponential(count + 1);
+		Base::reserve(count + 1);
 		Base::insert(value, binary_search(Base::span(), value, sort_by).would_be_at);
 	}
 };

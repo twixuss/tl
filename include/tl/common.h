@@ -125,7 +125,35 @@
 #define TL_LA
 #endif
 
+#ifdef TL_ENABLE_TESTS
+#ifndef TL_IMPL
+#error TL_ENABLE_TESTS must be defined with TL_IMPL
+#endif
 
+namespace tl {
+struct Test {
+	char const *name;
+	void (*func)();
+};
+Test tests_to_run[256] = {};
+int tests_to_run_count = 0;
+
+struct TestAdder {
+	TestAdder const &operator+(char const *name) const {
+		tests_to_run[tests_to_run_count].name = name;
+		return *this;
+	}
+	int operator+(void (*fn)()) const {
+		tests_to_run[tests_to_run_count++].func = fn;
+		return 0;
+	}
+};
+inline static constexpr TestAdder test_adder;
+
+}
+
+#define TL_TEST static int CONCAT(_t, __LINE__) = tl::test_adder + __FILE__ + []
+#endif
 
 #define KiB 0x400ull
 #define MiB 0x100000ull
@@ -192,7 +220,7 @@ struct Empty {};
 constexpr bool operator==(Empty a, Empty b) { return true; }
 constexpr bool operator!=(Empty a, Empty b) { return false; }
 
-inline void noop() {}
+inline umm noop() { return 0; }
 
 template <class ...T>
 inline constexpr umm type_count_of = sizeof...(T);
@@ -797,23 +825,23 @@ template <class T> forceinline T rotate_right_32(T v, s32 shift = 1) { return (v
 template <class T> forceinline T rotate_right_64(T v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
 
 #if COMPILER_GCC
-forceinline u8  rotate_left (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
-forceinline u16 rotate_left (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
-forceinline u32 rotate_left (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
-forceinline u64 rotate_left (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
-forceinline u8  rotate_right(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
-forceinline u16 rotate_right(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
-forceinline u32 rotate_right(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
-forceinline u64 rotate_right(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
+forceinline constexpr u8  rotate_left (u8  v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
+forceinline constexpr u16 rotate_left (u16 v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }
+forceinline constexpr u32 rotate_left (u32 v, s32 shift = 1) { return (v << shift) | (v >> (32 - shift)); }
+forceinline constexpr u64 rotate_left (u64 v, s32 shift = 1) { return (v << shift) | (v >> (64 - shift)); }
+forceinline constexpr u8  rotate_right(u8  v, s32 shift = 1) { return (v >> shift) | (v << ( 8 - shift)); }
+forceinline constexpr u16 rotate_right(u16 v, s32 shift = 1) { return (v >> shift) | (v << (16 - shift)); }
+forceinline constexpr u32 rotate_right(u32 v, s32 shift = 1) { return (v >> shift) | (v << (32 - shift)); }
+forceinline constexpr u64 rotate_right(u64 v, s32 shift = 1) { return (v >> shift) | (v << (64 - shift)); }
 #else
-forceinline u8  rotate_left (u8  v, s32 shift = 1) { return _rotl8(v, (u8)shift); }
-forceinline u16 rotate_left (u16 v, s32 shift = 1) { return _rotl16(v, (u8)shift); }
-forceinline u32 rotate_left (u32 v, s32 shift = 1) { return _rotl(v, shift); }
-forceinline u64 rotate_left (u64 v, s32 shift = 1) { return _rotl64(v, shift); }
-forceinline u8  rotate_right(u8  v, s32 shift = 1) { return _rotr8(v, (u8)shift); }
-forceinline u16 rotate_right(u16 v, s32 shift = 1) { return _rotr16(v, (u8)shift); }
-forceinline u32 rotate_right(u32 v, s32 shift = 1) { return _rotr(v, shift); }
-forceinline u64 rotate_right(u64 v, s32 shift = 1) { return _rotr64(v, shift); }
+forceinline constexpr u8  rotate_left (u8  v, s32 shift = 1) { return std::is_constant_evaluated() ? (v << shift) | (v >> (8  - shift)) : _rotl8(v, (u8)shift); }
+forceinline constexpr u16 rotate_left (u16 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v << shift) | (v >> (16 - shift)) : _rotl16(v, (u8)shift); }
+forceinline constexpr u32 rotate_left (u32 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v << shift) | (v >> (32 - shift)) : _rotl(v, shift); }
+forceinline constexpr u64 rotate_left (u64 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v << shift) | (v >> (64 - shift)) : _rotl64(v, shift); }
+forceinline constexpr u8  rotate_right(u8  v, s32 shift = 1) { return std::is_constant_evaluated() ? (v >> shift) | (v << (8  - shift)) : _rotr8(v, (u8)shift); }
+forceinline constexpr u16 rotate_right(u16 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v >> shift) | (v << (16 - shift)) : _rotr16(v, (u8)shift); }
+forceinline constexpr u32 rotate_right(u32 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v >> shift) | (v << (32 - shift)) : _rotr(v, shift); }
+forceinline constexpr u64 rotate_right(u64 v, s32 shift = 1) { return std::is_constant_evaluated() ? (v >> shift) | (v << (64 - shift)) : _rotr64(v, shift); }
 #endif
 
 constexpr f32 pi     = f32(3.1415926535897932384626433832795L);
@@ -914,6 +942,12 @@ struct Combine : public Callables... {
 	using Callables::operator()...;
 };
 
+template <class T>
+struct Repeat {
+	T value;
+	umm count;
+};
+
 template <class T, umm count>
 constexpr umm count_of(T const (&arr)[count]) { (void)arr; return count; }
 
@@ -959,6 +993,8 @@ inline bool any_true(bool value) { return value; }
 inline bool all_false(bool value) { return !value; }
 inline bool any_false(bool value) { return !value; }
 
+// I dont like this.
+// Should make a struct with bitfields and enums
 enum ForEachDirective {
 	ForEach_continue        = 0x0,
 	ForEach_break           = 0x1,
@@ -970,31 +1006,41 @@ enum ForEachDirective {
 
 constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
 
-// TODO: use this in all of for_each functions, DRY
-template <class ...Args, class Fn>
-auto wrap_foreach_fn(Fn &&fn) {
-	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
-	if constexpr (std::is_same_v<FnRet, void>) {
-		return [&] (auto &&...args) {
-			fn(args...);
+template <class T>
+concept ForEachIteratorResult = OneOf<T, void, ForEachDirective>;
+
+template <class Fn, class Input>
+concept ForEachIterator = requires(Fn fn, Input input) {
+	{ fn(input) } -> ForEachIteratorResult;
+};
+
+// convert function with one of these signatures:
+//     void(Input)
+//     ForEachDirective(Input)
+// to
+//     ForEachDirective(Input)
+template <class Input, ForEachIterator<Input> Iterator>
+auto wrap_foreach_fn(Iterator body) {
+	using IteratorResult = std::invoke_result_t<Iterator, Input>;
+	if constexpr (std::is_same_v<IteratorResult, void>) {
+		return [&] (Input input) {
+			body(input);
 			return ForEach_continue;
 		};
-	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-		return fn;
 	} else {
-		static_error_v(fn, "Invalid return type of for_each function");
+		static_assert(std::is_same_v<IteratorResult, ForEachDirective>, "Invalid return type of for_each function");
+		return body;
 	}
 }
-
-template <class T, class ...Args>
-concept ForEachIterator = requires(T fn, Args ...args) {
-	requires OneOf<decltype(fn(args...)), void, ForEachDirective>;
-};
 
 using ForEachFlags = u8;
 enum : ForEachFlags {
 	ForEach_reverse = 0x1,
 };
+
+bool for_each(auto &collection, auto &&fn) requires requires { { collection.for_each(fn) } -> std::same_as<bool>; } {
+	return collection.for_each(fn);
+}
 
 template <class T>
 concept Collection = requires(T collection) {
@@ -1517,6 +1563,10 @@ struct SampleParams {
 	bool normalized = true;
 };
 
+static constexpr bool max_is_divisible_by_min(umm a, umm b) {
+	return max(a, b) % min(a, b) == 0;
+}
+
 #pragma pack(push, 1)
 template <class T, class Size_ = umm>
 struct Span {
@@ -1632,7 +1682,7 @@ struct Span {
 	}
 
 	template <class ThatSize>
-	constexpr bool operator==(Span<T, ThatSize> that) const {
+	constexpr bool operator==(Span<T, ThatSize> that) const requires requires(T t) { { t == t } -> std::convertible_to<bool>; } {
 		if (count != that.count)
 			return false;
 
@@ -2108,6 +2158,34 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 	return result;
 }
 
+//
+// Default implementations for collection algorithms.
+// If collection has method with the same name, it is used.
+// Otherwise a potentially slower default implementation is utilized.
+//
+
+// Const correctess is pain. So much code for so little value.
+template <class Collection>
+auto find(Collection &collection, typename Collection::Element element) 
+//	requires 
+//		requires { collection.find(element); } ||
+//		requires { for_each(collection, [](Iterator it){}); } // This is fucking broken. Error - lambda is redefined. ?????
+ {
+	if constexpr (requires { collection.find(element); }) {
+		return collection.find(element);
+	} else {
+		typename Collection::Iterator found = {};
+		for_each(collection, [&](auto it) {
+			if (all(*it == element)) {
+				found = it;
+				return ForEach_break;
+			}
+			return ForEach_continue;
+		});
+		return found;
+	}
+}
+
 template <class Collection>
 umm find_index_of(Collection &collection, const ElementOf<Collection> &value) {
 	return index_of(collection, find(collection, value));
@@ -2443,266 +2521,6 @@ void reverse_in_place(Span<T> span) {
 	for (umm i = 0; i < span.count / 2; ++i) {
 		Swap(span.data[i], span.data[span.count - i - 1]);
 	}
-}
-
-template <class T, umm _capacity>
-struct StaticList {
-	using Element = T;
-	using Size = UintForCount<_capacity>;
-
-	inline static constexpr umm capacity = _capacity;
-
-	forceinline constexpr StaticList() {}
-
-	template <umm that_capacity>
-	constexpr StaticList(StaticList<T, that_capacity> const &that) {
-		assert(that.count <= capacity);
-		count = (Size)that.count;
-		memcpy(data, that.data, count * sizeof(T));
-	}
-
-	template <umm that_capacity>
-	constexpr StaticList(StaticList<T, that_capacity> &&that) = delete;
-
-	constexpr StaticList(std::initializer_list<T> that) {
-		assert(that.size() <= capacity);
-		count = (Size)that.size();
-		memcpy(data, that.begin(), count * sizeof(T));
-	}
-
-	template <umm that_capacity>
-	constexpr StaticList &operator=(StaticList<T, that_capacity> const &that) {
-		return *new (this) StaticList(that);
-	}
-
-	template <umm that_capacity>
-	constexpr StaticList &operator=(StaticList<T, that_capacity> &&that) = delete;
-
-	constexpr StaticList &operator=(std::initializer_list<T> that) {
-		return *new (this) StaticList(that);
-	}
-
-	forceinline constexpr T const *begin() const { return data; }
-	forceinline constexpr T const *end() const { return data + count; }
-
-	forceinline constexpr T *begin() { return data; }
-	forceinline constexpr T *end() { return data + count; }
-
-	forceinline constexpr ReverseIterator<T *> rbegin() { return data + count - 1; }
-	forceinline constexpr ReverseIterator<T *> rend() { return data - 1; }
-
-	forceinline constexpr bool empty() const { return count == 0; }
-	forceinline constexpr bool full() const { return count == capacity; }
-
-	forceinline constexpr T &front() { bounds_check(assert(count)); return data[0]; }
-	forceinline constexpr T &back() { bounds_check(assert(count)); return data[count - 1]; }
-	forceinline constexpr T &operator[](umm i) { bounds_check(assert(count)); return data[i]; }
-
-	forceinline constexpr T const &front() const { bounds_check(assert(count)); return data[0]; }
-	forceinline constexpr T const &back() const { bounds_check(assert(count)); return data[count - 1]; }
-	forceinline constexpr T const &operator[](umm i) const { bounds_check(assert(count)); return data[i]; }
-
-	constexpr void resize(umm new_count) {
-		bounds_check(assert(new_count <= capacity));
-		if (new_count > count) {
-			for (umm i = count; i < new_count; ++i) {
-				new (data + i) T();
-			}
-		}
-		count = new_count;
-	}
-	constexpr T &insert_at(T value, umm where) {
-		bounds_check(assert(where <= count));
-		bounds_check(assert(count < capacity));
-
-		memmove(data + where + 1, data + where, (count - where) * sizeof(T));
-		memcpy(data + where, &value, sizeof(T));
-
-		++count;
-		return data[where];
-	}
-	constexpr Span<T> insert_at(Span<T> span, umm where) {
-		bounds_check(assert(where <= count));
-		bounds_check(assert(count + span.count <= capacity));
-
-		memmove(data + where + span.count, data + where, (count - where) * sizeof(T));
-		memcpy(data + where, span.data, span.count * sizeof(T));
-
-		count = (Size)(count + span.count);
-		return {data + where, span.count};
-	}
-	constexpr Span<T> insert(Span<T> span, T *where) {
-		return insert_at(span, where - data);
-	}
-
-	forceinline constexpr StaticList &operator+=(T const &that) { add(that); return *this; }
-	forceinline constexpr StaticList &operator+=(T &&that) { add(std::move(that)); return *this; }
-	forceinline constexpr StaticList &operator+=(Span<T> that) { add(that); return *this; }
-	template <umm capacity>
-	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { add(as_span(that)); return *this; }
-	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span((T *)that.begin(), (T *)that.end())); return *this; }
-
-	template <class Size = umm>
-	forceinline constexpr Span<T, Size> span() { return {data, count}; }
-
-	template <class U, class ThatSize>
-	constexpr explicit operator Span<U, ThatSize>() const {
-		static_assert(sizeof(U) == sizeof(T));
-		assert_equal((ThatSize)count, count);
-		return {(U *)data, (ThatSize)count};
-	}
-
-	template <class ThatSize>
-	constexpr operator Span<T, ThatSize>() const {
-		assert_equal((ThatSize)count, count);
-		return {data, (ThatSize)count};
-	}
-
-	forceinline constexpr T &add() {
-		bounds_check(assert(!full()));
-		return *new(data + count++) T();
-	}
-	
-	forceinline constexpr T &add(T const &value) {
-		bounds_check(assert(!full()));
-		return data[count++] = value;
-	}
-
-	forceinline constexpr void add(Optional<T> value) {
-		if (value) {
-			bounds_check(assert(!full()));
-			data[count++] = value.value();
-		}
-	}
-
-	template <class Size>
-	forceinline constexpr Span<T> add(Span<T, Size> span) {
-		bounds_check(assert(count + span.count <= capacity));
-		memcpy(data + count, span.data, span.count * sizeof(T));
-		defer { count = (StaticList::Size)(count + span.count); };
-		return {data + count, span.count};
-	}
-	forceinline constexpr Span<T> add(std::initializer_list<T> list) {
-		return add(as_span(list));
-	}
-
-	constexpr Optional<T> pop() {
-		if (count == 0)
-			return {};
-		return data[--count];
-	}
-
-	constexpr T pop_back() {
-		bounds_check(assert(count));
-		return data[--count];
-	}
-	constexpr T pop_front() {
-		bounds_check(assert(count));
-		T popped = *data;
-		memmove(data, data + 1, --count * sizeof(T));
-		return popped;
-	}
-	forceinline constexpr void pop_back_unordered() { erase_unordered(&back()); }
-	forceinline constexpr void pop_front_unordered() { erase_unordered(begin()); }
-
-	T erase_at(umm where) {
-		bounds_check(assert(where < count));
-		T erased = data[where];
-		memmove(data + where, data + where + 1, (--count - where) * sizeof(T));
-		return erased;
-	}
-	forceinline T erase(T *where) { return erase_at(where - data); }
-
-	T erase_at_unordered(umm where) {
-		bounds_check(assert(where < count));
-		T erased = data[where];
-		--count;
-		if (count != where) {
-			data[where] = data[count];
-		}
-		return erased;
-	}
-	forceinline T erase_unordered(T *where) { return erase_at_unordered(where - data); }
-
-	void erase_at(umm where, umm amount) {
-		if (amount == 0)
-			return;
-		bounds_check(assert(where + amount <= count));
-		T *dst = data + where;
-		T *src = dst + amount;
-		umm cnt = end() - src;
-		memmove(dst, src, cnt * sizeof(T));
-		count -= amount;
-	}
-
-	constexpr void clear() {
-		count = 0;
-	}
-
-	Size count = 0;
-	union {
-		T data[capacity];
-	};
-};
-
-template <class T, umm capacity>
-umm index_of(StaticList<T, capacity> const &list, T const *value) {
-	return value - list.data;
-}
-
-template <class T, umm capacity> Span<T> as_span(StaticList<T, capacity> const &list) { return {(T *)list.data, list.count}; }
-
-template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, T const &value) { return find(as_span(list), value); }
-template <class T, umm capacity> constexpr T *find(StaticList<T, capacity> &list, Span<T> cmp) { return find(as_span(list), cmp); }
-template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, T const &value) { return find(as_span(list), value); }
-template <class T, umm capacity> constexpr T const *find(StaticList<T, capacity> const &list, Span<T> cmp) { return find(as_span(list), cmp); }
-
-template <class T, umm capacity, class Predicate> constexpr T *find_if(StaticList<T, capacity> &list, Predicate &&predicate) { return find_if(as_span(list), std::forward<Predicate>(predicate)); }
-
-template <class T, umm capacity>
-forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
-
-template <ForEachFlags flags = 0, class T, umm capacity>
-bool for_each(StaticList<T, capacity> &list, auto in_fn) {
-	auto fn = wrap_foreach_fn<T &>(in_fn);
-
-	T *begin;
-	T *end;
-
-	if constexpr (flags & ForEach_reverse) {
-		begin = list.end() - 1;
-		end = list.begin() - 1;
-	} else {
-		begin = list.begin();
-		end = list.end();
-	}
-
-	for (auto p = begin; p != end; ) {
-		auto d = fn(*p);
-
-		constexpr ForEachFlags allowed_flags = ForEach_break | ForEach_erase | ForEach_erase_unordered;
-		assert(!(d & ~allowed_flags), "not supported");
-
-		switch (d & ForEach_erase_mask) {
-			case 0: 
-				if constexpr (!(flags & ForEach_reverse))
-					p += 1;
-				break;
-			case ForEach_erase:
-				list.erase(p);
-				break;
-			case ForEach_erase_unordered:
-				list.erase_unordered(p);
-				break;
-		}
-		
-		if (d & ForEach_break)
-			return true;
-
-		if constexpr (flags & ForEach_reverse)
-			p -= 1;
-	}
-	return false;
 }
 
 template <class T, umm capacity>
@@ -3200,7 +3018,6 @@ struct TL_API DefaultAllocator : AllocatorBase<DefaultAllocator> {
 	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP);
 	void deallocate_impl(void *data, umm size, umm alignment TL_LP);
 };
-
 struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
 	Allocator parent_allocator;
 	umm buffer_size = 0;
@@ -3230,7 +3047,6 @@ struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
 
 	forceinline AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
 		assert(cursor, "arena allocator was not initialized");
-
 		auto target = ceil(cursor, alignment);
 		cursor = target + size;
 		assert(cursor <= base + buffer_size, "Out of arena memory");
