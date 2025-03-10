@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "static_list.h"
+#include "ring_buffer.h"
 
 #ifndef TL_INITIAL_QUEUE_CAPACITY
 #define TL_INITIAL_QUEUE_CAPACITY TL_INITIAL_LIST_CAPACITY
@@ -10,6 +11,46 @@ namespace tl {
 
 // Uses ring buffer for storage
 // Capacity is always power of 2 to replace mod with and
+// 
+// This is basically a RingBuffer from ring_buffer.h, but with restricted interface.
+// I wanted to not repeat myself and privately inherit, exposing whatever is needed.
+// But obviously this is c++ and you just can't have nice things.
+// Designated initialization stops working because why fucking not.
+// RingBuffer's methods with `this auto &&self` stop working because self.members become fucking private. Solvable with `friend` in every derived type.
+#if 1
+template <class T, class Allocator = Allocator>
+struct Queue : private RingBuffer<T, Allocator> {
+	using Base = RingBuffer<T, Allocator>;
+	friend Base;
+	using Spans = Base::Spans;
+	using Base::count;
+	using Base::capacity;
+	using Base::storage;
+	using Base::allocator;
+	using Base::iter;
+	using Base::begin;
+	using Base::end;
+	using Base::rbegin;
+	using Base::rend;
+	using Base::operator[];
+	using Base::at;
+	using Base::is_empty;
+	using Base::clear;
+	using Base::reserve;
+	using Base::free;
+	using Base::spans;
+	
+	T &push(T value = {}) {
+		return this->push_back(value);
+	}
+	Spans push(Span<T> span) {
+		return this->push_back(span);
+	}
+	Optional<T> pop() {
+		return this->pop_front();
+	}
+};
+#else
 template <class T, class Allocator = Allocator>
 struct Queue {
 	T *buffer = 0;
@@ -143,7 +184,7 @@ private:
 		start = 0;
 	}
 };
-
+#endif
 }
 
 #ifdef TL_ENABLE_TESTS

@@ -423,9 +423,9 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 
 	events_duration = events_end - events_begin;
 
-	thread_id_to_events_to_draw.for_each([&](auto kv) {
-		auto &thread_id = *kv.key;
-		auto &events_to_draw = *kv.value;
+	foreach(it, thread_id_to_events_to_draw) {
+		auto &thread_id = it.key();
+		auto &events_to_draw = it.value();
 		quick_sort(events_to_draw.events, [](Event const &a, Event const &b) {
 			if (a.begin != b.begin) {
 				return a.begin < b.begin;
@@ -513,9 +513,12 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 		for (auto &mark : events_to_draw.marks) {
 			mark.time -= events_begin;
 		}
-	});
+	}
 
-	thread_id_to_events_to_draw.set_to(all_events_to_draw);
+	thread_id_to_events_to_draw.clear();
+	foreach(it, all_events_to_draw) {
+		thread_id_to_events_to_draw.insert(it.key(), it.value());
+	}
 	quick_sort(all_events_to_draw, [](ThreadDrawList t) { return t.id; });
 }
 

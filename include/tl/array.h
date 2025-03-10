@@ -29,21 +29,8 @@ struct Array {
 	constexpr umm index_of(T const *pointer) const { return pointer - data; }
 	constexpr bool owns(T *pointer) { return (umm)(pointer - data) < count; }
 	
-	constexpr bool for_each(auto &&in_fn) {
-
-		auto fn = wrap_foreach_fn<T *>(in_fn);
-	
-		constexpr ForEachFlags allowed_flags = ForEach_break;
-
-		for (auto &it : data) {
-			auto d = fn(it);
-		
-			assert(!(d & ~allowed_flags), "not supported");
-
-			if (d & ForEach_break)
-				return true;
-		}
-		return false;
+	constexpr auto iter(ReverseIterOption options = {}) {
+		return span_iter(data, data + count, options);
 	}
 
 	#define OP(op)                                                               \

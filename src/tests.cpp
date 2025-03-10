@@ -24,6 +24,7 @@
 #include <tl/u256.h>
 #include <tl/big_int.h>
 #include <tl/main.h>
+#include <tl/default_logger.h>
 
 #if OS_WINDOWS
 #include <tl/win32.h>
@@ -434,7 +435,7 @@ struct u128 {
 	u128 operator+(u128 b) const {
 		u128 result;
 		bool carry;
-		add_carry(low, b.low, &result.low, &carry);
+		add_carry(low, b.low, false, &result.low, &carry);
 		result.high = high + b.high + carry;
 		return result;
 	}
@@ -656,6 +657,8 @@ no_inline void test_find() {
 void run_tl_tests();
 
 s32 tl_main(Span<Span<utf8>> args) {
+	DefaultLogger::default_init(args[0]);
+
 	run_tl_tests();
 
 	Span<bool> s = {1, 0, 0, 1};

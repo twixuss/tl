@@ -372,7 +372,7 @@ struct BlockList {
 
 		Span<T> span() { return {data(), count}; }
 
-		T &operator[](umm i) { bounds_check(assert(i < count); return data()[i]; )}
+		T &operator[](umm i) { bounds_check(assert(i < count)); return data()[i]; }
 	};
 	struct Index {
 		Block *block;

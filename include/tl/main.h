@@ -1,18 +1,11 @@
 #pragma once
 #include "string.h"
 #include "console.h"
-#include "default_logger.h"
 
 extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 
 #ifdef TL_USE_CONTEXT
 #include "context.h"
-#else
-namespace tl {
-void init_logger_thread() {
-	current_logger = tl::app_logger;
-}
-}
 #endif
 
 #ifdef TL_MAIN_WINMAIN
@@ -51,20 +44,6 @@ int wmain(int argc, wchar_t **argv) {
 	#endif
 
 	init_printer();
-
-	DefaultLogger::global_init(tformat(u8"{}.log", arguments[0]));
-
-	DefaultLogger app_logger = {.module = u8"app"s};
-	DefaultLogger tl_logger = {.module = u8"tl"s};
-	
-	#ifdef TL_USE_CONTEXT
-		context->app_logger() = app_logger;
-		context->tl_logger() = tl_logger;
-	#else
-		tl::app_logger = app_logger;
-		tl::tl_logger = tl_logger;
-		tl::init_logger_thread();
-	#endif
 
 	return tl_main(arguments);
 }

@@ -199,54 +199,50 @@ struct StaticList {
 		return value - data;
 	}
 	
-	template <ForEachFlags flags = 0>
-	bool for_each(this auto &&self, auto &&in_fn) {
-		auto fn = wrap_foreach_fn<decltype(self.begin())>(in_fn);
+	template <bool is_const>
+	struct Iter {
+		using Value = MakeConst<T, is_const>;
 
-		auto begin = self.data;
-		auto end = self.data + self.count;
+		StaticList *list;
 
-		if constexpr (flags & ForEach_reverse) {
-			begin = self.data + self.count - 1;
-			end = self.data - 1;
+		T *end = 0;
+		T *it = 0;
+		int step = 0;
+
+		explicit operator bool() { return it != end; }
+
+		void next() {
+			it += step;
 		}
 
-		constexpr bool is_const = std::is_const_v<std::remove_reference_t<decltype(self)>>;
+		umm key() { return it - list->data; }
+		Value &value() { return *it; }
 
-		for (auto p = begin; p != end; ) {
-			auto d = fn(p);
+		Value &operator*() { return *it; }
 
-			constexpr ForEachFlags allowed_flags = ForEach_break | ForEach_erase | ForEach_erase_unordered;
-			assert(!(d & ~allowed_flags), "not supported");
-
-			switch (d & ForEach_erase_mask) {
-				case 0: 
-					if constexpr (!(flags & ForEach_reverse))
-						p += 1;
-					break;
-				case ForEach_erase:
-					if constexpr (is_const) {
-						invalid_code_path("cant erase from const");
-					} else {
-						self.erase(p);
-					}
-					break;
-				case ForEach_erase_unordered:
-					if constexpr (is_const) {
-						invalid_code_path("cant erase from const");
-					} else {
-						self.erase_unordered(p);
-					}
-					break;
-			}
 		
-			if (d & ForEach_break)
-				return true;
-
-			if constexpr (flags & ForEach_reverse)
-				p -= 1;
+		void erase() requires !is_const {
+			list->erase(it);
+			--it;
 		}
-		return false;
+		void erase_unordered() requires !is_const {
+			list->erase_unordered(it);
+			--it;
+		}
+
+
+		std::pair<umm, Value &> key_value() { return {key(), value()}; }
+	};
+	
+	auto iter(this auto &&self, ReverseIterOption options = {}) {
+		auto start = self.data;
+		auto end = self.data + self.count;
+		return Iter<tl_self_const>{
+			.list = (StaticList *)&self,
+			.end  = (T *)(options.reverse ? start - 1 : end),
+			.it   = (T *)(options.reverse ? end - 1   : start),
+			.step = options.reverse ? -1        : 1,
+		};
 	}
 };
 

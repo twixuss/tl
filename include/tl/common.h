@@ -279,6 +279,18 @@ struct ElementOfT<T *> {
 template <class T>
 using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
+template <class T, bool add_const>
+struct MakeConstT {
+	using Type = const T;
+};
+template <class T>
+struct MakeConstT<T, false> {
+	using Type = T;
+};
+
+template <class T, bool add_const = true>
+using MakeConst = MakeConstT<T, add_const>::Type;
+
 template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
 	return *new(std::addressof(val)) T(std::forward<Args>(args)...);
@@ -399,41 +411,157 @@ concept CallableAnyRet = requires(Fn fn) { fn(std::declval<Args>()...); };
 // which will break designated initialization.
 // If there's a need to do that, specialize this function.
 template <class To, class From>
+forceinline constexpr void convert(To &to, From from) {
+	to = (To)from;
+}
+template <class To, class From>
 forceinline constexpr To convert(From from) {
-	return (To)from;
+	if constexpr (requires {(To)from;}) {
+		return (To)from;
+	} else {
+		To to;
+		convert(to, from);
+		return to;
+	}
 }
 
 
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }
 
-#if COMPILER_MSVC
-forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (carry_in, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(carry_in, a, b, result); }
-#elif COMPILER_GCC
-forceinline void add_carry(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
-	int c = a + b + carry_in;
-	*result = (u8)c;
-	*carry_out = c & 0x100;
-}
-forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
-	int c = a + b + carry_in;
-	*result = (u16)c;
-	*carry_out = c & 0x10000;
-}
-#endif
+namespace ce {
 
-forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(carry_in, a, b, result); }
-#if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, (unsigned long long *)result); }
-#endif
+forceinline constexpr void add_carry(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
+	u16 r = a + b + carry_in;
+	*result = r;
+	*carry_out = r & 0x100;
+}
+forceinline constexpr void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	u32 r = a + b + carry_in;
+	*result = r;
+	*carry_out = r & 0x10000;
+}
+forceinline constexpr void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
+	u64 r = (u64)a + b + carry_in;
+	*result = r;
+	*carry_out = r & 0x100000000;
+}
+forceinline constexpr void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
+	*result = a + b + carry_in;
+	if (a == 0xffff'ffff'ffff'ffff && (b || carry_in)) {
+		*carry_out = true;
+	} else {
+		*carry_out = a + carry_in > 0xffff'ffff'ffff'ffff - b;
+	}
+}
 
-forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
-forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
-forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
-#if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
-#endif
+forceinline constexpr void sub_borrow(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
+	auto r = (u16)a - b - carry_in;
+	*result = r;
+	*carry_out = r & 0x100;
+}
+forceinline constexpr void sub_borrow(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	auto r = (u32)a - b - carry_in;
+	*result = r;
+	*carry_out = r & 0x10000;
+}
+forceinline constexpr void sub_borrow(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
+	auto r = (u64)a - b - carry_in;
+	*result = r;
+	*carry_out = r & 0x100000000;
+}
+forceinline constexpr void sub_borrow(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
+	*result = a - b - carry_in;
+	if (b == 0xffff'ffff'ffff'ffff) {
+		*carry_out = b > a - carry_in;
+	} else {
+		*carry_out = b + carry_in > a;
+	}
+}
+
+}
+
+forceinline constexpr void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::add_carry(a, b, carry_in, result, carry_out);
+	} else {
+		#if COMPILER_MSVC
+			*carry_out = (bool)_addcarry_u8(carry_in, a, b, result);
+		#else COMPILER_GCC
+			ce::add_carry(a, b, carry_in, result, carry_out);
+		#endif
+	}
+ }
+forceinline constexpr void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::add_carry(a, b, carry_in, result, carry_out);
+	} else {
+		#if COMPILER_MSVC
+			*carry_out = (bool)_addcarry_u16(carry_in, a, b, result);
+		#else COMPILER_GCC
+			ce::add_carry(a, b, carry_in, result, carry_out);
+		#endif
+	}
+}
+forceinline constexpr void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::add_carry(a, b, carry_in, result, carry_out);
+	} else {
+		*carry_out = (bool)_addcarry_u32(carry_in, a, b, result);
+	}
+}
+forceinline constexpr void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::add_carry(a, b, carry_in, result, carry_out);
+	} else {
+		#if ARCH_X64
+			*carry_out = (bool)_addcarry_u64(carry_in, a, b, (unsigned long long *)result);
+		#else
+			ce::add_carry(a, b, carry_in, result, carry_out);
+		#endif
+	}
+}
+
+forceinline constexpr void sub_borrow(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::sub_borrow(a, b, carry_in, result, carry_out);
+	} else {
+		#if COMPILER_MSVC
+			*carry_out = (bool)_subborrow_u8(carry_in, a, b, result);
+		#else COMPILER_GCC
+			ce::sub_borrow(a, b, carry_in, result, carry_out);
+		#endif
+	}
+ }
+forceinline constexpr void sub_borrow(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::sub_borrow(a, b, carry_in, result, carry_out);
+	} else {
+		#if COMPILER_MSVC
+			*carry_out = (bool)_subborrow_u16(carry_in, a, b, result);
+		#else COMPILER_GCC
+			ce::sub_borrow(a, b, carry_in, result, carry_out);
+		#endif
+	}
+}
+forceinline constexpr void sub_borrow(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::sub_borrow(a, b, carry_in, result, carry_out);
+	} else {
+		*carry_out = (bool)_subborrow_u32(carry_in, a, b, result);
+	}
+}
+forceinline constexpr void sub_borrow(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
+	if (std::is_constant_evaluated()) {
+		ce::sub_borrow(a, b, carry_in, result, carry_out);
+	} else {
+		#if ARCH_X64
+			*carry_out = (bool)_subborrow_u64(carry_in, a, b, (unsigned long long *)result);
+		#else
+			ce::sub_borrow(a, b, carry_in, result, carry_out);
+		#endif
+	}
+}
 
 forceinline constexpr bool is_nan(f32 v) {
 	union {
@@ -993,8 +1121,19 @@ inline bool any_true(bool value) { return value; }
 inline bool all_false(bool value) { return !value; }
 inline bool any_false(bool value) { return !value; }
 
-// I dont like this.
-// Should make a struct with bitfields and enums
+template <class Collection>
+struct IterOfT {
+	using Type = typename Collection::Iter;
+};
+
+template <class Collection>
+using IterOf = IterOfT<std::remove_cvref_t<Collection>>::Type;
+
+template <class Collection>
+auto iter(Collection &collection, typename Collection::IterOptions options = {}) requires requires { { collection.iter(options) } /*-> AnIter*/; } {
+	return collection.iter(options);
+}
+
 enum ForEachDirective {
 	ForEach_continue        = 0x0,
 	ForEach_break           = 0x1,
@@ -1006,45 +1145,30 @@ enum ForEachDirective {
 
 constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
 
-template <class T>
-concept ForEachIteratorResult = OneOf<T, void, ForEachDirective>;
-
-template <class Fn, class Input>
-concept ForEachIterator = requires(Fn fn, Input input) {
-	{ fn(input) } -> ForEachIteratorResult;
-};
-
-// convert function with one of these signatures:
-//     void(Input)
-//     ForEachDirective(Input)
-// to
-//     ForEachDirective(Input)
-template <class Input, ForEachIterator<Input> Iterator>
-auto wrap_foreach_fn(Iterator body) {
-	using IteratorResult = std::invoke_result_t<Iterator, Input>;
-	if constexpr (std::is_same_v<IteratorResult, void>) {
-		return [&] (Input input) {
-			body(input);
+// TODO: use this in all of for_each functions, DRY
+template <class ...Args, class Fn>
+auto wrap_foreach_fn(Fn &&fn) {
+	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
+	if constexpr (std::is_same_v<FnRet, void>) {
+		return [&] (auto &&...args) {
+			fn(args...);
 			return ForEach_continue;
 		};
+	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
+		return fn;
 	} else {
-		static_assert(std::is_same_v<IteratorResult, ForEachDirective>, "Invalid return type of for_each function");
-		return body;
+		static_error_v(fn, "Invalid return type of for_each function");
 	}
 }
+
+template <class T, class ...Args>
+concept ForEachIterator = requires(T fn, Args ...args) {
+	requires OneOf<decltype(fn(args...)), void, ForEachDirective>;
+};
 
 using ForEachFlags = u8;
 enum : ForEachFlags {
 	ForEach_reverse = 0x1,
-};
-
-bool for_each(auto &collection, auto &&fn) requires requires { { collection.for_each(fn) } -> std::same_as<bool>; } {
-	return collection.for_each(fn);
-}
-
-template <class T>
-concept Collection = requires(T collection) {
-	for_each(collection, [](auto item) {});
 };
 
 template <class Fn, class Item>
@@ -1055,65 +1179,91 @@ auto for_each_default_action(Fn &&fn, Item &&item) {
 		return;
 	}
 }
-
-template <class Inner, class Mapper>
-struct MappedCollection {
-	using Element = decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()));
-	Inner inner;
-	Mapper mapper;
+template <class T>
+concept Collection = requires(T collection) {
+	{ iter(collection) };
 };
 
-template <class Inner, class Mapper>
-MappedCollection<Inner, Mapper> mapped(Inner &&inner, Mapper &&mapper) {
-	return MappedCollection<Inner, Mapper>{inner, mapper};
-}
+template <class T>
+concept Iterable = requires(T collection) { collection.iter(); };
 
-template <class Inner, std::invocable<ElementOf<Inner>> Mapper>
-bool for_each(MappedCollection<Inner, Mapper> c, std::invocable<decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()))> auto fn) {
-	return for_each(c.inner, [&](auto item) {
-		return fn(c.mapper(item));
-	});
-}
+template <class T, class Options>
+concept IterableWithOptions = requires(T collection, Options options) { collection.iter(options); };
 
-template <class Inner, class Mapper>
-bool count_of(MappedCollection<Inner, Mapper> c) {
-	return count_of(c.inner);
-}
+template <class From, class To>
+concept ExplicitlyConvertibleTo = std::is_constructible<To, From>::value && !std::is_convertible<From, To>::value;
 
-template <class Inner, class Predicate>
-struct PredicatedCollection {
-	using Element = decltype(std::declval<Predicate>()(std::declval<ElementOf<Inner>>()));
-	Inner inner;
-	Predicate predicate;
+template <class Iter>
+concept AnIter = requires(Iter iter) {
+	{ iter } -> ExplicitlyConvertibleTo<bool>;
+	{ iter.next() } -> std::same_as<void>;
+	iter.value();
+	iter.key();
 };
 
-template <class Inner, class Predicate>
-bool for_each(PredicatedCollection<Inner, Predicate> c, auto fn) {
-	return for_each(c.inner, [&](auto item) {
-		if (c.predicate(item)) {
-			return fn(item);
-		}
-		return for_each_default_action(fn, item);
-	});
-}
+#define tl_self_const std::is_const_v<std::remove_reference_t<decltype(self)>>
 
-template <class Inner, class Predicate>
-PredicatedCollection<Inner, Predicate> predicated(Inner &&inner, Predicate &&predicate) {
-	return PredicatedCollection<Inner, Predicate>{inner, predicate};
-}
+
+template <class Iter>
+struct IterAdapter {
+	Iter iter;
+
+	auto &operator*() {
+		return *iter;
+	}
+	auto &operator++() {
+		iter.next();
+		return *this;
+	}
+	bool operator!=(Empty) {
+		return !!iter;
+	}
+};
 
 template <class Collection>
-auto stddev(Collection const &collection) {
+auto to_iter(Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options)
+	requires requires {collection.iter(options); }
+{
+	return collection.iter(options);
+}
+
+template <Iterable Collection>
+auto to_iter(Collection &&collection) {
+	return collection.iter();
+}
+
+auto to_iter(AnIter auto &&iter) {
+	return iter;
+}
+
+#define foreach(it, collection, ...) for (auto it = to_iter(collection __VA_OPT__(,) __VA_ARGS__); it; it.next())
+
+template <Iterable Collection> 
+umm count_of(Collection const &collection) {
+	if constexpr (requires { { collection.count } -> std::same_as<umm>; }) {
+		return collection.count;
+	} else if constexpr (requires { { collection.count() } -> std::same_as<umm>; }) {
+		return collection.count();
+	} else {
+		umm result = 0;
+		foreach(it, collection) {
+			++result;
+		}
+		return result;
+	}
+}
+
+auto stddev(Collection auto const &collection) {
 	using Element = ElementOf<Collection>;
 
 	auto count = count_of(collection);
 	Element average = {};
 
-	for_each(collection, [&](Element x) { average += x; });
+	foreach (it, collection) average += *it;
 	average /= count;
 
 	Element variance = {};
-	for_each(collection, [&](Element x) { variance += pow2(x - average); });
+	foreach (it, collection) variance += pow2(*it - average);
 	variance /= count;
 
 	return tl::sqrt(variance);
@@ -1124,41 +1274,31 @@ constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
 };
 
 template <class Predicate = decltype(identity_value)>
-bool all(Collection auto x, Predicate predicate = {}) {
-	for (auto v : x) {
-		if (!predicate(v))
+bool all(Collection auto collection, Predicate predicate = {}) {
+	foreach (it, collection) {
+		if (!predicate(it))
 			return false;
 	}
 	return true;
 }
 
 template <class Predicate = decltype(identity_value)>
-bool any(Collection auto x, Predicate predicate = {}) {
-	for (auto v : x) {
-		if (predicate(v))
+bool any(Collection auto collection, Predicate predicate = {}) {
+	foreach (it, collection) {
+		if (predicate(it))
 			return true;
 	}
 	return false;
 }
 
-/*
-template <ForEachFlags flags, umm count, class Fn, class ...Ts>
-constexpr void for_each(Fn &&fn, Ts ...ts) {
-	(fn(ts), ...);
-}
-*/
-
-template <class Container, class Predicate>
-constexpr auto find_if(Container &container, Predicate &&predicate) {
-	ElementOf<Container> *result = 0;
-	for_each(container, [&] (auto &it) {
-		if (predicate(it)) {
-			result = &it;
-			return ForEach_break;
+template <Collection Collection>
+constexpr auto find_if(Collection const &collection, auto &&predicate) -> decltype(iter(collection).pointer()) {
+	foreach (it, collection) {
+		if (predicate(*it)) {
+			return it.pointer();
 		}
-		return ForEach_continue;
-	});
-	return result;
+	}
+	return {};
 }
 
 template <class Predicate, class Iterator>
@@ -1239,11 +1379,11 @@ private:
 
 template <class T>
 constexpr auto reversed(T x) {
-	using Iter = decltype(x.rbegin());
 	struct Range {
-		constexpr Iter begin() { return {_begin}; }
-		constexpr Iter end() { return {_end}; }
-		Iter _begin, _end;
+		constexpr auto begin() { return _begin; }
+		constexpr auto end() { return _end; }
+		decltype(x.rbegin()) _begin;
+		decltype(x.rend()) _end;
 	};
 	Range r = {
 		x.rbegin(),
@@ -1567,12 +1707,77 @@ static constexpr bool max_is_divisible_by_min(umm a, umm b) {
 	return max(a, b) % min(a, b) == 0;
 }
 
+/*
+interface Iter {
+	// Returns false if there is no more elements.
+	bool valid();
+
+	// Advance to next element.
+	void next();
+
+	// Current element. Assert that `valid()` is true.
+	T value();
+
+	[[optional]] K key();     // key corresponding to the value
+}
+*/
+
+struct ReverseIterOption {
+	bool reverse = false;
+};
+
+struct IterBase {
+	auto key_value(this auto &&self) requires requires { self.key(); self.value(); } {
+		return std::pair<decltype(self.key()), decltype(self.value())>{self.key(), self.value()};
+	}
+	decltype(auto) operator*(this auto &&self) { return self.value(); }
+	explicit operator bool(this auto &&self) { return self.valid(); }
+
+	void skip(this auto &&self, umm n) {
+		while (n--) self.next();
+	}
+};
+
+template <class T>
+struct SpanIter : IterBase {
+	T *data = 0;
+	umm count = 0;
+
+	T *it = 0;
+	int step = 0;
+
+	bool valid() {
+		return (umm)(it - data) < count;
+	}
+	void next() {
+		it += step;
+	}
+	void skip(umm n) {
+		it += n * step;
+	}
+
+	umm key() { return it - data; }
+	T &value() { return *it; }
+};
+
+template <class T>
+SpanIter<T> span_iter(T *start, T *end, ReverseIterOption options = {}) {
+	return {
+		.data = start,
+		.count = (umm)(end - start),
+		.it   = options.reverse ? end - 1 : start,
+		.step = options.reverse ? -1      : 1,
+	};
+}
+
 #pragma pack(push, 1)
 template <class T, class Size_ = umm>
 struct Span {
 	using Element = T;
 	using Size = Size_;
 	using ReverseIterator = ReverseIterator<T *>;
+	using Iter = SpanIter<T>;
+	using IterOptions = ReverseIterOption;
 
 	constexpr Span(std::initializer_list<Element> list) : data((Element *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
@@ -1830,6 +2035,10 @@ struct Span {
 		}
 	}
 
+	auto iter(ReverseIterOption options = {}) {
+		return span_iter(data, data + count, options);
+	}
+
 	Element *data = 0;
 	Size count = 0;
 };
@@ -1850,70 +2059,21 @@ template <class T, umm x>               inline Span<T> flatten(T (&array)[x]    
 template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
 template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
 
-template <ForEachFlags flags=0, class T, class Fn>
-constexpr bool for_each(Span<T> span, Fn &&in_fn) {
-	T *start = 0;
-	T *end = 0;
-	umm step = 0;
-	if constexpr (flags & ForEach_reverse) {
-		start = span.data + span.count - 1;
-		end = span.data - 1;
-		step = (umm)-1;
-	} else {
-		start = span.data;
-		end = span.data + span.count;
-		step = (umm)1;
-	}
+template <class T, umm count>
+struct IterOfT<T[count]> { using Iter = SpanIter<T>; };
 
-	auto fn = wrap_foreach_fn<T &>(in_fn);
-
-	for (auto it = start; it != end; it += step) {
-		auto d = fn(*it);
-
-		constexpr ForEachFlags allowed_flags = ForEach_break;
-		assert(!(d & ~allowed_flags), "not supported");
-
-		if (d & ForEach_break)
-			return true;
-	}
-	return false;
+// MSVC bug: default options does not compile
+template <class T, umm count>
+constexpr auto iter(T (&array)[count], ReverseIterOption options/* = {}*/) {
+	return span_iter(array, array + count, options);
 }
 
-template <ForEachFlags flags=0, class T, umm count, class Fn>
-constexpr bool for_each(T (&array)[count], Fn &&fn) {
-	return for_each(Span(array, count), fn);
-}
+template <class T>
+struct IterOfT<std::initializer_list<T>> { using Iter = SpanIter<T>; };
 
-template <ForEachFlags flags=0, class T>
-constexpr bool for_each(std::initializer_list<T> list, auto &&fn) {
-	return for_each(Span(list.begin(), list.size()), fn);
-}
-
-template <class Enumerable>
-forceinline constexpr auto enumerate(Enumerable &&enumerable) {
-
-	using BaseIterator = decltype(enumerable.begin());
-
-	struct IndexedEnumerable {
-		struct Iterator {
-			BaseIterator base;
-			umm index;
-
-			forceinline constexpr auto &operator++() {
-				++base;
-				++index;
-				return *this;
-			}
-			forceinline constexpr auto operator*() { return std::pair<umm, decltype(*base)>{index, *base}; }
-			forceinline constexpr bool operator==(const Iterator &that) const { return base == that.base; }
-		};
-
-		Enumerable enumerable;
-		forceinline constexpr Iterator begin() { return { enumerable.begin(), 0 }; }
-		forceinline constexpr Iterator end() { return { enumerable.end(), 0 }; }
-	};
-
-	return IndexedEnumerable{enumerable};
+template <class T>
+constexpr auto iter(std::initializer_list<T> list, ReverseIterOption options = {}) {
+	return span_iter(list.begin(), list.end(), options);
 }
 
 forceinline constexpr Span<ascii> operator""s(ascii const *string, umm count) { return Span((ascii *)string, count); }
@@ -2145,17 +2305,14 @@ constexpr T *find_any(Span<T> where, Span<T> what) {
 
 template <class T>
 constexpr T *find_last_any(Span<T> where, Span<T> what) {
-	T *result = 0;
-	for_each<ForEach_reverse>(where, [&](T &a) {
-		for (auto &b : what) {
-			if (a == b) {
-				result = &a;
-				return ForEach_break;
+	foreach(a, where, {.reverse = true}) {
+		foreach(b, what) {
+			if (*a == *b) {
+				return &*a;
 			}
 		}
-		return ForEach_continue;
-	});
-	return result;
+	}
+	return 0;
 }
 
 //
@@ -2165,24 +2322,18 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 //
 
 // Const correctess is pain. So much code for so little value.
-template <class Collection>
-auto find(Collection &collection, typename Collection::Element element) 
-//	requires 
-//		requires { collection.find(element); } ||
-//		requires { for_each(collection, [](Iterator it){}); } // This is fucking broken. Error - lambda is redefined. ?????
- {
+// Lambdas in requires are broken. redefinition. ???
+template <Iterable Collection>
+auto find(Collection const &collection, ElementOf<Collection> element) {
 	if constexpr (requires { collection.find(element); }) {
 		return collection.find(element);
 	} else {
-		typename Collection::Iterator found = {};
-		for_each(collection, [&](auto it) {
+		foreach (it, collection) {
 			if (all(*it == element)) {
-				found = it;
-				return ForEach_break;
+				return &*it;
 			}
-			return ForEach_continue;
-		});
-		return found;
+		}
+		return decltype(&*collection.iter()){};
 	}
 }
 
@@ -2236,6 +2387,17 @@ void flip_order(Span<T> span) {
 
 template <class T, class Size, class Fn>
 void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
+	struct Iter {
+		explicit operator bool() {
+
+		}
+		void next() {
+
+		}
+		Span<T, Size> operator*() {
+		}
+	};
+
 	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
 
 	umm start = 0;
@@ -3638,4 +3800,79 @@ void deinit_allocator() {
 
 #if COMPILER_MSVC
 #pragma warning(pop)
+#endif
+
+#ifdef TL_ENABLE_TESTS
+
+TL_TEST {
+	using namespace tl;
+
+	constexpr auto test_carry = [] {
+		u8 ru8;
+		u16 ru16;
+		u32 ru32;
+		u64 ru64;
+		bool carry;
+	
+		add_carry((u8)0xfe, (u8)1, false, &ru8, &carry); assert(ru8 == 0xff); assert(carry == 0);
+		add_carry((u8)0xff, (u8)1, false, &ru8, &carry); assert(ru8 == 0); assert(carry == 1);
+		add_carry((u8)0xff, (u8)0, true,  &ru8, &carry); assert(ru8 == 0); assert(carry == 1);
+		add_carry((u8)0xff, (u8)1, true,  &ru8, &carry); assert(ru8 == 1); assert(carry == 1);
+		add_carry((u8)1, (u8)0xfe, false, &ru8, &carry); assert(ru8 == 0xff); assert(carry == 0);
+		add_carry((u8)1, (u8)0xff, false, &ru8, &carry); assert(ru8 == 0); assert(carry == 1);
+		add_carry((u8)0, (u8)0xff, true,  &ru8, &carry); assert(ru8 == 0); assert(carry == 1);
+		add_carry((u8)1, (u8)0xff, true,  &ru8, &carry); assert(ru8 == 1); assert(carry == 1);
+	
+		add_carry((u16)0xfffe, (u16)1, false, &ru16, &carry); assert(ru16 == 0xffff); assert(carry == 0);
+		add_carry((u16)0xffff, (u16)1, false, &ru16, &carry); assert(ru16 == 0); assert(carry == 1);
+		add_carry((u16)0xffff, (u16)0, true,  &ru16, &carry); assert(ru16 == 0); assert(carry == 1);
+		add_carry((u16)0xffff, (u16)1, true,  &ru16, &carry); assert(ru16 == 1); assert(carry == 1);
+		add_carry((u16)1, (u16)0xfffe, false, &ru16, &carry); assert(ru16 == 0xffff); assert(carry == 0);
+		add_carry((u16)1, (u16)0xffff, false, &ru16, &carry); assert(ru16 == 0); assert(carry == 1);
+		add_carry((u16)0, (u16)0xffff, true,  &ru16, &carry); assert(ru16 == 0); assert(carry == 1);
+		add_carry((u16)1, (u16)0xffff, true,  &ru16, &carry); assert(ru16 == 1); assert(carry == 1);
+	
+		add_carry((u32)0xfffffffe, (u32)1, false, &ru32, &carry); assert(ru32 == 0xffffffff); assert(carry == 0);
+		add_carry((u32)0xffffffff, (u32)1, false, &ru32, &carry); assert(ru32 == 0); assert(carry == 1);
+		add_carry((u32)0xffffffff, (u32)0, true,  &ru32, &carry); assert(ru32 == 0); assert(carry == 1);
+		add_carry((u32)0xffffffff, (u32)1, true,  &ru32, &carry); assert(ru32 == 1); assert(carry == 1);
+		add_carry((u32)1, (u32)0xfffffffe, false, &ru32, &carry); assert(ru32 == 0xffffffff); assert(carry == 0);
+		add_carry((u32)1, (u32)0xffffffff, false, &ru32, &carry); assert(ru32 == 0); assert(carry == 1);
+		add_carry((u32)0, (u32)0xffffffff, true,  &ru32, &carry); assert(ru32 == 0); assert(carry == 1);
+		add_carry((u32)1, (u32)0xffffffff, true,  &ru32, &carry); assert(ru32 == 1); assert(carry == 1);
+	
+		add_carry((u64)0xfffffffffffffffe, (u64)1, false, &ru64, &carry); assert(ru64 == 0xffffffffffffffff); assert(carry == 0);
+		add_carry((u64)0xffffffffffffffff, (u64)1, false, &ru64, &carry); assert(ru64 == 0); assert(carry == 1);
+		add_carry((u64)0xffffffffffffffff, (u64)0, true,  &ru64, &carry); assert(ru64 == 0); assert(carry == 1);
+		add_carry((u64)0xffffffffffffffff, (u64)1, true,  &ru64, &carry); assert(ru64 == 1); assert(carry == 1);
+		add_carry((u64)1, (u64)0xfffffffffffffffe, false, &ru64, &carry); assert(ru64 == 0xffffffffffffffff); assert(carry == 0);
+		add_carry((u64)1, (u64)0xffffffffffffffff, false, &ru64, &carry); assert(ru64 == 0); assert(carry == 1);
+		add_carry((u64)0, (u64)0xffffffffffffffff, true,  &ru64, &carry); assert(ru64 == 0); assert(carry == 1);
+		add_carry((u64)1, (u64)0xffffffffffffffff, true,  &ru64, &carry); assert(ru64 == 1); assert(carry == 1);
+
+		sub_borrow((u8)0, (u8)1, false, &ru8, &carry); assert(ru8 == 0xff); assert(carry == 1);
+		sub_borrow((u8)0, (u8)0, true,  &ru8, &carry); assert(ru8 == 0xff); assert(carry == 1);
+		sub_borrow((u8)0, (u8)1, true,  &ru8, &carry); assert(ru8 == 0xfe); assert(carry == 1);
+		sub_borrow((u8)1, (u8)0, true,  &ru8, &carry); assert(ru8 == 0); assert(carry == 0);
+
+		sub_borrow((u16)0, (u16)1, false, &ru16, &carry); assert(ru16 == 0xffff); assert(carry == 1);
+		sub_borrow((u16)0, (u16)0, true,  &ru16, &carry); assert(ru16 == 0xffff); assert(carry == 1);
+		sub_borrow((u16)0, (u16)1, true,  &ru16, &carry); assert(ru16 == 0xfffe); assert(carry == 1);
+		sub_borrow((u16)1, (u16)0, true,  &ru16, &carry); assert(ru16 == 0); assert(carry == 0);
+
+		sub_borrow((u32)0, (u32)1, false, &ru32, &carry); assert(ru32 == 0xffffffff); assert(carry == 1);
+		sub_borrow((u32)0, (u32)0, true,  &ru32, &carry); assert(ru32 == 0xffffffff); assert(carry == 1);
+		sub_borrow((u32)0, (u32)1, true,  &ru32, &carry); assert(ru32 == 0xfffffffe); assert(carry == 1);
+		sub_borrow((u32)1, (u32)0, true,  &ru32, &carry); assert(ru32 == 0); assert(carry == 0);
+
+		sub_borrow((u64)0, (u64)1, false, &ru64, &carry); assert(ru64 == 0xffffffffffffffff); assert(carry == 1);
+		sub_borrow((u64)0, (u64)0, true,  &ru64, &carry); assert(ru64 == 0xffffffffffffffff); assert(carry == 1);
+		sub_borrow((u64)0, (u64)1, true,  &ru64, &carry); assert(ru64 == 0xfffffffffffffffe); assert(carry == 1);
+		sub_borrow((u64)1, (u64)0, true,  &ru64, &carry); assert(ru64 == 0); assert(carry == 0);
+	};
+
+	constexpr int x = (test_carry(), 1);
+	test_carry();
+};
+
 #endif

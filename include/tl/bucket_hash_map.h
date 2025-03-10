@@ -13,7 +13,7 @@ struct BucketHashMap : Traits {
 	using Key = Key_;
 	using Value = Value_;
 	using KeyValue = KeyValue<Key, Value>;
-	using KeyValueRef = KeyValueRef<Key, Value>;
+	using KeyValuePointers = KeyValuePointers<Key, Value>;
 
 	using Element = KeyValue;
 
@@ -123,7 +123,7 @@ struct BucketHashMap : Traits {
 		return true;
 	}
 
-	KeyValueRef find(Key const &key) const {
+	KeyValuePointers find(Key const &key) const {
 		if (buckets.count == 0)
 			return {};
 
@@ -139,7 +139,7 @@ struct BucketHashMap : Traits {
 		}
 		return {};
 	}
-	Value erase(KeyValueRef kv) {
+	Value erase(KeyValuePointers kv) {
 		if (buckets.count == 0)
 			return {};
 
@@ -216,14 +216,14 @@ struct BucketHashMap : Traits {
 	}
 
 	template <ForEachFlags flags = 0>
-	bool for_each(std::invocable<KeyValueRef> auto &&in_fn) {
+	bool for_each(std::invocable<KeyValuePointers> auto &&in_fn) {
 		static_assert(flags == 0, "Only default flags supported");
 
-		auto fn = wrap_foreach_fn<KeyValueRef>(in_fn);
+		auto fn = wrap_foreach_fn<KeyValuePointers>(in_fn);
 
 		for (u32 i = 0; i < buckets.count; ++i) {
 			for (auto &it : buckets[i]) {
-				auto d = fn(KeyValueRef{&it.key, &it.value});
+				auto d = fn(KeyValuePointers{&it.key, &it.value});
 
 				switch (d & ForEach_erase_mask) {
 					case ForEach_erase:
@@ -239,8 +239,8 @@ struct BucketHashMap : Traits {
 	}
 
 	template <class Allocator = tl::Allocator>
-	auto map(std::invocable<KeyValueRef> auto &&fn TL_LP) {
-		using U = decltype(fn(std::declval<KeyValueRef>()));
+	auto map(std::invocable<KeyValuePointers> auto &&fn TL_LP) {
+		using U = decltype(fn(std::declval<KeyValuePointers>()));
 		List<U, Allocator> result;
 		result.reserve(count TL_LA);
 		for_each([&](auto kv) { result.add(fn(kv) TL_LA); });
@@ -285,6 +285,62 @@ struct BucketHashMap : Traits {
 		for_each([&](auto kv) { (void)kv; result = false; return ForEach_break; });
 		return result;
 	}
+
+	template <bool is_const>
+	struct Iter {
+		BucketHashMap *map = 0;
+		typename BucketHashMap::Bucket *bucket = 0;
+		typename BucketHashMap::Bucket::template Iter<is_const> bucket_iter = {};
+
+		KeyValueReferences<Key, MakeConst<Value, is_const>> operator*() {
+			auto &it = *bucket_iter;
+			return {it.key, it.value};
+		}
+		
+		tl::KeyValuePointers<Key, MakeConst<Value, is_const>> pointer() {
+			auto &it = *bucket_iter;
+			return {&it.key, &it.value};
+		}
+
+		explicit operator bool() {
+			return (bool)bucket_iter;
+		}
+
+		void next() {
+			bucket_iter.next();
+			if (!bucket_iter) {
+				do {
+					++bucket;
+					if (bucket == map->buckets.end()) {
+						bucket_iter = {};
+						return;
+					} else {
+						bucket_iter = bucket->iter();
+					}
+				} while (!bucket_iter);
+			}
+		}
+
+		void erase() requires !is_const {
+			--map->count;
+			bucket_iter.erase();
+		}
+	};
+
+	auto iter(this auto &&self) {
+		Iter<tl_self_const> result = {(BucketHashMap *)&self};
+
+		if (self.buckets.count) {
+			for (auto &bucket : self.buckets) {
+				if (bucket.head) {
+					result.bucket_iter = bucket.iter();
+					result.bucket = &bucket;
+					break;
+				}
+			}
+		}
+		return result;
+	}
 };
 
 }
@@ -296,6 +352,10 @@ TL_TEST {
 
 	{
 		BucketHashMap<int, int> map;
+		for (auto it = map.iter(); it; it.next()) {
+
+		}
+
 		map.insert(42, 1);
 		map.insert(69, 2);
 		map.insert(1337, 3);
@@ -319,6 +379,13 @@ TL_TEST {
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 	{
 		struct CollideTraits : DefaultHashTraits<int> {
@@ -349,6 +416,13 @@ TL_TEST {
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 };
 

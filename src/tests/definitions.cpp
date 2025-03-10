@@ -54,6 +54,7 @@
 #include <tl/contiguous_hash_set.h>
 #include <tl/bucket_hash_map.h>
 #include <tl/bucket_hash_set.h>
+#include <tl/signed_int.h>
 #include <tl/static_bucket_hash_map.h>
 #include <tl/hash_map.h>
 #include <tl/hash_set.h>
@@ -85,9 +86,12 @@
 #include <tl/ram.h>
 #include <tl/random.h>
 #include <tl/reusable_fiber.h>
+#include <tl/ring_buffer.h>
 #include <tl/simd.h>
 #include <tl/sorted_list.h>
 #include <tl/source_location.h>
+#include <tl/static_queue.h>
+#include <tl/static_ring_buffer.h>
 #include <tl/stream.h>
 #include <tl/string.h>
 #include <tl/text_input_field.h>

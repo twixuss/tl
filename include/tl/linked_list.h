@@ -188,8 +188,8 @@ struct LinkedList {
 		return false;
 	}
 	
-	auto &front(this auto &&self) { bounds_check(assert(self.head); return self.head->value; )}
-	auto &back(this auto &&self) { bounds_check(assert(self.head); return self.tail->value; )}
+	auto &front(this auto &&self) { bounds_check(assert(self.head)); return self.head->value; }
+	auto &back(this auto &&self) { bounds_check(assert(self.head)); return self.tail->value; }
 
 	
 	struct CppIterator {
@@ -215,6 +215,57 @@ struct LinkedList {
 	
 	CppIterator begin() { return head; }
 	CppIterator end() { return {}; }
+
+
+	template <bool is_const>
+	struct Iter {
+		LinkedList *list = 0;
+		Node *node = 0;
+		bool should_advance = true;
+		bool reverse = false;
+
+		explicit operator bool() {
+			return node;
+		}
+		void next() {
+			if (should_advance) {
+				node = reverse ? node->prev : node->next;
+			}
+		}
+		auto &operator*() {
+			return node->value;
+		}
+		auto pointer() { return &node->value; }
+
+		void erase() requires !is_const {
+			auto next_node = reverse ? node->prev : node->next;
+			list->erase(node);
+			node = next_node;
+			should_advance = false;
+		}
+	};
+
+	struct IterOptions {
+		bool reverse = false;
+	};
+
+	auto iter(this auto &&self, IterOptions options = {}) {
+		Iter<tl_self_const> result = {(LinkedList *)&self};
+		result.reverse = options.reverse;
+		result.node = options.reverse ? self.tail : self.head;
+		return result;
+	}
+
+	int test() {
+		for (auto it = iter(); it; it.next()) {
+			auto value = *it;
+
+			if (value.bad) {
+				it.erase();
+				continue;
+			}
+		}
+	}
 };
 
 }

@@ -240,15 +240,24 @@ forceinline bool atomic_and(bool volatile *a, bool b) { return (bool)atomic_and(
 forceinline bool atomic_or (bool volatile *a, bool b) { return (bool)atomic_or ((u8 *)a, (u8)b); }
 forceinline bool atomic_xor(bool volatile *a, bool b) { return (bool)atomic_xor((u8 *)a, (u8)b); }
 
+extern TL_API FatFunctionPointer thread_initter;
+extern TL_API FatFunctionPointer thread_deinitter;
+
 #ifdef TL_IMPL
+
+TL_API FatFunctionPointer thread_initter = +[]{
+	init_allocator();
+	current_printer = standard_output_printer;
+};
+TL_API FatFunctionPointer thread_deinitter = +[]{
+	deinit_allocator();
+};
 
 #if OS_WINDOWS
 
 void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
 void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
-
-void init_logger_thread();
 
 void run_thread(Thread *thread) {
 	#ifdef TL_USE_CONTEXT
@@ -258,12 +267,10 @@ void run_thread(Thread *thread) {
 		auto thread = (Thread *)param;
 		#ifdef TL_USE_CONTEXT
 		registrate(thread->context);
-		#else
-		init_allocator();
-		defer {deinit_allocator();};
-		current_printer = standard_output_printer;
-		init_logger_thread();
 		#endif
+
+		thread_initter();
+		defer { thread_deinitter(); };
 		thread->function(thread);
 		return 0;
 	}, thread, 0, 0);
@@ -1180,7 +1187,8 @@ struct TaskQueuesThreadPool {
 			auto &shared = pool.shared;
 			locked_use(shared) {
 				//tasks = shared.unused_task_queues.pop().value_or({.allocator = pool.allocator});
-				tasks = {.allocator = pool.allocator};
+				tasks = {};
+				tasks.allocator = pool.allocator;
 				shared.task_queues.add(this);
 			};
 			#if TL_DEBUG

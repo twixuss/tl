@@ -133,6 +133,13 @@ TL_TEST {
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 	{
 		struct CollideTraits : DefaultHashTraits<int> {
@@ -163,6 +170,13 @@ TL_TEST {
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 };
 

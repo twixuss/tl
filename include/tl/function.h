@@ -38,6 +38,10 @@ struct FatFunctionPointer {
 	}
 	#ifndef TL_FAT_FUNCTION_POINTER_NO_CONSTRUCTORS
 	FatFunctionPointer() = default;
+	FatFunctionPointer(FatFunctionPointer const &) = default;
+	FatFunctionPointer(FatFunctionPointer &&) = default;
+	FatFunctionPointer &operator=(FatFunctionPointer const &) = default;
+	FatFunctionPointer &operator=(FatFunctionPointer &&) = default;
 	FatFunctionPointer(void (*fn)()) {
 		function = (void(*)(void*))fn;
 		parameter = 0;
@@ -47,8 +51,8 @@ struct FatFunctionPointer {
 		parameter = param;
 	}
 	template <class Fn>
-	FatFunctionPointer(Fn &&fn) requires requires { fn(); } {
-		parameter = default_allocator.allocate_uninitialized<Fn>();
+	FatFunctionPointer(Fn &&fn) requires (requires { fn(); } && !std::same_as<std::remove_cvref_t<Fn>, FatFunctionPointer>) {
+		parameter = default_allocator.template allocate_uninitialized<Fn>();
 		new(parameter) Fn(std::move(fn));
 		function = [](void *parameter) {
 			(*(Fn *)parameter)();
@@ -74,6 +78,25 @@ void free(FatFunctionPointer &fn, Allocator allocator) {
 	if (fn.parameter)
 		allocator.free(fn.parameter);
 	fn = {};
+}
+
+inline FatFunctionPointer chain(FatFunctionPointer a, FatFunctionPointer b) {
+	auto fns = DefaultAllocator{}.allocate<FatFunctionPointer>(2);
+	fns[0] = a;
+	fns[1] = b;
+
+	FatFunctionPointer result;
+	result.parameter = fns;
+	result.function = [](void *param) {
+		auto fns = (FatFunctionPointer *)param;
+		fns[0]();
+		fns[1]();
+	};
+
+	return result;
+}
+inline void chain(FatFunctionPointer *a, FatFunctionPointer b) {
+	*a = chain(*a, b);
 }
 
 template <class ParameterlessFunction, class Allocator = Allocator>

@@ -23,7 +23,7 @@ struct ContiguousHashMap : Traits {
 
 	using CellState = ContiguousHashMapCellState;
 	using KeyValue = KeyValue<Key, Value>;
-	using KeyValueRef = KeyValueRef<Key, Value>;
+	using KeyValuePointers = KeyValuePointers<Key, Value>;
 
 	using Element = KeyValue;
 
@@ -137,7 +137,7 @@ struct ContiguousHashMap : Traits {
 		return cell.value = value;
 	}
 
-	KeyValueRef find(Key key) const {
+	KeyValuePointers find(Key key) const {
 		if (cells.count == 0)
 			return {};
 
@@ -166,13 +166,16 @@ struct ContiguousHashMap : Traits {
 		}
 		count = 0;
 	}
-	KeyValue erase(KeyValueRef kv) {
-		bounds_check(assert(cells.count));
-		auto cell = (Cell *)((u8 *)kv.key - offsetof(Cell, key));
+	KeyValue erase(Cell *cell) {
 		assert(cell->state == CellState::occupied);
-		cell->state = CellState::removed;
+		cell->state = ContiguousHashMapCellState::removed;
 		--count;
 		return {cell->key, cell->value};
+	}
+	KeyValue erase(KeyValuePointers kv) {
+		bounds_check(assert(cells.count));
+		auto cell = (Cell *)((u8 *)kv.key - offsetof(Cell, key));
+		return erase(cell);
 	}
 	Optional<Value> erase(Key key) {
 		bounds_check(assert(cells.count));
@@ -206,50 +209,51 @@ struct ContiguousHashMap : Traits {
 		return count == 0;
 	}
 
-	bool for_each(HashMapIterFn<Key, Value> auto &&in_fn) {
-		auto fn = wrap_foreach_fn<KeyValueRef>(in_fn);
-		for (auto &cell : cells) {
-			if (cell.state == ContiguousHashMapCellState::occupied) {
-				auto d = fn(KeyValueRef{&cell.key, &cell.value});
-				switch (d & ForEach_erase_mask) {
-					case ForEach_erase: cell.state = ContiguousHashMapCellState::removed; break;
-					case ForEach_erase_unordered: cell.state = ContiguousHashMapCellState::removed; break;
-				}
-				if (d & ForEach_break)
-					return true;
+	
+	template <bool is_const>
+	struct Iter {
+		ContiguousHashMap *map = 0;
+		Cell *cell = 0;
+
+		explicit operator bool() {
+			return cell != map->cells.end();
+		}
+
+		void next() {
+			while (1) {
+				++cell;
+				if (cell == map->cells.end())
+					break;
+				if (cell->state == ContiguousHashMapCellState::occupied)
+					break;
 			}
 		}
-		return false;
-	}
 
-	template <class DstAllocator = Allocator>
-	auto map(HashMapIterFn<Key, Value> auto &&fn TL_LP) {
-		using U = decltype(fn(std::declval<KeyValueRef>()));
-		List<U, DstAllocator> result;
-		result.reserve(count TL_LA);
-		for_each([&](auto kv) { result.add(fn(kv) TL_LA); });
-		return result;
-	}
+		Key const &key() { return cell->key; }
+		Value &value() { return cell->value; }
 
-	template <class DstAllocator = Allocator>
-	auto to_list(TL_LPC) {
-		return map<DstAllocator>([](auto kv) { return kv.load(); });
-	}
-	
-	template <class DstAllocator, class DstSize>
-	void set_to(List<KeyValue, DstAllocator, DstSize> &list TL_LP) {
-		list.clear();
-		list.reserve(count TL_LA);
-		for_each([&](auto kv) { list.add(kv.load() TL_LA); });
-	}
 
-	template <class DstAllocator, class DstSize>
-	void set_to(List<Value, DstAllocator, DstSize> &list TL_LP) {
-		list.clear();
-		list.reserve(count TL_LA);
-		for_each([&](auto kv) { list.add(*kv.value TL_LA); });
+		void erase() requires !is_const {
+			map->erase(cell);
+		}
+
+
+		KeyValueReferences<Key, Value> key_value() { return {key(), value()}; }
+	};
+
+	using IterOptions = Empty;
+
+	auto iter(this auto &&self, IterOptions options = {}) {
+		auto iter = Iter<tl_self_const>{
+			(ContiguousHashMap *)&self, self.cells.data
+		};
+		if (self.cells.count && self.cells.data[0].state != ContiguousHashMapCellState::occupied) {
+			iter.next();
+		}
+		return iter;
 	}
 };
+
 
 }
 
@@ -257,6 +261,10 @@ struct ContiguousHashMap : Traits {
 
 TL_TEST {
 	using namespace tl;
+
+	static_assert(Iterable<ContiguousHashMap<int, int>>);
+	static_assert(AnIter<ContiguousHashMap<int, int>::Iter<false>>);
+
 
 	{
 		ContiguousHashMap<int, int> map;
@@ -279,10 +287,17 @@ TL_TEST {
 		assert(!map.find(69));
 		assert(map.count == 3);
 
-		auto list = map.to_list();
+		auto list = to_list_with_keys(map);
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 	{
 		struct CollideTraits : DefaultHashTraits<int> {
@@ -309,10 +324,17 @@ TL_TEST {
 		assert(!map.find(69));
 		assert(map.count == 3);
 		
-		auto list = map.to_list();
+		auto list = to_list_with_keys(map);
 		assert(find(list, KeyValue{42, 1}));
 		assert(find(list, KeyValue{1337, 3}));
 		assert(find(list, KeyValue{12345, 4}));
+
+		
+		foreach(it, map) {
+			it.erase();
+		}
+
+		assert(map.count == 0);
 	}
 };
 

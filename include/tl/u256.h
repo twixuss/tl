@@ -95,7 +95,7 @@ union u256 {
 	u256 operator+(u256 b) const {
 		u256 result;
 		bool carry;
-		add_carry(s[0], b.s[0], &result.s[0], &carry);
+		add_carry(s[0], b.s[0], false, &result.s[0], &carry);
 		add_carry(s[1], b.s[1], carry, &result.s[1], &carry);
 		add_carry(s[2], b.s[2], carry, &result.s[2], &carry);
 		result.s[3] = s[3] + b.s[3] + carry;
