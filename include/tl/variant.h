@@ -46,11 +46,16 @@ private:
 	Size _index;
 
 public:
-	Variant() = default;
+	Variant() { 
+		using First = TypeAt<0, T...>;
+
+		new (storage) First();
+		_index = 0;
+	}
 
 	template <OneOf<T...> U>
 	Variant(U value) {
-		*(U *)storage = value;
+		new (storage) U(value);
 		_index = index_of<U>;
 	}
 
@@ -58,7 +63,15 @@ public:
 	forceinline decltype(auto) visit(this auto &&self, Visitor &&visitor) requires requires {
 		{ (visitor(*(T *)0), ...) };
 	} {
-		return visit_impl<void, T...>(self._index, self.storage, std::forward<Visitor>(visitor));
+		if constexpr (sizeof...(T) <= 64) {
+			return visit_impl<void, T...>(self._index, self.storage, std::forward<Visitor>(visitor));
+		} else {
+			Array table = {
+				+[](u8 *storage, Visitor &&visitor) -> decltype(auto) { return visitor(*(T *)storage); }...
+			};
+
+			return table.data[self._index](self.storage, std::forward<Visitor>(visitor));
+		}
 	}
 
 	template <OneOf<T...> U>
@@ -112,3 +125,65 @@ inline umm append(StringBuilder &builder, Variant<T...> const &v) {
 }
 
 }
+
+#ifdef TL_ENABLE_TESTS
+
+namespace tl::test {
+
+template <int i>
+struct S {};
+
+}
+TL_TEST {
+	using namespace tl;
+	using namespace tl::test;
+	{
+		Variant<int, float, bool> v;
+		assert(v.index() == 0);
+		assert(v.is<int>());
+		assert(v.as<int>().value() == 0);
+		v.visit(Combine{
+			[](int) {},
+			[](auto) { invalid_code_path(); },
+		});
+
+		v = 1.0f;
+		assert(v.index() == 1);
+		assert(v.is<float>());
+		assert(v.as<float>().value() == 1.0f);
+		v.visit(Combine{
+			[](float) {},
+			[](auto) { invalid_code_path(); },
+		});
+
+		v = true;
+		assert(v.index() == 2);
+		assert(v.is<bool>());
+		assert(v.as<bool>().value() == true);
+		v.visit(Combine{
+			[](bool) {},
+			[](auto) { invalid_code_path(); },
+		});
+	}
+	{
+		#define x(i) S<i>, 
+		Variant<TL_IREPEAT64(x) S<64>> v;
+
+		assert(v.index() == 0);
+		assert(v.is<S<0>>());
+		v.visit(Combine{
+			[](S<0>) {},
+			[](auto) { invalid_code_path(); },
+		});
+
+		v = S<64>{};
+		assert(v.index() == 64);
+		assert(v.is<S<64>>());
+		v.visit(Combine{
+			[](S<64>) {},
+			[](auto) { invalid_code_path(); },
+		});
+	}
+};
+
+#endif
