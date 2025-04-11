@@ -3,3 +3,4 @@ temp/
 tmp/
 *.pdb
 bin/
+packages/

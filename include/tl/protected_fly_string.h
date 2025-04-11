@@ -25,7 +25,7 @@ struct ProtectedFlyString {
             found->value += 1;
             data = found->key.data;
         } else {
-            auto buffer = storage.allocator.allocate<utf8>(span.count + 1);
+            auto buffer = storage.buffer.allocator.allocate<utf8>(span.count + 1);
             memcpy(buffer, span.data, span.count);
             buffer[span.count] = 0;
             storage.get_or_insert({buffer, span.count}) = 1;

@@ -325,16 +325,20 @@ struct List : Span<T, Size_> {
 	
 	Span span() const { return *this; }
 
+	template <bool is_const>
 	struct Iter {
-		List *list = 0;
-		T *it = 0;
-		T *end = 0;
+		using CList = MakeConst<List, is_const>;
+		using CT = MakeConst<T, is_const>;
+
+		CList *list = 0;
+		CT *it = 0;
+		CT *end = 0;
 		s8 step = 0;
 
 		explicit operator bool() { return it != end; }
 		void next() { it += step; }
 		umm key() { return it - list->data; }
-		T &value() { return *it; }
+		CT &value() { return *it; }
 
 		// must `continue` right after
 		void erase() {
@@ -353,14 +357,30 @@ struct List : Span<T, Size_> {
 			}
 		}
 
-		T &operator*() { return value(); }
-		std::pair<umm, T &> key_value() { return {key(), value()}; }
+		CT &operator*() { return value(); }
+		std::pair<umm, CT &> key_value() { return {key(), value()}; }
 	};
 
 	using IterOptions = ReverseIterOption;
-
-	Iter iter(IterOptions options = {}) {
-		return {
+	
+	//auto iter(this auto &&self, IterOptions options = {}) {
+	//	return Iter<tl_self_const>{
+	//		.list = &self,
+	//		.it = options.reverse ? self.data + self.count - 1 : self.data,
+	//		.end = options.reverse ? self.data - 1 : self.data + self.count,
+	//		.step = options.reverse ? -1 : 1,
+	//	};
+	//}
+	auto iter(IterOptions options = {}) {
+		return Iter<false>{
+			.list = this,
+			.it = options.reverse ? data + count - 1 : data,
+			.end = options.reverse ? data - 1 : data + count,
+			.step = options.reverse ? -1 : 1,
+		};
+	}
+	auto iter(IterOptions options = {}) const {
+		return Iter<true>{
 			.list = this,
 			.it = options.reverse ? data + count - 1 : data,
 			.end = options.reverse ? data - 1 : data + count,
@@ -400,6 +420,37 @@ List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Alloc
 	List<T, Allocator, Size> result;
 	result.allocator = allocator;
 	result.set(as_span(that));
+	return result;
+}
+
+template <class Allocator = Allocator, class Size = umm>
+auto to_list(AnIter auto iter TL_LP) {
+	List<std::remove_cvref_t<decltype(*iter)>, Allocator, Size> result;
+
+	foreach (it, iter) {
+		result.add(*it TL_LA);
+	}
+
+	return result;
+}
+
+template <class Allocator = Allocator, Iterable InputCollection>
+auto to_list(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
+	List<std::remove_cvref_t<decltype(collection.iter().value())>, Allocator> result;
+	result.reserve(count_of(collection));
+	foreach(it, collection.iter(options)) {
+		result.add(it.value());
+	}
+	return result;
+}
+
+template <class Allocator = Allocator, Iterable InputCollection>
+auto to_list_with_keys(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
+	List<typename std::remove_cvref_t<InputCollection>::KeyValue, Allocator> result;
+	result.reserve(count_of(collection));
+	foreach(it, collection.iter(options)) {
+		result.add(it.key_value());
+	}
 	return result;
 }
 
@@ -488,28 +539,6 @@ umm count(List<T, Allocator, Size> list, Fn &&fn) {
 	return result;
 }
 
-template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> split_by_seq(Span<T> what, Span<T> by TL_LP) {
-	List<Span<T>, Allocator, Size> result;
-	
-	split_by_seq(what, by, [&] (Span<T> part) {
-		result.add(part);
-	});
-
-	return result;
-}
-
-template <class Allocator = Allocator, class T, class Size>
-List<Span<T>, Allocator, Size> split_by_one(Span<T, Size> what, T by TL_LP) {
-	List<Span<T>, Allocator, Size> result;
-
-	split_by_one(what, by, [&](auto part) {
-		result.add(part TL_LA);
-	});
-
-	return result;
-}
-
 template <class T, class Size>
 void replace_inplace(Span<T, Size> where, T what, T with) {
 	for (auto &v : where) {
@@ -558,26 +587,6 @@ auto map(Span<T, Size> span, Fn &&fn TL_LP) {
 		result.add(fn(x));
 	}
 
-	return result;
-}
-
-template <class Allocator = Allocator, Iterable InputCollection>
-auto to_list(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
-	List<std::remove_cvref_t<decltype(collection.iter().value())>, Allocator> result;
-	result.reserve(count_of(collection));
-	foreach(it, collection.iter(options)) {
-		result.add(it.value());
-	}
-	return result;
-}
-
-template <class Allocator = Allocator, Iterable InputCollection>
-auto to_list_with_keys(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
-	List<typename std::remove_cvref_t<InputCollection>::KeyValue, Allocator> result;
-	result.reserve(count_of(collection));
-	foreach(it, collection.iter(options)) {
-		result.add(it.key_value());
-	}
 	return result;
 }
 

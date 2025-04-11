@@ -321,10 +321,15 @@ struct BucketHashMap : Traits {
 			}
 		}
 
+		Key const &key() { return (*bucket_iter).key; }
+		Value &value() { return (*bucket_iter).value; }
+
 		void erase() requires !is_const {
 			--map->count;
 			bucket_iter.erase();
 		}
+		
+		KeyValueReferences<Key, Value> key_value() { return {key(), value()}; }
 	};
 
 	auto iter(this auto &&self) {

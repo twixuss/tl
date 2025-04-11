@@ -252,6 +252,16 @@ constexpr umm type_index_of = IndexOfT<T, Rest...>::value;
 template <class First, class ...Rest>
 concept AllSame = (std::is_same_v<First, Rest> && ...);
 
+template <class...>
+struct AllDifferentT : std::true_type {};
+template <>
+struct AllDifferentT<> : std::true_type {};
+template <class First, class ...Rest>
+struct AllDifferentT<First, Rest...> : std::conditional_t<(!std::is_same_v<First, Rest> && ...) && AllDifferentT<Rest...>::value, std::true_type, std::false_type> {};
+
+template <class First, class ...Rest>
+concept AllDifferent = AllDifferentT<First, Rest...>::value;
+
 template <class First, class ...Rest>
 struct RequireAllSame {
 	static_assert(AllSame<First, Rest...>);
@@ -290,6 +300,17 @@ struct MakeConstT<T, false> {
 
 template <class T, bool add_const = true>
 using MakeConst = MakeConstT<T, add_const>::Type;
+
+template <class ...Ts>
+struct TypePackIterator {
+	auto operator->*(auto fn) {
+		[&] <umm ...I>(std::index_sequence<I...>) {
+			((fn.operator()<I, TypeAt<I, Ts...>>()), ...);
+		}(std::make_index_sequence<sizeof...(Ts)>{});
+	}
+};
+
+#define for_each_type(I, T, Ts) TypePackIterator<Ts...>{} ->* [&]<umm I, class T>()
 
 template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
@@ -433,17 +454,17 @@ namespace ce {
 
 forceinline constexpr void add_carry(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
 	u16 r = a + b + carry_in;
-	*result = r;
+	*result = (u8)r;
 	*carry_out = r & 0x100;
 }
 forceinline constexpr void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
 	u32 r = a + b + carry_in;
-	*result = r;
+	*result = (u16)r;
 	*carry_out = r & 0x10000;
 }
 forceinline constexpr void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
 	u64 r = (u64)a + b + carry_in;
-	*result = r;
+	*result = (u32)r;
 	*carry_out = r & 0x100000000;
 }
 forceinline constexpr void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
@@ -457,17 +478,17 @@ forceinline constexpr void add_carry(u64 a, u64 b, bool carry_in, u64 *result, b
 
 forceinline constexpr void sub_borrow(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
 	auto r = (u16)a - b - carry_in;
-	*result = r;
+	*result = (u8)r;
 	*carry_out = r & 0x100;
 }
 forceinline constexpr void sub_borrow(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
 	auto r = (u32)a - b - carry_in;
-	*result = r;
+	*result = (u16)r;
 	*carry_out = r & 0x10000;
 }
 forceinline constexpr void sub_borrow(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) {
 	auto r = (u64)a - b - carry_in;
-	*result = r;
+	*result = (u32)r;
 	*carry_out = r & 0x100000000;
 }
 forceinline constexpr void sub_borrow(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) {
@@ -600,6 +621,14 @@ forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~va
 #else
 #endif
 #endif
+forceinline u32 find_lowest_one_bit(u8  val) { return find_lowest_one_bit((u32)val); }
+forceinline u32 find_lowest_one_bit(u16 val) { return find_lowest_one_bit((u32)val); }
+forceinline u32 find_highest_one_bit(u8  val) { return find_highest_one_bit((u32)val); }
+forceinline u32 find_highest_one_bit(u16 val) { return find_highest_one_bit((u32)val); }
+forceinline u32 find_lowest_zero_bit(u8  val) { return find_lowest_zero_bit((u32)val); }
+forceinline u32 find_lowest_zero_bit(u16 val) { return find_lowest_zero_bit((u32)val); }
+forceinline u32 find_highest_zero_bit(u8  val) { return find_highest_zero_bit((u32)val | 0xffffff00); }
+forceinline u32 find_highest_zero_bit(u16 val) { return find_highest_zero_bit((u32)val | 0xffff0000); }
 
 namespace ce {
 
@@ -1198,7 +1227,6 @@ concept AnIter = requires(Iter iter) {
 	{ iter } -> ExplicitlyConvertibleTo<bool>;
 	{ iter.next() } -> std::same_as<void>;
 	iter.value();
-	iter.key();
 };
 
 #define tl_self_const std::is_const_v<std::remove_reference_t<decltype(self)>>
@@ -1710,7 +1738,7 @@ static constexpr bool max_is_divisible_by_min(umm a, umm b) {
 /*
 interface Iter {
 	// Returns false if there is no more elements.
-	bool valid();
+	explicit operator bool();
 
 	// Advance to next element.
 	void next();
@@ -1731,7 +1759,6 @@ struct IterBase {
 		return std::pair<decltype(self.key()), decltype(self.value())>{self.key(), self.value()};
 	}
 	decltype(auto) operator*(this auto &&self) { return self.value(); }
-	explicit operator bool(this auto &&self) { return self.valid(); }
 
 	void skip(this auto &&self, umm n) {
 		while (n--) self.next();
@@ -1746,7 +1773,7 @@ struct SpanIter : IterBase {
 	T *it = 0;
 	int step = 0;
 
-	bool valid() {
+	explicit operator bool() {
 		return (umm)(it - data) < count;
 	}
 	void next() {
@@ -2378,26 +2405,41 @@ BinarySearchResult<T> binary_search(Span<T> span, T value) {
 	return binary_search(span, value, [](T &value) -> T & { return value; });
 }
 
-template <class T>
-void flip_order(Span<T> span) {
-	for (umm i = 0; i < span.count / 2; ++i) {
-		Swap(span[i], span[span.count-i-1]);
-	}
+template <class T, class Size>
+auto split_by_one(Span<T, Size> what, T by) {
+	struct Iter : IterBase {
+		Span<T, Size> what = {};
+		T *word_start = 0;
+		T *cursor = 0;
+		T by = {};
+
+		explicit operator bool() {
+			return word_start < what.end();
+		}
+		void next() {
+			word_start = cursor;
+			while (cursor < what.end() && *cursor != by)
+				++cursor;
+			++cursor;
+		}
+		Span<T, Size> value() {
+			return {word_start, cursor - 1};
+		}
+	};
+
+	auto iter = Iter{
+		.what = what,
+		.cursor = what.data,
+		.by = by,
+	};
+
+	iter.next();
+
+	return iter;
 }
 
 template <class T, class Size, class Fn>
 void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
-	struct Iter {
-		explicit operator bool() {
-
-		}
-		void next() {
-
-		}
-		Span<T, Size> operator*() {
-		}
-	};
-
 	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
 
 	umm start = 0;
@@ -2560,7 +2602,7 @@ inline constexpr u8 hex_digit_to_int(utf32 c) {
 	if (c >= '0' && c <= '9') return c - '0';
 	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
 	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-	return c;
+	return (u8)c;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {
@@ -3873,6 +3915,23 @@ TL_TEST {
 
 	constexpr int x = (test_carry(), 1);
 	test_carry();
+
+	constexpr auto test_split = [] (Span<char> input, char sep, Span<Span<char>> expected) {
+
+		umm i = 0;
+
+		split_by_one(input, sep, [&](Span<char> span) {
+			assert(span == expected[i++]);
+		});
+
+		i = 0;
+		foreach(it, split_by_one(input, sep)) {
+			assert(it.value() == expected[i++]);
+		}
+
+	};
+	test_split("hello world !"s, ' ', { "hello"s, "world"s, "!"s });
+	test_split(" hello world ! "s, ' ', { ""s, "hello"s, "world"s, "!"s, ""s });
 };
 
 #endif

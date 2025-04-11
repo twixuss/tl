@@ -77,6 +77,12 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 #include "logger.h"
 #include "win32.h"
 
+// NOTE: From https://learn.microsoft.com/en-us/windows/win32/api/dbghelp/nf-dbghelp-undecoratesymbolname
+// All DbgHelp functions, such as this one, are single threaded.
+// Therefore, calls from more than one thread to this function will likely result in unexpected behavior or memory corruption.
+// To avoid this, you must synchronize all concurrent calls from more than one thread to this function.
+#include "thread.h"
+
 #pragma warning(push, 0)
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
@@ -89,6 +95,7 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 namespace tl {
 
 static HANDLE debug_process;
+static OsLock debug_lock;
 
 bool debug_init() {
 	debug_process = GetCurrentProcess();
@@ -111,6 +118,9 @@ bool debug_add_module(void *module, Span<char> path) {
 	// I wasted way too much time on this function...
 	// I thought module handle would be enough.
 	// And SymLoadModuleEx was succeeding but SymFromAddr was failing with ERROR_MOD_NOT_FOUND ??? Like wtf.
+
+	scoped(debug_lock);
+
 	MODULEINFO mi;
 	if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)module, &mi, sizeof(mi))) {
 		TL_GET_CURRENT(logger).error("debug_add_module({}, \"{}\"): GetModuleInformation failed: {}", module, path, win32_error());
@@ -127,6 +137,8 @@ bool debug_add_module(void *module, Span<char> path) {
 }
 
 List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
+	scoped(debug_lock);
+
 	CONTEXT context;
 	
 	if (context_opaque) {
@@ -174,6 +186,8 @@ List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 }
 
 StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options) {
+	scoped(debug_lock);
+
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
 

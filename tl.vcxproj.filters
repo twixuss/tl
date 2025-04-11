@@ -27,5 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\tests\coroutine.asm" />
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

@@ -36,6 +36,7 @@
     <ClInclude Include="src\compile_speed_test.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="src\tests\coroutine.asm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -101,5 +102,12 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets" Condition="Exists('packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets'))" />
+  </Target>
 </Project>
