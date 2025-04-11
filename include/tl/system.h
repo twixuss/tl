@@ -5,10 +5,14 @@
 // Compiler
 //
 
-#define COMPILER_MSVC 0
-#define COMPILER_GCC  0
+#define COMPILER_MSVC  0
+#define COMPILER_GCC   0
+#define COMPILER_CLANG 0
 
-#if defined __GNUG__
+#if defined __clang__
+	#undef COMPILER_CLANG
+	#define COMPILER_CLANG 1
+#elif defined __GNUG__
 	#undef COMPILER_GCC
 	#define COMPILER_GCC 1
 #elif defined _MSC_VER
@@ -25,10 +29,14 @@
 
 #define OS_WINDOWS 0
 #define OS_LINUX   0
+#define OS_WASM    0
 
 #if defined _WIN32 || defined _WIN64
 	#undef OS_WINDOWS
 	#define OS_WINDOWS 1
+#elif defined __wasm__
+	#undef OS_WASM
+	#define OS_WASM 1
 #else
 	#undef OS_LINUX
 	#define OS_LINUX 1
@@ -163,6 +171,15 @@ using u8  = unsigned __int8;
 using u16 = unsigned __int16;
 using u32 = unsigned __int32;
 using u64 = unsigned __int64;
+#elif COMPILER_CLANG
+using s8 = __INT8_TYPE__;
+using s16 = __INT16_TYPE__;
+using s32 = __INT32_TYPE__;
+using s64 = __INT64_TYPE__;
+using u8 = __UINT8_TYPE__;
+using u16 = __UINT16_TYPE__;
+using u32 = __UINT32_TYPE__;
+using u64 = __UINT64_TYPE__;
 #else
 using s8  = signed char;
 using s16 = signed short;
