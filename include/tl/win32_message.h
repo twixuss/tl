@@ -1,7 +1,10 @@
 #pragma once
 #include "common.h"
 
+#pragma warning(push, 0)
+#define NOMINMAX
 #include <Windows.h>
+#pragma warning(pop)
 
 namespace tl {
 

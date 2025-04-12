@@ -9,6 +9,11 @@ extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 #endif
 
 #ifdef TL_MAIN_WINMAIN
+#pragma warning(push, 0)
+#define NOMINMAX
+#include <Windows.h>
+#pragma warning(pop)
+#include "file.h"
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, wchar_t *wcmdline, int) {
 #else
 int wmain(int argc, wchar_t **argv) {

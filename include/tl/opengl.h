@@ -592,6 +592,13 @@ inline bool init_opengl(NativeWindowHandle window) { return init_opengl(window, 
 inline bool init_opengl(NativeWindowHandle window, InitFlags flags) { return init_opengl(window, flags, default_debug_proc, get_default_back_buffer_params()); }
 inline bool init_opengl(NativeWindowHandle window, InitFlags flags, BackBufferParams back_buffer_params) { return init_opengl(window, flags, default_debug_proc, back_buffer_params); }
 
+#if OS_WINDOWS
+TL_API HDC get_dc();
+TL_API HGLRC get_glrc();
+#endif
+
+bool make_current();
+
 TL_API void present();
 TL_API GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source);
 TL_API GLuint create_shader(GLenum shaderType, Span<char> source);
@@ -842,6 +849,13 @@ static GLuint immediate_vertex_array;
 
 static HDC client_dc;
 static HGLRC context;
+
+HDC get_dc() { return client_dc; }
+HGLRC get_glrc() { return context; }
+
+bool make_current() {
+	return wglMakeCurrent(client_dc, context);
+}
 
 static StaticList<int, 16> context_attribs;
 
