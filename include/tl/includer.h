@@ -67,8 +67,6 @@ template <class SourceFile = SourceFileBase>
 requires std::is_same_v<SourceFile, SourceFileBase>
 	  || std::is_base_of_v<SourceFileBase, SourceFile> // is_base_of<SourceFile, SourceFile> returns true, which doesn't make sense, that's why is_same check.
 struct Includer {
-	StringBuilder builder;
-
 	// contains the main file, its dependencies, and their dependencies, all of them.
 	List<SourceFile> source_files;
 
@@ -78,7 +76,12 @@ struct Includer {
 		using PathAllocator = typename SourceFile::PathAllocator;
 
 		assert(text);
-		builder.clear();
+		
+		// TODO: Implement reuse. Should ask caller for available builder
+		// because storing it makes Includer non-copyable.
+		StringBuilder builder;
+		defer { tl::free(builder); };
+
 		for (auto &source_file : source_files) {
 			source_file.free();
 		}
@@ -158,7 +161,6 @@ struct Includer {
 		builder.fill(as_bytes(*text));
 	}
 	void free() {
-		tl::free(builder);
 		for (auto &source_file : source_files) {
 			source_file.free();
 		}
