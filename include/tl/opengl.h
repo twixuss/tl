@@ -734,10 +734,16 @@ static GLuint compile_shader(GLuint shader) {
 
 	scoped(temporary_storage_checkpoint);
 
-	auto message = current_temporary_allocator.allocate<char>(maxLength);
-	glGetShaderInfoLog(shader, maxLength, &maxLength, message);
+	auto message_p = current_temporary_allocator.allocate<char>(maxLength);
+	glGetShaderInfoLog(shader, maxLength, &maxLength, message_p);
 
-	print(Span(message, maxLength));
+	Span message = {message_p, (umm)maxLength};
+
+	print(message);
+
+	if (find(message, ": error"s)) {
+		current_logger.error("There were shader compilation errors.");
+	}
 
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
