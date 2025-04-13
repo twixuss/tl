@@ -43,7 +43,7 @@ umm append(StringBuilder &builder, YourType t) {
 
 namespace tl {
 
-template <class T, class Size>
+template <class Allocator = Allocator, class T, class Size>
 List<T, Allocator, Size> null_terminate(Span<T, Size> span) {
 	List<T, Allocator, Size> result;
 	result.count = span.count + 1;
