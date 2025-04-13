@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "array.h"
 
 namespace tl {
 
