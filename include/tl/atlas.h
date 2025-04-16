@@ -22,13 +22,13 @@ struct Atlas {
 	// stride_in_bytes - if 0, replaced with `new_elem_size.x * sizeof(Element)`
 	Area &add(Element *new_elem, v2u new_elem_size, u32 stride_in_bytes = 0) {
 		while (1) {
-			if (cursor.x + new_elem_size.x <= size.x)
+			if (cursor.x + new_elem_size.x <= size.x && cursor.y + new_elem_size.y <= size.y)
 				break;
 
 			cursor.x = cursor_min_x;
 			cursor.y += row_height;
 			row_height = 0;
-			if (cursor.y + new_elem_size.y <= size.y)
+			if (cursor.x + new_elem_size.x <= size.x && cursor.y + new_elem_size.y <= size.y)
 				break;
 
 			grow();
