@@ -17,6 +17,7 @@ struct OpenFileParams {
 	bool write = false;
 	bool silent = false;
 	bool create_directories = write;
+	bool share_read = false;
 };
 
 enum FileCursorOrigin {
@@ -569,7 +570,7 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 	WinOpenFileParams result;
 	if (params.read && params.write) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
-		result.share = 0;
+		result.share = params.share_read ? FILE_SHARE_READ : 0;
 		result.creation = OPEN_ALWAYS;
 	} else if (params.read) {
 		result.access = GENERIC_READ;
@@ -577,7 +578,7 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 		result.creation = OPEN_EXISTING;
 	} else if (params.write) {
 		result.access = GENERIC_WRITE;
-		result.share = 0;
+		result.share = params.share_read ? FILE_SHARE_READ : 0;
 		result.creation = CREATE_ALWAYS;
 	} else {
 		result.access = 0;

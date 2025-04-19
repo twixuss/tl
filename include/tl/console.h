@@ -73,8 +73,8 @@ enum class ConsoleColor {
     dark_red,
     dark_magenta,
     dark_yellow,
+    gray, // Yes gray and dark_gray are swapped..
     dark_gray,
-    gray,
     blue,
     green,
     cyan,
@@ -84,6 +84,8 @@ enum class ConsoleColor {
     white,
 };
 
+// foreground, background
+TL_API std::pair<ConsoleColor, ConsoleColor> get_console_color();
 TL_API void set_console_color(ConsoleColor foreground, ConsoleColor background);
 inline void set_console_color(ConsoleColor foreground) {
 	set_console_color(foreground, ConsoleColor::black);
@@ -103,16 +105,13 @@ TL_API bool is_stdout_console();
 
 template <>
 struct Scoped<ConsoleColor> {
-	inline static ConsoleColor current = ConsoleColor::dark_gray;
-	ConsoleColor old;
+	std::pair<ConsoleColor, ConsoleColor> old;
 	void enter(ConsoleColor _new) {
-		old = current;
-		current = _new;
+		old = get_console_color();
 		set_console_color(_new);
 	}
 	void exit() {
-		current = old;
-		set_console_color(old);
+		set_console_color(old.first, old.second);
 	}
 };
 
@@ -236,6 +235,15 @@ void set_console_encoding(Encoding encoding) {
 
 void set_console_color(ConsoleColor foreground, ConsoleColor background) {
 	SetConsoleTextAttribute(std_out, (WORD)((DWORD)foreground | ((DWORD)background << 4)));
+}
+std::pair<ConsoleColor, ConsoleColor> get_console_color() {
+	CONSOLE_SCREEN_BUFFER_INFO csbi = {};
+	GetConsoleScreenBufferInfo(std_out, &csbi);
+
+	return {
+		(ConsoleColor)((csbi.wAttributes >> 0) & 0xf), 
+		(ConsoleColor)((csbi.wAttributes >> 4) & 0xf), 
+	};
 }
 
 void hide_console_window() {

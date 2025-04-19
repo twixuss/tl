@@ -1,4 +1,10 @@
 ﻿#pragma once
+/*
+Requirements:
+	Provide storage for functions:
+		tl::gl::Functions *tl_opengl_functions() { return ...; }
+*/
+
 #include "system.h"
 #include "console.h"
 #include "math.h"
@@ -516,14 +522,14 @@ namespace gl {
 #include "generated/opengl_all_funcs.h"
 
 #if OS_WINDOWS
-#define EXT_AND_OS_FUNCS EXTENSION_FUNCS WINDOWS_FUNCS
+#define TL_OPENGL_EXT_AND_OS_FUNCS TL_OPENGL_EXTENSION_FUNCS TL_OPENGL_WINDOWS_FUNCS
 #else
-#define EXT_AND_OS_FUNCS EXTENSION_FUNCS
+#define TL_OPENGL_EXT_AND_OS_FUNCS TL_OPENGL_EXTENSION_FUNCS
 #endif
 
 
 #define D(ret, name, args, params) using name##_t=ret(GLAPI*)args;
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
@@ -531,37 +537,38 @@ EXT_AND_OS_FUNCS
 BASE_FUNCS
 #undef D
 #define D(ret, name, args, params) extern TL_API ret _##name args;
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 #endif
 
 union Functions {
 	struct {
 #define D(ret, name, args, params) name##_t _##name;
-		EXT_AND_OS_FUNCS
+		TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 	};
 	void *data[1];
 };
 
-extern TL_API Functions functions;
+}}
+extern tl::gl::Functions *tl_opengl_functions();
+namespace tl {
+namespace gl {
 
 #ifdef TL_IMPL
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
 #define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return ::name params;}
-BASE_FUNCS
+TL_OPENGL_BASE_FUNCS
 #undef D
-#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return functions._##name params;}
-EXT_AND_OS_FUNCS
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return tl_opengl_functions()->_##name params;}
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 #endif
 
-Functions functions;
-
 static char const *function_names[] {
 #define D(ret, name, args, params) #name,
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 };
 
@@ -936,7 +943,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 		assert(wglGetCurrentContext());
 	}
 
-	static constexpr u32 function_count = sizeof(functions) / sizeof(void *);
+	static constexpr u32 function_count = sizeof(*tl_opengl_functions()) / sizeof(void *);
 
 	{
 		TL_GL_PROFILE("Loading OpenGL extensions");
@@ -945,7 +952,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 			char const *name = function_names[function_index];
 			void *function = wglGetProcAddress(name);
 			if (function) {
-				functions.data[function_index] = function;
+				tl_opengl_functions()->data[function_index] = function;
 			} else {
 				print("Failed to query '{}'\n", name);
 			}
@@ -953,17 +960,17 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 	}
 
 	#define D(ret, name, args, params)                                    \
-		if (!functions._##name) {                                         \
-			functions._##name = autocast +[]() {                          \
+		if (!tl_opengl_functions()->_##name) {                           \
+			tl_opengl_functions()->_##name = autocast +[]() {            \
 				println("OpenGL function '{}' is not supported.", #name); \
 				abort();                                                  \
 			};                                                            \
 		}
-	EXT_AND_OS_FUNCS
+	TL_OPENGL_EXT_AND_OS_FUNCS
 	#undef D
 
 
-	if (functions._wglCreateContextAttribsARB) {
+	if (tl_opengl_functions()->_wglCreateContextAttribsARB) {
 #if 0
 		float required_attribs_f[] = {
 			0, 0
@@ -1475,10 +1482,5 @@ void free(GrowingBuffer<T> &buffer) {
 }
 }
 
-#undef BASE_FUNCS
-#undef EXTENSION_FUNCS
-#undef WINDOWS_FUNCS
-#undef EXT_AND_OS_FUNCS
-#undef ALL_FUNCS
 #undef TL_GL_PROFILE
 #pragma warning(pop)

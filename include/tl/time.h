@@ -15,8 +15,6 @@ TL_API f64 reset(PreciseTimer &timer);
 
 TL_API u64 read_timestamp_counter();
 
-TL_API List<char> get_time_string();
-
 TL_API void make_os_timing_precise();
 
 TL_API void sync(PreciseTimer &timer, f32 target_delta_time);
@@ -33,6 +31,11 @@ struct Date {
 };
 
 TL_API Date get_date();
+
+inline List<char> get_time_string() {
+	auto d = get_date();
+	return format("{}:{}:{}.{}", d.hour, d.minute, d.second, d.millisecond);
+}
 
 TL_API void sleep_nanoseconds(u64 nanoseconds);
 
@@ -99,13 +102,6 @@ f64 reset(PreciseTimer &timer) {
 
 u64 read_timestamp_counter() {
 	return __rdtsc();
-}
-
-List<char> get_time_string() {
-	SYSTEMTIME t;
-	GetLocalTime(&t);
-
-	return format("{}:{}:{}.{}", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 }
 
 void make_os_timing_precise() {

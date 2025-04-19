@@ -1,11 +1,11 @@
-#define BASE_FUNCS \
+#define TL_OPENGL_BASE_FUNCS \
 D(void, glClearColor, (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha), (red, green, blue, alpha))\
 D(void, glViewport, (GLint x, GLint y, GLsizei width, GLsizei height), (x, y, width, height))\
 D(void, glScissor, (GLint x, GLint y, GLsizei width, GLsizei height), (x, y, width, height))\
 D(void, glGetTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLvoid * pixels), (target, level, format, type, pixels))\
 D(void, glBindTexture, (GLenum target, GLuint texture), (target, texture))\
 
-#define EXTENSION_FUNCS \
+#define TL_OPENGL_EXTENSION_FUNCS \
 D(void, glBlendEquation, (GLenum mode), (mode))\
 D(GLuint, glCreateShader, (GLenum shaderType), (shaderType))\
 D(void, glDeleteShader, (GLuint shader), (shader))\
@@ -133,7 +133,7 @@ D(void, glClearNamedFramebufferuiv, (GLuint framebuffer, GLenum buffer, GLint dr
 D(void, glClearNamedFramebufferfv, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLfloat * value), (framebuffer, buffer, drawbuffer, value))\
 D(void, glClearNamedFramebufferfi, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLfloat depth, GLint stencil), (framebuffer, buffer, drawbuffer, depth, stencil))\
 
-#define WINDOWS_FUNCS \
+#define TL_OPENGL_WINDOWS_FUNCS \
 D(BOOL, wglSwapIntervalEXT, (int interval), (interval))\
 D(HGLRC, wglCreateContextAttribsARB, (HDC hDC, HGLRC hShareContext, const int * attribList), (hDC, hShareContext, attribList))\
 D(BOOL, wglChoosePixelFormatARB, (HDC hdc, const int * piAttribIList, const FLOAT * pfAttribFList, UINT nMaxFormats, int * piFormats, UINT * nNumFormats), (hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats))\

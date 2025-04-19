@@ -1301,6 +1301,9 @@ constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
 	return x;
 };
 
+constexpr auto compare_equal = []<class T>(T const &a, T const &b) { return a == b; };
+
+
 template <class Predicate = decltype(identity_value)>
 bool all(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
@@ -2211,25 +2214,25 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 	}
 }
 
-template <class T, class TSize, class U, class USize>
-inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str) {
+template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
+inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
 	if (sub_str.count > str.count)
 		return false;
 	for (USize i = 0; i < sub_str.count; ++i) {
-		if (str.data[i] != sub_str.data[i]) {
+		if (!compare_equal(str.data[i], sub_str.data[i])) {
 			return false;
 		}
 	}
 	return true;
 }
 
-template <class T, class TSize, class U, class USize>
-inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str) {
+template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
+inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
 	if (sub_str.count > str.count)
 		return false;
 	auto base_offset = str.count - sub_str.count;
 	for (USize i = 0; i < sub_str.count; ++i) {
-		if (str.data[i + base_offset] != sub_str.data[i]) {
+		if (!compare(str.data[i + base_offset], sub_str.data[i])) {
 			return false;
 		}
 	}
@@ -2458,6 +2461,24 @@ void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
 	fn(Span(what.data + start, what.end()));
 }
 
+// If `what` contains `by`, returns first part before `by`, rest assigned to `what`.
+// If not found, returns `what`, `what` is cleared.
+template <class T, class Size, class Compare = decltype(compare_equal)>
+Span<T, Size> split_by_one_first(Span<T, Size> *what, T by, Compare compare = compare_equal) {
+	Span<T, Size> result = {};
+	for (umm i = 0; i < what->count; ++i) {
+		if (compare_equal(what->data[i], by)) {
+			result = {what->data, i};
+			*what = {what->data + i + 1, what->end()};
+			return result;
+		}
+	}
+
+	result = *what;
+	*what = {what->end(), (umm)0};
+	return result;
+}
+
 template <class T, class Size, class Fn>
 void split_by_any(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
 	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
@@ -2529,15 +2550,35 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 }
 
 template <class T, class Size>
-Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
+Span<T, Size> trim_left(Span<T, Size> span, auto &&predicate) {
 	while (span.count && predicate(span.data[0])) {
 		span.data++;
 		span.count--;
 	}
+	return span;
+}
+
+template <class T, class Size>
+Span<T, Size> trim_right(Span<T, Size> span, auto &&predicate) {
 	while (span.count && predicate(span.data[span.count - 1])) {
 		span.count--;
 	}
 	return span;
+}
+
+template <class T, class Size>
+Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
+	return trim_right(trim_left(span, predicate), predicate);
+}
+
+template <class T, class Size>
+Span<T, Size> trim_left(Span<T, Size> span, T &&value) {
+	return trim_left(span, [&](T const &it) { return it == value; });
+}
+
+template <class T, class Size>
+Span<T, Size> trim_right(Span<T, Size> span, T &&value) {
+	return trim_right(span, [&](T const &it) { return it == value; });
 }
 
 template <class T, class Size>
@@ -2669,19 +2710,7 @@ inline bool equals_case_insensitive(Span<utf8> a, Span<utf8> b) {
 	return true;
 }
 
-template <class T, class Predicate>
-requires std::is_invocable_v<Predicate, T, T>
-inline constexpr bool ends_with(Span<T> str, Span<T> sub_str, Predicate &&predicate) {
-	if (sub_str.count > str.count)
-		return false;
-	umm base_offset = str.count - sub_str.count;
-	for (umm i = 0; i < sub_str.count; ++i) {
-		if (!predicate(str.data[i + base_offset], sub_str.data[i])) {
-			return false;
-		}
-	}
-	return true;
-}
+constexpr auto compare_equal_case_insensitive = []<class T>(T const &a, T const &b) { return equals_case_insensitive(a, b); };
 
 inline constexpr void set_to_lower_case(Span<ascii> span) {
 	for (auto &c : span) {

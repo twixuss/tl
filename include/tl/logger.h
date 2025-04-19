@@ -34,20 +34,25 @@ inline umm append(StringBuilder &builder, LogSeverity s) {
 	return append_format(builder, "LogSeverity({})", (int)s);
 }
 
+inline ConsoleColor to_color(LogSeverity severity) {
+	switch (severity) {
+		default:
+		case LogSeverity::debug:   return ConsoleColor::cyan;
+		case LogSeverity::info:    return ConsoleColor::gray;
+		case LogSeverity::warning: return ConsoleColor::yellow;
+		case LogSeverity::error:   return ConsoleColor::red;
+	}
+}
+
 template <class Derived>
 struct LoggerBase {
-	inline void log(LogSeverity severity, char const *format, auto ...args) {
-		derived().impl(severity, TL_TMP(tl::format(as_utf8(as_span(format)), args...)));
+	inline void log(LogSeverity severity, auto ...args) {
+		derived().impl(severity, (Span<utf8>)(TL_TMP(tl::format(args...))));
 	}
-	inline void debug  (char const *format, auto ...args) { derived().log(LogSeverity::debug,   format, args...); }
-	inline void info   (char const *format, auto ...args) { derived().log(LogSeverity::info,    format, args...); }
-	inline void warning(char const *format, auto ...args) { derived().log(LogSeverity::warning, format, args...); }
-	inline void error  (char const *format, auto ...args) { derived().log(LogSeverity::error,   format, args...); }
-
-	inline void debug  (auto &&arg) { derived().impl(LogSeverity::debug,   TL_TMP(to_string(arg))); }
-	inline void info   (auto &&arg) { derived().impl(LogSeverity::info,    TL_TMP(to_string(arg))); }
-	inline void warning(auto &&arg) { derived().impl(LogSeverity::warning, TL_TMP(to_string(arg))); }
-	inline void error  (auto &&arg) { derived().impl(LogSeverity::error,   TL_TMP(to_string(arg))); }
+	inline void debug  (auto ...args) { log(LogSeverity::debug,   args...); }
+	inline void info   (auto ...args) { log(LogSeverity::info,    args...); }
+	inline void warning(auto ...args) { log(LogSeverity::warning, args...); }
+	inline void error  (auto ...args) { log(LogSeverity::error,   args...); }
 
 	Derived &derived() { return *(Derived *)this; }
 };

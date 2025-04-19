@@ -176,7 +176,7 @@ begin_parse:
 	append(builder, "#else\n");
 	{
 		auto append_redefines = [&](List<Func> &funcs) {
-			for (auto &f : funcs) append_format(builder, "#define {} tl::gl::functions._{}\n", f.name, f.name);
+			for (auto &f : funcs) append_format(builder, "#define {} ::tl_opengl_functions()->_{}\n", f.name, f.name);
 		};
 
 
@@ -212,13 +212,13 @@ begin_parse:
 		}
 	};
 
-	append_format(builder, "#define BASE_FUNCS \\\n");
+	append_format(builder, "#define TL_OPENGL_BASE_FUNCS \\\n");
 	append_ds(base_funcs);
 
-	append_format(builder, "\n#define EXTENSION_FUNCS \\\n");
+	append_format(builder, "\n#define TL_OPENGL_EXTENSION_FUNCS \\\n");
 	append_ds(extension_funcs);
 
-	append_format(builder, "\n#define WINDOWS_FUNCS \\\n");
+	append_format(builder, "\n#define TL_OPENGL_WINDOWS_FUNCS \\\n");
 	append_ds(windows_funcs);
 
 	write_entire_file(u8"../include/tl/generated/opengl_all_funcs.h"s, as_bytes(to_string(builder)));
