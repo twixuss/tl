@@ -37,7 +37,7 @@ struct FormattedWin32Error {
 };
 
 TL_API FormattedWin32Error win32_error();
-TL_API umm append(StringBuilder &b, FormattedWin32Error e);
+TL_API void append(StringBuilder &b, FormattedWin32Error e);
 
 //
 // Window
@@ -126,10 +126,10 @@ FormattedWin32Error win32_error() {
 	return {GetLastError()};
 }
 
-umm append(StringBuilder &b, FormattedWin32Error e) {
+void append(StringBuilder &b, FormattedWin32Error e) {
 	auto description = describe_win32_error(e.value);
 	defer { free(description); };
-	return append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = e.value, .radix = 16, .leading_zero_count = 8}, description);
+	append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = e.value, .radix = 16, .leading_zero_count = 8}, description);
 }
 
 HWND create_class_and_window(Span<utf8> class_name, WNDPROC wnd_proc, Span<utf8> title, CreateClassAndWindowOptions options) {

@@ -113,3 +113,7 @@ void run_tl_tests() {
 	}
 
 }
+static tl::gl::Functions opengl_functions;
+tl::gl::Functions *tl_opengl_functions() {
+	return &opengl_functions;
+}

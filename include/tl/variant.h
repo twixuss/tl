@@ -118,9 +118,9 @@ public:
 };
 
 template <class ...T>
-inline umm append(StringBuilder &builder, Variant<T...> const &v) {
-	return v.visit([&](auto &inner) {
-		return append(builder, inner);
+inline void append(StringBuilder &builder, Variant<T...> const &v) {
+	v.visit([&](auto &inner) {
+		append(builder, inner);
 	});
 }
 

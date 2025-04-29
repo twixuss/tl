@@ -32,7 +32,7 @@ enum class DecodeError {
 	too_much_data,
 };
 
-inline umm append(StringBuilder &builder, DecodeError error) {
+inline void append(StringBuilder &builder, DecodeError error) {
 	switch (error) {
 		case DecodeError::not_enough_data:    return append(builder, "not enough data");
 		case DecodeError::bad_magic:          return append(builder, "not a .qoi file");

@@ -179,7 +179,7 @@ BigRational<Allocator> make_big_rational(s64 numerator, s64 denominator = 1) {
 }
 
 template <class Allocator>
-umm append(StringBuilder &builder, BigRational<Allocator> f) {
+void append(StringBuilder &builder, BigRational<Allocator> f) {
 	if (f.denom.parts.count == 1) {
 		auto denom = f.denom.parts.data[0];
 		//umm dec = 10000000000000000000;
@@ -212,11 +212,11 @@ umm append(StringBuilder &builder, BigRational<Allocator> f) {
 
 				f.numer.divmod(denom, quotient, remainder);
 
-				return append_format(builder, "{}.{}", quotient, remainder);
+				append_format(builder, "{}.{}", quotient, remainder);
 			}
 		}
 	}
-	return append(builder, FormatFloat{.value = (f64)f, .precision = 99, .trailing_zeros = false});
+	append(builder, FormatFloat{.value = (f64)f, .precision = 99, .trailing_zeros = false});
 }
 
 }

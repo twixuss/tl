@@ -817,7 +817,7 @@ BigInt<Allocator> make_big_int(s64 value) {
 }
 
 template <class Allocator>
-inline umm append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
+inline void append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
 	auto v = f.value;
 	auto radix = f.radix;
 	u32 maxDigits = sizeof(decltype(v)::Part) * 8 * v.parts.count + 1;
@@ -862,7 +862,7 @@ inline umm append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
 		if (f.leading_zero_count > charsWritten)
 			charsWritten = f.leading_zero_count;
 	}
-	return append(builder, Span(lsc + 1, charsWritten));
+	append(builder, Span(lsc + 1, charsWritten));
 }
 
 }

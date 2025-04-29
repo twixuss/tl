@@ -373,16 +373,16 @@ template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) {
 template <class T> forceinline constexpr v4<T> select(v4b t, v4<T> a, v4<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z), select(t.w, a.w, b.w)}; }
 
 template <class T>
-inline umm append(StringBuilder &builder, v2<T> v) {
-	return append_format(builder, "({}, {})"s, v.x, v.y);
+inline void append(StringBuilder &builder, v2<T> v) {
+	append_format(builder, "{{{}, {}}}"s, v.x, v.y);
 }
 template <class T>
-inline umm append(StringBuilder &builder, v3<T> v) {
-	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z);
+inline void append(StringBuilder &builder, v3<T> v) {
+	append_format(builder, "{{{}, {}, {}}}"s, v.x, v.y, v.z);
 }
 template <class T>
-inline umm append(StringBuilder &builder, v4<T> v) {
-	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w);
+inline void append(StringBuilder &builder, v4<T> v) {
+	append_format(builder, "{{{}, {}, {}, {}}}"s, v.x, v.y, v.z, v.w);
 }
 
 }

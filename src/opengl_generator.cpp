@@ -17,8 +17,8 @@ struct Token {
 	u32 column;
 };
 
-umm append(StringBuilder &builder, Token token) {
-	return append_format(builder, "'{}:{}:{}'", token.view, token.line, token.column);
+void append(StringBuilder &builder, Token token) {
+	append_format(builder, "'{}:{}:{}'", token.view, token.line, token.column);
 }
 
 s32 tl_main(Span<Span<utf8>> args) {

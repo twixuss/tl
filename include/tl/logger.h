@@ -25,7 +25,7 @@ enum class LogSeverity {
 	#undef x
 };
 
-inline umm append(StringBuilder &builder, LogSeverity s) {
+inline void append(StringBuilder &builder, LogSeverity s) {
 	switch (s) {
 		#define x(name) case LogSeverity::name: return append(builder, u8###name##s);
 		TL_ENUMERATE_LOGGER_SEVERITIES

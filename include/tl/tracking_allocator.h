@@ -15,8 +15,8 @@ struct AllocationInfo {
 	umm total_size;
 };
 
-inline umm append(StringBuilder &builder, AllocationInfo info) {
-	return append_format(builder, "{} current: {} total: {}", OnlyFileAndLine{info.location}, format_bytes(info.current_size), format_bytes(info.total_size));
+inline void append(StringBuilder &builder, AllocationInfo info) {
+	append_format(builder, "{} current: {} total: {}", OnlyFileAndLine{info.location}, format_bytes(info.current_size), format_bytes(info.total_size));
 }
 
 struct AllocationCounts {

@@ -2605,25 +2605,25 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace ce
 
-forceinline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
-	return append_format(builder, "({}, {})",
+forceinline void append(StringBuilder &builder, FormatFloat<v2f> f) {
+	return append_format(builder, "{{{}, {}}}",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
 }
 
-forceinline umm append(StringBuilder &builder, m4 m) {
-	return append_format(builder, "({}, {}, {}, {})", m.i, m.j, m.k, m.l);
+forceinline void append(StringBuilder &builder, m4 m) {
+	return append_format(builder, "{{{}, {}, {}, {}}}", m.i, m.j, m.k, m.l);
 }
 
 template <class T>
-umm append(StringBuilder &builder, aabb<T> v) {
-	return append_format(builder, "(min={}, max={})"s, v.min, v.max);
+void append(StringBuilder &builder, aabb<T> v) {
+	return append_format(builder, "{{.min={}, .max={}}}"s, v.min, v.max);
 }
 
 template <class T>
-umm append(StringBuilder &builder, ray<T> r) {
-	return append_format(builder, "(origin={}, direction={})", r.origin, r.direction);
+void append(StringBuilder &builder, ray<T> r) {
+	return append_format(builder, "{{.origin={}, .direction={}}}", r.origin, r.direction);
 }
 
 template <class T>

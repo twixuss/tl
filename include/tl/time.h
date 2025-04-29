@@ -57,8 +57,8 @@ inline Span<utf8> month_string(u8 month) {
 	return u8"UnknownMonth"s;
 }
 
-inline umm append(StringBuilder &b, Date d) {
-	return append_format(b,
+inline void append(StringBuilder &b, Date d) {
+	append_format(b,
 		"{} {} {} - {}:{}:{}",
 		d.day,
 		month_string(d.month),

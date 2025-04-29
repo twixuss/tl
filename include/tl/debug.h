@@ -46,15 +46,13 @@ inline StringizedCallStack get_stack_trace() {
 
 TL_API bool debugger_attached();
 
-inline umm append(StringBuilder &builder, StringizedCallStack::Entry const &entry) {
-	return append_format(builder, "{}:{}: {}", entry.file, entry.line, entry.name);
+inline void append(StringBuilder &builder, StringizedCallStack::Entry const &entry) {
+	append_format(builder, "{}:{}: {}", entry.file, entry.line, entry.name);
 }
-inline umm append(StringBuilder &builder, StringizedCallStack const &call_stack) {
-	umm result = 0;
+inline void append(StringBuilder &builder, StringizedCallStack const &call_stack) {
 	for (auto entry : call_stack.call_stack) {
-		result += append_format(builder, "{}\n", entry);
+		append_format(builder, "{}\n", entry);
 	}
-	return result;
 }
 
 }

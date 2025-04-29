@@ -75,7 +75,7 @@ ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_PROTECTED_F
 TL_PROTECTED_FLY_STRING_LOCK ProtectedFlyString::lock;
 #endif
 
-inline umm append(StringBuilder &builder, ProtectedFlyString str) {
+inline void append(StringBuilder &builder, ProtectedFlyString str) {
     return append(builder, as_span(str.data));
 }
 
