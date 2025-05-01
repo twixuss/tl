@@ -22,15 +22,15 @@ struct Printer {
 		return span.count;
 	}
 
-	template <Appendable FmtOrObj, Appendable ...T>
-	inline umm write(FmtOrObj fmt_or_obj, T const &...args) {
+	template <Appendable ...T>
+	inline umm write(T const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = TL_GET_CURRENT(temporary_allocator);
-		if constexpr (sizeof...(T) > 0) {
-			append_format(builder, fmt_or_obj, args...);
+		if constexpr (sizeof...(T) > 1) {
+			append_format(builder, args...);
 		} else {
-			append(builder, fmt_or_obj);
+			append(builder, args...);
 		}
 		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
@@ -41,9 +41,9 @@ struct Printer {
 	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
 	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
 
-	template <class Fmt, Appendable ...T>
-	inline umm writeln(Fmt fmt, T const &...args) {
-		auto a = write(fmt, args...);
+	template <Appendable ...T>
+	inline umm writeln(T const &...args) {
+		auto a = write(args...);
 		auto b = write('\n');
 		return a + b;
 	}
