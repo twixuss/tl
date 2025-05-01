@@ -212,7 +212,7 @@ void append(StringBuilder &builder, BigRational<Allocator> f) {
 
 				f.numer.divmod(denom, quotient, remainder);
 
-				append_format(builder, "{}.{}", quotient, remainder);
+				return append_format(builder, "{}.{}", quotient, remainder);
 			}
 		}
 	}
