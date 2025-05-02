@@ -4054,7 +4054,7 @@ TL_TEST {
 		/* replace with bigger, forward */ {
 			int arr[] = { 1, 2, 3, 1, 2, 3, 1, 2, 3, 0};
 
-			auto s = Span(arr, 9umm);
+			auto s = Span(arr, 9_umm);
 			replace_inplace(s, Span{2, 3}, Span{4, 5, 6}, {.capacity = count_of(arr), .reverse = false});
 
 			assert(s.data == arr);
@@ -4074,7 +4074,7 @@ TL_TEST {
 		/* replace with bigger, reverse */ {
 			int arr[] = { 1, 2, 3, 1, 2, 3, 1, 2, 3, 0};
 
-			auto s = Span(arr, 9umm);
+			auto s = Span(arr, 9_umm);
 			replace_inplace(s, Span{2, 3}, Span{4, 5, 6}, {.capacity = count_of(arr), .reverse = true});
 
 			assert(s.data == arr);

@@ -229,16 +229,16 @@ using utf32 = char32_t;
 
 namespace integer_literals {
 
-forceinline constexpr u8  operator""u8 (u64 i) { return i; }
-forceinline constexpr u16 operator""u16(u64 i) { return i; }
-forceinline constexpr u32 operator""u32(u64 i) { return i; }
-forceinline constexpr u64 operator""u64(u64 i) { return i; }
-forceinline constexpr s8  operator""s8 (u64 i) { return i; }
-forceinline constexpr s16 operator""s16(u64 i) { return i; }
-forceinline constexpr s32 operator""s32(u64 i) { return i; }
-forceinline constexpr s64 operator""s64(u64 i) { return i; }
-forceinline constexpr umm operator""umm(u64 i) { return i; }
-forceinline constexpr smm operator""smm(u64 i) { return i; }
+forceinline constexpr u8  operator""_u8 (u64 i) { return (u8 )i; }
+forceinline constexpr u16 operator""_u16(u64 i) { return (u16)i; }
+forceinline constexpr u32 operator""_u32(u64 i) { return (u32)i; }
+forceinline constexpr u64 operator""_u64(u64 i) { return (u64)i; }
+forceinline constexpr s8  operator""_s8 (u64 i) { return (s8 )i; }
+forceinline constexpr s16 operator""_s16(u64 i) { return (s16)i; }
+forceinline constexpr s32 operator""_s32(u64 i) { return (s32)i; }
+forceinline constexpr s64 operator""_s64(u64 i) { return (s64)i; }
+forceinline constexpr umm operator""_umm(u64 i) { return (umm)i; }
+forceinline constexpr smm operator""_smm(u64 i) { return (smm)i; }
 
 }
 
