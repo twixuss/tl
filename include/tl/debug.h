@@ -27,6 +27,7 @@ struct StringizedCallStack {
 };
 
 TL_API bool debug_init();
+TL_API void debug_init_from_dll();
 TL_API void debug_deinit();
 TL_API bool debug_add_module(void *module, Span<char> path);
 
@@ -97,15 +98,70 @@ static OsLock debug_lock;
 
 bool debug_init() {
 	debug_process = GetCurrentProcess();
+	scoped(debug_lock);
 	if (!SymInitialize(debug_process, 0, true)) {
 		TL_GET_CURRENT(logger).error("SymInitialize failed: {}", win32_error());
 		return false;
 	}
 
 	DWORD options = SymGetOptions();
-	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
+	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_DEBUG);
+		
+	SymRegisterCallback64(debug_process, [](HANDLE hProcess, ULONG ActionCode, ULONG64 CallbackData, ULONG64 UserContext) -> BOOL {
+		switch (ActionCode) {
+			case CBA_DEFERRED_SYMBOL_LOAD_START: {
+				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: LOAD_START: {}", s->FileName);
+				break;
+			}
+			case CBA_DEFERRED_SYMBOL_LOAD_COMPLETE: {
+				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: LOAD_COMPLETE: {}", s->FileName);
+				break;
+			}
+			case CBA_DEFERRED_SYMBOL_LOAD_FAILURE: {
+				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: LOAD_FAILURE: {}", s->FileName);
+				break;
+			}
+			case CBA_DEFERRED_SYMBOL_LOAD_CANCEL: {
+				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: LOAD_CANCEL: {}", s->FileName);
+				break;
+			}
+			case CBA_DEFERRED_SYMBOL_LOAD_PARTIAL: {
+				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: LOAD_PARTIAL: {}", s->FileName);
+				break;
+			}
+			case CBA_SYMBOLS_UNLOADED: break;
+			case CBA_DUPLICATE_SYMBOL: {
+				auto d = (IMAGEHLP_DUPLICATE_SYMBOL64 *)CallbackData;
+				TL_GET_CURRENT(logger).error("DBGHELP: Duplicate symbol: {}", d->Symbol->Name);
+				break;
+			}
+			case CBA_READ_MEMORY: break;
+			case CBA_SET_OPTIONS: break;
+			case CBA_EVENT: break;
+			case CBA_DEBUG_INFO:
+				TL_GET_CURRENT(logger).error((char *)CallbackData);
+				break;
+			case CBA_SRCSRV_INFO: break;
+			case CBA_SRCSRV_EVENT: break;
+			case CBA_UPDATE_STATUS_BAR: break;
+			case CBA_ENGINE_PRESENT: break;
+			case CBA_CHECK_ENGOPT_DISALLOW_NETWORK_PATHS: break;
+			case CBA_CHECK_ARM_MACHINE_THUMB_TYPE_OVERRIDE: break;
+			case CBA_XML_LOG: break;
+		}
+		return FALSE;
+	}, 0);
 
 	return true;
+}
+
+void debug_init_from_dll() {
+	debug_process = GetCurrentProcess();
 }
 
 void debug_deinit() {
@@ -136,7 +192,7 @@ bool debug_add_module(void *module, Span<char> path) {
 
 List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 	scoped(debug_lock);
-
+	
 	CONTEXT context;
 	
 	if (context_opaque) {
@@ -250,7 +306,7 @@ StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceName
 				}
 			} else {
 				auto error = GetLastError();
-				TL_GET_CURRENT(logger).error("SymFromAddr failed: {}\n", win32_error());
+				TL_GET_CURRENT(logger).error("SymFromAddr failed: {}", win32_error());
 				file = "SymFromAddr failed"s;
 				name = "SymFromAddr failed"s;
 			}
