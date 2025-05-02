@@ -227,7 +227,23 @@ using utf8  = char8_t;
 using utf16 = char16_t;
 using utf32 = char32_t;
 
+namespace integer_literals {
+
+forceinline constexpr u8  operator""u8 (u64 i) { return i; }
+forceinline constexpr u16 operator""u16(u64 i) { return i; }
+forceinline constexpr u32 operator""u32(u64 i) { return i; }
+forceinline constexpr u64 operator""u64(u64 i) { return i; }
+forceinline constexpr s8  operator""s8 (u64 i) { return i; }
+forceinline constexpr s16 operator""s16(u64 i) { return i; }
+forceinline constexpr s32 operator""s32(u64 i) { return i; }
+forceinline constexpr s64 operator""s64(u64 i) { return i; }
+forceinline constexpr umm operator""umm(u64 i) { return i; }
+forceinline constexpr smm operator""smm(u64 i) { return i; }
+
 }
+
+}
+
 
 #ifdef TL_DEBUG
 #if TL_DEBUG != 0 && TL_DEBUG != 1
