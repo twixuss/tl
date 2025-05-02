@@ -27,7 +27,6 @@ struct StringizedCallStack {
 };
 
 TL_API bool debug_init();
-TL_API void debug_init_from_dll();
 TL_API void debug_deinit();
 TL_API bool debug_add_module(void *module, Span<char> path);
 
@@ -35,7 +34,8 @@ TL_API bool debug_add_module(void *module, Span<char> path);
 TL_API List<void *> get_call_stack(void *context = 0, umm frames_to_skip = 0);
 
 struct ResolveStackTraceNamesOptions {
-	bool cleanup = false;
+	bool demangle = true;
+	bool cleanup = false; // Replace msvc keywords with tl types.
 };
 
 TL_API StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options = {});
@@ -93,13 +93,11 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 
 namespace tl {
 
-static HANDLE debug_process;
 static OsLock debug_lock;
 
 bool debug_init() {
-	debug_process = GetCurrentProcess();
 	scoped(debug_lock);
-	if (!SymInitialize(debug_process, 0, true)) {
+	if (!SymInitialize(GetCurrentProcess(), 0, true)) {
 		TL_GET_CURRENT(logger).error("SymInitialize failed: {}", win32_error());
 		return false;
 	}
@@ -107,7 +105,8 @@ bool debug_init() {
 	DWORD options = SymGetOptions();
 	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_DEBUG);
 		
-	SymRegisterCallback64(debug_process, [](HANDLE hProcess, ULONG ActionCode, ULONG64 CallbackData, ULONG64 UserContext) -> BOOL {
+	#if 0
+	SymRegisterCallback64(GetCurrentProcess(), [](HANDLE hProcess, ULONG ActionCode, ULONG64 CallbackData, ULONG64 UserContext) -> BOOL {
 		switch (ActionCode) {
 			case CBA_DEFERRED_SYMBOL_LOAD_START: {
 				auto s = (IMAGEHLP_DEFERRED_SYMBOL_LOAD64 *)CallbackData;
@@ -156,16 +155,13 @@ bool debug_init() {
 		}
 		return FALSE;
 	}, 0);
+	#endif
 
 	return true;
 }
 
-void debug_init_from_dll() {
-	debug_process = GetCurrentProcess();
-}
-
 void debug_deinit() {
-	SymCleanup(debug_process);
+	SymCleanup(GetCurrentProcess());
 }
 
 bool debug_add_module(void *module, Span<char> path) {
@@ -223,11 +219,11 @@ List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 #endif
 
 	HANDLE thread;
-	DuplicateHandle(debug_process, GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
+	DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &thread, 0, false, DUPLICATE_SAME_ACCESS);
 	defer { CloseHandle(thread); };
 
 	List<void *> call_stack;
-	while (StackWalk64(image_type, debug_process, thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
+	while (StackWalk64(image_type, GetCurrentProcess(), thread, &frame, &context, 0, SymFunctionTableAccess64, SymGetModuleBase64, 0)) {
 		if (frames_to_skip) {
 			--frames_to_skip;
 			continue;
@@ -248,37 +244,44 @@ StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceName
 		StringizedCallStack::Entry entry;
 		Span<char> file = "unknown"s;
 		Span<char> name = "unknown"s;
+		char name_buffer[256];
 
         if (call == 0) {
 			file = "nullptr"s;
 			name = "nullptr"s;
 		} else {
 			constexpr u32 maxNameLength = MAX_SYM_NAME;
-			DWORD64 displacement;
 
-			static u8 buffer[sizeof(SYMBOL_INFO) + maxNameLength] = {};
-			auto symbol = (SYMBOL_INFO*)buffer;
+			static u8 symbol_buffer[sizeof(SYMBOL_INFO) + maxNameLength];
+			auto symbol = (SYMBOL_INFO*)symbol_buffer;
+			*symbol = {};
 			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-			symbol->MaxNameLen = maxNameLength;
+			symbol->MaxNameLen = maxNameLength - 1;
 
-			if (SymFromAddr(debug_process, (DWORD64)call, &displacement, symbol)) {
+			if (SymFromAddr(GetCurrentProcess(), (DWORD64)call + 1, NULL, symbol)) {
 				#if 1
-				DWORD const flags = UNDNAME_NO_MS_KEYWORDS
-					| UNDNAME_NO_ACCESS_SPECIFIERS 
-					| UNDNAME_NO_CV_THISTYPE 
-					| UNDNAME_NO_FUNCTION_RETURNS 
-					| UNDNAME_NO_MEMBER_TYPE 
-					| UNDNAME_NO_ALLOCATION_LANGUAGE 
-					| UNDNAME_NO_ALLOCATION_MODEL 
-					| UNDNAME_NO_MS_THISTYPE 
-					| UNDNAME_NO_RETURN_UDT_MODEL
-					| UNDNAME_NO_SPECIAL_SYMS
-					| UNDNAME_NO_THISTYPE
-					| UNDNAME_NO_THROW_SIGNATURES
-				;
-				char name_buffer[256];
-				name.data = name_buffer;
-				name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
+
+				if (options.demangle) {
+					DWORD const flags = UNDNAME_NO_MS_KEYWORDS
+						| UNDNAME_NO_ACCESS_SPECIFIERS 
+						| UNDNAME_NO_CV_THISTYPE 
+						| UNDNAME_NO_FUNCTION_RETURNS 
+						| UNDNAME_NO_MEMBER_TYPE 
+						| UNDNAME_NO_ALLOCATION_LANGUAGE 
+						| UNDNAME_NO_ALLOCATION_MODEL 
+						| UNDNAME_NO_MS_THISTYPE 
+						| UNDNAME_NO_RETURN_UDT_MODEL
+						| UNDNAME_NO_SPECIAL_SYMS
+						| UNDNAME_NO_THISTYPE
+						| UNDNAME_NO_THROW_SIGNATURES
+					;
+
+					name.data = name_buffer;
+					name.count = UnDecorateSymbolName(symbol->Name, name_buffer, (DWORD)count_of(name_buffer), flags);
+				} else {
+					name.data = symbol->Name;
+					name.count = strlen(symbol->Name);
+				}
 
 				if (options.cleanup) {
 					replace_inplace(name, "struct "s, ""s);
@@ -300,7 +303,7 @@ StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceName
 				line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
 				DWORD line_displacement;
 
-				if (SymGetLineFromAddr64(debug_process, (ULONG64)call, &line_displacement, &line)) {
+				if (SymGetLineFromAddr64(GetCurrentProcess(), (ULONG64)call, &line_displacement, &line)) {
 					entry.line = line.LineNumber;
 					file = as_span(line.FileName);
 				}
