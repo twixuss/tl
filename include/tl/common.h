@@ -2207,13 +2207,6 @@ umm count(Span<T, Size> span, Fn &&fn) {
 	return result;
 }
 
-template <class T>
-constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0) {
-	for (umm i = 0; i < source.count; ++i) {
-		destination[start_index + i] = source[i];
-	}
-}
-
 template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
 inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
 	if (sub_str.count > str.count)
@@ -2375,6 +2368,84 @@ umm find_index_of(Collection &collection, const ElementOf<Collection> &value) {
 template <class Collection, class Predicate>
 umm find_index_of_if(Collection &collection, Predicate predicate) {
 	return index_of(collection, find_if(collection, predicate));
+}
+
+template <class T>
+constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0) {
+	for (umm i = 0; i < source.count; ++i) {
+		destination[start_index + i] = source[i];
+	}
+}
+
+template <class T, class Size>
+void replace_inplace(Span<T, Size> where, T what, T with) {
+	for (auto &v : where) {
+		v = v == what ? with : v;
+	}
+}
+
+struct ReplaceInplaceOptions {
+	// Number of writable elements after `where.data` to allow for growth.
+	// If 0, use where.count.
+	umm capacity = 0;
+
+	// When true, replacements will work from end to start.
+	//   This might do more work that will be discarded,
+	//   but all occurences will be replaced without leaving cut off parts.
+	// When false, replacements will go forward.
+	//   This will do less work, mut might leave cut off parts you're
+	//   trying to replace. 
+	// Ignored if no growth happens.
+	bool reverse = true;
+};
+
+// Replaces occurrences of `what` in `where` with `with`.
+template <class T, class Size>
+void replace_inplace(Span<T, Size> &where, Span<T> what, Span<T> with, ReplaceInplaceOptions options = {}) {
+	if (options.capacity == 0) {
+		options.capacity = where.count;
+	}
+	assert(options.capacity >= where.count);
+
+	T *buf_end = where.data + options.capacity;
+	T *found = where.begin();
+	if (with.count <= what.count) {
+		// `where` is going to shink or stay the same size. No need for bounds checks.
+		while (found = find(Span(found, where.end()), what)) {
+			memmove(found + with.count, found + what.count, (where.end() - (found + what.count)) * sizeof(T));
+			memcpy(found, with.data, with.count * sizeof(T));
+			where.count += with.count - what.count;
+			found += with.count;
+		}
+	} else {
+		// `where` is going to grow. Ensure don't overflow `options.capacity`.
+
+		auto spread_and_insert = [&]() {
+			T *d = found + with.count;
+			T *s = found + what.count;
+			smm count = max((smm)0, min(where.end() - s, buf_end - d));
+			memmove(d, s, count * sizeof(T));
+
+			d = found;
+			s = with.data;
+			count = min((smm)with.count, buf_end - found);
+			memcpy(d, s, count * sizeof(T));
+
+			where.count = min(where.count + with.count - what.count, options.capacity);
+		};
+
+		if (options.reverse) {
+			found = where.end();
+			while (found = find_last(Span(where.begin(), found), what).data) {
+				spread_and_insert();
+			}
+		} else {
+			while (found < where.end() && (found = find(Span(found, where.end()), what))) {
+				spread_and_insert();
+				found += with.count;
+			}
+		}
+	}
 }
 
 template <class T>
@@ -3877,6 +3948,7 @@ void deinit_allocator() {
 
 TL_TEST {
 	using namespace tl;
+	using namespace integer_literals;
 
 	constexpr auto test_carry = [] {
 		u8 ru8;
@@ -3961,6 +4033,64 @@ TL_TEST {
 	};
 	test_split("hello world !"s, ' ', { "hello"s, "world"s, "!"s });
 	test_split(" hello world ! "s, ' ', { ""s, "hello"s, "world"s, "!"s, ""s });
+
+
+	/* replace_inplace */ {
+
+		/* replace with smaller */ {
+			int arr[] = { 1, 2, 3, 1, 2, 3};
+
+			auto s = Span(arr, 6umm);
+			replace_inplace(s, Span{2, 3}, Span{4});
+
+			assert(s.data == arr);
+			assert(s.count == 4);
+			assert(arr[0] == 1);
+			assert(arr[1] == 4);
+			assert(arr[2] == 1);
+			assert(arr[3] == 4);
+		}
+
+		/* replace with bigger, forward */ {
+			int arr[] = { 1, 2, 3, 1, 2, 3, 1, 2, 3, 0};
+
+			auto s = Span(arr, 9umm);
+			replace_inplace(s, Span{2, 3}, Span{4, 5, 6}, {.capacity = count_of(arr), .reverse = false});
+
+			assert(s.data == arr);
+			assert(s.count == 10);
+			assert(arr[0] == 1);
+			assert(arr[1] == 4);
+			assert(arr[2] == 5);
+			assert(arr[3] == 6);
+			assert(arr[4] == 1);
+			assert(arr[5] == 4);
+			assert(arr[6] == 5);
+			assert(arr[7] == 6);
+			assert(arr[8] == 1);
+			assert(arr[9] == 2); // this was cut off so not replaced.
+		}
+
+		/* replace with bigger, reverse */ {
+			int arr[] = { 1, 2, 3, 1, 2, 3, 1, 2, 3, 0};
+
+			auto s = Span(arr, 9umm);
+			replace_inplace(s, Span{2, 3}, Span{4, 5, 6}, {.capacity = count_of(arr), .reverse = true});
+
+			assert(s.data == arr);
+			assert(s.count == 10);
+			assert(arr[0] == 1);
+			assert(arr[1] == 4);
+			assert(arr[2] == 5);
+			assert(arr[3] == 6);
+			assert(arr[4] == 1);
+			assert(arr[5] == 4);
+			assert(arr[6] == 5);
+			assert(arr[7] == 6);
+			assert(arr[8] == 1);
+			assert(arr[9] == 4); // should be replaced even when cut off
+		}
+	}
 };
 
 #endif
