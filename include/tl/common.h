@@ -4040,7 +4040,7 @@ TL_TEST {
 		/* replace with smaller */ {
 			int arr[] = { 1, 2, 3, 1, 2, 3};
 
-			auto s = Span(arr, 6umm);
+			auto s = Span(arr, 6_umm);
 			replace_inplace(s, Span{2, 3}, Span{4});
 
 			assert(s.data == arr);
