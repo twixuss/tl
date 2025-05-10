@@ -483,17 +483,21 @@ struct StringBuilder {
 		Span<u8> span() { return {data(), count}; }
 	};
 
-	Allocator allocator = {};
-	Block first = {};
+	Allocator allocator = TL_GET_CURRENT(allocator);
+	Block first = {.capacity = TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY};
 	u8 initial_buffer[TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY];
 	Block *last = &first;
 	Block *alloc_last = &first;
 
-	StringBuilder() {
+	// You can't use this static_assert in struct scope that uses said struct. Didn't know that? Really? SMH
+private:
+	static void static_asserts() {
 		static_assert(offsetof(StringBuilder, first) + sizeof(Block) == offsetof(StringBuilder, initial_buffer));
-		allocator = TL_GET_CURRENT(allocator);
-		first.capacity = TL_STRING_BUILDER_INITIAL_BUFFER_CAPACITY;
 	}
+public:
+
+	StringBuilder() = default;
+	StringBuilder(Allocator allocator) : allocator(allocator) {}
 	StringBuilder(StringBuilder const &that) = delete;
 	StringBuilder(StringBuilder&& that) = default;
 	StringBuilder &operator=(StringBuilder const &that) = delete;
