@@ -1528,6 +1528,16 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 		this->_has_value = false;
 	}
 
+	template <class ...Args>
+	constexpr void emplace(Args &&...args) {
+		if (this->_has_value) {
+			this->_value = T(std::forward<Args>(args)...);
+		} else {
+			new (&this->_value) T(std::forward<Args>(args)...);
+			this->_has_value = true;
+		}
+	}
+
 	constexpr void reset() {
 		this->_has_value = false;
 	}
@@ -1613,6 +1623,13 @@ struct Optional<void> : OptionalBaseTrivial<void> {
 
 #pragma warning(suppress: 4820)
 };
+
+template <class T>
+struct IsOptionalT : std::false_type {};
+template <class T>
+struct IsOptionalT<Optional<T>> : std::true_type {};
+template <class T>
+inline static constexpr bool is_optional = IsOptionalT<T>::value;
 
 template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
 template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
@@ -3501,6 +3518,8 @@ extern TL_API thread_local TemporaryAllocator current_temporary_allocator;
 inline struct TemporaryStorageCheckpoint {} temporary_storage_checkpoint;
 inline struct TemporaryAllocatorAndCheckpoint {} temporary_allocator_and_checkpoint;
 
+// Example use:
+// auto str = TL_TMP(format("{}, {}", a, b));
 #define TL_TMP(x) with(TL_GET_CURRENT(temporary_allocator), x)
 
 extern TL_API void init_allocator(Allocator tempory_allocator_backup = os_allocator);
@@ -3552,18 +3571,19 @@ struct Scoped {
 template <class Thing>
 Scoped(Thing) -> Scoped<Thing>;
 
-// Example use:
-// auto str = TL_TMP(format("{}, {}", a, b));
-#define scoped(new_thing) \
-	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
-	CONCAT(_scoped_, __LINE__).enter(new_thing); \
-	defer { CONCAT(_scoped_, __LINE__).exit(); }
-#define scoped_if(new_thing, condition) \
-	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
-	bool CONCAT(_scoped_enabled, __LINE__) = condition; \
-	if (CONCAT(_scoped_enabled, __LINE__)) \
-		CONCAT(_scoped_, __LINE__).enter(new_thing); \
-	defer { if (CONCAT(_scoped_enabled, __LINE__)) CONCAT(_scoped_, __LINE__).exit(); }
+#define make_scoped(name, new_thing) \
+	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> name; \
+	name.enter(new_thing); \
+	defer { name.exit(); }
+#define make_scoped_if(name, new_thing, condition) \
+	::tl::Optional<::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>>> name; \
+	if (condition) { \
+		name.emplace(); \
+		name.value().enter(new_thing); \
+	} \
+	defer { if (name) name.value().exit(); }
+#define scoped(new_thing) make_scoped(CONCAT(_scoped_, __LINE__), new_thing)
+#define scoped_if(new_thing, condition) make_scoped_if(CONCAT(_scoped_, __LINE__), new_thing, condition)
 #define with(new_thing, ...) ([&]()->decltype(auto){scoped(new_thing);return __VA_ARGS__;}())
 
 template <class Thing>
@@ -3574,9 +3594,9 @@ struct ScopedBlock {
 	ScopedBlock(Thing &&thing) : storage(thing), pointer(&storage) {}
 
 	template <class Fn>
-	void operator+(Fn &&fn) {
+	decltype(auto) operator+(Fn &&fn) {
 		scoped(*pointer);
-		fn();
+		return fn();
 	}
 };
 
@@ -3588,7 +3608,7 @@ ScopedBlock(Thing) -> ScopedBlock<Thing>;
 //     do_some_stuff();
 //     do_other_stuff();
 // };
-#define withs(new_thing) ScopedBlock(new_thing) + [&]
+#define withs(new_thing) ScopedBlock(new_thing) + [&]()
 
 struct ValueChanger {
 	template <class Fn>
