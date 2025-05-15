@@ -21,9 +21,11 @@
     <ClCompile Include="src\tests\simd.cpp" />
     <ClCompile Include="src\tests\sorted_list.cpp" />
     <ClCompile Include="src\tests\thread_pool.cpp" />
+    <ClCompile Include="src\tests\c_tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />
+    <ClInclude Include="include\tl\c_tokenizer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\tests\coroutine.asm" />

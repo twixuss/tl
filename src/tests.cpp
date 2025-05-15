@@ -658,6 +658,10 @@ void run_tl_tests();
 
 s32 tl_main(Span<Span<utf8>> args) {
 	DefaultLogger::default_init(args[0]);
+	
+	void c_tokenizer_test();
+	c_tokenizer_test();
+	return 0;
 
 	run_tl_tests();
 

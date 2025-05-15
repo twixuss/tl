@@ -20,6 +20,7 @@
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
     <ClCompile Include="src\tests\coroutine.cpp" />
+    <ClCompile Include="src\tests\c_tokenizer.cpp" />
     <ClCompile Include="src\tests\definitions.cpp" />
     <ClCompile Include="src\tests\file.cpp" />
     <ClCompile Include="src\tests\fly_string.cpp" />
@@ -33,6 +34,7 @@
     <ClCompile Include="src\tests\utf8.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\tl\c_tokenizer.h" />
     <ClInclude Include="src\compile_speed_test.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _TL_STRING_H
+#define _TL_STRING_H
 
 // Basic string utilities are here.
 
@@ -1274,6 +1275,69 @@ inline void append(StringBuilder &builder, EscapedCString string) {
 	escape_c_string(string.unescaped_string, [&](auto s) { append(builder, s); });
 }
 
+enum class UnescapeOneCCharacterError {
+	empty_string,
+	unfinished_escape_sequence,
+};
+// Parses one character from str, advances str
+// Supported:
+//     basic char
+//     \n \r \t ...
+//     \xFF
+// Unsupported: TODO:
+//     universal character name \u...
+inline Result<char, UnescapeOneCCharacterError> unescape_one_c_character(Span<char> *str) {
+	char *c = str->data;
+	char *end = str->end();
+	defer { str->set_begin(c); };
+
+	if (c == end) {
+		return UnescapeOneCCharacterError::empty_string;
+	}
+
+	if (*c == '\\') {
+		++c;
+		if (c == end) {
+			return UnescapeOneCCharacterError::unfinished_escape_sequence;
+		}
+		switch (*c) {
+			case 'a': ++c; return '\a';
+			case 'b': ++c; return '\b';
+			case 'f': ++c; return '\f';
+			case 'n': ++c; return '\n';
+			case 'r': ++c; return '\r';
+			case 't': ++c; return '\t';
+			case 'v': ++c; return '\v';
+			case '\\': ++c; return '\\';
+			case 'x': case 'X': {
+				char x = 0;
+				while (c < end && is_hex_digit(*c)) {
+					x = (x << 4) | hex_digit_to_int(*c);
+					++c;
+				}
+				return x;
+			}
+			default: 
+				return *c;
+		}
+	} else {
+		return *c++;
+	}
+}
+
+template <umm buffer_capacity = 4096>
+inline void unescape_c_string(Span<char> string, auto write) {
+	StaticList<char, buffer_capacity> buffer;
+	while (string.count) {
+		buffer.add(unescape_one_c_character(&string).value());
+		if (buffer.count == buffer.capacity) {
+			write(buffer.span());
+			buffer.clear();
+		}
+	}
+	write(buffer.span());
+}
+
 struct HexCString {
 	Span<utf8> string;
 };
@@ -1510,3 +1574,5 @@ umm _to_utf16(Span<utf8> src, Span<utf16> dst) {
 }
 
 #pragma warning(pop)
+
+#endif // _TL_STRING_H
