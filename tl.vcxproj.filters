@@ -22,6 +22,7 @@
     <ClCompile Include="src\tests\sorted_list.cpp" />
     <ClCompile Include="src\tests\thread_pool.cpp" />
     <ClCompile Include="src\tests\c_tokenizer.cpp" />
+    <ClCompile Include="src\tests\c_preprocessor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />

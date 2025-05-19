@@ -20,6 +20,7 @@
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
     <ClCompile Include="src\tests\coroutine.cpp" />
+    <ClCompile Include="src\tests\c_preprocessor.cpp" />
     <ClCompile Include="src\tests\c_tokenizer.cpp" />
     <ClCompile Include="src\tests\definitions.cpp" />
     <ClCompile Include="src\tests\file.cpp" />
@@ -86,11 +87,15 @@
       <Command>
       </Command>
     </PreBuildEvent>
+    <ClCompile>
+      <AdditionalOptions>/w15262</AdditionalOptions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalOptions>
-      </AdditionalOptions>
+      <AdditionalOptions>/w15262</AdditionalOptions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

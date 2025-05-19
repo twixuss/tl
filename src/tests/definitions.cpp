@@ -103,6 +103,8 @@
 #include <tl/variant.h>
 #include <tl/vector.h>
 #include <tl/window.h>
+#include <tl/c_tokenizer.h>
+#include <tl/c_preprocessor.h>
 
 
 void run_tl_tests() {

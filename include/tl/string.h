@@ -1312,7 +1312,7 @@ inline Result<char, UnescapeOneCCharacterError> unescape_one_c_character(Span<ch
 			case 'x': case 'X': {
 				char x = 0;
 				while (c < end && is_hex_digit(*c)) {
-					x = (x << 4) | hex_digit_to_int(*c);
+					x = (x << 4) | hex_digit_to_int_unchecked(*c);
 					++c;
 				}
 				return x;

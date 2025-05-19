@@ -661,6 +661,8 @@ s32 tl_main(Span<Span<utf8>> args) {
 	
 	void c_tokenizer_test();
 	c_tokenizer_test();
+	void c_preprocessor_test();
+	c_preprocessor_test();
 	return 0;
 
 	run_tl_tests();

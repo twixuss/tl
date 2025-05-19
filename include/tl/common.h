@@ -1307,7 +1307,7 @@ constexpr auto compare_equal = []<class T>(T const &a, T const &b) { return a ==
 template <class Predicate = decltype(identity_value)>
 bool all(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
-		if (!predicate(it))
+		if (!predicate(*it))
 			return false;
 	}
 	return true;
@@ -1316,7 +1316,7 @@ bool all(Collection auto collection, Predicate predicate = {}) {
 template <class Predicate = decltype(identity_value)>
 bool any(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
-		if (predicate(it))
+		if (predicate(*it))
 			return true;
 	}
 	return false;
@@ -1630,6 +1630,11 @@ template <class T>
 struct IsOptionalT<Optional<T>> : std::true_type {};
 template <class T>
 inline static constexpr bool is_optional = IsOptionalT<T>::value;
+
+template <class T>
+Optional<T> to_optional(T *pointer) {
+	return pointer ? *pointer : Optional<T>{};
+}
 
 template <class T> Optional<T> operator+(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() + b.value_unchecked()} : Optional<T>{}; }
 template <class T> Optional<T> operator-(Optional<T> a, Optional<T> b) { return (a && b) ? Optional<T>{a.value_unchecked() - b.value_unchecked()} : Optional<T>{}; }
@@ -2718,20 +2723,32 @@ inline constexpr bool is_alpha(utf32 c) {
 }
 
 inline constexpr bool is_digit(ascii c) {
-	return c >= '0' && c <= '9';
+	return (u32)(c - '0') < 10;
 }
 inline constexpr bool is_digit(utf32 c) {
-	return c >= '0' && c <= '9';
+	return (u32)(c - '0') < 10;
 }
 
 inline constexpr bool is_hex_digit(utf32 c) {
-	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+	return ((u32)(c - '0') < 10)
+	     | ((u32)(c - 'a') < 6)
+	     | ((u32)(c - 'A') < 6);
 }
-inline constexpr u8 hex_digit_to_int(utf32 c) {
+inline constexpr Optional<u8> hex_digit_to_int(utf32 c) {
 	if (c >= '0' && c <= '9') return c - '0';
 	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
 	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-	return (u8)c;
+	return {};
+}
+
+// Branchless version for cases when you know `c` is valid.
+inline constexpr u8 hex_digit_to_int_unchecked(utf32 c) {
+    u32 a = c - 'A' + 10;
+    u32 b = c - 'a' + 10;
+    a = b < 16 ? b : a;
+    b = c - '0';
+    a = b < 10 ? b : a;
+    return a;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {
@@ -2787,6 +2804,15 @@ inline constexpr bool equals(Span<T> a, Span<U> b) {
 
 inline bool equals_case_insensitive(ascii a, ascii b) { return to_lower(a) == to_lower(b); }
 inline bool equals_case_insensitive(utf32 a, utf32 b) { return to_lower(a) == to_lower(b); }
+
+inline bool equals_case_insensitive(Span<char> a, Span<char> b) {
+	if (a.count != b.count)
+		return false;
+	for (auto ap = a.begin(), bp = b.begin(); ap != a.end(); ++ap, ++bp)
+		if (to_lower(*ap) != to_lower(*bp))
+			return false;
+	return true;
+}
 
 inline bool equals_case_insensitive(Span<utf8> a, Span<utf8> b) {
 	if (a.count != b.count)
