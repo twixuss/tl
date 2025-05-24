@@ -628,16 +628,16 @@ forceinline constexpr auto relatively_equal(T a, T b, T relative_epsilon) {
 forceinline f32 set_sign(f32 dst, f32 src) { return copysignf(dst, src); }
 forceinline f64 set_sign(f64 dst, f64 src) { return copysign(dst, src); }
 
-forceinline s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 
 forceinline f32 sign(f32 v) { return set_sign(1.0f, v); }
 
-template <class T> forceinline v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
-template <class T> forceinline v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
-template <class T> forceinline v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
+template <class T> forceinline constexpr v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
+template <class T> forceinline constexpr v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
+template <class T> forceinline constexpr v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
 
 forceinline f32 trunc(f32 v) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
 forceinline v2f trunc(v2f v) { return {trunc(v.x), trunc(v.y)}; }

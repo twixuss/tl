@@ -2369,16 +2369,23 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 // Const correctess is pain. So much code for so little value.
 // Lambdas in requires are broken. redefinition. ???
 template <Iterable Collection>
-auto find(Collection const &collection, ElementOf<Collection> element) {
+auto find(Collection &&collection, ElementOf<Collection> element) {
 	if constexpr (requires { collection.find(element); }) {
 		return collection.find(element);
-	} else {
+	} else if constexpr (requires { to_iter(collection); }) {
 		foreach (it, collection) {
 			if (all(*it == element)) {
 				return &*it;
 			}
 		}
 		return decltype(&*collection.iter()){};
+	} else {
+		for (auto &it : collection) {
+			if (all(it == element)) {
+				return &it;
+			}
+		}
+		return decltype(&*collection.begin()){};
 	}
 }
 
