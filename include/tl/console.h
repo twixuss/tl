@@ -21,17 +21,20 @@ struct Printer {
 		func(span, state);
 		return span.count;
 	}
-
-	template <Appendable ...T>
-	inline umm write(T const &...args) {
+	
+	inline umm write(CFormatString auto const &format, Appendable auto const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = TL_GET_CURRENT(temporary_allocator);
-		if constexpr (sizeof...(T) > 1) {
-			append_format(builder, args...);
-		} else {
-			append(builder, args...);
-		}
+		append_format(builder, args...);
+		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
+	}
+
+	inline umm write(Appendable auto const &arg) {
+		scoped(temporary_storage_checkpoint);
+		StringBuilder builder;
+		builder.allocator = TL_GET_CURRENT(temporary_allocator);
+		append(builder, arg);
 		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
 
@@ -40,10 +43,14 @@ struct Printer {
 
 	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
 	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
-
-	template <Appendable ...T>
-	inline umm writeln(T const &...args) {
-		auto a = write(args...);
+	
+	inline umm writeln(CFormatString auto format, Appendable auto const &...args) {
+		auto a = write(format, args...);
+		auto b = write('\n');
+		return a + b;
+	}
+	inline umm writeln(Appendable auto const &arg) {
+		auto a = write(arg);
 		auto b = write('\n');
 		return a + b;
 	}
@@ -91,11 +98,16 @@ inline void set_console_color(ConsoleColor foreground) {
 	set_console_color(foreground, ConsoleColor::black);
 }
 
-inline umm print(Appendable auto const &...args) { return current_printer.write(args...); }
-inline umm println() { return print('\n'); }
-inline umm println(Appendable auto const &...args) { return current_printer.writeln(args...); }
+inline umm print(CFormatString auto format, Appendable auto const &...args) { return current_printer.write(format, args...); }
+inline umm print(Appendable auto const &arg) { return current_printer.write(arg); }
 
-inline umm errln(Appendable auto const &...args) { return standard_error_printer.writeln(args...); }
+inline umm println() { return print('\n'); }
+
+inline umm println(CFormatString auto format, Appendable auto const &...args) { return current_printer.writeln(format, args...); }
+inline umm println(Appendable auto const &arg) { return current_printer.writeln(arg); }
+
+inline umm errln(CFormatString auto format, Appendable auto const &...args) { return standard_error_printer.writeln(format, args...); }
+inline umm errln(Appendable auto const &arg) { return standard_error_printer.writeln(arg); }
 
 TL_API void hide_console_window();
 TL_API void show_console_window();

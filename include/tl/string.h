@@ -798,90 +798,179 @@ inline umm append_and_return_width(StringBuilder &builder, T const &it) {
 	return builder.count() - initial_count;
 }
 
-template <AChar Char>
-inline void append_format(StringBuilder &b, Span<Char> format_string) {
-	Char previous = {};
-	auto start = format_string.data;
-	auto c = start;
-	auto end = format_string.end();
+// Without this stupid thing consteval overload is never picked!
+template <class Char>
+struct CharPtrWrapper {
+	CharPtrWrapper(Char const *str) : str(str) {}
+	Char const *str;
+};
 
-	for (;c != end; ++c) {
-		auto next_prev = *c;
-		defer { previous = next_prev; };
-		if (previous == '{') {
-			switch (*c) {
-				case '{':
-					append(b, Span(start, c));
-					start = c + 1;
-					next_prev = 0;
-					break;
-				case '}': invalid_code_path("not enough arguments were provided for 'append_format'"); break;
-				default:  invalid_code_path("bad format string: only '{' or '}' can follow '{'"); break;
-			}
-		} else if (previous == '}') {
-			if (*c == '}') {
-				append(b, Span(start, c));
-				start = c + 1;
-				next_prev = 0;
+template <class Char, umm required_args>
+struct FormatStringBase {
+	template <umm size>
+	consteval void check_count(Char const (&str)[size]) {
+		umm arg_count = 0;
+
+		for (auto c = str; c != str + size; ) {
+			if (*c == '{') {
+				if (c[1] == '{') {
+					c += 2;
+				} else if (c[1] == '}') {
+					c += 2;
+					arg_count += 1;
+				} else {
+					*(char const **)0 = "Invalid format string";
+				}
+			} else if (*c == '}') {
+				if (c[1] == '}') {
+					c += 2;
+				} else {
+					*(char const **)0 = "Invalid format string";
+				}
 			} else {
-				invalid_code_path("bad format string: only '}' can follow '}'");
+				c += 1;
 			}
 		}
+
+		if (arg_count != required_args) {
+			*(char const **)0 = "Wrong argument count";
+		}
 	}
-	if (previous == '{' || previous == '}') {
-		invalid_code_path("bad format string: missing brace at the end");
+	
+	template <umm size>
+	consteval FormatStringBase(Char const (&str)[size]) {
+		string.data = (Char *)str;
+		string.count = size - 1;
+		check_count(str);
 	}
-	append(b, Span(start, end));
-}
+	
+	FormatStringBase(CharPtrWrapper<Char> str) {
+		string = as_span(str.str);
+	}
+
+	FormatStringBase(Span<Char> str) {
+		string = str;
+	}
+
+	Span<Char> string;
+};
+
+template <class T>
+struct SFormatString : std::false_type {};
+
+template <class Char, umm size> 
+struct SFormatString<FormatStringBase<Char, size>> : std::true_type {};
+
+template <class T>
+concept CFormatString = SFormatString<std::remove_cvref_t<T>>::value;
+
+template <umm required_size> using FormatStringA  = FormatStringBase<char,  required_size>;
+template <umm required_size> using FormatString8  = FormatStringBase<utf8,  required_size>;
+template <umm required_size> using FormatString16 = FormatStringBase<utf16, required_size>;
+template <umm required_size> using FormatString32 = FormatStringBase<utf32, required_size>;
 
 template <class T>
 concept Appendable = requires (StringBuilder &builder, T const &t) {
 	{ append(builder, t) } -> std::same_as<void>;
-};
+} && !CFormatString<T>;
 
-template <Appendable Arg, Appendable ...Args, AChar Char>
-void append_format(StringBuilder &b, Span<Char> format_string, Arg const &arg, Args const &...args) {
-	Char previous = {};
-	auto start = format_string.data;
-	auto c = start;
-	auto end = format_string.end();
-	for (;c != end; ++c) {
-		auto next_prev = *c;
-		defer { previous = next_prev; };
-		if (previous == '{') {
-			switch (*c) {
-				case '{':
-					append(b, Span(start, c));
-					start = c + 1;
-					next_prev = 0;
-					break;
-				case '}':
-					append(b, Span(start, c - 1));
-					append(b, arg);
-					append_format(b, Span(c + 1, end), args...);
-					start = end;
-					c = end;
-					return;
-				default:
-					invalid_code_path("bad format string: only '{' or '}' can follow '{'");
-					break;
-			}
-		} else if (previous == '}') {
-			if (*c == '}') {
-				append(b, Span(start, c));
-				start = c + 1;
-				next_prev = 0;
-			} else {
-				invalid_code_path("bad format string: only '}' can follow '}'");
-			}
-		}
-	}
-	invalid_code_path("Too many arguments provided for this format string");
-}
-template <Appendable ...Args, AChar Char>
-void append_format(StringBuilder &b, Char const *format_string, Args const &...args) {
-	return append_format(b, as_span(format_string), args...);
-}
+#define IMPL(Char, FormatString)                                                                                   \
+	template <Appendable ...Args>                                                                                  \
+	void append_format(StringBuilder &builder, FormatString<sizeof...(Args)> format_string, Args const &...args) { \
+		auto start = format_string.string.begin();                                                                 \
+		auto c = start;                                                                                            \
+		auto end = format_string.string.end();                                                                     \
+		                                                                                                           \
+		[&] <umm ...J>(std::index_sequence<J...>) {                                                                \
+			(([&]<umm I, class T>(T const &arg) {                                                                  \
+				                                                                                                   \
+				while (c != end) {                                                                                 \
+					if (*c == '{') {                                                                               \
+						if (c[1] == '{') {                                                                         \
+							append(builder, Span(start, c + 1));                                                   \
+							c += 2;                                                                                \
+							start = c;                                                                             \
+						} else if (c[1] == '}') {                                                                  \
+							append(builder, Span(start, c));                                                       \
+							append(builder, arg);                                                                  \
+							c += 2;                                                                                \
+							start = c;                                                                             \
+							break;                                                                                 \
+						} else {                                                                                   \
+							c += 1;                                                                                \
+							/* invalid_code_path("Invalid format string"); */                                      \
+						}                                                                                          \
+					} else if (*c == '}') {                                                                        \
+						if (c[1] == '}') {                                                                         \
+							append(builder, Span(start, c + 1));                                                   \
+							c += 2;                                                                                \
+							start = c;                                                                             \
+						} else {                                                                                   \
+							c += 1;                                                                                \
+							/* invalid_code_path("Invalid format string"); */                                      \
+						}                                                                                          \
+					} else {                                                                                       \
+						c += 1;                                                                                    \
+					}                                                                                              \
+				}                                                                                                  \
+				                                                                                                   \
+			}.operator()<J, TypeAt<J, Args...>>(args)), ...);                                                      \
+		}(std::make_index_sequence<sizeof...(Args)>{});                                                            \
+		                                                                                                           \
+		while (c != end) {                                                                                         \
+			if (*c == '{') {                                                                                       \
+				if (c[1] == '{') {                                                                                 \
+					append(builder, Span(start, c + 1));                                                           \
+					c += 2;                                                                                        \
+					start = c;                                                                                     \
+				} else if (c[1] == '}') {                                                                          \
+					c += 2;                                                                                        \
+					/* invalid_code_path("Less arguments than in format string"); */                               \
+				} else {                                                                                           \
+					c += 1;                                                                                        \
+					/* invalid_code_path("Invalid format string"); */                                              \
+				}                                                                                                  \
+			} else if (*c == '}') {                                                                                \
+				if (c[1] == '}') {                                                                                 \
+					append(builder, Span(start, c + 1));                                                           \
+					c += 2;                                                                                        \
+					start = c;                                                                                     \
+				} else {                                                                                           \
+					c += 1;                                                                                        \
+					/* invalid_code_path("Invalid format string"); */                                              \
+				}                                                                                                  \
+			} else {                                                                                               \
+				c += 1;                                                                                            \
+			}                                                                                                      \
+		}                                                                                                          \
+                                                                                                                   \
+		append(builder, Span(start, end));                                                                         \
+	}                                                                                                              \
+	template <class Allocator = Allocator, Appendable ...Args>                                                     \
+	List<Char, Allocator> aformat(Allocator allocator, FormatString<sizeof...(Args)> fmt, Args const &...args) {   \
+		StringBuilder builder;                                                                                     \
+		builder.allocator = TL_GET_CURRENT(temporary_allocator);                                                   \
+		append_format(builder, fmt, args...);                                                                      \
+		return (List<Char, Allocator>)to_string<Allocator>(builder, allocator);                                    \
+	}                                                                                                              \
+	                                                                                                               \
+	template <class Allocator = Allocator, Appendable ...Args>                                                     \
+	List<Char, Allocator> format(FormatString<sizeof...(Args)> fmt, Args const &...args) {                         \
+		return aformat<Allocator>(Allocator::current(), fmt, args...);                                             \
+	}                                                                                                              \
+	                                                                                                               \
+	template <Appendable ...Args>                                                                                  \
+	List<Char> tformat(FormatString<sizeof...(Args)> fmt, Args const &...args) {                                   \
+		return TL_TMP(format(fmt, args...));                                                                       \
+	}                                                                                                              \
+
+// Yeah, templates are not powerful enough, can't deduce...
+IMPL(char,  FormatStringA)
+IMPL(utf8,  FormatString8)
+IMPL(utf16, FormatString16)
+IMPL(utf32, FormatString32)
+
+#undef IMPL
 
 inline void append(StringBuilder &builder, bool value) {
 	return append(builder, value ? "true"s : "false"s);
@@ -1409,63 +1498,6 @@ template <Appendable ...Args>
 inline auto tconcatenate(Args &&...args) {
 	return TL_TMP(concatenate(args...));
 }
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<ascii, Allocator> aformat(Allocator allocator, Span<ascii> fmt, Args const &...args) {
-	StringBuilder builder;
-	builder.allocator = TL_GET_CURRENT(temporary_allocator);
-	append_format(builder, fmt, args...);
-	return (List<ascii, Allocator>)to_string<Allocator>(builder, allocator);
-}
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<utf8, Allocator> aformat(Allocator allocator, Span<utf8> fmt, Args const &...args) {
-	StringBuilder builder;
-	builder.allocator = TL_GET_CURRENT(temporary_allocator);
-	append_format(builder, fmt, args...);
-	return (List<utf8, Allocator>)to_string<Allocator>(builder, allocator);
-}
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<utf16, Allocator> aformat(Allocator allocator, Span<utf16> fmt, Args const &...args) {
-	StringBuilder builder;
-	builder.allocator = TL_GET_CURRENT(temporary_allocator);
-	append_format(builder, fmt, args...);
-	return (List<utf16, Allocator>)to_string<Allocator>(builder, allocator);
-}
-
-template <class Allocator = Allocator, Appendable ...Args> List<ascii, Allocator> aformat(Allocator allocator, ascii const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
-template <class Allocator = Allocator, Appendable ...Args> List<utf8 , Allocator> aformat(Allocator allocator, utf8  const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
-template <class Allocator = Allocator, Appendable ...Args> List<utf16, Allocator> aformat(Allocator allocator, utf16 const *fmt, Args const &...args) { return aformat<Allocator>(allocator, as_span(fmt), args...); }
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<ascii, Allocator> format(Span<ascii> fmt, Args const &...args) {
-	return aformat<Allocator>(Allocator::current(), fmt, args...);
-}
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<utf8, Allocator> format(Span<utf8> fmt, Args const &...args) {
-	return aformat<Allocator>(Allocator::current(), fmt, args...);
-}
-
-template <class Allocator = Allocator, Appendable ...Args>
-List<utf16, Allocator> format(Span<utf16> fmt, Args const &...args) {
-	return aformat<Allocator>(Allocator::current(), fmt, args...);
-}
-
-template <class Allocator = Allocator, Appendable ...Args> List<ascii, Allocator> format(ascii const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
-template <class Allocator = Allocator, Appendable ...Args> List<utf8 , Allocator> format(utf8  const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
-template <class Allocator = Allocator, Appendable ...Args> List<utf16, Allocator> format(utf16 const *fmt, Args const &...args) { return aformat<Allocator>(Allocator::current(), as_span(fmt), args...); }
-
-template <Appendable ...Args> List<ascii> tformat(ascii const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf8 > tformat(utf8  const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf16> tformat(utf16 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf32> tformat(utf32 const *fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-
-template <Appendable ...Args> List<ascii> tformat(Span<ascii> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf8 > tformat(Span<utf8 > fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
-template <Appendable ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
 template <class Allocator = Allocator, Appendable T>
 List<utf8, Allocator> to_string(T const &value) {
