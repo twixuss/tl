@@ -558,6 +558,7 @@ inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &
 #endif
 
 #include "static_list.h"
+#include "win32.h"
 
 namespace tl {
 
@@ -598,7 +599,7 @@ File open_file(Span<utf8> path8, OpenFileParams params) {
 	auto handle = CreateFileW((wchar_t *)path16.data, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
-			TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path8);
+			TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\": {}", path8, win32_error());
 		}
 		handle = 0;
 	}
@@ -822,7 +823,7 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 			case FileItem_file: {
 				path_buffer.add(u'\0');
 				if (!DeleteFileW(path_buffer.data)) {
-					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer8_from_utf16(path_buffer).span());
+					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}: {}", path_buffer8_from_utf16(path_buffer).span(), win32_error());
 				}
 				break;
 			}
@@ -834,9 +835,10 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 	});
 	
 	path_buffer.pop();
+	path_buffer.data[path_buffer.count] = '\0';
 
 	if (!RemoveDirectoryW(path_buffer.data)) {
-		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer8_from_utf16(path_buffer).span());
+		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}: {}", path_buffer8_from_utf16(path_buffer).span(), win32_error());
 	}
 }
 
@@ -1029,8 +1031,8 @@ MappedFile map_file(File file) {
 
 void unmap_file(MappedFile &file) {
 	// TODO: proper error handling
-	assert(UnmapViewOfFile(file.data.data));
-	assert(CloseHandle(file.mapping));
+	if (!UnmapViewOfFile(file.data.data)) { TL_GET_CURRENT(logger).error("UnmapViewOfFile failed: {}", win32_error()); }
+	if (!CloseHandle(file.mapping)) { TL_GET_CURRENT(logger).error("CloseHandle failed: {}", win32_error()); }
 
 	file = {};
 }
