@@ -802,6 +802,46 @@ constexpr u32 count_leading_zeros(u64 v) {
 	v |= v >> (u64)(1 << 5);
 	return ce::count_bits((u64)~v);
 }
+
+// Hacker's delight - FIGURE 5–24. Number of trailing zeros, Gaudet’s algorithm
+constexpr u8 count_trailing_zeros(u8 x) {
+	u8 y = x & (u8)-(s8)x;
+	u32 bz = !y;
+	u32 b2 = (y & 0x0F) ? 0 : 4;
+	u32 b1 = (y & 0x33) ? 0 : 2;
+	u32 b0 = (y & 0x55) ? 0 : 1;
+	return bz + b2 + b1 + b0;
+}
+constexpr u16 count_trailing_zeros(u16 x) {
+	u16 y = x & (u16)-(s16)x;
+	u32 bz = !y;
+	u32 b3 = (y & 0x00FF) ? 0 : 8;
+	u32 b2 = (y & 0x0F0F) ? 0 : 4;
+	u32 b1 = (y & 0x3333) ? 0 : 2;
+	u32 b0 = (y & 0x5555) ? 0 : 1;
+	return bz + b3 + b2 + b1 + b0;
+}
+constexpr u32 count_trailing_zeros(u32 x) {
+	u32 y = x & (u32)-(s32)x;
+	u32 bz = !y;
+	u32 b4 = (y & 0x0000FFFF) ? 0 : 16;
+	u32 b3 = (y & 0x00FF00FF) ? 0 : 8;
+	u32 b2 = (y & 0x0F0F0F0F) ? 0 : 4;
+	u32 b1 = (y & 0x33333333) ? 0 : 2;
+	u32 b0 = (y & 0x55555555) ? 0 : 1;
+	return bz + b4 + b3 + b2 + b1 + b0;
+}
+constexpr u32 count_trailing_zeros(u64 x) {
+	u64 y = x & (u64)-(s64)x;
+	u32 bz = !y;
+	u32 b5 = (y & 0x00000000FFFFFFFF) ? 0 : 32;
+	u32 b4 = (y & 0x0000FFFF0000FFFF) ? 0 : 16;
+	u32 b3 = (y & 0x00FF00FF00FF00FF) ? 0 : 8;
+	u32 b2 = (y & 0x0F0F0F0F0F0F0F0F) ? 0 : 4;
+	u32 b1 = (y & 0x3333333333333333) ? 0 : 2;
+	u32 b0 = (y & 0x5555555555555555) ? 0 : 1;
+	return bz + b5 + b4 + b3 + b2 + b1 + b0;
+}
 }
 
 #if COMPILER_MSVC
@@ -840,6 +880,15 @@ forceinline constexpr u32 count_leading_ones(u32 val) { return count_leading_zer
 forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 #endif
 
+forceinline constexpr u32 count_trailing_zeros(u8  v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 8  : (_BitScanForward(&r, v), r))); }
+forceinline constexpr u32 count_trailing_zeros(u16 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 16 : (_BitScanForward(&r, v), r))); }
+forceinline constexpr u32 count_trailing_zeros(u32 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (_BitScanForward(&r, v), r))); }
+forceinline constexpr u32 count_trailing_zeros(u64 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (_BitScanForward64(&r, v), r))); }
+
+forceinline constexpr u32 count_trailing_ones(u8  val) { return count_trailing_zeros((u8 )~val); }
+forceinline constexpr u32 count_trailing_ones(u16 val) { return count_trailing_zeros((u16)~val); }
+forceinline constexpr u32 count_trailing_ones(u32 val) { return count_trailing_zeros((u32)~val); }
+forceinline constexpr u32 count_trailing_ones(u64 val) { return count_trailing_zeros((u64)~val); }
 
 forceinline constexpr u32 log2(u8  v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
 forceinline constexpr u32 log2(u16 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
@@ -2042,7 +2091,7 @@ struct Span {
 		}
 	}
 	constexpr Span take(smm amount) const {
-		if (amount > 0) {
+		if (amount >= 0) {
 			return { 
 				begin(), 
 				min(end(), begin() + amount)

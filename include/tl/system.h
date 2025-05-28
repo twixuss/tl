@@ -110,6 +110,10 @@
 #define ARCH_LZCNT 0
 #endif
 
+#ifndef ARCH_BMI1
+#define ARCH_BMI1 0
+#endif
+
 #ifndef ARCH_FMA
 #define ARCH_FMA ARCH_AVX2
 #endif
