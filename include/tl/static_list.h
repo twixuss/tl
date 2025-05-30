@@ -17,6 +17,10 @@ struct StaticList {
 	};
 
 	forceinline constexpr StaticList() {}
+	forceinline constexpr ~StaticList() {
+		for (umm i = 0; i < count; ++i)
+			data[i].~T();
+	}
 
 	template <umm that_capacity>
 	constexpr StaticList(StaticList<T, that_capacity> const &that) {
@@ -26,7 +30,11 @@ struct StaticList {
 	}
 
 	template <umm that_capacity>
-	constexpr StaticList(StaticList<T, that_capacity> &&that) = delete;
+	constexpr StaticList(StaticList<T, that_capacity> &&that) {
+		memcpy(data, that.data, that.count * sizeof(T));
+		count = that.count;
+		that.count = 0;
+	}
 
 	constexpr StaticList(std::initializer_list<T> that) {
 		assert(that.size() <= capacity);
@@ -40,7 +48,13 @@ struct StaticList {
 	}
 
 	template <umm that_capacity>
-	constexpr StaticList &operator=(StaticList<T, that_capacity> &&that) = delete;
+	constexpr StaticList &operator=(StaticList<T, that_capacity> &&that) {
+		this->~StaticList();
+		memcpy(data, that.data, that.count * sizeof(T));
+		count = that.count;
+		that.count = 0;
+		return *this;
+	}
 
 	constexpr StaticList &operator=(std::initializer_list<T> that) {
 		return *new (this) StaticList(that);
