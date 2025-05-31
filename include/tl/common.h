@@ -2926,48 +2926,6 @@ void reverse_in_place(Span<T> span) {
 	}
 }
 
-template <class T, umm capacity>
-struct StaticSet {
-
-	T *begin() { return data; }
-	T const *begin() const { return data; }
-	T *end() { return data + count; }
-	T const *end() const { return data + count; }
-
-	T *find(T const &value) {
-		for (auto &it : *this) {
-			if (it == value)
-				return &it;
-		}
-		return 0;
-	}
-	T &get_or_insert(T const &value) {
-		if (auto found = find(value))
-			return *found;
-		return data[count++] = value;
-	}
-
-	bool remove(T const &value) {
-		if (auto found = find(value)) {
-			--count;
-			memcpy(found, found + 1, sizeof(T) * (end() - found));
-			return true;
-		}
-		return false;
-	}
-
-	Optional<T> pop() {
-		if (count)
-			return data[--count];
-		return {};
-	}
-
-	union {
-		T data[capacity];
-	};
-	umm count = 0;
-};
-
 template <umm size>
 struct BitSet {
 	using Word = umm;
