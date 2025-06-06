@@ -1443,6 +1443,24 @@ private:
 
 #define defer ::tl::Deferrer CONCAT(_deferrer, __COUNTER__) = [&]
 
+template <class Fn>
+struct OffableDeferrer {
+	inline OffableDeferrer(Fn &&fn) : fn(std::move(fn)) {}
+	inline ~OffableDeferrer() noexcept(false) { if (enabled) fn(); }
+
+	bool enabled = true;
+
+private:
+	Fn fn;
+#if COMPILER_MSVC
+#pragma warning(suppress: 4626)
+};
+#else
+};
+#endif
+
+#define offable_defer(name) ::tl::OffableDeferrer name = [&]
+
 #define scoped_replace(dst, src) \
 	auto CONCAT(old_, __LINE__) = dst; \
 	dst = src; \
