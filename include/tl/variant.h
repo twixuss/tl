@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "macros.h"
+#include "array.h"
 
 namespace tl {
 
@@ -66,9 +67,7 @@ public:
 		if constexpr (sizeof...(T) <= 64) {
 			return visit_impl<void, T...>(self._index, self.storage, std::forward<Visitor>(visitor));
 		} else {
-			using Fn = decltype(visitor(*(T *)storage)) (*)(u8 *, Visitor &&);
-
-			Fn table[] = {
+			Array table = {
 				+[](u8 *storage, Visitor &&visitor) -> decltype(auto) { return visitor(*(T *)storage); }...
 			};
 

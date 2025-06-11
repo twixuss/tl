@@ -604,31 +604,30 @@ forceinline constexpr bool is_nan(f64 v) {
 }
 
 #if COMPILER_GCC
-forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ffs(val) : ~0; }
-forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ffsll(val) : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { return val ? 32 - __builtin_clz(val) : ~0; }
-forceinline u32 find_highest_one_bit(u64 val) { return val ? 64 - __builtin_clzll(val) : ~0; }
+	forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ffs(val) : ~0; }
+	forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ffsll(val) : ~0; }
+	forceinline u32 find_highest_one_bit(u32 val) { return val ? 32 - __builtin_clz(val) : ~0; }
+	forceinline u32 find_highest_one_bit(u64 val) { return val ? 64 - __builtin_clzll(val) : ~0; }
 #elif COMPILER_MSVC
-forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0; }
-forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
-forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
-#if ARCH_X64
-forceinline u32 find_lowest_one_bit(u64 val) { unsigned long result; return _BitScanForward64(&result, val) ? (u32)result : ~0; }
-forceinline u32 find_highest_one_bit(u64 val) { unsigned long result; return _BitScanReverse64(&result, val) ? (u32)result : ~0; }
-forceinline u32 find_lowest_zero_bit (u64 val) { return find_lowest_one_bit (~val); }
-forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~val); }
-#else
-#endif
+	forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0; }
+	forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0; }
+	#if ARCH_X64
+		forceinline u32 find_lowest_one_bit(u64 val) { unsigned long result; return _BitScanForward64(&result, val) ? (u32)result : ~0; }
+		forceinline u32 find_highest_one_bit(u64 val) { unsigned long result; return _BitScanReverse64(&result, val) ? (u32)result : ~0; }
+	#endif
 #endif
 forceinline u32 find_lowest_one_bit(u8  val) { return find_lowest_one_bit((u32)val); }
 forceinline u32 find_lowest_one_bit(u16 val) { return find_lowest_one_bit((u32)val); }
 forceinline u32 find_highest_one_bit(u8  val) { return find_highest_one_bit((u32)val); }
 forceinline u32 find_highest_one_bit(u16 val) { return find_highest_one_bit((u32)val); }
-forceinline u32 find_lowest_zero_bit(u8  val) { return find_lowest_zero_bit((u32)val); }
-forceinline u32 find_lowest_zero_bit(u16 val) { return find_lowest_zero_bit((u32)val); }
-forceinline u32 find_highest_zero_bit(u8  val) { return find_highest_zero_bit((u32)val | 0xffffff00); }
-forceinline u32 find_highest_zero_bit(u16 val) { return find_highest_zero_bit((u32)val | 0xffff0000); }
+forceinline u32 find_lowest_zero_bit(u8  val) { return find_lowest_one_bit((u32)~val); }
+forceinline u32 find_lowest_zero_bit(u16 val) { return find_lowest_one_bit((u32)~val); }
+forceinline u32 find_lowest_zero_bit(u32 val) { return find_lowest_one_bit(~val); }
+forceinline u32 find_lowest_zero_bit(u64 val) { return find_lowest_one_bit(~val); }
+forceinline u32 find_highest_zero_bit(u8  val) { return find_highest_one_bit((u32)(u8 )~val); }
+forceinline u32 find_highest_zero_bit(u16 val) { return find_highest_one_bit((u32)(u16)~val); }
+forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
+forceinline u32 find_highest_zero_bit(u64 val) { return find_highest_one_bit(~val); }
 
 namespace ce {
 
