@@ -4,8 +4,6 @@
 
 namespace tl {
 
-#if OS_WINDOWS
-
 #define ALL_KEYS(K) \
 	K(backspace,     '\b') \
 	K(tab,           '\t') \
@@ -121,8 +119,6 @@ namespace tl {
 	K(f22,           0x85) \
 	K(f23,           0x86) \
 	K(f24,           0x87) \
-
-#endif
 
 enum Key : u16 {
 #define K(key, value) Key_##key = value,

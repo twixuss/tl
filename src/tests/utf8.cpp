@@ -1,6 +1,6 @@
 ﻿#include <tl/string.h>
 #include <tl/console.h>
-#include <tl/time.h>
+#include <tl/precise_time.h>
 #include <tl/random.h>
 #define NOMINMAX
 

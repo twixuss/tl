@@ -245,7 +245,7 @@ inline u256 U256(u64 val) {
 	return {.s = {val}};
 }
 
-inline u256 operator""ou(u64 val) {
+inline u256 operator""ou(unsigned long long val) {
 	return {.s = {val}};
 }
 

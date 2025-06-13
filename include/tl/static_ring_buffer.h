@@ -98,8 +98,8 @@ struct StaticRingBuffer {
 		return *result_ptr;
 	}
 
-	auto &back(this auto &&self) { bounds_check(assert(self.count)); return at(self.count - 1); }
-	auto &front(this auto &&self) { bounds_check(assert(self.count)); return at(0); }
+	auto &back(this auto &&self) { bounds_check(assert(self.count)); return self.at(self.count - 1); }
+	auto &front(this auto &&self) { bounds_check(assert(self.count)); return self.at(0); }
 
 	bool is_empty() const { return count == 0; }
 	bool is_full() const { return count == capacity; }

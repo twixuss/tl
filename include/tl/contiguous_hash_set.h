@@ -290,10 +290,10 @@ struct ContiguousHashSet : Traits {
 		return false;
 	}
 
-	template <class Allocator = Allocator, class Fn>
+	template <class ResultAllocator = Allocator, class Fn>
 	auto set(Fn &&fn TL_LP) {
 		using U = decltype(fn(*(Key *)0));
-		List<U, Allocator> result;
+		List<U, ResultAllocator> result;
 		result.reserve(count TL_LA);
 		for_each([&](auto &kv) { result.add(fn(kv)); });
 		return result;
@@ -306,9 +306,9 @@ struct ContiguousHashSet : Traits {
 		for_each([&](Key const &key) { list.add(key); });
 	}
 	
-	template <class Allocator = Allocator>
+	template <class ResultAllocator = Allocator>
 	auto to_list(TL_LPC) {
-		List<Key, Allocator> result;
+		List<Key, ResultAllocator> result;
 		copy_to(result);
 		return result;
 	}

@@ -200,12 +200,12 @@ inline void dilate(Pixel *source_pixels, Pixel *destination_pixels, v2u size, u3
     //    return dilate_impl.operator()<s8>();
     //}
     if (size.x <= (1<<15) && size.y <= (1<<15)) {
-        return dilate_impl.operator()<s16>();
+        return dilate_impl.template operator()<s16>();
     }
     if (size.x <= (1<<31) && size.y <= (1<<31)) {
-        return dilate_impl.operator()<s32>();
+        return dilate_impl.template operator()<s32>();
     }
-    return dilate_impl.operator()<s64>();
+    return dilate_impl.template operator()<s64>();
 }
 
 template <class Pixel>
@@ -213,7 +213,7 @@ inline void dilate(Pixel *pixels, v2u size, umm stride_in_pixels, DilateOptions 
     // NOTE:
     // Images are likely too big to store in temporary memory.
     auto allocator = TL_GET_CURRENT(allocator);
-    auto copy = allocator.allocate<Pixel>(size.y*size.x);
+    auto copy = allocator.template allocate<Pixel>(size.y*size.x);
     defer { allocator.free(copy); };
 
     for (u32 y = 0; y < size.y; ++y) {

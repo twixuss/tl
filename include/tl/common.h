@@ -9,6 +9,7 @@
 	#include <intrin.h>
 	#include <vcruntime_new.h>
 #elif COMPILER_GCC
+	#include <immintrin.h>
 	#include <x86gprintrin.h>
 	#include <malloc.h>
 	#include <math.h>
@@ -259,8 +260,8 @@ struct AllDifferentT<> : std::true_type {};
 template <class First, class ...Rest>
 struct AllDifferentT<First, Rest...> : std::conditional_t<(!std::is_same_v<First, Rest> && ...) && AllDifferentT<Rest...>::value, std::true_type, std::false_type> {};
 
-template <class First, class ...Rest>
-concept AllDifferent = AllDifferentT<First, Rest...>::value;
+template <class ...Ts>
+concept AllDifferent = AllDifferentT<Ts...>::value;
 
 template <class First, class ...Rest>
 struct RequireAllSame {
@@ -380,7 +381,14 @@ template<> inline constexpr f32 infinity<f32> = (__builtin_inff ());
 template<> inline constexpr f64 infinity<f64> = (__builtin_inff ());
 #endif
 
-template <class T> inline constexpr T nan = infinity<T> * 0;
+template <class T> inline constexpr T nan = undefined_constexpr_value;
+#if COMPILER_MSVC
+template <> inline constexpr f32 nan<f32> = infinity<f32> * 0;
+template <> inline constexpr f64 nan<f64> = infinity<f64> * 0;
+#else
+template <> inline constexpr f32 nan<f32> = __builtin_nanf("");
+template <> inline constexpr f64 nan<f64> = __builtin_nan("");
+#endif
 
 #pragma warning(pop)
 
@@ -879,10 +887,17 @@ forceinline constexpr u32 count_leading_ones(u32 val) { return count_leading_zer
 forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zeros((u64)~val); }
 #endif
 
+#if COMPILER_MSVC
 forceinline constexpr u32 count_trailing_zeros(u8  v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 8  : (_BitScanForward(&r, v), r))); }
 forceinline constexpr u32 count_trailing_zeros(u16 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 16 : (_BitScanForward(&r, v), r))); }
 forceinline constexpr u32 count_trailing_zeros(u32 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (_BitScanForward(&r, v), r))); }
 forceinline constexpr u32 count_trailing_zeros(u64 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (_BitScanForward64(&r, v), r))); }
+#else
+forceinline constexpr u32 count_trailing_zeros(u8  v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 8  : (__builtin_ffs  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u16 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 16 : (__builtin_ffs  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u32 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (__builtin_ffs  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u64 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (__builtin_ffsll(v)))); }
+#endif
 
 forceinline constexpr u32 count_trailing_ones(u8  val) { return count_trailing_zeros((u8 )~val); }
 forceinline constexpr u32 count_trailing_ones(u16 val) { return count_trailing_zeros((u16)~val); }
@@ -2019,8 +2034,8 @@ struct Span {
 			
 				#if TL_USE_SIMD
 				while (endp - ap >= 16) {
-					__m128i a = _mm_loadu_epi32(ap); ap += 16;
-					__m128i b = _mm_loadu_epi32(bp); bp += 16;
+					__m128i a = _mm_loadu_si128((__m128i *)ap); ap += 16;
+					__m128i b = _mm_loadu_si128((__m128i *)bp); bp += 16;
 					__m128i c = _mm_cmpeq_epi32(a, b);
 					int m = _mm_movemask_ps(_mm_castsi128_ps(c));
 					if (m != 0xF) {

@@ -1084,7 +1084,7 @@ File open_file(Span<utf8> path, OpenFileParams params) {
 	mode.add('b');
 	mode.add(0);
 
-	FILE *file = fopen(null_terminate(path).data, mode.data);
+	FILE *file = fopen((char *)null_terminate<TemporaryAllocator>(path).data, mode.data);
 
 	if (!file && !params.silent) {
 		TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path);
@@ -1123,7 +1123,7 @@ void close(File file) {
 
 bool file_exists(Span<utf8> path) {
 	scoped(temporary_allocator_and_checkpoint);
-    FILE *file = fopen(null_terminate(path).data, "r");
+    FILE *file = fopen((char *)null_terminate<TemporaryAllocator>(path).data, "r");
     if (file) {
         fclose(file);
         return true;
@@ -1134,7 +1134,7 @@ bool directory_exists(Span<utf8> path) {
 	scoped(temporary_allocator_and_checkpoint);
     struct stat statbuf;
 
-    if (stat(null_terminate(path).data, &statbuf) != 0) {
+    if (stat((char *)null_terminate<TemporaryAllocator>(path).data, &statbuf) != 0) {
         return false;
     }
 
@@ -1154,7 +1154,7 @@ FileItemList get_items_in_directory(Span<utf8> directory) {
 	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
 	scoped(TL_GET_CURRENT(temporary_allocator));
 
-    DIR *dir = opendir(null_terminate(directory).data);
+    DIR *dir = opendir((char *)null_terminate<TemporaryAllocator>(directory).data);
     if (dir == NULL) {
         current_logger.error("opendir({}) failed", directory);
 		return result;

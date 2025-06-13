@@ -235,11 +235,11 @@ struct StaticList {
 		Value &operator*() { return *it; }
 
 		
-		void erase() requires !is_const {
+		void erase() requires(!is_const) {
 			list->erase(it);
 			--it;
 		}
-		void erase_unordered() requires !is_const {
+		void erase_unordered() requires(!is_const) {
 			list->erase_unordered(it);
 			--it;
 		}

@@ -86,13 +86,13 @@ struct ContiguousHashMap : Traits {
 
 		buffer.init(ceil_to_power_of_2(max((umm)TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, desired)));
 
-		HashAndState *old_hns    = old_buffer.base_of<0>();
-		Key          *old_keys   = old_buffer.base_of<1>();
-		Value        *old_values = old_buffer.base_of<2>();
+		HashAndState *old_hns    = old_buffer.template base_of<0>();
+		Key          *old_keys   = old_buffer.template base_of<1>();
+		Value        *old_values = old_buffer.template base_of<2>();
 
-		HashAndState *new_hns    = buffer.base_of<0>();
-		Key          *new_keys   = buffer.base_of<1>();
-		Value        *new_values = buffer.base_of<2>();
+		HashAndState *new_hns    = buffer.template base_of<0>();
+		Key          *new_keys   = buffer.template base_of<1>();
+		Value        *new_values = buffer.template base_of<2>();
 		
 		for (umm i = 0; i < old_buffer.capacity; ++i) {
 			if (old_hns[i] > 1) {
@@ -130,8 +130,8 @@ struct ContiguousHashMap : Traits {
 	IndexAndOccupancy find_index_of_key_or_empty_slot(Key key, FullHash hash, umm index) const {
 		assert(buffer.capacity);
 		
-		HashAndState *hnss   = buffer.base_of<0>();
-		Key          *keys   = buffer.base_of<1>();
+		HashAndState *hnss   = buffer.template base_of<0>();
+		Key          *keys   = buffer.template base_of<1>();
 		
 		HashAndState compact_hash = compact(hash);
 
@@ -288,7 +288,7 @@ struct ContiguousHashMap : Traits {
 		Value &value() { return map->value_at(it); }
 
 
-		void erase() requires !is_const {
+		void erase() requires(!is_const) {
 			map->mark_erased(it);
 		}
 
@@ -309,13 +309,13 @@ struct ContiguousHashMap : Traits {
 	}
 private:
 	HashAndState &hash_and_state_at(umm index) const {
-		return buffer.at<0>(index);
+		return buffer.template at<0>(index);
 	}
 	Key &key_at(umm index) const {
-		return buffer.at<1>(index);
+		return buffer.template at<1>(index);
 	}
 	Value &value_at(umm index) const {
-		return buffer.at<2>(index);
+		return buffer.template at<2>(index);
 	}
 	KeyValue mark_erased(umm index) {
 		assert(hash_and_state_at(index) > 1);

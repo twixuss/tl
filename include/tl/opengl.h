@@ -8,9 +8,10 @@ Requirements:
 #include "system.h"
 #include "console.h"
 #include "math.h"
-#include "time.h"
+#include "precise_time.h"
 #include "includer.h"
 #include "static_list.h"
+#include "date.h"
 
 #if OS_WINDOWS
 #pragma warning(push, 0)

@@ -20,7 +20,7 @@
 #include <tl/string.h>
 #include <tl/system.h>
 #include <tl/thread.h>
-#include <tl/time.h>
+#include <tl/precise_time.h>
 #include <tl/u256.h>
 #include <tl/big_int.h>
 #include <tl/main.h>
@@ -535,14 +535,14 @@ struct u128 {
 	operator u64() const { return low; };
 };
 
-template <> inline static constexpr bool is_integer<u128> = true;
-template <> inline static constexpr bool is_integer_like<u128> = true;
+template <> constexpr bool tl::is_integer<u128> = true;
+template <> constexpr bool tl::is_integer_like<u128> = true;
 
 u128 U128(u64 val) {
 	return {.low = val};
 }
 
-u128 operator""su(u64 val) {
+u128 operator""su(unsigned long long val) {
 	return {.low = val};
 }
 
@@ -648,7 +648,7 @@ float pow2(float a) {
 
 DefaultLogger logger = {.module = u8"tests"s};
 
-__declspec(dllexport) char *found;
+char *found;
 
 no_inline void test_find() {
 	found = find("Hello world! I have a present for you!Hello world! I have a present for you!Hello world! I have a present for you!"s, "lo world! I have a present for you!"s);
@@ -659,11 +659,11 @@ void run_tl_tests();
 s32 tl_main(Span<Span<utf8>> args) {
 	DefaultLogger::default_init(args[0]);
 	
-	void c_tokenizer_test();
-	c_tokenizer_test();
-	void c_preprocessor_test();
-	c_preprocessor_test();
-	return 0;
+	//void c_tokenizer_test();
+	//c_tokenizer_test();
+	//void c_preprocessor_test();
+	//c_preprocessor_test();
+	//return 0;
 
 	run_tl_tests();
 

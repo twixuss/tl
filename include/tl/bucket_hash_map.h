@@ -238,10 +238,10 @@ struct BucketHashMap : Traits {
 		return false;
 	}
 
-	template <class Allocator = tl::Allocator>
+	template <class ResultAllocator = tl::Allocator>
 	auto map(std::invocable<KeyValuePointers> auto &&fn TL_LP) {
 		using U = decltype(fn(std::declval<KeyValuePointers>()));
-		List<U, Allocator> result;
+		List<U, ResultAllocator> result;
 		result.reserve(count TL_LA);
 		for_each([&](auto kv) { result.add(fn(kv) TL_LA); });
 		return result;
@@ -255,17 +255,17 @@ struct BucketHashMap : Traits {
 
 	// TODO: make all bucket hash map functions use allocator.
 
-	template <class Traits, class Allocator>
-	void set(BucketHashMap<Key, Value, Traits, Allocator> const &source TL_LP) {
+	template <class SourceTraits, class SourceAllocator>
+	void set(BucketHashMap<Key, Value, SourceTraits, SourceAllocator> const &source TL_LP) {
 		clear();
 		source.for_each([&](auto kv) {
 			get_or_insert(*kv.key TL_LA) = *kv.value;
 		});
 	}
 	
-	template <class Allocator = tl::Allocator>
+	template <class ResultAllocator = tl::Allocator>
 	auto copy(TL_LPC) {
-		BucketHashMap<Key, Value, Traits, Allocator> result;
+		BucketHashMap<Key, Value, Traits, ResultAllocator> result;
 		result.set(*this);
 		return result;
 	}
@@ -324,7 +324,7 @@ struct BucketHashMap : Traits {
 		Key const &key() { return (*bucket_iter).key; }
 		Value &value() { return (*bucket_iter).value; }
 
-		void erase() requires !is_const {
+		void erase() requires(!is_const) {
 			--map->count;
 			bucket_iter.erase();
 		}

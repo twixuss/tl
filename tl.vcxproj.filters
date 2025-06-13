@@ -27,6 +27,8 @@
   <ItemGroup>
     <ClInclude Include="src\compile_speed_test.h" />
     <ClInclude Include="include\tl\c_tokenizer.h" />
+    <ClInclude Include="include\tl\sleep.h" />
+    <ClInclude Include="include\tl\date.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\tests\coroutine.asm" />

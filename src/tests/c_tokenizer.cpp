@@ -2,7 +2,7 @@
 #include <tl/math_random.h>
 #include <tl/c_tokenizer.h>
 #include <tl/file.h>
-#include <tl/time.h>
+#include <tl/precise_time.h>
 
 using namespace tl;
 using namespace tl::c;

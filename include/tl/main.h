@@ -1,6 +1,7 @@
 #pragma once
 #include "string.h"
 #include "console.h"
+#include <xmmintrin.h>
 
 extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 
@@ -15,8 +16,10 @@ extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 #pragma warning(pop)
 #include "file.h"
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, wchar_t *wcmdline, int) {
-#else
+#elif OS_WINDOWS
 int wmain(int argc, wchar_t **argv) {
+#else
+int main(int argc, char **argv) {
 #endif
 	using namespace tl;
 	
@@ -30,7 +33,7 @@ int wmain(int argc, wchar_t **argv) {
 	init_allocator();
 	defer { deinit_allocator(); };
 	
-	List<Span<utf8>> arguments;
+	List<Span<utf8>, DefaultAllocator> arguments;
 	#ifdef TL_MAIN_WINMAIN
 	{
 		arguments.add(get_executable_path());
@@ -42,9 +45,13 @@ int wmain(int argc, wchar_t **argv) {
 			}
 		});
 	}
-	#else
+	#elif OS_WINDOWS
 	for (int i = 0; i < argc; ++i) {
 		arguments.add(to_utf8(as_span((utf16 *)argv[i]), true));
+	}
+	#else
+	for (int i = 0; i < argc; ++i) {
+		arguments.add(as_utf8(as_span(argv[i])));
 	}
 	#endif
 

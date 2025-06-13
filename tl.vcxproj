@@ -36,6 +36,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\tl\c_tokenizer.h" />
+    <ClInclude Include="include\tl\date.h" />
+    <ClInclude Include="include\tl\sleep.h" />
     <ClInclude Include="src\compile_speed_test.h" />
   </ItemGroup>
   <ItemGroup>

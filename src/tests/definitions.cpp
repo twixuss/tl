@@ -35,7 +35,7 @@
 #include <tl/constexpr_string_literal.h>
 #include <tl/coroutine.h>
 #include <tl/cpu.h>
-#include <tl/d3d11.h>
+#include <tl/date.h>
 #include <tl/debug.h>
 #include <tl/debug_allocator.h>
 #include <tl/default_logger.h>
@@ -88,6 +88,7 @@
 #include <tl/reusable_fiber.h>
 #include <tl/ring_buffer.h>
 #include <tl/simd.h>
+#include <tl/sleep.h>
 #include <tl/sorted_list.h>
 #include <tl/source_location.h>
 #include <tl/static_queue.h>
@@ -96,7 +97,7 @@
 #include <tl/string.h>
 #include <tl/text_input_field.h>
 #include <tl/thread.h>
-#include <tl/time.h>
+#include <tl/precise_time.h>
 #include <tl/tracking_allocator.h>
 #include <tl/turn.h>
 #include <tl/u256.h>

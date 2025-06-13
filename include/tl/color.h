@@ -42,10 +42,10 @@ color4u16 operator*(color4u16 a, color4u16 b) {
     auto z = _mm_add_epi32(y, _mm_set1_epi32(65535));
     auto x = _mm_srli_epi32(z, 16);
     return {
-        (u16)x.m128i_u32[0],
-        (u16)x.m128i_u32[1],
-        (u16)x.m128i_u32[2],
-        (u16)x.m128i_u32[3],
+        (u16)_mm_extract_epi32(x, 0),
+        (u16)_mm_extract_epi32(x, 1),
+        (u16)_mm_extract_epi32(x, 2),
+        (u16)_mm_extract_epi32(x, 3),
     };
 #elif 1
     return {

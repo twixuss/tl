@@ -237,7 +237,7 @@ struct LinkedList {
 		}
 		auto pointer() { return &node->value; }
 
-		void erase() requires !is_const {
+		void erase() requires(!is_const) {
 			auto next_node = reverse ? node->prev : node->next;
 			list->erase(node);
 			node = next_node;

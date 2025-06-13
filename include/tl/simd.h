@@ -698,8 +698,8 @@ constexpr Vector<Scalar, count> frac(Vector<Scalar, count> v, Vector<Scalar, cou
 iadd(u,8);
 isub(u,8);
 // imul(u,8);
-udiv(8);
-umod(8);
+// udiv(8); // in msvc, not in gcc
+// umod(8); // in msvc, not in gcc
 ieq(u,8);
 ine(u,8);
 ule(8);
@@ -710,8 +710,8 @@ ugt(8);
 iadd(u,16);
 isub(u,16);
 imul(u,16);
-udiv(16);
-umod(16);
+// udiv(16); // in msvc, not in gcc
+// umod(16); // in msvc, not in gcc
 ieq(u,16);
 ine(u,16);
 ule(16);
@@ -722,8 +722,8 @@ ugt(16);
 iadd(u,32);
 isub(u,32);
 imul(u,32);
-udiv(32);
-umod(32);
+// udiv(32); // in msvc, not in gcc
+// umod(32); // in msvc, not in gcc
 ieq(u,32);
 ine(u,32);
 ule(32);
@@ -734,8 +734,8 @@ ugt(32);
 iadd(u,64);
 isub(u,64);
 AVX512(imul(u,64));
-udiv(64);
-umod(64);
+// udiv(64); // in msvc, not in gcc
+// umod(64); // in msvc, not in gcc
 ieq(u,64);
 ine(u,64);
 ule(64);
@@ -746,8 +746,8 @@ ugt(64);
 iadd(s,8);
 isub(s,8);
 // imul(s,8);
-sdiv(8);
-smod(8);
+// sdiv(8); // in msvc, not in gcc
+// smod(8); // in msvc, not in gcc
 ieq(s,8);
 ine(s,8);
 sle(8);
@@ -758,8 +758,8 @@ sgt(8);
 iadd(s,16);
 isub(s,16);
 imul(s,16);
-sdiv(16);
-smod(16);
+// sdiv(16); // in msvc, not in gcc
+// smod(16); // in msvc, not in gcc
 ieq(s,16);
 ine(s,16);
 sle(16);
@@ -770,8 +770,8 @@ sgt(16);
 iadd(s,32);
 isub(s,32);
 imul(s,32);
-sdiv(32);
-smod(32);
+// sdiv(32); // in msvc, not in gcc
+// smod(32); // in msvc, not in gcc
 ieq(s,32);
 ine(s,32);
 sle(32);
@@ -782,8 +782,8 @@ sgt(32);
 iadd(s,64);
 isub(s,64);
 AVX512(imul(s,64));
-sdiv(64);
-smod(64);
+// sdiv(64); // in msvc, not in gcc
+// smod(64); // in msvc, not in gcc
 ieq(s,64);
 ine(s,64);
 sle(64);
@@ -845,8 +845,8 @@ template <> inline bool any(Vector<Mask32, 4> v) { return _mm_movemask_ps(_mm_ca
 A(u,32, +, _mm256_add_epi32(a.m, b.m))
 A(u,32, -, _mm256_sub_epi32(a.m, b.m))
 A(u,32, *, _mm256_mullo_epi32(a.m, b.m))
-A(u,32, /, _mm256_div_epu32(a.m, b.m))
-A(u,32, %, _mm256_rem_epu32(a.m, b.m))
+// A(u,32, /, _mm256_div_epu32(a.m, b.m)) // in msvc, not in gcc
+// A(u,32, %, _mm256_rem_epu32(a.m, b.m)) // in msvc, not in gcc
 A(u,32, ^, _mm256_xor_si256(a.m, b.m))
 A(u,32, &, _mm256_and_si256(a.m, b.m))
 A(u,32, |, _mm256_or_si256(a.m, b.m))
@@ -854,8 +854,8 @@ A(u,32, |, _mm256_or_si256(a.m, b.m))
 A(s,32, +, _mm256_add_epi32(a.m, b.m))
 A(s,32, -, _mm256_sub_epi32(a.m, b.m))
 A(s,32, *, _mm256_mullo_epi32(a.m, b.m))
-A(s,32, /, _mm256_div_epi32(a.m, b.m))
-A(s,32, %, _mm256_rem_epi32(a.m, b.m))
+// A(s,32, /, _mm256_div_epi32(a.m, b.m)) // in msvc, not in gcc
+// A(s,32, %, _mm256_rem_epi32(a.m, b.m)) // in msvc, not in gcc
 A(s,32, ^, _mm256_xor_si256(a.m, b.m))
 A(s,32, &, _mm256_and_si256(a.m, b.m))
 A(s,32, |, _mm256_or_si256(a.m, b.m))

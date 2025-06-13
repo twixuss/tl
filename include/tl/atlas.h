@@ -69,9 +69,9 @@ struct Atlas {
 			cursor_min_x = 0;
 
 			size = {256, 256};
-			data = allocator.allocate<Element>(size.x * size.y);
+			data = allocator.template allocate<Element>(size.x * size.y);
 		} else {
-			data = allocator.allocate<Element>(size.x * size.y * 2);
+			data = allocator.template allocate<Element>(size.x * size.y * 2);
 
 			if (size.x == size.y) {
 				// Extend width. Left half is used, right is unused.
@@ -112,7 +112,7 @@ struct Atlas {
 	}
 
 	void pack(bool keep_area_order = false) {
-		auto old_data = allocator.allocate<Element>(size.x * size.y);
+		auto old_data = allocator.template allocate<Element>(size.x * size.y);
 		defer { allocator.free(old_data); };
 
 		memcpy(old_data, data, size.x * size.y * sizeof(Element));

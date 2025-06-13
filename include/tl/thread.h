@@ -2,6 +2,7 @@
 #include "function.h"
 #include "list.h"
 #include "queue.h"
+#include "sleep.h"
 
 #include <emmintrin.h>
 
@@ -14,9 +15,6 @@
 #pragma warning(disable: 5220)
 
 namespace tl {
-
-TL_API void sleep_milliseconds(u32 milliseconds);
-TL_API void sleep_seconds(u32 seconds);
 
 template <class T>
 concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
@@ -255,8 +253,6 @@ TL_API FatFunctionPointer thread_deinitter = +[]{
 
 #if OS_WINDOWS
 
-void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
-void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
 
 void run_thread(Thread *thread) {
@@ -399,6 +395,7 @@ struct Scoped<SpinLock> {
 	}
 };
 
+// TODO: why indirection?
 struct TL_API OsLock {
 	TL_MAKE_FIXED(OsLock);
 
@@ -425,6 +422,20 @@ void lock(OsLock &m) {
 }
 void unlock(OsLock &m) {
 	LeaveCriticalSection((CRITICAL_SECTION *)m.handle);
+}
+#elif OS_LINUX
+OsLock::OsLock() {
+	handle = DefaultAllocator{}.allocate<pthread_mutex_t>();
+	pthread_mutex_init((pthread_mutex_t*)handle, 0);
+}
+bool try_lock(OsLock &m) {
+	return pthread_mutex_trylock((pthread_mutex_t *)m.handle) == 0;
+}
+void lock(OsLock &m) {
+	pthread_mutex_lock((pthread_mutex_t *)m.handle);
+}
+void unlock(OsLock &m) {
+	pthread_mutex_unlock((pthread_mutex_t *)m.handle);
 }
 #endif
 #endif
@@ -954,8 +965,14 @@ inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool) {
 	sync(pool->end_sync_point);
 }
 	
-#if !OS_LINUX
-// :NotImplemented: for linux because gcc is buggy and I don't want to deal with that right now
+struct TaskListsThreadPool;
+inline void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
+	
+// Not a nested struct cuz gcc is stupid
+struct TaskListsThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool_default_worker_proc;
+};
 
 // Runs the latest pushed tasks 
 struct TaskListsThreadPool {
@@ -1074,14 +1091,10 @@ struct TaskListsThreadPool {
 				}
 			}
 		}
+		friend void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskListsThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
@@ -1137,35 +1150,6 @@ struct TaskListsThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskListsThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-
-		while (1) {
-			Optional<TaskListsThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					if (task = pool->tasks.pop()) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				pool->run(task.value_unchecked());
-				pool->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-
 	TaskList create_task_list() {
 		return {this};
 	}
@@ -1202,6 +1186,45 @@ private:
 		task.free(task.param);
 		atomic_increment(&task.list->finished_task_count);
 	}
+
+	friend void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
+};
+
+void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool) {
+
+	sync(pool->start_sync_point);
+
+	while (1) {
+		Optional<TaskListsThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				if (task = pool->tasks.pop()) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			pool->run(task.value_unchecked());
+			pool->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
+
+// Not nested because gcc is shit
+struct TaskQueuesThreadPool;
+inline void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
+struct TaskQueuesThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskQueuesThreadPool *pool) = TaskQueuesThreadPool_default_worker_proc;
 };
 
 // Runs tasks in order of addition.
@@ -1339,14 +1362,10 @@ struct TaskQueuesThreadPool {
 			};
 			pool->new_work_notifier.wake();
 		}
+		friend void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskQueuesThreadPool *pool) = TaskQueuesThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskQueuesThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
@@ -1405,47 +1424,6 @@ struct TaskQueuesThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskQueuesThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-		
-		auto &shared = pool->shared;
-
-		while (1) {
-			Optional<TaskQueuesThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					locked_use(shared) {
-						for (umm i = shared.task_queues.count - 1; i != -1; --i) {
-							task = shared.task_queues[i]->tasks.pop();
-							if (task) {
-								assert(task.value_unchecked().fn != (void *)0xdddddddddddddddd);
-								break;
-							}
-						}
-					};
-					if (task) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				REDECLARE_VAL(task, task.value_unchecked());
-				pool->run(task);
-				task.queue->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-
 	#if TL_DEBUG
 	~TaskQueuesThreadPool() {
 		assert(stopping, "TaskQueuesThreadPool was not properly deinitted. Call TaskQueuesThreadPool::deinit.");
@@ -1483,10 +1461,49 @@ private:
 		task.free(task.param);
 		atomic_increment(&task.queue->finished_task_count);
 	}
+	friend void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
 };
 
-#endif
+void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool) {
 
+	sync(pool->start_sync_point);
+		
+	auto &shared = pool->shared;
+
+	while (1) {
+		Optional<TaskQueuesThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				locked_use(shared) {
+					for (umm i = shared.task_queues.count - 1; i != -1; --i) {
+						task = shared.task_queues[i]->tasks.pop();
+						if (task) {
+							assert(task.value_unchecked().fn != (void *)0xdddddddddddddddd);
+							break;
+						}
+					}
+				};
+				if (task) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			REDECLARE_VAL(task, task.value_unchecked());
+			pool->run(task);
+			task.queue->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
 } // namespace tl
 #pragma warning(pop)
 

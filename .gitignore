@@ -4,3 +4,4 @@ tmp/
 *.pdb
 bin/
 packages/
+*.o

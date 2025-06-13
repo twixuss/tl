@@ -1046,7 +1046,7 @@ forceinline void append(StringBuilder &builder, void const *p) {
 }
 
 template <class Float>
-inline void append_float(StringBuilder &builder, FormatFloat<Float> format) {
+inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 	auto value = format.value;
 
 	if (is_nan(value)) {
@@ -1191,8 +1191,6 @@ inline void append_float(StringBuilder &builder, FormatFloat<Float> format) {
 	}
 	return append(builder, buffer.span());
 }
-inline void append(StringBuilder &builder, FormatFloat<f32> f) { append_float(builder, f); }
-inline void append(StringBuilder &builder, FormatFloat<f64> f) { append_float(builder, f); }
 
 forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormatFloat{.value = v}); }
 forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormatFloat{.value = v}); }

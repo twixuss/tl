@@ -151,15 +151,17 @@
 #define CONCAT(x, y)  CONCAT_(x, y)
 
 #if COMPILER_MSVC
-	#define forceinline   __forceinline
+	#define forceinline   __forceinline inline
 	#define no_inline     __declspec(noinline)
 	#define debug_break() ::__debugbreak()
 #elif COMPILER_GCC
-	#define forceinline   __attribute__((always_inline))
+	#define forceinline   __attribute__((always_inline)) inline
+	#define no_inline     __attribute__((noinline))
 	#define debug_break() ::__builtin_trap()
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
 
 namespace tl {
 
@@ -214,16 +216,16 @@ using utf32 = char32_t;
 
 namespace integer_literals {
 
-forceinline constexpr u8  operator""_u8 (u64 i) { return (u8 )i; }
-forceinline constexpr u16 operator""_u16(u64 i) { return (u16)i; }
-forceinline constexpr u32 operator""_u32(u64 i) { return (u32)i; }
-forceinline constexpr u64 operator""_u64(u64 i) { return (u64)i; }
-forceinline constexpr s8  operator""_s8 (u64 i) { return (s8 )i; }
-forceinline constexpr s16 operator""_s16(u64 i) { return (s16)i; }
-forceinline constexpr s32 operator""_s32(u64 i) { return (s32)i; }
-forceinline constexpr s64 operator""_s64(u64 i) { return (s64)i; }
-forceinline constexpr umm operator""_umm(u64 i) { return (umm)i; }
-forceinline constexpr smm operator""_smm(u64 i) { return (smm)i; }
+forceinline constexpr u8  operator""_u8 (unsigned long long i) { return (u8 )i; }
+forceinline constexpr u16 operator""_u16(unsigned long long i) { return (u16)i; }
+forceinline constexpr u32 operator""_u32(unsigned long long i) { return (u32)i; }
+forceinline constexpr u64 operator""_u64(unsigned long long i) { return (u64)i; }
+forceinline constexpr s8  operator""_s8 (unsigned long long i) { return (s8 )i; }
+forceinline constexpr s16 operator""_s16(unsigned long long i) { return (s16)i; }
+forceinline constexpr s32 operator""_s32(unsigned long long i) { return (s32)i; }
+forceinline constexpr s64 operator""_s64(unsigned long long i) { return (s64)i; }
+forceinline constexpr umm operator""_umm(unsigned long long i) { return (umm)i; }
+forceinline constexpr smm operator""_smm(unsigned long long i) { return (smm)i; }
 
 }
 
