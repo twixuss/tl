@@ -151,7 +151,7 @@
 #define CONCAT(x, y)  CONCAT_(x, y)
 
 #if COMPILER_MSVC
-	#define forceinline   __forceinline inline
+	#define forceinline   __forceinline
 	#define no_inline     __declspec(noinline)
 	#define debug_break() ::__debugbreak()
 #elif COMPILER_GCC
