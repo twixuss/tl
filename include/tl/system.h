@@ -159,6 +159,7 @@
 	#define debug_break() ::__builtin_trap()
 #endif
 
+#include <stdint.h>
 
 namespace tl {
 
@@ -166,34 +167,14 @@ template <bool v, class T, class F> struct ConditionalT { using Type = T; };
 template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
 template <bool v, class T, class F> using Conditional = typename ConditionalT<v, T, F>::Type;
 
-#if COMPILER_MSVC
-using s8  = signed __int8;
-using s16 = signed __int16;
-using s32 = signed __int32;
-using s64 = signed __int64;
-using u8  = unsigned __int8;
-using u16 = unsigned __int16;
-using u32 = unsigned __int32;
-using u64 = unsigned __int64;
-#elif COMPILER_CLANG
-using s8 = __INT8_TYPE__;
-using s16 = __INT16_TYPE__;
-using s32 = __INT32_TYPE__;
-using s64 = __INT64_TYPE__;
-using u8 = __UINT8_TYPE__;
-using u16 = __UINT16_TYPE__;
-using u32 = __UINT32_TYPE__;
-using u64 = __UINT64_TYPE__;
-#else
-using s8  = signed char;
-using s16 = signed short;
-using s32 = signed int;
-using s64 = signed long;
-using u8  = unsigned char;
-using u16 = unsigned short;
-using u32 = unsigned int;
-using u64 = unsigned long;
-#endif
+using s8  = int8_t;
+using s16 = int16_t;
+using s32 = int32_t;
+using s64 = int64_t;
+using u8  = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
 
 using f32 = float;
 using f64 = double;

@@ -219,46 +219,46 @@ struct SignedIntWithBits {
 	fc bool operator>=(SignedIntWithBits that) const { return !(*this < that); }
 	
 	#define BP3(op) \
-		fc auto operator##op(u8  that) const { return *this op from(that); } \
-		fc auto operator##op(u16 that) const { return *this op from(that); } \
-		fc auto operator##op(u32 that) const { return *this op from(that); } \
-		fc auto operator##op(u64 that) const { return *this op from(that); } \
-		fc auto operator##op(s8  that) const { return *this op from(that); } \
-		fc auto operator##op(s16 that) const { return *this op from(that); } \
-		fc auto operator##op(s32 that) const { return *this op from(that); } \
-		fc auto operator##op(s64 that) const { return *this op from(that); } \
-		fc friend auto operator##op(u8  that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(u16 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(u32 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(u64 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(s8  that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(s16 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(s32 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
-		fc friend auto operator##op(s64 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc auto operator op(u8  that) const { return *this op from(that); } \
+		fc auto operator op(u16 that) const { return *this op from(that); } \
+		fc auto operator op(u32 that) const { return *this op from(that); } \
+		fc auto operator op(u64 that) const { return *this op from(that); } \
+		fc auto operator op(s8  that) const { return *this op from(that); } \
+		fc auto operator op(s16 that) const { return *this op from(that); } \
+		fc auto operator op(s32 that) const { return *this op from(that); } \
+		fc auto operator op(s64 that) const { return *this op from(that); } \
+		fc friend auto operator op(u8  that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(u16 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(u32 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(u64 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(s8  that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(s16 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(s32 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
+		fc friend auto operator op(s64 that, SignedIntWithBits thiss) { return from(that) op thiss; } \
 
 	#define BP1(op) \
 		BP3(op) \
-		fc SignedIntWithBits &operator##op##=(u8  that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(u16 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(u32 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(u64 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(s8  that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(s16 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(s32 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits &operator##op##=(s64 that) { return *this op##= from(that); } \
-		fc SignedIntWithBits operator##op(SignedIntWithBits that) const { SignedIntWithBits r = *this; return r op##= that; } \
+		fc SignedIntWithBits &operator op##=(u8  that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(u16 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(u32 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(u64 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(s8  that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(s16 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(s32 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits &operator op##=(s64 that) { return *this op##= from(that); } \
+		fc SignedIntWithBits operator op(SignedIntWithBits that) const { SignedIntWithBits r = *this; return r op##= that; } \
 
 	#define BP2(op) \
 		BP3(op) \
-		fc SignedIntWithBits &operator##op##=(SignedIntWithBits that) { return *this = *this op that; } \
-		fc SignedIntWithBits &operator##op##=(u8  that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(u16 that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(u32 that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(u64 that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(s8  that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(s16 that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(s32 that) { return *this = *this op from(that); } \
-		fc SignedIntWithBits &operator##op##=(s64 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(SignedIntWithBits that) { return *this = *this op that; } \
+		fc SignedIntWithBits &operator op##=(u8  that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(u16 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(u32 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(u64 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(s8  that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(s16 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(s32 that) { return *this = *this op from(that); } \
+		fc SignedIntWithBits &operator op##=(s64 that) { return *this = *this op from(that); } \
 	
 	BP1(^)
 	BP1(&)

@@ -305,7 +305,7 @@ template <class ...Ts>
 struct TypePackIterator {
 	auto operator->*(auto fn) {
 		[&] <umm ...I>(std::index_sequence<I...>) {
-			((fn.operator()<I, TypeAt<I, Ts...>>()), ...);
+			((fn.template operator()<I, TypeAt<I, Ts...>>()), ...);
 		}(std::make_index_sequence<sizeof...(Ts)>{});
 	}
 };
@@ -1329,7 +1329,8 @@ umm count_of(Collection const &collection) {
 	}
 }
 
-auto stddev(Collection auto const &collection) {
+template <Collection Collection>
+auto stddev(Collection const &collection) {
 	using Element = ElementOf<Collection>;
 
 	auto count = count_of(collection);
