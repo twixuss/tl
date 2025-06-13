@@ -2946,8 +2946,10 @@ void reverse_in_place(Span<T> span) {
 template <umm size>
 struct BitSet {
 	using Word = umm;
+	inline static constexpr auto bit_count = size;
 	inline static constexpr auto bits_in_word = sizeof(Word) * 8;
-	Word words[ceil(size, bits_in_word) / bits_in_word] = {};
+	inline static constexpr auto word_count = ceil(size, bits_in_word) / bits_in_word;
+	Word words[word_count] = {};
 
 	bool get(umm i) const {
 		bounds_check(assert(i < size));
@@ -3017,6 +3019,12 @@ struct BitSet {
 		for (auto &word : result.words)
 			word = ~word;
 		return result;
+	}
+	inline constexpr friend BitSet operator&(BitSet a, BitSet const &b) {
+		for (umm i = 0; i < a.word_count; ++i) {
+			a.words[i] &= b.words[i];
+		}
+		return a;
 	}
 };
 
