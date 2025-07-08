@@ -1501,7 +1501,7 @@ inline FormattedBytes format_bytes(auto byte_count, FormatBytesParams params = {
 	return result;
 }
 
-inline void append(StringBuilder &builder, FormattedBytes bytes) {
+inline void append(StringBuilder &builder, FormatFloat<FormattedBytes> formatted_bytes) {
 	static constexpr Span<ascii> unit_strings[2][7] = {
 		{
 			"B"s,
@@ -1521,7 +1521,11 @@ inline void append(StringBuilder &builder, FormattedBytes bytes) {
 			"EiB"s,
 		}
 	};
-	append_format(builder, "{} {}", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
+	append_format(builder, "{} {}", formatted_bytes.with_value(formatted_bytes.value.count), unit_strings[formatted_bytes.value.kilo_is_1024][formatted_bytes.value.unit]);
+}
+
+inline void append(StringBuilder &builder, FormattedBytes bytes) {
+	append(builder, FormatFloat{.value = bytes, .precision = 3, .trailing_zeros = false});
 }
 
 #ifdef TL_IMPL
