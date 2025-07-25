@@ -1492,10 +1492,13 @@ inline FormattedBytes format_bytes(auto byte_count, FormatBytesParams params = {
 	f64 kilo = params.kilo_is_1024 ? 1024 : 1000;
 
 	f64 count = (f64)byte_count;
-	while (count > kilo) {
-		count /= kilo;
-		result.unit += 1;
+	if (!isinf(count) && !isnan(count)) {
+		while (count > kilo) {
+			count /= kilo;
+			result.unit += 1;
+		}
 	}
+
 	result.count = (f32)count;
 
 	return result;
