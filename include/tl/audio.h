@@ -91,8 +91,8 @@ Sound load_wav_from_memory(Span<u8> data) {
 }
 
 Sound load_wav_from_file(Span<utf8> path) {
-	auto file = read_entire_file(path);
-	if (!file.data) return {};
+	auto [file, ok] = read_entire_file(path);
+	if (!ok) return {};
 
 	auto data = file;
 	if (data.count < sizeof(WavHeader)) {

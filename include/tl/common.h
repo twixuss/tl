@@ -1523,7 +1523,6 @@ inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
 struct OptionalBaseTrivial {
-protected:
 	union {
 		T _value;
 	};
@@ -1535,7 +1534,6 @@ protected:
 
 template <>
 struct OptionalBaseTrivial<void> {
-protected:
 	bool _has_value;
 	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
@@ -1544,7 +1542,6 @@ protected:
 
 template <class T>
 struct OptionalBaseNonTrivial {
-protected:
 	union {
 		T _value;
 	};
@@ -1705,6 +1702,16 @@ struct Optional<void> : OptionalBaseTrivial<void> {
 
 #pragma warning(suppress: 4820)
 };
+
+template <class T> struct std::tuple_size<Optional<T>> : std::integral_constant<size_t, 2> {};
+template <class T> struct std::tuple_element<0, Optional<T>> { using type = T; };
+template <class T> struct std::tuple_element<1, Optional<T>> { using type = bool; };
+
+template <size_t i, class T>
+auto get(Optional<T> x) {
+	if constexpr (i == 0) return x._value;
+	if constexpr (i == 1) return x._has_value;
+}
 
 template <class T>
 struct IsOptionalT : std::false_type {};

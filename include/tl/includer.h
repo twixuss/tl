@@ -71,7 +71,7 @@ struct Includer {
 	List<SourceFile> source_files;
 
 	template <class Allocator, class AppendLocationInfo>
-	void load(Span<utf8> path, List<utf8, Allocator> *text, LoadOptions<AppendLocationInfo> options = {}) {
+	bool load(Span<utf8> path, List<utf8, Allocator> *text, LoadOptions<AppendLocationInfo> options = {}) {
 
 		using PathAllocator = typename SourceFile::PathAllocator;
 
@@ -103,9 +103,12 @@ struct Includer {
 			Buffer buffer;
 			Span<utf8> remaining;
 
-			void init() {
-				buffer = read_entire_file(path);
+			bool init() {
+				auto [buffer, ok] = read_entire_file(path);
+				if (!ok)
+					return false;
 				remaining = as_utf8(buffer);
+				return true;
 			}
 			void deinit() {
 				tl::free(buffer);
@@ -116,7 +119,9 @@ struct Includer {
 		defer { tl::free(state_stack); };
 
 		FileState current = {.path = path};
-		current.init();
+		if (!current.init()) {
+			return false;
+		}
 
 		while (current.remaining.count) {
 			if (auto found = find(current.remaining, options.include_directive)) {
@@ -139,7 +144,9 @@ struct Includer {
 
 				state_stack.add(current);
 				current = {.path = full_include_path};
-				current.init();
+				if (!current.init()) {
+					return false;
+				}
 
 				options.append_location_info(builder, full_include_path, 0);
 			} else {
@@ -159,6 +166,7 @@ struct Includer {
 		text->reserve(count);
 		text->count = count;
 		builder.fill(as_bytes(*text));
+		return true;
 	}
 	void free() {
 		for (auto &source_file : source_files) {
