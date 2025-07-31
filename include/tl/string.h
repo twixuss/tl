@@ -319,7 +319,7 @@ inline utf8 *get_prev_char(utf8 *ptr, utf8 *limit) {
 
 inline u8 write_utf8(utf8 **dst, u32 ch) {
 	if (ch <= 0x80) {
-		*(*dst)++ = ch;
+		*(*dst)++ = (utf8)ch;
 		return 1;
 	} else if (ch <= 0x800) {
 		*(*dst)++ = 0xC0 | ((ch >> 6) & 0x1f);
@@ -693,7 +693,7 @@ forceinline void append_bytes(StringBuilder &b, List<T, Allocator, Size> list TL
 	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
-inline void append(StringBuilder &builder, Empty) {}
+inline void append(StringBuilder &, Empty) {}
 inline void append(StringBuilder &b, ascii ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }
@@ -934,11 +934,10 @@ void write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 			break;
 		case IntFormat_kmb: {
 			if (v >= 1000) {
-				f64 f = (f64)v;
 				scoped(temporary_allocator_and_checkpoint);
 				StringBuilder builder;
 				// :appendFormatFloat:
-				append(builder, FormatFloat{.value = f, .precision = 3, .format = FloatFormat_kmb});
+				append(builder, FormatFloat{.value = (f64)v, .precision = 3, .format = FloatFormat_kmb});
 				buffer.add((Span<ascii>)builder.first.span());
 				return;
 			}
@@ -1254,8 +1253,8 @@ inline void escape_c_string(Span<utf8> string, auto write) {
 	StaticList<utf8, buffer_capacity> buffer;
 	for (auto ch : string) {
 		auto escaped = escape_c_character((char)ch);
-		for (auto ch : escaped) {
-			buffer.add(ch); 
+		for (auto ech : escaped) {
+			buffer.add(ech); 
 			if (buffer.count == buffer.capacity) {
 				write(buffer.span());
 				buffer.clear();
