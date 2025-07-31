@@ -315,6 +315,12 @@ template <class T> inline constexpr u32 dimension_of<v2<T>> = 2;
 template <class T> inline constexpr u32 dimension_of<v3<T>> = 3;
 template <class T> inline constexpr u32 dimension_of<v4<T>> = 4;
 
+template <class T> struct ScalarOfT { using Type = T; };
+template <class T> struct ScalarOfT<v2<T>> { using Type = T; };
+template <class T> struct ScalarOfT<v3<T>> { using Type = T; };
+template <class T> struct ScalarOfT<v4<T>> { using Type = T; };
+template <class T> using ScalarOf = typename ScalarOfT<T>::Type;
+
 template <class T>
 struct Is_v2 : std::false_type {};
 template <class T>
