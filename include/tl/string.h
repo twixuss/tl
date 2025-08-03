@@ -1499,6 +1499,9 @@ inline static constexpr NumberAbbreviationUnits abbrev_kb = {1000, array_as_span
 inline static constexpr Span<utf8> abbrev_kib_strings[] = {u8"B"s, u8"KiB"s, u8"MiB"s, u8"GiB"s, u8"TiB"s, u8"PiB"s, u8"EiB"s};
 inline static constexpr NumberAbbreviationUnits abbrev_kib = {1024, array_as_span(abbrev_kib_strings)};
 
+inline static constexpr Span<utf8> abbrev_text_strings[] = {u8""s, u8"thousand"s, u8"million"s, u8"billion"s, u8"trillion"s, u8"quadrillion"s};
+inline static constexpr NumberAbbreviationUnits abbrev_text = {1000, array_as_span(abbrev_text_strings)};
+
 inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &units, NumberAbbreviationOptions options = {}) {
 	bool ok = !isinf(value) && !isnan(value);
 
