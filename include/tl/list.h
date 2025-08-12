@@ -64,6 +64,14 @@ struct List : Span<T, Size_> {
 		count += list.size();
 		return {data + count - list.size(), (Size)list.size()};
 	}
+	T &add(Repeat<T> repeat TL_LP) {
+		reserve_exponential(count + repeat.count TL_LA);
+		for (umm i = 0; i < repeat.count; ++i) {
+			memcpy(data + count + i, &repeat.value, sizeof(T));
+		}
+		count += repeat.count;
+		return data[count - 1];
+	}
 
 	// Moves the data! Slow!
 	T &add_front(T value TL_LP) {

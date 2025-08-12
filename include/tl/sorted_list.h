@@ -4,7 +4,13 @@
 
 namespace tl {
 
-template <class T, auto sort_by = identity_value, class Allocator = Allocator, class Size = umm>
+template <
+	class T,
+	auto map = identity_value,
+	auto compare = [](decltype(map(*(T *)0)) a, decltype(a) b) { return compare(a, b); },
+	class Allocator = Allocator,
+	class Size = umm
+>
 struct SortedList : private List<T, Allocator, Size> {
 	using Base = List<T, Allocator, Size>;
 
@@ -17,11 +23,38 @@ struct SortedList : private List<T, Allocator, Size> {
 	using Base::span;
 	using Base::clear;
 	using Base::pop;
+	using Base::iter;
+	using Base::erase;
+	using Base::erase_at;
 	using Base::operator[];
 
 	void add(T value TL_LP) {
 		Base::reserve(count + 1);
-		Base::insert(value, binary_search(Base::span(), value, sort_by).would_be_at);
+		auto search_result = binary_search(Base::span(), [&](T &it) {
+			return compare(map(value), map(it));
+		});
+		Base::insert(value, search_result.would_be_at);
+	}
+	
+	T *find(T value) {
+		return search(value).found;
+	}
+	
+	BinarySearchResult<T> search(T value) {
+		return binary_search(Base::span(), [&](T &it) {
+			return compare(map(value), map(it));
+		});
+	}
+
+	template <class U>
+	T *find(U value)
+		requires requires {
+			{ map(data[0]) } -> std::same_as<U>;
+		}
+	{
+		return binary_search(Base::span(), [&](T &it) {
+			return compare(value, map(it));
+		}).found;
 	}
 };
 

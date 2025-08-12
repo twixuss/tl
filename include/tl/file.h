@@ -131,11 +131,15 @@ inline bool write_entire_file(Span<Char> path, Data const &data, WriteEntireFile
 	return write(file, data) != 0;
 }
 
+struct GetFileWriteTimeOptions {
+	bool silent = false;
+};
+
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
 TL_API Optional<u64> get_file_write_time(File file);
 template <AChar Char>
-inline Optional<u64> get_file_write_time(Span<Char> path) {
-	auto file = open_file(path, {});
+inline Optional<u64> get_file_write_time(Span<Char> path, GetFileWriteTimeOptions options = {}) {
+	auto file = open_file(path, {.silent = options.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return get_file_write_time(file);
@@ -442,7 +446,6 @@ TL_API List<utf8> get_executable_path(bool null_terminated = false TL_LP);
 
 struct MoveFileParams {
 	bool replace_existing = false;
-	bool allow_copy = true;
 };
 
 TL_API bool move_file(Span<utf8> source, Span<utf8> destination, MoveFileParams params = {});
@@ -1056,8 +1059,7 @@ bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams param
 	scoped(temporary_allocator_and_checkpoint);
 	auto source16 = to_utf16(source8, true);
 	auto destination16 = to_utf16(destination8, true);
-	DWORD flags = 0;
-	if (params.allow_copy)       flags |= MOVEFILE_COPY_ALLOWED;
+	DWORD flags = MOVEFILE_COPY_ALLOWED;
 	if (params.replace_existing) flags |= MOVEFILE_REPLACE_EXISTING;
 	return MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags);
 }

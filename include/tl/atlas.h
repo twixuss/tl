@@ -84,6 +84,7 @@ struct Atlas {
 					memcpy(dst, src, size.x * sizeof(Element));
 				}
 
+				cursor = {size.x, 0};
 				cursor_min_x = size.x;
 
 				size.x *= 2;

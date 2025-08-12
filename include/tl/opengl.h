@@ -1396,80 +1396,103 @@ inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 ind
 
 inline void use_shader(GLuint shader) { glUseProgram(shader); }
 
-template <class T, class Index = umm>
+template <class T, bool use_bind_api = false>
 struct GrowingBuffer {
+	GLuint buffer = 0;
+	umm count = 0;
+	umm capacity = 0;
+	GLenum usage = 0;
+	
 	void add(T value) {
-		reserve(size + 1);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), sizeof(T), &value);
-		++size;
+		reserve(count + 1);
+		bufferSubData(buffer, count * sizeof(T), sizeof(T), &value);
+		++count;
 	}
 
 	void add(Span<T> span) {
-		reserve(size + span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), span.size * sizeof(T), span.data);
-		size += span.size;
+		reserve(count + span.count);
+		bufferSubData(buffer, count * sizeof(T), span.count * sizeof(T), span.data);
+		count += span.count;
 	}
-	void add(std::initializer_list<T> list) { add(as_span(list)); }
-	void set(Index index, T value) {
-		bounds_check(assert(index < size));
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
+	void add(std::initializer_list<T> list) {
+		add(as_span(list));
 	}
-	void set(Index start, Span<T> span) {
-		bounds_check(assert(start + span.size - 1 < size));
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
+	void set(Span<T> span) {
+		reserve(span.count);
+		bufferSubData(buffer, 0, span.count * sizeof(T), span.data);
+		count = span.count;
 	}
-	void reset(Span<T> span) {
-		reserve(span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, 0, span.size * sizeof(T), span.data);
-		size = span.size;
+	void set_at(umm index, T value) {
+		bounds_check(assert(index < count));
+		bufferSubData(buffer, index * sizeof(T), sizeof(T), &value);
 	}
-	void init() {
-		if (!buffer) {
-			glGenBuffers(1, &buffer);
-		}
+	void set_at(umm start, Span<T> span) {
+		bounds_check(assert(start + span.count - 1 < count));
+		bufferSubData(buffer, start * sizeof(T), span.count * sizeof(T), span.data);
 	}
 	void clear() {
-		size = 0;
+		count = 0;
 	}
-	void reserve(Index amount) {
+	void reserve(umm amount) {
 		if (amount <= capacity)
 			return;
+		
+		umm new_capacity = ceil_to_power_of_2(amount);
+		
+		if (buffer) {
+			resizeBuffer(&buffer, capacity * sizeof(T), new_capacity * sizeof(T), usage);
+		} else {
+			buffer = genBuffer();
+			bufferData(buffer, new_capacity * sizeof(T), 0, usage);
+		}
 
-		Index new_capacity = max(capacity, 1);
-		while (new_capacity < amount) new_capacity *= 2;
-
-		GLuint new_buffer;
-		glGenBuffers(1, &new_buffer);
-
-		glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
-		glBufferData(GL_COPY_WRITE_BUFFER, new_capacity * sizeof(T), 0, usage);
-
-		glBindBuffer(GL_COPY_READ_BUFFER, buffer);
-
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, capacity * sizeof(T));
-
-		glDeleteBuffers(1, &buffer);
-
-		buffer = new_buffer;
 		capacity = new_capacity;
 	}
 
-	GrowingBuffer &operator=(Span<T> span) {
-		reserve(span.size);
-		size = span.size;
-		set(0, span);
-		return *this;
+	//
+	// Wrappers for bound/named access
+	//
+	static GLuint genBuffer() {
+		GLuint result;
+		if constexpr (use_bind_api) {
+			glGenBuffers(1, &result);
+		} else {
+			glCreateBuffers(1, &result);
+		}
+		return result;
 	}
+	static void bufferData(GLuint buffer, GLsizeiptr size, const GLvoid *data, GLenum usage) {
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferData(GL_COPY_WRITE_BUFFER, size, data, usage);
+		} else {
+			glNamedBufferData(buffer, size, data, usage);
+		}
+	}
+	static void bufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size, const GLvoid *data) {
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferSubData(GL_COPY_WRITE_BUFFER, offset, size, data);
+		} else {
+			glNamedBufferSubData(buffer, offset, size, data);
+		}
+	}
+	static void resizeBuffer(GLuint *old_buffer, GLsizeiptr old_size, GLsizeiptr new_size, GLenum usage) {
+		GLuint new_buffer = genBuffer();
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
+			glBufferData(GL_COPY_WRITE_BUFFER, new_size, 0, usage);
 
-	Index size = 0;
-	Index capacity = 0;
-	GLuint buffer = 0;
-	GLenum usage = 0;
+			glBindBuffer(GL_COPY_READ_BUFFER, *old_buffer);
+			glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, old_size);
+		} else {
+			glNamedBufferData(new_buffer, new_size, 0, usage);
+
+			glCopyNamedBufferSubData(*old_buffer, new_buffer, 0, 0, old_size);
+		}
+		glDeleteBuffers(1, old_buffer);
+		*old_buffer = new_buffer;
+	}
 };
 
 template <class T>

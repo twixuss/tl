@@ -94,13 +94,19 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 namespace tl {
 
 static OsLock debug_lock;
+static bool debug_initialized = false;
 
 bool debug_init() {
+	if (debug_initialized)
+		return true;
+
 	scoped(debug_lock);
 	if (!SymInitialize(GetCurrentProcess(), 0, true)) {
 		TL_GET_CURRENT(logger).error("SymInitialize failed: {}", win32_error());
 		return false;
 	}
+
+	debug_initialized = true;
 
 	DWORD options = SymGetOptions();
 	SymSetOptions((options & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_DEBUG);
@@ -168,6 +174,10 @@ bool debug_add_module(void *module, Span<char> path) {
 	// I wasted way too much time on this function...
 	// I thought module handle would be enough.
 	// And SymLoadModuleEx was succeeding but SymFromAddr was failing with ERROR_MOD_NOT_FOUND ??? Like wtf.
+
+	if (!debug_initialized) {
+		return false;
+	}
 
 	scoped(debug_lock);
 
