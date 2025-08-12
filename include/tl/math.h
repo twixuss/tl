@@ -1917,12 +1917,12 @@ struct RaycastHit {
 };
 
 template <class Vector>
-RaycastHit<Vector> min(RaycastHit<Vector> a, RaycastHit<Vector> b) {
+forceinline constexpr RaycastHit<Vector> min(RaycastHit<Vector> a, RaycastHit<Vector> b) {
 	return a.distance < b.distance ? a : b;
 }
 
 template <class Vector>
-Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<RaycastHit<Vector>> b) {
+forceinline constexpr Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<RaycastHit<Vector>> b) {
 	if (a) {
 		if (b) {
 			return a.value().distance < b.value().distance ? a : b;
@@ -1935,6 +1935,24 @@ Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<Raycas
 		} else {
 			return {};
 		}
+	}
+}
+
+template <class Vector>
+forceinline constexpr Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, RaycastHit<Vector> b) {
+	if (a) {
+		return a.value().distance < b.distance ? a : b;
+	} else {
+		return b;
+	}
+}
+
+template <class Vector>
+forceinline constexpr Optional<RaycastHit<Vector>> min(RaycastHit<Vector> a, Optional<RaycastHit<Vector>> b) {
+	if (b) {
+		return a.distance < b.value().distance ? a : b;
+	} else {
+		return a;
 	}
 }
 
@@ -2664,7 +2682,7 @@ template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclam
 #endif
 
 template <class T>
-tl::u64 get_hash(tl::aabb<T> const &x) {
+constexpr tl::u64 get_hash(tl::aabb<T> const &x) {
 	return 
 		get_hash(x.min) * 13043817825332782231ull +
 		get_hash(x.max) * 6521908912666391129ull;

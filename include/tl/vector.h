@@ -394,20 +394,20 @@ inline void append(StringBuilder &builder, v4<T> v) {
 }
 
 template <class T>
-tl::u64 get_hash(tl::v2<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v2<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull;
 }
 template <class T>
-tl::u64 get_hash(tl::v3<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v3<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull +
 		get_hash(v.z) * 3260954456333195593ull;
 }
 template <class T>
-tl::u64 get_hash(tl::v4<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v4<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull +

@@ -248,7 +248,9 @@ struct StaticList {
 		std::pair<umm, Value &> key_value() { return {key(), value()}; }
 	};
 	
-	auto iter(this auto &&self, ReverseIterOption options = {}) {
+	using IterOptions = ReverseIterOption;
+
+	auto iter(this auto &&self, IterOptions options = {}) {
 		auto start = self.data;
 		auto end = self.data + self.count;
 		return Iter<tl_self_const>{

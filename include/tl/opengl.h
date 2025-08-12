@@ -1400,12 +1400,12 @@ inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 ind
 
 inline void use_shader(GLuint shader) { glUseProgram(shader); }
 
-template <class T, bool use_bind_api = false>
+template <class T, bool use_bind_api = false, umm growth_numer = 3, umm growth_denom = 2>
 struct GrowingBuffer {
 	GLuint buffer = 0;
 	umm count = 0;
 	umm capacity = 0;
-	GLenum usage = 0;
+	GLenum usage = GL_DYNAMIC_DRAW;
 	
 	void add(T value) {
 		reserve(count + 1);
@@ -1414,16 +1414,20 @@ struct GrowingBuffer {
 	}
 
 	void add(Span<T> span) {
-		reserve(count + span.count);
-		bufferSubData(buffer, count * sizeof(T), span.count * sizeof(T), span.data);
+		if (span.count) {
+			reserve(count + span.count);
+			bufferSubData(buffer, count * sizeof(T), span.count * sizeof(T), span.data);
+		}
 		count += span.count;
 	}
 	void add(std::initializer_list<T> list) {
 		add(as_span(list));
 	}
 	void set(Span<T> span) {
-		reserve(span.count);
-		bufferSubData(buffer, 0, span.count * sizeof(T), span.data);
+		if (span.count) {
+			reserve(span.count);
+			bufferSubData(buffer, 0, span.count * sizeof(T), span.data);
+		}
 		count = span.count;
 	}
 	void set_at(umm index, T value) {
@@ -1441,7 +1445,7 @@ struct GrowingBuffer {
 		if (amount <= capacity)
 			return;
 		
-		umm new_capacity = ceil_to_power_of_2(amount);
+		umm new_capacity = max(amount, (umm)1) * growth_numer / growth_denom;
 		
 		if (buffer) {
 			resizeBuffer(&buffer, capacity * sizeof(T), new_capacity * sizeof(T), usage);
@@ -1494,6 +1498,7 @@ struct GrowingBuffer {
 
 			glCopyNamedBufferSubData(*old_buffer, new_buffer, 0, 0, old_size);
 		}
+		//glInvalidateBufferData(old_buffer);
 		glDeleteBuffers(1, old_buffer);
 		*old_buffer = new_buffer;
 	}
