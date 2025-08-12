@@ -218,8 +218,8 @@ template <class T> inline constexpr bool is_unsigned = std::is_unsigned_v<T>;
 template <class T> inline constexpr bool is_float = std::is_floating_point_v<T>;
 
 struct Empty {};
-constexpr bool operator==(Empty a, Empty b) { return true; }
-constexpr bool operator!=(Empty a, Empty b) { return false; }
+constexpr bool operator==(Empty, Empty) { return true; }
+constexpr bool operator!=(Empty, Empty) { return false; }
 
 inline umm noop() { return 0; }
 
@@ -454,6 +454,36 @@ forceinline constexpr To convert(From from) {
 	}
 }
 
+forceinline constexpr smm compare(bool a, bool b) { return (s8)a - (s8)b; }
+forceinline constexpr smm compare(u8  a, u8  b) { return (s8 )a - (s8 )b; }
+forceinline constexpr smm compare(u16 a, u16 b) { return (s16)a - (s16)b; }
+forceinline constexpr smm compare(u32 a, u32 b) { return (s32)a - (s32)b; }
+forceinline constexpr smm compare(u64 a, u64 b) { return (s64)a - (s64)b; }
+forceinline constexpr smm compare(s8  a, s8  b) { return a - b; }
+forceinline constexpr smm compare(s16 a, s16 b) { return a - b; }
+forceinline constexpr smm compare(s32 a, s32 b) { return a - b; }
+forceinline constexpr smm compare(s64 a, s64 b) { return a - b; }
+forceinline constexpr smm compare(f32 a, f32 b) { return a < b ? -1 : a > b ? 1 : 0; }
+forceinline constexpr smm compare(f64 a, f64 b) { return a < b ? -1 : a > b ? 1 : 0; }
+
+template <class T>
+forceinline constexpr smm compare(T a, T b) {
+	if constexpr (requires { { a - b } -> std::signed_integral; }) {
+		return a - b;
+	} else {
+		return a < b ? -1 : a > b ? 1 : 0;
+	}
+}
+
+template <class Compare, class T>
+concept ACompare = requires (Compare compare, T t) {
+	{ compare(t, t) } -> std::signed_integral;
+};
+
+template <class Compare, class T>
+concept ACompare1 = requires (Compare compare, T t) {
+	{ compare(t) } -> std::signed_integral;
+};
 
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }
@@ -817,7 +847,7 @@ constexpr u8 count_trailing_zeros(u8 x) {
 	u32 b2 = (y & 0x0F) ? 0 : 4;
 	u32 b1 = (y & 0x33) ? 0 : 2;
 	u32 b0 = (y & 0x55) ? 0 : 1;
-	return bz + b2 + b1 + b0;
+	return (u8)(bz + b2 + b1 + b0);
 }
 constexpr u16 count_trailing_zeros(u16 x) {
 	u16 y = x & (u16)-(s16)x;
@@ -826,7 +856,7 @@ constexpr u16 count_trailing_zeros(u16 x) {
 	u32 b2 = (y & 0x0F0F) ? 0 : 4;
 	u32 b1 = (y & 0x3333) ? 0 : 2;
 	u32 b0 = (y & 0x5555) ? 0 : 1;
-	return bz + b3 + b2 + b1 + b0;
+	return (u16)(bz + b3 + b2 + b1 + b0);
 }
 constexpr u32 count_trailing_zeros(u32 x) {
 	u32 y = x & (u32)-(s32)x;
@@ -2318,6 +2348,36 @@ umm count(Span<T, Size> span, Fn &&fn) {
 	return result;
 }
 
+template <class T, class Size>
+constexpr smm compare(Span<T, Size> a, Span<T, Size> b) {
+	if (a.count != b.count) {
+		return a.count - b.count;
+	}
+
+	for (umm i = 0; i < a.count; ++i) {
+		if (a.data[i] != b.data[i])
+			return compare(a.data[i], b.data[i]);
+	}
+
+	return 0;
+}
+
+template <class T, class Size>
+smm compare_lexical(Span<T, Size> a, Span<T, Size> b) {
+	umm min_count = min(a.count, b.count);
+
+	for (umm i = 0; i < min_count; ++i) {
+		if (a.data[i] != b.data[i])
+			return compare(a.data[i], b.data[i]);
+	}
+	
+	if (a.count != b.count) {
+		return a.count - b.count;
+	}
+
+	return 0;
+}
+
 template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
 inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
 	if (sub_str.count > str.count)
@@ -2363,6 +2423,24 @@ constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
 		if (where_part == what) {
 			return where_part.data;
 		}
+	}
+	return 0;
+}
+
+template <class T, class SizeA, class SizeB>
+constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what, auto &&compare) {
+	if ((smm)(where.count - what.count + 1) <= 0)
+		return 0;
+
+	for (umm i = 0; i < where.count - what.count + 1; ++i) {
+		auto window = where.data + i;
+		for (umm j = 0; j < what.count; ++j) {
+			if (!compare(window[j], what.data[j])) {
+				goto continue_outer;
+			}
+		}
+		return window;
+	continue_outer:;
 	}
 	return 0;
 }
@@ -2572,8 +2650,8 @@ struct BinarySearchResult {
 	T *would_be_at = 0;
 };
 
-template <class T, class U, class Fn>
-BinarySearchResult<T> binary_search(Span<T> span, U value, Fn get_value) {
+template <class T>
+BinarySearchResult<T> binary_search(Span<T> span, ACompare1<T> auto compare) {
 	auto begin = span.begin();
 	auto end   = span.end();
 	while (1) {
@@ -2581,10 +2659,13 @@ BinarySearchResult<T> binary_search(Span<T> span, U value, Fn get_value) {
 			return {.would_be_at = begin};
 
 		auto mid = begin + (end - begin) / 2;
-		if (value == get_value(*mid))
+
+		auto c = compare(*mid);
+
+		if (c == 0)
 			return {.found = mid, .would_be_at = mid};
 
-		if (value < get_value(*mid)) {
+		if (c < 0) {
 			end = mid;
 		} else {
 			begin = mid + 1;
@@ -2593,8 +2674,18 @@ BinarySearchResult<T> binary_search(Span<T> span, U value, Fn get_value) {
 }
 
 template <class T>
+BinarySearchResult<T> binary_search(Span<T> span, T value, ACompare<T> auto compare) {
+	return binary_search(span, [&](T it) { return compare(value, it); });
+}
+
+template <class T>
 BinarySearchResult<T> binary_search(Span<T> span, T value) {
-	return binary_search(span, value, [](T &value) -> T & { return value; });
+	return binary_search(span, [&](T it) { return compare(value, it); });
+}
+
+template <class T, class U>
+BinarySearchResult<T> binary_search(Span<T> span, U value, Callable<U, T> auto map) {
+	return binary_search(span, [&](T it) { return compare(value, map(it)); });
 }
 
 template <class T, class Size>
@@ -2785,7 +2876,7 @@ constexpr T dot(Span<T> a, Span<T> b) {
 	return result;
 }
 
-#define passthrough(function) ([&](auto ...args){ return function(args...); })
+#define passthrough(function) ([&]<class ...Args>(Args &&...args) -> decltype(auto) { return function(std::forward<Args>(args)...); })
 
 inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
@@ -2831,9 +2922,9 @@ inline constexpr bool is_hex_digit(utf32 c) {
 	     | ((u32)(c - 'A') < 6);
 }
 inline constexpr Optional<u8> hex_digit_to_int(utf32 c) {
-	if (c >= '0' && c <= '9') return c - '0';
-	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
-	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= '0' && c <= '9') return (u8)(c - '0');
+	if (c >= 'a' && c <= 'f') return (u8)(c - 'a' + 10);
+	if (c >= 'A' && c <= 'F') return (u8)(c - 'A' + 10);
 	return {};
 }
 
@@ -2844,7 +2935,7 @@ inline constexpr u8 hex_digit_to_int_unchecked(utf32 c) {
     a = b < 16 ? b : a;
     b = c - '0';
     a = b < 10 ? b : a;
-    return a;
+    return (u8)a;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {
@@ -3893,6 +3984,7 @@ namespace tl {
 			};
 		}
 		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			(void)old_size;
 			return {
 				.data = ::_aligned_realloc(data, new_size, alignment),
 				.count = new_size,
@@ -3900,6 +3992,8 @@ namespace tl {
 			};
 		}
 		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			(void)size;
+			(void)alignment;
 			::_aligned_free(data);
 		}
 	#elif COMPILER_GCC

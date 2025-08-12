@@ -19,7 +19,7 @@ x(info) \
 x(warning) \
 x(error) \
 
-enum class LogSeverity {
+enum class LogSeverity : u8 {
 	#define x(name) name,
 	TL_ENUMERATE_LOGGER_SEVERITIES
 	#undef x
@@ -46,13 +46,13 @@ inline ConsoleColor to_color(LogSeverity severity) {
 
 template <class Derived>
 struct LoggerBase {
-	inline void log(LogSeverity severity, auto ...args) {
+	inline void log(LogSeverity severity, auto &&...args) {
 		derived().impl(severity, (Span<utf8>)(TL_TMP(tl::format(args...))));
 	}
-	inline void debug  (auto ...args) { log(LogSeverity::debug,   args...); }
-	inline void info   (auto ...args) { log(LogSeverity::info,    args...); }
-	inline void warning(auto ...args) { log(LogSeverity::warning, args...); }
-	inline void error  (auto ...args) { log(LogSeverity::error,   args...); }
+	inline void debug  (auto &&...args) { log(LogSeverity::debug,   args...); }
+	inline void info   (auto &&...args) { log(LogSeverity::info,    args...); }
+	inline void warning(auto &&...args) { log(LogSeverity::warning, args...); }
+	inline void error  (auto &&...args) { log(LogSeverity::error,   args...); }
 
 	Derived &derived() { return *(Derived *)this; }
 };
@@ -78,13 +78,13 @@ extern TL_API thread_local Logger current_logger;
 
 namespace global_log {
 
-inline void log(LogSeverity severity, char const *format, auto ...args) {
+inline void log(LogSeverity severity, char const *format, auto &&...args) {
 	current_logger.log(severity, format, args...);
 }
-inline void log_debug  (char const *format, auto ...args) { current_logger.debug  (format, args...); }
-inline void log_info   (char const *format, auto ...args) { current_logger.info   (format, args...); }
-inline void log_warning(char const *format, auto ...args) { current_logger.warning(format, args...); }
-inline void log_error  (char const *format, auto ...args) { current_logger.error  (format, args...); }
+inline void log_debug  (char const *format, auto &&...args) { current_logger.debug  (format, args...); }
+inline void log_info   (char const *format, auto &&...args) { current_logger.info   (format, args...); }
+inline void log_warning(char const *format, auto &&...args) { current_logger.warning(format, args...); }
+inline void log_error  (char const *format, auto &&...args) { current_logger.error  (format, args...); }
 
 }
 
