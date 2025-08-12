@@ -40,7 +40,7 @@ void c_tokenizer_test() {
 
 	auto path = as_utf8(as_span(__FILE__));
 	
-	auto source = (Span<char>)read_entire_file(path);
+	auto source = (Span<char>)read_entire_file(path).value();
 
 	auto t = Tokenizer::create(source);
 
@@ -176,7 +176,7 @@ void speed_test() {
 		if (!ends_with(path, u8".h"s) && !ends_with(path, u8".c"s) && !ends_with(path, u8".cpp"s))
 			return;
 		println(path);
-		auto source = (Span<char>)read_entire_file(path);
+		auto source = (Span<char>)read_entire_file(path).value();
 		if (starts_with(source, "\xEF\xBB\xBF"s)) {
 			source = source.skip(3);
 		}
@@ -196,10 +196,10 @@ void speed_test() {
 		for (auto file : source_files) {
 			print("\r{} / {}", i++, source_files.count);
 			//println(file.path);
-			//auto source = (Span<char>)read_entire_file(path);
-			//auto source = (Span<char>)read_entire_file("F:\\projects\\simplex\\dep\\tl\\include\\tl\\c_t.h"s);
-			//auto source = (Span<char>)read_entire_file("F:\\projects\\simplex\\dep\\tl\\src\\tests\\c_t.cpp"s);
-			//auto source = (Span<char>)read_entire_file("C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.18362.0\\um\\MShtml.h"s);
+			//auto source = (Span<char>)read_entire_file(path).value();
+			//auto source = (Span<char>)read_entire_file("F:\\projects\\simplex\\dep\\tl\\include\\tl\\c_t.h"s).value();
+			//auto source = (Span<char>)read_entire_file("F:\\projects\\simplex\\dep\\tl\\src\\tests\\c_t.cpp"s).value();
+			//auto source = (Span<char>)read_entire_file("C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.18362.0\\um\\MShtml.h"s).value();
 			auto source = file.source;
 
 			auto t = Tokenizer::create(source);

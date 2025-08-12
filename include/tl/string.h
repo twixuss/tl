@@ -319,7 +319,7 @@ inline utf8 *get_prev_char(utf8 *ptr, utf8 *limit) {
 
 inline u8 write_utf8(utf8 **dst, u32 ch) {
 	if (ch <= 0x80) {
-		*(*dst)++ = ch;
+		*(*dst)++ = (utf8)ch;
 		return 1;
 	} else if (ch <= 0x800) {
 		*(*dst)++ = 0xC0 | ((ch >> 6) & 0x1f);
@@ -693,7 +693,7 @@ forceinline void append_bytes(StringBuilder &b, List<T, Allocator, Size> list TL
 	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
-inline void append(StringBuilder &builder, Empty) {}
+inline void append(StringBuilder &, Empty) {}
 inline void append(StringBuilder &b, ascii ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }
@@ -934,11 +934,10 @@ void write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 			break;
 		case IntFormat_kmb: {
 			if (v >= 1000) {
-				f64 f = (f64)v;
 				scoped(temporary_allocator_and_checkpoint);
 				StringBuilder builder;
 				// :appendFormatFloat:
-				append(builder, FormatFloat{.value = f, .precision = 3, .format = FloatFormat_kmb});
+				append(builder, FormatFloat{.value = (f64)v, .precision = 3, .format = FloatFormat_kmb});
 				buffer.add((Span<ascii>)builder.first.span());
 				return;
 			}
@@ -1254,8 +1253,8 @@ inline void escape_c_string(Span<utf8> string, auto write) {
 	StaticList<utf8, buffer_capacity> buffer;
 	for (auto ch : string) {
 		auto escaped = escape_c_character((char)ch);
-		for (auto ch : escaped) {
-			buffer.add(ch); 
+		for (auto ech : escaped) {
+			buffer.add(ech); 
 			if (buffer.count == buffer.capacity) {
 				write(buffer.span());
 				buffer.clear();
@@ -1474,55 +1473,66 @@ List<utf8, Allocator> to_string(T const &value) {
 	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current());
 }
 
-struct FormattedBytes {
-	f32 count;
+struct NumberAbbreviation {
+	f64 value;
+	Span<utf8> between_value_and_unit = u8" "s;
 	u8 unit;
-	bool kilo_is_1024;
+	Span<Span<utf8>> const *unit_table;
 };
+
+struct NumberAbbreviationUnits {
+	f64 divisor;
+	Span<Span<utf8>> unit_table;
+};
+
+struct NumberAbbreviationOptions {
+	Span<utf8> between_value_and_unit = u8" "s;
+};
+
+inline static constexpr Span<utf8> abbrev_k_strings[] = {u8""s, u8"K"s, u8"M"s, u8"B"s, u8"T"s, u8"Q"s};
+inline static constexpr NumberAbbreviationUnits abbrev_k = {1000, array_as_span(abbrev_k_strings)};
+
+inline static constexpr Span<utf8> abbrev_kb_strings[] = {u8"B"s, u8"KB"s, u8"MB"s, u8"GB"s, u8"TB"s, u8"PB"s, u8"EB"s};
+inline static constexpr NumberAbbreviationUnits abbrev_kb = {1000, array_as_span(abbrev_kb_strings)};
+
+inline static constexpr Span<utf8> abbrev_kib_strings[] = {u8"B"s, u8"KiB"s, u8"MiB"s, u8"GiB"s, u8"TiB"s, u8"PiB"s, u8"EiB"s};
+inline static constexpr NumberAbbreviationUnits abbrev_kib = {1024, array_as_span(abbrev_kib_strings)};
+
+inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &units, NumberAbbreviationOptions options = {}) {
+	bool ok = !isinf(value) && !isnan(value);
+
+	u8 unit = 0;
+	if (ok) {
+		while (value > units.divisor) {
+			value /= units.divisor;
+			unit += 1;
+		}
+	}
+
+	return {
+		.value = value,
+		.between_value_and_unit = options.between_value_and_unit,
+		.unit = unit,
+		.unit_table = &units.unit_table,
+	};
+}
+inline void append(StringBuilder &builder, FormatFloat<NumberAbbreviation> abbrev) {
+	append_format(builder, "{}{}{}", abbrev.with_value(abbrev.value.value), abbrev.value.between_value_and_unit, (*abbrev.value.unit_table)[abbrev.value.unit]);
+}
+
+inline void append(StringBuilder &builder, NumberAbbreviation abbrev) {
+	append(builder, FormatFloat{.value = abbrev, .precision = 3, .trailing_zeros = false});
+}
+
 
 struct FormatBytesParams {
 	bool kilo_is_1024 = true;
 };
 
-inline FormattedBytes format_bytes(auto byte_count, FormatBytesParams params = {}) {
-	FormattedBytes result{};
-
-	result.kilo_is_1024 = params.kilo_is_1024;
-
-	f64 kilo = params.kilo_is_1024 ? 1024 : 1000;
-
-	f64 count = (f64)byte_count;
-	while (count > kilo) {
-		count /= kilo;
-		result.unit += 1;
-	}
-	result.count = (f32)count;
-
-	return result;
+inline NumberAbbreviation format_bytes(auto byte_count, FormatBytesParams params = {}) {
+	return abbreviate(byte_count, params.kilo_is_1024 ? abbrev_kib : abbrev_kb, {.between_value_and_unit = u8" "s});
 }
 
-inline void append(StringBuilder &builder, FormattedBytes bytes) {
-	static constexpr Span<ascii> unit_strings[2][7] = {
-		{
-			"B"s,
-			"KB"s,
-			"MB"s,
-			"GB"s,
-			"TB"s,
-			"PB"s,
-			"EB"s,
-		}, {
-			"B"s,
-			"KiB"s,
-			"MiB"s,
-			"GiB"s,
-			"TiB"s,
-			"PiB"s,
-			"EiB"s,
-		}
-	};
-	append_format(builder, "{} {}", FormatFloat{.value = bytes.count, .precision = 3, .trailing_zeros = false}, unit_strings[bytes.kilo_is_1024][bytes.unit]);
-}
 
 #ifdef TL_IMPL
 

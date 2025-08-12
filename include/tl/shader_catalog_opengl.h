@@ -168,8 +168,8 @@ Buffer load_shader_file(Span<pathchar> terminated_full_path) {
 
 	auto pre_include_line_directive = format("#line 0 \"{}\"\n", full_path);
 
-	auto buffer = read_entire_file(terminated_full_path, pre_include_line_directive.size, 1);
-	if (!buffer.data) {
+	auto [buffer, ok] = read_entire_file(terminated_full_path, pre_include_line_directive.size, 1);
+	if (!ok) {
 		print("#included file '{}' does not exist\n", full_path);
 	}
 

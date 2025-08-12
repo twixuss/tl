@@ -218,8 +218,8 @@ template <class T> inline constexpr bool is_unsigned = std::is_unsigned_v<T>;
 template <class T> inline constexpr bool is_float = std::is_floating_point_v<T>;
 
 struct Empty {};
-constexpr bool operator==(Empty a, Empty b) { return true; }
-constexpr bool operator!=(Empty a, Empty b) { return false; }
+constexpr bool operator==(Empty, Empty) { return true; }
+constexpr bool operator!=(Empty, Empty) { return false; }
 
 inline umm noop() { return 0; }
 
@@ -847,7 +847,7 @@ constexpr u8 count_trailing_zeros(u8 x) {
 	u32 b2 = (y & 0x0F) ? 0 : 4;
 	u32 b1 = (y & 0x33) ? 0 : 2;
 	u32 b0 = (y & 0x55) ? 0 : 1;
-	return bz + b2 + b1 + b0;
+	return (u8)(bz + b2 + b1 + b0);
 }
 constexpr u16 count_trailing_zeros(u16 x) {
 	u16 y = x & (u16)-(s16)x;
@@ -856,7 +856,7 @@ constexpr u16 count_trailing_zeros(u16 x) {
 	u32 b2 = (y & 0x0F0F) ? 0 : 4;
 	u32 b1 = (y & 0x3333) ? 0 : 2;
 	u32 b0 = (y & 0x5555) ? 0 : 1;
-	return bz + b3 + b2 + b1 + b0;
+	return (u16)(bz + b3 + b2 + b1 + b0);
 }
 constexpr u32 count_trailing_zeros(u32 x) {
 	u32 y = x & (u32)-(s32)x;
@@ -1553,7 +1553,6 @@ inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
 struct OptionalBaseTrivial {
-protected:
 	union {
 		T _value;
 	};
@@ -1565,7 +1564,6 @@ protected:
 
 template <>
 struct OptionalBaseTrivial<void> {
-protected:
 	bool _has_value;
 	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
@@ -1574,7 +1572,6 @@ protected:
 
 template <class T>
 struct OptionalBaseNonTrivial {
-protected:
 	union {
 		T _value;
 	};
@@ -1735,6 +1732,16 @@ struct Optional<void> : OptionalBaseTrivial<void> {
 
 #pragma warning(suppress: 4820)
 };
+
+template <class T> struct std::tuple_size<Optional<T>> : std::integral_constant<size_t, 2> {};
+template <class T> struct std::tuple_element<0, Optional<T>> { using type = T; };
+template <class T> struct std::tuple_element<1, Optional<T>> { using type = bool; };
+
+template <size_t i, class T>
+auto get(Optional<T> x) {
+	if constexpr (i == 0) return x._value;
+	if constexpr (i == 1) return x._has_value;
+}
 
 template <class T>
 struct IsOptionalT : std::false_type {};
@@ -2915,9 +2922,9 @@ inline constexpr bool is_hex_digit(utf32 c) {
 	     | ((u32)(c - 'A') < 6);
 }
 inline constexpr Optional<u8> hex_digit_to_int(utf32 c) {
-	if (c >= '0' && c <= '9') return c - '0';
-	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
-	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= '0' && c <= '9') return (u8)(c - '0');
+	if (c >= 'a' && c <= 'f') return (u8)(c - 'a' + 10);
+	if (c >= 'A' && c <= 'F') return (u8)(c - 'A' + 10);
 	return {};
 }
 
@@ -2928,7 +2935,7 @@ inline constexpr u8 hex_digit_to_int_unchecked(utf32 c) {
     a = b < 16 ? b : a;
     b = c - '0';
     a = b < 10 ? b : a;
-    return a;
+    return (u8)a;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {
@@ -3977,6 +3984,7 @@ namespace tl {
 			};
 		}
 		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			(void)old_size;
 			return {
 				.data = ::_aligned_realloc(data, new_size, alignment),
 				.count = new_size,
@@ -3984,6 +3992,8 @@ namespace tl {
 			};
 		}
 		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			(void)size;
+			(void)alignment;
 			::_aligned_free(data);
 		}
 	#elif COMPILER_GCC

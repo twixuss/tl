@@ -812,6 +812,10 @@ GLuint create_shader(GLenum shaderType, Span<char> source) {
 }
 
 GLuint create_program(ProgramStages stages) {
+	if (!stages.vertex && !stages.fragment && !stages.compute) {
+		return 0;
+	}
+
 	GLuint result = glCreateProgram();
 	if (stages.vertex)   glAttachShader(result, stages.vertex);
 	if (stages.fragment) glAttachShader(result, stages.fragment);

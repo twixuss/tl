@@ -10,6 +10,7 @@
 #include "common.h"
 #include "math.h"
 #include "string.h"
+#include "logger.h"
 
 namespace tl {
 namespace qoi {

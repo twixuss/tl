@@ -72,7 +72,7 @@ struct ReadEntireFileParams {
 	umm extra_space_after = 0;
 	bool silent : 1 = false;
 };
-inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
+inline Optional<Buffer> read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
 
@@ -90,7 +90,7 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 }
 
 template <AChar Char, class Size>
-inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
+inline Optional<Buffer> read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true, .silent = params.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };

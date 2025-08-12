@@ -189,9 +189,9 @@ Error preprocess_c_source(auto path, Span<char> source, Preprocessor &&p) {
 
 						p.before_include(include_path);
 
-						auto include_source_buffer = read_entire_file(include_path);
+						auto [include_source_buffer, ok] = read_entire_file(include_path);
 						// NOTE: don't free include_source_buffer. ownership is transferred to p.add_source_buffer
-						if (!include_source_buffer.data)
+						if (!ok)
 							return error(Error::file_not_readable, "Could not read {}"s, ei withx { it.path = include_path; });
 
 						p.add_source_buffer(include_path, include_source_buffer);
@@ -348,7 +348,9 @@ Error preprocess_c_source(auto path, Span<char> source, Preprocessor &&p) {
 
 template <class Preprocessor>
 Error preprocess_c_file(auto path, Preprocessor &&p) {
-	auto source_buffer = read_entire_file(path);
+	auto [source_buffer, ok] = read_entire_file(path);
+	if (!ok)
+		return Error::file_not_readable;
 	defer { free(source_buffer); };
 
 	auto source = (Span<char>)source_buffer;
