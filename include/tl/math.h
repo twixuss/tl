@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TL_MATH_H
+#define TL_MATH_H
 #include "common.h"
 #include "array.h"
 #include "simd_macros.h"
@@ -2687,3 +2688,4 @@ constexpr tl::u64 get_hash(tl::aabb<T> const &x) {
 		get_hash(x.min) * 13043817825332782231ull +
 		get_hash(x.max) * 6521908912666391129ull;
 }
+#endif

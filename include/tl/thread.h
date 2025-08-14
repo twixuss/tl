@@ -130,6 +130,14 @@ forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
 	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
 
+// Argument order `new_value, condition` is not intuitive for me.
+// `condition, new_value` makes sense for switching states.
+// Like atomic_switch(a, b, c) means switch a from state b to state c.
+template <AInterlockExchangeable T>
+forceinline bool atomic_switch(T volatile *dst, T condition, T new_value) {
+	return atomic_compare_exchange(dst, new_value, condition) == condition;
+}
+
 struct Thread {
 	Allocator allocator;
 	void (*function)(Thread *self) = 0;
