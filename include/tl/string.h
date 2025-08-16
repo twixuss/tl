@@ -94,6 +94,27 @@ inline Optional<u64> parse_u64(Span<utf8> string) {
 	return parse_u64(string, 10);
 
 }
+
+inline u64 chop_u64(Span<utf8> &string, u32 base = 10) {
+	u64 result = 0;
+	u64 previous = 0;
+	umm i = 0;
+	for (; i < string.count; ++i) {
+		u64 digit = character_to_digit(string.data[i], base);
+		if (digit >= base) {
+			break;
+		}
+		previous = result;
+		result = result * base + digit;
+		if (result < previous) {
+			result = previous;
+			break;
+		}
+	}
+	string = {string.data + i, string.count - i};
+	return result;
+}
+
 #if 0
 inline ParseResult<f64> parseDecimalFloat(Span<char> s) {
 	ParseResult<f64> result = {};

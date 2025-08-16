@@ -242,6 +242,9 @@ struct List : Span<T, Size_> {
 			}
 		}
 	}
+	void erase_all(T const &value) {
+		erase_all([&](T const &it) { return it == value; });
+	}
 	
 	void here_map(auto &&map) requires requires(T v) { { map(v) } -> std::same_as<T>; } {
 		auto end = data + count;

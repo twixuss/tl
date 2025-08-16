@@ -34,7 +34,9 @@ struct Array {
 	}
 
 	#define OP(op)                                                               \
-		forceinline constexpr auto operator op() const requires requires(T t) { op t; } {    \
+		forceinline constexpr auto operator op() const                           \
+			requires requires(T t) { op t; }                                     \
+		{                                                                        \
 			Array<std::remove_cvref_t<decltype(op data[0])>, count> result = {}; \
 			for (umm i = 0; i < count; ++i)                                      \
 				result.data[i] = op data[i];                                     \
@@ -55,13 +57,33 @@ struct Array {
 		return result;
 	};
 	
-	#define OP(op)                                                                                              \
-		template <class U>                                                                                      \
-		forceinline constexpr auto operator op(Array<U, count> const &that) const requires requires(T t, U u) { t op u; } { \
-			Array<std::remove_cvref_t<decltype(data[0] op that.data[0])>, count> result = {};                   \
-			for (umm i = 0; i < count; ++i)                                                                     \
-				result.data[i] = data[i] op that.data[i];                                                       \
-			return result;                                                                                      \
+	#define OP(op)                                                                            \
+		template <class U>                                                                    \
+		forceinline constexpr auto operator op(Array<U, count> const &that) const             \
+			requires requires(T t, U u) { t op u; }                                           \
+		{                                                                                     \
+			Array<std::remove_cvref_t<decltype(data[0] op that.data[0])>, count> result = {}; \
+			for (umm i = 0; i < count; ++i)                                                   \
+				result.data[i] = data[i] op that.data[i];                                     \
+			return result;                                                                    \
+		}                                                                                     \
+		template <class U>                                                            \
+		forceinline constexpr auto operator op(U const &that) const                   \
+			requires requires(T t, U u) { t op u; }                                   \
+		{                                                                             \
+			Array<std::remove_cvref_t<decltype(data[0] op that)>, count> result = {}; \
+			for (umm i = 0; i < count; ++i)                                           \
+				result.data[i] = data[i] op that;                                     \
+			return result;                                                            \
+		}                                                                             \
+		template <class U>                                                                        \
+		friend forceinline constexpr auto operator op(U const &that, Array<T, count> const &self) \
+			requires requires(U u, T t) { u op t; }                                               \
+		{                                                                                         \
+			Array<std::remove_cvref_t<decltype(that op data[0])>, count> result = {};             \
+			for (umm i = 0; i < count; ++i)                                                       \
+				result.data[i] = that op self.data[i];                                            \
+			return result;                                                                        \
 		}
 	OP(==)
 	OP(!=)
@@ -83,31 +105,23 @@ struct Array {
 	OP(||)
 	#undef OP
 		
-	#define OP(op)                                                                            \
-		template <class U>                                                                    \
-		forceinline constexpr auto operator op(U const &that) const                                       \
-			requires requires(T t, U u) { t op u; }                                           \
-		{                                                                                     \
-			Array<std::remove_cvref_t<decltype(data[0] op that)>, count> result = {};         \
-			for (umm i = 0; i < count; ++i)                                                   \
-				result.data[i] = data[i] op that;                                             \
-			return result;                                                                    \
-		}                                                                                     \
-		template <class U>                                                                    \
-		friend forceinline constexpr auto operator op(U const &that, Array<T, count> const &self)         \
-			requires requires(U u, T t) { u op t; }                                           \
-		{                                                                                     \
-			Array<std::remove_cvref_t<decltype(that op data[0])>, count> result = {};         \
-			for (umm i = 0; i < count; ++i)                                                   \
-				result.data[i] = that op self.data[i];                                        \
-			return result;                                                                    \
+	#define OP(op)                                                              \
+		template <class U>                                                      \
+		forceinline constexpr auto &operator op##=(Array<U, count> const &that) \
+			requires requires(T t, U u) { t op##= u; }                          \
+		{                                                                       \
+			for (umm i = 0; i < count; ++i)                                     \
+				data[i] op##= that.data[i];                                     \
+			return *this;                                                       \
+		}                                                                       \
+		template <class U>                                        \
+		forceinline constexpr auto &operator op##=(U const &that) \
+			requires requires(T t, U u) { t op##= u; }            \
+		{                                                         \
+			for (umm i = 0; i < count; ++i)                       \
+				data[i] op##= that;                               \
+			return *this;                                         \
 		}
-	OP(==)
-	OP(!=)
-	OP(<)
-	OP(>)
-	OP(<=)
-	OP(>=)
 	OP(+)
 	OP(-)
 	OP(*)
@@ -118,8 +132,6 @@ struct Array {
 	OP(|)
 	OP(<<)
 	OP(>>)
-	OP(&&)
-	OP(||)
 	#undef OP
 };
 

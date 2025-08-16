@@ -57,15 +57,24 @@ struct UntypedConstantBuffer {
 template <class T>
 struct ConstantBuffer : UntypedConstantBuffer {};
 
-struct DepthStencil {
+struct DepthStencilTexture {
 	ID3D11DepthStencilView *dsv = 0;
 	ID3D11Texture2D *tex = 0;
 };
 
-struct Texture : ShaderResource {
+struct Texture2D : ShaderResource {
 	ID3D11Texture2D *tex = 0;
+	DXGI_FORMAT format = {};
 	u32 width = 0;
 	u32 height = 0;
+};
+
+struct Texture3D : ShaderResource {
+	ID3D11Texture3D *tex = 0;
+	DXGI_FORMAT format = {};
+	u32 width = 0;
+	u32 height = 0;
+	u32 depth = 0;
 };
 
 struct Sampler {
@@ -82,6 +91,10 @@ struct RenderTexture : ShaderResource, RenderTarget {
 
 struct Rasterizer {
 	ID3D11RasterizerState *raster = 0;
+};
+
+struct DepthStencil {
+	ID3D11DepthStencilState *state = 0;
 };
 
 struct Blend {
@@ -102,6 +115,28 @@ struct RasterizerDesc {
 	BOOL AntialiasedLineEnable = false;
 };
 
+// Same layout as D3D11_DEPTH_STENCIL_DESC, but with default values.
+struct DepthStencilDesc {
+    BOOL DepthEnable = true;
+    D3D11_DEPTH_WRITE_MASK DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	D3D11_COMPARISON_FUNC DepthFunc = D3D11_COMPARISON_LESS;
+    BOOL StencilEnable = false;
+    UINT8 StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
+    UINT8 StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+	D3D11_DEPTH_STENCILOP_DESC FrontFace = {
+		.StencilFailOp = D3D11_STENCIL_OP_KEEP,
+		.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP,
+		.StencilPassOp = D3D11_STENCIL_OP_KEEP,
+		.StencilFunc = D3D11_COMPARISON_ALWAYS,
+	};
+    D3D11_DEPTH_STENCILOP_DESC BackFace = {
+		.StencilFailOp = D3D11_STENCIL_OP_KEEP,
+		.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP,
+		.StencilPassOp = D3D11_STENCIL_OP_KEEP,
+		.StencilFunc = D3D11_COMPARISON_ALWAYS,
+	};
+};
+
 struct TL_API State {
 	IDXGIAdapter *adapter;
 	IDXGIAdapter1 *adapter1;
@@ -119,15 +154,9 @@ struct TL_API State {
 	// 'sample_count' can be -1 for highest setting, -2 for second highest, etc
 	void init(HWND window, u32 width, u32 height, DXGI_FORMAT back_buffer_format, u32 buffer_count, bool windowed, u32 sample_count, u32 device_flags = 0);
 	void init_back_buffer();
-	UntypedStructuredBuffer create_structured_buffer(D3D11_USAGE usage, u32 count, u32 stride, void const* data = 0);
-	template <class T>
-	inline StructuredBuffer<T> create_structured_buffer(D3D11_USAGE usage, Span<T> span = {}) {
-		StructuredBuffer<T> result;
-		(UntypedStructuredBuffer &)result = create_structured_buffer(usage, span.count, sizeof(T), span.data);
-		return result;
-	}
 	RenderTexture create_render_texture(u32 width, u32 height, u32 sample_count, DXGI_FORMAT format, u32 cpu_flags = 0);
-	Texture create_texture(u32 width, u32 height, DXGI_FORMAT format, void const* data, bool generate_mips = false);
+	Texture2D create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generate_mips = false);
+	Texture3D create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT format, void const *data, bool generate_mips = false);
 	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
 	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
 	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
@@ -139,12 +168,15 @@ struct TL_API State {
 		(UntypedConstantBuffer &)result = create_constant_buffer(sizeof(T), usage, initial_data);
 		return result;
 	}
-	DepthStencil create_depth_stencil(u32 width, u32 height, DXGI_FORMAT format);
+	DepthStencilTexture create_depth_stencil_texture(u32 width, u32 height, DXGI_FORMAT format);
 	Sampler create_sampler(D3D11_TEXTURE_ADDRESS_MODE address, D3D11_FILTER filter);
 	Rasterizer create_rasterizer(RasterizerDesc desc);
+	DepthStencil create_depth_stencil(DepthStencilDesc desc);
 	Blend create_blend(D3D11_BLEND_OP op_color, D3D11_BLEND src_color, D3D11_BLEND dst_color, D3D11_BLEND_OP op_alpha, D3D11_BLEND src_alpha, D3D11_BLEND dst_alpha);
 	Blend create_blend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst);
-	void update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 first_element = 0);
+	void update_texture_2d(Texture2D &texture, u32 min_x, u32 min_y, u32 max_x, u32 max_y, void const *data, u32 data_pitch = 0);
+	void update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_z, u32 max_x, u32 max_y, u32 max_z, void const *data, u32 data_pitch1 = 0, u32 data_pitch2 = 0);
+	void update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const *data, u32 first_element = 0);
 	template <class T>
 	inline void update_structured_buffer(StructuredBuffer<T> &buffer, Span<T> span, u32 first_element = 0) {
 		update_structured_buffer(buffer, span.count, sizeof(T), span.data, first_element);
@@ -154,10 +186,10 @@ struct TL_API State {
 	inline void update_constant_buffer(ConstantBuffer<T> &buffer, T const &data) {
 		update_constant_buffer(buffer, sizeof(T), &data);
 	}
-	void clear_render_target(ID3D11RenderTargetView* render_target, f32 const rgba[4]);
+	void clear_render_target(ID3D11RenderTargetView *render_target, f32 const rgba[4]);
 	void clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth);
 	inline void clear_render_target(RenderTarget &rt, f32 const rgba[4]) { clear_render_target(rt.rtv, rgba); }
-	inline void clear_depth_stencil(DepthStencil &depth_stencil, f32 depth) { clear_depth_stencil(depth_stencil.dsv, depth); }
+	inline void clear_depth_stencil(DepthStencilTexture &depth_stencil, f32 depth) { clear_depth_stencil(depth_stencil.dsv, depth); }
 	void draw(u32 vertex_count, u32 offset = 0);
 	void present();
 	void resize_back_buffer(u32 width, u32 height);
@@ -178,8 +210,9 @@ struct TL_API State {
 	inline void set_viewport(f32 w, f32 h) { set_viewport(0, 0, w, h); }
 	void set_render_target(ID3D11RenderTargetView *render_target, ID3D11DepthStencilView *depth_stencil);
 	inline void set_render_target(RenderTarget &rt) { set_render_target(rt.rtv, 0); }
-	inline void set_render_target(RenderTarget &rt, DepthStencil &ds) { set_render_target(rt.rtv, ds.dsv); }
+	inline void set_render_target(RenderTarget &rt, DepthStencilTexture &ds) { set_render_target(rt.rtv, ds.dsv); }
 	void set_rasterizer(Rasterizer rasterizer = {});
+	void set_depth_stencil(DepthStencil depth_stencil = {});
 	void set_blend(Blend blend = {});
 	u32 get_max_msaa_sample_count(DXGI_FORMAT format);
 #ifdef TL_MATH_H
@@ -202,22 +235,26 @@ TL_API void add_ref(Shader &v);
 TL_API void add_ref(UntypedStructuredBuffer &v);
 TL_API void add_ref(UntypedConstantBuffer &v);
 TL_API void add_ref(RenderTarget &v);
-TL_API void add_ref(DepthStencil &v);
-TL_API void add_ref(Texture &v);
+TL_API void add_ref(DepthStencilTexture &v);
+TL_API void add_ref(Texture2D &v);
+TL_API void add_ref(Texture3D &v);
 TL_API void add_ref(Sampler &v);
 TL_API void add_ref(RenderTexture &v);
 TL_API void add_ref(Rasterizer &v);
+TL_API void add_ref(DepthStencil &v);
 TL_API void add_ref(Blend &v);
 
 TL_API void release(Shader &v);
 TL_API void release(UntypedStructuredBuffer &v);
 TL_API void release(UntypedConstantBuffer &v);
 TL_API void release(RenderTarget &v);
-TL_API void release(DepthStencil &v);
-TL_API void release(Texture &v);
+TL_API void release(DepthStencilTexture &v);
+TL_API void release(Texture2D &v);
+TL_API void release(Texture3D &v);
 TL_API void release(Sampler &v);
 TL_API void release(RenderTexture &v);
 TL_API void release(Rasterizer &v);
+TL_API void release(DepthStencil &v);
 TL_API void release(Blend &v);
 
 inline bool valid(ShaderResource &v) { return v.srv != 0; }
@@ -243,11 +280,15 @@ void add_ref(RenderTarget &v) {
 	v.rtv->AddRef();
 	v.tex->AddRef();
 }
-void add_ref(DepthStencil &v) {
+void add_ref(DepthStencilTexture &v) {
 	v.dsv->AddRef();
 	v.tex->AddRef();
 }
-void add_ref(Texture &v) {
+void add_ref(Texture2D &v) {
+	v.srv->AddRef();
+	v.tex->AddRef();
+}
+void add_ref(Texture3D &v) {
 	v.srv->AddRef();
 	v.tex->AddRef();
 }
@@ -261,6 +302,9 @@ void add_ref(RenderTexture &v) {
 }
 void add_ref(Rasterizer &v) {
 	v.raster->AddRef();
+}
+void add_ref(DepthStencil &v) {
+	v.state->AddRef();
 }
 void add_ref(Blend &v) {
 	v.blend->AddRef();
@@ -281,11 +325,15 @@ void release(RenderTarget &v) {
 	TL_COM_RELEASE(v.rtv);
 	TL_COM_RELEASE(v.tex);
 }
-void release(DepthStencil &v) {
+void release(DepthStencilTexture &v) {
 	TL_COM_RELEASE(v.dsv);
 	TL_COM_RELEASE(v.tex);
 }
-void release(Texture &v) {
+void release(Texture2D &v) {
+	TL_COM_RELEASE(v.srv);
+	TL_COM_RELEASE(v.tex);
+}
+void release(Texture3D &v) {
 	TL_COM_RELEASE(v.srv);
 	TL_COM_RELEASE(v.tex);
 }
@@ -299,6 +347,9 @@ void release(RenderTexture &v) {
 }
 void release(Rasterizer &v) {
 	TL_COM_RELEASE(v.raster);
+}
+void release(DepthStencil &v) {
+	TL_COM_RELEASE(v.state);
 }
 void release(Blend &v) {
 	TL_COM_RELEASE(v.blend);
@@ -453,44 +504,6 @@ void State::init_back_buffer() {
 	GHR(swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer.tex)));
 	GHR(device->CreateRenderTargetView(back_buffer.tex, 0, &back_buffer.rtv));
 }
-UntypedStructuredBuffer State::create_structured_buffer(D3D11_USAGE usage, u32 count, u32 stride, void const* data) {
-
-	// D3D11 does not allow zero sized buffers.
-	// I'm clamping the count to 1 to avoid complications with checking for buffer nullness in State::update_structured_buffer
-	count = max(count, 1u);
-	
-	UntypedStructuredBuffer result = {};
-	result.usage = usage;
-	result.size = count * stride;
-	{
-		D3D11_BUFFER_DESC d = {};
-		d.ByteWidth = result.size;
-		d.Usage = usage;
-		d.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		if (usage == D3D11_USAGE_DYNAMIC)
-			d.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		d.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		d.StructureByteStride = stride;
-
-		if (data) {
-			D3D11_SUBRESOURCE_DATA initial_data {};
-			initial_data.pSysMem = data;
-			GHR(device->CreateBuffer(&d, &initial_data, &result.buffer));
-		}
-		else {
-			GHR(device->CreateBuffer(&d, 0, &result.buffer));
-		}
-	}
-	{
-		D3D11_SHADER_RESOURCE_VIEW_DESC d = {};
-		d.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-		d.Buffer.FirstElement = 0;
-		d.Buffer.NumElements = count;
-		GHR(device->CreateShaderResourceView(result.buffer, &d, &result.srv));
-	}
-
-	return result;
-}
 RenderTexture State::create_render_texture(u32 width, u32 height, u32 sample_count, DXGI_FORMAT format, u32 cpu_flags) {
 	RenderTexture result;
 	{
@@ -518,8 +531,11 @@ RenderTexture State::create_render_texture(u32 width, u32 height, u32 sample_cou
 	}
 	return result;
 }
-Texture State::create_texture(u32 width, u32 height, DXGI_FORMAT format, void const* data, bool generate_mips) {
-	Texture result;
+Texture2D State::create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generate_mips) {
+	Texture2D result;
+	result.format = format;
+	result.width = width;
+	result.height = height;
 
 	u32 bpp = get_bits_per_pixel(format);
 	assert(bpp % 8 == 0);
@@ -557,11 +573,57 @@ Texture State::create_texture(u32 width, u32 height, DXGI_FORMAT format, void co
 		immediate_context->UpdateSubresource(result.tex, 0, 0, data, pitch, 0);
 		immediate_context->GenerateMips(result.srv);
 	}
+
+	return result;
+}
+Texture3D State::create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT format, void const *data, bool generate_mips) {
+	Texture3D result;
+	result.format = format;
+	result.width = width;
+	result.height = height;
+	result.depth = depth;
+
+	u32 bpp = get_bits_per_pixel(format);
+	assert(bpp % 8 == 0);
+	u32 pitch = width * bpp / 8;
+	u32 pitch2 = pitch * height;
+
+	{
+		D3D11_TEXTURE3D_DESC d = {};
+		d.Format = format;
+		d.BindFlags = D3D11_BIND_SHADER_RESOURCE | (generate_mips ? D3D11_BIND_RENDER_TARGET : 0u);
+		d.Width = width;
+		d.Height = height;
+		d.Depth = depth;
+		d.MipLevels = generate_mips ? 0u : 1u;
+		d.MiscFlags = generate_mips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0u;
+
+		if (data) {
+			D3D11_SUBRESOURCE_DATA initial_data {};
+			initial_data.pSysMem = data;
+			initial_data.SysMemPitch = pitch;
+			initial_data.SysMemSlicePitch = pitch2;
+			GHR(device->CreateTexture3D(&d, generate_mips ? nullptr : &initial_data, &result.tex));
+		} else {
+			GHR(device->CreateTexture3D(&d, 0, &result.tex));
+		}
+	}
+	D3D11_SHADER_RESOURCE_VIEW_DESC d = {};
+	d.Format = format;
+	d.Texture3D.MipLevels = generate_mips ? ~0u : 1u;
+	d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
+
+	GHR(device->CreateShaderResourceView(result.tex, &d, &result.srv));
+
+	if (generate_mips) {
+		immediate_context->UpdateSubresource(result.tex, 0, 0, data, pitch, pitch2);
+		immediate_context->GenerateMips(result.srv);
+	}
 	return result;
 }
 void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines ) {
-	ID3DBlob* bytecode = 0;
-	ID3DBlob* messages = 0;
+	ID3DBlob *bytecode = 0;
+	ID3DBlob *messages = 0;
 	HRESULT result = D3DCompile(source.data, source.count, name, defines, standard_include ? D3D_COMPILE_STANDARD_FILE_INCLUDE : 0, entry_point, target, 0, 0, &bytecode, &messages);
 
 	if (messages) {
@@ -604,8 +666,8 @@ UntypedConstantBuffer State::create_constant_buffer(u32 size, D3D11_USAGE usage,
 	result.size = size;
 	return result;
 }
-DepthStencil State::create_depth_stencil(u32 width, u32 height, DXGI_FORMAT format) {
-	DepthStencil result = {};
+DepthStencilTexture State::create_depth_stencil_texture(u32 width, u32 height, DXGI_FORMAT format) {
+	DepthStencilTexture result = {};
 	{
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.ArraySize = 1;
@@ -656,6 +718,21 @@ Rasterizer State::create_rasterizer(RasterizerDesc in_desc) {
 	GHR(device->CreateRasterizerState(&desc, &result.raster));
 	return result;
 }
+DepthStencil State::create_depth_stencil(DepthStencilDesc in_desc) {
+	D3D11_DEPTH_STENCIL_DESC desc = {
+		.DepthEnable = in_desc.DepthEnable,
+		.DepthWriteMask = in_desc.DepthWriteMask,
+		.DepthFunc = in_desc.DepthFunc,
+		.StencilEnable = in_desc.StencilEnable,
+		.StencilReadMask = in_desc.StencilReadMask,
+		.StencilWriteMask = in_desc.StencilWriteMask,
+		.FrontFace = in_desc.FrontFace,
+		.BackFace = in_desc.BackFace,
+	};
+	ID3D11DepthStencilState *state = 0;
+	GHR(device->CreateDepthStencilState(&desc, &state));
+	return {state};
+}
 Blend State::create_blend(D3D11_BLEND_OP op_color, D3D11_BLEND src_color, D3D11_BLEND dst_color, D3D11_BLEND_OP op_alpha, D3D11_BLEND src_alpha, D3D11_BLEND dst_alpha) {
 	D3D11_BLEND_DESC desc = {};
 	desc.RenderTarget[0].BlendEnable = true;
@@ -674,30 +751,95 @@ Blend State::create_blend(D3D11_BLEND_OP op_color, D3D11_BLEND src_color, D3D11_
 Blend State::create_blend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst) {
 	return create_blend(op, src, dst, D3D11_BLEND_OP_ADD, D3D11_BLEND_ONE, D3D11_BLEND_ZERO);
 }
-void State::update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const* data, u32 first_element) {
+void State::update_texture_2d(Texture2D &texture, u32 min_x, u32 min_y, u32 max_x, u32 max_y, void const *data, u32 data_pitch) {
+	if (data_pitch == 0) {
+		data_pitch = get_bits_per_pixel(texture.format) * texture.width;
+	}
+	D3D11_BOX box = {
+		.left = min_x,
+		.top = min_y,
+		.front = 0,
+		.right = max_x,
+		.bottom = max_y,
+		.back = 1,
+	};
+	immediate_context->UpdateSubresource(texture.tex, 0, &box, data, data_pitch, 0);
+}
+void State::update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_z, u32 max_x, u32 max_y, u32 max_z, void const *data, u32 data_pitch1, u32 data_pitch2) {
+	if (data_pitch1 == 0) {
+		data_pitch1 = get_bits_per_pixel(texture.format) * texture.width;
+	}
+	if (data_pitch2 == 0) {
+		data_pitch2 = data_pitch1 * texture.height;
+	}
+	D3D11_BOX box = {
+		.left = min_x,
+		.top = min_y,
+		.front = min_z,
+		.right = max_x,
+		.bottom = max_y,
+		.back = max_z,
+	};
+	immediate_context->UpdateSubresource(texture.tex, 0, &box, data, data_pitch1, data_pitch2);
+}
+void State::update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const *data, u32 first_element) {
+	if (buffer.usage == D3D11_USAGE_DYNAMIC)
+		assert(first_element == 0, "Dynamic buffers can't be updated partially, only as a whole.");
+
+	if (count == 0)
+		return;
+
 	u32 size = count * stride;
 	u32 offset = first_element * stride;
 	if (size + offset > buffer.size) {
 		// Resize
+			
+		UINT min_required_count = first_element + count;
+		UINT new_count = max(min_required_count * 3 / 2, 1u); // D3D11 does not allow zero sized buffers.
+		UINT new_size = new_count * stride;
 
-		// Create new bigger buffer
-		UINT new_count = count * 3 / 2;
-		auto new_buffer = create_structured_buffer(buffer.usage, new_count, stride, 0);
+		ID3D11Buffer *new_buffer = {};
+		{
+			D3D11_BUFFER_DESC d = {
+				.ByteWidth = new_size,
+				.Usage = buffer.usage,
+				.BindFlags = D3D11_BIND_SHADER_RESOURCE,
+				.CPUAccessFlags = buffer.usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u,
+				.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+				.StructureByteStride = stride,
+			};
+			GHR(device->CreateBuffer(&d, 0, &new_buffer));
+		}
 
-		// Copy old buffer to new one
-		D3D11_BOX box = {
-			.left = 0,
-			.top = 0,
-			.front = 0,
-			.right = buffer.size,
-			.bottom = 1,
-			.back = 1,
-		};
-		immediate_context->CopySubresourceRegion(new_buffer.buffer, 0, 0, 0, 0, buffer.buffer, 0, &box);
+		ID3D11ShaderResourceView *new_srv = {};
+		{
+			D3D11_SHADER_RESOURCE_VIEW_DESC d = {};
+			d.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+			d.Buffer.FirstElement = 0;
+			d.Buffer.NumElements = new_count;
+			GHR(device->CreateShaderResourceView(new_buffer, &d, &new_srv));
+		}
 
-		// Replace old with new
-		release(buffer);
-		buffer = new_buffer;
+		if (buffer.buffer) {
+			// Copy old buffer to new one
+			D3D11_BOX box = {
+				.left = 0,
+				.top = 0,
+				.front = 0,
+				.right = buffer.size,
+				.bottom = 1,
+				.back = 1,
+			};
+			immediate_context->CopySubresourceRegion(new_buffer, 0, 0, 0, 0, buffer.buffer, 0, &box);
+
+			// Release old
+			TL_COM_RELEASE(buffer.buffer);
+			TL_COM_RELEASE(buffer.srv);
+		}
+
+		buffer.buffer = new_buffer;
+		buffer.srv = new_srv;
+		buffer.size = new_size;
 	}
 	switch (buffer.usage) {
 		case D3D11_USAGE_DYNAMIC: {
@@ -736,7 +878,7 @@ void State::update_constant_buffer(UntypedConstantBuffer &buffer, u32 size, void
 		invalid_code_path("bad buffer.usage");
 	}
 }
-void State::clear_render_target(ID3D11RenderTargetView* render_target, f32 const rgba[4]) {
+void State::clear_render_target(ID3D11RenderTargetView *render_target, f32 const rgba[4]) {
 	immediate_context->ClearRenderTargetView(render_target, rgba);
 }
 void State::clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth) {
@@ -792,6 +934,9 @@ void State::set_render_target(ID3D11RenderTargetView *render_target, ID3D11Depth
 }
 void State::set_rasterizer(Rasterizer rasterizer) {
 	immediate_context->RSSetState(rasterizer.raster);
+}
+void State::set_depth_stencil(DepthStencil depth_stencil) {
+	immediate_context->OMSetDepthStencilState(depth_stencil.state, 0);
 }
 void State::set_blend(Blend blend) {
 	float factor[4]{};
