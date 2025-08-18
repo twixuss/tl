@@ -230,17 +230,10 @@ struct List : Span<T, Size_> {
 		return {};
 	}
 	
-	void erase_all(auto &&predicate) requires requires(T v) { predicate(v); } {
-		auto end = data + count;
-		auto dst = data;
-		for (auto it = data; it != end; ++it) {
-			if (predicate(*it)) {
-				it->~T();
-				--count;
-			} else {
-				*dst++ = *it;
-			}
-		}
+	void erase_all(auto &&predicate) 
+		requires requires(T v) { predicate(v); }
+	{
+		count = erase_all_compacting(span(), predicate).count;
 	}
 	void erase_all(T const &value) {
 		erase_all([&](T const &it) { return it == value; });

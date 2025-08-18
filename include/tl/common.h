@@ -2876,6 +2876,22 @@ constexpr T dot(Span<T> a, Span<T> b) {
 	return result;
 }
 
+template <class T, class Size>
+Span<T, Size> erase_all_compacting(Span<T, Size> span, auto &&predicate)
+	requires requires(T v) { predicate(v); }
+{
+	auto end = span.data + span.count;
+	auto dst = span.data;
+	for (auto it = span.data; it != end; ++it) {
+		if (predicate(*it)) {
+			it->~T();
+		} else {
+			*dst++ = (T &&)*it;
+		}
+	}
+	return {span.data, (Size)(dst - span.data)};
+}
+
 #define passthrough(function) ([&]<class ...Args>(Args &&...args) -> decltype(auto) { return function(std::forward<Args>(args)...); })
 
 inline constexpr bool is_whitespace(ascii c) {

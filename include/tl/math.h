@@ -2246,12 +2246,11 @@ union m4 {
 		}};
 	}
 	static forceinline m4 perspective_right_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
-		f32 xymax = nz * tan(fov * 0.5f);
+		f32 h = 1.0f / tan(fov * 0.5f);
+		f32 w = h / aspect;
 		f32 depth = fz - nz;
 		f32 q = -(fz + nz) / depth;
 		f32 qn = -2 * (fz * nz) / depth;
-		f32 h = nz / xymax;
-		f32 w = h / aspect;
 
 		return {.s = {
 			w, 0, 0, 0,

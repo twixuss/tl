@@ -39,10 +39,17 @@ struct ShaderResource {
 	ID3D11ShaderResourceView *srv = 0;
 };
 
-struct UntypedStructuredBuffer : ShaderResource {
+struct UntypedBuffer {
 	ID3D11Buffer *buffer = 0;
 	D3D11_USAGE usage = {};
 	u32 size = 0;
+};
+
+template <class T>
+struct Buffer : UntypedBuffer {
+};
+
+struct UntypedStructuredBuffer : ShaderResource, UntypedBuffer {
 };
 
 template <class T>
@@ -157,6 +164,7 @@ struct TL_API State {
 	RenderTexture create_render_texture(u32 width, u32 height, u32 sample_count, DXGI_FORMAT format, u32 cpu_flags = 0);
 	Texture2D create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generate_mips = false);
 	Texture3D create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT format, void const *data, bool generate_mips = false);
+	UntypedBuffer create_buffer(u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags);
 	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
 	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
 	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
@@ -176,7 +184,12 @@ struct TL_API State {
 	Blend create_blend(D3D11_BLEND_OP op, D3D11_BLEND src, D3D11_BLEND dst);
 	void update_texture_2d(Texture2D &texture, u32 min_x, u32 min_y, u32 max_x, u32 max_y, void const *data, u32 data_pitch = 0);
 	void update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_z, u32 max_x, u32 max_y, u32 max_z, void const *data, u32 data_pitch1 = 0, u32 data_pitch2 = 0);
-	void update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const *data, u32 first_element = 0);
+	void update_buffer(UntypedBuffer &buffer, u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags);
+	template <class T>
+	void update_buffer(Buffer<T> &buffer, Span<T> span, u32 first_element, UINT bind_flags, UINT misc_flags) {
+		update_buffer(buffer, span.count, sizeof(T), span.data, first_element, bind_flags, misc_flags);
+	}
+	void update_structured_buffer(UntypedStructuredBuffer &buffer, u32 count, u32 stride, void const *data, u32 first_element = 0);
 	template <class T>
 	inline void update_structured_buffer(StructuredBuffer<T> &buffer, Span<T> span, u32 first_element = 0) {
 		update_structured_buffer(buffer, span.count, sizeof(T), span.data, first_element);
@@ -782,7 +795,102 @@ void State::update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_
 	};
 	immediate_context->UpdateSubresource(texture.tex, 0, &box, data, data_pitch1, data_pitch2);
 }
-void State::update_structured_buffer(UntypedStructuredBuffer& buffer, u32 count, u32 stride, void const *data, u32 first_element) {
+UntypedBuffer State::create_buffer(u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags) {
+	UntypedBuffer buffer = {};
+
+	if (count == 0)
+		return {};
+
+	buffer.size = count * stride;
+			
+	{
+		D3D11_BUFFER_DESC d = {
+			.ByteWidth = buffer.size,
+			.Usage = buffer.usage,
+			.BindFlags = bind_flags,
+			.CPUAccessFlags = buffer.usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u,
+			.MiscFlags = misc_flags,
+			.StructureByteStride = stride,
+		};
+		GHR(device->CreateBuffer(&d, 0, &buffer.buffer));
+	}
+
+	return buffer;
+}
+void State::update_buffer(UntypedBuffer &buffer, u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags) {
+	if (buffer.usage == D3D11_USAGE_DYNAMIC)
+		assert(first_element == 0, "Dynamic buffers can't be updated partially, only as a whole.");
+
+	if (count == 0)
+		return;
+
+	u32 size = count * stride;
+	u32 offset = first_element * stride;
+	if (size + offset > buffer.size) {
+		// Resize
+			
+		UINT min_required_count = first_element + count;
+		UINT new_count = max(min_required_count * 3 / 2, 1u); // D3D11 does not allow zero sized buffers.
+		UINT new_size = new_count * stride;
+
+		ID3D11Buffer *new_buffer = {};
+		{
+			D3D11_BUFFER_DESC d = {
+				.ByteWidth = new_size,
+				.Usage = buffer.usage,
+				.BindFlags = bind_flags,
+				.CPUAccessFlags = buffer.usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u,
+				.MiscFlags = misc_flags,
+				.StructureByteStride = stride,
+			};
+			GHR(device->CreateBuffer(&d, 0, &new_buffer));
+		}
+
+		if (buffer.buffer) {
+			// Copy old buffer to new one
+			D3D11_BOX box = {
+				.left = 0,
+				.top = 0,
+				.front = 0,
+				.right = buffer.size,
+				.bottom = 1,
+				.back = 1,
+			};
+			immediate_context->CopySubresourceRegion(new_buffer, 0, 0, 0, 0, buffer.buffer, 0, &box);
+
+			// Release old
+			TL_COM_RELEASE(buffer.buffer);
+		}
+
+		buffer.buffer = new_buffer;
+		buffer.size = new_size;
+	}
+	switch (buffer.usage) {
+		case D3D11_USAGE_DYNAMIC: {
+			D3D11_MAPPED_SUBRESOURCE mapped;
+			GHR(immediate_context->Map(buffer.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
+			memcpy(mapped.pData, data, size);
+			immediate_context->Unmap(buffer.buffer, 0);
+			break;
+		}
+		case D3D11_USAGE_DEFAULT: {
+			D3D11_BOX box = {
+				.left = offset,
+				.top = 0,
+				.front = 0,
+				.right = offset + size,
+				.bottom = 1,
+				.back = 1,
+			};
+			immediate_context->UpdateSubresource(buffer.buffer, 0, &box, data, 0, 0);
+			break;
+		}
+		default:
+			invalid_code_path("buffer.usage");
+			break;
+	}
+}
+void State::update_structured_buffer(UntypedStructuredBuffer &buffer, u32 count, u32 stride, void const *data, u32 first_element) {
 	if (buffer.usage == D3D11_USAGE_DYNAMIC)
 		assert(first_element == 0, "Dynamic buffers can't be updated partially, only as a whole.");
 
