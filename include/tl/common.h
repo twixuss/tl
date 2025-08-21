@@ -1374,6 +1374,17 @@ umm count_of(Collection const &collection) {
 	}
 }
 
+constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
+	return x;
+};
+
+template <Collection Collection, class Mapper = decltype(identity_value)>
+auto sum(Collection const &collection, Mapper &&mapper = identity_value) {
+	std::remove_cvref_t<decltype(mapper(*(ElementOf<Collection> *)0))> result = {};
+	foreach (it, collection) result += mapper(*it);
+	return result;
+}
+
 template <Collection Collection>
 auto stddev(Collection const &collection) {
 	using Element = ElementOf<Collection>;
@@ -1390,10 +1401,6 @@ auto stddev(Collection const &collection) {
 
 	return tl::sqrt(variance);
 }
-
-constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
-	return x;
-};
 
 constexpr auto compare_equal = []<class T>(T const &a, T const &b) { return a == b; };
 
@@ -2233,9 +2240,9 @@ template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][
 template <class T, umm count>
 struct IterOfT<T[count]> { using Iter = SpanIter<T>; };
 
-// MSVC bug: default options does not compile
+// MSVC bug: {} instead of ReverseIterOption{} does not compile
 template <class T, umm count>
-constexpr auto iter(T (&array)[count], ReverseIterOption options/* = {}*/) {
+constexpr auto iter(T (&array)[count], ReverseIterOption options = ReverseIterOption{}) {
 	return span_iter(array, array + count, options);
 }
 

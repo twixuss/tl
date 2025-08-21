@@ -164,10 +164,10 @@ struct TL_API State {
 	RenderTexture create_render_texture(u32 width, u32 height, u32 sample_count, DXGI_FORMAT format, u32 cpu_flags = 0);
 	Texture2D create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generate_mips = false);
 	Texture3D create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT format, void const *data, bool generate_mips = false);
-	UntypedBuffer create_buffer(u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags);
-	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
-	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
-	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0);
+	UntypedBuffer create_buffer(u32 count, u32 stride, void const *data, UINT bind_flags, UINT misc_flags);
+	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
+	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
+	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 
 	UntypedConstantBuffer create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data = 0);
 	template <class T>
@@ -200,9 +200,9 @@ struct TL_API State {
 		update_constant_buffer(buffer, sizeof(T), &data);
 	}
 	void clear_render_target(ID3D11RenderTargetView *render_target, f32 const rgba[4]);
-	void clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth);
+	void clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth = 1, u8 stencil = 0);
 	inline void clear_render_target(RenderTarget &rt, f32 const rgba[4]) { clear_render_target(rt.rtv, rgba); }
-	inline void clear_depth_stencil(DepthStencilTexture &depth_stencil, f32 depth) { clear_depth_stencil(depth_stencil.dsv, depth); }
+	inline void clear_depth_stencil(DepthStencilTexture &depth_stencil, f32 depth = 1, u8 stencil = 0) { clear_depth_stencil(depth_stencil.dsv, depth, stencil); }
 	void draw(u32 vertex_count, u32 offset = 0);
 	void present();
 	void resize_back_buffer(u32 width, u32 height);
@@ -225,7 +225,7 @@ struct TL_API State {
 	inline void set_render_target(RenderTarget &rt) { set_render_target(rt.rtv, 0); }
 	inline void set_render_target(RenderTarget &rt, DepthStencilTexture &ds) { set_render_target(rt.rtv, ds.dsv); }
 	void set_rasterizer(Rasterizer rasterizer = {});
-	void set_depth_stencil(DepthStencil depth_stencil = {});
+	void set_depth_stencil(DepthStencil depth_stencil = {}, u8 stencil_ref = 0);
 	void set_blend(Blend blend = {});
 	u32 get_max_msaa_sample_count(DXGI_FORMAT format);
 #ifdef TL_MATH_H
@@ -634,7 +634,7 @@ Texture3D State::create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT
 	}
 	return result;
 }
-void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines ) {
+void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **out_bytecode) {
 	ID3DBlob *bytecode = 0;
 	ID3DBlob *messages = 0;
 	HRESULT result = D3DCompile(source.data, source.count, name, defines, standard_include ? D3D_COMPILE_STANDARD_FILE_INCLUDE : 0, entry_point, target, 0, 0, &bytecode, &messages);
@@ -651,17 +651,21 @@ void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T
 
 	void *vertex_shader;
 	GHR((device->*create_shader)(bytecode->GetBufferPointer(), bytecode->GetBufferSize(), 0, &vertex_shader));
-	bytecode->Release();
+	if (out_bytecode) {
+		*out_bytecode = bytecode;
+	} else {
+		bytecode->Release();
+	}
 	if (messages)
 		messages->Release();
 	return vertex_shader;
 }
 
-ID3D11VertexShader *State::create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines) {
-	return (ID3D11VertexShader *)create_shader(autocast &ID3D11Device::CreateVertexShader, source, name, entry_point, target, standard_include, defines);
+ID3D11VertexShader *State::create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **bytecode) {
+	return (ID3D11VertexShader *)create_shader(autocast &ID3D11Device::CreateVertexShader, source, name, entry_point, target, standard_include, defines, bytecode);
 }
-ID3D11PixelShader *State::create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines) {
-	return (ID3D11PixelShader *)create_shader(autocast &ID3D11Device::CreatePixelShader, source, name, entry_point, target, standard_include, defines);
+ID3D11PixelShader *State::create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **bytecode) {
+	return (ID3D11PixelShader *)create_shader(autocast &ID3D11Device::CreatePixelShader, source, name, entry_point, target, standard_include, defines, bytecode);
 }
 UntypedConstantBuffer State::create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data) {
 	D3D11_BUFFER_DESC desc = {};
@@ -795,7 +799,7 @@ void State::update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_
 	};
 	immediate_context->UpdateSubresource(texture.tex, 0, &box, data, data_pitch1, data_pitch2);
 }
-UntypedBuffer State::create_buffer(u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags) {
+UntypedBuffer State::create_buffer(u32 count, u32 stride, void const *data, UINT bind_flags, UINT misc_flags) {
 	UntypedBuffer buffer = {};
 
 	if (count == 0)
@@ -989,8 +993,8 @@ void State::update_constant_buffer(UntypedConstantBuffer &buffer, u32 size, void
 void State::clear_render_target(ID3D11RenderTargetView *render_target, f32 const rgba[4]) {
 	immediate_context->ClearRenderTargetView(render_target, rgba);
 }
-void State::clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth) {
-	immediate_context->ClearDepthStencilView(depth_stencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, 0);
+void State::clear_depth_stencil(ID3D11DepthStencilView *depth_stencil, f32 depth, u8 stencil) {
+	immediate_context->ClearDepthStencilView(depth_stencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, stencil);
 }
 void State::draw(u32 vertex_count, u32 offset) {
 	immediate_context->Draw(vertex_count, offset);
@@ -1043,8 +1047,8 @@ void State::set_render_target(ID3D11RenderTargetView *render_target, ID3D11Depth
 void State::set_rasterizer(Rasterizer rasterizer) {
 	immediate_context->RSSetState(rasterizer.raster);
 }
-void State::set_depth_stencil(DepthStencil depth_stencil) {
-	immediate_context->OMSetDepthStencilState(depth_stencil.state, 0);
+void State::set_depth_stencil(DepthStencil depth_stencil, u8 stencil_ref) {
+	immediate_context->OMSetDepthStencilState(depth_stencil.state, stencil_ref);
 }
 void State::set_blend(Blend blend) {
 	float factor[4]{};

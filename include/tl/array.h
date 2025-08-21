@@ -29,8 +29,10 @@ struct Array {
 	forceinline constexpr umm index_of(T const *pointer) const { return pointer - data; }
 	forceinline constexpr bool owns(T *pointer) { return (umm)(pointer - data) < count; }
 	
-	forceinline constexpr auto iter(ReverseIterOption options = {}) {
-		return span_iter(data, data + count, options);
+	using IterOptions = ReverseIterOption;
+
+	forceinline constexpr auto iter(this auto &&self, IterOptions options = {}) {
+		return span_iter(self.data, self.data + count, options);
 	}
 
 	#define OP(op)                                                               \
@@ -50,7 +52,9 @@ struct Array {
 	#undef OP
 		
 	template <class U>
-	forceinline constexpr operator Array<U, count>() const requires requires(T t) { (U)t; } {
+	forceinline constexpr explicit operator Array<U, count>() const
+		requires requires(T t) { (U)t; }
+	{
 		Array<U, count> result = {};
 		for (umm i = 0; i < count; ++i)
 			result.data[i] = (U)data[i];

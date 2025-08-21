@@ -45,15 +45,14 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		}
 	};
 	struct Shared {
-		HashMap<std::source_location, AllocationCounts, SourceLocationHashTraits> tracked_allocations;
-		HashMap<void *, AllocationMeta> allocation_metas;
+		HashMap<std::source_location, AllocationCounts, SourceLocationHashTraits, DefaultAllocator> tracked_allocations;
+		HashMap<void *, AllocationMeta, DefaultHashTraits<void *>, DefaultAllocator> allocation_metas;
 	};
 
-	Allocator underlying_allocator;
-	LockProtected<Shared, RecursiveSpinLock> shared;
+	inline static LockProtected<Shared, RecursiveSpinLock> shared;
 
 	AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
-		auto result = underlying_allocator.allocate_impl(size, alignment, location);
+		auto result = DefaultAllocator{}.allocate_impl(size, alignment, location);
 
 		shared.use([&] (auto &shared) {
 			auto &counts = shared.tracked_allocations.get_or_insert(location);
@@ -68,25 +67,27 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		return result;
 	}
 	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP) {
-		auto result = underlying_allocator.reallocate_impl(data, old_size, new_size, alignment, location);
+		auto result = DefaultAllocator{}.reallocate_impl(data, old_size, new_size, alignment, location);
 
 		shared.use([&] (auto &shared) {
-			auto &old_meta = *shared.allocation_metas.find(data).value;
-			old_meta.counts->current_size -= old_meta.this_size;
-			shared.allocation_metas.erase(data);
+			if (auto found = shared.allocation_metas.find(data)) {
+				auto &old_meta = *found.value;
+				old_meta.counts->current_size -= old_meta.this_size;
+				shared.allocation_metas.erase(data);
 
-			auto &counts = shared.tracked_allocations.get_or_insert(location);
-			counts.current_size += new_size;
-			counts.total_size   += new_size;
+				auto &counts = shared.tracked_allocations.get_or_insert(location);
+				counts.current_size += new_size;
+				counts.total_size   += new_size;
 
-			auto &new_meta = shared.allocation_metas.get_or_insert(result.data);
-			new_meta.this_size = new_size; 
-			new_meta.counts = &counts;
+				auto &new_meta = shared.allocation_metas.get_or_insert(result.data);
+				new_meta.this_size = new_size; 
+				new_meta.counts = &counts;
+			}
 		});
 		return result;
 	}
 	void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-		underlying_allocator.free(data, size, alignment, location);
+		DefaultAllocator{}.free(data, size, alignment, location);
 
 		if (!data)
 			return;
@@ -100,13 +101,13 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 		});
 	}
 
-	operator Allocator() & {
+	operator Allocator() {
 		return make_allocator_from<TrackingAllocator>(this);
 	}
-	operator Allocator() && = delete;
 
+	static TrackingAllocator current() { return {}; }
 
-	List<AllocationInfo> get_tracked_allocations() {
+	static List<AllocationInfo> get_tracked_allocations(TL_LPC) {
 		return shared.use([&] (auto &shared) {
 			return shared.tracked_allocations.map([](auto kv){
 				return AllocationInfo {
@@ -114,14 +115,19 @@ struct TrackingAllocator : AllocatorBase<TrackingAllocator> {
 					.current_size = kv.value->current_size,
 					.total_size = kv.value->total_size
 				};
-			});
+			} TL_LA);
 		});
 	}
 };
 
-inline void init_tracking_allocator(TrackingAllocator *tracking_alloctor, Allocator underlying) {
-	construct(tracking_alloctor->shared);
-	tracking_alloctor->underlying_allocator = underlying;
-}
 
+template <>
+struct Scoped<TrackingAllocator> : Scoped<Allocator> {
+	void enter(TrackingAllocator) {
+		Scoped<Allocator>::enter(TrackingAllocator{});
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
+};
 }

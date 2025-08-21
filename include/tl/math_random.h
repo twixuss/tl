@@ -214,9 +214,21 @@ namespace default_randomizer {
 	template <> forceinline f32 random(v3s seed) { return random<f32>((v3u)seed); }
 	template <> forceinline f32 random(v4s seed) { return random<f32>((v4u)seed); }
 
+	template <> forceinline u32 random(v2u seed) { return dot(v2u{random<u32>(seed.x), random<u32>(seed.y)                                          }, *(v2u *)&random_primes_u32[0]); }
+	template <> forceinline u32 random(v3u seed) {
+		__m128i i = _mm_set_epi32(random_primes_u32[0], seed.z, seed.y, seed.x);
+		i = _mm_aesenc_si128(i, i);
+		return sum(*(v4u *)&i);
+	}
+	template <> forceinline u32 random(v4u seed) { return dot(v4u{random<u32>(seed.x), random<u32>(seed.y), random<u32>(seed.z), random<u32>(seed.w)}, *(v4u *)&random_primes_u32[0]); }
+	template <> forceinline u32 random(v2s seed) { return random<u32>((v2u)seed); }
+	template <> forceinline u32 random(v3s seed) { return random<u32>((v3u)seed); }
+	template <> forceinline u32 random(v4s seed) { return random<u32>((v4u)seed); }
+
 	template <> forceinline u32 random(f32 seed) { return random<u32>(*(u32 *)&seed); }
-	template <> forceinline u32 random(v2f seed) { return random<u32>(seed.x) ^ random<u32>(seed.y); }
-	template <> forceinline u32 random(v3f seed) { return random<u32>(seed.x) ^ random<u32>(seed.y) ^ random<u32>(seed.z); }
+	template <> forceinline u32 random(v2f seed) { return random<u32>(*(v2u *)&seed); }
+	template <> forceinline u32 random(v3f seed) { return random<u32>(*(v3u *)&seed); }
+	template <> forceinline u32 random(v4f seed) { return random<u32>(*(v4u *)&seed); }
 	//template <> forceinline u32 random(v3f seed) {
 	//	u32 result = 0xbabeface;
 	//	result ^= random<u32>(seed.x);
@@ -225,12 +237,6 @@ namespace default_randomizer {
 	//	return result;
 	//}
 
-	template <> forceinline u32 random(v2u seed) { return random<u32>(dot(seed, *(v2u *)&random_primes_u32[0])); }
-	template <> forceinline u32 random(v3u seed) { return random<u32>(dot(seed, *(v3u *)&random_primes_u32[0])); }
-	template <> forceinline u32 random(v4u seed) { return random<u32>(dot(seed, *(v4u *)&random_primes_u32[0])); }
-	template <> forceinline u32 random(v2s seed) { return random<u32>((v2u)seed); }
-	template <> forceinline u32 random(v3s seed) { return random<u32>((v3u)seed); }
-	template <> forceinline u32 random(v4s seed) { return random<u32>((v4u)seed); }
 	template <> forceinline v2f random(f32 seed) {
 		return {
 			random<f32>(+seed),
@@ -704,7 +710,7 @@ forceinline f32 gradient_noise(v2f coordinate) {
 template <class Randomizer = DefaultRandomizer>
 forceinline f32 gradient_noise(v3f coordinate) {
 	v3f tile = floor(coordinate);
-	v3f local = frac(coordinate);
+	v3f local = coordinate - tile;
 
 	v3f t0 = local;
 	v3f t1 = t0 - 1;
