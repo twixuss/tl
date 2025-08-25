@@ -98,169 +98,77 @@ inline v3f next_v3f(State &state) {
 }
 
 namespace default_randomizer {
-	template <class Result, class From>
-	forceinline Result random(From value) {
-		if constexpr (std::is_same_v<Result, s32>) {
-			return random<u32>(value);
-		} else {
-			static_error_t(Result, "overload for randomizing not implemented");
-		}
+
+template <umm size_out, umm size_in>
+forceinline Array<u8, size_out> random_bytes(Array<u8, size_in> in) = delete; // not implemented
+
+template <class Out, class In>
+struct StupidMiddleman {
+	forceinline static Out random(In in) {
+		return std::bit_cast<Out>(random_bytes<sizeof(Out)>(std::bit_cast<Array<u8, sizeof(In)>>(in)));
 	}
+};
 
-	template <> forceinline u32 random(u32 x) {
-		const u32 k = 3037000507u; // next_prime(2**31.5)
-		x = x*k^k;
-		x = x*k^k;
-		x = x*k^k;
-		x = x*k^k;
-		return x;
-	}
+template <class In>
+struct StupidMiddleman<f32, In> { forceinline static f32 random(In in) {
+	return normalize_range_f32<f32>(std::bit_cast<u32>(random_bytes<sizeof(f32)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+}};
+template <class In>
+struct StupidMiddleman<v2f, In> { forceinline static v2f random(In in) {
+	return normalize_range_f32<v2f>(std::bit_cast<v2u>(random_bytes<sizeof(v2f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+}};
+template <class In>
+struct StupidMiddleman<v3f, In> { forceinline static v3f random(In in) {
+	return normalize_range_f32<v3f>(std::bit_cast<v3u>(random_bytes<sizeof(v3f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+}};
+template <class In>
+struct StupidMiddleman<v4f, In> { forceinline static v4f random(In in) {
+	return normalize_range_f32<v4f>(std::bit_cast<v4u>(random_bytes<sizeof(v4f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+}};
 
-	template <> forceinline u64 random(u64 seed) {
-		u64 r0 = seed;
-		u64 r1 = rotate_left(seed, 32);
-		u64 r2 = ((seed << 8) & 0xFF00FF00FF00FF00) | ((seed >> 8) & 0x00FF00FF00FF00FF);
-		return r2 * r1 * r0 * 0x8F2A63394D;
-	}
 
-	template <> forceinline u32 random(s32 seed) { return random<u32>((u32)seed); }
-
-	template <> forceinline f32 random(u32 seed) { return normalize_range_f32<f32>(random<u32>(seed)); }
-	template <> forceinline f32 random(s32 seed) { return random<f32>((u32)seed); }
-	template <> forceinline f32 random(f32 seed) { return random<f32>(*(u32 *)&seed); }
-
-	template <> forceinline u64 random(s64 seed) { return random<u64>((u64)seed); }
-	template <> forceinline s64 random(u64 seed) { return (s64)random<u64>(seed); }
-	template <> forceinline s64 random(s64 seed) { return (s64)random<u64>(seed); }
-	template <> forceinline f64 random(u64 seed) { return normalize_range_f64<f64>(random<u64>(seed)); }
-	template <> forceinline f64 random(s64 seed) { return normalize_range_f64<f64>(random<u64>(seed)); }
-	
-	template <> forceinline v2u random(v3u seed) {
-		return {
-			dot(seed, *(v3u *)&random_primes_u32[0]),
-			dot(seed, *(v3u *)&random_primes_u32[3]),
-		};
-	}
-
-	template <> forceinline f32 random(v2f value) {
-		v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
-		a += dot(a, a + 12.34f);
-		return frac(a.x * a.y * 136.51f);
-	}
-	template <> forceinline f32 random(v3f value) {
-		v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
-		a += dot(a, a + 12.34f);
-		a = frac(a * a.yzx() * 136.51f);
-		return frac(dot(a, a));
-	}
-	template <> forceinline v2f random(v2f value) {
-		v2f a = frac(value * v2f{sqrt2, sqrt3} * 123.45f);
-		return frac(a + dot(a, a + 12.34f));
-	}
-	template <> forceinline v3f random(v3f value) {
-		v3f a = frac(value * v3f{sqrt2, sqrt3, sqrt5} * 123.45f);
-		a = frac(a);
-		return frac(a * a.yzx() + dot(a, a + 12.34f));
-	}
-	template <> forceinline v2f random(v3f value) { return normalize_range_f32<v2f>(random<v2u>(*(v3u *)&value)); }
-
-	template <> forceinline v2f random(v2s value) {
-		return {
-			random<f32>((value.x + reverse_bits(value.y)) ^ 0xABCDEF01),
-			random<f32>((value.y - reverse_bits(value.x)) ^ 0x12435687)
-		};
-	}
-
-	template <> forceinline v3f random(u64 value) {
-		return {
-			random<f32>((u32)rotate_left(value, 0)),
-			random<f32>((u32)rotate_left(value, 21)),
-			random<f32>((u32)rotate_left(value, 43)),
-		};
-	}
-	template <> forceinline v3f random(v3u x) {
-		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
-
-		v3u a;
-		a.x = dot(x, *(v3u *)&random_primes_u32[0]);
-		a.y = dot(x, *(v3u *)&random_primes_u32[3]);
-		a.z = dot(x, *(v3u *)&random_primes_u32[6]);
-
-		a = ((a & 0x55555555) << 1) | ((a >> 1) & 0x55555555);
-
-		return normalize_range_f32<v3f>(a);
-	}
-	template <> forceinline v3f random(v3s value) { return random<v3f>((v3u)value); }
-	/*
-	template <> forceinline simd_vector::v3fxrandom_v3fx8(simd_vector::v3ux8 x) {
-		using namespace simd_vector;
-		x = ((x & 0x55555555) << 1) | ((x >> 1) & 0x55555555);
-
-		v3ux8 a;
-		a.x = dot(x, V3u32x8(*(v3u*)&random_primes_u32[0]));
-		a.y = dot(x, V3u32x8(*(v3u*)&random_primes_u32[3]));
-		a.z = dot(x, V3u32x8(*(v3u*)&random_primes_u32[6]));
-
-		a = ((a & 0x55555555) << 1) | ((a >> 1) & 0x55555555);
-
-		return normalize_range_f32<v3fx8>(a);
-	}
-	*/
-
-	template <> forceinline f32 random(v2u seed) { return random<f32>(dot(seed, *(v2u *)random_primes_u32)); }
-	template <> forceinline f32 random(v3u seed) { return random<f32>(dot(seed, *(v3u *)random_primes_u32)); }
-	template <> forceinline f32 random(v4u seed) { return random<f32>(dot(seed, *(v4u *)random_primes_u32)); }
-	template <> forceinline f32 random(v2s seed) { return random<f32>((v2u)seed); }
-	template <> forceinline f32 random(v3s seed) { return random<f32>((v3u)seed); }
-	template <> forceinline f32 random(v4s seed) { return random<f32>((v4u)seed); }
-
-	template <> forceinline u32 random(v2u seed) { return dot(v2u{random<u32>(seed.x), random<u32>(seed.y)                                          }, *(v2u *)&random_primes_u32[0]); }
-	template <> forceinline u32 random(v3u seed) {
-		__m128i i = _mm_set_epi32(random_primes_u32[0], seed.z, seed.y, seed.x);
-		i = _mm_aesenc_si128(i, i);
-		return sum(*(v4u *)&i);
-	}
-	template <> forceinline u32 random(v4u seed) { return dot(v4u{random<u32>(seed.x), random<u32>(seed.y), random<u32>(seed.z), random<u32>(seed.w)}, *(v4u *)&random_primes_u32[0]); }
-	template <> forceinline u32 random(v2s seed) { return random<u32>((v2u)seed); }
-	template <> forceinline u32 random(v3s seed) { return random<u32>((v3u)seed); }
-	template <> forceinline u32 random(v4s seed) { return random<u32>((v4u)seed); }
-
-	template <> forceinline u32 random(f32 seed) { return random<u32>(*(u32 *)&seed); }
-	template <> forceinline u32 random(v2f seed) { return random<u32>(*(v2u *)&seed); }
-	template <> forceinline u32 random(v3f seed) { return random<u32>(*(v3u *)&seed); }
-	template <> forceinline u32 random(v4f seed) { return random<u32>(*(v4u *)&seed); }
-	//template <> forceinline u32 random(v3f seed) {
-	//	u32 result = 0xbabeface;
-	//	result ^= random<u32>(seed.x);
-	//	result ^= random<u32>(result ^ *(u32 *)&seed.y);
-	//	result ^= random<u32>(result ^ *(u32 *)&seed.z);
-	//	return result;
-	//}
-
-	template <> forceinline v2f random(f32 seed) {
-		return {
-			random<f32>(+seed),
-			random<f32>(-seed),
-		};
-	}
-	template <> forceinline v3u random(u32 seed) {
-		return {
-			random<u32>(seed + random_primes_u32[0]),
-			random<u32>(seed + random_primes_u32[1]),
-			random<u32>(seed + random_primes_u32[2]),
-		};
-	}
-	template <> forceinline v3u random(f32 seed) { return random<v3u>(*(u32 *)&seed); }
-	template <> forceinline v3f random(f32 seed) { return normalize_range_f32<v3f>(random<v3u>(seed)); }
-
-	template <> forceinline u32 random(u64 seed) { return random<u32>(dot(*(v2u *)&seed, *(v2u *)random_primes_u32)); }
+template <class Out, class In>
+forceinline Out random(In in) {
+	return StupidMiddleman<Out, In>::random(in);
 }
+
+template <>
+forceinline Array<u8, 4> random_bytes(Array<u8, 4> in) {
+	const u32 k = 3037000507u; // next_prime(2**31.5)
+	u32 x = std::bit_cast<u32>(in);
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	return std::bit_cast<Array<u8, 4>>(x);
+}
+
+template <>
+forceinline Array<u8, 12> random_bytes(Array<u8, 4> in) {
+	u32 x = std::bit_cast<u32>(in);
+	v3u r = {
+		random<u32>(x + random_primes_u32[0]),
+		random<u32>(x + random_primes_u32[1]),
+		random<u32>(x + random_primes_u32[2]),
+	};
+	return std::bit_cast<Array<u8, 12>>(r);
+}
+
+template <>
+forceinline Array<u8, 12> random_bytes(Array<u8, 16> in) {
+	__m128i x = std::bit_cast<__m128i>(in);
+	x = _mm_aesenc_si128(x, _mm_set_epi64x(0x9b68c80c8405f4d9, 0x1bf1b0f0d96f7f3d));
+	x = _mm_aesenc_si128(x, _mm_set_epi64x(0x23df27c1dd3eee5e, 0xb5bcbd5448dc1f4c));
+	//x = _mm_aesenc_si128(x, _mm_set_epi64x(0xca00b5128b1edd01, 0x038b07db0eed3c04));
+	return *(Array<u8, 12> *)&x;
+}
+
+}
+
 struct DefaultRandomizer {
-	template <class T, class From>
-	T random(From f) {
-		// Because gcc does not implement function specializations in struct scope (which is standardized since c++14 btw)
-		// this has to be just a wrapper of functions in a namespace.
-		return default_randomizer::random<T>(f);
+	template <class Out, class In>
+	forceinline static Out random(In in) {
+		return default_randomizer::random<Out>(in);
 	}
 };
 
