@@ -104,7 +104,7 @@ forceinline Array<u8, size_out> random_bytes(Array<u8, size_in> in) = delete; //
 
 template <class Out, class In>
 struct StupidMiddleman {
-	forceinline static Out random(In in) {
+	forceinline static Out random(In in) requires requires { random_bytes<sizeof(Out)>(std::bit_cast<Array<u8, sizeof(In)>>(in)); } {
 		return std::bit_cast<Out>(random_bytes<sizeof(Out)>(std::bit_cast<Array<u8, sizeof(In)>>(in)));
 	}
 };
@@ -128,7 +128,7 @@ struct StupidMiddleman<v4f, In> { forceinline static v4f random(In in) {
 
 
 template <class Out, class In>
-forceinline Out random(In in) {
+forceinline Out random(In in) requires requires { StupidMiddleman<Out, In>::random(in); } {
 	return StupidMiddleman<Out, In>::random(in);
 }
 
@@ -141,6 +141,17 @@ forceinline Array<u8, 4> random_bytes(Array<u8, 4> in) {
 	x = x*k^k;
 	x = x*k^k;
 	return std::bit_cast<Array<u8, 4>>(x);
+}
+
+template <>
+forceinline Array<u8, 4> random_bytes(Array<u8, 8> in) {
+	u64 const k = 11400714819322457659; // next_prime(2**64 / phi)
+	u64 x = std::bit_cast<u64>(in);
+	x = x*k^k;
+	x = x*k^k;
+
+	u32 r = x ^ (x >> 32);
+	return std::bit_cast<Array<u8, 4>>(r);
 }
 
 template <>
@@ -167,7 +178,7 @@ forceinline Array<u8, 12> random_bytes(Array<u8, 16> in) {
 
 struct DefaultRandomizer {
 	template <class Out, class In>
-	forceinline static Out random(In in) {
+	forceinline static Out random(In in) requires requires { default_randomizer::random<Out>(in); } {
 		return default_randomizer::random<Out>(in);
 	}
 };
