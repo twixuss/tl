@@ -159,6 +159,24 @@ struct RingBuffer {
 		}
 	}
 	
+	// Packs elements to be contiguous
+	// 
+	// defg_abc
+	//  =>
+	// abcdefg_
+	Span<T> pack() {
+
+		for (umm i = 0; i < count; ++i) {
+			T *dst = &storage[i];
+			T *src = &storage[(start + i) & (capacity - 1)];
+			Swap(*dst, *src);
+		}
+
+		start = 0;
+
+		return {storage, count};
+	}
+
 	void free() {
 		if (storage == 0)
 			return;

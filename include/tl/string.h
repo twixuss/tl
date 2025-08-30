@@ -1510,16 +1510,70 @@ struct NumberAbbreviationOptions {
 	Span<utf8> between_value_and_unit = u8" "s;
 };
 
-inline static constexpr Span<utf8> abbrev_k_strings[] = {u8""s, u8"K"s, u8"M"s, u8"B"s, u8"T"s, u8"Q"s};
+inline static constexpr Span<utf8> abbrev_k_strings[] = {
+	u8""s,
+	u8"K"s,
+	u8"M"s,
+	u8"B"s,
+	u8"T"s,
+	u8"Q"s,
+};
 inline static constexpr NumberAbbreviationUnits abbrev_k = {1000, array_as_span(abbrev_k_strings)};
 
-inline static constexpr Span<utf8> abbrev_kb_strings[] = {u8"B"s, u8"KB"s, u8"MB"s, u8"GB"s, u8"TB"s, u8"PB"s, u8"EB"s};
+inline static constexpr Span<utf8> abbrev_kb_strings[] = {
+	u8"B"s,
+	u8"KB"s,
+	u8"MB"s,
+	u8"GB"s,
+	u8"TB"s,
+	u8"PB"s,
+	u8"EB"s,
+	u8"ZB"s,
+	u8"YB"s,
+	u8"RB"s,
+	u8"QB"s,
+};
 inline static constexpr NumberAbbreviationUnits abbrev_kb = {1000, array_as_span(abbrev_kb_strings)};
 
-inline static constexpr Span<utf8> abbrev_kib_strings[] = {u8"B"s, u8"KiB"s, u8"MiB"s, u8"GiB"s, u8"TiB"s, u8"PiB"s, u8"EiB"s};
+inline static constexpr Span<utf8> abbrev_kib_strings[] = {
+	u8"B"s,
+	u8"KiB"s,
+	u8"MiB"s,
+	u8"GiB"s,
+	u8"TiB"s,
+	u8"PiB"s,
+	u8"EiB"s,
+	u8"ZiB"s,
+	u8"YiB"s,
+	u8"RiB"s,
+	u8"QiB"s,
+};
 inline static constexpr NumberAbbreviationUnits abbrev_kib = {1024, array_as_span(abbrev_kib_strings)};
 
-inline static constexpr Span<utf8> abbrev_text_strings[] = {u8""s, u8"thousand"s, u8"million"s, u8"billion"s, u8"trillion"s, u8"quadrillion"s};
+inline static constexpr Span<utf8> abbrev_text_strings[] = {
+	u8""s,
+	u8"thousand"s,
+	u8"million"s,
+	u8"billion"s,
+	u8"trillion"s,
+	u8"quadrillion"s,
+	u8"quintillion"s,
+	u8"sextillion"s,
+	u8"septillion"s,
+	u8"octillion"s,
+	u8"nonillion"s,
+	u8"decillion"s,
+	u8"undecillion"s,
+	u8"duodecillion"s,
+	u8"tredecillion"s,
+	u8"quattuordecillion"s,
+	u8"quindecillion"s,
+	u8"sexdecillion"s,
+	u8"septendecillion"s,
+	u8"octodecillion"s,
+	u8"novemdecillion"s,
+	u8"vigintillion"s,
+};
 inline static constexpr NumberAbbreviationUnits abbrev_text = {1000, array_as_span(abbrev_text_strings)};
 
 inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &units, NumberAbbreviationOptions options = {}) {
@@ -1527,7 +1581,7 @@ inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &u
 
 	u8 unit = 0;
 	if (ok) {
-		while (value > units.divisor) {
+		while (value > units.divisor && unit + 1 < units.unit_table.count) {
 			value /= units.divisor;
 			unit += 1;
 		}

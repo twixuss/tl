@@ -709,29 +709,32 @@ void ConditionVariable::unlock() {
 #endif
 
 template <class T, class Allocator = Allocator>
-struct SignalQueue : private Queue<T, Allocator> {
-	using Base = Queue<T, Allocator>;
+struct SignalQueue {
+	Queue<T, Allocator> queue;
+	ConditionVariable cv;
 
 	void push(T value) {
 		cv.section([&]{
-			Base::push(value);
+			queue.push(value);
 		});
 		cv.wake();
 	}
 
 	void push(Span<T> value) {
 		cv.section([&]{
-			Base::push(value);
+			queue.push(value);
 		});
 		cv.wake();
 	}
-
-	Optional<T> pop(auto cancelled, u32 timeout = -1) {
+	
+	Optional<T> pop(auto cancelled, u32 timeout = -1)
+		requires requires { { cancelled() } -> std::convertible_to<bool>; }
+	{
 		Optional<T> result;
 
 		cv.section([&] (ConditionVariable::Sleeper sleeper) {
 			while (!cancelled()) {
-				if (result = Base::pop()) {
+				if (result = queue.pop()) {
 					break;
 				} else {
 					sleeper.sleep(timeout);
@@ -741,11 +744,12 @@ struct SignalQueue : private Queue<T, Allocator> {
 
 		return result;
 	}
+	Optional<T> pop(u32 timeout = -1) {
+		return pop([] { return false; }, timeout);
+	}
 	T pop() {
 		return pop([] { return false; }).value();
 	}
-private:
-	ConditionVariable cv;
 };
 
 enum WaitForCompletionOption {

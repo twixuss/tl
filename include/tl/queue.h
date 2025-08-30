@@ -39,6 +39,7 @@ struct Queue : private RingBuffer<T, Allocator> {
 	using Base::reserve;
 	using Base::free;
 	using Base::spans;
+	using Base::pack;
 	
 	T &push(T value = {}) {
 		return this->push_back(value);
