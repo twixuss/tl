@@ -35,6 +35,16 @@ struct Array {
 		return span_iter(self.data, self.data + count, options);
 	}
 
+	auto map(auto &&mapper) const
+		requires requires { mapper(data[0]); }
+	{
+		Array<std::remove_cvref_t<decltype(mapper(data[0]))>, count> result = {};
+		for (umm i = 0; i < count; ++i) {
+			result.data[i] = mapper(data[i]);
+		}
+		return result;
+	}
+
 	#define OP(op)                                                               \
 		forceinline constexpr auto operator op() const                           \
 			requires requires(T t) { op t; }                                     \

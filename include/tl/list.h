@@ -299,9 +299,9 @@ struct List : Span<T, Size_> {
 		bounds_check(assert(begin() <= where.begin() && where.begin() <= end()));
 		bounds_check(assert(begin() <= where.end()   && where.end()   <= end()));
 
-		T *old_data = data;
+		umm where_index = where.data - data;
 		reserve_exponential(count - where.count + with_what.count);
-		where.data += data - old_data;
+		where.data = data + where_index;
 
 		memmove(
 			where.data + with_what.count,
