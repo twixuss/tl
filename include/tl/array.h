@@ -205,4 +205,12 @@ forceinline constexpr Array<T, count> blend(Array<Mask, count> const &mask, Arra
 	return r;
 }
 
+template <class T, umm count>
+forceinline constexpr Array<T, count> select(Array<bool, count> const &mask, Array<T, count> const &a, Array<T, count> const &b) {
+	Array<T, count> r = {};
+	for (umm i = 0; i < count; ++i)
+		r.data[i] = mask.data[i] ? a.data[i] : b.data[i];
+	return r;
+}
+
 }

@@ -727,7 +727,35 @@ struct SignalQueue {
 		cv.wake();
 	}
 	
-	Optional<T> pop(auto cancelled, u32 timeout = -1)
+	Optional<T> try_pop() {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			result = queue.pop();
+		});
+
+		return result;
+	}
+	
+	// If the queue is empty, waits for `timeout`, checks availability again once and returns.
+	Optional<T> try_pop(u32 timeout) {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			result = queue.pop();
+			if (result) {
+				return;
+			}
+			sleeper.sleep(timeout);
+			result = queue.pop();
+		});
+
+		return result;
+	}
+	
+	// Wait until an element is available, or until the user cancels the operation.
+	// sleep_period determines the frequency with which the queue is checked for available elements.
+	Optional<T> pop(auto cancelled, u32 sleep_period = -1)
 		requires requires { { cancelled() } -> std::convertible_to<bool>; }
 	{
 		Optional<T> result;
@@ -737,18 +765,30 @@ struct SignalQueue {
 				if (result = queue.pop()) {
 					break;
 				} else {
-					sleeper.sleep(timeout);
+					sleeper.sleep(sleep_period);
 				}
 			}
 		});
 
 		return result;
 	}
-	Optional<T> pop(u32 timeout = -1) {
-		return pop([] { return false; }, timeout);
-	}
-	T pop() {
-		return pop([] { return false; }).value();
+
+	// Wait until an element is available.
+	// sleep_period determines the frequency with which the queue is checked for available elements.
+	T pop(u32 sleep_period = -1) {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (1) {
+				if (result = queue.pop()) {
+					break;
+				} else {
+					sleeper.sleep(sleep_period);
+				}
+			}
+		});
+
+		return result.value();
 	}
 };
 

@@ -36,6 +36,7 @@ void append(StringBuilder &builder, YourType t) {
 #include "common.h"
 #include "list.h"
 #include "static_list.h"
+#include "array.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820)
@@ -1494,111 +1495,210 @@ List<utf8, Allocator> to_string(T const &value) {
 	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current());
 }
 
-struct NumberAbbreviation {
-	f64 value;
-	Span<utf8> between_value_and_unit = u8" "s;
-	u8 unit;
-	Span<Span<utf8>> const *unit_table;
+struct UnitScaleAndName {
+	f64 scale = 0;
+	Span<utf8> name = {};
 };
 
 struct NumberAbbreviationUnits {
-	f64 divisor;
-	Span<Span<utf8>> unit_table;
+	umm base_unit_index = 0;
+	Span<UnitScaleAndName> unit_table = {};
+};
+
+inline static constexpr UnitScaleAndName abbrev_k_units[] = {
+	{1e+00, u8""s},
+	{1e+03, u8"K"s},
+	{1e+06, u8"M"s},
+	{1e+09, u8"B"s},
+	{1e+12, u8"T"s},
+	{1e+15, u8"Q"s},
+};
+inline static constexpr NumberAbbreviationUnits abbrev_k = {0, array_as_span(abbrev_k_units)};
+
+inline static constexpr UnitScaleAndName abbrev_kb_units[] = {
+	{1e+00, u8"B"s},
+	{1e+03, u8"KB"s},
+	{1e+06, u8"MB"s},
+	{1e+09, u8"GB"s},
+	{1e+12, u8"TB"s},
+	{1e+15, u8"PB"s},
+	{1e+18, u8"EB"s},
+	{1e+21, u8"ZB"s},
+	{1e+24, u8"YB"s},
+	{1e+27, u8"RB"s},
+	{1e+30, u8"QB"s},
+};
+inline static constexpr NumberAbbreviationUnits abbrev_kb = {0, array_as_span(abbrev_kb_units)};
+
+inline static constexpr UnitScaleAndName abbrev_kib_units[] = {
+	{1.0, u8"B"s},
+	{1024.0, u8"KiB"s},
+	{1048576.0, u8"MiB"s},
+	{1073741824.0, u8"GiB"s},
+	{1099511627776.0, u8"TiB"s},
+	{1125899906842624.0, u8"PiB"s},
+	{1152921504606846976.0, u8"EiB"s},
+	{1180591620717411303424.0, u8"ZiB"s},
+	{1208925819614629174706176.0, u8"YiB"s},
+	{1237940039285380274899124224.0, u8"RiB"s},
+	{1267650600228229401496703205376.0, u8"QiB"s},
+};
+inline static constexpr NumberAbbreviationUnits abbrev_kib = {0, array_as_span(abbrev_kib_units)};
+
+inline static constexpr UnitScaleAndName abbrev_text_units[] = {
+	{1e+00, u8""s},
+	{1e+03, u8"thousand"s},
+	{1e+06, u8"million"s},
+	{1e+09, u8"billion"s},
+	{1e+12, u8"trillion"s},
+	{1e+15, u8"quadrillion"s},
+	{1e+18, u8"quintillion"s},
+	{1e+21, u8"sextillion"s},
+	{1e+24, u8"septillion"s},
+	{1e+27, u8"octillion"s},
+	{1e+30, u8"nonillion"s},
+	{1e+33, u8"decillion"s},
+	{1e+36, u8"undecillion"s},
+	{1e+39, u8"duodecillion"s},
+	{1e+42, u8"tredecillion"s},
+	{1e+45, u8"quattuordecillion"s},
+	{1e+48, u8"quindecillion"s},
+	{1e+51, u8"sexdecillion"s},
+	{1e+54, u8"septendecillion"s},
+	{1e+57, u8"octodecillion"s},
+	{1e+60, u8"novemdecillion"s},
+	{1e+63, u8"vigintillion"s},
+	{1e+303, u8"centillion"s},
+};
+inline static constexpr NumberAbbreviationUnits abbrev_text = {0, array_as_span(abbrev_text_units)};
+
+inline static constexpr UnitScaleAndName abbrev_metres_units[] = {
+	{1e-9, u8"nm"s},
+	{1e-6, u8"um"s},
+	{1e-3, u8"mm"s},
+	{1e+0,  u8"m"s},
+	{1e+3, u8"km"s},
+};
+
+inline static constexpr NumberAbbreviationUnits abbrev_metres = {3, array_as_span(abbrev_metres_units)};
+
+struct NumberAbbreviation {
+	f64 value = 0;
+	Span<utf8> between_value_and_unit = u8" "s;
+	u8 unit = 0;
+	Span<UnitScaleAndName> unit_table = {};
+	s8 exponent = 1;
 };
 
 struct NumberAbbreviationOptions {
 	Span<utf8> between_value_and_unit = u8" "s;
+	s8 exponent = 1;
 };
-
-inline static constexpr Span<utf8> abbrev_k_strings[] = {
-	u8""s,
-	u8"K"s,
-	u8"M"s,
-	u8"B"s,
-	u8"T"s,
-	u8"Q"s,
-};
-inline static constexpr NumberAbbreviationUnits abbrev_k = {1000, array_as_span(abbrev_k_strings)};
-
-inline static constexpr Span<utf8> abbrev_kb_strings[] = {
-	u8"B"s,
-	u8"KB"s,
-	u8"MB"s,
-	u8"GB"s,
-	u8"TB"s,
-	u8"PB"s,
-	u8"EB"s,
-	u8"ZB"s,
-	u8"YB"s,
-	u8"RB"s,
-	u8"QB"s,
-};
-inline static constexpr NumberAbbreviationUnits abbrev_kb = {1000, array_as_span(abbrev_kb_strings)};
-
-inline static constexpr Span<utf8> abbrev_kib_strings[] = {
-	u8"B"s,
-	u8"KiB"s,
-	u8"MiB"s,
-	u8"GiB"s,
-	u8"TiB"s,
-	u8"PiB"s,
-	u8"EiB"s,
-	u8"ZiB"s,
-	u8"YiB"s,
-	u8"RiB"s,
-	u8"QiB"s,
-};
-inline static constexpr NumberAbbreviationUnits abbrev_kib = {1024, array_as_span(abbrev_kib_strings)};
-
-inline static constexpr Span<utf8> abbrev_text_strings[] = {
-	u8""s,
-	u8"thousand"s,
-	u8"million"s,
-	u8"billion"s,
-	u8"trillion"s,
-	u8"quadrillion"s,
-	u8"quintillion"s,
-	u8"sextillion"s,
-	u8"septillion"s,
-	u8"octillion"s,
-	u8"nonillion"s,
-	u8"decillion"s,
-	u8"undecillion"s,
-	u8"duodecillion"s,
-	u8"tredecillion"s,
-	u8"quattuordecillion"s,
-	u8"quindecillion"s,
-	u8"sexdecillion"s,
-	u8"septendecillion"s,
-	u8"octodecillion"s,
-	u8"novemdecillion"s,
-	u8"vigintillion"s,
-};
-inline static constexpr NumberAbbreviationUnits abbrev_text = {1000, array_as_span(abbrev_text_strings)};
 
 inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &units, NumberAbbreviationOptions options = {}) {
-	bool ok = !isinf(value) && !isnan(value);
+	u8 unit = units.base_unit_index;
 
-	u8 unit = 0;
-	if (ok) {
-		while (value > units.divisor && unit + 1 < units.unit_table.count) {
-			value /= units.divisor;
-			unit += 1;
+	if (!isinf(value) && !isnan(value)) {
+
+		while (unit > 1 && value < ::pow(units.unit_table[unit-1].scale, options.exponent)) {
+			--unit;
 		}
+		while (unit < units.unit_table.count-1 && value >= ::pow(units.unit_table[unit+1].scale, options.exponent)) {
+			++unit;
+		}
+
+		value /= ::pow(units.unit_table[unit].scale, options.exponent);
 	}
 
 	return {
 		.value = value,
 		.between_value_and_unit = options.between_value_and_unit,
 		.unit = unit,
-		.unit_table = &units.unit_table,
+		.unit_table = units.unit_table,
+		.exponent = options.exponent,
 	};
 }
 inline void append(StringBuilder &builder, FormatFloat<NumberAbbreviation> abbrev) {
-	append_format(builder, "{}{}{}", abbrev.with_value(abbrev.value.value), abbrev.value.between_value_and_unit, (*abbrev.value.unit_table)[abbrev.value.unit]);
+	append(builder, abbrev.with_value(abbrev.value.value));
+	if (abbrev.value.unit_table[abbrev.value.unit].name.count) {
+		append(builder, abbrev.value.between_value_and_unit);
+		append(builder, abbrev.value.unit_table[abbrev.value.unit].name);
+	}
+	if (abbrev.value.exponent != 1) {
+		append(builder, '^');
+		append(builder, abbrev.value.exponent);
+	}
 }
 
 inline void append(StringBuilder &builder, NumberAbbreviation abbrev) {
+	append(builder, FormatFloat{.value = abbrev, .precision = 3, .trailing_zeros = false});
+}
+
+template <umm count>
+struct NumberMultiAbbreviation {
+	struct Abbreviation {
+		Span<utf8> between_value_and_unit = u8" "s;
+		u8 unit = 0;
+		Span<UnitScaleAndName> unit_table = {};
+	};
+
+	f64 value = 0;
+	s8 exponent = 1;
+	Abbreviation abbreviations[count] = {};
+};
+
+template <umm count>
+inline NumberMultiAbbreviation<count> abbreviate(f64 value, Array<NumberAbbreviationUnits, count> units_array, NumberAbbreviationOptions options = {}) {
+	NumberMultiAbbreviation<count> result = {};
+
+	for (umm i = count-1; i != -1; --i) {
+		s8 exponent = i == count-1 ? options.exponent : 1;
+
+		auto units = units_array[i];
+
+		u8 unit = units.base_unit_index;
+
+		if (!isinf(value) && !isnan(value)) {
+
+			while (unit > 1 && value < ::pow(units.unit_table[unit-1].scale, exponent)) {
+				--unit;
+			}
+			while (unit < units.unit_table.count-1 && value >= ::pow(units.unit_table[unit+1].scale, exponent)) {
+				++unit;
+			}
+
+			value /= ::pow(units.unit_table[unit].scale, exponent);
+		}
+
+		result.abbreviations[i] = {
+			.between_value_and_unit = options.between_value_and_unit,
+			.unit = unit,
+			.unit_table = units.unit_table,
+		};
+	}
+
+	result.value = value;
+	result.exponent = options.exponent;
+
+	return result;
+}
+template <umm count>
+inline void append(StringBuilder &builder, FormatFloat<NumberMultiAbbreviation<count>> abbrev) {
+	append(builder, abbrev.with_value(abbrev.value.value));
+	for (umm i = 0; i < count; ++i) {
+		auto abbreviation = abbrev.value.abbreviations[i];
+		if (abbreviation.unit_table[abbreviation.unit].name.count) {
+			append(builder, abbreviation.between_value_and_unit);
+			append(builder, abbreviation.unit_table[abbreviation.unit].name);
+		}
+	}
+	if (abbrev.value.exponent != 1) {
+		append(builder, '^');
+		append(builder, abbrev.value.exponent);
+	}
+}
+template <umm count>
+inline void append(StringBuilder &builder, NumberMultiAbbreviation<count> abbrev) {
 	append(builder, FormatFloat{.value = abbrev, .precision = 3, .trailing_zeros = false});
 }
 
