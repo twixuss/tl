@@ -41,6 +41,14 @@ inline File open_file(Span<Char> path, OpenFileParams params) { scoped(temporary
 TL_API void close(File file);
 
 TL_API umm read(File file, Span<u8> data);
+
+template <class T>
+forceinline T read(File file) {
+	u8 bytes[sizeof(T)];
+	read(file, array_as_span(bytes));
+	return std::bit_cast<T>(bytes);
+}
+
 TL_API umm write(File file, Span<u8> data);
 
 TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
