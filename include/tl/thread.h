@@ -493,40 +493,40 @@ struct LockProtected {
 
 	using Value = T;
 
-	LockProtected() = default;
-	LockProtected(T value) : unprotected(value) {}
+	forceinline LockProtected() = default;
+	forceinline LockProtected(T value) : unprotected(value) {}
 
 	template <class Fn>
-	decltype(auto) use(Fn fn) {
+	forceinline decltype(auto) use(Fn fn) {
 		scoped(_lock);
 		return fn(unprotected);
 	}
 
 	template <class Fn>
-	decltype(auto) operator->*(Fn fn) { return use(fn); }
+	forceinline decltype(auto) operator->*(Fn fn) { return use(fn); }
 
 	struct Iterator {
 		LockProtected *p = 0;
 		bool should_unlock = false;
-		T &operator*() const {
+		forceinline T &operator*() const {
 			lock(_lock);
 			return p->unprotected;
 		}
-		bool operator!=(Iterator const &that) const {
+		forceinline bool operator!=(Iterator const &that) const {
 			return p != that.p;
 		}
-		void operator++() {
+		forceinline void operator++() {
 			p = 0;
 		}
-		~Iterator() {
+		forceinline ~Iterator() {
 			if (should_unlock) {
 				unlock(_lock);
 			}
 		}
 	};
 
-	Iterator begin() { return {this}; }
-	Iterator end() { return {}; }
+	forceinline Iterator begin() { return {this}; }
+	forceinline Iterator end() { return {}; }
 	
 
 	// private:
@@ -560,6 +560,18 @@ use_locked(auto &queue : context->queue) {
 };
 */
 #define use_locked for
+
+
+/*
+// Example usage:
+{
+	scoped_locked_use(queue);
+	queue.push(42);
+}
+*/
+#define scoped_locked_use(name) \
+	scoped(name._lock); \
+	REDECLARE_REF(name, name.unprotected)
 
 template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {

@@ -177,6 +177,27 @@ struct RingBuffer {
 		return {storage, count};
 	}
 
+	void erase_all(auto &&predicate)
+		requires requires { { predicate(storage[0]) } -> std::convertible_to<bool>; }
+	{
+		umm idst = 0;
+
+		for (umm isrc = 0; isrc < count; ++isrc) {
+			auto &src = storage[(start + isrc) & (capacity - 1)];
+			if (predicate(src)) {
+				// remove
+				src.~T();
+			} else {
+				// keep
+				auto &dst = storage[(start + idst) & (capacity - 1)];
+				dst = (T &&)src;
+				idst += 1;
+			}
+		}
+
+		count = idst;
+	}
+
 	void free() {
 		if (storage == 0)
 			return;

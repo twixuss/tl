@@ -727,6 +727,9 @@ constexpr bool owns(T (&array)[count], T *pointer) {
 // NOTE: have to use const & to pass arrays, otherwise they rot.
 template <class T> forceinline constexpr auto min(T const &a) { return a; }
 template <class T> forceinline constexpr auto max(T const &a) { return a; }
+template <class T> forceinline constexpr auto min(T const &a, T const &b) { return select(a < b, a, b); }
+template <class T> forceinline constexpr auto max(T const &a, T const &b) { return select(a > b, a, b); }
+
 template <class T, umm count>
 forceinline constexpr auto min(T const (&array)[count]) {
 	T result = array[0];
@@ -744,9 +747,6 @@ forceinline constexpr auto max(T const (&array)[count]) {
 	}
 	return result;
 }
-
-template <class T> forceinline constexpr auto min(T const &a, T const &b) { return select(a < b, a, b); }
-template <class T> forceinline constexpr auto max(T const &a, T const &b) { return select(a > b, a, b); }
 
 template <class T, class ...Rest>
 forceinline constexpr auto min(T first, Rest const &...rest) requires (sizeof...(Rest) > 1) && AllSame<T, Rest...> {
