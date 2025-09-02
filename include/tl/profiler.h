@@ -213,42 +213,16 @@ struct ProfileRenderer {
 		Nanoseconds total_duration;
 	};
 
-private:
-
-	List<ThreadDrawList> all_events_to_draw;
+	List<ThreadDrawList> events_to_draw_by_thread;
 	Nanoseconds events_begin = 0;
 	Nanoseconds events_end = 0;
 	Nanoseconds events_duration = 0;
 
-public:
 	void setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark> marks);
+
+	void render(f64 view_scale, f64 scroll_amount_in_nanoseconds, s32 button_height);
+
 	void free();
-
-	template <class Drawer>
-	void render(f64 view_scale, f64 scroll_amount_in_nanoseconds, s32 button_height, Drawer drawer) {
-		for (auto &events_to_draw : all_events_to_draw) {
-			u32 max_depth = 0;
-
-			for (auto &mark : events_to_draw.marks) {
-				mark.rect.min.x = (mark.time - scroll_amount_in_nanoseconds) * view_scale;
-				mark.rect.max.x = mark.rect.min.x + 1;
-				mark.rect.min.y = 0;
-				mark.rect.max.y = button_height * 1;
-			}
-			for (auto &event : events_to_draw.events) {
-				event.rect.min.x = (event.begin - scroll_amount_in_nanoseconds) * view_scale;
-				event.rect.max.x = max<f64>((event.end - scroll_amount_in_nanoseconds) * view_scale, event.rect.min.x + 1);
-				event.rect.min.y = button_height * (event.depth + 0);
-				event.rect.max.y = button_height * (event.depth + 1);
-
-				max_depth = max(max_depth, event.depth);
-			}
-
-			events_to_draw.height = max_depth * button_height;
-
-			drawer(events_to_draw);
-		}
-	}
 };
 
 }
@@ -475,14 +449,6 @@ List<u8> Profiler::output_for_timed() {
 	return (List<u8>)to_string(builder);
 }
 
-void ProfileRenderer::free() {
-	for (auto &events_to_draw : all_events_to_draw) {
-		tl::free(events_to_draw.events);
-		tl::free(events_to_draw.marks);
-	}
-	tl::free(all_events_to_draw);
-}
-
 void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark> marks) {
 	events_begin = max_value<Nanoseconds>;
 	events_end = min_value<Nanoseconds>;
@@ -532,11 +498,42 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 		}
 	}
 
-	all_events_to_draw.clear();
+	events_to_draw_by_thread.clear();
 	foreach(it, thread_id_to_events_to_draw) {
-		all_events_to_draw.add(it.value());
+		events_to_draw_by_thread.add(it.value());
 	}
-	quick_sort(all_events_to_draw, [](ThreadDrawList t) { return t.id; });
+	quick_sort(events_to_draw_by_thread, [](ThreadDrawList t) { return t.id; });
+}
+
+void ProfileRenderer::render(f64 view_scale, f64 scroll_amount_in_nanoseconds, s32 button_height) {
+	for (auto &events_to_draw : events_to_draw_by_thread) {
+		u32 max_depth = 0;
+
+		for (auto &mark : events_to_draw.marks) {
+			mark.rect.min.x = (mark.time - scroll_amount_in_nanoseconds) * view_scale;
+			mark.rect.max.x = mark.rect.min.x + 1;
+			mark.rect.min.y = 0;
+			mark.rect.max.y = button_height * 1;
+		}
+		for (auto &event : events_to_draw.events) {
+			event.rect.min.x = (event.begin - scroll_amount_in_nanoseconds) * view_scale;
+			event.rect.max.x = max<f64>((event.end - scroll_amount_in_nanoseconds) * view_scale, event.rect.min.x + 1);
+			event.rect.min.y = button_height * (event.depth + 0);
+			event.rect.max.y = button_height * (event.depth + 1);
+
+			max_depth = max(max_depth, event.depth);
+		}
+
+		events_to_draw.height = (max_depth + 1) * button_height;
+	}
+}
+
+void ProfileRenderer::free() {
+	for (auto &events_to_draw : events_to_draw_by_thread) {
+		tl::free(events_to_draw.events);
+		tl::free(events_to_draw.marks);
+	}
+	tl::free(events_to_draw_by_thread);
 }
 
 }

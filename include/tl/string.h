@@ -1612,7 +1612,7 @@ inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &u
 
 	if (!isinf(value) && !isnan(value)) {
 
-		while (unit > 1 && value < ::pow(units.unit_table[unit-1].scale, options.exponent)) {
+		while (unit > 1 && value < ::pow(units.unit_table[unit].scale, options.exponent)) {
 			--unit;
 		}
 		while (unit < units.unit_table.count-1 && value >= ::pow(units.unit_table[unit+1].scale, options.exponent)) {
@@ -1672,7 +1672,7 @@ inline NumberMultiAbbreviation<count> abbreviate(f64 value, Array<NumberAbbrevia
 
 		if (!isinf(value) && !isnan(value)) {
 
-			while (unit > 1 && value < ::pow(units.unit_table[unit-1].scale, exponent)) {
+			while (unit > 1 && value < ::pow(units.unit_table[unit].scale, exponent)) {
 				--unit;
 			}
 			while (unit < units.unit_table.count-1 && value >= ::pow(units.unit_table[unit+1].scale, exponent)) {
