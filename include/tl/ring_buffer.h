@@ -92,7 +92,7 @@ struct RingBuffer {
 			return {};
 		return storage[--count & (capacity - 1)];
 	}
-
+	
 	Optional<T> pop_front() {
 		if (!count)
 			return {};
@@ -100,6 +100,19 @@ struct RingBuffer {
 		auto result = storage[start];
 		++start &= (capacity - 1);
 		return result;
+	}
+	
+	void pop_back(umm count_to_pop) {
+		count_to_pop = min(count_to_pop, count);
+		count -= count_to_pop;
+	}
+	
+	void pop_front(umm count_to_pop) {
+		count_to_pop = min(count_to_pop, count);
+
+		count -= count_to_pop;
+		start += count_to_pop;
+		start &= (capacity - 1);
 	}
 	
 	void clear() {

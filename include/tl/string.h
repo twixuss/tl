@@ -1582,6 +1582,18 @@ inline static constexpr UnitScaleAndName abbrev_metres_units[] = {
 
 inline static constexpr NumberAbbreviationUnits abbrev_metres = {3, array_as_span(abbrev_metres_units)};
 
+inline static constexpr UnitScaleAndName abbrev_seconds_units[] = {
+	{1e-9, u8"ns"s},
+	{1e-6, u8"us"s},
+	{1e-3, u8"ms"s},
+	{1,     u8"s"s},
+	{60,    u8"m"s},
+	{3600,  u8"h"s},
+	{86400, u8"d"s},
+};
+
+inline static constexpr NumberAbbreviationUnits abbrev_seconds = {3, array_as_span(abbrev_seconds_units)};
+
 struct NumberAbbreviation {
 	f64 value = 0;
 	Span<utf8> between_value_and_unit = u8" "s;

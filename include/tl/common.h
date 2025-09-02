@@ -3573,7 +3573,7 @@ struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
 		auto target = ceil(cursor, alignment);
 		cursor = target + size;
 		assert(cursor <= base + buffer_size, "Out of arena memory");
-		return AllocationResult { .data = target, .count = size, .is_zeroed = true };
+		return AllocationResult { .data = target, .count = size, .is_zeroed = false };
 	}
 	forceinline AllocationResult reallocate_impl(void *old_data, umm old_size, umm new_size, umm alignment TL_LP) {
 		auto new_data = allocate_impl(new_size, alignment);

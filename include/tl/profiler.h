@@ -33,12 +33,16 @@
 namespace tl {
 struct TL_API Profiler {
 	struct TimeSpan {
+		static constexpr u32 invalid_parent_span = 0x80000000;
+
 		u64 begin;
 		u64 end;
 		Span<utf8> name;
 		Span<utf8> file;
 		u32 line;
 		u32 thread_id;
+		u64 self;
+		u16 depth;
 	};
 	struct Mark {
 		u64 counter;
@@ -46,7 +50,9 @@ struct TL_API Profiler {
 		u32 thread_id;
 	};
 	struct ThreadInfo {
-		List<TimeSpan> time_spans;
+		List<TimeSpan> time_span_stack;
+		List<TimeSpan> recorded_time_spans;
+		u32 depth = 0;
 #if TL_PROFILER_SUBTRACT_SELF_TIME
 		u64 self_time;
 #endif
@@ -54,18 +60,14 @@ struct TL_API Profiler {
 
 	ArenaAllocator allocator;
 
-	List<Mark> marks;
-	SpinLock marks_lock;
-
+	LockProtected<List<Mark>, RecursiveSpinLock> marks;
+	LockProtected<HashMap<u32, ThreadInfo>, RecursiveSpinLock> thread_infos;
 	List<TimeSpan> recorded_time_spans;
-	SpinLock recorded_time_spans_lock;
-
-	HashMap<u32, ThreadInfo> thread_infos;
-	SpinLock thread_infos_lock;
 
 	s64 start_time;
 
 	bool enabled = true;
+	bool waiting_for_everyone = false;
 
 	void init(ArenaAllocator allocator);
 	void reset();
@@ -84,7 +86,6 @@ struct TL_API Profiler {
 
 	inline void mark(char const *name, u32 color) { return mark(as_utf8(as_span(name)), color); }
 
-	Span<TimeSpan> get_recorded_time_spans();
 	List<ascii> output_for_chrome();
 	List<u8> output_for_timed();
 
@@ -125,6 +126,46 @@ struct TL_API Profiler {
 	}
 	ScopeMeasurer measure(std::source_location location = std::source_location::current()) {
 		return measure(as_utf8(as_span(location.function_name())), location);
+	}
+
+	// Waits for all threads to finish their timed blocks.
+	// Executes `fn` while holding all locks.
+	void when_everyone_is_done(auto &&fn) {
+		scoped_replace(waiting_for_everyone, true);
+
+		scoped_locked_use(thread_infos);
+		scoped_locked_use(marks);
+	
+		while (1) {
+			foreach (it, thread_infos) {
+				auto &info = it.value();
+				if (info.depth != 0) {
+					goto sleep;
+				}
+			}
+			break;
+		sleep:
+		
+			unlock(this->marks._lock);
+			unlock(this->thread_infos._lock);
+		
+			sleep_milliseconds(1);
+
+			lock(this->thread_infos._lock);
+			lock(this->marks._lock);
+		}
+
+		fn();
+	}
+
+	void collect() {
+		assert(waiting_for_everyone);
+
+		recorded_time_spans.clear();
+		foreach(it, thread_infos.unprotected) {
+			auto &thread_info = it.value();
+			recorded_time_spans.add(thread_info.recorded_time_spans);
+		}
 	}
 };
 
@@ -184,19 +225,19 @@ public:
 	void free();
 
 	template <class Drawer>
-	void render(f64 view_scale, f64 scroll_amount, s32 button_height, Drawer drawer) {
+	void render(f64 view_scale, f64 scroll_amount_in_nanoseconds, s32 button_height, Drawer drawer) {
 		for (auto &events_to_draw : all_events_to_draw) {
 			u32 max_depth = 0;
 
 			for (auto &mark : events_to_draw.marks) {
-				mark.rect.min.x = mark.time * view_scale + scroll_amount;
+				mark.rect.min.x = (mark.time - scroll_amount_in_nanoseconds) * view_scale;
 				mark.rect.max.x = mark.rect.min.x + 1;
 				mark.rect.min.y = 0;
 				mark.rect.max.y = button_height * 1;
 			}
 			for (auto &event : events_to_draw.events) {
-				event.rect.min.x = event.begin * view_scale + scroll_amount;
-				event.rect.max.x = max<f64>(event.end * view_scale + scroll_amount, event.rect.min.x + 1);
+				event.rect.min.x = (event.begin - scroll_amount_in_nanoseconds) * view_scale;
+				event.rect.max.x = max<f64>((event.end - scroll_amount_in_nanoseconds) * view_scale, event.rect.min.x + 1);
 				event.rect.min.y = button_height * (event.depth + 0);
 				event.rect.max.y = button_height * (event.depth + 1);
 
@@ -227,14 +268,22 @@ namespace tl {
 
 void Profiler::init(ArenaAllocator _allocator) {
 	allocator = _allocator;
-	marks.allocator = allocator;
+	marks.unprotected.allocator = allocator;
 	recorded_time_spans.allocator = allocator;
-	thread_infos.allocator = allocator;
+	thread_infos.unprotected.allocator = allocator;
 	start_time = get_performance_counter();
 }
 ArenaAllocator Profiler::switch_arena(ArenaAllocator new_arena) {
+	scoped_locked_use(marks);
+	scoped_locked_use(thread_infos);
+
 	tl::free(marks);
 	tl::free(recorded_time_spans);
+	foreach(it, thread_infos) {
+		auto &thread_info = it.value();
+		tl::free(thread_info.time_span_stack);
+		tl::free(thread_info.recorded_time_spans);
+	}
 	thread_infos.free();
 	defer {
 		allocator = new_arena;
@@ -242,8 +291,16 @@ ArenaAllocator Profiler::switch_arena(ArenaAllocator new_arena) {
 	return allocator;
 }
 void Profiler::free() {
+	scoped_locked_use(marks);
+	scoped_locked_use(thread_infos);
+
 	tl::free(marks);
 	tl::free(recorded_time_spans);
+	foreach(it, thread_infos) {
+		auto &thread_info = it.value();
+		tl::free(thread_info.time_span_stack);
+		tl::free(thread_info.recorded_time_spans);
+	}
 	thread_infos.free();
 	allocator.free();
 }
@@ -257,18 +314,37 @@ void Profiler::begin(Span<utf8> name, Span<utf8> file, u32 line) {
 
 	u32 thread_id = get_current_thread_id();
 
-	auto &info = with(thread_infos_lock, thread_infos.get_or_insert(thread_id));
+	scoped_locked_use(thread_infos);
 
-	auto &span = info.time_spans.add();
+	auto info = &thread_infos.get_or_insert(thread_id);
+
+	// TODO: profiler.reset() requires waiting for everyone to finish their timed blocks. 
+	//       If reset() is waiting, ideally we should delay starting a new timed block
+	//       until reset() does it's thing. If we don't do that - reset() might not catch the moment
+	//       info->depth goes to zero and will be waiting for way too long, causing lag spikes.
+	//       The code below implements that, but deadlocks sometimes.
+	//if (info->depth == 0 && waiting_for_everyone) {
+	//	unlock(this->thread_infos._lock);
+	//	while (waiting_for_everyone) {
+	//		sleep_milliseconds(1);
+	//	}
+	//	lock(this->thread_infos._lock);
+	//	info = &thread_infos.get_or_insert(thread_id);
+	//}
+
+	info->depth += 1;
+
+	auto &span = info->time_span_stack.add();
 	span.name = name;
 	span.file = file;
 	span.line = line;
 	span.thread_id = thread_id;
+	span.depth = info->time_span_stack.count - 1;
 
 #if TL_PROFILER_SUBTRACT_SELF_TIME
 	auto begin_counter = get_performance_counter();
-	info.self_time += begin_counter - self_begin;
-	span.begin = begin_counter - info.self_time;
+	info->self_time += begin_counter - self_begin;
+	span.begin = begin_counter - info->self_time;
 #else
 	span.begin = get_performance_counter();
 #endif
@@ -280,47 +356,62 @@ void Profiler::end() {
 	auto end_counter = get_performance_counter();
 	u32 thread_id = get_current_thread_id();
 
-	auto found = with(thread_infos_lock, thread_infos.find(thread_id));
+	scoped_locked_use(thread_infos);
+
+	auto found = thread_infos.find(thread_id);
 	assert(found);
 
-	auto info = found.value;
-	auto &list = info->time_spans;
+	auto &info = *found.value;
+	
+	info.depth -= 1;
 
-	TimeSpan span = list.back();
-	list.pop();
+	TimeSpan span = info.time_span_stack.back();
+	info.time_span_stack.pop();
 
 #if TL_PROFILER_SUBTRACT_SELF_TIME
-	span.end = end_counter - info->self_time;
+	span.end = end_counter - info.self_time;
 #else
 	span.end = end_counter;
 #endif
-
-	with(recorded_time_spans_lock, recorded_time_spans.add(span));
+	
+	if (info.time_span_stack.count) {
+		info.time_span_stack.back().self -= span.end - span.begin;
+	}
+	span.self += span.end - span.begin;
+	info.recorded_time_spans.add(span);
 
 #if TL_PROFILER_SUBTRACT_SELF_TIME
-	info->self_time += get_performance_counter() - end_counter;
+	info.self_time += get_performance_counter() - end_counter;
 #endif
 }
 void Profiler::mark(Span<utf8> name, u32 color) {
 	if (!enabled)
 		return;
 
-	scoped(thread_infos_lock);
-	scoped(marks_lock);
+	scoped_locked_use(thread_infos);
+	scoped_locked_use(marks);
+
 	auto found = thread_infos.find(get_current_thread_id());
 	assert(found);
 	auto info = found.value;
 #if TL_PROFILER_SUBTRACT_SELF_TIME
-	marks.add({get_performance_counter() - info->self_time, color, get_current_thread_id()});
+	marks.add(Profiler::Mark{get_performance_counter() - info->self_time, color, get_current_thread_id()});
 #else
-	marks.add({get_performance_counter(), color, get_current_thread_id()});
+	marks.add(Profiler::Mark{get_performance_counter(), color, get_current_thread_id()});
 #endif
 }
 void Profiler::reset() {
-	marks.clear();
-	recorded_time_spans.clear();
-	thread_infos.clear();
-	start_time = get_performance_counter();
+	when_everyone_is_done([&] {
+		marks.unprotected.clear();
+		recorded_time_spans.clear();
+		foreach(it, thread_infos.unprotected) {
+			auto &thread_info = it.value();
+			tl::free(thread_info.time_span_stack);
+			tl::free(thread_info.recorded_time_spans);
+		}
+		thread_infos.unprotected.clear();
+		start_time = get_performance_counter();
+	});
 }
 
 List<ascii> Profiler::output_for_chrome() {
@@ -364,6 +455,9 @@ List<u8> Profiler::output_for_timed() {
 
 	StringBuilder builder;
 	defer { tl::free(builder); };
+
+	scoped_locked_use(marks);
+
 	append_bytes(builder, (u32)recorded_time_spans.count);
 	for (auto span : recorded_time_spans) {
 		append_bytes(builder, (s64)(divide(multiply(span.begin - start_time, nanoseconds_in_second), performance_frequency)));
@@ -402,7 +496,8 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 			.name = span.name,
 			.begin = begin,
 			.end = end,
-			.self_duration = end - begin,
+			.depth = span.depth,
+			.self_duration = (Nanoseconds)divide(multiply(span.self, 1'000'000'000), performance_frequency),
 		};
 		auto &t = thread_id_to_events_to_draw.get_or_insert(span.thread_id);
 		t.id = span.thread_id;
@@ -426,88 +521,10 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 	foreach(it, thread_id_to_events_to_draw) {
 		auto &thread_id = it.key();
 		auto &events_to_draw = it.value();
-		quick_sort(events_to_draw.events, [](Event const &a, Event const &b) {
-			if (a.begin != b.begin) {
-				return a.begin < b.begin;
-			}
-			return a.duration() > b.duration();
-		});
-
-		List<Event *, TemporaryAllocator> event_stack;
 
 		for (auto &event : events_to_draw.events) {
-			//
-			// Calculate depth
-			//
 			event.begin -= events_begin;
 			event.end -= events_begin;
-
-
-			while (1) {
-				if (event_stack.count) {
-					auto previous = event_stack.back();
-					assert(event.begin >= previous->begin);
-					if (event.begin >= previous->end) {
-						event_stack.pop();
-						continue;
-					}
-					previous->self_duration -= event.duration();
-					event.depth = previous->depth + 1;
-				} else {
-					event.depth = 0;
-				}
-				event_stack.add(&event);
-				break;
-			}
-
-
-
-
-
-
-
-
-
-		//	Event *parent = 0;
-
-		//check_next_parent:
-		//	if (event_stack.count) {
-		//		parent = event_stack.back();
-		//	}
-		//	if (parent) {
-		//		if (intersects(aabb_min_max(parent->begin, parent->end), aabb_min_max(event.begin, event.end))) {
-		//			if (event.begin == parent->begin && event.duration() > parent->duration()) {
-		//				// 'parent' is actually a child (deeper in the stack), and 'event' is parent,
-		//				// so swap em
-		//				if (parent->parent) {
-		//					parent->parent->self_duration =
-		//						parent->parent->self_duration
-		//						+ parent->duration()
-		//						- event.duration();
-		//				}
-		//				event.self_duration -= parent->duration();
-
-		//				event.parent = parent->parent;
-		//				event.depth  = parent->depth;
-		//				parent->parent = &event;
-		//				parent->depth += 1;
-		//				event_stack.back() = &event;
-		//				event_stack.add(parent);
-		//			} else {
-		//				event.parent = parent;
-		//				event.depth = parent->depth + 1;
-		//				event_stack.add(&event);
-		//				parent->self_duration -= event.duration();
-		//			}
-		//			continue;
-		//		} else {
-		//			event_stack.pop();
-		//			parent = 0;
-		//			goto check_next_parent;
-		//		}
-		//	} else {
-		//		event_stack.add(&event);
-		//	}
 		}
 
 		for (auto &mark : events_to_draw.marks) {
@@ -515,9 +532,9 @@ void ProfileRenderer::setup(Span<Profiler::TimeSpan> spans, Span<Profiler::Mark>
 		}
 	}
 
-	thread_id_to_events_to_draw.clear();
-	foreach(it, all_events_to_draw) {
-		thread_id_to_events_to_draw.insert(it.key(), it.value());
+	all_events_to_draw.clear();
+	foreach(it, thread_id_to_events_to_draw) {
+		all_events_to_draw.add(it.value());
 	}
 	quick_sort(all_events_to_draw, [](ThreadDrawList t) { return t.id; });
 }

@@ -51,6 +51,9 @@ struct Queue : private RingBuffer<T, Allocator> {
 	Optional<T> pop() {
 		return this->pop_front();
 	}
+	void pop(umm count_to_pop) {
+		this->pop_front(count_to_pop);
+	}
 };
 #else
 template <class T, class Allocator = Allocator>
