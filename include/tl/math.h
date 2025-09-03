@@ -478,6 +478,32 @@ forceinline v2s frac(v2s v, v2s s) {
 	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
 	return *(v2s *)&result;
 }
+forceinline v4s frac(v4s v, v4s s) {
+	__m128i vm = _mm_loadu_si128((__m128i *)&v);
+	__m128i sm = _mm_loadu_si128((__m128i *)&s);
+
+	__m128i vm0 = vm;
+	__m128i vm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(vm), _mm_castsi128_ps(vm)));
+
+	__m128i sm0 = sm;
+	__m128i sm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(sm), _mm_castsi128_ps(sm)));
+
+	__m128d v0 = _mm_cvtepi32_pd(vm0);
+	__m128d v1 = _mm_cvtepi32_pd(vm1);
+	__m128d s0 = _mm_cvtepi32_pd(sm0);
+	__m128d s1 = _mm_cvtepi32_pd(sm1);
+
+	__m128i r0 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v0, s0)));
+	__m128i r1 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v1, s1)));
+
+	__m128i r = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(r0), _mm_castsi128_ps(r1)));
+
+	r = _mm_sub_epi32(vm, _mm_mullo_epi32(r, sm));
+	return *(v4s *)&r;
+}
+forceinline v3s frac(v3s v, v3s s) {
+	return frac(V4s(v, 1), V4s(s, 1)).xyz;
+}
 #endif
 
 forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }

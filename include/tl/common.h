@@ -785,7 +785,7 @@ forceinline constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1,
 template <class T>
 forceinline constexpr T frac(T v, T s) {
 	if constexpr(is_signed<T>) {
-		return (v < 0) ? ((v + 1) % s + s - 1) : (v % s);
+		return select(v < 0, (v + 1) % s + s - 1, v % s);
 	} else {
 		return v % s;
 	}
@@ -2233,9 +2233,14 @@ concept ASpan = is_span<T>;
 
 TL_DECLARE_CONCEPT(Span);
 
-template <class T, umm x>               inline Span<T> flatten(T (&array)[x]      ) { return {(T *)array, x    }; }
-template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y]   ) { return {(T *)array, x*y  }; }
-template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
+template <class T, umm x>                                                  inline Span<T> flatten(T (&array)[x]                     ) { return {(T *)array, x              }; }
+template <class T, umm x, umm y>                                           inline Span<T> flatten(T (&array)[x][y]                  ) { return {(T *)array, x*y            }; }
+template <class T, umm x, umm y, umm z>                                    inline Span<T> flatten(T (&array)[x][y][z]               ) { return {(T *)array, x*y*z          }; }
+template <class T, umm x, umm y, umm z, umm w>                             inline Span<T> flatten(T (&array)[x][y][z][w]            ) { return {(T *)array, x*y*z*w        }; }
+template <class T, umm x, umm y, umm z, umm w, umm r>                      inline Span<T> flatten(T (&array)[x][y][z][w][r]         ) { return {(T *)array, x*y*z*w*r      }; }
+template <class T, umm x, umm y, umm z, umm w, umm r, umm g>               inline Span<T> flatten(T (&array)[x][y][z][w][r][g]      ) { return {(T *)array, x*y*z*w*r*g    }; }
+template <class T, umm x, umm y, umm z, umm w, umm r, umm g, umm b>        inline Span<T> flatten(T (&array)[x][y][z][w][r][g][b]   ) { return {(T *)array, x*y*z*w*r*g*b  }; }
+template <class T, umm x, umm y, umm z, umm w, umm r, umm g, umm b, umm a> inline Span<T> flatten(T (&array)[x][y][z][w][r][g][b][a]) { return {(T *)array, x*y*z*w*r*g*b*a}; }
 
 template <class T, umm count>
 struct IterOfT<T[count]> { using Iter = SpanIter<T>; };

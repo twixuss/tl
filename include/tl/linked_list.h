@@ -265,6 +265,7 @@ struct LinkedList {
 			if (should_advance) {
 				node = reverse ? node->prev : node->next;
 			}
+			should_advance = true;
 		}
 		auto &operator*() {
 			return node->value;

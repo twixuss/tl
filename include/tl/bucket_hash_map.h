@@ -55,8 +55,38 @@ struct BucketHashMap : Traits {
 
 		return it.value;
 	}
-	void insert(Key const &key, Value value) {
-		get_or_insert(key) = value;
+	
+	struct InsertResult {
+		KeyValuePointers kv;
+		bool inserted;
+	};
+
+	InsertResult insert(Key const &key, Value const &value TL_LP) {
+		if (!buckets.count) {
+			rehash(4 TL_LA);
+		}
+
+		umm hash = get_hash(key);
+		auto bucket = &buckets[get_index_from_hash(hash, buckets.count)];
+
+		for (auto &it : *bucket) {
+			if (it.hash == hash) {
+				if (are_equal(it.key, key)) {
+					return {{&it.key, &it.value}, false};
+				}
+			}
+		}
+
+		if (count >= buckets.count * rehash_percentage / 100) {
+			rehash(buckets.count * 2 TL_LA);
+			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
+		}
+		++count;
+		auto &it = bucket->add(TL_LAC);
+		it.hash = hash;
+		it.key = key;
+		it.value = value;
+		return {{&it.key, &it.value}, true};
 	}
 
 	//

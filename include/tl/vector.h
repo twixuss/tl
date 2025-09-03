@@ -321,6 +321,14 @@ template <class T> struct ScalarOfT<v3<T>> { using Type = T; };
 template <class T> struct ScalarOfT<v4<T>> { using Type = T; };
 template <class T> using ScalarOf = typename ScalarOfT<T>::Type;
 
+template <class T> inline constexpr bool is_signed<v2<T>> = is_signed<T>;
+template <class T> inline constexpr bool is_signed<v3<T>> = is_signed<T>;
+template <class T> inline constexpr bool is_signed<v4<T>> = is_signed<T>;
+
+template <class T> inline constexpr bool is_unsigned<v2<T>> = is_unsigned<T>;
+template <class T> inline constexpr bool is_unsigned<v3<T>> = is_unsigned<T>;
+template <class T> inline constexpr bool is_unsigned<v4<T>> = is_unsigned<T>;
+
 template <class T>
 struct Is_v2 : std::false_type {};
 template <class T>
