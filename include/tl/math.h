@@ -2285,6 +2285,20 @@ union m4 {
 			0, 0, qn, 0,
 		}};
 	}
+	static forceinline m4 perspective_right_handed_invz(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		f32 h = 1.0f / tan(fov * 0.5f);
+		f32 w = h / aspect;
+		f32 depth = fz - nz;
+		f32 q = -(fz + nz) / depth;
+		f32 qn = -2 * (fz * nz) / depth;
+
+		return {.s = {
+			w, 0,  0,  0,
+			0, h,  0,  0,
+			0, 0, -q-1, -1,
+			0, 0, -qn,  0,
+		}};
+	}
 	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
 		f32 h = 1.0f / (height * 0.5f);
 		f32 rz = fz - nz;

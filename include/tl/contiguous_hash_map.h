@@ -335,7 +335,7 @@ private:
 #include "bucket_hash_map.h"
 #include "time.h"
 
-TL_TEST {
+TL_TEST(ContiguousHashMap) {
 	using namespace tl;
 
 	static_assert(Iterable<ContiguousHashMap<int, int>>);

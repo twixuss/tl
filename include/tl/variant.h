@@ -135,7 +135,7 @@ template <int i>
 struct S {};
 
 }
-TL_TEST {
+TL_TEST(Variant) {
 	using namespace tl;
 	using namespace tl::test;
 	{

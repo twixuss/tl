@@ -153,7 +153,7 @@ inline static constexpr TestAdder test_adder;
 
 }
 
-#define TL_TEST static int CONCAT(_t, __LINE__) = tl::test_adder + __FILE__ + []
+#define TL_TEST(name) static int _tl_test_##name = tl::test_adder + __FILE__ + []
 #endif
 
 #define KiB 0x400ull
@@ -3319,7 +3319,7 @@ extern TL_API thread_local Allocator current_allocator;
 #endif
 
 struct AllocationResult {
-	void *data = 0;
+	u8 *data = 0;
 	umm count = 0;
 	bool is_zeroed : 1 = false;
 };
@@ -4006,7 +4006,7 @@ namespace tl {
 	#if COMPILER_MSVC
 		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
 			return {
-				.data = ::_aligned_malloc(size, alignment),
+				.data = (u8 *)::_aligned_malloc(size, alignment),
 				.count = size,
 				.is_zeroed = false,
 			};
@@ -4014,7 +4014,7 @@ namespace tl {
 		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
 			(void)old_size;
 			return {
-				.data = ::_aligned_realloc(data, new_size, alignment),
+				.data = (u8 *)::_aligned_realloc(data, new_size, alignment),
 				.count = new_size,
 				.is_zeroed = false,
 			};
@@ -4093,7 +4093,7 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 		case Allocator_allocate: {
 			assert(align <= 4096);
 			return {
-				.data = VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
+				.data = (u8 *)VirtualAlloc(0, new_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
 				.count = new_size / 4096 * 4096,
 				.is_zeroed = true,
 			};
@@ -4103,7 +4103,7 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 
 			if (old_size / 4096 == new_size / 4096) {
 				return {
-					.data = data,
+					.data = (u8 *)data,
 					.count = new_size,
 					.is_zeroed = true,
 				};
@@ -4114,7 +4114,7 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 
 			if (VirtualAlloc((u8 *)data + ceiled_old_size, ceiled_new_size - ceiled_old_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)) {
 				return {
-					.data = data,
+					.data = (u8 *)data,
 					.count = new_size,
 					.is_zeroed = true,
 				};
@@ -4125,7 +4125,7 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 			VirtualFree(data, 0, MEM_RELEASE);
 
 			return {
-				.data = new_data,
+				.data = (u8 *)new_data,
 				.count = ceiled_new_size,
 				.is_zeroed = true,
 			};
@@ -4176,7 +4176,7 @@ void deinit_allocator() {
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(common) {
 	using namespace tl;
 	using namespace integer_literals;
 

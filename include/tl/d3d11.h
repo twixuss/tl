@@ -1097,6 +1097,17 @@ void State::init(HWND window, u32 width, u32 height, DXGI_FORMAT back_buffer_for
 	if (FAILED(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, 0, device_flags, &max_feature, 1, D3D11_SDK_VERSION, &device, 0, &immediate_context))) {
 		GHR(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, 0, device_flags, 0, 0, D3D11_SDK_VERSION, &device, 0, &immediate_context));
 	}
+	if (device_flags & D3D11_CREATE_DEVICE_DEBUG) {
+		if (FAILED(device->QueryInterface(&info_queue))) {
+			info_queue = 0;
+		}
+	}
+	if (FAILED(device->QueryInterface(&device2))) {
+		device2 = 0;
+	}
+	if (FAILED(device->QueryInterface(&device3))) {
+		device3 = 0;
+	}
 
 	u32 max_sample_count = get_max_msaa_sample_count(back_buffer_format);
 	if ((s32)sample_count < 0) sample_count = max_sample_count / (u32)-(s32)sample_count;
@@ -1111,18 +1122,6 @@ void State::init(HWND window, u32 width, u32 height, DXGI_FORMAT back_buffer_for
 	d.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	d.OutputWindow = window;
 	GHR(dxgi_factory->CreateSwapChain(device, &d, &swap_chain));
-
-	if (FAILED(device->QueryInterface(&device2))) {
-		device2 = 0;
-	}
-	if (FAILED(device->QueryInterface(&device3))) {
-		device3 = 0;
-	}
-	if (device_flags & D3D11_CREATE_DEVICE_DEBUG) {
-		if (FAILED(device->QueryInterface(&info_queue))) {
-			info_queue = 0;
-		}
-	}
 
 	init_back_buffer();
 }
@@ -1156,6 +1155,8 @@ void State::print_messages() {
 				case D3D11_MESSAGE_SEVERITY_MESSAGE:    return LogSeverity::info;
 			}
 		}();
+
+		current_logger.log(severity, message_string);
 	}
 
 	info_queue->ClearStoredMessages();

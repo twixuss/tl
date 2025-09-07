@@ -266,7 +266,7 @@ struct StaticList {
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(StaticList) {
 	using namespace tl;
 
 	StaticList<int, 8> list;

@@ -25,7 +25,7 @@ struct MultiArray {
 		}
 	}
 	void free() {
-		allocator.free(base());
+		allocator.free(base(), get_buffer_size(capacity), max(alignof(Ts)...));
 		buffer = {};
 		base_pointers = {};
 		capacity = 0;

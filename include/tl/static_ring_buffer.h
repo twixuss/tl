@@ -184,7 +184,7 @@ private:
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(StaticRingBuffer) {
 	using namespace tl;
 
 	StaticRingBuffer<int, 4> b;

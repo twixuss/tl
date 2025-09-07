@@ -869,7 +869,7 @@ inline void append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(BigInt) {
 	using namespace tl;
 
 	using BigInt = BigInt<DefaultAllocator>;

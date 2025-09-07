@@ -468,23 +468,31 @@ concept ALock = requires (T t) {
 	unlock(t); 
 };
 
-// There are two ways to use LockProtected.
-// 1) Using a lambda.
+// Usage of LockProtected:
+// 
 //    protected.use([&](Item &item) {
 //        item.modify();
 //    });
+// 
 //    You call `use` with lambda, it calls lock, invokes the lambda, calls unlock.
-//    Problem with this is unability to return values from mid lambda.
-//    For that I implemented a second way.
-// 2) Foreach.
-//    for (Item &item : protected) {
-//        item.modify();
-//        return item.value; // can return here, lock is unlocked automatically.
+//    `use` returns whatever the lamba returned, so you can use it as an expression.
+//    You can use `locked_use` macro to shorten the expression a bit:
+// 
+//    locked_use(protected) {
+//        protected.modify();
+//    };
+// 
+//    `locked_use` shadows `protected`. If you don't want that and want to assign a different name,
+//    use locked_use_expr
+// 
+//    Problem with this is unability to return values from the outer function from inside the lambda.
+//    For that there is scoped_locked_use. It is a statement that calls lock, defers call to unlock,
+//    and shadows the `variable` with `variable.unprotected`. You would use it like this:
+// 
+//    {
+//        scoped_locked_use(protected);
+//        return protected.modify();
 //    }
-//    With this way you can return from the body. But it looks confusing at first glance.
-//    There is `use_locked` macro that is more understandable.
-//
-// locked_use macros reduce some typing. See below.
 //
 // https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGe1wAyeAyYAHI%2BAEaYxCCSAJykAA6oCoRODB7evnrJqY4CQSHhLFEx8baY9vkMQgRMxASZPn5cFVXptfUEhWGR0bEJCnUNTdmtQ109xaUDAJS2qF7EyOwc5gDMwcjeWADUJutuQ/ioAHQIB9gmGgCC1zcAbqh46Lu0qMgA1hCz%2BwDsFl2iWIwQIVAg5jM7y%2BJgArG4GJDZgdASY/gARe5PF67LwMaHfX5owHA0HgyF4glwhFIlH/TG3e5DYheBy7AIfT7KYioAiYByYV7E%2B67UW7Zmsgi7ACSfOITCIxH%2BVluYrV7M53N5/L5rwAVIl9ut0bsNCiRerRRFUJ5xQhFrR0AB9Smco0mqhiJTm1WW3ag3aoRLRBUkPU/ZUWv1igk/H03aNqgD0Sd2ACVMAQlgxdsRMFRoowVrsiECeXyBa9UBFtDrdghC1HE3ms8Qc5IzPHo2iGQm/dbbUGQ4qwGADuiILLhyRdmgGEN9mYAGwEBAK35zhfC32J3OZ7NA3aj8cltcEU6JLt%2BntNtXYqvB%2BWK6zWCPbvu7w0ns3rFUf9U3ju6oAH5Tk%2BJBvgCt5%2BngVC7BACj2l4jouvinJElBQG7qKrpfHGv7QZagH/mqxGkRi8b3NccRgaGSpRMAwSQYCLYHsSq54AopAliymA3r%2B9JURoNFynRuyuMxe6tjmwoUQJxFUXJf73AGLBMExGF/mqHJfFqFa6m8lFAaSgjkmYZhRPwebUoi5nIgRQFWfBTBeKWqi7CAbyaYRZZkhC5nWugACei6wugNmQtxqj2VpYpkWKJlgv5ZgsC86D0BFdlXqKTkQC5bkeV5kZYQlIKmclgUheYYWZWYUUxT5KbifUtAhaxbY%2Be1OZcNlgnGWVSWQkwVByrVDVAV1pqURRtwcPMtCcLCvB%2BBwWikKgnBuC%2BljiosyyYIu6w8KQBCaHN8yfCAZiwqcAAcsK3ZI6ySH8ZhHRofzxOs%2BicJIy1netnC8AoIAaCdZ3zHAsAwIgICLAQiSueQlBoCwiR0NEoSsKsqhLpIuwsAoDzILsDxcHEpwGHyQy8IKhAkC8ej8IIIhiOwUgyIIigqOoq06HoADu8qJJwPDzYt/184DHAAPKuYjUqoHBqi3UuAC0eO7MAyAk1wN1cPBHhoxjSobFwsy8KdfOzPMDZMFgMQ/KQl3rGYpzk2YXC3Rot1/HEcS3WYGgaNIC0cH9pAsCArvu2Yt3%2Bxoz3x29sLSCta0bRwwOg%2BD1ukFDsPwwryMQHTiqM60zPCKI4gc1X3NqADuh1ULTAi9wc0/RwS2kOnvCZ3LCOuYGcF4lgNAhK8EBG%2Bj9Cm29ZgW7nWg26QdsO5Q4vh7wUfPacsKfX7D0dkuXCu60ffS9nYNWyv%2BcwxASBF0jFAQKjs%2BY9jnC4/jhPE6T5NThPV2AANSEFwP47t1i03wOXdATNZCs1rtIeuShG5S10N9Vu7cxZdx7pfAe8th5K12D/AmRMSZkwpsAsBECoGG1QMbOeh11hL1vudNemB7b9CdmHCOu91inDMHEJcnt1je0ekuV2sJe4A0ztfZeHDLpnzum9YO6wlxxFhJor2dUw7QNkVLeRijIYPzMfAR%2BKBGEfzIK/d%2BJsQDAD1pXOgcoQYQAiADCIwR6hBVFrwbxzBiBBRljWHU/jSCozYIIGW%2BI/FSywBELwwA3BiFoCDDupAsBqSMOIBJeA8wODwA8TAGS1qYFUPyVyqw1qgkqADWgeAIjymCR4LAAMCAgijpkkpxBrRKHRJgHJwBGlGAhnwAwwAFAgLwJgAWMtgwrWOlXJB7MUGyAbrzNauhWgGDGaYSw1h9BNJBpAeYQZqgZLVjLdYuw1bHHHAcqwlgpB3IAOppPeRUzpTBdj916SCLApynZ2B1OkFwDB3CeGaP4SFUw%2BgxFaLkNIAhRgtCSCkFFDB4UlH6OMSoYKBCdBGNCsYbRCU1GGN0YIvRcWItsFStFegJgNBxTMc2CwlgrAkFvfBcjOCkNVhrfG2tdb63grgem88jpsIhhdEAsIwZ8J3tHN26xYTOIPs9SQ908aGIzkDWwOd2GmIsUgexc8S4Wv6NsQwwAg5cDBjQWgbjKCeKloE3xETPXBNCbWBwESomMAILE1qANEnJNSbQdJETsl2ryWtfAhTHAlLKbTSpyBqkAzqWHNajTmm%2BLaTUy2XSIm9P6ZgQZwzRmgDzlQSZ0zZnzMWRElZNc1mc3kGgrZ/M9F2pQNtGw%2BbgXnMSJczg1zbn3IIOFY0TzrCvLVh86NXzVA/P%2BdEQFpT4DzFBUU5wpdIVMtaIEGl0w8UYryOkY9l6sVsovXu6oxLGikvRY%2BjoVL730pZS%2BrIb7P1noRTyzl%2B1gNhz5UYgVKt1aa1tUYXYQd3anA0BK2BM4zayutrbLhG9eG/RVXvA%2B8RfZLg0KIv4XAlz6v7oakGN9xkF0sda2xKNrEOOJokRIToqFOiek6WhfwnRnydD/PgrjojuPdWtH18Tjoyb9eEzJQaYlxPDZgJJKS0kZOOnG3JxaskFLBamgGFSql8mzYIepUt80tKCkWjppaenRArVW%2BNwRa133rUwKZMy5kLMYK2xB7aJDrK5t2pu0d9D9vnZYY5EQR3rTHekDJSYZZmF2EmY4A7DkvPxkmN5EdUAApeNus55L91%2BEPVCv9sL0BfpyJi6oN7kXVHq/i9oRLGWvuZQSirz62sMq6Den9bXd17W5Ry8DksDUcFIZrP%2BlDAE0PAZAs%2BqGpWHXNpbOVnDuGOy3vw6OgiPrPREUuWEcQzAdj%2BHqghtHjU7Zdm7VWt11XmTeuTYS319HTZo1nEx98LHmNgE/IhBAS5lwZvAyuQW2Yhc7ZsiL0hsH%2BN5b96Wg8FYj0FTBkVOtdh63dgwph0RDqSEwyvbDe3N7OwVUq/DkdVXIYgRo265NJBfVe2nfl/26MA8Y6Doe4PX6Q8BQglmwW64bPCxghVpAUcdzR9RjHYPsfQeFbOPZwAEMaCQyh6ebHmEbFhBTjh68eEHYI5IWOIjrpcDev7SjCQ7u84e3nAXcMwcQ7Q2LmHEu4dS7CzzCLVGFe4Km8rwhQu1fzYoQA6htyBP0INyT6VS5Ter3N/truh31iCPuusYOS4lxs41Rzv4kf7v0aw7TxVXcDEu%2B2%2B74HsNmNWsN/0JxGqxMuok26rxPjgnesHyEsJAalOMOiSG1TCT1ORq07GoZ8b9NJqM9uqWpnM3maljmhpTTbP2alp0vA3TjrlpSJWpfuT3PjK8z5pt/mlm8DbQH0LXbg%2By9DtFwdcWEsXOSxOg8nOoOousurQKuj8n8utMVkCjuuVtUBCtVjCienCoBnSg1leqit1kio1ukANu%2Bp1kNtgfAR%2BpMGgeyoNiSjVuMABkUEBhygoONuzEri7jjhrqKgTuKhAJKoqJthnlTrhvKnXsqoznnpXq7tXnfB7m3nYh3jEHBvahoI6j3q6h4gPkErJgEiPgpuPsdMptPmGrPhplGjGpkrpiMivoZkUsZhvhmlmjvpZrmrwDZoWhgPpsfqfrwOfgMlfiMjfnWg2r5s2gFpki/sggjjLtsnLlrtls8kOicnAf/gIFckAeiDFhYKAZ8kut8vKBusQFuglgQZVq4DeqenQegTgZgRkMQS1ngeQQ%2Br1k%2Bl1tQSQYQayvUd%2Bs0cgZQdSuUeymNlyswXgujpnGwbBlrjrnrutrwRhk3pTrtoITngRjdHEDqoqsRnnrdL7BfDzgoiaoDiDlYqnu3qniABxlxjxnxgJkJusCJnqs6qoVJloRocPhoToVbHoZPsGqGvEomnPpptGtprwOYQmsCVYSmuvuUnYdvrUo4XvgWq0m4Q5ifmWs5hfq5tfmMgEd5o2n5i2qEbDuEagh/lEVRjEekb/okUlskZwJljOrEQunlgVnkQUXAUUYgaUagX0RerUVgS0bydih0T1h1pSkQS0UUf1kKTQWKd0SNlKQMaBpNhLOIXNr/HHlQkAonitsnjwehh9vwQsRbksaIVwMhmXlokocXlwPblouIXsY9nTvXiMYaiavKkuKtkdHjH8N6SXsJGRl3GYCqo6mDI3iYm6brkdLqnrGzkHGRjdgGSqv7KcP7CmamWmXaWGQmRma6aQL0qkM4JIEAA%3D%3D
 template <class T, ALock Lock>
@@ -504,30 +512,6 @@ struct LockProtected {
 
 	template <class Fn>
 	forceinline decltype(auto) operator->*(Fn fn) { return use(fn); }
-
-	struct Iterator {
-		LockProtected *p = 0;
-		bool should_unlock = false;
-		forceinline T &operator*() const {
-			lock(_lock);
-			return p->unprotected;
-		}
-		forceinline bool operator!=(Iterator const &that) const {
-			return p != that.p;
-		}
-		forceinline void operator++() {
-			p = 0;
-		}
-		forceinline ~Iterator() {
-			if (should_unlock) {
-				unlock(_lock);
-			}
-		}
-	};
-
-	forceinline Iterator begin() { return {this}; }
-	forceinline Iterator end() { return {}; }
-	
 
 	// private:
 	Lock _lock;
@@ -555,15 +539,6 @@ locked_use(queue) {
 
 /*
 // Example usage:
-use_locked(auto &queue : context->queue) {
-	queue.push(42);
-};
-*/
-#define use_locked for
-
-
-/*
-// Example usage:
 {
 	scoped_locked_use(queue);
 	queue.push(42);
@@ -588,7 +563,7 @@ struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 			}
 		});
 	}
-	Optional<T> pop() {
+	Optional<T> try_pop() {
 		return this->use([&](auto &queue) {
 			return queue.pop();
 		});

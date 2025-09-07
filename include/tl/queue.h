@@ -194,7 +194,7 @@ private:
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(Queue) {
 	using namespace tl;
 
 	Queue<int> q;

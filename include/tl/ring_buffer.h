@@ -178,11 +178,72 @@ struct RingBuffer {
 	//  =>
 	// abcdefg_
 	Span<T> pack() {
+		if (start + count <= capacity) {
+			// _ _ a b c d e _
+			// a b c d e _ _ _
+			memmove(storage, storage + start, count * sizeof(T));
 
-		for (umm i = 0; i < count; ++i) {
-			T *dst = &storage[i];
-			T *src = &storage[(start + i) & (capacity - 1)];
-			Swap(*dst, *src);
+		} else {
+
+			#if 0
+			// Swap last with its destination
+
+			// f . . a b c d e
+			//         |     |
+			// f . . a e c d b
+			//   |           |
+			// f b . a e c d .
+			//             | |
+			// f b . a e c . d
+			//       |       |
+			// f b . d e c . a
+			// |             |
+			// a b . d e c . f
+			//           |   |
+			// a b . d e f . c
+			//     |         |
+			// a b c d e f . .
+			//               |
+			// a b c d e f . .
+
+			umm dst = capacity - start - 1;
+
+			for (umm i = 0; i < capacity; ++i) {
+				Swap(storage[capacity-1], storage[dst & (capacity - 1)]);
+				dst -= start;
+			}
+			#else
+			// Swap contiguous ranges
+			
+			// d e f . . a b c
+			// |         |
+			// a e f . . d b c
+			//   |         |
+			// a b f . . d e c
+			//     |         |
+			// a b c . . d e f
+			//       |   |
+			// a b c d . . e f
+			//         |   |
+			// a b c d e . . f
+			//           |   |
+			// a b c d e f . .
+			//             |  
+			// a b c d e f . .
+
+			umm s = start;
+
+			for (umm d = 0; d < count; ++d) {
+				while (s < d) {
+					// s = (s + start) & (capacity - 1); // Add one by one until s is bigger
+					s = (s + (d - s + start - 1) / start * start) & (capacity - 1); // Add some multiple of `start` at once. Less iterations, but with a division. Needs benchmarking.
+				}
+
+				Swap(storage[d], storage[s]);
+				s = (s + 1) & (capacity - 1);
+			}
+
+			#endif
 		}
 
 		start = 0;
@@ -275,7 +336,7 @@ private:
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(RingBuffer) {
 	using namespace tl;
 
 	RingBuffer<int> b;
@@ -363,6 +424,46 @@ TL_TEST {
 	check({3, 4, 5, 9, 10, 11, 12, 13}, 5);
 	// 11 12 13 3 4 5 9 10
 	//          ^
+
+
+
+
+
+
+	/* pack */ {
+		const int capacity = 32;
+		int arr[capacity];
+		RingBuffer<int> b;
+		b.storage = arr;
+		b.capacity = capacity;
+
+		// h a b c d e f g
+		// a h b c d e f g
+		// a b h c d e f g
+		// a b c h d e f g
+		// a b c d h e f g
+		// a b c d e h f g
+		// a b c d e f h g
+		// a b c d e f g h
+
+		for (int start = 0; start < capacity; ++start) {
+			for (int count = 0; count <= capacity; ++count) {
+				b.start = start;
+				b.count = count;
+				memset(arr, -1, sizeof(arr));
+				for (int i = 0; i < count; ++i) {
+					arr[(start + i) & (capacity - 1)] = i;
+				}
+
+				auto span = b.pack();
+				assert(span.data == arr);
+				assert(span.count == count);
+				for (int i = 0; i < count; ++i) {
+					assert(arr[i] == i);
+				}
+			}
+		}
+	}
 };
 
 #endif

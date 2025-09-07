@@ -306,7 +306,7 @@ template <umm bits> fc void convert(SignedIntWithBits<bits> &to, s64 from) { to 
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(SignedInt) {
 	using namespace tl;
 
 	{

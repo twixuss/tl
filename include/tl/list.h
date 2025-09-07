@@ -64,13 +64,17 @@ struct List : Span<T, Size_> {
 		count += list.size();
 		return {data + count - list.size(), (Size)list.size()};
 	}
-	T &add(Repeat<T> repeat TL_LP) {
-		reserve_exponential(count + repeat.count TL_LA);
-		for (umm i = 0; i < repeat.count; ++i) {
-			memcpy(data + count + i, &repeat.value, sizeof(T));
+	// I don't want to have `add` overload that takes `Repeat<T>` because
+	// C++ can't select the wanted overload when using initializer list.
+	// Even when it is clearly a different structure from Repeat, it still
+	// thinks this overload should participate in resolution.
+	Span add_repeat(T value, umm repeat_count TL_LP) {
+		reserve_exponential(count + repeat_count TL_LA);
+		for (umm i = 0; i < repeat_count; ++i) {
+			memcpy(data + count + i, &value, sizeof(T));
 		}
-		count += repeat.count;
-		return data[count - 1];
+		count += repeat_count;
+		return {data + count - repeat_count, repeat_count};
 	}
 
 	// Moves the data! Slow!
@@ -641,7 +645,7 @@ template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size>
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(List) {
 	using namespace tl;
 
 	List<int> l;

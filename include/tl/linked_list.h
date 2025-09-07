@@ -45,7 +45,7 @@ struct LinkedList {
 	// Use `unlink` if freeing is unwanted.
 	void erase(Node *node) {
 		unlink(node);
-		allocator.free(node);
+		allocator.free_t(node, 1);
 	}
 
 	void erase(T *value) {
@@ -326,7 +326,7 @@ struct LinkedList {
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(LinkedList) {
 	using namespace tl;
 
 	LinkedList<int> list;

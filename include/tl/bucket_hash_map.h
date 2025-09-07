@@ -382,7 +382,7 @@ struct BucketHashMap : Traits {
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(BucketHashMap) {
 	using namespace tl;
 
 	{
