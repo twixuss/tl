@@ -34,8 +34,13 @@ struct ContiguousHashMap : Traits {
 	static HashAndState compact(FullHash full_hash) {
 		return (u8)full_hash | 2;
 	}
+	
+	struct InsertResult {
+		KeyValuePointers kv;
+		bool inserted;
+	};
 
-	Value &get_or_insert(Key key, Value default_value = {} TL_LP) {
+	InsertResult find_or_insert(Key const &key TL_LP) {
 		FullHash hash = get_hash(key);
 		umm index = 0;
 		if (buffer.capacity) {
@@ -44,7 +49,11 @@ struct ContiguousHashMap : Traits {
 			auto found = find_index_of_key_or_empty_slot(key, hash, index);
 
 			if (found.occupied) {
-				return value_at(found.index);
+				return {
+					&key_at(found.index),
+					&value_at(found.index),
+					false,
+				};
 			}
 
 			index = found.index;
@@ -68,14 +77,24 @@ struct ContiguousHashMap : Traits {
 		}
 
 		hash_and_state_at(index) = compact(hash);
-		key_at(index) = key;
-		return value_at(index) = default_value;
+		
+		auto pkey = &key_at(index);
+		auto pvalue = &value_at(index);
+		*pkey = key;
+		construct(*pvalue);
+		return {
+			pkey,
+			pvalue,
+			true,
+		};
 	}
-	void insert(Key const &key, Value value) {
-		get_or_insert(key) = value;
-	}
-	void insert(KeyValue const &kv) {
-		get_or_insert(kv.key) = kv.value;
+	
+	Value &get_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
+		auto result = find_or_insert(key TL_LA);
+		if (result.inserted) {
+			*result.kv.value = default_value;
+		}
+		return *result.kv.value;
 	}
 
 	bool reserve(umm desired TL_LP) {

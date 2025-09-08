@@ -28,12 +28,12 @@ struct SortedList : private List<T, Allocator, Size> {
 	using Base::erase_at;
 	using Base::operator[];
 
-	void add(T value TL_LP) {
+	T &add(T value TL_LP) {
 		Base::reserve(count + 1);
 		auto search_result = binary_search(Base::span(), [&](T &it) {
 			return compare(map(value), map(it));
 		});
-		Base::insert(value, search_result.would_be_at);
+		return Base::insert(value, search_result.would_be_at);
 	}
 	
 	T *find(T value) {
@@ -55,6 +55,13 @@ struct SortedList : private List<T, Allocator, Size> {
 		return binary_search(Base::span(), [&](T &it) {
 			return compare(value, map(it));
 		}).found;
+	}
+	
+	Base &_list() {
+		return *this;
+	}
+	Base const &_list() const {
+		return *this;
 	}
 };
 

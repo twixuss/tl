@@ -28,40 +28,12 @@ struct BucketHashMap : Traits {
 	Span<Bucket> buckets;
 	umm count = 0;
 	
-	Value &get_or_insert(Key const &key TL_LP) {
-		if (!buckets.count) {
-			rehash(4 TL_LA);
-		}
-
-		umm hash = get_hash(key);
-		auto bucket = &buckets[get_index_from_hash(hash, buckets.count)];
-
-		for (auto &it : *bucket) {
-			if (it.hash == hash) {
-				if (are_equal(it.key, key)) {
-					return it.value;
-				}
-			}
-		}
-
-		if (count >= buckets.count * rehash_percentage / 100) {
-			rehash(buckets.count * 2 TL_LA);
-			bucket = &buckets[get_index_from_hash(hash, buckets.count)];
-		}
-		++count;
-		auto &it = bucket->add(TL_LAC);
-		it.hash = hash;
-		it.key = key;
-
-		return it.value;
-	}
-	
 	struct InsertResult {
 		KeyValuePointers kv;
 		bool inserted;
 	};
 
-	InsertResult insert(Key const &key, Value const &value TL_LP) {
+	InsertResult find_or_insert(Key const &key TL_LP) {
 		if (!buckets.count) {
 			rehash(4 TL_LA);
 		}
@@ -85,10 +57,18 @@ struct BucketHashMap : Traits {
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.key = key;
-		it.value = value;
+		construct(it.value);
 		return {{&it.key, &it.value}, true};
 	}
-
+	
+	Value &get_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
+		auto result = find_or_insert(key TL_LA);
+		if (result.inserted) {
+			*result.kv.value = default_value;
+		}
+		return *result.kv.value;
+	}
+	
 	//
 	// If value is not present returns true
 	//
