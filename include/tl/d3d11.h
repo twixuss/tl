@@ -145,13 +145,8 @@ struct DepthStencilDesc {
 };
 
 struct TL_API State {
-	IDXGIAdapter *adapter;
-	IDXGIAdapter1 *adapter1;
-	IDXGIAdapter2 *adapter2;
 	IDXGISwapChain *swap_chain;
-	ID3D11Device  *device;
-	ID3D11Device2 *device2;
-	ID3D11Device3 *device3;
+	ID3D11Device *device;
 	ID3D11DeviceContext *immediate_context;
 	ID3D11InfoQueue *info_queue;
 	RenderTarget back_buffer;
@@ -1078,35 +1073,14 @@ void State::init(HWND window, u32 width, u32 height, DXGI_FORMAT back_buffer_for
 	GHR(CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory)));
 	defer { TL_COM_RELEASE(dxgi_factory); };
 
-	{
-		IDXGIAdapter1 *adapter = 0;
-		for (UINT adapter_index = 0; dxgi_factory->EnumAdapters1(adapter_index, &adapter) != DXGI_ERROR_NOT_FOUND; ++adapter_index) {
-			DXGI_ADAPTER_DESC1 desc;
-			adapter->GetDesc1(&desc);
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
-				TL_COM_RELEASE(adapter);
-				continue;
-			}
-			this->adapter = adapter;
-			this->adapter1 = adapter;
-			break;
-		}
-	}
-
 	D3D_FEATURE_LEVEL max_feature = D3D_FEATURE_LEVEL_11_1;
-	if (FAILED(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, 0, device_flags, &max_feature, 1, D3D11_SDK_VERSION, &device, 0, &immediate_context))) {
-		GHR(D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, 0, device_flags, 0, 0, D3D11_SDK_VERSION, &device, 0, &immediate_context));
+	if (FAILED(D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, 0, device_flags, &max_feature, 1, D3D11_SDK_VERSION, &device, 0, &immediate_context))) {
+		GHR(D3D11CreateDevice(0, D3D_DRIVER_TYPE_HARDWARE, 0, device_flags, 0, 0, D3D11_SDK_VERSION, &device, 0, &immediate_context));
 	}
 	if (device_flags & D3D11_CREATE_DEVICE_DEBUG) {
 		if (FAILED(device->QueryInterface(&info_queue))) {
 			info_queue = 0;
 		}
-	}
-	if (FAILED(device->QueryInterface(&device2))) {
-		device2 = 0;
-	}
-	if (FAILED(device->QueryInterface(&device3))) {
-		device3 = 0;
 	}
 
 	u32 max_sample_count = get_max_msaa_sample_count(back_buffer_format);

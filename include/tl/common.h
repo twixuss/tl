@@ -934,11 +934,11 @@ forceinline constexpr u32 count_trailing_ones(u16 val) { return count_trailing_z
 forceinline constexpr u32 count_trailing_ones(u32 val) { return count_trailing_zeros((u32)~val); }
 forceinline constexpr u32 count_trailing_ones(u64 val) { return count_trailing_zeros((u64)~val); }
 
-forceinline constexpr u32 log2(u8  v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
-forceinline constexpr u32 log2(u16 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
-forceinline constexpr u32 log2(u32 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (31 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u8  v) { return 7  - count_leading_zeros(v); }
+forceinline constexpr u32 log2(u16 v) { return 15 - count_leading_zeros(v); }
+forceinline constexpr u32 log2(u32 v) { return 31 - count_leading_zeros(v); }
 #if ARCH_X64
-forceinline constexpr u32 log2(u64 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (63 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u64 v) { return 63 - count_leading_zeros(v); }
 #endif
 
 forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
@@ -948,6 +948,10 @@ forceinline constexpr u32 log2(s32 v) { return log2((u32)v); }
 forceinline constexpr u32 log2(s64 v) { return log2((u64)v); }
 #endif
 
+forceinline constexpr u32 ceiled_log2(u8  v) { return log2(v - 1) + 1; }
+forceinline constexpr u32 ceiled_log2(u16 v) { return log2(v - 1) + 1; }
+forceinline constexpr u32 ceiled_log2(u32 v) { return log2(v - 1) + 1; }
+forceinline constexpr u32 ceiled_log2(u64 v) { return log2(v - 1) + 1; }
 
 forceinline constexpr u8  floor_to_power_of_2(u8  v) { return v == 0 ? (u8 )0 : (u8 )((u8 )1 << (u8 )log2(v)); }
 forceinline constexpr u16 floor_to_power_of_2(u16 v) { return v == 0 ? (u16)0 : (u16)((u16)1 << (u16)log2(v)); }
