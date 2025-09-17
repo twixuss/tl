@@ -13,6 +13,7 @@ template <
 >
 struct SortedList : private List<T, Allocator, Size> {
 	using Base = List<T, Allocator, Size>;
+	using Element = T;
 
 	using Base::begin;
 	using Base::end;
@@ -30,9 +31,7 @@ struct SortedList : private List<T, Allocator, Size> {
 
 	T &add(T value TL_LP) {
 		Base::reserve(count + 1);
-		auto search_result = binary_search(Base::span(), [&](T &it) {
-			return compare(map(value), map(it));
-		});
+		auto search_result = search(value);
 		return Base::insert(value, search_result.would_be_at);
 	}
 	
@@ -40,14 +39,14 @@ struct SortedList : private List<T, Allocator, Size> {
 		return search(value).found;
 	}
 	
-	BinarySearchResult<T> search(T value) {
+	BinarySearchResult<T> search(T const &value) {
 		return binary_search(Base::span(), [&](T &it) {
 			return compare(map(value), map(it));
 		});
 	}
 
 	template <class U>
-	T *find(U value)
+	T *find(U const &value)
 		requires requires {
 			{ map(data[0]) } -> std::same_as<U>;
 		}
@@ -64,5 +63,10 @@ struct SortedList : private List<T, Allocator, Size> {
 		return *this;
 	}
 };
+
+template <class T, auto map, auto compare, class Allocator, class Size>
+void free(SortedList<T, map, compare, Allocator, Size> &list) {
+	free(list._list());
+}
 
 }

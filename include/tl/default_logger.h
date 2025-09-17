@@ -54,7 +54,7 @@ struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 
 	static void global_init(Span<utf8> shared_file_path);
 
-	static void default_init(Span<utf8> program_path);
+	void default_init(Span<utf8> program_path);
 };
 
 #ifdef TL_IMPL
@@ -71,22 +71,13 @@ void DefaultLogger::global_init(Span<utf8> shared_file_path) {
 	}
 }
 
-static DefaultLogger default_app_logger = {.module = u8"app"s};
-static DefaultLogger default_tl_logger = {.module = u8"tl"s};
 void DefaultLogger::default_init(Span<utf8> program_path) {
 	DefaultLogger::global_init(tformat(u8"{}.log", program_path));
 
-	#ifdef TL_USE_CONTEXT
-		context->app_logger() = default_app_logger;
-		context->tl_logger() = default_tl_logger;
-	#else
-		tl::app_logger = default_app_logger;
-		tl::tl_logger = default_tl_logger;
-		tl::current_logger = tl::app_logger;
-	#endif
+	tl::current_logger = *this;
 
-	chain(&thread_initter, [] {
-		tl::current_logger = tl::app_logger;
+	chain(&thread_initter, [=] {
+		tl::current_logger = *this;
 	});
 }
 

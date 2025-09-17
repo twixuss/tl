@@ -33,7 +33,7 @@ struct BucketHashMap : Traits {
 		bool inserted;
 	};
 
-	InsertResult find_or_insert(Key const &key TL_LP) {
+	InsertResult find_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
 		if (!buckets.count) {
 			rehash(4 TL_LA);
 		}
@@ -57,16 +57,12 @@ struct BucketHashMap : Traits {
 		auto &it = bucket->add(TL_LAC);
 		it.hash = hash;
 		it.key = key;
-		construct(it.value);
+		it.value = default_value;
 		return {{&it.key, &it.value}, true};
 	}
 	
 	Value &get_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
-		auto result = find_or_insert(key TL_LA);
-		if (result.inserted) {
-			*result.kv.value = default_value;
-		}
-		return *result.kv.value;
+		return *find_or_insert(key, default_value TL_LA).kv.value;
 	}
 	
 	//
@@ -371,10 +367,10 @@ TL_TEST(BucketHashMap) {
 
 		}
 
-		map.insert(42, 1);
-		map.insert(69, 2);
-		map.insert(1337, 3);
-		map.insert(12345, 4);
+		assert(map.find_or_insert(42, 1).inserted);
+		assert(map.find_or_insert(69, 2).inserted);
+		assert(map.find_or_insert(1337, 3).inserted);
+		assert(map.find_or_insert(12345, 4).inserted);
 	
 		assert(map.count == 4);
 		assert(*map.find(42).key == 42);
@@ -408,10 +404,10 @@ TL_TEST(BucketHashMap) {
 		};
 
 		BucketHashMap<int, int, CollideTraits> map;
-		map.insert(42, 1);
-		map.insert(69, 2);
-		map.insert(1337, 3);
-		map.insert(12345, 4);
+		assert(map.find_or_insert(42, 1).inserted);
+		assert(map.find_or_insert(69, 2).inserted);
+		assert(map.find_or_insert(1337, 3).inserted);
+		assert(map.find_or_insert(12345, 4).inserted);
 	
 		assert(map.count == 4);
 		assert(*map.find(42).key == 42);

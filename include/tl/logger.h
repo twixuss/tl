@@ -6,8 +6,6 @@
 /*
 #define TL_LOGGER_CONTEXT_MEMBERS \
 	x(tl::Logger, logger) \
-	x(tl::Logger, app_logger) \
-	x(tl::Logger, tl_logger) \
 
 */
 
@@ -75,8 +73,6 @@ struct Logger : LoggerBase<Logger> {
 };
 
 #ifndef TL_USE_CONTEXT
-extern TL_API Logger app_logger;
-extern TL_API Logger tl_logger;
 extern TL_API thread_local Logger current_logger;
 #endif
 
@@ -95,8 +91,6 @@ inline void log_error  (char const *format, auto &&...args) { current_logger.err
 #ifdef TL_IMPL
 
 #ifndef TL_USE_CONTEXT
-Logger app_logger;
-Logger tl_logger;
 thread_local Logger current_logger;
 #endif
 

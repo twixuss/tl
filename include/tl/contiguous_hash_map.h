@@ -40,7 +40,7 @@ struct ContiguousHashMap : Traits {
 		bool inserted;
 	};
 
-	InsertResult find_or_insert(Key const &key TL_LP) {
+	InsertResult find_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
 		FullHash hash = get_hash(key);
 		umm index = 0;
 		if (buffer.capacity) {
@@ -81,7 +81,7 @@ struct ContiguousHashMap : Traits {
 		auto pkey = &key_at(index);
 		auto pvalue = &value_at(index);
 		*pkey = key;
-		construct(*pvalue);
+		*pvalue = default_value;
 		return {
 			pkey,
 			pvalue,
@@ -90,11 +90,7 @@ struct ContiguousHashMap : Traits {
 	}
 	
 	Value &get_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
-		auto result = find_or_insert(key TL_LA);
-		if (result.inserted) {
-			*result.kv.value = default_value;
-		}
-		return *result.kv.value;
+		return *find_or_insert(key, default_value TL_LA).kv.value;
 	}
 
 	bool reserve(umm desired TL_LP) {
@@ -363,10 +359,10 @@ TL_TEST(ContiguousHashMap) {
 
 	auto test = []<class Map>(){
 		Map map;
-		map.insert(42, 1);
-		map.insert(69, 2);
-		map.insert(1337, 3);
-		map.insert(12345, 4);
+		assert(map.find_or_insert(42, 1).inserted);
+		assert(map.find_or_insert(69, 2).inserted);
+		assert(map.find_or_insert(1337, 3).inserted);
+		assert(map.find_or_insert(12345, 4).inserted);
 	
 		assert(map.count == 4);
 		assert(*map.find(42).key == 42);

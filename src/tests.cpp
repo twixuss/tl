@@ -657,7 +657,7 @@ no_inline void test_find() {
 void run_tl_tests();
 
 s32 tl_main(Span<Span<utf8>> args) {
-	DefaultLogger::default_init(args[0]);
+	logger.default_init(args[0]);
 	
 	//void c_tokenizer_test();
 	//c_tokenizer_test();
@@ -682,10 +682,6 @@ s32 tl_main(Span<Span<utf8>> args) {
 
 	init_printer();
 	defer { deinit_printer(); };
-
-	DefaultLogger::global_init(u8"log.txt"s);
-	current_logger = logger;
-	app_logger = logger;
 
 	print_floats(0.f);
 	print_floats(5.87747175411e-39f);

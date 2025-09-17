@@ -60,6 +60,7 @@ using AppendLocationInfo = void (*)(StringBuilder &output, Span<utf8> path, u32 
 template <class AppendLocationInfo = AppendLocationInfo>
 struct LoadOptions {
 	Span<utf8> include_directive = u8"#include"s;
+	bool must_be_first_in_line = true;
 	AppendLocationInfo append_location_info = autocast []{};
 };
 
@@ -107,6 +108,7 @@ struct Includer {
 				auto [buffer, ok] = read_entire_file(path);
 				if (!ok)
 					return false;
+				this->buffer = buffer;
 				remaining = as_utf8(buffer);
 				return true;
 			}
@@ -124,7 +126,39 @@ struct Includer {
 		}
 
 		while (current.remaining.count) {
-			if (auto found = find(current.remaining, options.include_directive)) {
+		refind:
+			utf8 *found = find(current.remaining, options.include_directive);
+
+			if (found) {
+				if (options.must_be_first_in_line) {
+					utf8 *c = found;
+					while (1) {
+						if (c == (utf8 *)current.buffer.data)
+							goto found_valid;
+						--c;
+
+						switch (*c) {
+							case ' ':
+							case '\t':
+							case '\v':
+							case '\r':
+								continue;
+							case '\n':
+								goto found_valid;
+							default:
+								auto endl = find(Span(found, current.remaining.end()), u8'\n');
+								if (endl) {
+									current.remaining = Span(endl + 1, current.remaining.end());
+									goto refind;
+								} else {
+									current.remaining = Span(current.remaining.end(), current.remaining.end());
+									goto nothing_left;
+								}
+						}
+					}
+				found_valid:;
+				}
+
 				auto text_before_include = Span(current.remaining.begin(), found);
 				append(builder, text_before_include);
 
@@ -150,6 +184,7 @@ struct Includer {
 
 				options.append_location_info(builder, full_include_path, 0);
 			} else {
+			nothing_left:
 				append(builder, current.remaining);
 				if (state_stack.count) {
 					current.deinit();

@@ -475,6 +475,8 @@ forceinline constexpr smm compare(T a, T b) {
 	}
 }
 
+inline static constexpr auto default_comparer = []<class T>(T a, T b) { return compare(a, b); };
+
 template <class Compare, class T>
 concept ACompare = requires (Compare compare, T t) {
 	{ compare(t, t) } -> std::signed_integral;
@@ -1406,8 +1408,12 @@ auto stddev(Collection const &collection) {
 	return tl::sqrt(variance);
 }
 
-constexpr auto compare_equal = []<class T>(T const &a, T const &b) { return a == b; };
+template <class T, class ...Args>
+concept APredicate = requires (T t, Args ...args) { 
+	{ t(args...) } -> std::convertible_to<bool>;
+};
 
+constexpr auto predicate_equal = []<class T, class U>(T const &a, U const &b) { return a == b; };
 
 template <class Predicate = decltype(identity_value)>
 bool all(Collection auto collection, Predicate predicate = {}) {
@@ -1437,8 +1443,8 @@ constexpr auto find_if(Collection const &collection, auto &&predicate) -> declty
 	return {};
 }
 
-template <class Predicate, class Iterator>
-constexpr Iterator find_if(Iterator begin, Iterator end, Predicate &&predicate) {
+template <class Iterator>
+constexpr Iterator find_if(Iterator begin, Iterator end, APredicate<decltype(*begin)> auto &&predicate) {
 	for (Iterator it = begin; it != end; ++it) {
 		if (predicate(*it)) {
 			return it;
@@ -1455,10 +1461,10 @@ constexpr Iterator find(Iterator begin, Iterator end, T const &value) {
 	}
 	return 0;
 }
-template <class T, class Iterator, class Compare>
-constexpr Iterator find(Iterator begin, Iterator end, T const &value, Compare &&compare) {
+template <class T, class Iterator>
+constexpr Iterator find(Iterator begin, Iterator end, decltype(*begin) const &value, APredicate<T, T> auto &&predicate) {
 	for (Iterator it = begin; it != end; ++it) {
-		if (compare(*it, value)) {
+		if (predicate(*it, value)) {
 			return it;
 		}
 	}
@@ -2364,22 +2370,23 @@ umm count(Span<T, Size> span, Fn &&fn) {
 	return result;
 }
 
-template <class T, class Size>
-constexpr smm compare(Span<T, Size> a, Span<T, Size> b) {
+template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
+constexpr smm compare(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {
 	if (a.count != b.count) {
 		return a.count - b.count;
 	}
 
 	for (umm i = 0; i < a.count; ++i) {
-		if (a.data[i] != b.data[i])
-			return compare(a.data[i], b.data[i]);
+		smm r = compare(a.data[i], b.data[i]);
+		if (r)
+			return r;
 	}
 
 	return 0;
 }
 
-template <class T, class Size>
-smm compare_lexical(Span<T, Size> a, Span<T, Size> b) {
+template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
+constexpr smm compare_lexical(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {
 	umm min_count = min(a.count, b.count);
 
 	for (umm i = 0; i < min_count; ++i) {
@@ -2394,25 +2401,27 @@ smm compare_lexical(Span<T, Size> a, Span<T, Size> b) {
 	return 0;
 }
 
-template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
-inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
+inline static constexpr auto lexical_comparer = []<class T>(T a, T b) { return compare_lexical(a, b); };
+
+template <class T, class TSize, class U, class USize, APredicate<T, U> Predicate = decltype(predicate_equal)>
+inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Predicate predicate = predicate_equal) {
 	if (sub_str.count > str.count)
 		return false;
 	for (USize i = 0; i < sub_str.count; ++i) {
-		if (!compare_equal(str.data[i], sub_str.data[i])) {
+		if (!predicate(str.data[i], sub_str.data[i])) {
 			return false;
 		}
 	}
 	return true;
 }
 
-template <class T, class TSize, class U, class USize, class Compare = decltype(compare_equal)>
-inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str, Compare compare = compare_equal) {
+template <class T, class TSize, class U, class USize, APredicate<T, U> Predicate = decltype(predicate_equal)>
+inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str, Predicate predicate = predicate_equal) {
 	if (sub_str.count > str.count)
 		return false;
 	auto base_offset = str.count - sub_str.count;
 	for (USize i = 0; i < sub_str.count; ++i) {
-		if (!compare(str.data[i + base_offset], sub_str.data[i])) {
+		if (!predicate(str.data[i + base_offset], sub_str.data[i])) {
 			return false;
 		}
 	}
@@ -2759,11 +2768,11 @@ void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
 
 // If `what` contains `by`, returns first part before `by`, rest assigned to `what`.
 // If not found, returns `what`, `what` is cleared.
-template <class T, class Size, class Compare = decltype(compare_equal)>
-Span<T, Size> split_by_one_first(Span<T, Size> *what, T by, Compare compare = compare_equal) {
+template <class T, class Size, APredicate<T, T> Predicate = decltype(predicate_equal)>
+Span<T, Size> split_by_one_first(Span<T, Size> *what, T by, Predicate predicate = predicate_equal) {
 	Span<T, Size> result = {};
 	for (umm i = 0; i < what->count; ++i) {
-		if (compare_equal(what->data[i], by)) {
+		if (predicate(what->data[i], by)) {
 			result = {what->data, i};
 			*what = {what->data + i + 1, what->end()};
 			return result;
@@ -3043,7 +3052,7 @@ inline bool equals_case_insensitive(Span<utf8> a, Span<utf8> b) {
 	return true;
 }
 
-constexpr auto compare_equal_case_insensitive = []<class T>(T const &a, T const &b) { return equals_case_insensitive(a, b); };
+constexpr auto predicate_equal_case_insensitive = []<class T>(T const &a, T const &b) { return equals_case_insensitive(a, b); };
 
 inline constexpr void set_to_lower_case(Span<ascii> span) {
 	for (auto &c : span) {
