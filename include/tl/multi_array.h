@@ -9,7 +9,7 @@ template <class Allocator, bool store_base_pointers, class ...Ts>
 struct MultiArray {
 	[[no_unique_address]] std::conditional_t<store_base_pointers, Empty, u8 *> buffer = {};
 	[[no_unique_address]] std::conditional_t<store_base_pointers, std::tuple<Ts *...>, Empty> base_pointers = {};
-	umm capacity = 0;
+	umm capacity = 0; // TODO: rename to `count`. This is an array, not a list.
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
 	void init(umm new_capacity) {

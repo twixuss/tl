@@ -7,7 +7,7 @@ namespace tl {
 template <
 	class T,
 	auto map = identity_value,
-	auto compare = [](decltype(map(*(T *)0)) a, decltype(a) b) { return compare(a, b); },
+	auto compare = [](std::remove_cvref_t<decltype(map(*(T *)0))> a, decltype(a) b) { return compare(a, b); },
 	class Allocator = Allocator,
 	class Size = umm
 >

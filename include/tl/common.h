@@ -1249,6 +1249,16 @@ inline bool any_true(bool value) { return value; }
 inline bool all_false(bool value) { return !value; }
 inline bool any_false(bool value) { return !value; }
 
+template <class From, class To>
+concept ExplicitlyConvertibleTo = std::is_constructible_v<To, From> && !std::is_convertible_v<From, To>;
+
+template <class Iter>
+concept AnIter = requires(Iter iter) {
+	{ iter } -> ExplicitlyConvertibleTo<bool>;
+	{ iter.next() } -> std::same_as<void>;
+	iter.value();
+};
+
 template <class Collection>
 struct IterOfT {
 	using Type = typename Collection::Iter;
@@ -1258,9 +1268,30 @@ template <class Collection>
 using IterOf = IterOfT<std::remove_cvref_t<Collection>>::Type;
 
 template <class Collection>
-auto iter(Collection &collection, typename Collection::IterOptions options = {}) requires requires { { collection.iter(options) } /*-> AnIter*/; } {
+auto to_iter(Collection &&collection)
+	requires requires { { collection.iter() } -> AnIter; }
+{
+	return collection.iter();
+}
+
+template <class Collection>
+auto to_iter(Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options)
+	requires requires { { collection.iter(options) } -> AnIter; }
+{
 	return collection.iter(options);
 }
+
+template <AnIter Iter>
+auto to_iter(Iter &&iter) {
+	return iter;
+}
+
+template <class T>
+concept Collection = requires(T collection) {
+	{ to_iter(collection) } -> AnIter;
+};
+
+#define foreach(it, collection, ...) for (auto it = to_iter(collection __VA_OPT__(,) __VA_ARGS__); it; it.next())
 
 enum ForEachDirective {
 	ForEach_continue        = 0x0,
@@ -1307,26 +1338,6 @@ auto for_each_default_action(Fn &&fn, Item &&item) {
 		return;
 	}
 }
-template <class T>
-concept Collection = requires(T collection) {
-	{ iter(collection) };
-};
-
-template <class T>
-concept Iterable = requires(T collection) { collection.iter(); };
-
-template <class T, class Options>
-concept IterableWithOptions = requires(T collection, Options options) { collection.iter(options); };
-
-template <class From, class To>
-concept ExplicitlyConvertibleTo = std::is_constructible<To, From>::value && !std::is_convertible<From, To>::value;
-
-template <class Iter>
-concept AnIter = requires(Iter iter) {
-	{ iter } -> ExplicitlyConvertibleTo<bool>;
-	{ iter.next() } -> std::same_as<void>;
-	iter.value();
-};
 
 #define tl_self_const std::is_const_v<std::remove_reference_t<decltype(self)>>
 
@@ -1347,29 +1358,10 @@ struct IterAdapter {
 	}
 };
 
-template <class Collection>
-auto to_iter(Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options)
-	requires requires {collection.iter(options); }
-{
-	return collection.iter(options);
-}
-
-template <Iterable Collection>
-auto to_iter(Collection &&collection) {
-	return collection.iter();
-}
-
-auto to_iter(AnIter auto &&iter) {
-	return iter;
-}
-
-#define foreach(it, collection, ...) for (auto it = to_iter(collection __VA_OPT__(,) __VA_ARGS__); it; it.next())
-
-template <Iterable Collection> 
-umm count_of(Collection const &collection) {
-	if constexpr (requires { { collection.count } -> std::same_as<umm>; }) {
+umm count_of(Collection auto const &collection) {
+	if constexpr (requires { { collection.count } -> std::integral; }) {
 		return collection.count;
-	} else if constexpr (requires { { collection.count() } -> std::same_as<umm>; }) {
+	} else if constexpr (requires { { collection.count() } -> std::integral; }) {
 		return collection.count();
 	} else {
 		umm result = 0;
@@ -1387,7 +1379,8 @@ constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
 template <Collection Collection, class Mapper = decltype(identity_value)>
 auto sum(Collection const &collection, Mapper &&mapper = identity_value) {
 	std::remove_cvref_t<decltype(mapper(*(ElementOf<Collection> *)0))> result = {};
-	foreach (it, collection) result += mapper(*it);
+	foreach (it, collection)
+		result += mapper(*it);
 	return result;
 }
 
@@ -2223,8 +2216,8 @@ struct Span {
 		}
 	}
 
-	auto iter(ReverseIterOption options = {}) {
-		return span_iter(data, data + count, options);
+	auto iter(this auto &&self, ReverseIterOption options = {}) {
+		return span_iter(self.data, self.data + self.count, options);
 	}
 
 	Element *data = 0;
@@ -2560,7 +2553,7 @@ constexpr T *find_last_any(Span<T> where, Span<T> what) {
 
 // Const correctess is pain. So much code for so little value.
 // Lambdas in requires are broken. redefinition. ???
-template <Iterable Collection>
+template <Collection Collection>
 auto find(Collection &&collection, ElementOf<Collection> element) {
 	if constexpr (requires { collection.find(element); }) {
 		return collection.find(element);
@@ -3461,8 +3454,10 @@ struct AllocatorBase {
 	inline T *reallocate(T *data, umm old_count, umm new_count, umm align = alignof(T) TL_LP) {
 		auto result = derived()->reallocate_impl(data, old_count * sizeof(T), new_count * sizeof(T), align TL_LA);
 		if (result.data) {
-			for (auto it = (T *)result.data + old_count; it != (T *)result.data + new_count; ++it) {
-				new (it) T();
+			if (new_count > old_count) {
+				for (auto it = (T *)result.data + old_count; it != (T *)result.data + new_count; ++it) {
+					new (it) T();
+				}
 			}
 		}
 		return (T *)result.data;

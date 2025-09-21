@@ -25,13 +25,13 @@ forceinline void yield_smt() { _mm_pause(); }
 
 TL_API void switch_thread();
 
-forceinline s16 atomic_increment(s16 volatile *a) { return _InterlockedIncrement16((short *)a); }
-forceinline s32 atomic_increment(s32 volatile *a) { return _InterlockedIncrement((long *)a); }
-forceinline s64 atomic_increment(s64 volatile *a) { return _InterlockedIncrement64((long long *)a); }
+forceinline s16 atomic_increment(s16 volatile *a) { return -1 + _InterlockedIncrement16((short *)a); }
+forceinline s32 atomic_increment(s32 volatile *a) { return -1 + _InterlockedIncrement((long *)a); }
+forceinline s64 atomic_increment(s64 volatile *a) { return -1 + _InterlockedIncrement64((long long *)a); }
 
-forceinline s16 atomic_decrement(s16 volatile *a) { return _InterlockedDecrement16((short *)a); }
-forceinline s32 atomic_decrement(s32 volatile *a) { return _InterlockedDecrement((long *)a); }
-forceinline s64 atomic_decrement(s64 volatile *a) { return _InterlockedDecrement64((long long *)a); }
+forceinline s16 atomic_decrement(s16 volatile *a) { return 1 + _InterlockedDecrement16((short *)a); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return 1 + _InterlockedDecrement((long *)a); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return 1 + _InterlockedDecrement64((long long *)a); }
 
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
@@ -540,13 +540,22 @@ locked_use(queue) {
 /*
 // Example usage:
 {
+	scoped_locked_use_expr(queue, some_state->the_queue);
+	queue.push(42);
+}
+*/
+#define scoped_locked_use_expr(name, expr) \
+	scoped((expr)._lock); \
+	REDECLARE_REF(name, (expr).unprotected)
+
+/*
+// Example usage:
+{
 	scoped_locked_use(queue);
 	queue.push(42);
 }
 */
-#define scoped_locked_use(name) \
-	scoped(name._lock); \
-	REDECLARE_REF(name, name.unprotected)
+#define scoped_locked_use(name) scoped_locked_use_expr(name, name)
 
 template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
@@ -570,6 +579,16 @@ struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 	}
 	umm count() {
 		return this->unprotected.count;
+	}
+
+	template <class DstAllocator, class DstSize>
+	void drain(List<T, DstAllocator, DstSize> &sink) {
+		this->use([&](auto &queue) {
+			for (auto span : queue.spans()) {
+				sink.add(span);
+			}
+			queue.clear();
+		});
 	}
 };
 

@@ -442,7 +442,7 @@ auto to_list(AnIter auto iter TL_LP) {
 	return result;
 }
 
-template <class Allocator = Allocator, Iterable InputCollection>
+template <class Allocator = Allocator, Collection InputCollection>
 auto to_list(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
 	List<std::remove_cvref_t<decltype(collection.iter().value())>, Allocator> result;
 	result.reserve(count_of(collection));
@@ -452,7 +452,7 @@ auto to_list(InputCollection &&collection, typename std::remove_cvref_t<InputCol
 	return result;
 }
 
-template <class Allocator = Allocator, Iterable InputCollection>
+template <class Allocator = Allocator, Collection InputCollection>
 auto to_list_with_keys(InputCollection &&collection, typename std::remove_cvref_t<InputCollection>::IterOptions options = {}) {
 	List<typename std::remove_cvref_t<InputCollection>::KeyValue, Allocator> result;
 	result.reserve(count_of(collection));

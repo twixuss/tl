@@ -353,7 +353,7 @@ private:
 TL_TEST(ContiguousHashMap) {
 	using namespace tl;
 
-	static_assert(Iterable<ContiguousHashMap<int, int>>);
+	static_assert(Collection<ContiguousHashMap<int, int>>);
 	static_assert(AnIter<ContiguousHashMap<int, int>::Iter<false>>);
 
 
