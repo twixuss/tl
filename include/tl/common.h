@@ -1403,7 +1403,7 @@ auto stddev(Collection const &collection) {
 
 template <class T, class ...Args>
 concept APredicate = requires (T t, Args ...args) { 
-	{ t(args...) } -> std::convertible_to<bool>;
+	{ t(args...) } -> std::same_as<bool>;
 };
 
 constexpr auto predicate_equal = []<class T, class U>(T const &a, U const &b) { return a == b; };
@@ -3948,8 +3948,10 @@ enum class QuickSortPivot {
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span, auto fn) {
 	auto less = [&] (T a, T b) {
-		if constexpr (std::is_invocable_r_v<bool, decltype(fn), T, T>) {
+		if constexpr (APredicate<decltype(fn), T, T>) {
 			return fn(a, b);
+		} else if constexpr (ACompare<decltype(fn), T>) {
+			return fn(a, b) < 0;
 		} else {
 			return fn(a) < fn(b);
 		}
