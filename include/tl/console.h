@@ -43,9 +43,16 @@ struct Printer {
 
 	template <Appendable ...T>
 	inline umm writeln(T const &...args) {
-		auto a = write(args...);
-		auto b = write('\n');
-		return a + b;
+		scoped(temporary_storage_checkpoint);
+		StringBuilder builder;
+		builder.allocator = TL_GET_CURRENT(temporary_allocator);
+		if constexpr (sizeof...(T) > 1) {
+			append_format(builder, args...);
+		} else {
+			append(builder, args...);
+		}
+		append(builder, '\n');
+		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
 };
 
