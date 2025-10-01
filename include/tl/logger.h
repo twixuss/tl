@@ -45,7 +45,9 @@ inline ConsoleColor to_color(LogSeverity severity) {
 template <class Derived>
 struct LoggerBase {
 	inline void log(LogSeverity severity, auto &&...args) {
-		if constexpr (sizeof...(args) == 1) {
+		if constexpr (sizeof...(args) == 0) {
+			derived().impl(severity, u8""s);
+		} else if constexpr (sizeof...(args) == 1) {
 			derived().impl(severity, (Span<utf8>)(TL_TMP(tl::to_string(args...))));
 		} else {
 			derived().impl(severity, (Span<utf8>)(TL_TMP(tl::format(args...))));

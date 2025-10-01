@@ -1139,7 +1139,7 @@ void State::print_messages() {
 bool State::default_hresult_handler(HRESULT hr, char const *file, int line, char const *function, char const *expression) {
 	print_messages();
 	if (FAILED(hr)) {
-		println("{}:{}:{}: {} - {}", file, line, function, expression, FormattedHRESULT{hr});
+		current_logger.error("{}:{}:{}: {} - {}", file, line, function, expression, FormattedHRESULT{hr});
 		return false;
 	}
 	return true;

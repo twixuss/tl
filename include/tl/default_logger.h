@@ -74,6 +74,8 @@ void DefaultLogger::global_init(Span<utf8> shared_file_path) {
 void DefaultLogger::default_init(Span<utf8> program_path) {
 	DefaultLogger::global_init(tformat(u8"{}.log", program_path));
 
+	file = default_logger_file;
+
 	tl::current_logger = *this;
 
 	chain(&thread_initter, [=] {
