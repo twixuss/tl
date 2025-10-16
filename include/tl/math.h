@@ -2567,10 +2567,10 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 #if ARCH_AVX2
 	using namespace simd;
-	f32x8 plane_x = f32x8_set(planes[0].x, planes[1].x, planes[2].x, planes[3].x, planes[4].x, planes[5].x, 0, 0);
-	f32x8 plane_y = f32x8_set(planes[0].y, planes[1].y, planes[2].y, planes[3].y, planes[4].y, planes[5].y, 0, 0);
-	f32x8 plane_z = f32x8_set(planes[0].z, planes[1].z, planes[2].z, planes[3].z, planes[4].z, planes[5].z, 0, 0);
-	f32x8 plane_w = f32x8_set(planes[0].w, planes[1].w, planes[2].w, planes[3].w, planes[4].w, planes[5].w, 0, 0);
+	f32x8 plane_x = f32x8_set(planes.data[0].x, planes.data[1].x, planes.data[2].x, planes.data[3].x, planes.data[4].x, planes.data[5].x, 0, 0);
+	f32x8 plane_y = f32x8_set(planes.data[0].y, planes.data[1].y, planes.data[2].y, planes.data[3].y, planes.data[4].y, planes.data[5].y, 0, 0);
+	f32x8 plane_z = f32x8_set(planes.data[0].z, planes.data[1].z, planes.data[2].z, planes.data[3].z, planes.data[4].z, planes.data[5].z, 0, 0);
+	f32x8 plane_w = f32x8_set(planes.data[0].w, planes.data[1].w, planes.data[2].w, planes.data[3].w, planes.data[4].w, planes.data[5].w, 0, 0);
 	f32x8 position_x = f32x8_set1(position.x);
 	f32x8 position_y = f32x8_set1(position.y);
 	f32x8 position_z = f32x8_set1(position.z);
