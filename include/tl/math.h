@@ -998,7 +998,7 @@ forceinline f32 angle(v2f a, v2f b) {
 }
 
 forceinline f32 angle(v3f a, v3f b) {
-	return acos(dot(a, b)/sqrt(length_squared(a) * length_squared(b)));
+	return acos(clamp(dot(a, b)/sqrt(length_squared(a) * length_squared(b)), -1.0f, +1.0f));
 }
 
 forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
@@ -2564,7 +2564,7 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 	}
 	return planes;
 }
-forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
+forceinline bool overlaps_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 #if ARCH_AVX2
 	using namespace simd;
 	f32x8 plane_x = f32x8_set(planes.data[0].x, planes.data[1].x, planes.data[2].x, planes.data[3].x, planes.data[4].x, planes.data[5].x, 0, 0);

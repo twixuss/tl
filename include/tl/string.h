@@ -645,9 +645,6 @@ public:
 	}
 
 	Optional<u8> pop() {
-		if (!last)
-			return {};
-
 		if (!last->count)
 			return {};
 
@@ -1373,6 +1370,35 @@ inline void append(StringBuilder &builder, Repeat<T> r) {
 	for (umm i = 0; i < r.count; ++i)
 		append(builder, r.value);
 }
+
+template <class T>
+struct TruncText {
+	T value;
+	umm limit = 0;
+	Span<utf8> ellipsis = u8"..."s;
+};
+
+
+template <class T>
+inline void append(StringBuilder &builder, TruncText<T> t) {
+	umm count_before = builder.count();
+
+	append(builder, t.value);
+
+	umm count_after = builder.count();
+
+	umm appended = count_after - count_before;
+
+	if (appended > t.limit) {
+		// TODO: this is dumb. make not dumb.
+		for (umm i = t.limit; i < appended; ++i) {
+			builder.pop();
+		}
+
+		append(builder, t.ellipsis);
+	}
+}
+
 
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };

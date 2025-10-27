@@ -434,6 +434,13 @@ concept Callable = requires(Fn fn) { { fn(std::declval<Args>()...) } -> std::sam
 template <class Fn, class ...Args>
 concept CallableAnyRet = requires(Fn fn) { fn(std::declval<Args>()...); };
 
+template <class T, class ...Args>
+concept APredicate = requires (T t, Args ...args) { 
+	{ t(args...) } -> std::same_as<bool>;
+};
+
+constexpr auto predicate_equal = []<class T, class U>(T const &a, U const &b) { return a == b; };
+
 
 // This function exists because C++ does not provide a way to convert
 // fundamental types to structs without adding a constructor to a struct, 
@@ -1358,11 +1365,13 @@ struct IterAdapter {
 	}
 };
 
-umm count_of(Collection auto const &collection) {
+constexpr umm count(Collection auto const &collection) {
 	if constexpr (requires { { collection.count } -> std::integral; }) {
 		return collection.count;
 	} else if constexpr (requires { { collection.count() } -> std::integral; }) {
 		return collection.count();
+	} else if constexpr (std::is_array_v<std::remove_cvref_t<decltype(collection)>>) {
+		return sizeof(collection) / sizeof(collection[0]);
 	} else {
 		umm result = 0;
 		foreach(it, collection) {
@@ -1370,6 +1379,15 @@ umm count_of(Collection auto const &collection) {
 		}
 		return result;
 	}
+}
+
+template <Collection Collection, APredicate<ElementOf<Collection>> Predicate>
+constexpr umm count(Collection const &collection, Predicate predicate) {
+	umm result = 0;
+	foreach(it, collection) {
+		result += predicate(it.value());
+	}
+	return result;
 }
 
 constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
@@ -1400,13 +1418,6 @@ auto stddev(Collection const &collection) {
 
 	return tl::sqrt(variance);
 }
-
-template <class T, class ...Args>
-concept APredicate = requires (T t, Args ...args) { 
-	{ t(args...) } -> std::same_as<bool>;
-};
-
-constexpr auto predicate_equal = []<class T, class U>(T const &a, U const &b) { return a == b; };
 
 template <class Predicate = decltype(identity_value)>
 bool all(Collection auto collection, Predicate predicate = {}) {
@@ -1927,28 +1938,33 @@ struct SpanIter : IterBase {
 	T *it = 0;
 	int step = 0;
 
-	explicit operator bool() {
+	constexpr explicit operator bool() {
 		return (umm)(it - data) < count;
 	}
-	void next() {
+	constexpr void next() {
 		it += step;
 	}
-	void skip(umm n) {
+	constexpr void skip(umm n) {
 		it += n * step;
 	}
 
-	umm key() { return it - data; }
-	T &value() { return *it; }
+	constexpr umm key() { return it - data; }
+	constexpr T &value() { return *it; }
 };
 
 template <class T>
-SpanIter<T> span_iter(T *start, T *end, ReverseIterOption options = {}) {
+constexpr SpanIter<T> span_iter(T *start, T *end, ReverseIterOption options = {}) {
 	return {
 		.data = start,
 		.count = (umm)(end - start),
 		.it   = options.reverse ? end - 1 : start,
 		.step = options.reverse ? -1      : 1,
 	};
+}
+
+template <class T, umm count>
+constexpr auto to_iter(T (&arr)[count], ReverseIterOption options = ReverseIterOption{} /* MSVC bug requires type name */) {
+	return span_iter(arr, arr + count, options);
 }
 
 #pragma pack(push, 1)
@@ -2343,24 +2359,6 @@ constexpr umm count_of(Span<T, Size> span) { return span.count; }
 template <class T>
 constexpr bool owns(Span<T> span, T *pointer) {
 	return (umm)(pointer - span.data) < span.count;
-}
-
-template <class T, class Size>
-T sum(Span<T, Size> span) {
-	T result = 0;
-	for (auto &v : span) {
-		result += v;
-	}
-	return result;
-}
-
-template <class T, class Size, class Fn>
-umm count(Span<T, Size> span, Fn &&fn) {
-	umm result = 0;
-	for (auto &v : span) {
-		result += (bool)fn(v);
-	}
-	return result;
 }
 
 template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
