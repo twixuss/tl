@@ -65,8 +65,8 @@ struct FlyString {
 HashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> FlyString::storage;
 #endif
 
-inline umm append(StringBuilder &builder, FlyString str) {
-    return append(builder, as_span(str.data));
+inline void append(StringBuilder &builder, FlyString str) {
+    append(builder, as_span(str.data));
 }
 
 }

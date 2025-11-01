@@ -4,8 +4,6 @@
 
 namespace tl {
 
-#if OS_WINDOWS
-
 #define ALL_KEYS(K) \
 	K(backspace,     '\b') \
 	K(tab,           '\t') \
@@ -122,15 +120,13 @@ namespace tl {
 	K(f23,           0x86) \
 	K(f24,           0x87) \
 
-#endif
-
 enum Key : u16 {
 #define K(key, value) Key_##key = value,
 	ALL_KEYS(K)
 #undef K
 };
 
-inline umm append(StringBuilder &builder, Key key) {
+inline void append(StringBuilder &builder, Key key) {
 	switch (key) {
 		#define K(key, value) case Key_##key: return append(builder, u8###key##s);
 		ALL_KEYS(K)

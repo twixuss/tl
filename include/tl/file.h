@@ -17,6 +17,7 @@ struct OpenFileParams {
 	bool write = false;
 	bool silent = false;
 	bool create_directories = write;
+	bool share_read = false;
 };
 
 enum FileCursorOrigin {
@@ -40,9 +41,19 @@ inline File open_file(Span<Char> path, OpenFileParams params) { scoped(temporary
 TL_API void close(File file);
 
 TL_API umm read(File file, Span<u8> data);
+
+template <class T>
+forceinline T read(File file) {
+	u8 bytes[sizeof(T)];
+	read(file, array_as_span(bytes));
+	return std::bit_cast<T>(bytes);
+}
+
 TL_API umm write(File file, Span<u8> data);
 
-TL_API void set_cursor(File file, s64 offset, FileCursorOrigin origin);
+// Returns number of bytes from the beginning of the file to the new cursor.
+TL_API s64 set_cursor(File file, s64 offset, FileCursorOrigin origin);
+
 TL_API s64 get_cursor(File file);
 TL_API void truncate_to_cursor(File file);
 
@@ -62,8 +73,7 @@ inline Optional<u64> get_file_size(Span<Char> path) {
 		return {};
 	defer { close(file); };
 
-	set_cursor(file, 0, File_end);
-	return (u64)get_cursor(file);
+	return set_cursor(file, 0, File_end);
 }
 
 struct ReadEntireFileParams {
@@ -71,12 +81,11 @@ struct ReadEntireFileParams {
 	umm extra_space_after = 0;
 	bool silent : 1 = false;
 };
-inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
+inline Optional<Buffer> read_entire_file(File file, ReadEntireFileParams params = {} TL_LP) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
 
-	set_cursor(file, 0, File_end);
-	auto size = (umm)get_cursor(file);
+	auto size = (umm)set_cursor(file, 0, File_end);
 	set_cursor(file, 0, File_begin);
 
 	auto result = create_buffer_uninitialized(size + params.extra_space_before + params.extra_space_after TL_LA);
@@ -89,7 +98,7 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 }
 
 template <AChar Char, class Size>
-inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
+inline Optional<Buffer> read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true, .silent = params.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
@@ -104,8 +113,6 @@ template <class T>
 concept WritableToFile = std::is_same_v<T, StringBuilder> || std::is_convertible_v<T, Span<u8>>;
 
 inline umm write(File file, StringBuilder const &builder) {
-	set_cursor(file, 0, File_begin);
-	defer { truncate_to_cursor(file); };
 	umm bytes_written = 0;
 	builder.for_each_block([&](StringBuilder::Block *block) {
 		umm block_bytes_written = write(file, block->span());
@@ -130,11 +137,15 @@ inline bool write_entire_file(Span<Char> path, Data const &data, WriteEntireFile
 	return write(file, data) != 0;
 }
 
+struct GetFileWriteTimeOptions {
+	bool silent = false;
+};
+
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
 TL_API Optional<u64> get_file_write_time(File file);
 template <AChar Char>
-inline Optional<u64> get_file_write_time(Span<Char> path) {
-	auto file = open_file(path, {});
+inline Optional<u64> get_file_write_time(Span<Char> path, GetFileWriteTimeOptions options = {}) {
+	auto file = open_file(path, {.silent = options.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return get_file_write_time(file);
@@ -216,14 +227,12 @@ inline FileState detect_change(Path path, FileTime *last_write_time) {
 inline u64 length(File file) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
-	set_cursor(file, 0, File_end);
-	return get_cursor(file);
+	return set_cursor(file, 0, File_end);
 }
 inline u64 remaining_bytes(File file) {
 	auto old_cursor = get_cursor(file);
 	defer { set_cursor(file, old_cursor, File_begin); };
-	set_cursor(file, 0, File_end);
-	return get_cursor(file) - old_cursor;
+	return set_cursor(file, 0, File_end) - old_cursor;
 }
 
 inline void truncate(File file, u64 size) {
@@ -441,7 +450,6 @@ TL_API List<utf8> get_executable_path(bool null_terminated = false TL_LP);
 
 struct MoveFileParams {
 	bool replace_existing = false;
-	bool allow_copy = true;
 };
 
 TL_API bool move_file(Span<utf8> source, Span<utf8> destination, MoveFileParams params = {});
@@ -449,6 +457,17 @@ template <AChar SChar, AChar DChar>
 inline bool move_file(Span<SChar> source, Span<DChar> destination, MoveFileParams params = {}) {
 	scoped(temporary_allocator_and_checkpoint);
 	return move_file(to_utf8(source), to_utf8(destination), params);
+}
+
+struct MoveDirectoryParams {
+	bool replace_existing = false;
+};
+
+TL_API bool move_directory(Span<utf8> source, Span<utf8> destination, MoveDirectoryParams params = {});
+template <AChar SChar, AChar DChar>
+inline bool move_directory(Span<SChar> source, Span<DChar> destination, MoveDirectoryParams params = {}) {
+	scoped(temporary_allocator_and_checkpoint);
+	return move_directory(to_utf8(source), to_utf8(destination), params);
 }
 
 struct ForEachFileOptions {
@@ -557,6 +576,7 @@ inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &
 #endif
 
 #include "static_list.h"
+#include "win32.h"
 
 namespace tl {
 
@@ -569,7 +589,7 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 	WinOpenFileParams result;
 	if (params.read && params.write) {
 		result.access = GENERIC_READ | GENERIC_WRITE;
-		result.share = 0;
+		result.share = params.share_read ? FILE_SHARE_READ : 0;
 		result.creation = OPEN_ALWAYS;
 	} else if (params.read) {
 		result.access = GENERIC_READ;
@@ -577,7 +597,7 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 		result.creation = OPEN_EXISTING;
 	} else if (params.write) {
 		result.access = GENERIC_WRITE;
-		result.share = 0;
+		result.share = params.share_read ? FILE_SHARE_READ : 0;
 		result.creation = CREATE_ALWAYS;
 	} else {
 		result.access = 0;
@@ -597,14 +617,14 @@ File open_file(Span<utf8> path8, OpenFileParams params) {
 	auto handle = CreateFileW((wchar_t *)path16.data, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
-			TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path8);
+			TL_GET_CURRENT(logger).error("Could not open file \"{}\": {}", path8, win32_error());
 		}
 		handle = 0;
 	}
 	return {handle};
 }
 
-void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
+s64 set_cursor(File file, s64 offset, FileCursorOrigin origin) {
 	LARGE_INTEGER newP;
 	newP.QuadPart = offset;
 	DWORD moveMethod;
@@ -612,9 +632,11 @@ void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
 		case File_begin: moveMethod = FILE_BEGIN; break;
 		case File_cursor: moveMethod = FILE_CURRENT; break;
 		case File_end: moveMethod = FILE_END; break;
-		default: return;
+		default: invalid_code_path();
 	}
-	SetFilePointerEx(file.handle, newP, 0, moveMethod);
+	LARGE_INTEGER result;
+	SetFilePointerEx(file.handle, newP, &result, moveMethod);
+	return result.QuadPart;
 }
 s64 get_cursor(File file) {
 	LARGE_INTEGER curP;
@@ -821,7 +843,7 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 			case FileItem_file: {
 				path_buffer.add(u'\0');
 				if (!DeleteFileW(path_buffer.data)) {
-					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer8_from_utf16(path_buffer).span());
+					TL_GET_CURRENT(logger).error("Could not delete file {}: {}", path_buffer8_from_utf16(path_buffer).span(), win32_error());
 				}
 				break;
 			}
@@ -833,9 +855,10 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 	});
 	
 	path_buffer.pop();
+	path_buffer.data[path_buffer.count] = '\0';
 
 	if (!RemoveDirectoryW(path_buffer.data)) {
-		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer8_from_utf16(path_buffer).span());
+		TL_GET_CURRENT(logger).error("Could not delete directory {}: {}", path_buffer8_from_utf16(path_buffer).span(), win32_error());
 	}
 }
 
@@ -1028,8 +1051,8 @@ MappedFile map_file(File file) {
 
 void unmap_file(MappedFile &file) {
 	// TODO: proper error handling
-	assert(UnmapViewOfFile(file.data.data));
-	assert(CloseHandle(file.mapping));
+	if (!UnmapViewOfFile(file.data.data)) { TL_GET_CURRENT(logger).error("UnmapViewOfFile failed: {}", win32_error()); }
+	if (!CloseHandle(file.mapping)) { TL_GET_CURRENT(logger).error("CloseHandle failed: {}", win32_error()); }
 
 	file = {};
 }
@@ -1038,7 +1061,66 @@ bool copy_file(Span<utf8> source8, Span<utf8> destination8) {
 	scoped(temporary_allocator_and_checkpoint);
 	auto source16 = to_utf16(source8, true);
 	auto destination16 = to_utf16(destination8, true);
-	return CopyFileW((wchar_t *)source16.data, (wchar_t *)destination16.data, false);
+	if (!CopyFileW((wchar_t *)source16.data, (wchar_t *)destination16.data, false)) {
+		current_logger.error("Failed to copy file from {} to {}", source8, destination8);
+		return false;
+	}
+	return true;
+}
+
+bool copy_directory(Span<utf8> source8, Span<utf8> destination8) {
+	scoped(temporary_allocator_and_checkpoint);
+	SHFILEOPSTRUCTW s = {};
+	s.wFunc = FO_COPY;
+	s.fFlags = FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NO_UI;
+	
+	s.pFrom = (wchar_t *)(to_utf16(tformat("{}/*"s, source8)) withx { it.add(0); it.add(0); }).data;
+	for (auto c = (wchar_t *)s.pFrom; *c; ++c)
+		*c = *c == '/' ? '\\' : *c;
+
+	s.pTo = (wchar_t *)(to_utf16(destination8) withx { it.add(0); it.add(0); }).data;
+	for (auto c = (wchar_t *)s.pTo;   *c; ++c)
+		*c = *c == '/' ? '\\' : *c;
+
+	int ret = SHFileOperationW(&s);
+	if (ret != 0) {
+		StringBuilder tmp;
+
+		append_format(tmp, "Failed to copy directory from {} to {}: ", source8, destination8);
+
+		switch (ret) {
+			case 0x71:    append(tmp, "DE_SAMEFILE"); break;
+			case 0x72:    append(tmp, "DE_MANYSRC1DEST"); break;
+			case 0x73:    append(tmp, "DE_DIFFDIR"); break;
+			case 0x74:    append(tmp, "DE_ROOTDIR"); break;
+			case 0x75:    append(tmp, "DE_OPCANCELLED"); break;
+			case 0x76:    append(tmp, "DE_DESTSUBTREE"); break;
+			case 0x78:    append(tmp, "DE_ACCESSDENIEDSRC"); break;
+			case 0x79:    append(tmp, "DE_PATHTOODEEP"); break;
+			case 0x7A:    append(tmp, "DE_MANYDEST"); break;
+			case 0x7C:    append(tmp, "DE_INVALIDFILES"); break;
+			case 0x7D:    append(tmp, "DE_DESTSAMETREE"); break;
+			case 0x7E:    append(tmp, "DE_FLDDESTISFILE"); break;
+			case 0x80:    append(tmp, "DE_FILEDESTISFLD"); break;
+			case 0x81:    append(tmp, "DE_FILENAMETOOLONG"); break;
+			case 0x82:    append(tmp, "DE_DEST_IS_CDROM"); break;
+			case 0x83:    append(tmp, "DE_DEST_IS_DVD"); break;
+			case 0x84:    append(tmp, "DE_DEST_IS_CDRECORD"); break;
+			case 0x85:    append(tmp, "DE_FILE_TOO_LARGE"); break;
+			case 0x86:    append(tmp, "DE_SRC_IS_CDROM"); break;
+			case 0x87:    append(tmp, "DE_SRC_IS_DVD"); break;
+			case 0x88:    append(tmp, "DE_SRC_IS_CDRECORD"); break;
+			case 0xB7:    append(tmp, "DE_ERROR_MAX"); break;
+			case 0x402:   append(tmp, "UNKNOWN_ERROR"); break;
+			case 0x10000: append(tmp, "ERRORONDEST"); break;
+			case 0x10074: append(tmp, "DE_ROOTDIR | ERRORONDEST"); break;
+			default:      append(tmp, FormattedWin32Error{(DWORD)ret}); break;
+		}
+
+		current_logger.error(to_string(tmp));
+		return false;
+	}
+	return true;
 }
 
 List<utf8> get_executable_path(bool null_terminated TL_LPD) {
@@ -1053,10 +1135,26 @@ bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams param
 	scoped(temporary_allocator_and_checkpoint);
 	auto source16 = to_utf16(source8, true);
 	auto destination16 = to_utf16(destination8, true);
-	DWORD flags = 0;
-	if (params.allow_copy)       flags |= MOVEFILE_COPY_ALLOWED;
+	DWORD flags = MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH;
 	if (params.replace_existing) flags |= MOVEFILE_REPLACE_EXISTING;
-	return MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags);
+	if (!MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags)) {
+		current_logger.error("Failed to move file from {} to {}", source8, destination8);
+		return false;
+	}
+	return true;
+}
+
+bool move_directory(Span<utf8> source8, Span<utf8> destination8, MoveDirectoryParams params) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto source16 = to_utf16(source8, true);
+	auto destination16 = to_utf16(destination8, true);
+	DWORD flags = MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH;
+	if (params.replace_existing) flags |= MOVEFILE_REPLACE_EXISTING;
+	if (!MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags)) {
+		current_logger.error("Failed to move directory from {} to {}", source8, destination8);
+		return false;
+	}
+	return true;
 }
 
 
@@ -1081,10 +1179,10 @@ File open_file(Span<utf8> path, OpenFileParams params) {
 	mode.add('b');
 	mode.add(0);
 
-	FILE *file = fopen(null_terminate(path).data, mode.data);
+	FILE *file = fopen((char *)null_terminate<TemporaryAllocator>(path).data, mode.data);
 
 	if (!file && !params.silent) {
-		TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path);
+		TL_GET_CURRENT(logger).error("Could not open file \"{}\"", path);
 	}
 
 	return {file};
@@ -1120,7 +1218,7 @@ void close(File file) {
 
 bool file_exists(Span<utf8> path) {
 	scoped(temporary_allocator_and_checkpoint);
-    FILE *file = fopen(null_terminate(path).data, "r");
+    FILE *file = fopen((char *)null_terminate<TemporaryAllocator>(path).data, "r");
     if (file) {
         fclose(file);
         return true;
@@ -1131,7 +1229,7 @@ bool directory_exists(Span<utf8> path) {
 	scoped(temporary_allocator_and_checkpoint);
     struct stat statbuf;
 
-    if (stat(null_terminate(path).data, &statbuf) != 0) {
+    if (stat((char *)null_terminate<TemporaryAllocator>(path).data, &statbuf) != 0) {
         return false;
     }
 
@@ -1151,7 +1249,7 @@ FileItemList get_items_in_directory(Span<utf8> directory) {
 	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
 	scoped(TL_GET_CURRENT(temporary_allocator));
 
-    DIR *dir = opendir(null_terminate(directory).data);
+    DIR *dir = opendir((char *)null_terminate<TemporaryAllocator>(directory).data);
     if (dir == NULL) {
         current_logger.error("opendir({}) failed", directory);
 		return result;

@@ -29,7 +29,7 @@ struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 		auto color = [&] {
 			switch (severity) {
 				case LogSeverity::debug:   return ConsoleColor::cyan;
-				case LogSeverity::info:    return ConsoleColor::dark_gray;
+				case LogSeverity::info:    return ConsoleColor::gray;
 				case LogSeverity::warning: return ConsoleColor::yellow;
 				case LogSeverity::error:   return ConsoleColor::red;
 			}
@@ -53,6 +53,8 @@ struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 	}
 
 	static void global_init(Span<utf8> shared_file_path);
+
+	void default_init(Span<utf8> program_path);
 };
 
 #ifdef TL_IMPL
@@ -69,6 +71,17 @@ void DefaultLogger::global_init(Span<utf8> shared_file_path) {
 	}
 }
 
+void DefaultLogger::default_init(Span<utf8> program_path) {
+	DefaultLogger::global_init(tformat(u8"{}.log", program_path));
+
+	file = default_logger_file;
+
+	tl::current_logger = *this;
+
+	chain(&thread_initter, [=] {
+		tl::current_logger = *this;
+	});
+}
 
 #endif
 

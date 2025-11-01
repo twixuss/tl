@@ -28,7 +28,7 @@ inline void init(CoroutineState &state, Coroutine coroutine, umm stack_size = 10
 		- coroutine_saved_registers_count * 8
 		- 8 // return address
 		- 16; // shadow space
-	state.return_addr = coroutine;
+	state.return_addr = (void *)coroutine;
 	memset(state.rsp, 0xcd, (u8 *)state.stack_base + stack_size - (u8*)state.rsp);
 }
 inline void free(CoroutineState &state) {
@@ -37,3 +37,11 @@ inline void free(CoroutineState &state) {
 }
 
 }
+
+#ifdef TL_IMPL
+#if !OS_WINDOWS
+extern "C" void *tl_coroutine_yield(tl::CoroutineState &, void *) {
+	not_implemented();
+}
+#endif
+#endif

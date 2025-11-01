@@ -32,12 +32,18 @@ inline wchar_t *tmp_to_wstr(Span<utf8> str) {
 // Debug
 //
 
+struct FormattedHRESULT {
+	HRESULT value;
+};
+TL_API void append(StringBuilder &b, FormattedHRESULT e);
+
+
 struct FormattedWin32Error {
 	DWORD value;
 };
 
 TL_API FormattedWin32Error win32_error();
-TL_API umm append(StringBuilder &b, FormattedWin32Error e);
+TL_API void append(StringBuilder &b, FormattedWin32Error e);
 
 //
 // Window
@@ -102,13 +108,13 @@ TL_API u64 get_performance_counter();
 
 namespace tl {
 
-List<utf8> describe_win32_error(DWORD error) {
+static List<utf8> describe_hresult(HRESULT hr) {
 	LPWSTR error_text = NULL;
 
 	FormatMessageW(
 		FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_IGNORE_INSERTS|FORMAT_MESSAGE_MAX_WIDTH_MASK,
 		NULL,
-		HRESULT_FROM_WIN32(error),
+		hr,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 		(LPWSTR)&error_text,
 		0,
@@ -122,14 +128,18 @@ List<utf8> describe_win32_error(DWORD error) {
 	return to_utf8(as_span((utf16 *)error_text), true);
 }
 
+void append(StringBuilder &b, FormattedHRESULT e) {
+	auto description = describe_hresult(e.value);
+	defer { free(description); };
+	append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = (u32)e.value, .radix = 16, .leading_zero_count = 8}, description);
+}
+
 FormattedWin32Error win32_error() {
 	return {GetLastError()};
 }
 
-umm append(StringBuilder &b, FormattedWin32Error e) {
-	auto description = describe_win32_error(e.value);
-	defer { free(description); };
-	return append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = e.value, .radix = 16, .leading_zero_count = 8}, description);
+void append(StringBuilder &b, FormattedWin32Error e) {
+	append(b, FormattedHRESULT{HRESULT_FROM_WIN32(e.value)});
 }
 
 HWND create_class_and_window(Span<utf8> class_name, WNDPROC wnd_proc, Span<utf8> title, CreateClassAndWindowOptions options) {

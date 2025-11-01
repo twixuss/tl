@@ -60,6 +60,7 @@ using AppendLocationInfo = void (*)(StringBuilder &output, Span<utf8> path, u32 
 template <class AppendLocationInfo = AppendLocationInfo>
 struct LoadOptions {
 	Span<utf8> include_directive = u8"#include"s;
+	bool must_be_first_in_line = true;
 	AppendLocationInfo append_location_info = autocast []{};
 };
 
@@ -67,18 +68,21 @@ template <class SourceFile = SourceFileBase>
 requires std::is_same_v<SourceFile, SourceFileBase>
 	  || std::is_base_of_v<SourceFileBase, SourceFile> // is_base_of<SourceFile, SourceFile> returns true, which doesn't make sense, that's why is_same check.
 struct Includer {
-	StringBuilder builder;
-
 	// contains the main file, its dependencies, and their dependencies, all of them.
 	List<SourceFile> source_files;
 
 	template <class Allocator, class AppendLocationInfo>
-	void load(Span<utf8> path, List<utf8, Allocator> *text, LoadOptions<AppendLocationInfo> options = {}) {
+	bool load(Span<utf8> path, List<utf8, Allocator> *text, LoadOptions<AppendLocationInfo> options = {}) {
 
 		using PathAllocator = typename SourceFile::PathAllocator;
 
 		assert(text);
-		builder.clear();
+		
+		// TODO: Implement reuse. Should ask caller for available builder
+		// because storing it makes Includer non-copyable.
+		StringBuilder builder;
+		defer { tl::free(builder); };
+
 		for (auto &source_file : source_files) {
 			source_file.free();
 		}
@@ -100,9 +104,13 @@ struct Includer {
 			Buffer buffer;
 			Span<utf8> remaining;
 
-			void init() {
-				buffer = read_entire_file(path);
+			bool init() {
+				auto [buffer, ok] = read_entire_file(path);
+				if (!ok)
+					return false;
+				this->buffer = buffer;
 				remaining = as_utf8(buffer);
+				return true;
 			}
 			void deinit() {
 				tl::free(buffer);
@@ -113,10 +121,44 @@ struct Includer {
 		defer { tl::free(state_stack); };
 
 		FileState current = {.path = path};
-		current.init();
+		if (!current.init()) {
+			return false;
+		}
 
 		while (current.remaining.count) {
-			if (auto found = find(current.remaining, options.include_directive)) {
+		refind:
+			utf8 *found = find(current.remaining, options.include_directive);
+
+			if (found) {
+				if (options.must_be_first_in_line) {
+					utf8 *c = found;
+					while (1) {
+						if (c == (utf8 *)current.buffer.data)
+							goto found_valid;
+						--c;
+
+						switch (*c) {
+							case ' ':
+							case '\t':
+							case '\v':
+							case '\r':
+								continue;
+							case '\n':
+								goto found_valid;
+							default:
+								auto endl = find(Span(found, current.remaining.end()), u8'\n');
+								if (endl) {
+									current.remaining = Span(endl + 1, current.remaining.end());
+									goto refind;
+								} else {
+									current.remaining = Span(current.remaining.end(), current.remaining.end());
+									goto nothing_left;
+								}
+						}
+					}
+				found_valid:;
+				}
+
 				auto text_before_include = Span(current.remaining.begin(), found);
 				append(builder, text_before_include);
 
@@ -136,10 +178,13 @@ struct Includer {
 
 				state_stack.add(current);
 				current = {.path = full_include_path};
-				current.init();
+				if (!current.init()) {
+					return false;
+				}
 
 				options.append_location_info(builder, full_include_path, 0);
 			} else {
+			nothing_left:
 				append(builder, current.remaining);
 				if (state_stack.count) {
 					current.deinit();
@@ -156,9 +201,9 @@ struct Includer {
 		text->reserve(count);
 		text->count = count;
 		builder.fill(as_bytes(*text));
+		return true;
 	}
 	void free() {
-		tl::free(builder);
 		for (auto &source_file : source_files) {
 			source_file.free();
 		}

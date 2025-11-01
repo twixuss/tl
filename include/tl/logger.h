@@ -6,8 +6,6 @@
 /*
 #define TL_LOGGER_CONTEXT_MEMBERS \
 	x(tl::Logger, logger) \
-	x(tl::Logger, app_logger) \
-	x(tl::Logger, tl_logger) \
 
 */
 
@@ -19,13 +17,13 @@ x(info) \
 x(warning) \
 x(error) \
 
-enum class LogSeverity {
+enum class LogSeverity : u8 {
 	#define x(name) name,
 	TL_ENUMERATE_LOGGER_SEVERITIES
 	#undef x
 };
 
-inline umm append(StringBuilder &builder, LogSeverity s) {
+inline void append(StringBuilder &builder, LogSeverity s) {
 	switch (s) {
 		#define x(name) case LogSeverity::name: return append(builder, u8###name##s);
 		TL_ENUMERATE_LOGGER_SEVERITIES
@@ -34,20 +32,31 @@ inline umm append(StringBuilder &builder, LogSeverity s) {
 	return append_format(builder, "LogSeverity({})", (int)s);
 }
 
+inline ConsoleColor to_color(LogSeverity severity) {
+	switch (severity) {
+		default:
+		case LogSeverity::debug:   return ConsoleColor::cyan;
+		case LogSeverity::info:    return ConsoleColor::gray;
+		case LogSeverity::warning: return ConsoleColor::yellow;
+		case LogSeverity::error:   return ConsoleColor::red;
+	}
+}
+
 template <class Derived>
 struct LoggerBase {
-	inline void log(LogSeverity severity, char const *format, auto ...args) {
-		derived().impl(severity, TL_TMP(tl::format(as_utf8(as_span(format)), args...)));
+	inline void log(LogSeverity severity, auto &&...args) {
+		if constexpr (sizeof...(args) == 0) {
+			derived().impl(severity, u8""s);
+		} else if constexpr (sizeof...(args) == 1) {
+			derived().impl(severity, (Span<utf8>)(TL_TMP(tl::to_string(args...))));
+		} else {
+			derived().impl(severity, (Span<utf8>)(TL_TMP(tl::format(args...))));
+		}
 	}
-	inline void debug  (char const *format, auto ...args) { derived().log(LogSeverity::debug,   format, args...); }
-	inline void info   (char const *format, auto ...args) { derived().log(LogSeverity::info,    format, args...); }
-	inline void warning(char const *format, auto ...args) { derived().log(LogSeverity::warning, format, args...); }
-	inline void error  (char const *format, auto ...args) { derived().log(LogSeverity::error,   format, args...); }
-
-	inline void debug  (auto &&arg) { derived().impl(LogSeverity::debug,   TL_TMP(to_string(arg))); }
-	inline void info   (auto &&arg) { derived().impl(LogSeverity::info,    TL_TMP(to_string(arg))); }
-	inline void warning(auto &&arg) { derived().impl(LogSeverity::warning, TL_TMP(to_string(arg))); }
-	inline void error  (auto &&arg) { derived().impl(LogSeverity::error,   TL_TMP(to_string(arg))); }
+	inline void debug  (auto &&...args) { log(LogSeverity::debug,   args...); }
+	inline void info   (auto &&...args) { log(LogSeverity::info,    args...); }
+	inline void warning(auto &&...args) { log(LogSeverity::warning, args...); }
+	inline void error  (auto &&...args) { log(LogSeverity::error,   args...); }
 
 	Derived &derived() { return *(Derived *)this; }
 };
@@ -66,28 +75,24 @@ struct Logger : LoggerBase<Logger> {
 };
 
 #ifndef TL_USE_CONTEXT
-extern TL_API Logger app_logger;
-extern TL_API Logger tl_logger;
 extern TL_API thread_local Logger current_logger;
 #endif
 
 namespace global_log {
 
-inline void log(LogSeverity severity, char const *format, auto ...args) {
+inline void log(LogSeverity severity, char const *format, auto &&...args) {
 	current_logger.log(severity, format, args...);
 }
-inline void log_debug  (char const *format, auto ...args) { current_logger.debug  (format, args...); }
-inline void log_info   (char const *format, auto ...args) { current_logger.info   (format, args...); }
-inline void log_warning(char const *format, auto ...args) { current_logger.warning(format, args...); }
-inline void log_error  (char const *format, auto ...args) { current_logger.error  (format, args...); }
+inline void log_debug  (char const *format, auto &&...args) { current_logger.debug  (format, args...); }
+inline void log_info   (char const *format, auto &&...args) { current_logger.info   (format, args...); }
+inline void log_warning(char const *format, auto &&...args) { current_logger.warning(format, args...); }
+inline void log_error  (char const *format, auto &&...args) { current_logger.error  (format, args...); }
 
 }
 
 #ifdef TL_IMPL
 
 #ifndef TL_USE_CONTEXT
-Logger app_logger;
-Logger tl_logger;
 thread_local Logger current_logger;
 #endif
 

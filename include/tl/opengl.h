@@ -1,10 +1,17 @@
 ﻿#pragma once
+/*
+Requirements:
+	Provide storage for functions:
+		tl::gl::Functions *tl_opengl_functions() { return ...; }
+*/
+
 #include "system.h"
 #include "console.h"
 #include "math.h"
-#include "time.h"
+#include "precise_time.h"
 #include "includer.h"
 #include "static_list.h"
+#include "date.h"
 
 #if OS_WINDOWS
 #pragma warning(push, 0)
@@ -516,14 +523,14 @@ namespace gl {
 #include "generated/opengl_all_funcs.h"
 
 #if OS_WINDOWS
-#define EXT_AND_OS_FUNCS EXTENSION_FUNCS WINDOWS_FUNCS
+#define TL_OPENGL_EXT_AND_OS_FUNCS TL_OPENGL_EXTENSION_FUNCS TL_OPENGL_WINDOWS_FUNCS
 #else
-#define EXT_AND_OS_FUNCS EXTENSION_FUNCS
+#define TL_OPENGL_EXT_AND_OS_FUNCS TL_OPENGL_EXTENSION_FUNCS
 #endif
 
 
 #define D(ret, name, args, params) using name##_t=ret(GLAPI*)args;
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
@@ -531,37 +538,38 @@ EXT_AND_OS_FUNCS
 BASE_FUNCS
 #undef D
 #define D(ret, name, args, params) extern TL_API ret _##name args;
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 #endif
 
 union Functions {
 	struct {
 #define D(ret, name, args, params) name##_t _##name;
-		EXT_AND_OS_FUNCS
+		TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 	};
 	void *data[1];
 };
 
-extern TL_API Functions functions;
+}}
+extern tl::gl::Functions *tl_opengl_functions();
+namespace tl {
+namespace gl {
 
 #ifdef TL_IMPL
 
 #ifdef TL_GL_VALIDATE_EACH_CALL
 #define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return ::name params;}
-BASE_FUNCS
+TL_OPENGL_BASE_FUNCS
 #undef D
-#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return functions._##name params;}
-EXT_AND_OS_FUNCS
+#define D(ret, name, args, params) ret _##name args{defer{auto error=glGetError();assert(error==GL_NO_ERROR);};return tl_opengl_functions()->_##name params;}
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 #endif
 
-Functions functions;
-
 static char const *function_names[] {
 #define D(ret, name, args, params) #name,
-EXT_AND_OS_FUNCS
+TL_OPENGL_EXT_AND_OS_FUNCS
 #undef D
 };
 
@@ -591,6 +599,13 @@ TL_API bool init_opengl(NativeWindowHandle window, InitFlags flags, DEBUGPROC de
 inline bool init_opengl(NativeWindowHandle window) { return init_opengl(window, false, default_debug_proc, get_default_back_buffer_params()); }
 inline bool init_opengl(NativeWindowHandle window, InitFlags flags) { return init_opengl(window, flags, default_debug_proc, get_default_back_buffer_params()); }
 inline bool init_opengl(NativeWindowHandle window, InitFlags flags, BackBufferParams back_buffer_params) { return init_opengl(window, flags, default_debug_proc, back_buffer_params); }
+
+#if OS_WINDOWS
+TL_API HDC get_dc();
+TL_API HGLRC get_glrc();
+#endif
+
+bool make_current();
 
 TL_API void present();
 TL_API GLuint create_shader(GLenum shaderType, u32 version, bool core, Span<char> source);
@@ -727,10 +742,16 @@ static GLuint compile_shader(GLuint shader) {
 
 	scoped(temporary_storage_checkpoint);
 
-	auto message = current_temporary_allocator.allocate<char>(maxLength);
-	glGetShaderInfoLog(shader, maxLength, &maxLength, message);
+	auto message_p = current_temporary_allocator.allocate<char>(maxLength);
+	glGetShaderInfoLog(shader, maxLength, &maxLength, message_p);
 
-	print(Span(message, maxLength));
+	Span message = {message_p, (umm)maxLength};
+
+	print(message);
+
+	if (find(message, ": error"s)) {
+		current_logger.error("There were shader compilation errors.");
+	}
 
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
@@ -791,6 +812,10 @@ GLuint create_shader(GLenum shaderType, Span<char> source) {
 }
 
 GLuint create_program(ProgramStages stages) {
+	if (!stages.vertex && !stages.fragment && !stages.compute) {
+		return 0;
+	}
+
 	GLuint result = glCreateProgram();
 	if (stages.vertex)   glAttachShader(result, stages.vertex);
 	if (stages.fragment) glAttachShader(result, stages.fragment);
@@ -842,6 +867,13 @@ static GLuint immediate_vertex_array;
 
 static HDC client_dc;
 static HGLRC context;
+
+HDC get_dc() { return client_dc; }
+HGLRC get_glrc() { return context; }
+
+bool make_current() {
+	return wglMakeCurrent(client_dc, context);
+}
 
 static StaticList<int, 16> context_attribs;
 
@@ -916,7 +948,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 		assert(wglGetCurrentContext());
 	}
 
-	static constexpr u32 function_count = sizeof(functions) / sizeof(void *);
+	static constexpr u32 function_count = sizeof(*tl_opengl_functions()) / sizeof(void *);
 
 	{
 		TL_GL_PROFILE("Loading OpenGL extensions");
@@ -925,7 +957,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 			char const *name = function_names[function_index];
 			void *function = wglGetProcAddress(name);
 			if (function) {
-				functions.data[function_index] = function;
+				tl_opengl_functions()->data[function_index] = function;
 			} else {
 				print("Failed to query '{}'\n", name);
 			}
@@ -933,17 +965,17 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 	}
 
 	#define D(ret, name, args, params)                                    \
-		if (!functions._##name) {                                         \
-			functions._##name = autocast +[]() {                          \
+		if (!tl_opengl_functions()->_##name) {                           \
+			tl_opengl_functions()->_##name = autocast +[]() {            \
 				println("OpenGL function '{}' is not supported.", #name); \
 				abort();                                                  \
 			};                                                            \
 		}
-	EXT_AND_OS_FUNCS
+	TL_OPENGL_EXT_AND_OS_FUNCS
 	#undef D
 
 
-	if (functions._wglCreateContextAttribsARB) {
+	if (tl_opengl_functions()->_wglCreateContextAttribsARB) {
 #if 0
 		float required_attribs_f[] = {
 			0, 0
@@ -1368,80 +1400,108 @@ inline void set_sampler(GLuint shader, char const *name, GLuint texture, u32 ind
 
 inline void use_shader(GLuint shader) { glUseProgram(shader); }
 
-template <class T, class Index = umm>
+template <class T, bool use_bind_api = false, umm growth_numer = 3, umm growth_denom = 2>
 struct GrowingBuffer {
+	GLuint buffer = 0;
+	umm count = 0;
+	umm capacity = 0;
+	GLenum usage = GL_DYNAMIC_DRAW;
+	
 	void add(T value) {
-		reserve(size + 1);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), sizeof(T), &value);
-		++size;
+		reserve(count + 1);
+		bufferSubData(buffer, count * sizeof(T), sizeof(T), &value);
+		++count;
 	}
 
 	void add(Span<T> span) {
-		reserve(size + span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, size * sizeof(T), span.size * sizeof(T), span.data);
-		size += span.size;
-	}
-	void add(std::initializer_list<T> list) { add(as_span(list)); }
-	void set(Index index, T value) {
-		bounds_check(assert(index < size));
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, index * sizeof(T), sizeof(T), &value);
-	}
-	void set(Index start, Span<T> span) {
-		bounds_check(assert(start + span.size - 1 < size));
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, start * sizeof(T), span.size * sizeof(T), span.data);
-	}
-	void reset(Span<T> span) {
-		reserve(span.size);
-		glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
-		glBufferSubData(GL_COPY_WRITE_BUFFER, 0, span.size * sizeof(T), span.data);
-		size = span.size;
-	}
-	void init() {
-		if (!buffer) {
-			glGenBuffers(1, &buffer);
+		if (span.count) {
+			reserve(count + span.count);
+			bufferSubData(buffer, count * sizeof(T), span.count * sizeof(T), span.data);
 		}
+		count += span.count;
+	}
+	void add(std::initializer_list<T> list) {
+		add(as_span(list));
+	}
+	void set(Span<T> span) {
+		if (span.count) {
+			reserve(span.count);
+			bufferSubData(buffer, 0, span.count * sizeof(T), span.data);
+		}
+		count = span.count;
+	}
+	void set_at(umm index, T value) {
+		bounds_check(assert(index < count));
+		bufferSubData(buffer, index * sizeof(T), sizeof(T), &value);
+	}
+	void set_at(umm start, Span<T> span) {
+		bounds_check(assert(start + span.count - 1 < count));
+		bufferSubData(buffer, start * sizeof(T), span.count * sizeof(T), span.data);
 	}
 	void clear() {
-		size = 0;
+		count = 0;
 	}
-	void reserve(Index amount) {
+	void reserve(umm amount) {
 		if (amount <= capacity)
 			return;
+		
+		umm new_capacity = max(amount, (umm)1) * growth_numer / growth_denom;
+		
+		if (buffer) {
+			resizeBuffer(&buffer, capacity * sizeof(T), new_capacity * sizeof(T), usage);
+		} else {
+			buffer = genBuffer();
+			bufferData(buffer, new_capacity * sizeof(T), 0, usage);
+		}
 
-		Index new_capacity = max(capacity, 1);
-		while (new_capacity < amount) new_capacity *= 2;
-
-		GLuint new_buffer;
-		glGenBuffers(1, &new_buffer);
-
-		glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
-		glBufferData(GL_COPY_WRITE_BUFFER, new_capacity * sizeof(T), 0, usage);
-
-		glBindBuffer(GL_COPY_READ_BUFFER, buffer);
-
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, capacity * sizeof(T));
-
-		glDeleteBuffers(1, &buffer);
-
-		buffer = new_buffer;
 		capacity = new_capacity;
 	}
 
-	GrowingBuffer &operator=(Span<T> span) {
-		reserve(span.size);
-		size = span.size;
-		set(0, span);
-		return *this;
+	//
+	// Wrappers for bound/named access
+	//
+	static GLuint genBuffer() {
+		GLuint result;
+		if constexpr (use_bind_api) {
+			glGenBuffers(1, &result);
+		} else {
+			glCreateBuffers(1, &result);
+		}
+		return result;
 	}
+	static void bufferData(GLuint buffer, GLsizeiptr size, const GLvoid *data, GLenum usage) {
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferData(GL_COPY_WRITE_BUFFER, size, data, usage);
+		} else {
+			glNamedBufferData(buffer, size, data, usage);
+		}
+	}
+	static void bufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size, const GLvoid *data) {
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferSubData(GL_COPY_WRITE_BUFFER, offset, size, data);
+		} else {
+			glNamedBufferSubData(buffer, offset, size, data);
+		}
+	}
+	static void resizeBuffer(GLuint *old_buffer, GLsizeiptr old_size, GLsizeiptr new_size, GLenum usage) {
+		GLuint new_buffer = genBuffer();
+		if constexpr (use_bind_api) {
+			glBindBuffer(GL_COPY_WRITE_BUFFER, new_buffer);
+			glBufferData(GL_COPY_WRITE_BUFFER, new_size, 0, usage);
 
-	Index size = 0;
-	Index capacity = 0;
-	GLuint buffer = 0;
-	GLenum usage = 0;
+			glBindBuffer(GL_COPY_READ_BUFFER, *old_buffer);
+			glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, old_size);
+		} else {
+			glNamedBufferData(new_buffer, new_size, 0, usage);
+
+			glCopyNamedBufferSubData(*old_buffer, new_buffer, 0, 0, old_size);
+		}
+		//glInvalidateBufferData(old_buffer);
+		glDeleteBuffers(1, old_buffer);
+		*old_buffer = new_buffer;
+	}
 };
 
 template <class T>
@@ -1455,10 +1515,5 @@ void free(GrowingBuffer<T> &buffer) {
 }
 }
 
-#undef BASE_FUNCS
-#undef EXTENSION_FUNCS
-#undef WINDOWS_FUNCS
-#undef EXT_AND_OS_FUNCS
-#undef ALL_FUNCS
 #undef TL_GL_PROFILE
 #pragma warning(pop)

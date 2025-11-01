@@ -1,6 +1,9 @@
 #pragma once
 
 #include "common.h"
+#if TL_DEBUG
+#include "list.h" // debug_check
+#endif
 
 namespace tl {
 
@@ -42,7 +45,7 @@ struct LinkedList {
 	// Use `unlink` if freeing is unwanted.
 	void erase(Node *node) {
 		unlink(node);
-		allocator.free(node);
+		allocator.free_t(node, 1);
 	}
 
 	void erase(T *value) {
@@ -62,25 +65,41 @@ struct LinkedList {
 	}
 
 	Node *unlink(Node *node) {
+		auto old_head = head;
+		auto old_tail = tail;
+
+		debug_check();
+		defer { debug_check(); };
+		
 		if (node->prev) {
-			node->prev->next = node->next;
-			node->prev = 0;
+			if (node->next) {
+				node->prev->next = node->next;
+				node->next->prev = node->prev;
+			} else {
+				node->prev->next = 0;
+				tail = node->prev;
+			}
 		} else {
-			head = node->next;
+			if (node->next) {
+				node->next->prev = 0;
+				head = node->next;
+			} else {
+				head = 0;
+				tail = 0;
+			}
 		}
 
-		if (node->next) {
-			node->next->prev = node->prev;
-			node->next = 0;
-		} else {
-			tail = node->prev;
-		}
+		node->prev = 0;
+		node->next = 0;
 
 		return node;
 	}
 
 	// node must be not linked
 	T &add(Node *node) {
+		debug_check();
+		defer { debug_check(); };
+
 		assert_equal(node->prev, 0, "node is referenced, unlink first");
 		assert_equal(node->next, 0, "node is referenced, unlink first");
 
@@ -107,6 +126,9 @@ struct LinkedList {
 	}
 
 	void clear() {
+		debug_check();
+		defer { debug_check(); };
+
 		auto node = head;
 		while (node) {
 			auto next = node->next;
@@ -118,6 +140,9 @@ struct LinkedList {
 	}
 	
 	Optional<T> pop_first() {
+		debug_check();
+		defer { debug_check(); };
+
 		if (!head)
 			return {};
 
@@ -137,6 +162,9 @@ struct LinkedList {
 	}
 
 	Optional<T> pop_last() {
+		debug_check();
+		defer { debug_check(); };
+
 		if (!tail)
 			return {};
 
@@ -158,6 +186,9 @@ struct LinkedList {
 	Optional<T> pop() { return pop_last(); }
 	
 	void free() {
+		debug_check();
+		defer { debug_check(); };
+
 		auto node = head;
 		while (node) {
 			auto next = node->next;
@@ -170,6 +201,9 @@ struct LinkedList {
 	
 	template <ForEachFlags flags = 0>
 	bool for_each(std::invocable<Iterator> auto &&in_fn) {
+		debug_check();
+		defer { debug_check(); };
+
 		auto fn = wrap_foreach_fn<Iterator>(in_fn);
 		auto node = head;
 		while (node) {
@@ -188,8 +222,8 @@ struct LinkedList {
 		return false;
 	}
 	
-	auto &front(this auto &&self) { bounds_check(assert(self.head); return self.head->value; )}
-	auto &back(this auto &&self) { bounds_check(assert(self.head); return self.tail->value; )}
+	auto &front(this auto &&self) { bounds_check(assert(self.head)); return self.head->value; }
+	auto &back(this auto &&self) { bounds_check(assert(self.head)); return self.tail->value; }
 
 	
 	struct CppIterator {
@@ -215,13 +249,85 @@ struct LinkedList {
 	
 	CppIterator begin() { return head; }
 	CppIterator end() { return {}; }
+
+
+	template <bool is_const>
+	struct Iter {
+		LinkedList *list = 0;
+		Node *node = 0;
+		bool should_advance = true;
+		bool reverse = false;
+
+		explicit operator bool() {
+			return node;
+		}
+		void next() {
+			if (should_advance) {
+				node = reverse ? node->prev : node->next;
+			}
+			should_advance = true;
+		}
+		auto &operator*() {
+			return node->value;
+		}
+		auto pointer() { return &node->value; }
+		auto &value() { return node->value; }
+
+		void erase() requires(!is_const) {
+			auto next_node = reverse ? node->prev : node->next;
+			list->erase(node);
+			node = next_node;
+			should_advance = false;
+		}
+	};
+
+	struct IterOptions {
+		bool reverse = false;
+	};
+
+	auto iter(this auto &&self, IterOptions options = {}) {
+		Iter<tl_self_const> result = {(LinkedList *)&self};
+		result.reverse = options.reverse;
+		result.node = options.reverse ? self.tail : self.head;
+		return result;
+	}
+
+	void debug_check() {
+		#if 0
+		if (head) {
+			assert(tail);
+		} else {
+			assert(!tail);
+		}
+
+		List<Node *, DefaultAllocator> nodes;
+		Node *node = head;
+		Node *prev = 0;
+		while (node) {
+			assert(node->prev == prev);
+			nodes.add(node);
+			prev = node;
+			node = node->next;
+		}
+
+		node = tail;
+		Node *next = 0;
+		umm i = nodes.count - 1;
+		while (node) {
+			assert(node->next == next);
+			assert(node == nodes[i--]);
+			next = node;
+			node = node->prev;
+		}
+		#endif
+	}
 };
 
 }
 
 #ifdef TL_ENABLE_TESTS
 
-TL_TEST {
+TL_TEST(LinkedList) {
 	using namespace tl;
 
 	LinkedList<int> list;

@@ -162,7 +162,7 @@ TL_API void draw_rect(Window &window, s32 x, s32 y, u32 w, u32 h);
 }
 
 #ifdef TL_IMPL
-
+#if OS_WINDOWS
 #include "string.h"
 #include "win32.h"
 #include "console.h"
@@ -710,4 +710,5 @@ void draw_rect(Window &window, s32 x, s32 y, u32 w, u32 h) {
 
 }
 
+#endif
 #endif

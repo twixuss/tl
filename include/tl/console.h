@@ -22,15 +22,15 @@ struct Printer {
 		return span.count;
 	}
 
-	template <Appendable FmtOrObj, Appendable ...T>
-	inline umm write(FmtOrObj fmt_or_obj, T const &...args) {
+	template <Appendable ...T>
+	inline umm write(T const &...args) {
 		scoped(temporary_storage_checkpoint);
 		StringBuilder builder;
 		builder.allocator = TL_GET_CURRENT(temporary_allocator);
-		if constexpr (sizeof...(T) > 0) {
-			append_format(builder, fmt_or_obj, args...);
+		if constexpr (sizeof...(T) > 1) {
+			append_format(builder, args...);
 		} else {
-			append(builder, fmt_or_obj);
+			append(builder, args...);
 		}
 		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
@@ -41,11 +41,18 @@ struct Printer {
 	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
 	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
 
-	template <class Fmt, Appendable ...T>
-	inline umm writeln(Fmt fmt, T const &...args) {
-		auto a = write(fmt, args...);
-		auto b = write('\n');
-		return a + b;
+	template <Appendable ...T>
+	inline umm writeln(T const &...args) {
+		scoped(temporary_storage_checkpoint);
+		StringBuilder builder;
+		builder.allocator = TL_GET_CURRENT(temporary_allocator);
+		if constexpr (sizeof...(T) > 1) {
+			append_format(builder, args...);
+		} else {
+			append(builder, args...);
+		}
+		append(builder, '\n');
+		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
 };
 
@@ -73,8 +80,8 @@ enum class ConsoleColor {
     dark_red,
     dark_magenta,
     dark_yellow,
+    gray, // Yes gray and dark_gray are swapped..
     dark_gray,
-    gray,
     blue,
     green,
     cyan,
@@ -84,6 +91,8 @@ enum class ConsoleColor {
     white,
 };
 
+// foreground, background
+TL_API std::pair<ConsoleColor, ConsoleColor> get_console_color();
 TL_API void set_console_color(ConsoleColor foreground, ConsoleColor background);
 inline void set_console_color(ConsoleColor foreground) {
 	set_console_color(foreground, ConsoleColor::black);
@@ -103,16 +112,13 @@ TL_API bool is_stdout_console();
 
 template <>
 struct Scoped<ConsoleColor> {
-	inline static ConsoleColor current = ConsoleColor::dark_gray;
-	ConsoleColor old;
+	std::pair<ConsoleColor, ConsoleColor> old;
 	void enter(ConsoleColor _new) {
-		old = current;
-		current = _new;
+		old = get_console_color();
 		set_console_color(_new);
 	}
 	void exit() {
-		current = old;
-		set_console_color(old);
+		set_console_color(old.first, old.second);
 	}
 };
 
@@ -131,7 +137,6 @@ struct Scoped<Printer> {
 }
 
 #ifdef TL_IMPL
-#if OS_WINDOWS
 
 namespace tl {
 
@@ -148,6 +153,11 @@ Printer console_printer = {
 	0
 };
 
+}
+
+#if OS_WINDOWS
+
+namespace tl {
 
 static HANDLE std_out;
 static HANDLE std_err;
@@ -237,6 +247,15 @@ void set_console_encoding(Encoding encoding) {
 void set_console_color(ConsoleColor foreground, ConsoleColor background) {
 	SetConsoleTextAttribute(std_out, (WORD)((DWORD)foreground | ((DWORD)background << 4)));
 }
+std::pair<ConsoleColor, ConsoleColor> get_console_color() {
+	CONSOLE_SCREEN_BUFFER_INFO csbi = {};
+	GetConsoleScreenBufferInfo(std_out, &csbi);
+
+	return {
+		(ConsoleColor)((csbi.wAttributes >> 0) & 0xf), 
+		(ConsoleColor)((csbi.wAttributes >> 4) & 0xf), 
+	};
+}
 
 void hide_console_window() {
 	ShowWindow(console_window, SW_HIDE);
@@ -262,7 +281,6 @@ void toggle_console_window() {
 namespace tl {
 Printer standard_output_printer = {
 	[](Span<utf8> span, void *) {
-	not_implemented();
 		write(1, span.data, span.count);
 	},
 	0
@@ -270,35 +288,111 @@ Printer standard_output_printer = {
 
 Printer standard_error_printer = {
 	[](Span<utf8> span, void *) {
-	not_implemented();
 		write(2, span.data, span.count);
 	},
 	0
 };
 
 void print_to_console(Span<ascii> span) {
-	not_implemented();
 	write(1, span.data, span.count);
 }
 void print_to_console(Span<utf8> span) {
-	not_implemented();
 	write(1, span.data, span.count);
 }
 void print_to_console(Span<utf16> span) {
-	not_implemented();
 	write(1, span.data, span.count);
 }
 
 void clear_console() {
-	not_implemented();
+	auto str = "\33[H\33[J"s;
+	write(2, str.data, str.count);
 }
 
 void set_console_encoding(Encoding encoding) {
-	not_implemented();
+	assert(encoding == Encoding::ascii || encoding == Encoding::utf8, "not supported");
 }
 
+static std::pair<ConsoleColor, ConsoleColor> current_console_color;
+
 void set_console_color(ConsoleColor foreground, ConsoleColor background) {
-	not_implemented();
+	// \33[{attr};{fg};{bg}m
+	// attr:
+	//     0 - reset
+	//     1 - bright
+	//     2 - dim
+	//     3 - underline
+	//     5 - blink
+	//     7 - reverse
+	//     8 - hidden
+	// fg:
+	//     30 - black
+	//     31 - red
+	//     32 - green
+	//     33 - yellow
+	//     34 - blue
+	//     35 - magenta
+	//     36 - cyan
+	//     37 - white
+	// bg:
+	//     40 - black
+	//     41 - red
+	//     42 - green
+	//     43 - yellow
+	//     44 - blue
+	//     45 - magenta
+	//     46 - cyan
+	//     47 - white
+
+	using enum ConsoleColor;
+
+	StaticList<char, 64> buf;
+	buf.add('\33');
+	buf.add('[');
+	// attr
+	switch (foreground) {
+		case black:
+		case dark_blue:
+		case dark_green:
+		case dark_cyan:
+		case dark_red:
+		case dark_magenta:
+		case dark_yellow:
+		case dark_gray:
+			buf.add("2;"s);
+			break;
+		default:
+			buf.add("0;"s);
+			break;
+	}
+	// fg
+	switch (foreground) {
+		case black:   buf.add("30;"s); break;
+		case red:     case dark_red:     buf.add("31;"s); break;
+		case green:   case dark_green:   buf.add("32;"s); break;
+		case yellow:  case dark_yellow:  buf.add("33;"s); break;
+		case blue:    case dark_blue:    buf.add("34;"s); break;
+		case magenta: case dark_magenta: buf.add("35;"s); break;
+		case cyan:    case dark_cyan:    buf.add("36;"s); break;
+		case white: case dark_gray: case gray: buf.add("37;"s); break;
+	}
+	// bg
+	switch (foreground) {
+		case black:   buf.add("40m"s); break;
+		case red:     case dark_red:     buf.add("41m"s); break;
+		case green:   case dark_green:   buf.add("42m"s); break;
+		case yellow:  case dark_yellow:  buf.add("43m"s); break;
+		case blue:    case dark_blue:    buf.add("44m"s); break;
+		case magenta: case dark_magenta: buf.add("45m"s); break;
+		case cyan:    case dark_cyan:    buf.add("46m"s); break;
+		case white: case dark_gray: case gray: buf.add("47m"s); break;
+	}
+
+	write(2, buf.data, buf.count);
+
+	current_console_color =  {foreground, background};
+}
+std::pair<ConsoleColor, ConsoleColor> get_console_color() {
+	return current_console_color;
 }
 
 void hide_console_window() {

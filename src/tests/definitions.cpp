@@ -35,7 +35,7 @@
 #include <tl/constexpr_string_literal.h>
 #include <tl/coroutine.h>
 #include <tl/cpu.h>
-#include <tl/d3d11.h>
+#include <tl/date.h>
 #include <tl/debug.h>
 #include <tl/debug_allocator.h>
 #include <tl/default_logger.h>
@@ -54,6 +54,7 @@
 #include <tl/contiguous_hash_set.h>
 #include <tl/bucket_hash_map.h>
 #include <tl/bucket_hash_set.h>
+#include <tl/signed_int.h>
 #include <tl/static_bucket_hash_map.h>
 #include <tl/hash_map.h>
 #include <tl/hash_set.h>
@@ -85,20 +86,26 @@
 #include <tl/ram.h>
 #include <tl/random.h>
 #include <tl/reusable_fiber.h>
+#include <tl/ring_buffer.h>
 #include <tl/simd.h>
+#include <tl/sleep.h>
 #include <tl/sorted_list.h>
 #include <tl/source_location.h>
+#include <tl/static_queue.h>
+#include <tl/static_ring_buffer.h>
 #include <tl/stream.h>
 #include <tl/string.h>
 #include <tl/text_input_field.h>
 #include <tl/thread.h>
-#include <tl/time.h>
+#include <tl/precise_time.h>
 #include <tl/tracking_allocator.h>
 #include <tl/turn.h>
 #include <tl/u256.h>
 #include <tl/variant.h>
 #include <tl/vector.h>
 #include <tl/window.h>
+#include <tl/c_tokenizer.h>
+#include <tl/c_preprocessor.h>
 
 
 void run_tl_tests() {
@@ -108,4 +115,8 @@ void run_tl_tests() {
 		tests_to_run[i].func();
 	}
 
+}
+static tl::gl::Functions opengl_functions;
+tl::gl::Functions *tl_opengl_functions() {
+	return &opengl_functions;
 }

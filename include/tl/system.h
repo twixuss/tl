@@ -5,10 +5,14 @@
 // Compiler
 //
 
-#define COMPILER_MSVC 0
-#define COMPILER_GCC  0
+#define COMPILER_MSVC  0
+#define COMPILER_GCC   0
+#define COMPILER_CLANG 0
 
-#if defined __GNUG__
+#if defined __clang__
+	#undef COMPILER_CLANG
+	#define COMPILER_CLANG 1
+#elif defined __GNUG__
 	#undef COMPILER_GCC
 	#define COMPILER_GCC 1
 #elif defined _MSC_VER
@@ -25,10 +29,14 @@
 
 #define OS_WINDOWS 0
 #define OS_LINUX   0
+#define OS_WASM    0
 
 #if defined _WIN32 || defined _WIN64
 	#undef OS_WINDOWS
 	#define OS_WINDOWS 1
+#elif defined __wasm__
+	#undef OS_WASM
+	#define OS_WASM 1
 #else
 	#undef OS_LINUX
 	#define OS_LINUX 1
@@ -102,6 +110,10 @@
 #define ARCH_LZCNT 0
 #endif
 
+#ifndef ARCH_BMI1
+#define ARCH_BMI1 0
+#endif
+
 #ifndef ARCH_FMA
 #define ARCH_FMA ARCH_AVX2
 #endif
@@ -143,10 +155,13 @@
 	#define no_inline     __declspec(noinline)
 	#define debug_break() ::__debugbreak()
 #elif COMPILER_GCC
-	#define forceinline   __attribute__((always_inline))
+	#define forceinline   __attribute__((always_inline)) inline
+	#define no_inline     __attribute__((noinline))
 	#define debug_break() ::__builtin_trap()
 #endif
 
+#include <stdint.h>
+#include <stddef.h>
 
 namespace tl {
 
@@ -154,25 +169,14 @@ template <bool v, class T, class F> struct ConditionalT { using Type = T; };
 template <class T, class F> struct ConditionalT<false, T, F> { using Type = F; };
 template <bool v, class T, class F> using Conditional = typename ConditionalT<v, T, F>::Type;
 
-#if COMPILER_MSVC
-using s8  = signed __int8;
-using s16 = signed __int16;
-using s32 = signed __int32;
-using s64 = signed __int64;
-using u8  = unsigned __int8;
-using u16 = unsigned __int16;
-using u32 = unsigned __int32;
-using u64 = unsigned __int64;
-#else
-using s8  = signed char;
-using s16 = signed short;
-using s32 = signed int;
-using s64 = signed long;
-using u8  = unsigned char;
-using u16 = unsigned short;
-using u32 = unsigned int;
-using u64 = unsigned long;
-#endif
+using s8  = int8_t;
+using s16 = int16_t;
+using s32 = int32_t;
+using s64 = int64_t;
+using u8  = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
 
 using f32 = float;
 using f64 = double;
@@ -210,7 +214,23 @@ using utf8  = char8_t;
 using utf16 = char16_t;
 using utf32 = char32_t;
 
+namespace integer_literals {
+
+forceinline constexpr u8  operator""_u8 (unsigned long long i) { return (u8 )i; }
+forceinline constexpr u16 operator""_u16(unsigned long long i) { return (u16)i; }
+forceinline constexpr u32 operator""_u32(unsigned long long i) { return (u32)i; }
+forceinline constexpr u64 operator""_u64(unsigned long long i) { return (u64)i; }
+forceinline constexpr s8  operator""_s8 (unsigned long long i) { return (s8 )i; }
+forceinline constexpr s16 operator""_s16(unsigned long long i) { return (s16)i; }
+forceinline constexpr s32 operator""_s32(unsigned long long i) { return (s32)i; }
+forceinline constexpr s64 operator""_s64(unsigned long long i) { return (s64)i; }
+forceinline constexpr umm operator""_umm(unsigned long long i) { return (umm)i; }
+forceinline constexpr smm operator""_smm(unsigned long long i) { return (smm)i; }
+
 }
+
+}
+
 
 #ifdef TL_DEBUG
 #if TL_DEBUG != 0 && TL_DEBUG != 1

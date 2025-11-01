@@ -263,7 +263,7 @@ forceinline constexpr f32 convert(f16 from) {
 	return (f32)from;
 }
 
-inline umm append(StringBuilder &builder, FormatFloat<f16> fmt) {
+inline void append(StringBuilder &builder, FormatFloat<f16> fmt) {
 	auto v = fmt.value;
 	if (v.exponent == 31) {
 		if (v.mantissa == 0) {
@@ -282,8 +282,8 @@ inline umm append(StringBuilder &builder, FormatFloat<f16> fmt) {
 	}
 	return append(builder, fmt.with_value((v.sign?-1:1)*powf(2,v.exponent-15)*((f32)(1024+v.mantissa) / 1024)));
 }
-inline umm append(StringBuilder &builder, f16 v) {
-	return append(builder, FormatFloat{.value = v});
+inline void append(StringBuilder &builder, f16 v) {
+	append(builder, FormatFloat{.value = v});
 }
 
 }

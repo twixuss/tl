@@ -49,7 +49,7 @@ static void file_stream_test() {
 
 	close(file);
 
-	result_test(read_entire_file(as_span(path)));
+	result_test(read_entire_file(as_span(path)).value());
 }
 
 void stream_test() {

@@ -97,7 +97,7 @@ struct StaticMaskedBlockList {
 
 		while (1) {
 			if (!block) {
-				block = allocator.allocate<Block>();
+				block = allocator.template allocate<Block>();
 				last->next = block;
 				last = block;
 			}

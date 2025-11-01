@@ -95,4 +95,21 @@
     </Type>
     <Type Name="tl::f16">
     </Type>
+    <Type Name="tl::MultiArray&lt;*&gt;">
+        <DisplayString>{{capacity={capacity}}}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>capacity</Size>
+                <ValuePointer>(A *)buffer</ValuePointer>
+            </ArrayItems>
+            <ArrayItems>
+                <Size>capacity</Size>
+                <ValuePointer>(B *)(((umm)buffer + capacity*sizeof(A) + alignof_A - 1) / alignof_A * alignof_A)</ValuePointer>
+            </ArrayItems>
+            <ArrayItems>
+                <Size>capacity</Size>
+                <ValuePointer>(C *)(((((umm)buffer + capacity*sizeof(A) + alignof_A - 1) / alignof_A * alignof_A) + capacity*sizeof(B) + alignof_B - 1) / alignof_B * alignof_B)</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
 </AutoVisualizer>

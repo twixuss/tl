@@ -25,7 +25,7 @@ struct KeyValue {
 };
 
 template <class Key, class Value>
-struct KeyValueRef {
+struct KeyValuePointers {
 	Key const *key = 0;
 	Value *value = 0;
 
@@ -34,7 +34,16 @@ struct KeyValueRef {
 	KeyValue<Key, Value> load() { return {*key, *value}; }
 };
 
+template <class Key, class Value>
+struct KeyValueReferences {
+	Key const &key;
+	Value &value;
+
+	KeyValue<Key, Value> load() { return {key, value}; }
+	operator KeyValue<Key, Value>() { return {key, value}; }
+};
+
 template <class T, class Key, class Value>
-concept HashMapIterFn = std::invocable<T, KeyValueRef<Key, Value>>;
+concept HashMapIterFn = std::invocable<T, KeyValuePointers<Key, Value>>;
 
 }

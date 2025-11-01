@@ -22,13 +22,13 @@ struct Atlas {
 	// stride_in_bytes - if 0, replaced with `new_elem_size.x * sizeof(Element)`
 	Area &add(Element *new_elem, v2u new_elem_size, u32 stride_in_bytes = 0) {
 		while (1) {
-			if (cursor.x + new_elem_size.x <= size.x)
+			if (cursor.x + new_elem_size.x <= size.x && cursor.y + new_elem_size.y <= size.y)
 				break;
 
 			cursor.x = cursor_min_x;
 			cursor.y += row_height;
 			row_height = 0;
-			if (cursor.y + new_elem_size.y <= size.y)
+			if (cursor.x + new_elem_size.x <= size.x && cursor.y + new_elem_size.y <= size.y)
 				break;
 
 			grow();
@@ -69,9 +69,9 @@ struct Atlas {
 			cursor_min_x = 0;
 
 			size = {256, 256};
-			data = allocator.allocate<Element>(size.x * size.y);
+			data = allocator.template allocate<Element>(size.x * size.y);
 		} else {
-			data = allocator.allocate<Element>(size.x * size.y * 2);
+			data = allocator.template allocate<Element>(size.x * size.y * 2);
 
 			if (size.x == size.y) {
 				// Extend width. Left half is used, right is unused.
@@ -84,6 +84,7 @@ struct Atlas {
 					memcpy(dst, src, size.x * sizeof(Element));
 				}
 
+				cursor = {size.x, 0};
 				cursor_min_x = size.x;
 
 				size.x *= 2;
@@ -112,7 +113,7 @@ struct Atlas {
 	}
 
 	void pack(bool keep_area_order = false) {
-		auto old_data = allocator.allocate<Element>(size.x * size.y);
+		auto old_data = allocator.template allocate<Element>(size.x * size.y);
 		defer { allocator.free(old_data); };
 
 		memcpy(old_data, data, size.x * size.y * sizeof(Element));
