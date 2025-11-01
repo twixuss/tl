@@ -9,7 +9,7 @@ struct BigIntView {
 
 
 	bool msb = false;
-	Span<umm> parts = {};
+	Span<Part> parts = {};
 
 	
 	bool get_bit_unchecked(umm index) const {
@@ -398,6 +398,30 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
+	BigInt &operator-=(Part       b) {
+		if (parts.count == 0)
+			parts.add(0);
+
+		bool borrow = false;
+
+		//sub_borrow(parts[0], b, borrow, &parts[0], &borrow);
+		borrow = _subborrow_u64(borrow, parts[0], b, &parts[0]);
+		for (umm part_index = 1; part_index < parts.count; ++part_index) {
+			//sub_borrow(parts[part_index], 0, borrow, &parts[part_index], &borrow);
+			borrow = _subborrow_u64(borrow, parts[part_index], 0, &parts[part_index]);
+		}
+
+		if (borrow) {
+			if (!msb) {
+				msb = true;
+			} else {
+				parts.add(~0ull);
+			}
+		}
+
+		normalize();
+		return *this;
+	}
 	BigInt &operator-=(SignedPart b) { return *this += -b; }
 	BigInt &operator-=(BigIntView b) {
 		// Not optimal
@@ -522,10 +546,17 @@ struct BigInt {
 		set(remainder);
 		return *this;
 	}
-
+	
+	bool operator==(Part b) const {
+		if (parts.count == 1)
+			return msb == 0 && parts[0] == b;
+		if (parts.count == 0)
+			return msb == 0 && b == 0;
+		return false;
+	}
 	bool operator==(SignedPart b) const {
 		if (parts.count == 1)
-			return (SignedPart)parts[0] == b;
+			return msb == (b < 0) && (SignedPart)parts[0] == b;
 		if (parts.count == 0)
 			return (msb ? -1 : 0) == b;
 		return false;
@@ -545,16 +576,24 @@ struct BigInt {
 		return true;
 	}
 
-	bool operator!=(Part   b) const { return !operator==(b); }
+	bool operator!=(Part       b) const { return !operator==(b); }
+	bool operator!=(SignedPart b) const { return !operator==(b); }
 	bool operator!=(BigIntView b) const { return !operator==(b); }
 
+	bool operator<(Part b) const {
+		if (msb)
+			return true;
+
+		if (parts.count == 0)
+			return 0 < b;
+		if (parts.count == 1)
+			return parts[0] < b;
+		return false;
+	}
 	bool operator<(SignedPart b) const {
 		if (parts.count == 1) {
-			if (!msb) {
-				// this is positive
-				if (parts[0] > max_value<SignedPart>)
-					return false;
-			}
+			if (parts[0] >> 63 != msb)
+				return msb;
 			return (SignedPart)parts[0] < b;
 		}
 		if (parts.count == 0)
@@ -575,9 +614,22 @@ struct BigInt {
 		return false;
 	}
 
-	bool operator>(SignedPart b) const {
+	bool operator>(Part b) const {
+		if (msb)
+			return false;
+
+		if (parts.count == 0)
+			return 0 > b;
 		if (parts.count == 1)
+			return parts[0] > b;
+		return true;
+	}
+	bool operator>(SignedPart b) const {
+		if (parts.count == 1) {
+			if (parts[0] >> 63 != msb)
+				return !msb;
 			return (SignedPart)parts[0] > b;
+		}
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return !msb;
@@ -596,11 +648,55 @@ struct BigInt {
 		return false;
 	}
 
+	bool operator>=(Part       b) const { return !(*this < b); }
 	bool operator>=(SignedPart b) const { return !(*this < b); }
 	bool operator>=(BigIntView b) const { return !(*this < b); }
 
+	bool operator<=(Part       b) const { return !(*this > b); }
 	bool operator<=(SignedPart b) const { return !(*this > b); }
 	bool operator<=(BigIntView b) const { return !(*this > b); }
+	
+	bool operator==(u8  b) const { return *this == (Part)b; }
+	bool operator==(u16 b) const { return *this == (Part)b; }
+	bool operator==(u32 b) const { return *this == (Part)b; }
+	bool operator==(s8  b) const { return *this == (SignedPart)b; }
+	bool operator==(s16 b) const { return *this == (SignedPart)b; }
+	bool operator==(s32 b) const { return *this == (SignedPart)b; }
+
+	bool operator!=(u8  b) const { return *this != (Part)b; }
+	bool operator!=(u16 b) const { return *this != (Part)b; }
+	bool operator!=(u32 b) const { return *this != (Part)b; }
+	bool operator!=(s8  b) const { return *this != (SignedPart)b; }
+	bool operator!=(s16 b) const { return *this != (SignedPart)b; }
+	bool operator!=(s32 b) const { return *this != (SignedPart)b; }
+
+	bool operator<(u8  b) const { return *this < (Part)b; }
+	bool operator<(u16 b) const { return *this < (Part)b; }
+	bool operator<(u32 b) const { return *this < (Part)b; }
+	bool operator<(s8  b) const { return *this < (SignedPart)b; }
+	bool operator<(s16 b) const { return *this < (SignedPart)b; }
+	bool operator<(s32 b) const { return *this < (SignedPart)b; }
+
+	bool operator>(u8  b) const { return *this > (Part)b; }
+	bool operator>(u16 b) const { return *this > (Part)b; }
+	bool operator>(u32 b) const { return *this > (Part)b; }
+	bool operator>(s8  b) const { return *this > (SignedPart)b; }
+	bool operator>(s16 b) const { return *this > (SignedPart)b; }
+	bool operator>(s32 b) const { return *this > (SignedPart)b; }
+
+	bool operator<=(u8  b) const { return *this <= (Part)b; }
+	bool operator<=(u16 b) const { return *this <= (Part)b; }
+	bool operator<=(u32 b) const { return *this <= (Part)b; }
+	bool operator<=(s8  b) const { return *this <= (SignedPart)b; }
+	bool operator<=(s16 b) const { return *this <= (SignedPart)b; }
+	bool operator<=(s32 b) const { return *this <= (SignedPart)b; }
+
+	bool operator>=(u8  b) const { return *this >= (Part)b; }
+	bool operator>=(u16 b) const { return *this >= (Part)b; }
+	bool operator>=(u32 b) const { return *this >= (Part)b; }
+	bool operator>=(s8  b) const { return *this >= (SignedPart)b; }
+	bool operator>=(s16 b) const { return *this >= (SignedPart)b; }
+	bool operator>=(s32 b) const { return *this >= (SignedPart)b; }
 
 	bool is_zero() const {
 		return parts.count == 0 && !msb;

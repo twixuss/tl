@@ -186,34 +186,37 @@ umm append(StringBuilder &builder, BigRational<Allocator> f) {
 		//if (dec % denom == 0) {
 		//
 		//}
+		u32 dc = 0;
 		switch (denom) {
 			case 1: return append(builder, f.numer);
-			case 10:
-			case 100:
-			case 1000:
-			case 10000:
-			case 100000:
-			case 1000000:
-			case 10000000:
-			case 100000000:
-			case 1000000000:
-			case 10000000000:
-			case 100000000000:
-			case 1000000000000:
-			case 10000000000000:
-			case 100000000000000:
-			case 1000000000000000:
-			case 10000000000000000:
-			case 100000000000000000:
-			case 1000000000000000000:
-			case 10000000000000000000: {
-				big_int_scratch_scoped(quotient);
-				big_int_scratch_scoped(remainder);
+			case 10: 				   dc = 1; break;
+			case 100: 				   dc = 2; break;
+			case 1000: 				   dc = 3; break;
+			case 10000: 			   dc = 4; break;
+			case 100000: 			   dc = 5; break;
+			case 1000000: 			   dc = 6; break;
+			case 10000000: 			   dc = 7; break;
+			case 100000000: 		   dc = 8; break;
+			case 1000000000: 		   dc = 9; break;
+			case 10000000000: 		   dc = 10; break;
+			case 100000000000: 		   dc = 11; break;
+			case 1000000000000: 	   dc = 12; break;
+			case 10000000000000: 	   dc = 13; break;
+			case 100000000000000: 	   dc = 14; break;
+			case 1000000000000000: 	   dc = 15; break;
+			case 10000000000000000:    dc = 16; break;
+			case 100000000000000000:   dc = 17; break;
+			case 1000000000000000000:  dc = 18; break;
+			case 10000000000000000000: dc = 19; break;
+		}
 
-				f.numer.divmod(denom, quotient, remainder);
+		if (dc) {
+			big_int_scratch_scoped(quotient);
+			big_int_scratch_scoped(remainder);
 
-				return append_format(builder, "{}.{}", quotient, remainder);
-			}
+			f.numer.divmod(denom, quotient, remainder);
+
+			return append_format(builder, "{}.{}", quotient, FormatInt{.value = remainder, .leading_zero_count = dc});
 		}
 	}
 	return append(builder, FormatFloat{.value = (f64)f, .precision = 99, .trailing_zeros = false});
