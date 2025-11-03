@@ -32,7 +32,7 @@ static HashMap<void *, umm, DefaultHashTraits<void *>, DefaultAllocator> allocat
 static OsLock allocation_lock;
 
 AllocationResult DebugAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
-	auto memory = tl_allocate(size + check_space*2, alignment);
+	auto memory = DefaultAllocator{}.allocate(size + check_space*2, alignment TL_LA);
 	for (umm i = 0; i < check_space; ++i) {
 		((u8 *)memory)[i] = pre_byte;
 		((u8 *)memory)[check_space + size + i] = post_byte;
@@ -62,7 +62,7 @@ void DebugAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD)
 		assert(base[i] == pre_byte);
 		assert(base[check_space + size + i] == post_byte);
 	}
-	tl_free(base);
+	DefaultAllocator{}.free(base, size, 0 TL_LA);
 }
 
 }

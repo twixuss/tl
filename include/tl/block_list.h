@@ -95,7 +95,7 @@ struct StaticBlockList {
 
 		if (!dest) {
 			assert(last == alloc_last);
-			dest = allocator.allocate<Block>(TL_LAC);
+			dest = allocator.template allocate<Block>(TL_LAC);
 			dest->previous = alloc_last;
 			dest->next = 0;
 			alloc_last->next = dest;
@@ -758,7 +758,7 @@ T *find(BlockList<T> &list, T const &to_find, BlockListIndex *result_index = 0) 
 
 template <class T>
 T *find(BlockList<T> &list, T const &to_find, typename BlockList<T>::Index *result_index = 0) {
-	typename BlockList<T, Allocator>::Index index = {};
+	typename BlockList<T>::Index index = {};
 	auto block = list.first;
 	do {
 		index.block = block;

@@ -2,6 +2,7 @@
 #include "common.h"
 
 #include <type_traits>
+#include <functional>
 
 namespace tl {
 
@@ -28,6 +29,34 @@ static constexpr auto get_invoke_separated(std::index_sequence<indices...>) noex
 
 } // namespace Detail
 
+struct FatFunctionPointer {
+	void (*function)(void *);
+	void *parameter;
+	
+	void operator()() {
+		return function(parameter);
+	}
+};
+
+template <class Allocator = Allocator, class Fn>
+FatFunctionPointer create_fat_function_pointer(Fn &&fn, Allocator allocator = Allocator::current()) {
+	FatFunctionPointer result = {};
+	allocator = Allocator::current();
+
+	using Tuple = std::tuple<std::decay_t<Fn>>;
+	result.parameter = allocator.template allocate_uninitialized<Tuple>();
+	new(result.parameter) Tuple(std::forward<Fn>(fn));
+
+	result.function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
+	return result;
+}
+template <class Allocator = Allocator>
+void free(FatFunctionPointer &fn, Allocator allocator) {
+	if (fn.parameter)
+		allocator.free(fn.parameter);
+	fn = {};
+}
+
 template <class ParameterlessFunction, class Allocator = Allocator>
 struct Function {
 	Allocator allocator = {};
@@ -42,7 +71,7 @@ struct Function {
 		allocator = Allocator::current();
 
 		using Tuple = std::tuple<std::decay_t<Fn>>;
-		state = allocator.allocate_uninitialized<Tuple>();
+		state = allocator.template allocate_uninitialized<Tuple>();
 		new(state) Tuple(std::forward<Fn>(fn));
 
 		function = Detail::get_invoke<Tuple>(std::make_index_sequence<1>{});
@@ -76,7 +105,7 @@ struct Function<ReturnType(Args...), Allocator> {
 		allocator = Allocator::current();
 
 		using Func = std::decay_t<Fn>;
-		state = allocator.allocate_uninitialized<Func>();
+		state = allocator.template allocate_uninitialized<Func>();
 		new(state) Func(std::forward<Fn>(fn));
 
 		function = Detail::get_invoke_separated<std::decay_t<Fn>, std::tuple<std::decay_t<Args>...>>(std::make_index_sequence<sizeof...(Args)>{});
@@ -84,7 +113,7 @@ struct Function<ReturnType(Args...), Allocator> {
 
 	void operator()(Args ...args) {
 		using Param = std::tuple<std::decay_t<Args>...>;
-		auto param = allocator.allocate_uninitialized<Param>();
+		auto param = allocator.template allocate_uninitialized<Param>();
 		new(param) Param(std::forward<Args>(args)...);
 		defer { allocator.free(param); };
 

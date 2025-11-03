@@ -598,7 +598,7 @@ namespace simd_typed {
 }
 )");
 
-	write_entire_file(tl_file_string("../include/tl/generated/simd.h"ts), as_bytes(to_string(builder)));
+	write_entire_file(u8"../include/tl/generated/simd.h"s, as_bytes(to_string(builder)));
 
 	/////////////////////
 	//                 //
@@ -867,7 +867,7 @@ auto V4fx8(auto ...args) requires requires { V4f32x8(args...); } { return V4f32x
 }
 )");
 
-	write_entire_file(tl_file_string("../include/tl/generated/simd_vector.h"ts), as_bytes(to_string(builder)));
+	write_entire_file(u8"../include/tl/generated/simd_vector.h"s, as_bytes(to_string(builder)));
 
 	print("Done\n");
 

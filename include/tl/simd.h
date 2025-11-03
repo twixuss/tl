@@ -18,8 +18,8 @@ struct Mask##bits {                                                             
 	Mask##bits &operator&=(Mask##bits that) { return value &= that.value, *this; }     \
 	Mask##bits &operator|=(Mask##bits that) { return value |= that.value, *this; }     \
 }; \
-constexpr Mask##bits false##bits = {0}; \
-constexpr Mask##bits true##bits = {-1}; \
+constexpr Mask##bits false##bits = {(u##bits)0}; \
+constexpr Mask##bits true##bits = {(u##bits)-1}; \
 
 DEFINE_MASK_SCALAR(8);
 DEFINE_MASK_SCALAR(16);
@@ -316,7 +316,7 @@ union Vector<v4<Scalar_>, count_> {
 TL_DECLARE_CONCEPT(Vector);
 
 template <class Scalar>
-using MaskForScalar = TypeAt<log2(sizeof Scalar), Mask8, Mask16, Mask32, Mask64>;
+using MaskForScalar = TypeAt<log2(sizeof(Scalar)), Mask8, Mask16, Mask32, Mask64>;
 
 template <class Scalar, umm count>
 struct MaskVectorT {
@@ -336,7 +336,7 @@ struct MaskVectorT<v4<Scalar>, count> {
 };
 
 template <class Scalar, umm count>
-using MaskVector = typename MaskVectorT<Scalar, count>::Type; // FIXME: compiler error when two last u64's are not provided. wtf
+using MaskVector = typename MaskVectorT<Scalar, count>::Type;
 
 template <umm count, class Scalar>
 forceinline Vector<Scalar, count> broadcast(Scalar s) {

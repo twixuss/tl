@@ -6,53 +6,22 @@
 using namespace tl;
 
 void list_test() {
-	with(ConsoleColor::red, println("list_test broken"));
-	/*
 	Queue<int> test;
 
-	assert(test.allocator);
-	assert(test.data == 0);
 	assert(test.count == 0);
-	assert(test.alloc_data == 0);
-	assert(test.alloc_count == 0);
-
 	test.push(42);
-
 	assert(test.count == 1);
-	assert(test.alloc_count == 1);
-	assert(test.data[0] == 42);
-	assert(test.alloc_data[0] == 42);
-
 	test.push(69);
-
 	assert(test.count == 2);
-	assert(test.alloc_count == 2);
-	assert(test.data[0] == 42);
-	assert(test.data[1] == 69);
-	assert(test.alloc_data[0] == 42);
-	assert(test.alloc_data[1] == 69);
-
 	test.push(23);
-
 	assert(test.count == 3);
-	assert(test.alloc_count == 4);
-	assert(test.data[0] == 42);
-	assert(test.data[1] == 69);
-	assert(test.data[2] == 23);
-	assert(test.alloc_data[0] == 42);
-	assert(test.alloc_data[1] == 69);
-	assert(test.alloc_data[2] == 23);
 
-	test.pop();
+	assert(test.pop().value() == 42);
 
 	assert(test.count == 2);
-	assert(test.alloc_count == 4);
-	assert(test.data[0] == 69);
-	assert(test.data[1] == 23);
-	assert(test.alloc_data[0] == 42);
-	assert(test.alloc_data[1] == 69);
-	assert(test.alloc_data[2] == 23);
+
+	assert(test[0] == 69);
+	assert(test[1] == 23);
 
 	free(test);
-	*/
 }

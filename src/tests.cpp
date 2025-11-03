@@ -18,7 +18,6 @@
 #include <tl/profiler.h>
 #include <tl/random.h>
 #include <tl/simd.h>
-#include <tl/std_hash.h>
 #include <tl/string.h>
 #include <tl/system.h>
 #include <tl/thread.h>
@@ -39,7 +38,6 @@ using namespace tl;
 #pragma warning(push, 0)
 #include <stdio.h>
 #include <assert.h>
-#include <excpt.h>
 #if COMPILER_GCC
 #include <cxxabi.h>
 #endif
@@ -650,7 +648,20 @@ float pow2(float a) {
 
 DefaultLogger logger = {.module = u8"tests"s};
 
+__declspec(dllexport) char *found;
+
+no_inline void test_find() {
+	found = find("Hello world! I have a present for you!Hello world! I have a present for you!Hello world! I have a present for you!"s, "lo world! I have a present for you!"s);
+}
+
 s32 tl_main(Span<Span<utf8>> args) {
+	Span<bool> s = {1, 0, 0, 1};
+	all(s);
+
+	test_find();
+	assert(found);
+	assert(Span(found, 5) == "lo wo"s);
+
 	powf(1, 2);
 	::pow2(2);
 

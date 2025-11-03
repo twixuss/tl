@@ -63,46 +63,36 @@
 #if COMPILER_MSVC || COMPILER_GCC
 	#ifndef ARCH_AVX
 		#ifdef __AVX__
-			#undef ARCH_AVX
 			#define ARCH_AVX 1
 		#else
-			#undef ARCH_AVX
 			#define ARCH_AVX 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX2
 		#ifdef __AVX2__
-			#undef ARCH_AVX2
 			#define ARCH_AVX2 1
 		#else
-			#undef ARCH_AVX2
 			#define ARCH_AVX2 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512F
 		#ifdef __AVX512F__
-			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 1
 		#else
-			#undef ARCH_AVX512F
 			#define ARCH_AVX512F 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512VL
 		#ifdef __AVX512VL__
-			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 1
 		#else
-			#undef ARCH_AVX512VL
 			#define ARCH_AVX512VL 0
 		#endif
 	#endif
 	#ifndef ARCH_AVX512DQ
 		#ifdef __AVX512DQ__
-			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 1
 		#else
-			#undef ARCH_AVX512DQ
 			#define ARCH_AVX512DQ 0
 		#endif
 	#endif
@@ -177,11 +167,11 @@ using u64 = unsigned __int64;
 using s8  = signed char;
 using s16 = signed short;
 using s32 = signed int;
-using s64 = signed long long;
+using s64 = signed long;
 using u8  = unsigned char;
 using u16 = unsigned short;
 using u32 = unsigned int;
-using u64 = unsigned long long;
+using u64 = unsigned long;
 #endif
 
 using f32 = float;
@@ -220,24 +210,6 @@ using utf8  = char8_t;
 using utf16 = char16_t;
 using utf32 = char32_t;
 
-
-
-//
-// Really?
-//
-using slong = signed long;
-using ulong = unsigned long;
-using wchar = wchar_t;
-
-using slong_s = Conditional<sizeof(slong) == 4, s32, s64>;
-using ulong_s = Conditional<sizeof(ulong) == 4, u32, u64>;
-using wchar_s = Conditional<sizeof(wchar) == 2, utf16, utf32>;
-
-
-#if OS_WINDOWS
-static_assert(sizeof(utf16) == sizeof(wchar));
-#endif
-
 }
 
 #ifdef TL_DEBUG
@@ -258,7 +230,7 @@ static_assert(sizeof(utf16) == sizeof(wchar));
 		#undef OS_WINDOWS
 		#define NOMINMAX
 			#pragma warning(push, 0)
-				#pragma warning(disable: 5039 4668)
+				#pragma warning(disable: 5039 4668 5105)
 				#include <Windows.h>
 			#pragma warning(pop)
 		#pragma pop_macro("OS_WINDOWS")

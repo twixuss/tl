@@ -62,19 +62,25 @@ inline Process start_process(Span<utf8> command_line) {
 	return start_process(TL_TMP(to_utf16(command_line, true)).data);
 }
 
-inline List<u8> start_process_and_get_output(Span<utf8> command_line) {
+inline void start_process(Span<utf8> command_line, auto on_output) {
 	auto process = start_process(command_line);
-	StringBuilder builder;
 	while (true) {
 		u8 buffer[256];
 		auto bytes_read = process.standard_out->read(array_as_span(buffer));
 		if (bytes_read == 0) {
 			break;
 		}
-		append(builder, Span(buffer, bytes_read));
+		on_output(Span(buffer, bytes_read));
 	}
 	free(process);
-	return to_string(builder);
+}
+
+inline List<u8> start_process_and_get_output(Span<utf8> command_line) {
+	List<u8> result;
+	start_process(command_line, [&](Span<u8> output) {
+		result.add(output);
+	});
+	return result;
 }
 
 }
@@ -109,8 +115,8 @@ Process execute(utf16 const *path, utf16 const *arguments, ExecuteParams params)
 	ShExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
 	ShExecInfo.hwnd = NULL;
 	ShExecInfo.lpVerb = NULL;
-	ShExecInfo.lpFile = (wchar *)path;
-	ShExecInfo.lpParameters = (wchar *)arguments;
+	ShExecInfo.lpFile = (wchar_t *)path;
+	ShExecInfo.lpParameters = (wchar_t *)arguments;
 	ShExecInfo.lpDirectory = NULL;
 	ShExecInfo.nShow = params.visible ? SW_SHOW : SW_HIDE;
 	ShExecInfo.hInstApp = NULL;
@@ -194,7 +200,7 @@ Process start_process(utf16 const *command_line) {
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
 	if (!CreateProcessW(NULL,
-		(wchar *)command_line,
+		(wchar_t *)command_line,
 		NULL,          // process security attributes
 		NULL,          // primary thread security attributes
 		TRUE,          // handles are inherited

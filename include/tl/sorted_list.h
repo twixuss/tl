@@ -4,7 +4,7 @@
 
 namespace tl {
 
-template <class T, auto sort_by = [](auto x) { return x; }, class Allocator = Allocator, class Size = umm>
+template <class T, auto sort_by = identity_value, class Allocator = Allocator, class Size = umm>
 struct SortedList : private List<T, Allocator, Size> {
 	using Base = List<T, Allocator, Size>;
 

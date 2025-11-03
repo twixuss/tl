@@ -10,6 +10,9 @@
 
 namespace tl {
 
+constexpr u32 next_prime_after_2_to_power_of_7_point_5 = 181;
+constexpr u32 next_prime_after_2_to_power_of_31_point_5 = 3037000507;
+
 inline constexpr u32 random_primes_u32[] = {
 	3282017723,
 	351133033,
@@ -94,7 +97,7 @@ inline v3f next_v3f(State &state) {
 	};
 }
 
-struct DefaultRandomizer {
+namespace default_randomizer {
 	template <class Result, class From>
 	forceinline Result random(From value) {
 		if constexpr (std::is_same_v<Result, s32>) {
@@ -245,7 +248,14 @@ struct DefaultRandomizer {
 	template <> forceinline v3f random(f32 seed) { return normalize_range_f32<v3f>(random<v3u>(seed)); }
 
 	template <> forceinline u32 random(u64 seed) { return random<u32>(dot(*(v2u *)&seed, *(v2u *)random_primes_u32)); }
-
+}
+struct DefaultRandomizer {
+	template <class T, class From>
+	T random(From f) {
+		// Because gcc does not implement function specializations in struct scope (which is standardized since c++14 btw)
+		// this has to be just a wrapper of functions in a namespace.
+		return default_randomizer::random<T>(f);
+	}
 };
 
 static constexpr f32 voronoi_largest_possible_distance_2d = 1.5811388300841896659994467722164f; // sqrt(2.5)
@@ -272,7 +282,7 @@ forceinline f32 voronoi_v2f(v2f coordinate) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v2f>(tile_position + offset) + offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.template random<v2f>(tile_position + offset) + offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
@@ -297,7 +307,7 @@ forceinline f32 voronoi_v3f(v3f coordinate) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v3f>(tile_position + offset) + offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.template random<v3f>(tile_position + offset) + offset));
 	}
 
 
@@ -317,7 +327,7 @@ forceinline f32 voronoi_v2s(v2s coordinate, s32 step_size) {
 	};
 
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v2f>(tile_position + offset) + (v2f)offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.template random<v2f>(tile_position + offset) + (v2f)offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_2d;
@@ -342,7 +352,7 @@ forceinline f32 voronoi_v3s(v3s coordinate, s32 step_size) {
 		{ 1, 1,-1}, { 1, 1, 0}, { 1, 1, 1},
 	};
 	for (auto offset : offsets) {
-		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.random<v3f>(tile_position + offset) + (v3f)offset));
+		min_distance_squared = min(min_distance_squared, distance_squared(local_position, Randomizer{}.template random<v3f>(tile_position + offset) + (v3f)offset));
 	}
 
 	return sqrt(min_distance_squared) * voronoi_inv_largest_possible_distance_3d;
@@ -361,7 +371,7 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 		for(f32 y1=-1; y1<=1; y1++){
 			for(f32 z1=-1; z1<=1; z1++){
 				v3f cell = baseCell + v3f{x1, y1, z1};
-				v3f cellPosition = cell + Randomizer{}.random<v3f>(cell);
+				v3f cellPosition = cell + Randomizer{}.template random<v3f>(cell);
 				v3f toCell = cellPosition - coordinate;
 				float distToCell = length(toCell);
 				if(distToCell < minDistToCell){
@@ -379,7 +389,7 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 		for(f32 y2=-1; y2<=1; y2++){
 			for(f32 z2=-1; z2<=1; z2++){
 				v3f cell = baseCell + v3f{x2, y2, z2};
-				v3f cellPosition = cell + Randomizer{}.random<v3f>(cell);
+				v3f cellPosition = cell + Randomizer{}.template random<v3f>(cell);
 				v3f toCell = cellPosition - coordinate;
 
 				v3f diffToClosestCell = absolute(closestCell - cell);
@@ -413,7 +423,7 @@ forceinline f32 voronoi_line_v3f(v3f coordinate) {
 				int iy = y + 1;
 				int iz = z + 1;
 				v3f offset = V3f(x,y,z);
-				r[ix][iy][iz] = offset + Randomizer{}.random<v3f>(tile + offset);
+				r[ix][iy][iz] = offset + Randomizer{}.template random<v3f>(tile + offset);
 			}
 		}
 	}
@@ -473,7 +483,7 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 		//	s32x8 iz = offset.z + 1;
 		//	s32x8 in = ix*3*3 + iy*3 + iz;
 		//
-		//	auto n = (v3fx8)offset + Randomizer{}.random<v3fx8>(tile + offset);
+		//	auto n = (v3fx8)offset + Randomizer{}.template random<v3fx8>(tile + offset);
 		//	for(int i = 0; i < 8; ++i)
 		//		((v3f *)r)[in[i]] = n.subvector(i);
 		//}
@@ -486,7 +496,7 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 					int iy = y + 1;
 					int iz = z + 1;
 					v3s offset = V3s(x,y,z);
-					r[ix][iy][iz] = (v3f)offset + Randomizer{}.random<v3f>(tile + offset);
+					r[ix][iy][iz] = (v3f)offset + Randomizer{}.template random<v3f>(tile + offset);
 				}
 			}
 		}
@@ -507,16 +517,16 @@ forceinline f32 voronoi_line_v3s(v3s coordinate, s32 step) {
 
 template <class Result, class Randomizer = DefaultRandomizer>
 forceinline Result value_noise(f32 tile_position, f32 local_position) {
-	Result left  = Randomizer{}.random<Result>(tile_position + 0);
-	Result right = Randomizer{}.random<Result>(tile_position + 1);
+	Result left  = Randomizer{}.template random<Result>(tile_position + 0);
+	Result right = Randomizer{}.template random<Result>(tile_position + 1);
 	return lerp(left, right, local_position);
 }
 template <class Result, class Randomizer = DefaultRandomizer>
 forceinline Result value_noise(v2f tile_position, v2f local_position) {
-	Result top_left     = Randomizer{}.random<Result>(tile_position + v2f{0,0});
-	Result bottom_left  = Randomizer{}.random<Result>(tile_position + v2f{0,1});
-	Result bottom_right = Randomizer{}.random<Result>(tile_position + v2f{1,1});
-	Result top_right    = Randomizer{}.random<Result>(tile_position + v2f{1,0});
+	Result top_left     = Randomizer{}.template random<Result>(tile_position + v2f{0,0});
+	Result bottom_left  = Randomizer{}.template random<Result>(tile_position + v2f{0,1});
+	Result bottom_right = Randomizer{}.template random<Result>(tile_position + v2f{1,1});
+	Result top_right    = Randomizer{}.template random<Result>(tile_position + v2f{1,0});
 
 	f32 tx = local_position.x;
 	f32 ty = local_position.y;
@@ -526,14 +536,14 @@ forceinline Result value_noise(v2f tile_position, v2f local_position) {
 }
 template <class Result, class Randomizer = DefaultRandomizer>
 forceinline Result value_noise(v3f tile_position, v3f local_position) {
-	Result left_bottom_front  = Randomizer{}.random<Result>(tile_position + v3f{0,0,0});
-	Result left_bottom_back   = Randomizer{}.random<Result>(tile_position + v3f{0,0,1});
-	Result left_top_front     = Randomizer{}.random<Result>(tile_position + v3f{0,1,0});
-	Result left_top_back      = Randomizer{}.random<Result>(tile_position + v3f{0,1,1});
-	Result right_bottom_front = Randomizer{}.random<Result>(tile_position + v3f{1,0,0});
-	Result right_bottom_back  = Randomizer{}.random<Result>(tile_position + v3f{1,0,1});
-	Result right_top_front    = Randomizer{}.random<Result>(tile_position + v3f{1,1,0});
-	Result right_top_back     = Randomizer{}.random<Result>(tile_position + v3f{1,1,1});
+	Result left_bottom_front  = Randomizer{}.template random<Result>(tile_position + v3f{0,0,0});
+	Result left_bottom_back   = Randomizer{}.template random<Result>(tile_position + v3f{0,0,1});
+	Result left_top_front     = Randomizer{}.template random<Result>(tile_position + v3f{0,1,0});
+	Result left_top_back      = Randomizer{}.template random<Result>(tile_position + v3f{0,1,1});
+	Result right_bottom_front = Randomizer{}.template random<Result>(tile_position + v3f{1,0,0});
+	Result right_bottom_back  = Randomizer{}.template random<Result>(tile_position + v3f{1,0,1});
+	Result right_top_front    = Randomizer{}.template random<Result>(tile_position + v3f{1,1,0});
+	Result right_top_back     = Randomizer{}.template random<Result>(tile_position + v3f{1,1,1});
 
 	f32 tx = local_position.x;
 	f32 ty = local_position.y;
@@ -550,10 +560,10 @@ forceinline Result value_noise(v2s coordinate, s32 step, Interpolate interpolate
 	v2s tile = floored / step;
 	v2f local = (v2f)(coordinate - floored) * reciprocal((f32)step);
 
-	Result top_left     = Randomizer{}.random<Result>(tile + v2s{0,0});
-	Result bottom_left  = Randomizer{}.random<Result>(tile + v2s{0,1});
-	Result bottom_right = Randomizer{}.random<Result>(tile + v2s{1,1});
-	Result top_right    = Randomizer{}.random<Result>(tile + v2s{1,0});
+	Result top_left     = Randomizer{}.template random<Result>(tile + v2s{0,0});
+	Result bottom_left  = Randomizer{}.template random<Result>(tile + v2s{0,1});
+	Result bottom_right = Randomizer{}.template random<Result>(tile + v2s{1,1});
+	Result top_right    = Randomizer{}.template random<Result>(tile + v2s{1,0});
 
 	f32 tx = interpolate(local.x);
 	f32 ty = interpolate(local.y);
@@ -608,14 +618,14 @@ forceinline Result value_noise(v3s coordinate, s32 step, Interpolate interpolate
 
 	return a.s[0];
 #else
-	Result left_bottom_back   = Randomizer{}.random<Result>(tile + v3s{0,0,0});
-	Result right_bottom_back  = Randomizer{}.random<Result>(tile + v3s{1,0,0});
-	Result left_top_back      = Randomizer{}.random<Result>(tile + v3s{0,1,0});
-	Result right_top_back     = Randomizer{}.random<Result>(tile + v3s{1,1,0});
-	Result left_bottom_front  = Randomizer{}.random<Result>(tile + v3s{0,0,1});
-	Result right_bottom_front = Randomizer{}.random<Result>(tile + v3s{1,0,1});
-	Result left_top_front     = Randomizer{}.random<Result>(tile + v3s{0,1,1});
-	Result right_top_front    = Randomizer{}.random<Result>(tile + v3s{1,1,1});
+	Result left_bottom_back   = Randomizer{}.template random<Result>(tile + v3s{0,0,0});
+	Result right_bottom_back  = Randomizer{}.template random<Result>(tile + v3s{1,0,0});
+	Result left_top_back      = Randomizer{}.template random<Result>(tile + v3s{0,1,0});
+	Result right_top_back     = Randomizer{}.template random<Result>(tile + v3s{1,1,0});
+	Result left_bottom_front  = Randomizer{}.template random<Result>(tile + v3s{0,0,1});
+	Result right_bottom_front = Randomizer{}.template random<Result>(tile + v3s{1,0,1});
+	Result left_top_front     = Randomizer{}.template random<Result>(tile + v3s{0,1,1});
+	Result right_top_front    = Randomizer{}.template random<Result>(tile + v3s{1,1,1});
 
 	Result left_bottom  = lerp(left_bottom_back,  left_bottom_front,  tz);
 	Result right_bottom = lerp(right_bottom_back, right_bottom_front, tz);
@@ -646,7 +656,7 @@ forceinline f32 gradient_noise(f32 coordinate) {
 
 	static constexpr f32 directions[] = {-1, -.75, -.5, -.25, .25, .5, .75, 1};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](f32 offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 26) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](f32 offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 26) & (count_of(directions) - 1)]; };
 	f32 d0 = get_direction(0);
 	f32 d1 = get_direction(1);
 
@@ -676,7 +686,7 @@ forceinline f32 gradient_noise(v2f coordinate) {
 		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2f offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v2f offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v2f g00 = get_direction(v2f{0, 0});
 	v2f g10 = get_direction(v2f{1, 0});
 	v2f g01 = get_direction(v2f{0, 1});
@@ -713,7 +723,7 @@ forceinline f32 gradient_noise(v3f coordinate) {
 
 	v3f t = smoothstep3(local);
 
-	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v3f g000 = get_direction({0, 0, 0});
 	v3f g100 = get_direction({1, 0, 0});
 	v3f g010 = get_direction({0, 1, 0});
@@ -759,7 +769,7 @@ forceinline f32 gradient_noise(v2s coordinate, s32 step) {
 		normalize(v2f{-1,-1})
 	};
 	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2s offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v2s offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
 	v2f g00 = get_direction(v2s{0, 0});
 	v2f g10 = get_direction(v2s{1, 0});
 	v2f g01 = get_direction(v2s{0, 1});
@@ -803,7 +813,7 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 
 	v3f t = smoothstep3(local);
 
-	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
+	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
     v3f g000 = get_direction({0, 0, 0});
     v3f g100 = get_direction({1, 0, 0});
     v3f g010 = get_direction({0, 1, 0});
@@ -850,6 +860,23 @@ template <class T>
 forceinline void interpolate(Smoothed<T> &smoothed, f32 delta) {
 	smoothed.factor = clamp(smoothed.factor + delta, 0, 1);
 	smoothed.interpolated = lerp(smoothed.base, smoothed.target, smoothed.factor);
+}
+
+template <class Generator>
+v3f random_unit_v3f(Generator &generator) {
+    f32 u1 = next_f32(generator);
+    f32 u2 = next_f32(generator);
+
+    // Convert to spherical coordinates
+    f32 theta = 2 * pi * u1; // azimuthal angle
+    f32 phi = acosf(2 * u2 - 1); // polar angle
+
+    // Convert to Cartesian coordinates
+	return {
+		sinf(phi) * cosf(theta),
+		sinf(phi) * sinf(theta),
+		cosf(phi),
+	};
 }
 
 }

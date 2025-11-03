@@ -2,7 +2,6 @@
 #include "linked_list.h"
 #include "array.h"
 #include "hash.h"
-#include "pointer.h"
 
 namespace tl {
 

@@ -3,6 +3,8 @@
 #include "optional.h"
 #include "list.h"
 
+#include <emmintrin.h>
+
 #pragma warning(push)
 #pragma warning(disable: TL_DISABLED_WARNINGS)
 #pragma warning(disable: 4582)
@@ -15,43 +17,43 @@ namespace tl {
 
 TL_API void sleep_milliseconds(u32 milliseconds);
 TL_API void sleep_seconds(u32 seconds);
-#if OS_WINDOWS
-TL_API void switch_thread();
+
+template <class T>
+concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
+
 forceinline void yield_smt() { _mm_pause(); }
+
+#if OS_WINDOWS
+
+TL_API void switch_thread();
+
+forceinline s16 atomic_increment(s16 volatile *a) { return _InterlockedIncrement16((short *)a); }
+forceinline s32 atomic_increment(s32 volatile *a) { return _InterlockedIncrement((long *)a); }
+forceinline s64 atomic_increment(s64 volatile *a) { return _InterlockedIncrement64((long long *)a); }
+
+forceinline s16 atomic_decrement(s16 volatile *a) { return _InterlockedDecrement16((short *)a); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return _InterlockedDecrement((long *)a); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return _InterlockedDecrement64((long long *)a); }
 
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
 forceinline s32 atomic_add(s32 volatile *a, s32 b) { return (s32)_InterlockedExchangeAdd((long *)a, (long)b); }
-#if ARCH_X64
 forceinline s64 atomic_add(s64 volatile *a, s64 b) { return _InterlockedExchangeAdd64(a, b); }
-#endif
 
-forceinline u16 atomic_increment(u16 volatile *a) { return (u16)_InterlockedIncrement16((short *)a); }
-forceinline u32 atomic_increment(u32 volatile *a) { return (u32)_InterlockedIncrement((long *)a); }
-#if ARCH_X64
-forceinline u64 atomic_increment(u64 volatile *a) { return (u64)_InterlockedIncrement64((long long *)a); }
-#endif
+forceinline s8  atomic_and(s8  volatile *a, s8  b) { return _InterlockedAnd8((char *)a, (char)b); }
+forceinline s16 atomic_and(s16 volatile *a, s16 b) { return _InterlockedAnd16((short *)a, (short)b); }
+forceinline s32 atomic_and(s32 volatile *a, s32 b) { return _InterlockedAnd((long *)a, (long)b); }
+forceinline s64 atomic_and(s64 volatile *a, s64 b) { return _InterlockedAnd64((long long *)a, (long long)b); }
 
-forceinline s16 atomic_increment(s16 volatile *a) { return (s16)atomic_increment((u16 *)a); }
-forceinline s32 atomic_increment(s32 volatile *a) { return (s32)atomic_increment((u32 *)a); }
-#if ARCH_X64
-forceinline s64 atomic_increment(s64 volatile *a) { return (s64)atomic_increment((u64 *)a); }
-#endif
+forceinline s8  atomic_or(s8  volatile *a, s8  b) { return _InterlockedOr8((char *)a, (char)b); }
+forceinline s16 atomic_or(s16 volatile *a, s16 b) { return _InterlockedOr16((short *)a, (short)b); }
+forceinline s32 atomic_or(s32 volatile *a, s32 b) { return _InterlockedOr((long *)a, (long)b); }
+forceinline s64 atomic_or(s64 volatile *a, s64 b) { return _InterlockedOr64((long long *)a, (long long)b); }
 
-forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)_InterlockedDecrement16((short *)a); }
-forceinline u32 atomic_decrement(u32 volatile *a) { return (u32)_InterlockedDecrement((long *)a); }
-#if ARCH_X64
-forceinline u64 atomic_decrement(u64 volatile *a) { return (u64)_InterlockedDecrement64((long long *)a); }
-#endif
-
-forceinline s16 atomic_decrement(s16 volatile *a) { return (s16)atomic_decrement((u16 *)a); }
-forceinline s32 atomic_decrement(s32 volatile *a) { return (s32)atomic_decrement((u32 *)a); }
-#if ARCH_X64
-forceinline s64 atomic_decrement(s64 volatile *a) { return (s64)atomic_decrement((u64 *)a); }
-#endif
-
-template <class T>
-concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
+forceinline s8  atomic_xor(s8  volatile *a, s8  b) { return _InterlockedXor8((char *)a, (char)b); }
+forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return _InterlockedXor16((short *)a, (short)b); }
+forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return _InterlockedXor((long *)a, (long)b); }
+forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return _InterlockedXor64((long long *)a, (long long)b); }
 
 template <AInterlockExchangeable T>
 forceinline T atomic_set(T volatile *dst, T src) {
@@ -74,6 +76,56 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 	else static_error_t(T, "atomic_compare_exchange is not available for this size");
 	return *(T *)&result;
 }
+
+#elif OS_LINUX
+
+forceinline void switch_thread() {}
+
+forceinline s8  atomic_increment(s8  volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s16 atomic_increment(s16 volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s32 atomic_increment(s32 volatile *a) { return __sync_fetch_and_add(a, 1); }
+forceinline s64 atomic_increment(s64 volatile *a) { return __sync_fetch_and_add(a, 1); }
+
+forceinline s8  atomic_decrement(s8  volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s16 atomic_decrement(s16 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return __sync_fetch_and_sub(a, 1); }
+
+forceinline s8  atomic_add(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
+forceinline s16 atomic_add(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
+forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
+forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
+
+forceinline s8  atomic_sub(s8  volatile *a, s8  b) { return __sync_fetch_and_sub(a, b); }
+forceinline s16 atomic_sub(s16 volatile *a, s16 b) { return __sync_fetch_and_sub(a, b); }
+forceinline s32 atomic_sub(s32 volatile *a, s32 b) { return __sync_fetch_and_sub(a, b); }
+forceinline s64 atomic_sub(s64 volatile *a, s64 b) { return __sync_fetch_and_sub(a, b); }
+
+forceinline s8  atomic_and(s8  volatile *a, s8  b) { return __sync_fetch_and_and(a, b); }
+forceinline s16 atomic_and(s16 volatile *a, s16 b) { return __sync_fetch_and_and(a, b); }
+forceinline s32 atomic_and(s32 volatile *a, s32 b) { return __sync_fetch_and_and(a, b); }
+forceinline s64 atomic_and(s64 volatile *a, s64 b) { return __sync_fetch_and_and(a, b); }
+
+forceinline s8  atomic_or(s8  volatile *a, s8  b) { return __sync_fetch_and_or(a, b); }
+forceinline s16 atomic_or(s16 volatile *a, s16 b) { return __sync_fetch_and_or(a, b); }
+forceinline s32 atomic_or(s32 volatile *a, s32 b) { return __sync_fetch_and_or(a, b); }
+forceinline s64 atomic_or(s64 volatile *a, s64 b) { return __sync_fetch_and_or(a, b); }
+
+forceinline s8  atomic_xor(s8  volatile *a, s8  b) { return __sync_fetch_and_xor(a, b); }
+forceinline s16 atomic_xor(s16 volatile *a, s16 b) { return __sync_fetch_and_xor(a, b); }
+forceinline s32 atomic_xor(s32 volatile *a, s32 b) { return __sync_fetch_and_xor(a, b); }
+forceinline s64 atomic_xor(s64 volatile *a, s64 b) { return __sync_fetch_and_xor(a, b); }
+
+template <AInterlockExchangeable T>
+forceinline T atomic_set(T volatile *dst, T src) {
+	return __atomic_exchange_n(dst, src, __ATOMIC_ACQ_REL);
+}
+
+template <class T>
+forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
+	return __sync_val_compare_and_swap(dst, comparand, new_value);
+}
+#endif
 
 template <AInterlockExchangeable T>
 forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
@@ -156,24 +208,37 @@ inline void join_and_free(Thread *thread) {
 	free(thread);
 }
 
-#else
-forceinline s8  atomic_add(s8  volatile *a, s8  b) { return __sync_fetch_and_add(a, b); }
-forceinline s16 atomic_add(s16 volatile *a, s16 b) { return __sync_fetch_and_add(a, b); }
-forceinline s32 atomic_add(s32 volatile *a, s32 b) { return __sync_fetch_and_add(a, b); }
-forceinline s64 atomic_add(s64 volatile *a, s64 b) { return __sync_fetch_and_add(a, b); }
+forceinline u16 atomic_increment(u16 volatile *a) { return (u16)atomic_increment((s16 *)a); }
+forceinline u32 atomic_increment(u32 volatile *a) { return (u32)atomic_increment((s32 *)a); }
+forceinline u64 atomic_increment(u64 volatile *a) { return (u64)atomic_increment((s64 *)a); }
 
-template <class T>
-forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
-	return __sync_val_compare_and_swap(dst, comparand, new_value);
-}
-#endif
+forceinline u16 atomic_decrement(u16 volatile *a) { return (u16)atomic_decrement((s16 *)a); }
+forceinline u32 atomic_decrement(u32 volatile *a) { return (u32)atomic_decrement((s32 *)a); }
+forceinline u64 atomic_decrement(u64 volatile *a) { return (u64)atomic_decrement((s64 *)a); }
 
 forceinline u8  atomic_add(u8  volatile *a, u8  b) { return (u8 )atomic_add((s8  *)a, (s8 )b); }
 forceinline u16 atomic_add(u16 volatile *a, u16 b) { return (u16)atomic_add((s16 *)a, (s16)b); }
 forceinline u32 atomic_add(u32 volatile *a, u32 b) { return (u32)atomic_add((s32 *)a, (s32)b); }
-#if ARCH_X64
 forceinline u64 atomic_add(u64 volatile *a, u64 b) { return (u64)atomic_add((s64 *)a, (s64)b); }
-#endif
+
+forceinline u8  atomic_and(u8  volatile *a, u8  b) { return (u8 )atomic_and((s8  *)a, (s8 )b); }
+forceinline u16 atomic_and(u16 volatile *a, u16 b) { return (u16)atomic_and((s16 *)a, (s16)b); }
+forceinline u32 atomic_and(u32 volatile *a, u32 b) { return (u32)atomic_and((s32 *)a, (s32)b); }
+forceinline u64 atomic_and(u64 volatile *a, u64 b) { return (u64)atomic_and((s64 *)a, (s64)b); }
+
+forceinline u8  atomic_or(u8  volatile *a, u8  b) { return (u8 )atomic_or((s8  *)a, (s8 )b); }
+forceinline u16 atomic_or(u16 volatile *a, u16 b) { return (u16)atomic_or((s16 *)a, (s16)b); }
+forceinline u32 atomic_or(u32 volatile *a, u32 b) { return (u32)atomic_or((s32 *)a, (s32)b); }
+forceinline u64 atomic_or(u64 volatile *a, u64 b) { return (u64)atomic_or((s64 *)a, (s64)b); }
+
+forceinline u8  atomic_xor(u8  volatile *a, u8  b) { return (u8 )atomic_xor((s8  *)a, (s8 )b); }
+forceinline u16 atomic_xor(u16 volatile *a, u16 b) { return (u16)atomic_xor((s16 *)a, (s16)b); }
+forceinline u32 atomic_xor(u32 volatile *a, u32 b) { return (u32)atomic_xor((s32 *)a, (s32)b); }
+forceinline u64 atomic_xor(u64 volatile *a, u64 b) { return (u64)atomic_xor((s64 *)a, (s64)b); }
+
+forceinline bool atomic_and(bool volatile *a, bool b) { return (bool)atomic_and((u8 *)a, (u8)b); }
+forceinline bool atomic_or (bool volatile *a, bool b) { return (bool)atomic_or ((u8 *)a, (u8)b); }
+forceinline bool atomic_xor(bool volatile *a, bool b) { return (bool)atomic_xor((u8 *)a, (u8)b); }
 
 #ifdef TL_IMPL
 
@@ -250,7 +315,7 @@ struct SleepySpinner {
 };
 
 template <AInterlockExchangeable T, ASpinner Spinner = BasicSpinner>
-forceinline T atomic_update(T volatile *a, auto fn, Spinner spinner = {}) requires requires { { fn(*(T *)0) } -> std::same_as<T>; } {
+forceinline T atomic_update(T volatile *a, Callable<T, T> auto fn, Spinner spinner = {}) {
 	using Int = TypeAt<log2(sizeof(T)), u8, u16, u32, u64>;
 	while (1) {
 		auto old_value = *a;
@@ -296,32 +361,36 @@ inline void sync(SyncPoint &point, Spinner spinner = {}) {
 struct SpinLock {
 	TL_MAKE_FIXED(SpinLock);
 
-	bool volatile in_use = false;
+	u32 volatile locker_id = 0;
 
 	SpinLock() = default;
 };
 
 inline bool try_lock(SpinLock &m) {
-	return !atomic_compare_exchange(&m.in_use, true, false);
+	auto current = get_current_thread_id();
+	return !atomic_compare_exchange(&m.locker_id, current, (u32)0);
 }
 template <ASpinner Spinner = SleepySpinner>
 inline void lock(SpinLock &m, Spinner spinner = {}) {
-	loop_until([&] {
-		return try_lock(m);
-	}, spinner);
+	auto current = get_current_thread_id();
+	assert(m.locker_id != current, "single thread deadlock");
+	while (!atomic_replace(&m.locker_id, current, (u32)0)) {
+		spinner.spin();
+	}
 }
 inline void unlock(SpinLock &m) {
-	m.in_use = false;
+	atomic_set(&m.locker_id, (u32)0);
 }
 
 template <>
 struct Scoped<SpinLock> {
-	SpinLock &mutex;
-	Scoped(SpinLock &mutex) : mutex(mutex) {
+	SpinLock *mutex;
+	void enter(SpinLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
-		unlock(mutex);
+	void exit() {
+		unlock(*mutex);
 	}
 };
 
@@ -338,6 +407,7 @@ TL_API void lock(OsLock &m);
 TL_API void unlock(OsLock &m);
 
 #ifdef TL_IMPL
+#if OS_WINDOWS
 OsLock::OsLock() {
 	handle = DefaultAllocator{}.allocate<CRITICAL_SECTION>();
 	InitializeCriticalSection((CRITICAL_SECTION *)handle);
@@ -352,16 +422,18 @@ void unlock(OsLock &m) {
 	LeaveCriticalSection((CRITICAL_SECTION *)m.handle);
 }
 #endif
+#endif
 
 
 template <>
 struct Scoped<OsLock> {
-	OsLock &mutex;
-	Scoped(OsLock &mutex) : mutex(mutex) {
+	OsLock *mutex;
+	void enter(OsLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
-		unlock(mutex);
+	void exit() {
+		unlock(*mutex);
 	}
 };
 
@@ -397,7 +469,7 @@ private:
 	T value;
 };
 
-#define locked_use_ret(name) name * [&](auto &name)
+#define locked_use_ret(name) name * [&](typename std::remove_cvref_t<decltype(name)>::Value &name)
 #define locked_use(name) locked_use_ret(name) -> decltype(auto)
 
 template <class T, ALock Lock, class Allocator = Allocator>
@@ -471,10 +543,11 @@ inline void unlock(RecursiveSpinLock &m) {
 template <>
 struct Scoped<RecursiveSpinLock> {
 	RecursiveSpinLock *mutex;
-	Scoped(RecursiveSpinLock &mutex) : mutex(&mutex) {
+	void enter(RecursiveSpinLock &mutex) {
+		this->mutex = &mutex;
 		lock(mutex);
 	}
-	~Scoped() {
+	void exit() {
 		unlock(*mutex);
 	}
 };
@@ -516,7 +589,7 @@ private:
 };
 
 #ifdef TL_IMPL
-
+#if OS_WINDOWS
 struct ConditionVariableImpl {
 	CONDITION_VARIABLE c = {};
 	CRITICAL_SECTION s = {};
@@ -543,6 +616,7 @@ void ConditionVariable::lock() {
 void ConditionVariable::unlock() {
 	LeaveCriticalSection(&impl().s);
 }
+#endif
 #endif
 
 template <class T, class Allocator = Allocator>
@@ -598,6 +672,16 @@ enum WaitForCompletionOption {
 //
 // Only one thread may push tasks.
 
+// :NestedOptionsStruct:
+// This could have been a nested struct of TaskQueueThreadPool, but gcc has a bug which does not allow that.
+// Because of that I have to pull out default_worker_proc as well.
+struct TaskQueueThreadPool;
+inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool);
+struct TaskQueueThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskQueueThreadPool *pool) = TaskQueueThreadPool_default_worker_proc;
+};
+
 struct TaskQueueThreadPool {
 	struct Task {
 		TaskQueueThreadPool *pool = 0;
@@ -606,12 +690,7 @@ struct TaskQueueThreadPool {
 		void (*free)(void *param) = 0;
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskQueueThreadPool *pool) = TaskQueueThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskQueueThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
@@ -667,35 +746,6 @@ struct TaskQueueThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskQueueThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-
-		while (1) {
-			Optional<TaskQueueThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					if (task = pool->tasks.pop()) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				pool->run(task.value_unchecked());
-				pool->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-	
 	inline void add_task(void (*fn)(void *param), void *param) {
 		atomic_increment(&started_task_count);
 
@@ -763,7 +813,6 @@ struct TaskQueueThreadPool {
 	}
 	#endif
 
-private:
 	Allocator allocator = TL_GET_CURRENT(allocator);
 	List<Thread *> threads;
 
@@ -805,6 +854,38 @@ private:
 	}
 
 };
+
+inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool) {
+
+	sync(pool->start_sync_point);
+
+	while (1) {
+		Optional<TaskQueueThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				if (task = pool->tasks.pop()) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			pool->run(task.value_unchecked());
+			pool->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
+	
+#if !OS_LINUX
+// :NotImplemented: for linux because gcc is buggy and I don't want to deal with that right now
 
 // Runs the latest pushed tasks 
 struct TaskListsThreadPool {
@@ -1332,6 +1413,8 @@ private:
 		atomic_increment(&task.queue->finished_task_count);
 	}
 };
+
+#endif
 
 } // namespace tl
 #pragma warning(pop)

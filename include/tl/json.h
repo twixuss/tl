@@ -98,6 +98,7 @@ struct Object {
 		return &_array[i];
 	}
 	f64 number() {
+		assert_equal(type, Type::number);
 		return _number;
 	}
 	Array &array() {

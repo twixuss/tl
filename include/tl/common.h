@@ -9,7 +9,9 @@
 	#include <intrin.h>
 	#include <vcruntime_new.h>
 #elif COMPILER_GCC
+	#include <x86gprintrin.h>
 	#include <malloc.h>
+	#include <math.h>
 #endif
 
 #include <string.h>
@@ -27,7 +29,7 @@
 #define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)((x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)(!!(x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
 
 #ifndef assert
 #define assert(x, ...) assert_always(x __VA_OPT__(,) __VA_ARGS__)
@@ -64,8 +66,14 @@
 #define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
 #endif
 
-#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
-#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), __assume(0))
+#if COMPILER_MSVC
+#define TL_ASSUME(x) __assume(x)
+#else
+#define TL_ASSUME(x) 0
+#endif
+
+#define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), TL_ASSUME(0))
+#define not_implemented(...) (ASSERTION_FAILURE("not_implemented", "" __VA_OPT__(,) __VA_ARGS__), TL_ASSUME(0))
 
 #ifndef bounds_check
 #define bounds_check(x) x
@@ -156,6 +164,10 @@
 #define TL_GET_GLOBAL(x) x
 #endif
 
+#ifndef TL_ALIGN_RW_OPS
+#define TL_ALIGN_RW_OPS 0
+#endif
+
 namespace tl {
 
 inline constexpr umm string_char_count(ascii const *str) { umm result = 0; while (*str++) ++result; return result; }
@@ -164,45 +176,17 @@ inline constexpr umm string_unit_count(ascii const *str) { umm result = 0; while
 inline constexpr umm string_unit_count(utf8  const *str) { umm result = 0; while (*str++) ++result; return result; }
 inline constexpr umm string_unit_count(utf16 const *str) { umm result = 0; while (*str++) ++result; return result;}
 inline constexpr umm string_unit_count(utf32 const *str) { umm result = 0; while (*str++) ++result; return result;}
-inline constexpr umm string_unit_count(wchar const *str) { umm result = 0; while (*str++) ++result; return result;}
 
 inline constexpr umm string_byte_count(ascii const *str) { return string_unit_count(str) * sizeof(ascii); }
 inline constexpr umm string_byte_count(utf8  const *str) { return string_unit_count(str) * sizeof(utf8 ); }
 inline constexpr umm string_byte_count(utf16 const *str) { return string_unit_count(str) * sizeof(utf16);}
 inline constexpr umm string_byte_count(utf32 const *str) { return string_unit_count(str) * sizeof(utf32);}
-inline constexpr umm string_byte_count(wchar const *str) { return string_unit_count(str) * sizeof(wchar);}
 
-template <class T> inline constexpr bool is_integer = false;
-template <> inline constexpr bool is_integer<u8 > = true;
-template <> inline constexpr bool is_integer<u16> = true;
-template <> inline constexpr bool is_integer<u32> = true;
-template <> inline constexpr bool is_integer<u64> = true;
-template <> inline constexpr bool is_integer<s8 > = true;
-template <> inline constexpr bool is_integer<s16> = true;
-template <> inline constexpr bool is_integer<s32> = true;
-template <> inline constexpr bool is_integer<s64> = true;
-template <> inline constexpr bool is_integer<slong> = true;
-template <> inline constexpr bool is_integer<ulong> = true;
-
+template <class T> inline constexpr bool is_integer = std::is_integral_v<T>;
 template <class T> inline constexpr bool is_integer_like = is_integer<T>;
-
-template <class T> inline constexpr bool is_signed = false;
-template <> inline constexpr bool is_signed<s8   > = true;
-template <> inline constexpr bool is_signed<s16  > = true;
-template <> inline constexpr bool is_signed<s32  > = true;
-template <> inline constexpr bool is_signed<s64  > = true;
-template <> inline constexpr bool is_signed<slong> = true;
-
-template <class T> inline constexpr bool is_unsigned = false;
-template <> inline constexpr bool is_unsigned<u8   > = true;
-template <> inline constexpr bool is_unsigned<u16  > = true;
-template <> inline constexpr bool is_unsigned<u32  > = true;
-template <> inline constexpr bool is_unsigned<u64  > = true;
-template <> inline constexpr bool is_unsigned<ulong> = true;
-
-template <class T> inline constexpr bool is_float = false;
-template <> inline constexpr bool is_float<f32> = true;
-template <> inline constexpr bool is_float<f64> = true;
+template <class T> inline constexpr bool is_signed = std::is_signed_v<T>;
+template <class T> inline constexpr bool is_unsigned = std::is_unsigned_v<T>;
+template <class T> inline constexpr bool is_float = std::is_floating_point_v<T>;
 
 struct Empty {};
 constexpr bool operator==(Empty a, Empty b) { return true; }
@@ -240,8 +224,32 @@ constexpr umm type_index_of = IndexOfT<T, Rest...>::value;
 template <class First, class ...Rest>
 concept AllSame = (std::is_same_v<First, Rest> && ...);
 
+template <class First, class ...Rest>
+struct RequireAllSame {
+	static_assert(AllSame<First, Rest...>);
+	using Type = First;
+};
+
 template <class T, class ...Types>
 concept OneOf = (std::is_same_v<T, Types> || ...);
+
+template <class Container>
+struct ElementOfT {
+	using Type = typename Container::Element;
+};
+
+template <class T, umm count>
+struct ElementOfT<T[count]> {
+	using Type = T;
+};
+
+template <class T>
+struct ElementOfT<T *> {
+	using Type = T;
+};
+
+template <class T>
+using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class T, class ...Args>
 constexpr T &construct(T &val, Args &&...args) {
@@ -285,12 +293,6 @@ template<> inline constexpr s32 max_value<s32> = 0x7FFFFFFF;
 template<> inline constexpr s64 min_value<s64> = 0x8000000000000000;
 template<> inline constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
 
-template<> inline constexpr ulong min_value<ulong> = (ulong)min_value<ulong_s>;
-template<> inline constexpr ulong max_value<ulong> = (ulong)max_value<ulong_s>;
-
-template<> inline constexpr slong min_value<slong> = (slong)min_value<slong_s>;
-template<> inline constexpr slong max_value<slong> = (slong)max_value<slong_s>;
-
 template<> inline constexpr f32 min_value<f32> = -3.402823466e+38f;
 template<> inline constexpr f32 max_value<f32> = +3.402823466e+38f;
 
@@ -301,9 +303,21 @@ template <class T> inline constexpr T epsilon = {};
 template<> inline constexpr f32 epsilon<f32> = 1.175494351e-38f;
 template<> inline constexpr f64 epsilon<f64> = 2.2250738585072014e-308;
 
-template <class T> inline constexpr T infinity = {};
+constexpr struct {
+	template <class T>
+	constexpr operator T() const { 
+		static_error_t(T, "value for this type is undefined");
+	}
+} undefined_constexpr_value;
+
+template <class T> inline constexpr T infinity = undefined_constexpr_value;
+#if COMPILER_MSVC
 template<> inline constexpr f32 infinity<f32> = 1e300 * 1e300;
 template<> inline constexpr f64 infinity<f64> = 1e300 * 1e300;
+#else
+template<> inline constexpr f32 infinity<f32> = (__builtin_inff ());
+template<> inline constexpr f64 infinity<f64> = (__builtin_inff ());
+#endif
 
 template <class T> inline constexpr T nan = infinity<T> * 0;
 
@@ -345,9 +359,16 @@ forceinline constexpr auto enum_values() {
 }
 
 
+template <class Fn, class Ret, class ...Args>
+concept Callable = requires(Fn fn) { { fn(std::declval<Args>()...) } -> std::same_as<Ret>; };
+
+template <class Fn, class ...Args>
+concept CallableAnyRet = requires(Fn fn) { fn(std::declval<Args>()...); };
+
 
 // This function exists because C++ does not provide a way to convert
-// fundamental types to structs without adding a constructor to a struct.
+// fundamental types to structs without adding a constructor to a struct, 
+// which will break designated initialization.
 // If there's a need to do that, specialize this function.
 template <class To, class From>
 forceinline constexpr To convert(From from) {
@@ -358,18 +379,32 @@ forceinline constexpr To convert(From from) {
 forceinline bool all(bool v) { return v; }
 forceinline bool any(bool v) { return v; }
 
-forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (0, a, b, result); }
-forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(0, a, b, result); }
-forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(0, a, b, result); }
-#if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(0, a, b, result); }
-#endif
-
+#if COMPILER_MSVC
 forceinline void add_carry(u8  a, u8  b, bool carry_in, u8  *result, bool *carry_out) { *carry_out = (bool)_addcarry_u8 (carry_in, a, b, result); }
 forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u16(carry_in, a, b, result); }
+#elif COMPILER_GCC
+forceinline void add_carry(u8 a, u8 b, bool carry_in, u8 *result, bool *carry_out) {
+	int c = a + b + carry_in;
+	*result = (u8)c;
+	*carry_out = c & 0x100;
+}
+forceinline void add_carry(u16 a, u16 b, bool carry_in, u16 *result, bool *carry_out) {
+	int c = a + b + carry_in;
+	*result = (u16)c;
+	*carry_out = c & 0x10000;
+}
+#endif
+
 forceinline void add_carry(u32 a, u32 b, bool carry_in, u32 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u32(carry_in, a, b, result); }
 #if ARCH_X64
-forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, result); }
+forceinline void add_carry(u64 a, u64 b, bool carry_in, u64 *result, bool *carry_out) { *carry_out = (bool)_addcarry_u64(carry_in, a, b, (unsigned long long *)result); }
+#endif
+
+forceinline void add_carry(u8  a, u8  b, u8  *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+forceinline void add_carry(u16 a, u16 b, u16 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+forceinline void add_carry(u32 a, u32 b, u32 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
+#if ARCH_X64
+forceinline void add_carry(u64 a, u64 b, u64 *result, bool *carry_out) { add_carry(a, b, 0, result, carry_out); }
 #endif
 
 forceinline constexpr bool is_nan(f32 v) {
@@ -392,13 +427,13 @@ forceinline constexpr bool is_nan(f64 v) {
 }
 
 #if COMPILER_GCC
-forceinline u32 find_lowest_one_bit(u32 val) { val ? __builtin_ffs(val) : ~0; }
-forceinline u32 find_lowest_one_bit(u64 val) { val ? __builtin_ffsll(val) : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { val ? 32 - __builtin_clz(val) : ~0; }
-forceinline u32 find_highest_one_bit(u64 val) { val ? 64 - __builtin_clzll(val) : ~0; }
+forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ffs(val) : ~0; }
+forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ffsll(val) : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { return val ? 32 - __builtin_clz(val) : ~0; }
+forceinline u32 find_highest_one_bit(u64 val) { return val ? 64 - __builtin_clzll(val) : ~0; }
 #elif COMPILER_MSVC
-forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (ulong)val) ? (u32)result : ~0; }
-forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (ulong)val) ? (u32)result : ~0; }
+forceinline u32 find_lowest_one_bit(u32 val) { unsigned long result; return _BitScanForward(&result, (unsigned long)val) ? (u32)result : ~0; }
+forceinline u32 find_highest_one_bit(u32 val) { unsigned long result; return _BitScanReverse(&result, (unsigned long)val) ? (u32)result : ~0; }
 forceinline u32 find_lowest_zero_bit (u32 val) { return find_lowest_one_bit (~val); }
 forceinline u32 find_highest_zero_bit(u32 val) { return find_highest_one_bit(~val); }
 #if ARCH_X64
@@ -586,18 +621,23 @@ constexpr u32 count_leading_zeros(u64 v) {
 
 #if COMPILER_MSVC
 #if ARCH_LZCNT
-forceinline constexpr u32 count_leading_zeros(u8  val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val) - 8; }
-forceinline constexpr u32 count_leading_zeros(u16 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(val); }
-forceinline constexpr u32 count_leading_zeros(u32 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(val); }
-forceinline constexpr u32 count_leading_zeros(u64 val) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(val); }
+forceinline constexpr u32 count_leading_zeros(u8  v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v) - 8; }
+forceinline constexpr u32 count_leading_zeros(u16 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(v); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(v); }
 #else
-forceinline constexpr u32 count_leading_zeros(u8  v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
-forceinline constexpr u32 count_leading_zeros(u16 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
-forceinline constexpr u32 count_leading_zeros(u32 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 32 : (_BitScanReverse(&r, v), 31 - r))); }
+forceinline constexpr u32 count_leading_zeros(u8  v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 8  : (_BitScanReverse(&r, v),  7 - r))); }
+forceinline constexpr u32 count_leading_zeros(u16 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 16 : (_BitScanReverse(&r, v), 15 - r))); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 32 : (_BitScanReverse(&r, v), 31 - r))); }
 #if ARCH_X64
-forceinline constexpr u32 count_leading_zeros(u64 v) { ulong r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_leading_zeros(v) : ((v == 0) ? 64 : (_BitScanReverse64(&r, v), 63 - r))); }
 #endif
 #endif
+#elif COMPILER_GCC
+forceinline constexpr u32 count_leading_zeros(u8  v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v) - 8; }
+forceinline constexpr u32 count_leading_zeros(u16 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt16(v); }
+forceinline constexpr u32 count_leading_zeros(u32 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : __lzcnt32(v); }
+forceinline constexpr u32 count_leading_zeros(u64 v) { return std::is_constant_evaluated() ? ce::count_leading_zeros(v) : (u32)__lzcnt64(v); }
 #endif
 
 forceinline constexpr u32 count_leading_zeros(s8  val) { return count_leading_zeros((u8 )val); }
@@ -616,11 +656,11 @@ forceinline constexpr u32 count_leading_ones(u64 val) { return count_leading_zer
 #endif
 
 
-forceinline constexpr u32 log2(u8  v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
-forceinline constexpr u32 log2(u16 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
-forceinline constexpr u32 log2(u32 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (_BitScanReverse(&r, v), r)); }
+forceinline constexpr u32 log2(u8  v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (7  - ce::count_leading_zeros(v)) : (7  - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u16 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (15 - ce::count_leading_zeros(v)) : (15 - count_leading_zeros(v))); }
+forceinline constexpr u32 log2(u32 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (31 - ce::count_leading_zeros(v)) : (31 - count_leading_zeros(v))); }
 #if ARCH_X64
-forceinline constexpr u32 log2(u64 v) { ulong r; return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (_BitScanReverse64(&r, v), r)); }
+forceinline constexpr u32 log2(u64 v) { return (v == 0) ? -1 : (std::is_constant_evaluated() ? (63 - ce::count_leading_zeros(v)) : (63 - count_leading_zeros(v))); }
 #endif
 
 forceinline constexpr u32 log2(s8  v) { return log2((u8 )v); }
@@ -782,9 +822,16 @@ constexpr f32 inv_pi = f32(0.31830988618379067153776752674503L);
 constexpr f32 sqrt2  = f32(1.4142135623730950488016887242097L);
 constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
+constexpr f32 golden_ratio = f32(1.6180339887498948482045868343656L);
 
 template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
 template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+
+constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
+    return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);
+};
+
+forceinline constexpr f32 sqrt(f32 v) { return std::is_constant_evaluated() ? sqrt_newton_raphson(v, v, 0) : sqrtf(v); }
 
 // Does not check if min_bound is greater than max_bound
 // There is `clamp_checked` for that.
@@ -826,6 +873,9 @@ constexpr T midpoint(T a, T b) {
 	sort_values(a, b);
 	return a + (b - a) / 2;
 }
+
+template <umm bits>
+using UintWithBits = TypeAt<log2(ceil_to_power_of_2(bits) / 8), u8, u16, u32, u64>;
 
 template <umm count>
 using UintForCount = TypeAt<log2(log2(max(count, (umm)255))) - 2, u8, u16, u32, u64>;
@@ -909,50 +959,123 @@ inline bool any_false(bool value) { return !value; }
 enum ForEachDirective {
 	ForEach_continue        = 0x0,
 	ForEach_break           = 0x1,
-	ForEach_erase           = 0x2,
+	ForEach_erase           = 0x2, // ordered
 	ForEach_erase_unordered = 0x4,
+	ForEach_erase_mask      = 0x6,
+	ForEach_dont_recurse    = 0x8,
 };
 
 constexpr ForEachDirective operator|(ForEachDirective a, ForEachDirective b) { return (ForEachDirective)(to_underlying(a) | to_underlying(b)); }
+
+// TODO: use this in all of for_each functions, DRY
+template <class ...Args, class Fn>
+auto wrap_foreach_fn(Fn &&fn) {
+	using FnRet = std::invoke_result_t<std::remove_cvref_t<Fn>, Args...>;
+	if constexpr (std::is_same_v<FnRet, void>) {
+		return [&] (auto &&...args) {
+			fn(args...);
+			return ForEach_continue;
+		};
+	} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
+		return fn;
+	} else {
+		static_error_v(fn, "Invalid return type of for_each function");
+	}
+}
+
+template <class T, class ...Args>
+concept ForEachIterator = requires(T fn, Args ...args) {
+	requires OneOf<decltype(fn(args...)), void, ForEachDirective>;
+};
 
 using ForEachFlags = u8;
 enum : ForEachFlags {
 	ForEach_reverse = 0x1,
 };
 
-template <ForEachFlags flags=0, class T, umm count, class Fn>
-constexpr bool for_each(T (&array)[count], Fn &&fn) {
-	using FnRet = decltype(fn(*(T*)0));
+template <class T>
+concept Collection = requires(T collection) {
+	for_each(collection, [](auto item) {});
+};
 
-	T *start;
-	T *end;
-	umm step;
-	if constexpr (flags & ForEach_reverse) {
-		start = array + count - 1;
-		end = array - 1;
-		step = -1;
+template <class Fn, class Item>
+auto for_each_default_action(Fn &&fn, Item &&item) {
+	if constexpr (std::is_same_v<decltype(fn(item)), ForEachDirective>) {
+		return ForEach_continue;
 	} else {
-		start = array;
-		end = array + count;
-		step = 1;
+		return;
 	}
-	for (auto it = start; it != end; it += step) {
-		if constexpr (std::is_same_v<FnRet, void>) {
-			fn(*it);
-		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			auto d = fn(*it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_t(T, "Invalid return type of for_each function");
-		}
-	}
-	return false;
 }
 
-bool all(auto x, auto predicate) {
+template <class Inner, class Mapper>
+struct MappedCollection {
+	using Element = decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Mapper mapper;
+};
+
+template <class Inner, class Mapper>
+MappedCollection<Inner, Mapper> mapped(Inner &&inner, Mapper &&mapper) {
+	return MappedCollection<Inner, Mapper>{inner, mapper};
+}
+
+template <class Inner, std::invocable<ElementOf<Inner>> Mapper>
+bool for_each(MappedCollection<Inner, Mapper> c, std::invocable<decltype(std::declval<Mapper>()(std::declval<ElementOf<Inner>>()))> auto fn) {
+	return for_each(c.inner, [&](auto item) {
+		return fn(c.mapper(item));
+	});
+}
+
+template <class Inner, class Mapper>
+bool count_of(MappedCollection<Inner, Mapper> c) {
+	return count_of(c.inner);
+}
+
+template <class Inner, class Predicate>
+struct PredicatedCollection {
+	using Element = decltype(std::declval<Predicate>()(std::declval<ElementOf<Inner>>()));
+	Inner inner;
+	Predicate predicate;
+};
+
+template <class Inner, class Predicate>
+bool for_each(PredicatedCollection<Inner, Predicate> c, auto fn) {
+	return for_each(c.inner, [&](auto item) {
+		if (c.predicate(item)) {
+			return fn(item);
+		}
+		return for_each_default_action(fn, item);
+	});
+}
+
+template <class Inner, class Predicate>
+PredicatedCollection<Inner, Predicate> predicated(Inner &&inner, Predicate &&predicate) {
+	return PredicatedCollection<Inner, Predicate>{inner, predicate};
+}
+
+template <class Collection>
+auto stddev(Collection const &collection) {
+	using Element = ElementOf<Collection>;
+
+	auto count = count_of(collection);
+	Element average = {};
+
+	for_each(collection, [&](Element x) { average += x; });
+	average /= count;
+
+	Element variance = {};
+	for_each(collection, [&](Element x) { variance += pow2(x - average); });
+	variance /= count;
+
+	return tl::sqrt(variance);
+}
+
+constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
+	return x;
+};
+
+template <class Predicate = decltype(identity_value)>
+bool all(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (!predicate(v))
 			return false;
@@ -960,7 +1083,8 @@ bool all(auto x, auto predicate) {
 	return true;
 }
 
-bool any(auto x, auto predicate) {
+template <class Predicate = decltype(identity_value)>
+bool any(Collection auto x, Predicate predicate = {}) {
 	for (auto v : x) {
 		if (predicate(v))
 			return true;
@@ -974,24 +1098,6 @@ constexpr void for_each(Fn &&fn, Ts ...ts) {
 	(fn(ts), ...);
 }
 */
-
-template <class Container>
-struct ElementOfT {
-	using Type = typename Container::Element;
-};
-
-template <class T, umm count>
-struct ElementOfT<T[count]> {
-	using Type = T;
-};
-
-template <class T>
-struct ElementOfT<T *> {
-	using Type = T;
-};
-
-template <class T>
-using ElementOf = ElementOfT<std::remove_cvref_t<T>>::Type;
 
 template <class Container, class Predicate>
 constexpr auto find_if(Container &container, Predicate &&predicate) {
@@ -1071,19 +1177,23 @@ private:
 #define scoped_replace(dst, src) \
 	auto CONCAT(old_, __LINE__) = dst; \
 	dst = src; \
-	defer { dst = CONCAT(old_, __LINE__); };
+	defer { dst = CONCAT(old_, __LINE__); }
 
 #define scoped_replace_if(dst, src, condition) \
 	Optional<decltype(dst)> CONCAT(old_, __LINE__); \
 	if (condition) { CONCAT(old_, __LINE__) = dst; dst = src; } \
-	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); };
+	defer { if (CONCAT(old_, __LINE__)) dst = CONCAT(old_, __LINE__).value(); }
+
+#define scoped_exchange(dst, src) \
+	Swap(dst, src);               \
+	defer { Swap(dst, src); }
 
 template <class T>
-auto reversed(T x) {
+constexpr auto reversed(T x) {
 	using Iter = decltype(x.rbegin());
 	struct Range {
-		Iter begin() { return {_begin}; }
-		Iter end() { return {_end}; }
+		constexpr Iter begin() { return {_begin}; }
+		constexpr Iter end() { return {_end}; }
 		Iter _begin, _end;
 	};
 	Range r = {
@@ -1098,41 +1208,88 @@ struct ReverseIterator {
 	using Element = decltype(*Iterator{});
 
 	Iterator it;
-	ReverseIterator(Iterator it) : it(it) {}
-	ReverseIterator &operator++() { return --it, *this; }
-	ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
-	bool operator==(ReverseIterator that) const { return it == that.it; }
-	bool operator!=(ReverseIterator that) const { return it != that.it; }
-	Element &operator*() { return *it; }
-	Iterator operator->() { return it; }
+	constexpr ReverseIterator(Iterator it) : it(it) {}
+	constexpr ReverseIterator &operator++() { return --it, *this; }
+	constexpr ReverseIterator operator++(int) { auto temp = *this; return --it, temp; }
+	constexpr bool operator==(ReverseIterator that) const { return it == that.it; }
+	constexpr bool operator!=(ReverseIterator that) const { return it != that.it; }
+	constexpr Element &operator*() { return *it; }
+	constexpr Iterator operator->() { return it; }
 };
-
 
 inline constexpr struct null_opt_t {} null_opt;
 
 template <class T>
-struct OptionalBase {
+struct OptionalBaseTrivial {
 protected:
 	union {
 		T _value;
 	};
 	bool _has_value;
-	constexpr OptionalBase() {
+	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
 	}
 };
 
 template <>
-struct OptionalBase<void> {
+struct OptionalBaseTrivial<void> {
 protected:
 	bool _has_value;
-	constexpr OptionalBase() {
+	constexpr OptionalBaseTrivial() {
 		this->_has_value = false;
 	}
 };
 
 template <class T>
-struct OptionalBaseNonTrivial : OptionalBase<T> {
+struct OptionalBaseNonTrivial {
+protected:
+	union {
+		T _value;
+	};
+	bool _has_value;
+	constexpr OptionalBaseNonTrivial() {
+		this->_has_value = false;
+	}
+	constexpr OptionalBaseNonTrivial(OptionalBaseNonTrivial const &that) {
+		if (that._has_value) {
+			new (&this->_value) T(that._value);
+		}
+		this->_has_value = that._has_value;
+	}
+	constexpr OptionalBaseNonTrivial& operator=(OptionalBaseNonTrivial const &that) {
+		if (this->_has_value) {
+			if (that._has_value) {
+				this->_value = that._value;
+			} else {
+				this->_has_value = false;
+				this->_value.~T();
+			}
+		} else {
+			if (that._has_value) {
+				new(&this->_value) T(that._value);
+				this->_has_value = true;
+			} else {
+			}
+		}
+		return *this;
+	}
+	constexpr OptionalBaseNonTrivial& operator=(OptionalBaseNonTrivial &&that) {
+		if (this->_has_value) {
+			if (that._has_value) {
+				this->_value = std::move(that._value);
+			} else {
+				this->_has_value = false;
+				this->_value.~T();
+			}
+		} else {
+			if (that._has_value) {
+				new(&this->_value) T(std::move(that._value));
+				this->_has_value = true;
+			} else {
+			}
+		}
+		return *this;
+	}
 	constexpr ~OptionalBaseNonTrivial() {
 		if (this->_has_value)
 			this->_value.~T();
@@ -1140,18 +1297,12 @@ struct OptionalBaseNonTrivial : OptionalBase<T> {
 };
 
 template <class T>
-struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBase<T>, OptionalBaseNonTrivial<T>> {
+struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, OptionalBaseTrivial<T>, OptionalBaseNonTrivial<T>> {
 	using Element = T;
 	constexpr Optional() {}
 	constexpr Optional(Element that) {
 		new (&this->_value) Element(that);
 		this->_has_value = true;
-	}
-	constexpr Optional(Optional<Element> const &that) {
-		if (that._has_value) {
-			new (&this->_value) Element(that._value);
-		}
-		this->_has_value = that._has_value;
 	}
 	constexpr Optional(null_opt_t) {
 		this->_has_value = false;
@@ -1164,8 +1315,10 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
+	constexpr auto &value() { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() { return this->_value; }
+	constexpr auto &value() const { assert_always(this->_has_value); return this->_value; }
+	constexpr auto &value_unchecked() const { return this->_value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -1206,12 +1359,9 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 };
 
 template <>
-struct Optional<void> : OptionalBase<void> {
+struct Optional<void> : OptionalBaseTrivial<void> {
 	using Element = void;
 	constexpr Optional() {}
-	constexpr Optional(Optional<Element> const &that) {
-		this->_has_value = that._has_value;
-	}
 	constexpr Optional(null_opt_t) {
 		this->_has_value = false;
 	}
@@ -1223,8 +1373,6 @@ struct Optional<void> : OptionalBase<void> {
 	constexpr explicit operator bool() const { return this->_has_value; }
 
 	constexpr bool has_value() const { return this->_has_value; }
-	constexpr auto &value(this auto &&self) { assert_always(self._has_value); return self._value; }
-	constexpr auto &value_unchecked(this auto &&self) { return self._value; }
 
 	template <class Fallback>
 	constexpr Element value_or(Fallback &&fallback) requires requires { (Element)fallback(); } {
@@ -1343,6 +1491,12 @@ private:
 		Error _error;
 	};
 };
+
+#define TRY(name, expression)           \
+	auto name##_or_error = expression;  \
+	if (name##_or_error.is_error())     \
+		return name##_or_error.error(); \
+	auto name = name##_or_error.value()
 
 enum class Overflow {
 	clamp,
@@ -1478,6 +1632,82 @@ struct Span {
 	constexpr bool operator==(Span<T, ThatSize> that) const {
 		if (count != that.count)
 			return false;
+
+		if (!std::is_constant_evaluated()) {
+			if constexpr (std::is_integral_v<T>) {
+				u8 *ap = (u8 *)data;
+				u8 *bp = (u8 *)that.data;
+
+				u8 *endp = (u8 *)end();
+			
+				#if TL_USE_SIMD
+				while (endp - ap >= 16) {
+					__m128i a = _mm_loadu_epi32(ap); ap += 16;
+					__m128i b = _mm_loadu_epi32(bp); bp += 16;
+					__m128i c = _mm_cmpeq_epi32(a, b);
+					int m = _mm_movemask_ps(_mm_castsi128_ps(c));
+					if (m != 0xF) {
+						return false;
+					}
+				}
+				#endif
+				while (endp - ap >= 8) {
+					u64 a = *(u64 *)ap; ap += 8;
+					u64 b = *(u64 *)bp; bp += 8;
+					if (a != b) {
+						return false;
+					}
+				}
+				while (endp - ap) {
+					if (*ap++ != *bp++) {
+						return false;
+					}
+				}
+				return true;
+			}
+			#if TL_USE_SIMD
+			if constexpr (std::is_same_v<T, f32>) {
+				umm remaining_count = count;
+				f32 *ap = data;
+				f32 *bp = that.data;
+
+				#if TL_ALIGN_RW_OPS
+				// Align `ap` to 16 bytes.
+				while (remaining_count && (((umm)ap & 15) != 0)) {
+					if (*ap != *bp)
+						return false;
+					++ap;
+					++bp;
+					--remaining_count;
+				}
+				#endif
+				while (remaining_count >= 4) {
+					#if TL_ALIGN_RW_OPS
+					__m128 a = _mm_load_ps(ap);
+					#else
+					__m128 a = _mm_loadu_ps(ap);
+					#endif
+					__m128 b = _mm_loadu_ps(bp);
+					__m128 c = _mm_cmpeq_ps(a, b);
+					int m = _mm_movemask_ps(c);
+					if (m != 0xF) {
+						return false;
+					}
+					ap += 4;
+					bp += 4;
+					remaining_count -= 4;
+				}
+				while (remaining_count) {
+					if (*ap != *bp)
+						return false;
+					++ap;
+					++bp;
+					--remaining_count;
+				}
+				return true;
+			}
+			#endif
+		}
 		for (Size i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
@@ -1540,6 +1770,13 @@ struct Span {
 		return that;
 	}
 
+	void set(Span that) const {
+		assert(count == that.count);
+		for (umm i = 0; i < count; ++i) {
+			data[i] = that.data[i];
+		}
+	}
+
 	Element *data = 0;
 	Size count = 0;
 };
@@ -1561,9 +1798,7 @@ template <class T, umm x, umm y>        inline Span<T> flatten(T (&array)[x][y] 
 template <class T, umm x, umm y, umm z> inline Span<T> flatten(T (&array)[x][y][z]) { return {(T *)array, x*y*z}; }
 
 template <ForEachFlags flags=0, class T, class Fn>
-constexpr bool for_each(Span<T> span, Fn &&fn) {
-	using FnRet = decltype(fn(*(T*)0));
-
+constexpr bool for_each(Span<T> span, Fn &&in_fn) {
 	T *start = 0;
 	T *end = 0;
 	umm step = 0;
@@ -1577,20 +1812,28 @@ constexpr bool for_each(Span<T> span, Fn &&fn) {
 		step = (umm)1;
 	}
 
+	auto fn = wrap_foreach_fn<T &>(in_fn);
+
 	for (auto it = start; it != end; it += step) {
-		if constexpr (std::is_same_v<FnRet, void>) {
-			fn(*it);
-		} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
-			auto d = fn(*it);
-			if (d & ForEach_erase) invalid_code_path("not supported");
-			if (d & ForEach_erase_unordered) invalid_code_path("not supported");
-			if (d & ForEach_break)
-				return true;
-		} else {
-			static_error_v(fn, "Invalid return type of for_each function");
-		}
+		auto d = fn(*it);
+
+		constexpr ForEachFlags allowed_flags = ForEach_break;
+		assert(!(d & ~allowed_flags), "not supported");
+
+		if (d & ForEach_break)
+			return true;
 	}
 	return false;
+}
+
+template <ForEachFlags flags=0, class T, umm count, class Fn>
+constexpr bool for_each(T (&array)[count], Fn &&fn) {
+	return for_each(Span(array, count), fn);
+}
+
+template <ForEachFlags flags=0, class T>
+constexpr bool for_each(std::initializer_list<T> list, auto &&fn) {
+	return for_each(Span(list.begin(), list.size()), fn);
 }
 
 template <class Enumerable>
@@ -1620,14 +1863,12 @@ forceinline constexpr auto enumerate(Enumerable &&enumerable) {
 	return IndexedEnumerable{enumerable};
 }
 
-forceinline constexpr Span<char > operator""s(char  const *string, umm count) { return Span((char  *)string, count); }
+forceinline constexpr Span<ascii> operator""s(ascii const *string, umm count) { return Span((ascii *)string, count); }
 forceinline constexpr Span<utf8 > operator""s(utf8  const *string, umm count) { return Span((utf8  *)string, count); }
 forceinline constexpr Span<utf16> operator""s(utf16 const *string, umm count) { return Span((utf16 *)string, count); }
-forceinline constexpr Span<wchar> operator""s(wchar const *string, umm count) { return Span((wchar *)string, count); }
-forceinline constexpr Span<char > operator""ts(char  const *string, umm count) { return Span((char  *)string, count + 1); }
+forceinline constexpr Span<ascii> operator""ts(ascii const *string, umm count) { return Span((ascii *)string, count + 1); }
 forceinline constexpr Span<utf8 > operator""ts(utf8  const *string, umm count) { return Span((utf8  *)string, count + 1); }
 forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) { return Span((utf16 *)string, count + 1); }
-forceinline constexpr Span<wchar> operator""ts(wchar const *string, umm count) { return Span((wchar *)string, count + 1); }
 forceinline constexpr Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
 forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }
@@ -1638,8 +1879,7 @@ inline constexpr Span<T> array_as_span(T const (&arr)[count]) { return Span((T *
 template <class T>
 inline constexpr Span<T> as_span(std::initializer_list<T> list) { return Span((T *)list.begin(), list.size()); }
 
-inline constexpr Span<char > as_span(char  const *str) { return Span((char  *)str, string_unit_count(str)); }
-inline constexpr Span<wchar> as_span(wchar const *str) { return Span((wchar *)str, string_unit_count(str)); }
+inline constexpr Span<ascii> as_span(ascii const *str) { return Span((ascii *)str, string_unit_count(str)); }
 inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)str, string_unit_count(str)); }
 inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
 inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
@@ -1658,7 +1898,7 @@ inline constexpr Span<T, Size> as_span_of(Span<u8, Size> span) {
 }
 
 template <class Size>
-constexpr Span<utf8, Size> as_utf8(Span<char, Size> span) {
+constexpr Span<utf8, Size> as_utf8(Span<ascii, Size> span) {
 	return {(utf8 *)span.begin(), span.count};
 }
 template <class Size>
@@ -1678,11 +1918,11 @@ constexpr Span<u8, Size> as_bytes(Span<T, Size> span) {
 }
 
 template <class T, class Size>
-constexpr Span<char, Size> as_chars(Span<T, Size> span) {
-	return {(char *)span.begin(), span.count * sizeof(T)};
+constexpr Span<ascii, Size> as_chars(Span<T, Size> span) {
+	return {(ascii *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
-constexpr Span<char> as_chars(T span_like) {
+constexpr Span<ascii> as_chars(T span_like) {
 	return as_chars(as_span(span_like));
 }
 
@@ -1766,7 +2006,16 @@ constexpr T *find(Span<T, Size> where, T const &what) {
 
 template <class T, class SizeA, class SizeB>
 constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
-	return find(where.begin(), where.end(), what.begin(), what.end());
+	if ((smm)(where.count - what.count + 1) <= 0)
+		return 0;
+
+	for (umm i = 0; i < where.count - what.count + 1; ++i) {
+		auto where_part = Span(where.data + i, what.count);
+		if (where_part == what) {
+			return where_part.data;
+		}
+	}
+	return 0;
 }
 
 template <class T>
@@ -1903,19 +2152,61 @@ void flip_order(Span<T> span) {
 }
 
 template <class T, class Size, class Fn>
-void split(Span<T, Size> what, T by, Fn &&callback) {
+void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
 	umm start = 0;
 	umm what_start = 0;
 
 	for (; what_start < what.count;) {
 		if (what.data[what_start] == by) {
-			callback(what.subspan(start, what_start - start));
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
+
 			start = what_start + 1;
 		}
 		++what_start;
 	}
 
-	callback(Span(what.data + start, what.end()));
+	fn(Span(what.data + start, what.end()));
+}
+
+template <class T, class Size, class Fn>
+void split_by_any(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.count;) {
+		if (find(by, what.data[what_start])) {
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
+			start = what_start + 1;
+		}
+		++what_start;
+	}
+
+	fn(Span(what.data + start, what.end()));
+}
+
+template <class T, class Size, class Fn>
+void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+
+	umm start = 0;
+	umm what_start = 0;
+
+	for (; what_start < what.count;) {
+		if (starts_with(what.skip(what_start), by)) {
+			if (fn(what.subspan(start, what_start - start)) == ForEach_break)
+				return;
+			start = what_start + by.count;
+		}
+		++what_start;
+	}
+
+	fn(Span(what.data + start, what.end()));
 }
 
 template <class T, class Size, class Selector, class GroupProcessor>
@@ -1950,6 +2241,23 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 	process_group(span.subspan(first_index, span.count - first_index));
 }
 
+template <class T, class Size>
+Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
+	while (span.count && predicate(span.data[0])) {
+		span.data++;
+		span.count--;
+	}
+	while (span.count && predicate(span.data[span.count - 1])) {
+		span.count--;
+	}
+	return span;
+}
+
+template <class T, class Size>
+Span<T, Size> trim(Span<T, Size> span, T &&value) {
+	return trim(span, [&](T const &it) { return it == value; });
+}
+
 template <class T>
 constexpr T dot(Span<T> a, Span<T> b) {
 	assert_equal(a.count, b.count);
@@ -1959,6 +2267,8 @@ constexpr T dot(Span<T> a, Span<T> b) {
 	}
 	return result;
 }
+
+#define passthrough(function) ([&](auto ...args){ return function(args...); })
 
 inline constexpr bool is_whitespace(ascii c) {
 	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
@@ -2000,6 +2310,12 @@ inline constexpr bool is_digit(utf32 c) {
 
 inline constexpr bool is_hex_digit(utf32 c) {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+inline constexpr u8 hex_digit_to_int(utf32 c) {
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10; 
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return c;
 }
 
 inline constexpr bool is_punctuation(utf32 c) {
@@ -2105,18 +2421,23 @@ inline constexpr bool is_any_of(T &value, Span<T> span) {
 	return is_any_of(value, span, [](T &a, T &b) { return a == b; });
 }
 
-inline constexpr Span<char> skip_chars(Span<char> span, Span<char> chars_to_skip) {
+template <class T>
+inline constexpr Span<T> skip_front(Span<T> span, Span<T> to_skip) {
 	if (span.count == 0) {
 		return span;
 	}
-	while (is_any_of(span.front(), chars_to_skip)) {
+	while (span.count && is_any_of(span.front(), to_skip)) {
 		++span.data;
 		--span.count;
-		if (span.count == 0) {
-			break;
-		}
 	}
 	return span;
+}
+
+template <class T>
+void reverse_in_place(Span<T> span) {
+	for (umm i = 0; i < span.count / 2; ++i) {
+		Swap(span.data[i], span.data[span.count - i - 1]);
+	}
 }
 
 template <class T, umm _capacity>
@@ -2236,10 +2557,17 @@ struct StaticList {
 		bounds_check(assert(!full()));
 		return *new(data + count++) T();
 	}
-
+	
 	forceinline constexpr T &add(T const &value) {
 		bounds_check(assert(!full()));
 		return data[count++] = value;
+	}
+
+	forceinline constexpr void add(Optional<T> value) {
+		if (value) {
+			bounds_check(assert(!full()));
+			data[count++] = value.value();
+		}
 	}
 
 	template <class Size>
@@ -2248,6 +2576,9 @@ struct StaticList {
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		defer { count = (StaticList::Size)(count + span.count); };
 		return {data + count, span.count};
+	}
+	forceinline constexpr Span<T> add(std::initializer_list<T> list) {
+		return add(as_span(list));
 	}
 
 	constexpr Optional<T> pop() {
@@ -2327,36 +2658,44 @@ template <class T, umm capacity>
 forceinline void erase(StaticList<T, capacity> &list, T *value) { list.erase(value); }
 
 template <ForEachFlags flags = 0, class T, umm capacity>
-bool for_each(StaticList<T, capacity> &list, auto fn) {
-	using Ret = decltype(fn(std::declval<T&>()));
+bool for_each(StaticList<T, capacity> &list, auto in_fn) {
+	auto fn = wrap_foreach_fn<T &>(in_fn);
+
+	T *begin;
+	T *end;
+
 	if constexpr (flags & ForEach_reverse) {
-		for (auto p = list.end() - 1; p != list.data - 1; ) {
-			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-				switch (fn(*p)) {
-					case ForEach_continue: break;
-					case ForEach_break: return true;
-					case ForEach_erase: list.erase(p); break;
-					case ForEach_erase_unordered: list.erase_unordered(p); break;
-				}
-			} else {
-				fn(*p);
-			}
-			--p;
-		}
+		begin = list.end() - 1;
+		end = list.begin() - 1;
 	} else {
-		for (auto p = list.data; p != list.end(); ) {
-			if constexpr (std::is_same_v<Ret, ForEachDirective>) {
-				switch (fn(*p)) {
-					case ForEach_continue: break;
-					case ForEach_break: return true;
-					case ForEach_erase: list.erase(p); continue;
-					case ForEach_erase_unordered: list.erase_unordered(p); continue;
-				}
-			} else {
-				fn(*p);
-			}
-			++p;
+		begin = list.begin();
+		end = list.end();
+	}
+
+	for (auto p = begin; p != end; ) {
+		auto d = fn(*p);
+
+		constexpr ForEachFlags allowed_flags = ForEach_break | ForEach_erase | ForEach_erase_unordered;
+		assert(!(d & ~allowed_flags), "not supported");
+
+		switch (d & ForEach_erase_mask) {
+			case 0: 
+				if constexpr (!(flags & ForEach_reverse))
+					p += 1;
+				break;
+			case ForEach_erase:
+				list.erase(p);
+				break;
+			case ForEach_erase_unordered:
+				list.erase_unordered(p);
+				break;
 		}
+		
+		if (d & ForEach_break)
+			return true;
+
+		if constexpr (flags & ForEach_reverse)
+			p -= 1;
 	}
 	return false;
 }
@@ -2410,9 +2749,11 @@ struct BitSet {
 	Word words[ceil(size, bits_in_word) / bits_in_word] = {};
 
 	bool get(umm i) const {
+		bounds_check(assert(i < size));
 		return word(i) & bit(i);
 	}
 	void set(umm i, bool value) {
+		bounds_check(assert(i < size));
 		if (value) {
 			word(i) |= bit(i);
 		} else {
@@ -2420,20 +2761,36 @@ struct BitSet {
 		}
 	}
 	void flip(umm i) {
+		bounds_check(assert(i < size));
 		word(i) ^= bit(i);
 	}
 
-	auto &word(this auto &&self, umm i) {
-		return self.words[i / bits_in_word];
-	}
+	auto &word(umm i) { return words[i / bits_in_word]; }
+	auto &word(umm i) const { return words[i / bits_in_word]; }
+
 	umm bit(umm i) const {
 		return (Word)1 << (i % bits_in_word);
 	}
 
 	umm count() const {
 		umm result = 0;
-		for (auto word : words) {
-			result += count_bits(word);
+		if constexpr (size % bits_in_word == 0) {
+			// All words are popcountable
+			for (auto word : words) {
+				result += count_bits(word);
+			}
+		} else {
+			// Last word should be trimmed
+			auto words_span = array_as_span(words);
+			for (auto word : words_span.skip(-1)) {
+				result += count_bits(word);
+			}
+
+			Word last_word = words_span.back();
+			
+			Word mask = ((Word)1 << (size % bits_in_word)) - 1;
+
+			result += count_bits(last_word & mask);
 		}
 		return result;
 	}
@@ -2446,7 +2803,10 @@ struct BitSet {
 			if (bit_index == ~0)
 				continue;
 			word &= ~(1 << bit_index);
-			return word_index * bits_in_word + bit_index;
+			auto index = word_index * bits_in_word + bit_index;
+			if (index >= size)
+				return {};
+			return index;
 		}
 		return {};
 	}
@@ -2460,10 +2820,14 @@ struct BitSet {
 };
 
 template <ForEachFlags flags = 0, umm size>
-bool for_each(BitSet<size> &set, auto &&fn)
-	requires requires { fn((umm)0); }
+bool for_each(BitSet<size> &set, auto &&in_fn)
+	requires requires { in_fn((umm)0); }
 {
-	using Word = typename decltype(set)::Word;
+	using Word = typename BitSet<size>::Word;
+
+	auto fn = wrap_foreach_fn<umm>(in_fn);
+					
+	constexpr ForEachFlags allowed_flags = ForEach_break;
 
 	if constexpr (flags & ForEach_reverse) {
 		for (umm word_index = count_of(set.words) - 1; word_index != -1; --word_index) {
@@ -2471,20 +2835,18 @@ bool for_each(BitSet<size> &set, auto &&fn)
 			if (!word)
 				continue;
 
-			for (u64 bit = set.bits_in_word - 1; bit != -1; --bit) {
-				if (word & ((Word)1 << bit)) {
-					auto absolute_index = word_index * set.bits_in_word + bit;
+			for (u64 bit_index = set.bits_in_word - 1; bit_index != -1; --bit_index) {
+				if (word & ((Word)1 << bit_index)) {
+					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
 						continue;
-					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						auto d = fn(absolute_index);
-						if (d & ForEach_erase) not_implemented();
-						if (d & ForEach_erase_unordered) not_implemented();
-						if (d & ForEach_break)
-							return true;
-					} else {
-						fn(absolute_index);
-					}
+
+					auto d = fn(absolute_index);
+					
+					assert(!(d & ~allowed_flags), "not supported");
+
+					if (d & ForEach_break)
+						return true;
 				}
 			}
 		}
@@ -2494,20 +2856,18 @@ bool for_each(BitSet<size> &set, auto &&fn)
 			if (!word)
 				continue;
 
-			for (u64 bit = 0; bit < set.bits_in_word; ++bit) {
-				if (word & ((Word)1 << bit)) {
-					auto absolute_index = word_index * set.bits_in_word + bit;
+			for (u64 bit_index = 0; bit_index < set.bits_in_word; ++bit_index) {
+				if (word & ((Word)1 << bit_index)) {
+					auto absolute_index = word_index * set.bits_in_word + bit_index;
 					if (absolute_index >= size)
-						return;
-					if constexpr (std::is_same_v<decltype(fn(absolute_index)), ForEachDirective>) {
-						auto d = fn(absolute_index);
-						if (d & ForEach_erase) not_implemented();
-						if (d & ForEach_erase_unordered) not_implemented();
-						if (d & ForEach_break)
-							return true;
-					} else {
-						fn(absolute_index);
-					}
+						return false;
+					
+					auto d = fn(absolute_index);
+					
+					assert(!(d & ~allowed_flags), "not supported");
+
+					if (d & ForEach_break)
+						return true;
 				}
 			}
 		}
@@ -2823,19 +3183,7 @@ Allocator make_allocator_from(CustomAllocator *allocator) {
 	};
 }
 
-#if OS_WINDOWS
-#if COMPILER_MSVC
-#define tl_allocate(size, align)         ::_aligned_malloc(size, align)
-#define tl_reallocate(data, size, align) ::_aligned_realloc(data, size, align)
-#define tl_free(data)                    ::_aligned_free(data)
-#elif COMPILER_GCC
-#define tl_allocate(size, align)         ::__mingw_aligned_malloc(size, align)
-#define tl_reallocate(data, size, align) ::__mingw_aligned_realloc(data, size, align)
-#define tl_free(data)                    ::__mingw_aligned_free(data)
-#endif
-#endif
-
-struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
+struct TL_API DefaultAllocator : AllocatorBase<DefaultAllocator> {
 
 	static DefaultAllocator current() { return {}; }
 
@@ -2843,36 +3191,17 @@ struct DefaultAllocator : AllocatorBase<DefaultAllocator> {
 		return true;
 	}
 
-	AllocationResult allocate_impl(umm size, umm alignment TL_LP) {
-		return {
-			.data = tl_allocate(size, alignment),
-			.count = size,
-			.is_zeroed = false,
-		};
-	}
-	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP) {
-		(void)old_size;
-		return {
-			.data = tl_reallocate(data, new_size, alignment),
-			.count = new_size,
-			.is_zeroed = false,
-		};
-	}
-	void deallocate_impl(void *data, umm size, umm alignment TL_LP) {
-		(void)size;
-		(void)alignment;
-		tl_free(data);
-	}
+	AllocationResult allocate_impl(umm size, umm alignment TL_LP);
+	AllocationResult reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LP);
+	void deallocate_impl(void *data, umm size, umm alignment TL_LP);
 };
 
 struct ArenaAllocator : AllocatorBase<ArenaAllocator> {
-private:
 	Allocator parent_allocator;
 	umm buffer_size = 0;
 	u8 *base = 0;
 	u8 *cursor = 0;
 
-public:
 	struct Checkpoint {
 		u8 *cursor;
 	};
@@ -3026,6 +3355,13 @@ struct TemporaryAllocator : AllocatorBase<TemporaryAllocator> {
 			.state = this
 		};
 	}
+	
+	forceinline ArenaAllocator::Checkpoint checkpoint() { 
+		return arena.checkpoint();
+	}
+	forceinline void reset(ArenaAllocator::Checkpoint checkpoint) { 
+		arena.reset(checkpoint);
+	}
 
 	forceinline static void clear() {
 		arena.clear();
@@ -3093,8 +3429,17 @@ Scoped(Thing) -> Scoped<Thing>;
 
 // Example use:
 // auto str = TL_TMP(format("{}, {}", a, b));
-#define with(new_thing, ...) ([&]()->decltype(auto){auto replacer=::tl::Scoped(new_thing);return __VA_ARGS__;}())
-#define scoped(new_thing) auto CONCAT(_scoped_, __LINE__) = ::tl::Scoped(new_thing)
+#define scoped(new_thing) \
+	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
+	CONCAT(_scoped_, __LINE__).enter(new_thing); \
+	defer { CONCAT(_scoped_, __LINE__).exit(); }
+#define scoped_if(new_thing, condition) \
+	::tl::Scoped<std::remove_cvref_t<decltype(new_thing)>> CONCAT(_scoped_, __LINE__); \
+	bool CONCAT(_scoped_enabled, __LINE__) = condition; \
+	if (CONCAT(_scoped_enabled, __LINE__)) \
+		CONCAT(_scoped_, __LINE__).enter(new_thing); \
+	defer { if (CONCAT(_scoped_enabled, __LINE__)) CONCAT(_scoped_, __LINE__).exit(); }
+#define with(new_thing, ...) ([&]()->decltype(auto){scoped(new_thing);return __VA_ARGS__;}())
 
 template <class Thing>
 struct ScopedBlock {
@@ -3145,43 +3490,65 @@ struct ValueChanger {
 template <>
 struct Scoped<Allocator> {
 	Allocator old_allocator;
-	Scoped(Allocator new_allocator) {
+	void enter(Allocator new_allocator) {
 		old_allocator = TL_GET_CURRENT(allocator);
 		TL_GET_CURRENT(allocator) = new_allocator;
 	}
-	~Scoped() {
+	void exit() {
 		TL_GET_CURRENT(allocator) = old_allocator;
 	}
 };
 
 template <>
 struct Scoped<ArenaAllocator> : Scoped<Allocator> {
-	Scoped(ArenaAllocator &arena) : Scoped<Allocator>(arena) {}
+	void enter(ArenaAllocator &arena) {
+		Scoped<Allocator>::enter(arena);
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 template <>
 struct Scoped<DefaultAllocator> : Scoped<Allocator> {
-	Scoped(DefaultAllocator) : Scoped<Allocator>(default_allocator) {}
+	void enter(DefaultAllocator) {
+		Scoped<Allocator>::enter(default_allocator);
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 template <>
 struct Scoped<TemporaryAllocator> : Scoped<Allocator> {
-	Scoped(TemporaryAllocator) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)) {}
+	void enter(TemporaryAllocator) {
+		Scoped<Allocator>::enter(TL_GET_CURRENT(temporary_allocator));
+	}
+	void exit() {
+		Scoped<Allocator>::exit();
+	}
 };
 
 template <>
 struct Scoped<TemporaryStorageCheckpoint> {
 	ArenaAllocator::Checkpoint checkpoint;
 
-	Scoped(TemporaryStorageCheckpoint) {
-		checkpoint = TL_GET_CURRENT(temporary_allocator).arena.checkpoint();
+	void enter(TemporaryStorageCheckpoint) {
+		checkpoint = TL_GET_CURRENT(temporary_allocator).checkpoint();
 	}
-	~Scoped() {
-		TL_GET_CURRENT(temporary_allocator).arena.reset(checkpoint);
+	void exit() {
+		TL_GET_CURRENT(temporary_allocator).reset(checkpoint);
 	}
 };
 
 template <>
 struct Scoped<TemporaryAllocatorAndCheckpoint> : Scoped<Allocator>, Scoped<TemporaryStorageCheckpoint> {
-	Scoped(TemporaryAllocatorAndCheckpoint) : Scoped<Allocator>(TL_GET_CURRENT(temporary_allocator)), Scoped<TemporaryStorageCheckpoint>({}) {}
+	void enter(TemporaryAllocatorAndCheckpoint) {
+		Scoped<Allocator>::enter(TL_GET_CURRENT(temporary_allocator));
+		Scoped<TemporaryStorageCheckpoint>::enter({});
+	}
+	void exit() {
+	    Scoped<TemporaryStorageCheckpoint>::exit();
+		Scoped<Allocator>::exit();
+	}
 };
 
 template <class T>
@@ -3273,8 +3640,91 @@ void quick_sort(T (&array)[size], auto ...args) {
 	quick_sort<pivot_mode>(array_as_span(array), args...);
 }
 
+}
+
 #ifdef TL_IMPL
 
+namespace tl {
+
+#if OS_WINDOWS
+	#if COMPILER_MSVC
+		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+			return {
+				.data = ::_aligned_malloc(size, alignment),
+				.count = size,
+				.is_zeroed = false,
+			};
+		}
+		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			return {
+				.data = ::_aligned_realloc(data, new_size, alignment),
+				.count = new_size,
+				.is_zeroed = false,
+			};
+		}
+		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			::_aligned_free(data);
+		}
+	#elif COMPILER_GCC
+		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+			return {
+				.data = ::__mingw_aligned_malloc(size, alignment),
+				.count = size,
+				.is_zeroed = false,
+			};
+		}
+		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+			(void)old_size;
+			return {
+				.data = ::__mingw_aligned_realloc(data, new_size, alignment),
+				.count = new_size,
+				.is_zeroed = false,
+			};
+		}
+		void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+			(void)size;
+			(void)alignment;
+			::__mingw_aligned_free(data);
+		}
+
+	#endif
+#elif OS_LINUX
+	AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
+		// I could not find existing aligned realloc, so I have to implement it myself.
+		// realloc needs to know old size so it can memcpy the data. Store it before the data.
+		umm extra_storage = max(sizeof(size), alignment);
+		void *result; 
+		::posix_memalign(&result, alignment, size + extra_storage);
+		result = ((u8 *)result) + extra_storage;
+		((umm *)result)[-1] = size;
+		return {
+			.data = result,
+			.count = size,
+			.is_zeroed = false,
+		};
+	}
+	AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
+		if (old_size == 0) {
+			old_size = ((umm *)data)[-1];
+		}
+		void *result; 
+		::posix_memalign(&result, alignment, new_size);
+		memcpy(result, data, old_size);
+		free(data);
+		return {
+			.data = result,
+			.count = new_size,
+			.is_zeroed = false,
+		};
+	}
+	void DefaultAllocator::deallocate_impl(void *data, umm size, umm alignment TL_LPD) {
+		(void)size;
+		(void)alignment;
+		::free(data);
+	}
+#endif
+
+#if OS_WINDOWS
 AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
 	(void)state;
 #if TL_PARENT_SOURCE_LOCATION
@@ -3327,6 +3777,13 @@ AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old
 	}
 	return {};
 }
+#elif OS_LINUX
+
+AllocationResult page_allocator_proc(AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) {
+	not_implemented();
+	return {};
+}
+#endif
 
 Allocator os_allocator = make_allocator_from<DefaultAllocator>(0);
 Allocator page_allocator = {
@@ -3350,9 +3807,9 @@ void init_allocator(Allocator temporary_allocator_backup) {
 void deinit_allocator() {
 }
 
-#endif
-
 } // namespace tl
+
+#endif
 
 #if COMPILER_MSVC
 #pragma warning(pop)

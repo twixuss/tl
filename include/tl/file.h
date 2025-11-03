@@ -12,22 +12,6 @@
 
 namespace tl {
 
-#if OS_WINDOWS
-using pathchar = utf16;
-template <class Size>
-inline List<pathchar> to_pathchars(Span<utf8, Size> string, bool terminate = false TL_LP) { return to_utf16(string, terminate TL_LA); }
-#define tl_file_string(x) u ## x
-
-inline constexpr utf8 path_separator = u'\\';
-
-#endif
-
-template <class T>
-concept APathChar = OneOf<T, char, wchar, utf8, utf16, utf32>;
-
-template <class T>
-concept APathSpan = OneOf<T, Span<char>, Span<wchar>, Span<utf8>, Span<utf16>, Span<utf32>>;
-
 struct OpenFileParams {
 	bool read = false;
 	bool write = false;
@@ -49,12 +33,9 @@ inline bool is_valid(File file) {
 	return file.handle != 0;
 }
 
-TL_API File open_file(ascii const *path, OpenFileParams params);
-TL_API File open_file(utf16 const *path, OpenFileParams params);
-
-inline File open_file(Span<ascii> path, OpenFileParams params) { return open_file(TL_TMP(null_terminate(path)).data, params); }
-inline File open_file(Span<utf16> path, OpenFileParams params) { return open_file(TL_TMP(null_terminate(path)).data, params); }
-inline File open_file(Span<utf8> path, OpenFileParams params) { return with(temporary_allocator_and_checkpoint, open_file(to_utf16(path, true).data, params)); }
+TL_API File open_file(Span<utf8> path, OpenFileParams params);
+template <AChar Char>
+inline File open_file(Span<Char> path, OpenFileParams params) { scoped(temporary_allocator_and_checkpoint); return open_file(to_utf8(path), params); }
 
 TL_API void close(File file);
 
@@ -66,32 +47,16 @@ TL_API s64 get_cursor(File file);
 TL_API void truncate_to_cursor(File file);
 
 
-TL_API bool file_exists(ascii const *path);
-TL_API bool file_exists(utf16 const *path);
+TL_API bool file_exists(Span<utf8> path);
+template <AChar Char>
+inline bool file_exists(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return file_exists(to_utf8(path)); }
 
-inline bool file_exists(Span<ascii> path) {
-	return file_exists(TL_TMP(null_terminate(path)).data);
-}
-inline bool file_exists(Span<utf8> path) {
-	return with(temporary_allocator_and_checkpoint, file_exists(to_utf16(path, true).data));
-}
-inline bool file_exists(Span<utf16> path) {
-	return file_exists(TL_TMP(null_terminate(path)).data);
-}
+TL_API bool directory_exists(Span<utf8> path);
+template <AChar Char>
+inline bool directory_exists(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return directory_exists(to_utf8(path)); }
 
-TL_API bool directory_exists(ascii const *path);
-TL_API bool directory_exists(utf16 const *path);
-inline bool directory_exists(Span<utf16> path) {
-	return directory_exists(TL_TMP(null_terminate(path)).data);
-}
-inline bool directory_exists(Span<utf8> path) {
-	return with(temporary_allocator_and_checkpoint, directory_exists(to_utf16(path, true).data));
-}
-forceinline bool directory_exists(Span<ascii> path) {
-	return directory_exists((Span<utf8>)path);
-}
-
-inline Optional<u64> get_file_size(char const *path) {
+template <AChar Char>
+inline Optional<u64> get_file_size(Span<Char> path) {
 	auto file = open_file(path, {.read = true});
 	if (!is_valid(file))
 		return {};
@@ -100,6 +65,7 @@ inline Optional<u64> get_file_size(char const *path) {
 	set_cursor(file, 0, File_end);
 	return (u64)get_cursor(file);
 }
+
 struct ReadEntireFileParams {
 	umm extra_space_before = 0;
 	umm extra_space_after = 0;
@@ -122,7 +88,7 @@ inline Buffer read_entire_file(File file, ReadEntireFileParams params = {} TL_LP
 	return result;
 }
 
-template <class Char, class Size>
+template <AChar Char, class Size>
 inline Buffer read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true, .silent = params.silent});
 	if (!is_valid(file)) return {};
@@ -134,36 +100,45 @@ struct WriteEntireFileOptions {
 	bool create_directories = true;
 };
 
-inline bool write_entire_file(File file, Span<u8> span) {
+template <class T>
+concept WritableToFile = std::is_same_v<T, StringBuilder> || std::is_convertible_v<T, Span<u8>>;
+
+inline umm write(File file, StringBuilder const &builder) {
 	set_cursor(file, 0, File_begin);
 	defer { truncate_to_cursor(file); };
-	return write(file, span) != 0;
+	umm bytes_written = 0;
+	builder.for_each_block([&](StringBuilder::Block *block) {
+		umm block_bytes_written = write(file, block->span());
+		bytes_written += block_bytes_written;
+		if (block_bytes_written != block->count)
+			return ForEach_break;
+		return ForEach_continue;
+	});
+	return bytes_written;
 }
-template <APathChar Char>
-inline bool write_entire_file(Span<Char> path, Span<u8> span, WriteEntireFileOptions options = {}) {
+template <WritableToFile Data>
+inline bool write_entire_file(File file, Data const &data) {
+	set_cursor(file, 0, File_begin);
+	defer { truncate_to_cursor(file); };
+	return write(file, data) != 0;
+}
+template <AChar Char, WritableToFile Data>
+inline bool write_entire_file(Span<Char> path, Data const &data, WriteEntireFileOptions options = {}) {
 	File file = open_file(path, {.write = true, .create_directories = options.create_directories});
 	if (!is_valid(file)) return false;
 	defer { close(file); };
-	return write(file, span) != 0;
+	return write(file, data) != 0;
 }
 
  // Represents the number of 100-nanosecond intervals since January 1, 1601 (UTC).
 TL_API Optional<u64> get_file_write_time(File file);
-inline Optional<u64> get_file_write_time(pathchar const *path) {
+template <AChar Char>
+inline Optional<u64> get_file_write_time(Span<Char> path) {
 	auto file = open_file(path, {});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
 	return get_file_write_time(file);
 }
-inline Optional<u64> get_file_write_time(Span<pathchar> path) {
-	return get_file_write_time(TL_TMP(null_terminate(path)).data);
-}
-inline Optional<u64> get_file_write_time(Span<utf8> path) {
-	return with(temporary_allocator_and_checkpoint, get_file_write_time(to_pathchars(path, true).data));
-}
-
-
-TL_API ListOfLists<pathchar> get_file_names_in_directory(Span<pathchar> directory);
 
 
 enum FileItemKind {
@@ -191,24 +166,21 @@ inline void free(FileItemList &list) {
 
 TL_API FileItemList get_items_in_directory(Span<utf8> directory);
 
-TL_API void create_file(pathchar const *path);
-inline void create_file(Span<pathchar> path) {
-	return create_file(TL_TMP(null_terminate(path)).data);
-}
+TL_API void create_file(Span<utf8> path);
+template <AChar Char>
+inline void create_file(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return create_file(to_utf8(path)); }
 
-TL_API void delete_file(pathchar const *path);
-inline void delete_file(Span<pathchar> path) {
-	return delete_file(TL_TMP(null_terminate(path)).data);
-}
-inline void delete_file(Span<utf8> path) {
-	return with(temporary_allocator_and_checkpoint, delete_file(to_utf16(path, true).data));
-}
+TL_API void delete_file(Span<utf8> path);
+template <AChar Char>
+inline void delete_file(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return delete_file(to_utf8(path)); }
 
-TL_API bool create_directory(ascii const *path);
-TL_API bool create_directory(utf16 const *path);
-inline bool create_directory(Span<ascii> path) { return with(temporary_allocator_and_checkpoint, create_directory(null_terminate(path).data)); }
-inline bool create_directory(Span<utf8>  path) { return with(temporary_allocator_and_checkpoint, create_directory(to_utf16(path, true).data)); }
-inline bool create_directory(Span<utf16> path) { return with(temporary_allocator_and_checkpoint, create_directory(null_terminate(path).data)); }
+TL_API bool create_directory(Span<utf8> path);
+template <AChar Char>
+inline bool create_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return create_directory(to_utf8(path)); }
+
+TL_API void delete_directory(Span<utf8> path);
+template <AChar Char>
+inline void delete_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return delete_directory(to_utf8(path)); }
 
 struct FileState {
 	bool changed : 1;
@@ -271,13 +243,10 @@ TL_API Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<
 #endif
 
 TL_API List<utf8> get_current_directory();
-TL_API void set_current_directory(pathchar const *path);
-inline void set_current_directory(Span<pathchar> path) {
-	return set_current_directory(TL_TMP(null_terminate(path)).data);
-}
-inline void set_current_directory(Span<utf8> path) {
-	return with(temporary_allocator_and_checkpoint, set_current_directory(to_utf16(path, true).data));
-}
+
+TL_API void set_current_directory(Span<utf8> path);
+template <AChar Char>
+inline void set_current_directory(Span<Char> path) { scoped(temporary_allocator_and_checkpoint); return set_current_directory(to_utf8(path)); }
 
 struct MappedFile {
 	Span<u8> data;
@@ -322,16 +291,18 @@ inline ParsedPath parse_path(Span<utf8> path) {
 				}
 				if (result.name.count == 0) {
 					result.name = result.extension;
-					result.extension = {};
+					result.extension = Span(result.extension.end(), 0);
 					result.name.data --;
 					result.name.count ++;
 				}
 			} else {
 				result.directory = {path.data, last_slash};
 				result.name      = {last_slash + 1, path.end()};
+				result.extension = Span(path.end(), 0);
 			}
 
 		} else {
+			result.directory = Span(path.data, 0);
 			result.name      = {path.data, last_dot};
 			result.extension = {last_dot + 1, path.end()};
 			// Include the dot into the name because the extension is empty
@@ -340,7 +311,7 @@ inline ParsedPath parse_path(Span<utf8> path) {
 			}
 			if (result.name.count == 0) {
 				result.name = result.extension;
-				result.extension = {};
+				result.extension = Span(result.extension.end(), 0);
 				result.name.data --;
 				result.name.count ++;
 			}
@@ -349,13 +320,12 @@ inline ParsedPath parse_path(Span<utf8> path) {
 		if (last_slash) {
 			result.directory = {path.data, last_slash};
 			result.name      = {last_slash + 1, path.end()};
+			result.extension = Span(path.end(), 0);
 		} else {
-			result.name = path;
+			result.directory = Span(path.data, 0);
+			result.name      = path;
+			result.extension = Span(path.end(), 0);
 		}
-	}
-
-	if (!result.directory.data) {
-		result.directory.data = result.name.data;
 	}
 
 	return result;
@@ -386,8 +356,56 @@ inline List<utf8> make_absolute_path(Span<utf8> path) {
 			return to_list(path);
 	}
 	scoped(temporary_storage_checkpoint);
-	return (List<utf8>)concatenate(TL_TMP(get_current_directory()), path_separator, path);
+	return (List<utf8>)concatenate(TL_TMP(get_current_directory()), u8'/', path);
 }
+
+inline ListOfLists<utf8> split_path(Span<utf8> path) {
+	ListOfLists<utf8> result;
+
+	split_by_any(path, Span{u8'\\', u8'/'}, [&](Span<utf8> part) {
+		if (part.count) {
+			result.add(part);
+		}
+	});
+
+	result.enable_reading();
+
+	return result;
+}
+
+// Returns original path on error
+inline List<utf8> normalize_path(Span<utf8> path, utf8 separator = u8'/') {
+	List<utf8> result;
+
+	scoped(current_temporary_allocator);
+
+	List<Span<utf8>> result_parts;
+
+	auto parts = split_path(path);
+
+	for (auto part : parts) {
+		if (part == u8"."s) {
+			continue;
+		} else if (part == u8".."s) {
+			if (!result_parts.count) {
+				return to_list(path);
+			}
+			result_parts.pop();
+		} else {
+			result_parts.add(part);
+		}
+	}
+
+	for (auto &part : result_parts) {
+		if (&part != result_parts.begin()) {
+			result.add(separator);
+		}
+		result.add(part);
+	}
+
+	return result;
+}
+
 
 template <class Size>
 inline bool is_absolute_path(Span<utf8, Size> path) {
@@ -415,31 +433,9 @@ inline bool create_directories(Span<utf8> path) {
 	return true;
 }
 
-TL_API bool copy_file(pathchar const *source, pathchar const *destination);
-inline bool copy_file(Span<utf8> source, Span<utf8> destination) {
-	scoped(temporary_storage_checkpoint);
-	return copy_file(
-		TL_TMP(to_pathchars(source, true).data), 
-		TL_TMP(to_pathchars(destination, true).data)
-	);
-}
-
-template <class Fn>
-void for_each_file_recursive(Span<utf8> directory, Fn &&fn) {
-	auto original_allocator = TL_GET_CURRENT(allocator);
-	scoped(TL_GET_CURRENT(temporary_allocator));
-
-	auto items = get_items_in_directory(directory);
-	for (auto &item : items) {
-		auto item_path = concatenate(directory, u8'/', item.name);
-		if (item.kind == FileItem_directory) {
-			for_each_file_recursive(item_path, std::forward<Fn>(fn));
-		} else {
-			scoped(original_allocator);
-			fn(item_path);
-		}
-	}
-}
+TL_API bool copy_file(Span<utf8> source, Span<utf8> destination);
+template <AChar SChar, AChar DChar>
+inline bool copy_file(Span<SChar> source, Span<DChar> destination) { scoped(temporary_allocator_and_checkpoint); return copy_file(to_utf8(source), to_utf8(destination)); }
 
 TL_API List<utf8> get_executable_path(bool null_terminated = false TL_LP);
 
@@ -448,45 +444,103 @@ struct MoveFileParams {
 	bool allow_copy = true;
 };
 
-TL_API bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params = {});
-inline bool move_file(Span<utf8> old, Span<utf8> _new, MoveFileParams params = {}) {
-	scoped(temporary_storage_checkpoint);
-	return move_file(
-		TL_TMP(to_pathchars(old, true).data), 
-		TL_TMP(to_pathchars(_new, true).data),
-		params
-	);
+TL_API bool move_file(Span<utf8> source, Span<utf8> destination, MoveFileParams params = {});
+template <AChar SChar, AChar DChar>
+inline bool move_file(Span<SChar> source, Span<DChar> destination, MoveFileParams params = {}) {
+	scoped(temporary_allocator_and_checkpoint);
+	return move_file(to_utf8(source), to_utf8(destination), params);
 }
 
-template <class T>
-inline void visit_files(Span<utf8> directory, T &&process_file) requires requires(T x) { { x(Span<utf8>{}) } -> std::convertible_to<ForEachDirective>; } {
-	auto outer_allocator = TL_GET_CURRENT(allocator);
-	scoped(TL_GET_CURRENT(temporary_allocator));
+struct ForEachFileOptions {
+	bool recursive = true;
+	bool files = false;
+	bool directories = false;
+};
 
+// NOTE: Almost redundant with FileItem.
+// Only difference is full path instead of just name.
+// But it makes it clearer.
+struct ForEachFileItemValue {
+	FileItemKind kind;
+	Span<utf8> path;
+};
+
+template <ForEachIterator<ForEachFileItemValue> Fn>
+inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options, Fn &&process_item_) {
 	auto list = get_items_in_directory(directory);
+	defer { free(list); };
+
+	auto process_item = wrap_foreach_fn<ForEachFileItemValue>(process_item_);
 
 	for (auto item : list) {
 		auto item_path = format(u8"{}\\{}", directory, item.name);
+		defer { free(item_path); };
+
+		ForEachFileItemValue item_to_process = {
+			.kind = item.kind,
+			.path = item_path
+		};
+
 		switch (item.kind) {
 			case FileItem_file: {
-				scoped(outer_allocator);
-				process_file(item_path);
+				if (options.files) {
+					auto d = process_item(item_to_process);
+
+					switch (d & ForEach_erase_mask) {
+						case ForEach_erase:
+						case ForEach_erase_unordered:
+							delete_file(item_path);
+							break;
+					}
+
+					if (d & ForEach_break)
+						return true;
+				}
 				break;
 			}
 			case FileItem_directory: {
-				visit_files(item_path, process_file);
+				if (options.directories) {
+					auto d = process_item(item_to_process);
+
+					switch (d & ForEach_erase_mask) {
+						case ForEach_erase:
+						case ForEach_erase_unordered:
+							delete_directory(item_path);
+							break;
+					}
+
+					if (d & ForEach_dont_recurse)
+						options.recursive = false;
+
+					if (d & ForEach_break)
+						return true;
+				}
+				if (options.recursive) {
+					bool broken = for_each_file_item(item_path, options, process_item_);
+					if (broken) {
+						return true;
+					}
+				}
 				break;
 			}
 		}
 	}
+	return false;
+}
+
+template <ForEachIterator<Span<utf8>> Fn>
+inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &&process_item_) {
+	options.files = true;
+	options.directories = false;
+	return for_each_file_item(directory, options, [&] (ForEachFileItemValue item) { return process_item_(item.path); });
 }
 
 }
 
 #ifdef TL_IMPL
+#if OS_WINDOWS
 
 #if TL_FILE_INCLUDE_DIALOG
-
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
 #pragma warning(push, 0)
@@ -500,12 +554,10 @@ inline void visit_files(Span<utf8> directory, T &&process_file) requires require
 #pragma comment(lib, "Ole32.lib")
 
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
 #endif
 
 namespace tl {
 
-#if OS_WINDOWS
 struct WinOpenFileParams {
 	DWORD access;
 	DWORD share;
@@ -532,30 +584,18 @@ WinOpenFileParams get_open_file_params(OpenFileParams params) {
 	}
 	return result;
 }
-File open_file(ascii const *path, OpenFileParams params) {
+File open_file(Span<utf8> path8, OpenFileParams params) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+
 	auto win_params = get_open_file_params(params);
 	if (params.create_directories) {
-		create_directories(parse_path(as_utf8(as_span(path))).directory);
+		create_directories(parse_path(path8).directory);
 	}
-	auto handle = CreateFileA(path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
+	auto handle = CreateFileW((wchar_t *)path16.data, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
 	if (handle == INVALID_HANDLE_VALUE) {
 		if (!params.silent) {
-			TL_GET_GLOBAL(tl_logger).error("Could not open file {}", path);
-		}
-		handle = 0;
-	}
-	return {handle};
-}
-File open_file(pathchar const *path, OpenFileParams params) {
-	auto win_params = get_open_file_params(params);
-	if (params.create_directories) {
-		scoped(temporary_storage_checkpoint);
-		create_directories(parse_path(to_utf8<TemporaryAllocator>(as_span((utf16 const *)path))).directory);
-	}
-	auto handle = CreateFileW((wchar *)path, win_params.access, win_params.share, 0, win_params.creation, 0, 0);
-	if (handle == INVALID_HANDLE_VALUE) {
-		if (!params.silent) {
-			TL_GET_GLOBAL(tl_logger).error("Could not open file {}", TL_TMP(to_utf8(as_span((utf16 const *)path))));
+			TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path8);
 		}
 		handle = 0;
 	}
@@ -638,20 +678,16 @@ void close(File file) {
 	CloseHandle(file.handle);
 }
 
-bool file_exists(ascii const *path) {
-	DWORD attr = GetFileAttributesA(path);
+bool file_exists(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	DWORD attr = GetFileAttributesW((wchar_t *)path16.data);
 	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }
-bool file_exists(utf16 const *path) {
-	DWORD attr = GetFileAttributesW((wchar *)path);
-	return ((attr != INVALID_FILE_ATTRIBUTES) && !(attr & FILE_ATTRIBUTE_DIRECTORY));
-}
-bool directory_exists(ascii const *path) {
-	DWORD attr = GetFileAttributesA(path);
-	return ((attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY));
-}
-bool directory_exists(utf16 const *path) {
-	DWORD attr = GetFileAttributesW((wchar *)path);
+bool directory_exists(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	DWORD attr = GetFileAttributesW((wchar_t *)path16.data);
 	return ((attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY));
 }
 
@@ -663,130 +699,148 @@ Optional<u64> get_file_write_time(File file) {
 	return last_write_time.dwLowDateTime | ((u64)last_write_time.dwHighDateTime << 32);
 }
 
-static wchar *append_star(Span<utf16> directory) {
-	auto allocator = TL_GET_CURRENT(temporary_allocator);
-	wchar *directory_with_star;
+using PathBuffer = StaticList<wchar_t, MAX_PATH>;
+using PathBuffer8 = StaticList<utf8, MAX_PATH>;
 
-	if (directory.count == 0) {
-		directory_with_star = allocator.allocate<wchar>(2);
-		directory_with_star[0] = '*';
-		directory_with_star[1] = 0;
-		return directory_with_star;
-	}
-
-	if (directory.back() == u'\0')
-		directory.count--;
-
-	if (directory.back() == u'\\' || directory.back() == u'/') {
-		directory_with_star = allocator.allocate<wchar>(directory.count + 2);
-		memcpy(directory_with_star, directory.data, directory.count * sizeof(directory.data[0]));
-		directory_with_star[directory.count + 0] = '*';
-		directory_with_star[directory.count + 1] = 0;
-	} else {
-		directory_with_star = allocator.allocate<wchar>(directory.count + 3);
-		memcpy(directory_with_star, directory.data, directory.count * sizeof(directory.data[0]));
-		directory_with_star[directory.count + 0] = '/';
-		directory_with_star[directory.count + 1] = '*';
-		directory_with_star[directory.count + 2] = 0;
-	}
-	return directory_with_star;
-}
-
-ListOfLists<pathchar> get_file_names_in_directory(Span<pathchar> directory) {
-	auto directory_with_star = append_star(directory);
-
-	WIN32_FIND_DATAW find_data;
-	HANDLE handle = FindFirstFileW(directory_with_star, &find_data);
-	if (handle == INVALID_HANDLE_VALUE) {
-		return {};
-	}
-
-	u32 file_index = 0;
-	ListOfLists<pathchar> result;
-	do {
-		if (file_index++ < 2) {
-			continue; // Skip . and ..
-		}
-		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			continue;
-		}
-		result.add(as_span((pathchar *)find_data.cFileName));
-	} while (FindNextFileW(handle, &find_data));
-	FindClose(handle);
-
-	result.enable_reading();
+static PathBuffer8 path_buffer8_from_utf16(Span<wchar_t> buf) {
+	PathBuffer8 result;
+	result.count = autocast _to_utf8((Span<utf16>)buf, Span(result.data, result.data + result.capacity));
 	return result;
 }
 
-FileItemList get_items_in_directory(Span<utf8> directory_) {
-	auto directory = TL_TMP(to_utf16(directory_));
-	auto directory_with_star = append_star(directory);
+static PathBuffer path_buffer_from_utf8(Span<utf8> path8) {
+	PathBuffer path_buffer;
 
-	WIN32_FIND_DATAW find_data;
-	HANDLE handle = FindFirstFileW(directory_with_star, &find_data);
-	if (handle == INVALID_HANDLE_VALUE) {
-		return {};
+	while (path8.count && (path8.back() == '\\' || path8.back() == '/')) {
+		--path8.count;
 	}
 
+	path_buffer.count = autocast _to_utf16(path8, (Span<utf16>)Span(path_buffer.data, path_buffer.data + path_buffer.capacity));
+
+	return path_buffer;
+}
+
+static bool win32_for_each_item_in_directory(PathBuffer &directory_buffer, auto &&fn) {
+	WIN32_FIND_DATAW find_data;
+	HANDLE handle = FindFirstFileW(directory_buffer.data, &find_data);
+	if (handle == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer { FindClose(handle); };
+	
+	directory_buffer.pop(); // \0
+	directory_buffer.pop(); // *
+
 	u32 file_index = 0;
-	FileItemList result;
 	do {
 		if (file_index++ < 2) {
 			continue; // Skip . and ..
 		}
-		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) {
-			continue;
-		}
 
-
-		auto name = as_span((utf16 *)find_data.cFileName);
-
-		if (name.count > 200)
-			debug_break();
-
-		FileItem item;
-		item.name.count = name.count;
-		item.name.data = (utf8 *)result.buffer.count;
-
-		if (item.name.count > 200)
-			debug_break();
+		auto name = (Span<wchar_t>)as_span((utf16 *)find_data.cFileName);
+		FileItemKind kind;
 
 		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			item.kind = FileItem_directory;
+			kind = FileItem_directory;
 		} else {
-			item.kind = FileItem_file;
+			kind = FileItem_file;
 		}
 
-		result.add(item);
-		result.buffer.add(TL_TMP(to_utf8(name)));
+		fn(kind, name);
 
 	} while (FindNextFileW(handle, &find_data));
-	FindClose(handle);
+
+	return true;
+}
+
+FileItemList get_items_in_directory(Span<utf8> directory8) {
+	FileItemList result;
+
+	auto path_buffer = path_buffer_from_utf8(directory8);
+
+	path_buffer.add(u'\\');
+	path_buffer.add(u'*');
+	path_buffer.add(u'\0');
+
+	PathBuffer8 name_buffer;
+
+	win32_for_each_item_in_directory(path_buffer, [&](FileItemKind kind, Span<wchar_t> name) {
+		name_buffer = path_buffer8_from_utf16(name);
+		
+		FileItem item;
+		item.kind = kind;
+		item.name.count = name_buffer.count;
+		item.name.data = (utf8 *)result.buffer.count;
+
+		result.add(item);
+		result.buffer.add(name_buffer.span());
+	});
 
 	for (auto &item : result) {
 		item.name.data = result.buffer.data + (umm)item.name.data;
 	}
 
-	for (auto &item : result) {
-		if (item.name.count > 200)
-			debug_break();
-	}
 	return result;
 }
 
-void create_file(pathchar const *path) {
-	CloseHandle(CreateFileW((wchar *)path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL));
+void create_file(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	CloseHandle(CreateFileW((wchar_t *)path16.data, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL));
 }
 
-void delete_file(pathchar const *path) {
-	DeleteFileW((wchar *)path);
+void delete_file(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	DeleteFileW((wchar_t *)path16.data);
 }
 
-bool create_directory(ascii const *path) {
-	return (bool)CreateDirectoryA(path, 0);
+bool create_directory(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	return (bool)CreateDirectoryW((wchar_t *)path16.data, 0);
 }
-bool create_directory(utf16 const *path) {
-	return (bool)CreateDirectoryW((wchar *)path, 0);
+
+
+
+// Expects NOT null terminated path that DOES NOT end in a slash.
+static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
+	path_buffer.add(u'\\');
+	path_buffer.add(u'*');
+	path_buffer.add(u'\0');
+
+	// NOTE: win32_for_each_item_in_directory pops terminator and star.
+	win32_for_each_item_in_directory(path_buffer, [&](FileItemKind kind, Span<wchar_t> name) {
+		scoped_replace(path_buffer.count, path_buffer.count);
+
+		path_buffer.add(name);
+
+		switch (kind) {
+			case FileItem_file: {
+				path_buffer.add(u'\0');
+				if (!DeleteFileW(path_buffer.data)) {
+					TL_GET_GLOBAL(tl_logger).error("Could not delete file {}", path_buffer8_from_utf16(path_buffer).span());
+				}
+				break;
+			}
+			case FileItem_directory: {
+				win32_delete_directory_recursive(path_buffer);
+				break;
+			}
+		}
+	});
+	
+	path_buffer.pop();
+
+	if (!RemoveDirectoryW(path_buffer.data)) {
+		TL_GET_GLOBAL(tl_logger).error("Could not delete directory {}", path_buffer8_from_utf16(path_buffer).span());
+	}
+}
+
+void delete_directory(Span<utf8> path8) {
+	auto path_buffer = path_buffer_from_utf8(path8);
+
+	win32_delete_directory_recursive(path_buffer);
 }
 
 #if TL_FILE_INCLUDE_DIALOG
@@ -889,7 +943,7 @@ Optional<ListOfLists<utf8>> open_file_dialog(FileDialogFlags flags, Span<Span<ut
 					append_format(builder, "*.{};", ext);
 				}
 			}
-			file_type = {L"Files", (wchar *)to_utf16((Span<utf8>)to_string(builder), true).data};
+			file_type = {L"Files", (wchar_t *)to_utf16((Span<utf8>)to_string(builder), true).data};
 		} else {
 			file_type = {L"Files", L"*.*"};
 		}
@@ -945,13 +999,15 @@ List<utf8> get_current_directory() {
 	List<utf16> temp;
 	temp.allocator = TL_GET_CURRENT(temporary_allocator);
 	temp.resize(GetCurrentDirectoryW(0, 0));
-	GetCurrentDirectoryW((DWORD)temp.count, (wchar *)temp.data);
+	GetCurrentDirectoryW((DWORD)temp.count, (wchar_t *)temp.data);
 	temp.count--;
 	return to_utf8(temp);
 }
 
-void set_current_directory(pathchar const *path) {
-	SetCurrentDirectoryW((wchar *)path);
+void set_current_directory(Span<utf8> path8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto path16 = to_utf16(path8, true);
+	SetCurrentDirectoryW((wchar_t *)path16.data);
 }
 
 MappedFile map_file(File file) {
@@ -976,29 +1032,168 @@ void unmap_file(MappedFile &file) {
 	file = {};
 }
 
-bool copy_file(pathchar const *source, pathchar const *destination) {
-	return CopyFileW((wchar *)source, (wchar *)destination, false);
+bool copy_file(Span<utf8> source8, Span<utf8> destination8) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto source16 = to_utf16(source8, true);
+	auto destination16 = to_utf16(destination8, true);
+	return CopyFileW((wchar_t *)source16.data, (wchar_t *)destination16.data, false);
 }
 
 List<utf8> get_executable_path(bool null_terminated TL_LPD) {
 	List<utf16> temp;
 	temp.allocator = TL_GET_CURRENT(temporary_allocator);
 	temp.reserve(512);
-	temp.count = GetModuleFileNameW(0, (wchar *)temp.data, (DWORD)temp.capacity);
+	temp.count = GetModuleFileNameW(0, (wchar_t *)temp.data, (DWORD)temp.capacity);
 	return to_utf8(temp, null_terminated TL_LA);
 }
 
-bool move_file(pathchar const *old, pathchar const *_new, MoveFileParams params) {
+bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams params) {
+	scoped(temporary_allocator_and_checkpoint);
+	auto source16 = to_utf16(source8, true);
+	auto destination16 = to_utf16(destination8, true);
 	DWORD flags = 0;
 	if (params.allow_copy)       flags |= MOVEFILE_COPY_ALLOWED;
 	if (params.replace_existing) flags |= MOVEFILE_REPLACE_EXISTING;
-	return MoveFileExW((wchar *)old, (wchar *)_new, flags);
+	return MoveFileExW((wchar_t *)source16.data, (wchar_t *)destination16.data, flags);
+}
+
+
 }
 
 #else
-	XXX;
-#endif
+
+#include <sys/stat.h>
+#include <dirent.h>
+
+namespace tl {
+
+File open_file(Span<utf8> path, OpenFileParams params) {
+	scoped(temporary_allocator_and_checkpoint);
+
+	assert(!params.create_directories, "not implemented");
+
+	StaticList<char, 8> mode;
+
+	if (params.read) mode.add('r');
+	if (params.write) mode.add('w');
+	mode.add('b');
+	mode.add(0);
+
+	FILE *file = fopen(null_terminate(path).data, mode.data);
+
+	if (!file && !params.silent) {
+		TL_GET_GLOBAL(tl_logger).error("Could not open file \"{}\"", path);
+	}
+
+	return {file};
+}
+
+int convert_origin(FileCursorOrigin origin) {
+	switch (origin) {
+		case File_begin: return SEEK_SET;
+		case File_cursor: return SEEK_CUR;
+		case File_end: return SEEK_END;
+	}
+	return -1;
+}
+
+void set_cursor(File file, s64 offset, FileCursorOrigin origin) {
+	fseek((FILE *)file.handle, offset, convert_origin(origin));
+}
+s64 get_cursor(File file) {
+	return ftell((FILE *)file.handle);
+}
+umm read(File file, Span<u8> span) {
+	return fread(span.data, 1, span.count, (FILE *)file.handle);
+}
+umm write(File file, Span<u8> span) {
+	return fwrite(span.data, 1, span.count, (FILE *)file.handle);
+}
+void truncate_to_cursor(File file) {
+	ftruncate(fileno((FILE *)file.handle), get_cursor(file));
+}
+void close(File file) {
+	fclose((FILE *)file.handle);
+}
+
+bool file_exists(Span<utf8> path) {
+	scoped(temporary_allocator_and_checkpoint);
+    FILE *file = fopen(null_terminate(path).data, "r");
+    if (file) {
+        fclose(file);
+        return true;
+    }
+    return false;
+}
+bool directory_exists(Span<utf8> path) {
+	scoped(temporary_allocator_and_checkpoint);
+    struct stat statbuf;
+
+    if (stat(null_terminate(path).data, &statbuf) != 0) {
+        return false;
+    }
+
+    return S_ISDIR(statbuf.st_mode);
+}
+Optional<u64> get_file_write_time(File file) {
+	scoped(temporary_allocator_and_checkpoint);
+	struct stat statbuf;
+    if (fstat(fileno((FILE*)file.handle), &statbuf) != 0) {
+		return {};
+    }
+	return (u64)statbuf.st_mtime;
+}
+FileItemList get_items_in_directory(Span<utf8> directory) {
+	FileItemList result = {};
+	
+	scoped_if(temporary_storage_checkpoint, current_allocator != (Allocator)TL_GET_CURRENT(temporary_allocator));
+	scoped(TL_GET_CURRENT(temporary_allocator));
+
+    DIR *dir = opendir(null_terminate(directory).data);
+    if (dir == NULL) {
+        current_logger.error("opendir({}) failed", directory);
+		return result;
+    }
+
+    struct dirent *entry;
+	int i = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip the current (.) and parent (..) directories
+		defer { ++i; };
+		if (i <= 1)
+			continue;
+
+		auto name = (Span<utf8>)as_span(entry->d_name);
+
+		auto name_in_buffer_start = result.buffer.count;
+		result.buffer.add(name);
+
+		result.add(FileItem{
+			.kind = entry->d_type == DT_REG ? FileItem_file : FileItem_directory,
+			.name = {(utf8 *)name_in_buffer_start, name.count},
+		});
+    }
+
+	for (auto &item : result) {
+		item.name.data = result.buffer.data + (u64)item.name.data;
+	}
+
+    closedir(dir);
+    return result;
+}
+void create_file(Span<utf8> path8);
+void delete_file(Span<utf8> path8);
+bool create_directory(Span<utf8> path8);
+List<utf8> get_current_directory();
+void set_current_directory(Span<utf8> path8);
+MappedFile map_file(File file);
+void unmap_file(MappedFile &file);
+bool copy_file(Span<utf8> source8, Span<utf8> destination8);
+List<utf8> get_executable_path(bool null_terminated TL_LPD);
+bool move_file(Span<utf8> source8, Span<utf8> destination8, MoveFileParams params);
 
 }
+
+#endif
 
 #endif
