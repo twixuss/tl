@@ -18,7 +18,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{e808c7d6-2dab-4077-820b-182af6ff9b44}</ProjectGuid>
     <RootNamespace>tl_opengl_generator</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

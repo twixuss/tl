@@ -41,11 +41,7 @@ template <class T, class Size>
 constexpr tl::u64 get_hash(tl::Span<T, Size> const &span) {
 	tl::u64 result = 0xdeadc0debabeface;
 	for (auto const &it : span) {
-		if (std::is_constant_evaluated()) {
-			result = tl::ce::rotate_left(result, 23) ^ get_hash(it);
-		} else {
-			result = tl::rotate_left(result, 23) ^ get_hash(it);
-		}
+		result = tl::rotate_left(result, 23) ^ get_hash(it);
 	}
 	return result;
 }
@@ -58,4 +54,41 @@ constexpr tl::u64 get_hash(tl::List<T, Allocator, Size> const &list) {
 template <tl::AnEnum T>
 inline constexpr tl::u64 get_hash(T const &value) {
 	return tl::to_underlying(value);
+}
+
+namespace tl {
+
+template <class Key, bool use_high_bits = true>
+struct DefaultHashTraits {
+	inline static constexpr u32 rehash_percentage = 70;
+	inline static constexpr void on_collision(Key a, Key b) {}
+
+	// These are templates because of situation where == operator is not defined, but are_equal is defined in derived class.
+	// In that case these functions will not be instantiated.
+	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return all(a == b); }
+	inline constexpr u64 get_hash(this auto &&self, Key const &key) { return ::get_hash(key); }
+
+	inline constexpr umm get_index_from_hash(this auto &&self, u64 hash, u64 capacity) {
+		if constexpr (use_high_bits) {
+			hash ^= hash >> 32;
+			hash ^= hash >> 16;
+			hash ^= hash >> 8;
+		}
+
+		assert(is_power_of_2(capacity));
+		return hash & (capacity - 1);
+	}
+	inline constexpr umm get_index_from_key(this auto &&self, Key const &key, u64 capacity) {
+		return self.get_index_from_hash(self.get_hash(key), capacity);
+	}
+};
+
+#define TL_USE_HASH_TRAITS_MEMBERS \
+	using Traits::rehash_percentage; \
+	using Traits::on_collision; \
+	using Traits::are_equal; \
+	using Traits::get_hash; \
+	using Traits::get_index_from_hash; \
+	using Traits::get_index_from_key; \
+
 }

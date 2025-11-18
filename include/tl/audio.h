@@ -1,5 +1,7 @@
 #pragma once
 #include "buffer.h"
+#include "static_list.h"
+#include "file.h"
 
 namespace tl {
 
@@ -39,9 +41,9 @@ struct Sound {
 };
 
 bool validate(WavHeader *header) {
-	if (header->chunk.id       != "RIFF"s) return false;
-	if (header->format         != "WAVE"s) return false;
-	if (header->sub_chunk_1.id != "fmt "s) return false;
+	if (array_as_span(header->chunk.id)       != "RIFF"s) return false;
+	if (array_as_span(header->format)         != "WAVE"s) return false;
+	if (array_as_span(header->sub_chunk_1.id) != "fmt "s) return false;
 	if (header->audio_format     != 1)  return false;
 	if (header->sub_chunk_1.size != 16) return false;
 	return true;
@@ -54,7 +56,7 @@ WavChunk *get_samples_chunk(WavHeader *header, u8 *end_of_buffer) {
 		sub_chunks.add(sub_chunk);
 	}
 
-	WavChunk **it = find_if(sub_chunks, [](WavChunk *subChunk){ return subChunk->id == "data"s; });
+	WavChunk **it = find_if(sub_chunks, [](WavChunk *subChunk){ return array_as_span(subChunk->id) == "data"s; });
 
 	if (it == sub_chunks.end()) {
 		return {};
@@ -64,7 +66,7 @@ WavChunk *get_samples_chunk(WavHeader *header, u8 *end_of_buffer) {
 }
 
 Sound load_wav_from_memory(Span<u8> data) {
-	if (data.size < sizeof(WavHeader)) {
+	if (data.count < sizeof(WavHeader)) {
 		return {};
 	}
 
@@ -88,12 +90,12 @@ Sound load_wav_from_memory(Span<u8> data) {
 	return result;
 }
 
-Sound load_wav_from_file(Span<pathchar> path) {
-	auto file = read_entire_file(path);
-	if (!file.data) return {};
+Sound load_wav_from_file(Span<utf8> path) {
+	auto [file, ok] = read_entire_file(path);
+	if (!ok) return {};
 
 	auto data = file;
-	if (data.size < sizeof(WavHeader)) {
+	if (data.count < sizeof(WavHeader)) {
 		return {};
 	}
 

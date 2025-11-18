@@ -17,16 +17,15 @@
     <ClCompile Include="src\tests.cpp" />
     <ClCompile Include="src\tests\allocation.cpp" />
     <ClCompile Include="src\tests\array.cpp" />
-    <ClCompile Include="src\tests\big_int.cpp" />
     <ClCompile Include="src\tests\common.cpp" />
     <ClCompile Include="src\tests\compiler.cpp" />
     <ClCompile Include="src\tests\coroutine.cpp" />
+    <ClCompile Include="src\tests\c_preprocessor.cpp" />
+    <ClCompile Include="src\tests\c_tokenizer.cpp" />
     <ClCompile Include="src\tests\definitions.cpp" />
     <ClCompile Include="src\tests\file.cpp" />
     <ClCompile Include="src\tests\fly_string.cpp" />
     <ClCompile Include="src\tests\function.cpp" />
-    <ClCompile Include="src\tests\hash_map.cpp" />
-    <ClCompile Include="src\tests\list.cpp" />
     <ClCompile Include="src\tests\math.cpp" />
     <ClCompile Include="src\tests\simd.cpp" />
     <ClCompile Include="src\tests\sorted_list.cpp" />
@@ -36,9 +35,13 @@
     <ClCompile Include="src\tests\utf8.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\tl\c_tokenizer.h" />
+    <ClInclude Include="include\tl\date.h" />
+    <ClInclude Include="include\tl\sleep.h" />
     <ClInclude Include="src\compile_speed_test.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="src\tests\coroutine.asm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -46,7 +49,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{b6c8883b-f0cf-4ebd-a8a1-09c5728a9e11}</ProjectGuid>
     <RootNamespace>tl</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -86,11 +89,15 @@
       <Command>
       </Command>
     </PreBuildEvent>
+    <ClCompile>
+      <AdditionalOptions>/w15262</AdditionalOptions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalOptions>
-      </AdditionalOptions>
+      <AdditionalOptions>/w15262</AdditionalOptions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,5 +111,12 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets" Condition="Exists('packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Cpp.BuildInsights.1.4.2\build\native\Microsoft.Cpp.BuildInsights.targets'))" />
+  </Target>
 </Project>

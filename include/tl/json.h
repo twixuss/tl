@@ -25,13 +25,12 @@ enum class Type {
 	#undef x
 };
 
-inline umm append(StringBuilder &builder, Type type) {
+inline void append(StringBuilder &builder, Type type) {
 	switch (type) {
 		#define x(name) case Type::name: return append(builder, #name);
 		TL_ENUMERATE_JSON_TYPES
 		#undef x
 	}
-	return 0;
 }
 
 struct Object {

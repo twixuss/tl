@@ -32,19 +32,6 @@ forceinline u8 *chunk_data(Chunk *chunk) {
 
 TL_API Scene3D parse_from_memory(Span<u8> memory);
 
-struct ParseFromFileResult {
-	Buffer file_contents;
-	Scene3D scene;
-};
-
-inline Optional<ParseFromFileResult> parse_from_file(Span<utf8> path) {
-	auto memory = read_entire_file(to_pathchars(path, true));
-	if (memory.data) {
-		return ParseFromFileResult{memory, parse_from_memory(memory)};
-	}
-	return {};
-}
-
 }
 }
 
@@ -246,9 +233,9 @@ Scene3D parse_from_memory(Span<u8> memory) {
 		v4f default_tangent = {1,0,0,0};
 		v2f default_uv = {};
 
-		CommonMesh mesh;
+		CommonMesh result_mesh;
 
-		mesh.vertices.reserve(vertex_count);
+		result_mesh.vertices.reserve(vertex_count);
 		for (u32 i = 0; i < vertex_count; ++i) {
 			CommonVertex v = {};
 			v.position = positions[i];
@@ -256,24 +243,24 @@ Scene3D parse_from_memory(Span<u8> memory) {
 			v.tangent = tangents ? tangents[i] : default_tangent;
 			v.color   = colors   ? colors  [i] : default_color;
 			v.uv      = uvs      ? uvs     [i] : default_uv;
-			mesh.vertices.add(v);
+			result_mesh.vertices.add(v);
 		}
 
-		mesh.indices.reserve(index_count);
+		result_mesh.indices.reserve(index_count);
 
 		void *indices_data = binary_chunk_data + (u32)index_buffer_view->member(u8"byteOffset"s)->number();
 		switch (indexType) {
 			case ComponentType_u32: {
 				u32 *indices = (u32 *)(indices_data);
 				for (u32 i = 0; i < index_count; ++i) {
-					mesh.indices.add(indices[i]);
+					result_mesh.indices.add(indices[i]);
 				}
 				break;
 			}
 			case ComponentType_u16: {
 				u16 *indices = (u16 *)(indices_data);
 				for (u32 i = 0; i < index_count; ++i) {
-					mesh.indices.add(indices[i]);
+					result_mesh.indices.add(indices[i]);
 				}
 				break;
 			}
@@ -283,7 +270,7 @@ Scene3D parse_from_memory(Span<u8> memory) {
 			}
 		}
 
-		scene.meshes.add(mesh);
+		scene.meshes.add(result_mesh);
 	}
 
 	auto to_v3f = [](Json::Object::Array &array) {

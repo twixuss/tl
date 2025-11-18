@@ -3,16 +3,45 @@
 #include "string.h"
 
 namespace tl {
-namespace impl {
 
-template <class List>
+struct BigIntView {
+	using Part = umm;
+
+
+	bool msb = false;
+	Span<Part> parts = {};
+
+	
+	bool get_bit_unchecked(umm index) const {
+		umm part_index = index / (sizeof(parts[0]) * 8);
+		umm bit_index  = index % (sizeof(parts[0]) * 8);
+		return parts[part_index] & ((Part)1 << bit_index);
+	}
+	bool get_bit(umm index) const {
+		umm part_index = index / (sizeof(parts[0]) * 8);
+		if (part_index >= parts.count)
+			return msb;
+
+		umm bit_index  = index % (sizeof(parts[0]) * 8);
+		return parts[part_index] & ((Part)1 << bit_index);
+	}
+	Part get_part(umm index) const {
+		if (index < parts.count) {
+			return parts.data[index];
+		}
+		return msb ? -1 : 0;
+	}
+};
+
+template <class Allocator = Allocator>
 struct BigInt;
 
-template <class List>
-BigInt<List> copy(BigInt<List> that);
+BigInt<DefaultAllocator> big_int_scratch_pop();
+void big_int_scratch_add(BigInt<DefaultAllocator>);
 
-template <class List>
-void free(BigInt<List> &a);
+#define big_int_scratch_scoped(name) \
+	auto name = big_int_scratch_pop(); \
+	defer { big_int_scratch_add(name); }
 
 //
 // Arbitrarily long, signed, two's complement integer.
@@ -25,24 +54,38 @@ void free(BigInt<List> &a);
 //
 // Note that division by zero is not exceptional; you decide what to do in that case.
 //
-template <class List_>
+template <class Allocator>
 struct BigInt {
-	using List = List_;
-	using Part = typename List::ElementType;
-	using SignedPart = std::make_signed_t<typename List::ElementType>;
+	using Part = umm;
+	using SignedPart = std::make_signed_t<Part>;
+	using List = List<Part, Allocator>;
 	using Size = typename List::Size;
 
-	static_assert(is_unsigned<Part>, "BigInt::List::ElementType must be unsigned");
+	static_assert(is_unsigned<Part>, "BigInt::List::Element must be unsigned");
 
 	inline static constexpr umm bytes_in_part = sizeof(Part);
 	inline static constexpr umm bits_in_part = bytes_in_part * 8;
 
 	bool msb = false;
 	List parts;
+	
+	BigIntView view() const { return {msb, parts.span()}; }
+	operator BigIntView() const { return view(); }
+
+	void set(SignedPart p) {
+		parts.set(p);
+		msb = p < 0;
+		normalize();
+	}
+
+	void set(BigIntView that) {
+		parts.set(that.parts);
+		msb = that.msb;
+	}
 
 	void normalize() {
-		for (umm i = parts.count - 1; i != 0; --i) {
-			if (parts[i] == (msb ? (Part)-1 : (Part)0)) {
+		for (smm i = parts.count - 1; i != -1; --i) {
+			if (parts.data[i] == (msb ? (Part)-1 : (Part)0)) {
 				parts.pop();
 			} else {
 				break;
@@ -50,19 +93,18 @@ struct BigInt {
 		}
 	}
 
-	BigInt &invert() {
+	void invert() {
 		msb = !msb;
 		for (auto &part : parts)
 			part = ~part;
-		return *this;
 	}
 
-	BigInt operator~() const { return copy(*this).invert(); }
+	void negate() {
+		invert();
+		*this += (u64)1;
+	}
 
-	BigInt &negate() { return invert() += (u64)1; }
-	BigInt operator-() const { return copy(*this).negate(); }
-
-	BigInt &operator^=(BigInt const &b) {
+	BigInt &operator^=(BigIntView b) {
 		for (umm i = 0; i < min(parts.count, b.parts.count); ++i) {
 			parts[i] ^= b.parts[i];
 		}
@@ -82,7 +124,21 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
-	BigInt &operator|=(SignedPart b) {
+	BigInt &operator|=(umm b) {
+		if (parts.count == 0) {
+			if (msb) {
+				// already all ones, nothing to change
+			} else {
+				parts.add(b);
+			}
+		} else {
+			parts.data[0] |= b;
+		}
+
+		normalize();
+		return *this;
+	}
+	BigInt &operator|=(smm b) {
 		if (parts.count == 0) {
 			if (msb) {
 				// already all ones, nothing to change
@@ -93,15 +149,14 @@ struct BigInt {
 		} else {
 			parts.data[0] |= b;
 			if (b < 0) {
-				// parts.resize(1);
-				// that's simpler.
 				parts.count = 1;
 			}
 		}
-		// no need to normalize
+
+		normalize();
 		return *this;
 	}
-	BigInt &operator|=(BigInt const &b) {
+	BigInt &operator|=(BigIntView b) {
 		if (b.msb) {
 			if (b.parts.count < parts.count) {
 				parts.resize(b.parts.count);
@@ -126,7 +181,7 @@ struct BigInt {
 		return *this;
 	}
 
-	BigInt &operator&=(BigInt b) {
+	BigInt &operator&=(BigIntView b) {
 		if (!b.msb) {
 			if (b.parts.count < parts.count) {
 				parts.resize(b.parts.count);
@@ -154,8 +209,10 @@ struct BigInt {
 		return *this;
 	}
 
+
+	#if 0
 	template <class A, class B>
-	bool shift_left(BigInt const &b, u64 bytes_threshold, A &&error_shift_by_negative, B &&error_too_big) {
+	bool shift_left(BigIntView b, u64 bytes_threshold, A &&error_shift_by_negative, B &&error_too_big) {
 		BigInt zero_part_count_big, shift_amount;
 		b.divmod(bits_in_part, zero_part_count_big, shift_amount);
 		if (zero_part_count_big.msb) {
@@ -181,21 +238,26 @@ struct BigInt {
 
 		*this <<= (u64)shift_amount;
 
-		parts.insert_n_at(0, 0, (u64)zero_part_count_big);
+		parts.insert_at(Repeat{(Part)0, zero_part_count_big}, 0);
 		return true;
 	}
+	BigInt &operator<<=(BigIntView b) {
+		shift_left(b, max_value<u64>, []{}, [](auto){});
+		return *this;
+	}
+	#endif
 
-	BigInt &operator<<=(Part b) {
-		parts.insert_n_at(0, 0, b >> 6);
+	BigInt &operator<<=(umm b) {
+		parts.insert_at(Repeat{.value = (Part)0, .count = b / bits_in_part}, 0);
 
-		auto part_shift = b & (bits_in_part - 1);
+		auto part_shift = b % bits_in_part;
 		if (part_shift) {
 			if (parts.count) {
 				parts.resize(parts.count+1);
 				parts.data[parts.count-1] = ((msb ? (Part)-1 : (Part)0) << part_shift) | (parts.data[parts.count-2] >> (bits_in_part - part_shift));
 				for (umm part_index = parts.count-2; part_index != 0; --part_index) {
-					// NOTE: there is shld instruction, which does 128 bit shift, but i didn't find an intrinsic for it.
-					// And this is sad, because msvc can't optimize this...
+					// NOTE: there is shld instruction, which does 128 bit shift.
+					// There's no intrinsic for it and msvc can't optimize this.
 					parts.data[part_index] = (parts.data[part_index] << part_shift) | (parts.data[part_index - 1] >> (bits_in_part - part_shift));
 				}
 				parts.data[0] <<= part_shift;
@@ -205,49 +267,46 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
-	BigInt &operator<<=(BigInt const &b) {
-		shift_left(b, max_value<u64>, []{}, [](auto){});
-		return *this;
-	}
 
-	inline void shift_right_arithmetic(Part delete_part_count, Part shift_amount) {
+	inline void shift_right_arithmetic(umm delete_part_count, umm shift_amount) {
 		if (delete_part_count >= parts.count) {
 			parts.clear();
 		} else {
-			//    ____    ____    ____
-			//   1....1001101100000000 >> 6
-			//      ____    ____
-			// 1....111001101100
-
 			parts.erase(parts.subspan(0, delete_part_count));
 
 			if (shift_amount) {
 				for (umm part_index = 1; part_index < parts.count-1; ++part_index) {
+					// NOTE: there is shrd instruction, which does 128 bit shift.
+					// There's no intrinsic for it and msvc can't optimize this.
 					parts.data[part_index-1] = (parts.data[part_index-1] >> shift_amount) | (parts.data[part_index] << (bits_in_part - shift_amount));
 				}
-				// NOTE: sign bit must be involved
-				parts.data[parts.count - 1] = (SignedPart)parts.data[parts.count - 1] >> shift_amount;
+				if (msb) {
+					parts.data[parts.count - 1] = (SignedPart)parts.data[parts.count - 1] >> shift_amount;
+				} else {
+					parts.data[parts.count - 1] =             parts.data[parts.count - 1] >> shift_amount;
+				}
 			}
 		}
+		normalize();
 	}
-	BigInt &operator>>=(Part b) {
+	BigInt &operator>>=(umm b) {
 		if (!parts.count)
 			return *this;
 
 		shift_right_arithmetic(b / bits_in_part, b % bits_in_part);
 		return *this;
 	}
-	BigInt &operator>>=(BigInt const &b) {
-		if (!parts.count)
-			return *this;
+	// NOTE: shift amount is masked by one part
+	BigInt &operator>>=(BigIntView b) {
+		u64 total_shift_amount = b.get_part(0);
 
-		BigInt delete_part_count, shift_amount_big;
-		b.divmod(bits_in_part, delete_part_count, shift_amount_big);
+		u64 delete_part_count = total_shift_amount >> log2(bits_in_part);
+		u64 part_shift_amount = total_shift_amount & (bits_in_part - 1);
 
 		if (delete_part_count >= parts.count) {
 			parts.clear();
 		} else {
-			shift_right_arithmetic((Part)delete_part_count, (Part)shift_amount_big);
+			shift_right_arithmetic(delete_part_count, part_shift_amount);
 		}
 		return *this;
 	}
@@ -318,112 +377,130 @@ struct BigInt {
 		normalize();
 		return *this;
 	}
-	BigInt &operator+=(BigInt b) {
-		BigInt *min_int = this;
-		BigInt *max_int = &b;
-		if (min_int->parts.count > max_int->parts.count) {
-			Swap(min_int, max_int);
-		}
-
-		parts.resize(max_int->parts.count);
-
+	BigInt &operator+=(BigIntView b) {
 		bool carry = false;
 
-		// sum up low part
-		// min_int         165a6f31
-		//                 ++++++++
-		// max_int   21765ac6ef371c
-		for (umm part_index = 0; part_index < min_int->parts.count; ++part_index) {
-			add_carry(min_int->parts[part_index], max_int->parts[part_index], carry, &parts[part_index], &carry);
+		umm max_parts = max(parts.count, b.parts.count);
+
+		parts.resize(max_parts, msb ? -1 : 0);
+
+		for (umm i = 0; i < max_parts; ++i) {
+			umm result = 0;
+			add_carry(get_part(i), b.get_part(i), carry, &result, &carry);
+			parts[i] = result;
 		}
 
-		// propagate carry into high part
-		for (umm part_index = min_int->parts.count; part_index < max_int->parts.count; ++part_index) {
-			add_carry(max_int->parts[part_index], 0, carry, &parts[part_index], &carry);
+		if ( msb &&  b.msb && !carry) parts.add(0);
+		if ( msb && !b.msb &&  carry) msb = false;
+		if (!msb &&  b.msb && !carry) msb = true;
+		if (!msb && !b.msb &&  carry) parts.add(1);
+
+		normalize();
+		return *this;
+	}
+	BigInt &operator-=(Part       b) {
+		if (parts.count == 0)
+			parts.add(0);
+
+		bool borrow = false;
+
+		//sub_borrow(parts[0], b, borrow, &parts[0], &borrow);
+		borrow = _subborrow_u64(borrow, parts[0], b, &parts[0]);
+		for (umm part_index = 1; part_index < parts.count; ++part_index) {
+			//sub_borrow(parts[part_index], 0, borrow, &parts[part_index], &borrow);
+			borrow = _subborrow_u64(borrow, parts[part_index], 0, &parts[part_index]);
 		}
 
-
-
-		// if needed wrap around zero or grow
-		if (carry) {
-			if (msb) {
-				if (b.msb) {
-					// this       b          result
-					// -1(...F) + -1(...F) = -2(...E)     don't need carry bit!
-					// msb = true; // noop
-				} else {
-					// this     b       result
-					// -1(...F) + 1(1) = 10 but need 0! - don't add carry bit!
-					msb = false;
-				}
-			} else {
-				if (b.msb) {
-					// this     b       result
-					// 1(1) + -1(...F) = 10 but need 0! - don't add carry bit!
-					// msb = false; // noop
-				} else {
-					// this     b       result
-					// 1(1) + 15(F) = 16(10)     DO add carry bit!
-					// msb = false; // noop
-					parts.add(1);
-				}
-			}
-		} else {
-			if (b.msb)
+		if (borrow) {
+			if (!msb) {
 				msb = true;
+			} else {
+				parts.add(~0ull);
+			}
 		}
 
 		normalize();
 		return *this;
 	}
-	BigInt &operator*=(Part b) {
-		auto a = *this;
-		defer { free(a); };
+	BigInt &operator-=(SignedPart b) { return *this += -b; }
+	BigInt &operator-=(BigIntView b) {
+		// Not optimal
+		big_int_scratch_scoped(x);
+
+		x.set(b);
+		x.negate();
+		*this += x;
+		return *this;
+	}
+	
+	BigInt &operator*=(Part that) {
+		big_int_scratch_scoped(a);
+		big_int_scratch_scoped(b);
+
+		a.set(*this);
+		
 		*this = {};
+
 		for (u32 bit_index = 0; bit_index < bits_in_part; ++bit_index) {
-			if ((b >> bit_index) & 1) {
-				*this += a << bit_index;
+			if ((that >> bit_index) & 1) {
+				b.set(a);
+				b <<= bit_index;
+				*this += b;
 			}
 		}
 		normalize();
 		return *this;
 	}
-	BigInt &operator*=(BigInt b) {
-		auto a = *this;
-		defer { free(a); };
+	BigInt &operator*=(BigIntView that) {
+		big_int_scratch_scoped(a);
+		big_int_scratch_scoped(b);
+
+		a.set(*this);
+
 		*this = {};
-		for (u32 bit_index = 0; bit_index < b.parts.count * (sizeof(b.parts[0]) * 8); ++bit_index) {
-			if (b.get_bit(bit_index)) {
-				*this += a << bit_index;
+
+		for (u32 bit_index = 0; bit_index < that.parts.count * bits_in_part; ++bit_index) {
+			if (that.get_bit_unchecked(bit_index)) {
+				b.set(a);
+				b <<= bit_index;
+				*this += b;
 			}
 		}
 		normalize();
 		return *this;
 	}
 
-	void divmod(Part b, BigInt &quotient, BigInt &remainder) const {
-		umm max_parts_count = max(parts.count, 1);
+	template <class QA, class RA>
+	void divmod(Part b, BigInt<QA> &quotient, BigInt<RA> &remainder) const {
+		umm max_parts_count = max(parts.count, (Size)1);
 
+		quotient.msb = 0;
+		quotient.parts.clear();
 		quotient.parts.resize(max_parts_count);
-		remainder.parts.resize(max_parts_count);
+		remainder.msb = 0;
+		remainder.parts.clear();
 
 		for (umm bit_index = max_parts_count * bits_in_part - 1; bit_index != ~(umm)0; --bit_index) {
 			remainder <<= 1;
 			remainder.set_bit(0, get_bit(bit_index));
 			if (remainder >= b) {
 				remainder -= b;
-				quotient.set_bit(bit_index, 1);
+				quotient.set_bit_unchecked(bit_index, 1);
 			}
 		}
 
 		remainder.normalize();
 		quotient.normalize();
 	}
-	void divmod(BigInt const &b, BigInt &quotient, BigInt &remainder) const {
+	template <class QA, class RA>
+	void divmod(BigIntView b, BigInt<QA> &quotient, BigInt<RA> &remainder) const {
 		umm max_parts_count = max(parts.count, b.parts.count);
-
+		
+		quotient.msb = 0;
+		quotient.parts.clear();
 		quotient.parts.resize(max_parts_count);
-		remainder.parts.resize(max_parts_count);
+		remainder.msb = 0;
+		remainder.parts.clear();
 
 		for (umm bit_index = max_parts_count * bits_in_part - 1; bit_index != ~(umm)0; --bit_index) {
 			remainder <<= 1;
@@ -433,7 +510,7 @@ struct BigInt {
 
 			if (remainder >= b) {
 				remainder -= b;
-				quotient.set_bit(bit_index, 1);
+				quotient.set_bit_unchecked(bit_index, 1);
 			}
 		}
 
@@ -442,335 +519,404 @@ struct BigInt {
 	}
 
 	BigInt &operator/=(Part b) {
-		BigInt result, dummy;
-		divmod(b, result, dummy);
-		free(dummy);
-		return *this = result;
+		big_int_scratch_scoped(quotient);
+		big_int_scratch_scoped(remainder);
+		divmod(b, quotient, remainder);
+		set(quotient);
+		return *this;
 	}
-	BigInt &operator/=(BigInt const &b) {
-		BigInt result, dummy;
-		divmod(b, result, dummy);
-		free(dummy);
-		return *this = result;
+	BigInt &operator/=(BigIntView b) {
+		big_int_scratch_scoped(quotient);
+		big_int_scratch_scoped(remainder);
+		divmod(b, quotient, remainder);
+		set(quotient);
+		return *this;
 	}
 	BigInt &operator%=(Part b) {
-		BigInt result, dummy;
-		divmod(b, dummy, result);
-		free(dummy);
-		return *this = result;
+		big_int_scratch_scoped(quotient);
+		big_int_scratch_scoped(remainder);
+		divmod(b, quotient, remainder);
+		set(remainder);
+		return *this;
 	}
-	BigInt &operator%=(BigInt const &b) {
-		BigInt result, dummy;
-		divmod(b, dummy, result);
-		free(dummy);
-		return *this = result;
+	BigInt &operator%=(BigIntView b) {
+		big_int_scratch_scoped(quotient);
+		big_int_scratch_scoped(remainder);
+		divmod(b, quotient, remainder);
+		set(remainder);
+		return *this;
 	}
-
+	
+	bool operator==(Part b) const {
+		if (parts.count == 1)
+			return msb == 0 && parts[0] == b;
+		if (parts.count == 0)
+			return msb == 0 && b == 0;
+		return false;
+	}
 	bool operator==(SignedPart b) const {
 		if (parts.count == 1)
-			return (SignedPart)parts[0] == b;
+			return msb == (b < 0) && (SignedPart)parts[0] == b;
 		if (parts.count == 0)
 			return (msb ? -1 : 0) == b;
 		return false;
 	}
-	bool operator==(BigInt b) const {
+	bool operator==(BigIntView b) const {
 		if (msb != b.msb)
 			return false;
 
-		BigInt min_int = *this, max_int = b;
-		if (min_int.parts.count > max_int.parts.count) {
-			Swap(min_int, max_int);
-		}
+		if (parts.count != b.parts.count)
+			return false;
 
-		for (Size i = 0; i < min_int.parts.count; ++i) {
-			if (max_int.parts[i] != min_int.parts[i])
+		for (Size i = 0; i < parts.count; ++i) {
+			if (parts[i] != b.parts[i])
 				return false;
 		}
 
-		for (Size index = max_int.parts.count - 1; index != min_int.parts.count - 1; --index) {
-			if (max_int.parts[index] != 0) {
-				return false;
-			}
-		}
-		for (Size index = min_int.parts.count - 1; index != (Size)-1; --index) {
-			if (min_int.parts[index] != max_int.parts[index]) {
-				return false;
-			}
-		}
 		return true;
 	}
 
-	bool operator!=(Part   b) const { return !operator==(b); }
-	bool operator!=(BigInt b) const { return !operator==(b); }
+	bool operator!=(Part       b) const { return !operator==(b); }
+	bool operator!=(SignedPart b) const { return !operator==(b); }
+	bool operator!=(BigIntView b) const { return !operator==(b); }
 
+	bool operator<(Part b) const {
+		if (msb)
+			return true;
+
+		if (parts.count == 0)
+			return 0 < b;
+		if (parts.count == 1)
+			return parts[0] < b;
+		return false;
+	}
 	bool operator<(SignedPart b) const {
 		if (parts.count == 1) {
-			if (!msb) {
-				// this is positive
-				if (parts[0] > max_value<SignedPart>)
-					return false;
-			}
+			if (parts[0] >> 63 != msb)
+				return msb;
 			return (SignedPart)parts[0] < b;
 		}
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return msb;
 	}
-	bool operator<(BigInt b) const {
+	bool operator<(BigIntView b) const {
 		if (msb != b.msb) {
 			return msb;
 		}
 
-		/*
-		3 2	false   1
-		3 3 false   0
-		3 4 true   -1
-		*/
+		for (umm i = max(parts.count, b.parts.count) - 1; i != -1; --i) {
+			if (get_part(i) != b.get_part(i)) {
+				return get_part(i) < b.get_part(i);
+			}
+		}
 
-		auto diff = *this - b;
-		defer { free(diff); };
-		return diff.msb;
+		return false;
 	}
 
-	bool operator>(SignedPart b) const {
+	bool operator>(Part b) const {
+		if (msb)
+			return false;
+
+		if (parts.count == 0)
+			return 0 > b;
 		if (parts.count == 1)
+			return parts[0] > b;
+		return true;
+	}
+	bool operator>(SignedPart b) const {
+		if (parts.count == 1) {
+			if (parts[0] >> 63 != msb)
+				return !msb;
 			return (SignedPart)parts[0] > b;
+		}
 		if (parts.count == 0)
 			return (msb ? -1 : 0) < b;
 		return !msb;
 	}
-	bool operator>(BigInt b) const {
+	bool operator>(BigIntView b) const {
 		if (msb != b.msb) {
 			return b.msb;
 		}
-
-		/*
-		3 2	true    1
-		3 3 false   0
-		3 4 false  -1
-		*/
-
-		auto diff = *this - b;
-		defer { free(diff); };
-		if (diff.msb) {
-			return false;
-		} else {
-			if (diff == BigInt{}) {
-				return false;
+		
+		for (umm i = max(parts.count, b.parts.count) - 1; i != -1; --i) {
+			if (get_part(i) != b.get_part(i)) {
+				return get_part(i) > b.get_part(i);
 			}
-			return true;
 		}
+
+		return false;
 	}
 
+	bool operator>=(Part       b) const { return !(*this < b); }
 	bool operator>=(SignedPart b) const { return !(*this < b); }
-	bool operator>=(BigInt b) const { return !(*this < b); }
+	bool operator>=(BigIntView b) const { return !(*this < b); }
 
+	bool operator<=(Part       b) const { return !(*this > b); }
 	bool operator<=(SignedPart b) const { return !(*this > b); }
-	bool operator<=(BigInt b) const { return !(*this > b); }
+	bool operator<=(BigIntView b) const { return !(*this > b); }
+	
+	bool operator==(u8  b) const { return *this == (Part)b; }
+	bool operator==(u16 b) const { return *this == (Part)b; }
+	bool operator==(u32 b) const { return *this == (Part)b; }
+	bool operator==(s8  b) const { return *this == (SignedPart)b; }
+	bool operator==(s16 b) const { return *this == (SignedPart)b; }
+	bool operator==(s32 b) const { return *this == (SignedPart)b; }
 
-	BigInt &operator-=(SignedPart b) { return *this += -b; }
-	BigInt &operator-=(BigInt const &b) { return *this += -b; }
+	bool operator!=(u8  b) const { return *this != (Part)b; }
+	bool operator!=(u16 b) const { return *this != (Part)b; }
+	bool operator!=(u32 b) const { return *this != (Part)b; }
+	bool operator!=(s8  b) const { return *this != (SignedPart)b; }
+	bool operator!=(s16 b) const { return *this != (SignedPart)b; }
+	bool operator!=(s32 b) const { return *this != (SignedPart)b; }
 
-	BigInt operator&(BigInt const &b) const { auto a = copy(*this); a &= b; return a; }
-	BigInt operator|(BigInt const &b) const { auto a = copy(*this); a |= b; return a; }
-	BigInt operator^(BigInt const &b) const { auto a = copy(*this); a ^= b; return a; }
-	BigInt operator+(BigInt const &b) const { auto a = copy(*this); a += b; return a; }
+	bool operator<(u8  b) const { return *this < (Part)b; }
+	bool operator<(u16 b) const { return *this < (Part)b; }
+	bool operator<(u32 b) const { return *this < (Part)b; }
+	bool operator<(s8  b) const { return *this < (SignedPart)b; }
+	bool operator<(s16 b) const { return *this < (SignedPart)b; }
+	bool operator<(s32 b) const { return *this < (SignedPart)b; }
 
-	BigInt operator-(SignedPart    b) const { auto a = copy(*this); a -= b; return a; }
-	BigInt operator-(BigInt const &b) const { auto a = copy(*this); a -= b; return a; }
+	bool operator>(u8  b) const { return *this > (Part)b; }
+	bool operator>(u16 b) const { return *this > (Part)b; }
+	bool operator>(u32 b) const { return *this > (Part)b; }
+	bool operator>(s8  b) const { return *this > (SignedPart)b; }
+	bool operator>(s16 b) const { return *this > (SignedPart)b; }
+	bool operator>(s32 b) const { return *this > (SignedPart)b; }
 
-	BigInt operator*(Part   b) const { auto a = copy(*this); a *= b; return a; }
-	BigInt operator*(BigInt b) const { auto a = copy(*this); a *= b; return a; }
-	BigInt operator/(Part   b) const { auto a = copy(*this); a /= b; return a; }
-	BigInt operator/(BigInt b) const { auto a = copy(*this); a /= b; return a; }
-	BigInt operator%(Part   b) const { auto a = copy(*this); a %= b; return a; }
-	BigInt operator%(BigInt b) const { auto a = copy(*this); a %= b; return a; }
-	BigInt operator<<(Part   b) const { auto a = copy(*this); a <<= b; return a; }
-	BigInt operator<<(BigInt b) const { auto a = copy(*this); a <<= b; return a; }
-	BigInt operator>>(Part   b) const { auto a = copy(*this); a >>= b; return a; }
-	BigInt operator>>(BigInt b) const { auto a = copy(*this); a >>= b; return a; }
+	bool operator<=(u8  b) const { return *this <= (Part)b; }
+	bool operator<=(u16 b) const { return *this <= (Part)b; }
+	bool operator<=(u32 b) const { return *this <= (Part)b; }
+	bool operator<=(s8  b) const { return *this <= (SignedPart)b; }
+	bool operator<=(s16 b) const { return *this <= (SignedPart)b; }
+	bool operator<=(s32 b) const { return *this <= (SignedPart)b; }
 
-	//BigInt operator-(BigInt const &b) const { return *this + -b; }
+	bool operator>=(u8  b) const { return *this >= (Part)b; }
+	bool operator>=(u16 b) const { return *this >= (Part)b; }
+	bool operator>=(u32 b) const { return *this >= (Part)b; }
+	bool operator>=(s8  b) const { return *this >= (SignedPart)b; }
+	bool operator>=(s16 b) const { return *this >= (SignedPart)b; }
+	bool operator>=(s32 b) const { return *this >= (SignedPart)b; }
 
-	bool get_bit(umm index) const {
-		umm part_index = index / (sizeof(parts[0]) * 8);
-		if (part_index >= parts.count)
-			return msb;
-
-		umm bit_index  = index % (sizeof(parts[0]) * 8);
-		return parts[part_index] & ((Part)1 << bit_index);
+	bool is_zero() const {
+		return parts.count == 0 && !msb;
 	}
-	void set_bit(umm index, bool value) {
+
+	//BigInt operator-(BigIntView b) const { return *this + -b; }
+	
+	bool get_bit_unchecked(umm index) const { return view().get_bit_unchecked(index); }
+	bool get_bit(umm index) const { return view().get_bit(index); }
+	Part get_part(umm index) const { return view().get_part(index); }
+
+	void set_bit_unchecked(umm index, bool value) {
 		umm part_index = index / (sizeof(parts[0]) * 8);
 		umm bit_index  = index % (sizeof(parts[0]) * 8);
 		if (value) parts[part_index] |=  ((Part)1 << bit_index);
 		else       parts[part_index] &= ~((Part)1 << bit_index);
 	}
-
-	explicit operator u8 () { return parts.count ? (u8 )parts[0] : 0; }
-	explicit operator u16() { return parts.count ? (u16)parts[0] : 0; }
-	explicit operator u32() { return parts.count ? (u32)parts[0] : 0; }
-	explicit operator u64() {
-		if constexpr (bits_in_part == 64) {
-			return parts.count ? (u64)parts[0] : 0;
-		} else {
-			static_error_v(bits_in_part, "not implemented");
+	void set_bit(umm index, bool value) {
+		umm part_index = index / (sizeof(parts[0]) * 8);
+		umm bit_index  = index % (sizeof(parts[0]) * 8);
+		if (part_index >= parts.count) {
+			auto old_count = parts.count;
+			parts.resize(part_index + 1);
+			for (umm i = old_count; i < parts.count; ++i) {
+				parts.data[i] = msb ? -1 : 0;
+			}
 		}
+		if (value) parts[part_index] |=  ((Part)1 << bit_index);
+		else       parts[part_index] &= ~((Part)1 << bit_index);
 	}
-	explicit operator s8 () { return (s8 )operator u8 (); }
-	explicit operator s16() { return (s16)operator u16(); }
-	explicit operator s32() { return (s32)operator u32(); }
-	explicit operator s64() { return (s64)operator u64(); }
 
-	explicit operator f64() {
+	explicit operator u8 () const { return get_part(0); }
+	explicit operator u16() const { return get_part(0); }
+	explicit operator u32() const { return get_part(0); }
+	explicit operator u64() const { return get_part(0); }
+	explicit operator s8 () const { return get_part(0); }
+	explicit operator s16() const { return get_part(0); }
+	explicit operator s32() const { return get_part(0); }
+	explicit operator s64() const { return get_part(0); }
+
+	explicit operator f32() const { return (f32)*this; }
+	explicit operator f64() const {
 		f64 result = 0;
 
-		BigInt src = *this;
+		big_int_scratch_scoped(x);
+
+		x.set(*this);
 
 		if (msb) {
-			src = copy(*this);
+			x.negate();
 		}
 
-		for (auto part : reverse_iterate(src.parts)) {
+		for (auto part : reversed(x.parts)) {
 			result *= 18'446'744'073'709'551'616.0; // 2^64
 			result += part;
 		}
 
 		if (msb) {
-			free(src);
 			result = -result;
 		}
 
 		return result;
 	}
 
-	template <class T>
-	explicit operator T() { return (T)operator u64(); }
-
-#if 0
-	BigInt &set(BigInt const &that) { free(parts); parts = copy(that.parts); return *this; }
-
-	u64 try_get_part(umm index) const {
-		return index < parts.count ? parts[index] : (u64)0;
-	}
-
-	BigInt operator~() const {
+	BigInt copy() const {
 		BigInt result;
-		result.parts.reserve(parts.count);
-		for (auto &part : parts) {
-			result.parts.add(~part);
-		}
+		result.msb = msb;
+		result.parts = tl::copy(parts);
 		return result;
 	}
-	BigInt operator-() const {
-		BigInt result = ~*this;
-		return ++result;
+
+	void free() {
+		tl::free(parts);
 	}
 
-	BigInt &operator++() { return *this += 1bi; }
-	BigInt operator++(int) { BigInt copy = *this; ++*this; return copy; }
-
-
-	BigInt operator&(BigInt const &b) const { auto a = copy(*this); a &= b; return a; }
-
-	BigInt &operator|=(BigInt const &b) {
-		parts.resize(b.parts.count);
-		for (umm i = 0; i < parts.count; ++i) {
-			parts[i] |= b.parts[i];
+	void make_absolute() {
+		if (msb) {
+			negate();
 		}
-		return *this;
 	}
-	BigInt operator|(BigInt const &b) const { auto a = copy(*this); a |= b; return a; }
 
-	BigInt operator-(BigInt const &b) const {
-		assert(*this >= b);
-		if (parts.count == 0)
-			return {};
-
-		BigInt result = *this;
-		if (result.parts[0] < b.parts[0]) {
-			for (umm part_index = 1; part_index != result.parts.count; part_index += 1) {
-				result.parts[part_index]--;
-				if (result.parts[part_index] != -1) {
-					break;
-				}
-			}
-		}
-		result.parts[0] -= b.parts[0];
-		return result;
-	}
-	BigInt operator*(BigInt b) const {
-		BigInt result = {};
-		for (u32 bit_index = 0; bit_index < b.parts.count * (sizeof(b.parts[0]) * 8); ++bit_index) {
-			if (b.get_bit(bit_index)) {
-				result += *this << bit_index;
+	umm trailing_zeros_count() const {
+		umm result = 0;
+		for (auto part : parts) {
+			for (umm bit = 0; bit < bits_in_part; ++bit) {
+				if (part & (1 << bit))
+					return result;
+				++result;
 			}
 		}
 		return result;
 	}
+	
+	void pow(umm exponent) {
+		big_int_scratch_scoped(base);
+		base.set(*this);
+		set((umm)1);
 
+		while (exponent) {
+			if (exponent & 1)
+				*this *= base;
+			exponent >>= 1;
+			base *= base;
+		}
+	}
 
-	BigInt &operator-=(BigInt b) { return *this = *this - b; }
-	BigInt &operator*=(BigInt b) { return *this = *this * b; }
-	BigInt &operator/=(BigInt b) { return *this = *this / b; }
-	BigInt &operator<<=(u64 b) { return *this = *this << b; }
-#endif
+	#if 0
+	// Operators that return new value. Disabled because easy to leak.
+	BigInt operator~() const { return copy().invert(); }
+	BigInt operator-() const { return copy().negate(); }
+
+	BigInt operator&(BigIntView b) const { auto a = copy(); a &= b; return a; }
+	BigInt operator|(BigIntView b) const { auto a = copy(); a |= b; return a; }
+	BigInt operator^(BigIntView b) const { auto a = copy(); a ^= b; return a; }
+	BigInt operator+(BigIntView b) const { auto a = copy(); a += b; return a; }
+
+	BigInt operator-(SignedPart    b) const { auto a = copy(); a -= b; return a; }
+	BigInt operator-(BigIntView b) const { auto a = copy(); a -= b; return a; }
+
+	BigInt operator*(Part   b) const { auto a = copy(); a *= b; return a; }
+	BigInt operator*(BigInt b) const { auto a = copy(); a *= b; return a; }
+	BigInt operator/(Part   b) const { auto a = copy(); a /= b; return a; }
+	BigInt operator/(BigInt b) const { auto a = copy(); a /= b; return a; }
+	BigInt operator%(Part   b) const { auto a = copy(); a %= b; return a; }
+	BigInt operator%(BigInt b) const { auto a = copy(); a %= b; return a; }
+	BigInt operator<<(Part   b) const { auto a = copy(); a <<= b; return a; }
+	BigInt operator<<(BigInt b) const { auto a = copy(); a <<= b; return a; }
+	BigInt operator>>(Part   b) const { auto a = copy(); a >>= b; return a; }
+	BigInt operator>>(BigInt b) const { auto a = copy(); a >>= b; return a; }
+	#endif
 };
 
-template <class List>
-BigInt<List> copy(BigInt<List> that) {
-	BigInt<List> result;
-	result.msb = that.msb;
-	result.parts = copy(that.parts);
+inline static List<BigInt<DefaultAllocator>, DefaultAllocator> scratch_ints;
+
+inline BigInt<DefaultAllocator> big_int_scratch_pop() {
+	if (auto popped = scratch_ints.pop()) {
+		popped.value().parts.clear();
+		popped.value().msb = 0;
+		return popped.value();
+	}
+	return {};
+}
+inline void big_int_scratch_add(BigInt<DefaultAllocator> value) {
+	scratch_ints.add(value);
+}
+
+TL_DECLARE_CONCEPT(BigInt);
+
+inline void gcd(CBigInt auto &a, CBigInt auto _b) {
+	if (a.is_zero()) {
+		return;
+	}
+	if (_b.is_zero()) {
+		a.set((u64)0);
+		return;
+	}
+
+	big_int_scratch_scoped(b);
+	b.set(_b);
+
+	auto at = a.trailing_zeros_count();
+	auto bt = b.trailing_zeros_count();
+	auto d = min(at, bt);
+
+	a >>= at;
+	b >>= bt;
+
+	while (a != b) {
+		if (a > b) {
+			a -= b;
+			a >>= a.trailing_zeros_count();
+		} else {
+			b -= a;
+			b >>= b.trailing_zeros_count();
+		}
+	}
+	
+	// b = pow(2, d)
+	b.parts.clear();
+	b.msb = 0;
+	b.set_bit(d, 1);
+
+	a *= b;
+}
+inline void lcm(CBigInt auto &a, CBigInt auto b) {
+	//  |a|*|b|
+	// ---------
+	// gcd(a, b)
+	
+	big_int_scratch_scoped(x);
+	big_int_scratch_scoped(y);
+
+	x.set(a);
+	y.set(b);
+
+	a.make_absolute();
+	y.make_absolute();
+
+	gcd(x, y);
+	a /= x;
+
+	a *= y;
+}
+
+template<class Allocator> inline constexpr bool is_integer<BigInt<Allocator>> = true;
+template<class Allocator> inline constexpr bool is_integer_like<BigInt<Allocator>> = true;
+template<class Allocator> inline constexpr bool is_signed<BigInt<Allocator>> = true;
+
+template <class Allocator = Allocator>
+BigInt<Allocator> make_big_int(s64 value) {
+	BigInt<Allocator> result;
+	result.set(value);
 	return result;
 }
 
-template <class List>
-void free(BigInt<List> &a) {
-	free(a.parts);
-}
-
-//template <class List>
-//inline umm append(StringBuilder &builder, impl::BigInt<List> value) {
-//	using Part = decltype(value)::Part;
-//
-//	// BigInt temp = copy(value);
-	// defer { free(temp); };
-//
-//	umm chars_appended = 0;
-//	auto append = [&] (StringBuilder &builder, auto const &x) {
-//		chars_appended += ::tl::append(builder, x);
-//	};
-//
-//	// do {
-	// 	temp.divmod(10, quotient, remainder);
-	// 	append(builder, )
-	// } while (temp != 0);
-//
-//	append(builder, "0x"s);
-//	append(builder, FormatInt<Part>{.value=value.parts.back(), .radix=16});
-//	for (smm i = (smm)value.parts.count - 2; i >= 0; --i) {
-//		append(builder, FormatInt<Part>{.value=value.parts[i], .radix=16, .leading_zero_count=16});
-//	}
-//
-//	return chars_appended;
-//}
-
-}
-
-template <class List>
-inline constexpr bool is_integer<impl::BigInt<List>> = true;
-
-template <class List>
-inline constexpr bool is_signed<impl::BigInt<List>> = true;
-
-template <class List>
-umm append(StringBuilder &builder, FormatInt<impl::BigInt<List>> f) {
-	using Int = impl::BigInt<List>;
-
-	Int v = f.value;
+template <class Allocator>
+inline void append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
+	auto v = f.value;
 	auto radix = f.radix;
-	u32 maxDigits = sizeof(Int::Part) * 8 * v.parts.count + 1;
+	u32 maxDigits = sizeof(decltype(v)::Part) * 8 * v.parts.count + 1;
 	char *buf = (char *)alloca(maxDigits);
 
 	auto charMap = f.char_set;
@@ -778,37 +924,32 @@ umm append(StringBuilder &builder, FormatInt<impl::BigInt<List>> f) {
 	u32 charsWritten = 0;
 
 	bool negative = false;
-	if constexpr (is_signed<Int>) {
-		if (v < 0) {
-			negative = true;
-			if constexpr (OneOf<Int, s8, s16, s32, s64>) {
-				if (v == min_value<Int>) {
-					*lsc-- = charMap[(u32)-(v % radix)];
-					v /= radix;
-					++charsWritten;
-				}
-			}
-			v = -v;
-		}
+	if (v < 0) {
+		negative = true;
+		v.negate();
 	}
 
 	for (;;) {
-		u32 char_index = (u32)(v % radix);
+		big_int_scratch_scoped(quotient);
+		big_int_scratch_scoped(remainder);
+
+		v.divmod(radix, quotient, remainder);
+		
+		u32 char_index = (u32)remainder;
+
 		*lsc-- = charMap[char_index];
 		++charsWritten;
-		v /= radix;
-		if (v == Int{})
+
+		v.set(quotient);
+
+		if (v.is_zero())
 			break;
 	}
 	lsc += f.skip_digits;
 	charsWritten -= f.skip_digits;
-	if constexpr (is_signed<Int>) {
-		if (negative) {
-			++charsWritten;
-			*lsc-- = '-';
-		}
-	} else {
-		(void)negative;
+	if (negative) {
+		++charsWritten;
+		*lsc-- = '-';
 	}
 	if (f.leading_zero_count) {
 		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
@@ -817,47 +958,271 @@ umm append(StringBuilder &builder, FormatInt<impl::BigInt<List>> f) {
 		if (f.leading_zero_count > charsWritten)
 			charsWritten = f.leading_zero_count;
 	}
-	return append(builder, Span(lsc + 1, charsWritten));
-}
-
-using BigInt = impl::BigInt<List<umm>>;
-
-template <> inline constexpr bool is_integer<BigInt> = true;
-template <> inline constexpr bool is_integer_like<BigInt> = true;
-template <> inline constexpr bool is_signed<BigInt> = true;
-
-
-template <class BigInt = BigInt, class Allocator = Allocator>
-inline BigInt make_big_int(typename BigInt::Part value TL_LP) {
-	BigInt result;
-	result.msb = false;
-	result.parts.set({value} TL_LA);
-	return result;
-}
-template <class BigInt = BigInt, class Allocator = Allocator>
-inline BigInt make_big_int(typename BigInt::SignedPart value TL_LP) {
-	BigInt result;
-	result.msb = value < 0;
-	result.parts.set({(typename BigInt::Part)value} TL_LA);
-	return result;
-}
-template <class BigInt = BigInt, class Allocator = Allocator>
-inline BigInt make_big_int(typename BigInt::Part high, typename BigInt::Part low TL_LP) {
-	BigInt result;
-	result.msb = false;
-	result.parts.set({low, high} TL_LA);
-	return result;
-}
-template <class BigInt = BigInt, class Allocator = Allocator>
-inline BigInt make_big_int(typename BigInt::Part high, typename BigInt::Part mid, typename BigInt::Part low TL_LP) {
-	BigInt result;
-	result.msb = false;
-	result.parts.set({low, mid, high} TL_LA);
-	return result;
-}
-
-inline BigInt operator""_ib(u64 value) {
-	return make_big_int(value);
+	append(builder, Span(lsc + 1, charsWritten));
 }
 
 }
+
+#ifdef TL_ENABLE_TESTS
+
+TL_TEST(BigInt) {
+	using namespace tl;
+
+	using BigInt = BigInt<DefaultAllocator>;
+
+	BigInt a;
+	BigInt b;
+	
+	auto set = [](BigInt &val, bool msb, Span<u64> rev_parts) {
+		val.msb = msb;
+		val.parts.reserve(rev_parts.count);
+		val.parts.count = rev_parts.count;
+		for (umm i = 0; i < rev_parts.count; ++i) {
+			val.parts.data[i] = rev_parts.data[rev_parts.count - 1 - i];
+		}
+	};
+
+	// NOTE: order of parts in `set` is reverse of store order, so rightmost parts are smallest and parts to the left are bigger.
+
+	/* BITWISE OR  | */ {
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a |= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0111);
+		assert(a.parts[1] == 0x0222);
+	
+
+		set(a, false, {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a |= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0111);
+		assert(a.parts[1] == 0x0022);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a |= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0111);
+		assert(a.parts[1] == 0x0202);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, true,  {        0x0011});
+		a |= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0111);
+
+	
+		set(a, true,  {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a |= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0111);
+
+
+		set(a, true,  {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a |= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0111);
+		assert(a.parts[1] == 0x0202);
+
+	
+		set(a, false, {        0x0101});
+		set(b, true,  {0x0022, 0x0011});
+		a |= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0111);
+		assert(a.parts[1] == 0x0022);
+	}
+	/* BITWISE AND & */ {
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0001);
+		assert(a.parts[1] == 0x0002);
+	
+
+		set(a, false, {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0001);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0001);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, true,  {        0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0001);
+		assert(a.parts[1] == 0x0202);
+
+	
+		set(a, true,  {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0001);
+		assert(a.parts[1] == 0x0022);
+
+
+		set(a, true,  {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0001);
+
+	
+		set(a, false, {        0x0101});
+		set(b, true,  {0x0022, 0x0011});
+		a &= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 0x0001);
+	}
+	/* BITWISE XOR ^ */ {
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a ^= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0110);
+		assert(a.parts[1] == 0x0220);
+	
+
+		set(a, false, {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a ^= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0110);
+		assert(a.parts[1] == 0x0022);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a ^= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0110);
+		assert(a.parts[1] == 0x0202);
+
+
+		set(a, false, {0x0202, 0x0101});
+		set(b, true,  {        0x0011});
+		a ^= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] ==  0x0110);
+		assert(a.parts[1] == ~0x0202);
+	
+
+		set(a, true,  {        0x0101});
+		set(b, false, {0x0022, 0x0011});
+		a ^= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] ==  0x0110);
+		assert(a.parts[1] == ~0x0022);
+
+
+		set(a, true,  {0x0202, 0x0101});
+		set(b, false, {        0x0011});
+		a ^= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0110);
+		assert(a.parts[1] == 0x0202);
+
+	
+		set(a, false, {        0x0101});
+		set(b, true,  {0x0022, 0x0011});
+		a ^= b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x0110);
+		assert(a.parts[1] == 0x0022);
+	}
+	/* ADD + */ {
+		set(a, false, {34});
+		set(b, false, {35});
+		a += b;
+		assert(a.msb == false);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == 69);
+
+		
+		set(a, false, {34, 34});
+		set(b, false, {35, 35});
+		a += b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 69);
+		assert(a.parts[1] == 69);
+
+		
+		set(a, false, {0x8000'0000'0000'1234});
+		set(b, false, {0x8000'0000'0000'0000});
+		a += b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x1234);
+		assert(a.parts[1] == 1);
+		
+
+		set(a, false, {           2});
+		set(b, true,  {autocast -10});
+		a += b;
+		assert(a.msb == true);
+		assert(a.parts.count == 1);
+		assert(a.parts[0] == -8);
+		
+
+		set(a, false, {           2, 100});
+		set(b, true,  {autocast -10,  10});
+		a += b;
+		assert(a.msb == true);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 110);
+		assert(a.parts[1] == -8);
+	}
+	/* MULTIPLY * */ {
+		set(a, false, {0x8000'0000'0000'0000});
+		set(b, false, {5});
+		a *= b;
+		assert(a.msb == false);
+		assert(a.parts.count == 2);
+		assert(a.parts[0] == 0x8000'0000'0000'0000);
+		assert(a.parts[1] == 2);
+	}
+};
+
+#endif
+

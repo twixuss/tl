@@ -15,8 +15,8 @@ struct FlyString {
     inline FlyString(Span<utf8, Size> span) {
         auto found = storage.find(span);
         if (found) {
-            found->value += 1;
-            data = found->key.data;
+            *found.value += 1;
+            data = found.key->data;
         } else {
             auto buffer = storage.allocator.allocate<utf8>(span.count + 1);
             memcpy(buffer, span.data, span.count);
@@ -55,18 +55,18 @@ struct FlyString {
 
     utf8 const *data = 0;
 
-    static ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> storage;
+    static HashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> storage;
     static void init() {
         construct(storage);
     }
 };
 
 #ifdef TL_IMPL
-ContiguousHashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> FlyString::storage;
+HashMap<Span<utf8>, umm, DefaultHashTraits<Span<utf8>>, TL_FLY_STRING_ALLOCATOR> FlyString::storage;
 #endif
 
-inline umm append(StringBuilder &builder, FlyString str) {
-    return append(builder, as_span(str.data));
+inline void append(StringBuilder &builder, FlyString str) {
+    append(builder, as_span(str.data));
 }
 
 }

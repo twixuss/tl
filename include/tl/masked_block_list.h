@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.h"
-#include "optional.h"
 #include "list.h"
 
 namespace tl {
@@ -98,7 +97,7 @@ struct StaticMaskedBlockList {
 
 		while (1) {
 			if (!block) {
-				block = allocator.allocate<Block>();
+				block = allocator.template allocate<Block>();
 				last->next = block;
 				last = block;
 			}

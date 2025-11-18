@@ -83,16 +83,16 @@ namespace tl {
 	forceinline constexpr v4 operator o() const { return {o x, o y, o z, o w}; }
 
 #define BINOP_2(o) \
-	forceinline constexpr v2 operator o(v2 b) const { return {x o b.x, y o b.y}; } \
-	forceinline constexpr v2 operator o(Scalar b) const { return {x o b, y o b}; } \
-	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {a o b.x, a o b.y};} \
+	forceinline constexpr v2 operator o(v2 b) const { return {(Scalar)(x o b.x), (Scalar)(y o b.y)}; } \
+	forceinline constexpr v2 operator o(Scalar b) const { return {(Scalar)(x o b), (Scalar)(y o b)}; } \
+	forceinline constexpr friend v2 operator o(Scalar a, v2 b) { return {(Scalar)(a o b.x), (Scalar)(a o b.y)};} \
 	forceinline constexpr v2 &operator o##=(v2 b) { return x o##= b.x, y o##= b.y, *this;} \
 	forceinline constexpr v2 &operator o##=(Scalar b) { return x o##= b, y o##= b, *this;}
 
 #define BINOP_3(o) \
-	forceinline constexpr v3 operator o(v3 b) const { return {x o b.x, y o b.y, z o b.z}; } \
-	forceinline constexpr v3 operator o(Scalar b) const { return {x o b, y o b, z o b}; } \
-	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {a o b.x, a o b.y, a o b.z};} \
+	forceinline constexpr v3 operator o(v3 b) const { return {(Scalar)(x o b.x), (Scalar)(y o b.y), (Scalar)(z o b.z)}; } \
+	forceinline constexpr v3 operator o(Scalar b) const { return {(Scalar)(x o b), (Scalar)(y o b), (Scalar)(z o b)}; } \
+	forceinline constexpr friend v3 operator o(Scalar a, v3 b) { return {(Scalar)(a o b.x), (Scalar)(a o b.y), (Scalar)(a o b.z)};} \
 	forceinline constexpr v3 &operator o##=(v3 b) { return x o##= b.x, y o##= b.y, z o##= b.z, *this;} \
 	forceinline constexpr v3 &operator o##=(Scalar b) { return x o##= b, y o##= b, z o##= b, *this;}
 
@@ -315,6 +315,28 @@ template <class T> inline constexpr u32 dimension_of<v2<T>> = 2;
 template <class T> inline constexpr u32 dimension_of<v3<T>> = 3;
 template <class T> inline constexpr u32 dimension_of<v4<T>> = 4;
 
+template <class T> struct ScalarOfT { using Type = T; };
+template <class T> struct ScalarOfT<v2<T>> { using Type = T; };
+template <class T> struct ScalarOfT<v3<T>> { using Type = T; };
+template <class T> struct ScalarOfT<v4<T>> { using Type = T; };
+template <class T> using ScalarOf = typename ScalarOfT<T>::Type;
+
+template <class T> inline constexpr bool is_signed<v2<T>> = is_signed<T>;
+template <class T> inline constexpr bool is_signed<v3<T>> = is_signed<T>;
+template <class T> inline constexpr bool is_signed<v4<T>> = is_signed<T>;
+
+template <class T> inline constexpr bool is_unsigned<v2<T>> = is_unsigned<T>;
+template <class T> inline constexpr bool is_unsigned<v3<T>> = is_unsigned<T>;
+template <class T> inline constexpr bool is_unsigned<v4<T>> = is_unsigned<T>;
+
+template <class T>
+struct Is_v2 : std::false_type {};
+template <class T>
+struct Is_v2<v2<T>> : std::true_type {};
+
+template <class T>
+concept v2Int = Is_v2<T>::value && std::integral<typename T::Scalar>;
+
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
 	forceinline constexpr v2f V2f(f32 v = 0) { return {v, v}; }
@@ -365,35 +387,35 @@ template <class T> forceinline constexpr v3<T> select(v3b t, v3<T> a, v3<T> b) {
 template <class T> forceinline constexpr v4<T> select(v4b t, v4<T> a, v4<T> b) { return {select(t.x, a.x, b.x), select(t.y, a.y, b.y), select(t.z, a.z, b.z), select(t.w, a.w, b.w)}; }
 
 template <class T>
-inline umm append(StringBuilder &builder, v2<T> v) {
-	return append_format(builder, "({}, {})"s, v.x, v.y);
+inline void append(StringBuilder &builder, v2<T> v) {
+	append_format(builder, "{{{}, {}}}"s, v.x, v.y);
 }
 template <class T>
-inline umm append(StringBuilder &builder, v3<T> v) {
-	return append_format(builder, "({}, {}, {})"s, v.x, v.y, v.z);
+inline void append(StringBuilder &builder, v3<T> v) {
+	append_format(builder, "{{{}, {}, {}}}"s, v.x, v.y, v.z);
 }
 template <class T>
-inline umm append(StringBuilder &builder, v4<T> v) {
-	return append_format(builder, "({}, {}, {}, {})"s, v.x, v.y, v.z, v.w);
+inline void append(StringBuilder &builder, v4<T> v) {
+	append_format(builder, "{{{}, {}, {}, {}}}"s, v.x, v.y, v.z, v.w);
 }
 
 }
 
 template <class T>
-tl::u64 get_hash(tl::v2<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v2<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull;
 }
 template <class T>
-tl::u64 get_hash(tl::v3<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v3<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull +
 		get_hash(v.z) * 3260954456333195593ull;
 }
 template <class T>
-tl::u64 get_hash(tl::v4<T> const &v) {
+inline constexpr tl::u64 get_hash(tl::v4<T> const &v) {
 	return 
 		get_hash(v.x) * 13043817825332782231ull +
 		get_hash(v.y) * 6521908912666391129ull +

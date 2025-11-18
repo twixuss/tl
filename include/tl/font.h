@@ -2,17 +2,15 @@
 
 #include "common.h"
 #include "list.h"
+#include "linear_set.h"
 #include "buffer.h"
 #include "file.h"
 #include "hash_map.h"
 #include "math.h"
+#include "atlas.h"
 
 #ifndef TL_FONT_TEXTURE_HANDLE
 #define TL_FONT_TEXTURE_HANDLE void *
-#endif
-
-#ifndef TL_FONT_SHARED_ATLAS
-#define TL_FONT_SHARED_ATLAS 1
 #endif
 
 // Set TL_FONT_USE_SPECIAL_CODES to 1 to be able to use special 
@@ -45,82 +43,89 @@
 
 namespace tl {
 
-struct FontChar {
-	v2u position;
-	v2u size;
-	v2s offset;
-	v2s advance;
-};
-
-struct FontCollection;
-struct SizedFont;
-struct Font;
-
-
-struct Font {
-	FontCollection *collection = 0;
-
-	List<utf8> path;
-	HashMap<u32, SizedFont> size_to_font;
-};
-
-TL_API SizedFont *get_font_at_size(Font *font, u32 size);
-
-struct FontAtlas {
-	v3u8 *data = 0;
-	v2u size = {};
-	
-	TL_FONT_TEXTURE_HANDLE texture = {};
-
-	v2u next_char_position = {};
-	u32 current_row_height = 0;
-};
-
 struct SizedFont {
-	Font *font = {};
-
-	ContiguousHashMap<u32, FontChar> chars;
-	u32 size = {};
-
-	#if !TL_FONT_SHARED_ATLAS
-	FontAtlas atlas_ = {};
-	#endif
-
+	// distance between baselines of two lines.
 	s32 line_spacing = 0;
-	s32 ascender     = 0;
-	s32 descender    = 0;
+	
+	// distance between baseline and highest point
+	s32 ascender = 0;
 
+	// distance between baseline and lowest point
+	s32 descender = 0;
 
-	FontAtlas &atlas();
+	// distance between baseline and highest point of a *capital* letter.
+	s32 cap_height = 0;
 };
 
+struct FontBase {
+	// font size => SizedFont
+	HashMap<u32, SizedFont> sized;
+
+	// Storage for the backend, e.g. contents of a .ttf file
+	Span<u8> buffer;
+};
+struct Font : FontBase {
+	u8 impl_data[32];
+};
+
+struct FontChar {
+	aabb<v2u> rect = {};
+	v2s offset = {};
+	v2s advance = {};
+	u32 line_spacing = 0; // This is per sized font data, but it is needed where there is no access to SizedFont
+};
+using FontAtlas = Atlas<v3u8, FontChar>;
+
+struct CodePointAndSize {
+	utf32 code = 0;
+	u32 size = 0;
+	constexpr auto operator<=>(CodePointAndSize const &) const noexcept = default;
+};
+
+}
+
+template<>
+inline tl::u64 get_hash(tl::CodePointAndSize const &x) {
+	return ((tl::u64)x.code << 32) | x.size;
+}
+
+namespace tl {
 
 struct FontCollection {
 	Allocator allocator = TL_GET_CURRENT(allocator);
-	List<Font *> fonts;
-	#if TL_FONT_SHARED_ATLAS
+	List<Font> fonts;
+	
 	FontAtlas atlas;
-	#endif
-	TL_FONT_TEXTURE_HANDLE (*create_atlas)(v2u size);
-	void (*update_atlas)(TL_FONT_TEXTURE_HANDLE texture, v3u8 *data, v2u size, aabb<v2u> updated_region);
-	void (*free_atlas)(TL_FONT_TEXTURE_HANDLE texture);
-};
+	// Code point + size -> index in atlas.areas
+	HashMap<CodePointAndSize, u32> rendered_chars;
 
-#if TL_FONT_SHARED_ATLAS
-inline FontAtlas &SizedFont::atlas() { return font->collection->atlas; }
-#else
-inline FontAtlas &SizedFont::atlas() { return atlas_; }
-#endif
+	TL_FONT_TEXTURE_HANDLE texture = {};
+	
+	TL_FONT_TEXTURE_HANDLE (*resize_texture)(TL_FONT_TEXTURE_HANDLE texture, v2u size) = autocast noop;
+	void (*update_texture)(TL_FONT_TEXTURE_HANDLE texture, v3u8 *data, v2u size, aabb<v2u> updated_region) = autocast noop;
+	void (*free_texture)(TL_FONT_TEXTURE_HANDLE texture) = autocast noop;
+};
 
 TL_API FontCollection *create_font_collection();
 TL_API void free(FontCollection *collection);
 
-TL_API Font *add_font(FontCollection *collection, Span<utf8> path);
+// buffer - view to font file contents. Must be valid until FontCollection is freed.
+TL_API void add_font(FontCollection *collection, Span<u8> buffer);
 
-struct PlacedText {
-	struct Char {
+struct PlaceTextParams {
+	f32 line_alignment = 0; // 0 = left-aligned; 0.5 = centered; 1 = right-aligned
+	bool wrap = false;
+	u32 width = 0;
+	u32 font_size = 14;
+	#if TL_FONT_USE_SPECIAL_CODES
+	v3f default_color = {1,1,1};
+	bool use_codes = true;
+	#endif
+};
+struct TL_API TextPlacer {
+	struct Quad {
 		aabb<v2s> position = {};
-		aabb<v2f> uv = {};
+		aabb<v2u> uv = {};
 		#if TL_FONT_USE_SPECIAL_CODES
 		union Color {
 			struct {
@@ -131,7 +136,7 @@ struct PlacedText {
 			u16 flat;
 
 			Color &operator=(v3f c) {
-				auto i = floor_to_int(c * 15.999999f);
+				auto i = round_to_int(c * 15.0f);
 				r = i.x;
 				g = i.y;
 				b = i.z;
@@ -143,15 +148,37 @@ struct PlacedText {
 		#endif
 	};
 	struct Line {
+		// indices for `quads`
 		umm begin_index = 0;
 		umm end_index = 0;
-		s32 width = 0;
+		v2s size = {};
+	};
+	struct CursorPosition {
+		u32 x = 0;
+		u32 line = 0;
 	};
 
-	List<Char> chars;
+	// Quads for rendering.
+	// Whitespace and special codes don't produce quads.
+	List<Quad> quads;
+
 	List<Line> lines;
+
+	// Where cursor should be rendered.
+	// Just index by cursor in your input field.
+	List<CursorPosition> cursor_positions;
+
+	// Tight bounds encapsulating all quads
 	aabb<v2s> bounds = {};
+
 	u32 line_count = 0;
+	
+	// Sum of all line spacings.
+	u32 height = 0;
+
+	// Calling place a second time will clear previous data and reuse memory.
+	void place(FontCollection *collection, Span<utf8> text, PlaceTextParams params = {} TL_LP);
+	void place(FontCollection *collection, Span<utf32> text, PlaceTextParams params = {} TL_LP);
 
 	inline Optional<umm> line_of(umm char_index) {
 		for (umm i = 0; i < lines.count; ++i) {
@@ -163,31 +190,43 @@ struct PlacedText {
 	}
 };
 
-struct PlaceTextParams {
-	f32 line_alignment = 0; // 0 = left-aligned; 0.5 = centered; 1 = right-aligned
-	s32 wrap_width = max_value<s32>;
-	#if TL_FONT_USE_SPECIAL_CODES
-	v3f default_color = {1,1,1};
-	#endif
-};
-
-TL_API FontChar get_char_info(u32 ch, SizedFont *font);
-
-struct EnsureAllCharsPresentResult {
-	bool new_chars_added = false;
-	bool atlas_resized = false;
-};
-
-// Returns true if new characters were added
-TL_API EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont *font);
-
-TL_API void free(FontCollection *collection);
-TL_API PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params = {} TL_LP);
-
-inline void free(PlacedText &text) {
-	free(text.chars);
-	free(text.lines);
+inline void free(TextPlacer &placer) {
+	free(placer.quads);
+	free(placer.lines);
 }
+
+TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf8> text, u32 font_size);
+TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf32> text, u32 font_size);
+
+TL_API bool render_glyph(FontCollection *collection, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point, List<v3u8, TemporaryAllocator> &temp_pixels);
+
+struct Utf8Reader {
+	utf8 *cursor = 0;
+	utf8 *end = 0;
+
+	utf32 next() {
+		if (cursor >= end)
+			return 0;
+		return decode_and_advance(&cursor).value_or(0);
+	}
+	utf8 *checkpoint() { return cursor; }
+	void reset(utf8 *checkpoint) { cursor = checkpoint; }
+	bool empty() { return cursor >= end; }
+};
+
+struct Utf32Reader {
+	utf32 *cursor = 0;
+	utf32 *end = 0;
+
+	utf32 next() {
+		if (cursor >= end)
+			return 0;
+		return *cursor++;
+	}
+	utf32 *checkpoint() { return cursor; }
+	void reset(utf32 *checkpoint) { cursor = checkpoint; }
+	bool empty() { return cursor >= end; }
+};
 
 }
 
@@ -197,259 +236,154 @@ inline void free(PlacedText &text) {
 
 namespace tl {
 
-struct FontFT : Font {
-	Buffer file;
+struct FontFT : FontBase {
 	FT_Face face;
-	u32 size;
+	u32 face_size;
 };
+static_assert(sizeof(FontFT) <= sizeof(Font), "increase impl_data size");
 
 struct FontCollectionFT : FontCollection {
 	FT_Library ft_library;
 };
-
-void init_ft(FontFT *ft) {
-	ft->file = read_entire_file(ft->path);
-	auto error = FT_New_Memory_Face(static_cast<FontCollectionFT *>(ft->collection)->ft_library, ft->file.data, ft->file.count, 0, &ft->face);
-	assert(!error, "FT_New_Face failed: {}", FT_Error_String(error));
-	ft->face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
-}
-
-EnsureAllCharsPresentResult ensure_all_chars_present(Span<utf8> text, SizedFont *sized_font) {
-	assert(sized_font);
-
-	auto font = (FontFT *)sized_font->font;
-	auto collection = (FontCollectionFT *)font->collection;
-
-	assert(collection->update_atlas);
-
-	scoped(collection->allocator);
-
-	auto &atlas = sized_font->atlas();
-
-	auto current_char = text.data;
-
-	List<utf32, TemporaryAllocator> new_chars;
-
-	while (current_char < text.end()) {
-		auto got_char = decode_and_advance(&current_char);
-		if (!got_char.has_value()) {
-			invalid_code_path();
-		}
-		auto code_point = got_char.value();
-		if (!sized_font->chars.find(code_point)) {
-			new_chars.add(code_point);
-		}
-	}
-
-	auto allocator = collection->allocator;
-
-	if (new_chars.count) {
-
-		bool atlas_was_resized = false;
-
-		aabb<v2u> updated_region = {
-			V2u(-1),
-			V2u(0),
-		};
-
-		while (new_chars.count) {
-			auto new_char_code_point = new_chars.pop().value();
-
-			if (!font->face) {
-				init_ft(font);
-			}
-
-			if (font->size != sized_font->size) {
-				font->size = sized_font->size;
-				auto error = FT_Set_Pixel_Sizes(font->face, sized_font->size, sized_font->size);
-				assert(!error);
-
-				sized_font->line_spacing = font->face->size->metrics.height / 64;
-				sized_font->ascender     = font->face->size->metrics.ascender / 64;
-				sized_font->descender    = font->face->size->metrics.descender / 64;
-			}
-
-			auto glyph_index = FT_Get_Char_Index(font->face, new_char_code_point);
-
-			auto error = FT_Load_Glyph(font->face, glyph_index, 0);
-
-			error = FT_Render_Glyph(font->face->glyph, FT_RENDER_MODE_LCD);
-			if (error)
-				continue;
-
-			auto slot = font->face->glyph;
-			auto &bitmap = slot->bitmap;
-
-			v2u char_size = {bitmap.width/3, bitmap.rows};
-
-			if (atlas.next_char_position.x + char_size.x >= atlas.size.x) {
-				if (atlas.size.x == atlas.size.y) {
-					atlas.next_char_position.x = 0;
-				} else {
-					atlas.next_char_position.x = atlas.size.x / 2;
-				}
-				atlas.next_char_position.y += atlas.current_row_height;
-				atlas.current_row_height = 0;
-			}
-
-			if ((atlas.next_char_position.y + char_size.y > atlas.size.y) || !atlas.data) {
-				if (atlas.data) {
-					auto new_atlas_size = atlas.size;
-					if (new_atlas_size.x == new_atlas_size.y) {
-						atlas.next_char_position = {new_atlas_size.x, 0};
-
-						new_atlas_size.x *= 2;
-					} else {
-						atlas.next_char_position = {0, new_atlas_size.y};
-
-						assert(new_atlas_size.x > new_atlas_size.y);
-						new_atlas_size.y *= 2;
-						assert(new_atlas_size.x == new_atlas_size.y);
-					}
-
-					v3u8 *new_atlas_data = allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
-
-					for (umm y = 0; y < atlas.size.y; ++y) {
-						memcpy(&new_atlas_data[y * new_atlas_size.x], &atlas.data[y * atlas.size.x], atlas.size.x * sizeof(atlas.data[0]));
-					}
-					
-					allocator.free(atlas.data);
-
-					atlas.data = new_atlas_data;
-					atlas.size = new_atlas_size;
-				} else {
-					#if TL_FONT_SHARED_ATLAS
-					auto new_atlas_size = V2u(1024);
-					#else
-					auto new_atlas_size = V2u(ceil_to_power_of_2(sized_font->size * 16));
-					#endif
-					v3u8 *new_atlas_data = allocator.allocate<v3u8>(new_atlas_size.x * new_atlas_size.y);
-
-					atlas.data = new_atlas_data;
-					atlas.size = new_atlas_size;
-				}
-
-				atlas.current_row_height = 0;
-
-				atlas_was_resized = true;
-			}
-
-			assert(all(atlas.next_char_position + char_size <= atlas.size));
-
-			//
-			// NOTE bitmap.width is in bytes not pixels
-			//
-			auto &info = sized_font->chars.get_or_insert(new_char_code_point);
-			info.position = atlas.next_char_position;
-			info.size = char_size;
-			info.offset = {slot->bitmap_left, slot->bitmap_top};
-			info.advance = {slot->advance.x >> 6, slot->advance.y >> 6};
-
-			//
-			// Add new rows
-			//
-
-			for (u32 y = 0; y < bitmap.rows; ++y) {
-				memcpy(
-					atlas.data + (atlas.next_char_position.y + y)*atlas.size.x + atlas.next_char_position.x,
-					bitmap.buffer + y*bitmap.pitch,
-					bitmap.width
-				);
-			}
-
-			updated_region.min = min(updated_region.min, atlas.next_char_position);
-			updated_region.max = max(updated_region.max, atlas.next_char_position + char_size);
-
-			atlas.next_char_position.x += char_size.x;
-			atlas.current_row_height = max(atlas.current_row_height, char_size.y);
-		}
-
-		if (atlas.texture && atlas_was_resized) {
-			collection->free_atlas(atlas.texture);
-			atlas.texture = 0;
-		}
-
-		if (!atlas.texture) {
-			atlas.texture = collection->create_atlas(atlas.size);
-			updated_region = {{}, atlas.size};
-		}
-		collection->update_atlas(atlas.texture, atlas.data, atlas.size, updated_region);
-
-		return {
-			.new_chars_added = true,
-			.atlas_resized = atlas_was_resized,
-		};
-	}
-	return {
-		.new_chars_added = false,
-		.atlas_resized = false,
-	};
-}
-
-SizedFont *get_font_at_size(Font *font, u32 size) {
-	assert(font);
-	assert(size);
-	scoped(font->collection->allocator);
-
-	auto found = font->size_to_font.find(size);
-	if (found) {
-		return &found->value;
-	}
-
-	SizedFont &sized_font = font->size_to_font.get_or_insert(size);
-
-	sized_font.font = font;
-
-	sized_font.size = size;
-
-	return &sized_font;
-}
 
 FontCollection *create_font_collection() {
 	auto allocator = TL_GET_CURRENT(allocator);
 	auto result = allocator.allocate<FontCollectionFT>();
 	result->allocator = allocator;
 
+	result->atlas.user_data = result;
+	result->atlas.on_modify = [](FontAtlas *atlas, void *user_data, aabb<v2u> modified_area) {
+		auto result = (FontCollection *)user_data;
+
+		result->update_texture(result->texture, atlas->data, atlas->size, modified_area);
+	};
+	result->atlas.on_resize = [](FontAtlas *atlas, void *user_data, v2u new_size) {
+		auto result = (FontCollection *)user_data;
+
+		result->texture = result->resize_texture(result->texture, new_size);
+	};
+
 	auto error = FT_Init_FreeType(&result->ft_library);
 	assert(!error, "FT_Init_FreeType Error {}", FT_Error_String(error));
 	return result;
 }
 
-Font *add_font(FontCollection *collection, Span<utf8> path) {
-	auto font = (FontFT *)collection->fonts.add(collection->allocator.allocate<FontFT>());
-	font->path.set(path);
-	font->collection = collection;
-	return font;
+void free(FontCollection *collection) {
+	for (auto &_font : collection->fonts) {
+		auto font = (FontFT *)&_font;
+
+		FT_Done_Face(font->face);
+	}
+	collection->free_texture(collection->texture);
+	collection->atlas.free();
+	free(collection->fonts);
+}
+
+bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point, List<v3u8, TemporaryAllocator> &temp_pixels) {
+	auto collection = (FontCollectionFT *)collection_;
+	auto &atlas = collection->atlas;
+	auto &font = *(FontFT *)&font_;
+	
+	assert(&font.sized.get_or_insert(font_size) == &sized_font);
+
+	int error = 0;
+
+	if (!font.face) {
+		error = FT_New_Memory_Face(collection->ft_library, font.buffer.data, font.buffer.count, 0, &font.face);
+		if (error) {
+			return false;
+		}
+		font.face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
+	}
+
+	if (font.face_size != font_size) {
+		font.face_size = font_size;
+
+		error = FT_Set_Pixel_Sizes(font.face, font_size, font_size);
+		if (error) {
+			return false;
+		}
+
+		sized_font.line_spacing = font.face->size->metrics.height >> 6;
+		sized_font.ascender     = font.face->size->metrics.ascender >> 6;
+		sized_font.descender    = font.face->size->metrics.descender >> 6;
+		sized_font.cap_height   = font.face->bbox.yMax - font.face->bbox.yMin;
+	}
+
+	auto glyph_index = FT_Get_Char_Index(font.face, new_char_code_point);
+	if (glyph_index == 0) {
+		return false;
+	}
+
+	error = FT_Load_Glyph(font.face, glyph_index, 0);
+	if (error) {
+		return false;
+	}
+
+	error = FT_Render_Glyph(font.face->glyph, FT_RENDER_MODE_LCD);
+	if (error) {
+		collection->rendered_chars.get_or_insert({new_char_code_point, font_size}) = 0;
+		return false;
+	}
+
+	auto slot = font.face->glyph;
+
+	auto &bitmap = slot->bitmap;
+
+	collection->rendered_chars.get_or_insert({new_char_code_point, font_size}) = atlas.areas.count;
+
+	FontChar info = {};
+	info.offset = {
+		slot->bitmap_left,
+		(s32)font_size - slot->bitmap_top + sized_font.ascender - sized_font.line_spacing,
+	};
+	info.offset = {
+		slot->bitmap_left,
+		sized_font.ascender-slot->bitmap_top,
+	};
+	info.advance = {slot->advance.x >> 6, slot->advance.y >> 6};
+	info.line_spacing = sized_font.line_spacing;
+
+
+	assert(bitmap.width % 3 == 0);
+	if (bitmap.width % 3 == 0) {
+		v2u char_size = {bitmap.width/3, bitmap.rows};
+		atlas.add(info, (v3u8*)bitmap.buffer, char_size, bitmap.pitch);
+	} else {
+		v2u char_size = {(bitmap.width+2)/3, bitmap.rows};
+		temp_pixels.clear();
+		temp_pixels.reserve(char_size.x * char_size.y);
+		for (int y = 0; y < bitmap.rows; ++y) {
+			auto dst = (u8 *)&temp_pixels.data[y * char_size.x];
+			auto src = (u8 *)bitmap.buffer + y * bitmap.pitch;
+			memcpy(dst, src, bitmap.width);
+			memset(dst + bitmap.width, 0, char_size.x*3 - bitmap.width);
+		}
+
+		atlas.add(info, temp_pixels.data, char_size);
+	}
+
+	return true;
+}
+
+}
+
+#else
+
+namespace tl {
+
+static constexpr char const *font_no_backend_error = "tl/font.h was compiled without a backend. Include one before including tl/font.h";
+
+FontCollection *create_font_collection() {
+	invalid_code_path(font_no_backend_error);
 }
 
 void free(FontCollection *collection) {
-	for (auto &_font : collection->fonts) {
-		auto font = (FontFT *)_font;
-		for_each(font->size_to_font, [&](auto &kv) {
-			auto &[size, sized_font] = kv;
-			#if !TL_FONT_SHARED_ATLAS
-			collection->allocator.free(sized_font.atlas_.data);
-			if (sized_font.atlas_.texture) {
-				collection->free_atlas(sized_font.atlas_.texture);
-			}
-			#endif
-		});
-		free(font->path);
+	invalid_code_path(font_no_backend_error);
+}
 
-		free(font->size_to_font);
-
-		free(font->file);
-		FT_Done_Face(font->face);
-
-		collection->allocator.free(font);
-
-	}
-	#if TL_FONT_SHARED_ATLAS
-	collection->allocator.free(collection->atlas.data);
-	collection->free_atlas(collection->atlas.texture);
-	#endif
-	free(collection->fonts);
-	collection->allocator.free(collection);
+bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point, List<v3u8, TemporaryAllocator> &temp_pixels) {
+	invalid_code_path(font_no_backend_error);
 }
 
 }
@@ -458,58 +392,113 @@ void free(FontCollection *collection) {
 
 namespace tl {
 
-FontChar get_char_info(u32 ch, SizedFont *font) {
-	auto found = font->chars.find(ch);
-
-	assert(found, "get_char_info: character '{}' is not present. Call ensure_all_chars_present before", ch);
-	return found->value;
+void add_font(FontCollection *collection, Span<u8> buffer) {
+	auto &font = collection->fonts.add();
+	font.buffer = buffer;
 }
 
-PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params TL_LPD) {
-	PlacedText result = {};
-	v2s char_position = {};
-	char_position.y = font->ascender - font->line_spacing;
+static void _ensure_all_chars_present(FontCollection *collection, auto reader, u32 font_size) {
+	assert(collection->update_texture);
 
-	result.bounds.min = max_value<v2s>;
-	result.bounds.max = min_value<v2s>;
-	result.line_count = 1;
+	scoped(collection->allocator);
+
+	auto &atlas = collection->atlas;
+
+	LinearSet<utf32, TemporaryAllocator> new_chars;
+	
+	if (!collection->rendered_chars.find({'?', font_size})) {
+		new_chars.add('?');
+	}
+
+	while (auto code_point = reader.next()) {
+		if (!collection->rendered_chars.find({code_point, font_size})) {
+			new_chars.add(code_point);
+		}
+	}
+	
+	List<v3u8, TemporaryAllocator> temp_pixels;
+
+	for (auto new_char_code_point : new_chars) {
+		for (auto &font : collection->fonts) {
+			auto &sized_font = font.sized.get_or_insert(font_size);
+
+			bool ok = render_glyph(collection, font, font_size, sized_font, new_char_code_point, temp_pixels);
+
+			if (ok) {
+				break;
+			}
+		}
+	}
+}
+void ensure_all_chars_present(FontCollection *collection_, Span<utf8> text, u32 font_size) {
+	return _ensure_all_chars_present(collection_, Utf8Reader{.cursor = text.data, .end = text.end()}, font_size);
+}
+void ensure_all_chars_present(FontCollection *collection_, Span<utf32> text, u32 font_size) {
+	return _ensure_all_chars_present(collection_, Utf32Reader{.cursor = text.data, .end = text.end()}, font_size);
+}
+
+void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, PlaceTextParams params TL_LPD) {
+	v2s char_position = {};
+
+	placer->quads.clear();
+	placer->lines.clear();
+	placer->cursor_positions.clear();
+	placer->bounds.min = max_value<v2s>;
+	placer->bounds.max = min_value<v2s>;
+	placer->line_count = 1;
+	placer->height = 0;
 
 	aabb<s32> line_x_bounds = {max_value<s32>, min_value<s32>};
 	umm line_begin_index = 0;
 	
 	s32 max_line_width = 0;
 
-	auto current_char = text.data;
-
-	utf8 *word_start = text.begin();
+	auto word_start = reader.checkpoint();
 	umm word_start_index = 0;
 	bool can_wrap = false;
 	
-	PlacedText::Char c = {};
+	TextPlacer::Quad c = {};
 	#if TL_FONT_USE_SPECIAL_CODES
 	c.color = params.default_color;
 	#endif
 
-	while (current_char < text.end()) {
+	auto &atlas = collection->atlas;
+	auto &char_infos = atlas.areas;
+	
+	_ensure_all_chars_present(collection, reader, params.font_size);
+
+	auto get_char_info = [&](utf32 ch) {
+		auto found = collection->rendered_chars.find({ch, params.font_size});
+		if (found)
+			return char_infos[*found.value];
+		found = collection->rendered_chars.find({U'?', params.font_size});
+		if (found)
+			return char_infos[*found.value];
+		return char_infos[0];
+	};
+
+	u32 line_spacing = 0;
+	
+	placer->cursor_positions.add({.x = 0, .line = 0});
+
+	while (!reader.empty()) {
 		utf32 code_point = {};
 		FontChar d = {};
 
-		#define read_char()                                        \
-			{                                                      \
-				auto got_char = decode_and_advance(&current_char); \
-				if (!got_char) {                                   \
-					break;                                         \
-				}                                                  \
-				code_point = got_char.value();                     \
-				d = get_char_info(code_point, font);               \
-			}
+		#define read_char()                    \
+			do {                               \
+				code_point = reader.next();    \
+				if (!code_point)               \
+					break;                     \
+				d = get_char_info(code_point); \
+			} while (0)
 
 		read_char();
 
 		#if TL_FONT_USE_SPECIAL_CODES
-		if (code_point == TL_FONT_SPECIAL_CODE_PREFIX) {
+		if (code_point == TL_FONT_SPECIAL_CODE_PREFIX && params.use_codes) {
 			read_char();
-
+			placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 			if (code_point == TL_FONT_SPECIAL_CODE_PREFIX) {
 				// Escaped $
 			} else {
@@ -527,78 +516,110 @@ PlacedText place_text(Span<utf8> text, SizedFont *font, PlaceTextParams params T
 				read_char();
 				c.color.b = hex_digit_to_int(code_point); 
 				read_char();
+				placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
+				placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
+				placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 			}
 		}
 		#endif
 
 		if (is_whitespace(code_point)) {
-			word_start = current_char;
-			word_start_index = result.chars.count;
+			word_start = reader.checkpoint();
+			word_start_index = placer->quads.count;
 			can_wrap = true;
 		}
 
 		if (code_point == '\n') {
-			result.lines.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
+			placer->lines.add({
+				.begin_index = line_begin_index,
+				.end_index = placer->quads.count,
+				.size = {line_x_bounds.size(), (s32)line_spacing},
+			});
 			max_line_width = max(max_line_width, line_x_bounds.size());
 			line_x_bounds = {max_value<s32>, min_value<s32>};
 			char_position.x = 0;
-			char_position.y += font->line_spacing;
-			result.line_count += 1;
-			line_begin_index = result.chars.count;
-		} else {
-			auto place_char = [&] {
-				c.position.min = {char_position.x + d.offset.x, char_position.y + (s32)font->size - d.offset.y};
-				c.position.max = c.position.min + (v2s)d.size;
-			};
+			char_position.y += line_spacing;
+			placer->line_count += 1;
+			line_begin_index = placer->quads.count;
+
+			placer->height += line_spacing;
+			line_spacing = 0;
+
+			d = {};
+		}
+
+		auto place_char = [&] {
+			c.position.min = {char_position.x + d.offset.x, char_position.y + d.offset.y};
+			c.position.max = c.position.min + (v2s)d.rect.size();
+		};
+
+		place_char();
+
+		if (params.wrap && can_wrap && c.position.max.x > params.width) {
+			can_wrap = false;
+
+			reader.reset(word_start);
+			read_char();
+
+			placer->quads.resize(word_start_index);
+
+			char_position.x = 0;
+			char_position.y += line_spacing;
+			placer->line_count += 1;
+			
+			placer->height += line_spacing;
+			line_spacing = 0;
 
 			place_char();
-
-			if (can_wrap && c.position.max.x > params.wrap_width) {
-				can_wrap = false;
-
-				current_char = word_start;
-				read_char();
-
-				result.chars.resize(word_start_index);
-
-				char_position.x = 0;
-				char_position.y += font->line_spacing;
-				result.line_count += 1;
-
-				place_char();
-			}
-
-			c.uv.min = (v2f)d.position / (v2f)font->atlas().size;
-			c.uv.max = c.uv.min + (v2f)d.size / (v2f)font->atlas().size;
-
-			result.bounds.max = max(result.bounds.max, c.position.max);
-			result.bounds.min = min(result.bounds.min, c.position.min);
-
-			result.chars.add(c TL_LA);
-
-			line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
-			line_x_bounds.max = max(line_x_bounds.max, c.position.max.x);
-
-			char_position.x += d.advance.x;
 		}
+
+		c.uv.min = d.rect.min;
+		c.uv.max = d.rect.max;
+
+		placer->bounds.max = max(placer->bounds.max, c.position.max);
+		placer->bounds.min = min(placer->bounds.min, c.position.min);
+		
+		placer->quads.add(c TL_LA);
+
+		line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
+		line_x_bounds.max = max(line_x_bounds.max, c.position.max.x);
+
+		char_position.x += d.advance.x;
+
+		// FIXME: this is wrong.
+		// baseline of the next line should be calculated by adding max ascent and max descent
+		line_spacing = max(line_spacing, d.line_spacing);
+
+		placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 
 		#undef read_char
 	}
 	
-	result.lines.add({.begin_index = line_begin_index, .end_index = result.chars.count, .width = line_x_bounds.size()});
+	placer->height += line_spacing;
+	
+	placer->lines.add({
+		.begin_index = line_begin_index,
+		.end_index = placer->quads.count,
+		.size = {line_x_bounds.size(), (s32)line_spacing},
+	});
 	max_line_width = max(max_line_width, line_x_bounds.size());
 
-	for (auto &line : result.lines) {
-		for (umm i = line.begin_index; i < line.end_index; ++i) {
-			s32 offset = round_to_int((max_line_width - line.width) * params.line_alignment);
-			result.chars[i].position.min.x += offset;
-			result.chars[i].position.max.x += offset;
+	if (params.line_alignment) {
+		for (auto &line : placer->lines) {
+			for (umm i = line.begin_index; i < line.end_index; ++i) {
+				s32 offset = round_to_int((max_line_width - line.size.x) * params.line_alignment);
+				placer->quads[i].position.min.x += offset;
+				placer->quads[i].position.max.x += offset;
+			}
 		}
 	}
-
-	return result;
 }
-
+void TextPlacer::place(FontCollection *collection, Span<utf8> text, PlaceTextParams params TL_LPD) {
+	_place_text(this, collection, Utf8Reader{.cursor = text.data, .end = text.end()}, params TL_LA);
+}
+void TextPlacer::place(FontCollection *collection, Span<utf32> text, PlaceTextParams params TL_LPD) {
+	_place_text(this, collection, Utf32Reader{.cursor = text.data, .end = text.end()}, params TL_LA);
+}
 }
 
 #endif

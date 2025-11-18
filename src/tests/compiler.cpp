@@ -2,6 +2,8 @@
 #include <tl/console.h>
 using namespace tl;
 
+#if COMPILER_MSVC
+
 struct EmptyStruct {
 };
 
@@ -315,5 +317,12 @@ void test_demangler() {
 	assert(as_span(b) == demangled)
 
 	TESTS;
+}
+#endif
+
+#else
+void compiler_test() {
+}
+void test_demangler() {
 }
 #endif

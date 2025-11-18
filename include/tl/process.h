@@ -62,8 +62,10 @@ inline Process start_process(Span<utf8> command_line) {
 	return start_process(TL_TMP(to_utf16(command_line, true)).data);
 }
 
-inline void start_process(Span<utf8> command_line, auto on_output) {
+inline Optional<u32> start_process(Span<utf8> command_line, auto on_output) {
 	auto process = start_process(command_line);
+	if (!is_valid(process))
+		return {};
 	while (true) {
 		u8 buffer[256];
 		auto bytes_read = process.standard_out->read(array_as_span(buffer));
@@ -72,7 +74,9 @@ inline void start_process(Span<utf8> command_line, auto on_output) {
 		}
 		on_output(Span(buffer, bytes_read));
 	}
+	auto code = get_exit_code(process);
 	free(process);
+	return code;
 }
 
 inline List<u8> start_process_and_get_output(Span<utf8> command_line) {

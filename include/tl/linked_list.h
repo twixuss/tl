@@ -1,41 +1,28 @@
 #pragma once
 
 #include "common.h"
+#if TL_DEBUG
+#include "list.h" // debug_check
+#endif
 
 namespace tl {
 
 template <class T, class Allocator = Allocator>
 struct LinkedList {
 	using Element = T;
+	using Iterator = T *;
 
 	struct Node {
 		T value;
-		Node *next;
+		Node *prev = 0;
+		Node *next = 0;
 	};
-	struct Iterator {
-		Node *node;
+	
+	Allocator allocator = Allocator::current();
+	Node *head = 0;
+	Node *tail = 0;
 
-		Iterator() : node() {}
-		Iterator(Node *node) : node(node) {}
-		T &operator*() { return node->value; }
-		Iterator &operator++() {
-			node = node->next;
-			return *this;
-		}
-		Iterator operator++(int) {
-			Node *prev = node;
-			node = node->next;
-			return prev;
-		}
-		bool operator==(Iterator const &that) const { return node == that.node; }
-		bool operator!=(Iterator const &that) const { return node != that.node; }
-		T *operator->() { return std::addressof(node->value); }
-		explicit operator bool() { return node; }
-	};
-
-	LinkedList() = default;
-
-	umm size() const {
+	umm count() const {
 		umm result = 0;
 		Node *node = head;
 		while (node) {
@@ -54,51 +41,94 @@ struct LinkedList {
 		}
 		return node->value;
 	}
+	
+	// Use `unlink` if freeing is unwanted.
+	void erase(Node *node) {
+		unlink(node);
+		allocator.free_t(node, 1);
+	}
+
+	void erase(T *value) {
+		Node *node = (Node *)((u8 *)value - offsetof(Node, value));
+		erase(node);
+	}
 
 	void erase_at(umm index) {
-		Node *prev = 0;
 		Node *node = head;
 		while (index) {
 			--index;
-			prev = node;
 			node = node->next;
 			bounds_check(assert(node));
 		}
 
-		if (prev) {
-			prev->next = node->next;
-			if (!node->next)
-				tail = prev;
-		} else {
-			head = node->next;
-		}
-
-		allocator.free(node);
+		erase(node);
 	}
 
-	T &add_steal(Node *node) {
-		assert_equal(node->next, 0);
-		if (head == 0) {
-			head = tail = node;
+	Node *unlink(Node *node) {
+		auto old_head = head;
+		auto old_tail = tail;
+
+		debug_check();
+		defer { debug_check(); };
+		
+		if (node->prev) {
+			if (node->next) {
+				node->prev->next = node->next;
+				node->next->prev = node->prev;
+			} else {
+				node->prev->next = 0;
+				tail = node->prev;
+			}
 		} else {
-			assert(!tail->next);
-			tail = tail->next = node;
+			if (node->next) {
+				node->next->prev = 0;
+				head = node->next;
+			} else {
+				head = 0;
+				tail = 0;
+			}
+		}
+
+		node->prev = 0;
+		node->next = 0;
+
+		return node;
+	}
+
+	// node must be not linked
+	T &add(Node *node) {
+		debug_check();
+		defer { debug_check(); };
+
+		assert_equal(node->prev, 0, "node is referenced, unlink first");
+		assert_equal(node->next, 0, "node is referenced, unlink first");
+
+		if (head == 0) {
+			head = node;
+			tail = node;
+		} else {
+			tail->next = node;
+			node->prev = tail;
+			tail = node;
 		}
 		return node->value;
 	}
 
 	T &add(T value TL_LP) {
-		auto &result = add_steal(allocator.template allocate<Node>(TL_LAC));
+		auto &result = add(allocator.template allocate<Node>(TL_LAC));
 		memcpy(&result, &value, sizeof(value));
 		return result;
 	}
 	T &add(TL_LPC) {
-		auto &result = add_steal(allocator.template allocate<Node>(TL_LAC));
+		auto &result = add(allocator.template allocate<Node>(TL_LAC));
 		new (&result) T();
 		return result;
 	}
 
 	void clear() {
+		debug_check();
+		defer { debug_check(); };
+
 		auto node = head;
 		while (node) {
 			auto next = node->next;
@@ -108,121 +138,215 @@ struct LinkedList {
 		head = 0;
 		tail = 0;
 	}
+	
+	Optional<T> pop_first() {
+		debug_check();
+		defer { debug_check(); };
 
-	Optional<T> pop() {
-		if (!tail)
+		if (!head)
 			return {};
 
-		Node *prev = 0;
-		auto node = head;
-		while (node != tail) {
-			prev = node;
-			node = node->next;
+		auto result = head->value;
+
+		allocator.free(head);
+
+		head = head->next;
+
+		if (head) {
+			head->prev = 0;
+		} else {
+			tail = 0;
 		}
+
+		return result;
+	}
+
+	Optional<T> pop_last() {
+		debug_check();
+		defer { debug_check(); };
+
+		if (!tail)
+			return {};
 
 		auto result = tail->value;
 
 		allocator.free(tail);
 
-		if (prev) {
-			tail = prev;
+		tail = tail->prev;
+
+		if (tail) {
 			tail->next = 0;
 		} else {
-			head = tail = 0;
+			head = 0;
 		}
 
 		return result;
 	}
 
-	umm count() {
-		umm result = 0;
+	Optional<T> pop() { return pop_last(); }
+	
+	void free() {
+		debug_check();
+		defer { debug_check(); };
+
 		auto node = head;
 		while (node) {
-			result += 1;
+			auto next = node->next;
+			allocator.free(node);
+			node = next;
+		}
+		head = 0;
+		tail = 0;
+	}
+	
+	template <ForEachFlags flags = 0>
+	bool for_each(std::invocable<Iterator> auto &&in_fn) {
+		debug_check();
+		defer { debug_check(); };
+
+		auto fn = wrap_foreach_fn<Iterator>(in_fn);
+		auto node = head;
+		while (node) {
+			auto d = fn(&node->value);
+			switch (d & ForEach_erase_mask) {
+				case ForEach_erase:
+				case ForEach_erase_unordered:
+					erase(node);
+					break;
+			}
+			if (d & ForEach_break)
+				return true;
+
 			node = node->next;
 		}
+		return false;
+	}
+	
+	auto &front(this auto &&self) { bounds_check(assert(self.head)); return self.head->value; }
+	auto &back(this auto &&self) { bounds_check(assert(self.head)); return self.tail->value; }
+
+	
+	struct CppIterator {
+		Node *node;
+
+		CppIterator() : node() {}
+		CppIterator(Node *node) : node(node) {}
+		T &operator*() { return node->value; }
+		CppIterator &operator++() {
+			node = node->next;
+			return *this;
+		}
+		CppIterator operator++(int) {
+			Node *prev = node;
+			node = node->next;
+			return prev;
+		}
+		bool operator==(CppIterator const &that) const { return node == that.node; }
+		bool operator!=(CppIterator const &that) const { return node != that.node; }
+		T *operator->() { return std::addressof(node->value); }
+		explicit operator bool() { return node; }
+	};
+	
+	CppIterator begin() { return head; }
+	CppIterator end() { return {}; }
+
+
+	template <bool is_const>
+	struct Iter {
+		LinkedList *list = 0;
+		Node *node = 0;
+		bool should_advance = true;
+		bool reverse = false;
+
+		explicit operator bool() {
+			return node;
+		}
+		void next() {
+			if (should_advance) {
+				node = reverse ? node->prev : node->next;
+			}
+			should_advance = true;
+		}
+		auto &operator*() {
+			return node->value;
+		}
+		auto pointer() { return &node->value; }
+		auto &value() { return node->value; }
+
+		void erase() requires(!is_const) {
+			auto next_node = reverse ? node->prev : node->next;
+			list->erase(node);
+			node = next_node;
+			should_advance = false;
+		}
+	};
+
+	struct IterOptions {
+		bool reverse = false;
+	};
+
+	auto iter(this auto &&self, IterOptions options = {}) {
+		Iter<tl_self_const> result = {(LinkedList *)&self};
+		result.reverse = options.reverse;
+		result.node = options.reverse ? self.tail : self.head;
 		return result;
 	}
 
-	T &front() { bounds_check(assert(head); return head->value; )}
-	T const &front() const { bounds_check(assert(head); return head->value; )}
+	void debug_check() {
+		#if 0
+		if (head) {
+			assert(tail);
+		} else {
+			assert(!tail);
+		}
 
-	T &back() { bounds_check(assert(head); return tail->value; )}
-	T const &back() const { bounds_check(assert(head); return tail->value; )}
+		List<Node *, DefaultAllocator> nodes;
+		Node *node = head;
+		Node *prev = 0;
+		while (node) {
+			assert(node->prev == prev);
+			nodes.add(node);
+			prev = node;
+			node = node->next;
+		}
 
-	Iterator begin() { return head; }
-	Iterator end() { return {}; }
-
-	Allocator allocator = Allocator::current();
-	Node *head = 0;
-	Node *tail = 0;
+		node = tail;
+		Node *next = 0;
+		umm i = nodes.count - 1;
+		while (node) {
+			assert(node->next == next);
+			assert(node == nodes[i--]);
+			next = node;
+			node = node->prev;
+		}
+		#endif
+	}
 };
 
-template <class T, class Allocator>
-void free(LinkedList<T, Allocator> &list) {
-	auto node = list.head;
-	while (node) {
-		auto next = node->next;
-		list.allocator.free(node);
-		node = next;
-	}
-	list.head = 0;
-	list.tail = 0;
 }
 
-template <class T, class Allocator>
-void erase(LinkedList<T, Allocator> &list, T *value) {
-	using Node = typename LinkedList<T, Allocator>::Node;
-	Node *node = list.head;
-	Node *prev_node = 0;
-	while (node) {
-		if (value == &node->value) {
-			if (prev_node) {
-				prev_node->next = node->next;
-			}
-			if (node == list.head) list.head = list.head->next;
-			if (node == list.tail) list.tail = prev_node;
-			list.allocator.free(node);
-			return;
-		}
-		prev_node = node;
-		node = node->next;
-	}
-	bounds_check(assert(false));
-}
+#ifdef TL_ENABLE_TESTS
 
-template <class T, class Allocator, class Predicate>
-T *find_if(LinkedList<T, Allocator> list, Predicate &&predicate) {
-	auto node = list.head;
-	while (node) {
-		if (predicate(node->value))
-			return &node->value;
-		node = node->next;
-	}
-	return 0;
-}
+TL_TEST(LinkedList) {
+	using namespace tl;
 
-template <ForEachFlags flags, class T, class Allocator, class Fn>
-bool for_each(LinkedList<T, Allocator> list, Fn &&fn) {
-	auto node = list.head;
-	while (node) {
-		if constexpr (std::is_same_v<decltype(fn(*(T*)0)), ForEachDirective>) {
-			auto d = fn(node->value);
-			if (d & ForEach_erase) not_implemented();
-			if (d & ForEach_erase_unordered) not_implemented();
-			if (d & ForEach_break)
-				return true;
-		} else {
-			fn(node->value);
-		}
-		node = node->next;
-	}
-	return false;
-}
+	LinkedList<int> list;
+	list.add(1);
+	list.add(4);
+	list.add(9);
+	list.add(16);
+	assert(list.count() == 4);
+	assert(find(list, 1));
+	assert(find(list, 4));
+	assert(find(list, 9));
+	assert(find(list, 16));
 
-template <class T, class Allocator>
-umm count_of(LinkedList<T, Allocator> list) {
-	return list.count();
-}
+	list.erase(find(list, 4));
+	assert(list.count() == 3);
+	assert(find(list, 1));
+	assert(!find(list, 4));
+	assert(find(list, 9));
+	assert(find(list, 16));
+};
 
-}
+#endif

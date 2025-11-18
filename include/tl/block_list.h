@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "static_list.h"
 
 namespace tl {
 
@@ -68,7 +69,7 @@ struct StaticBlockList {
 		T &operator*() { return (*block)[value_index]; }
 	};
 
-	Allocator allocator = Allocator::current();
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Block first;
 	Block *last = &first;
 	Block *alloc_last = &first;
@@ -371,7 +372,7 @@ struct BlockList {
 
 		Span<T> span() { return {data(), count}; }
 
-		T &operator[](umm i) { bounds_check(assert(i < count); return data()[i]; )}
+		T &operator[](umm i) { bounds_check(assert(i < count)); return data()[i]; }
 	};
 	struct Index {
 		Block *block;

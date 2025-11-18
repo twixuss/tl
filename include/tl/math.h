@@ -1,9 +1,11 @@
-#pragma once
+#ifndef TL_MATH_H
+#define TL_MATH_H
 #include "common.h"
 #include "array.h"
 #include "simd_macros.h"
 #include "string.h"
 #include "vector.h"
+#include "static_list.h"
 
 #if COMPILER_MSVC
 #pragma warning(push, 0)
@@ -476,6 +478,32 @@ forceinline v2s frac(v2s v, v2s s) {
 	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
 	return *(v2s *)&result;
 }
+forceinline v4s frac(v4s v, v4s s) {
+	__m128i vm = _mm_loadu_si128((__m128i *)&v);
+	__m128i sm = _mm_loadu_si128((__m128i *)&s);
+
+	__m128i vm0 = vm;
+	__m128i vm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(vm), _mm_castsi128_ps(vm)));
+
+	__m128i sm0 = sm;
+	__m128i sm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(sm), _mm_castsi128_ps(sm)));
+
+	__m128d v0 = _mm_cvtepi32_pd(vm0);
+	__m128d v1 = _mm_cvtepi32_pd(vm1);
+	__m128d s0 = _mm_cvtepi32_pd(sm0);
+	__m128d s1 = _mm_cvtepi32_pd(sm1);
+
+	__m128i r0 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v0, s0)));
+	__m128i r1 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v1, s1)));
+
+	__m128i r = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(r0), _mm_castsi128_ps(r1)));
+
+	r = _mm_sub_epi32(vm, _mm_mullo_epi32(r, sm));
+	return *(v4s *)&r;
+}
+forceinline v3s frac(v3s v, v3s s) {
+	return frac(V4s(v, 1), V4s(s, 1)).xyz;
+}
 #endif
 
 forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
@@ -571,6 +599,31 @@ forceinline constexpr auto bezier_derivative(T a, T b, T c, T d, Float t) {
 	return -3*a + 3*b + t * (6*a - 12*b + 6*c + 3 * t * (-a + 3*b - 3*c + d));
 }
 
+// ax^2 + bx + c
+template <class T>
+struct Quadratic {
+	T a, b, c;
+};
+
+template <class T>
+forceinline constexpr T evaluate(Quadratic<T> q, T x) {
+	T x2 = x*x;
+	return q.a*x2 + q.b*x + q.c;
+}
+
+template <class T>
+forceinline constexpr T derivative(Quadratic<T> q, T x) {
+	return 2*q.a*x + q.b;
+}
+
+template <class T>
+forceinline Quadratic<T> quadratic_y0y1d0(T y0, T y1, T d0) {
+	auto a = y1 - d0 - y0;
+	auto b = d0;
+	auto c = y0;
+	return {a, b, c};
+}
+
 // ax^3 + bx^2 + cx + d
 template <class T>
 struct Cubic {
@@ -591,7 +644,7 @@ forceinline constexpr T derivative(Cubic<T> c, T x) {
 }
 
 template <class T>
-Cubic<T> cubic_2y2d(T y0, T y1, T d0, T d1) {
+Cubic<T> cubic_y0y1d0d1(T y0, T y1, T d0, T d1) {
     T r1 = y1 - y0 - convert<T>(0);
     T r2 = d1 - d0;
     T a = r2 - convert<T>(2) * r1;
@@ -627,16 +680,16 @@ forceinline constexpr auto relatively_equal(T a, T b, T relative_epsilon) {
 forceinline f32 set_sign(f32 dst, f32 src) { return copysignf(dst, src); }
 forceinline f64 set_sign(f64 dst, f64 src) { return copysign(dst, src); }
 
-forceinline s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-forceinline s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
+forceinline constexpr s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 
 forceinline f32 sign(f32 v) { return set_sign(1.0f, v); }
 
-template <class T> forceinline v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
-template <class T> forceinline v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
-template <class T> forceinline v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
+template <class T> forceinline constexpr v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
+template <class T> forceinline constexpr v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
+template <class T> forceinline constexpr v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
 
 forceinline f32 trunc(f32 v) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
 forceinline v2f trunc(v2f v) { return {trunc(v.x), trunc(v.y)}; }
@@ -970,7 +1023,7 @@ forceinline f32 angle(v2f a, v2f b) {
 }
 
 forceinline f32 angle(v3f a, v3f b) {
-	return acos(dot(a, b)/sqrt(length_squared(a) * length_squared(b)));
+	return acos(clamp(dot(a, b)/sqrt(length_squared(a) * length_squared(b)), -1.0f, +1.0f));
 }
 
 forceinline f32 cos01(f32 t) { return 0.5f - cosf(t * pi) * 0.5f; }
@@ -1921,12 +1974,12 @@ struct RaycastHit {
 };
 
 template <class Vector>
-RaycastHit<Vector> min(RaycastHit<Vector> a, RaycastHit<Vector> b) {
+forceinline constexpr RaycastHit<Vector> min(RaycastHit<Vector> a, RaycastHit<Vector> b) {
 	return a.distance < b.distance ? a : b;
 }
 
 template <class Vector>
-Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<RaycastHit<Vector>> b) {
+forceinline constexpr Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<RaycastHit<Vector>> b) {
 	if (a) {
 		if (b) {
 			return a.value().distance < b.value().distance ? a : b;
@@ -1939,6 +1992,24 @@ Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, Optional<Raycas
 		} else {
 			return {};
 		}
+	}
+}
+
+template <class Vector>
+forceinline constexpr Optional<RaycastHit<Vector>> min(Optional<RaycastHit<Vector>> a, RaycastHit<Vector> b) {
+	if (a) {
+		return a.value().distance < b.distance ? a : b;
+	} else {
+		return b;
+	}
+}
+
+template <class Vector>
+forceinline constexpr Optional<RaycastHit<Vector>> min(RaycastHit<Vector> a, Optional<RaycastHit<Vector>> b) {
+	if (b) {
+		return a.distance < b.value().distance ? a : b;
+	} else {
+		return a;
 	}
 }
 
@@ -1976,11 +2047,21 @@ forceinline Optional<RaycastHit<Vector>> raycast(ray<Vector> ray, sphere<Vector>
 	if (d < 0)
 		return {};
 
-	auto point = ray.origin + ray.direction * ((-b - sqrt(d)) / 2);
+	d = sqrt(d);
+
+	float t = b + d;
+	if (t > 0)
+		t = b - d;
+	if (t > 0)
+		return {};
+
+	t = t * -0.5f;
+
+	auto point = ray.origin + ray.direction * t;
 	return RaycastHit<Vector>{
 		.position = point,
 		.normal = normalize(point - sphere.center),
-		.distance = distance(ray.origin, point),
+		.distance = t,
 	};
 }
 
@@ -2227,18 +2308,31 @@ union m4 {
 		}};
 	}
 	static forceinline m4 perspective_right_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
-		f32 xymax = nz * tan(fov * 0.5f);
+		f32 h = 1.0f / tan(fov * 0.5f);
+		f32 w = h / aspect;
 		f32 depth = fz - nz;
 		f32 q = -(fz + nz) / depth;
 		f32 qn = -2 * (fz * nz) / depth;
-		f32 h = nz / xymax;
-		f32 w = h / aspect;
 
 		return {.s = {
 			w, 0, 0, 0,
 			0, h, 0, 0,
 			0, 0, q, -1,
 			0, 0, qn, 0,
+		}};
+	}
+	static forceinline m4 perspective_right_handed_invz(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		f32 h = 1.0f / tan(fov * 0.5f);
+		f32 w = h / aspect;
+		f32 depth = fz - nz;
+		f32 q = -(fz + nz) / depth;
+		f32 qn = -2 * (fz * nz) / depth;
+
+		return {.s = {
+			w, 0,  0,  0,
+			0, h,  0,  0,
+			0, 0, -q-1, -1,
+			0, 0, -qn,  0,
 		}};
 	}
 	static forceinline m4 ortho_right_handed(f32 height, f32 aspect, f32 nz, f32 fz) {
@@ -2506,13 +2600,13 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 	}
 	return planes;
 }
-forceinline bool contains_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
+forceinline bool overlaps_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 #if ARCH_AVX2
 	using namespace simd;
-	f32x8 plane_x = f32x8_set(planes[0].x, planes[1].x, planes[2].x, planes[3].x, planes[4].x, planes[5].x, 0, 0);
-	f32x8 plane_y = f32x8_set(planes[0].y, planes[1].y, planes[2].y, planes[3].y, planes[4].y, planes[5].y, 0, 0);
-	f32x8 plane_z = f32x8_set(planes[0].z, planes[1].z, planes[2].z, planes[3].z, planes[4].z, planes[5].z, 0, 0);
-	f32x8 plane_w = f32x8_set(planes[0].w, planes[1].w, planes[2].w, planes[3].w, planes[4].w, planes[5].w, 0, 0);
+	f32x8 plane_x = f32x8_set(planes.data[0].x, planes.data[1].x, planes.data[2].x, planes.data[3].x, planes.data[4].x, planes.data[5].x, 0, 0);
+	f32x8 plane_y = f32x8_set(planes.data[0].y, planes.data[1].y, planes.data[2].y, planes.data[3].y, planes.data[4].y, planes.data[5].y, 0, 0);
+	f32x8 plane_z = f32x8_set(planes.data[0].z, planes.data[1].z, planes.data[2].z, planes.data[3].z, planes.data[4].z, planes.data[5].z, 0, 0);
+	f32x8 plane_w = f32x8_set(planes.data[0].w, planes.data[1].w, planes.data[2].w, planes.data[3].w, planes.data[4].w, planes.data[5].w, 0, 0);
 	f32x8 position_x = f32x8_set1(position.x);
 	f32x8 position_y = f32x8_set1(position.y);
 	f32x8 position_z = f32x8_set1(position.z);
@@ -2605,25 +2699,25 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 
 } // namespace ce
 
-forceinline umm append(StringBuilder &builder, FormatFloat<v2f> f) {
-	return append_format(builder, "({}, {})",
+forceinline void append(StringBuilder &builder, FormatFloat<v2f> f) {
+	return append_format(builder, "{{{}, {}}}",
 		FormatFloat{.value = (f32)f.value.x, .precision = f.precision, .format = f.format},
 		FormatFloat{.value = (f32)f.value.y, .precision = f.precision, .format = f.format}
 	);
 }
 
-forceinline umm append(StringBuilder &builder, m4 m) {
-	return append_format(builder, "({}, {}, {}, {})", m.i, m.j, m.k, m.l);
+forceinline void append(StringBuilder &builder, m4 m) {
+	return append_format(builder, "{{{}, {}, {}, {}}}", m.i, m.j, m.k, m.l);
 }
 
 template <class T>
-umm append(StringBuilder &builder, aabb<T> v) {
-	return append_format(builder, "(min={}, max={})"s, v.min, v.max);
+void append(StringBuilder &builder, aabb<T> v) {
+	return append_format(builder, "{{.min={}, .max={}}}"s, v.min, v.max);
 }
 
 template <class T>
-umm append(StringBuilder &builder, ray<T> r) {
-	return append_format(builder, "(origin={}, direction={})", r.origin, r.direction);
+void append(StringBuilder &builder, ray<T> r) {
+	return append_format(builder, "{{.origin={}, .direction={}}}", r.origin, r.direction);
 }
 
 template <class T>
@@ -2664,8 +2758,9 @@ template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclam
 #endif
 
 template <class T>
-tl::u64 get_hash(tl::aabb<T> const &x) {
+constexpr tl::u64 get_hash(tl::aabb<T> const &x) {
 	return 
 		get_hash(x.min) * 13043817825332782231ull +
 		get_hash(x.max) * 6521908912666391129ull;
 }
+#endif

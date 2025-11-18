@@ -20,7 +20,7 @@ struct ReusableFiber : Fiber {
 		bool should_jump_back = false;
 	};
 
-	Allocator allocator = Allocator::current();
+	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Data *data = 0; // Needs to be stable in memory.
 };
 

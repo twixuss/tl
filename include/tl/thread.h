@@ -1,7 +1,8 @@
 #pragma once
 #include "function.h"
-#include "optional.h"
 #include "list.h"
+#include "queue.h"
+#include "sleep.h"
 
 #include <emmintrin.h>
 
@@ -15,9 +16,6 @@
 
 namespace tl {
 
-TL_API void sleep_milliseconds(u32 milliseconds);
-TL_API void sleep_seconds(u32 seconds);
-
 template <class T>
 concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
 
@@ -27,13 +25,13 @@ forceinline void yield_smt() { _mm_pause(); }
 
 TL_API void switch_thread();
 
-forceinline s16 atomic_increment(s16 volatile *a) { return _InterlockedIncrement16((short *)a); }
-forceinline s32 atomic_increment(s32 volatile *a) { return _InterlockedIncrement((long *)a); }
-forceinline s64 atomic_increment(s64 volatile *a) { return _InterlockedIncrement64((long long *)a); }
+forceinline s16 atomic_increment(s16 volatile *a) { return -1 + _InterlockedIncrement16((short *)a); }
+forceinline s32 atomic_increment(s32 volatile *a) { return -1 + _InterlockedIncrement((long *)a); }
+forceinline s64 atomic_increment(s64 volatile *a) { return -1 + _InterlockedIncrement64((long long *)a); }
 
-forceinline s16 atomic_decrement(s16 volatile *a) { return _InterlockedDecrement16((short *)a); }
-forceinline s32 atomic_decrement(s32 volatile *a) { return _InterlockedDecrement((long *)a); }
-forceinline s64 atomic_decrement(s64 volatile *a) { return _InterlockedDecrement64((long long *)a); }
+forceinline s16 atomic_decrement(s16 volatile *a) { return 1 + _InterlockedDecrement16((short *)a); }
+forceinline s32 atomic_decrement(s32 volatile *a) { return 1 + _InterlockedDecrement((long *)a); }
+forceinline s64 atomic_decrement(s64 volatile *a) { return 1 + _InterlockedDecrement64((long long *)a); }
 
 forceinline s8  atomic_add(s8  volatile *a, s8  b) { return _InterlockedExchangeAdd8((char *)a, (char)b); }
 forceinline s16 atomic_add(s16 volatile *a, s16 b) { return _InterlockedExchangeAdd16(a, b); }
@@ -129,6 +127,14 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 
 template <AInterlockExchangeable T>
 forceinline bool atomic_replace(T volatile *dst, T new_value, T condition) {
+	return atomic_compare_exchange(dst, new_value, condition) == condition;
+}
+
+// Argument order `new_value, condition` is not intuitive for me.
+// `condition, new_value` makes sense for switching states.
+// Like atomic_switch(a, b, c) means switch a from state b to state c.
+template <AInterlockExchangeable T>
+forceinline bool atomic_switch(T volatile *dst, T condition, T new_value) {
 	return atomic_compare_exchange(dst, new_value, condition) == condition;
 }
 
@@ -240,15 +246,22 @@ forceinline bool atomic_and(bool volatile *a, bool b) { return (bool)atomic_and(
 forceinline bool atomic_or (bool volatile *a, bool b) { return (bool)atomic_or ((u8 *)a, (u8)b); }
 forceinline bool atomic_xor(bool volatile *a, bool b) { return (bool)atomic_xor((u8 *)a, (u8)b); }
 
+extern TL_API FatFunctionPointer thread_initter;
+extern TL_API FatFunctionPointer thread_deinitter;
+
 #ifdef TL_IMPL
+
+TL_API FatFunctionPointer thread_initter = +[]{
+	init_allocator();
+	current_printer = standard_output_printer;
+};
+TL_API FatFunctionPointer thread_deinitter = +[]{
+	deinit_allocator();
+};
 
 #if OS_WINDOWS
 
-void sleep_milliseconds(u32 milliseconds) { Sleep(milliseconds); }
-void sleep_seconds(u32 seconds) { Sleep(seconds * 1000); }
 void switch_thread() { SwitchToThread(); }
-
-void init_logger_thread();
 
 void run_thread(Thread *thread) {
 	#ifdef TL_USE_CONTEXT
@@ -258,12 +271,10 @@ void run_thread(Thread *thread) {
 		auto thread = (Thread *)param;
 		#ifdef TL_USE_CONTEXT
 		registrate(thread->context);
-		#else
-		init_allocator();
-		defer {deinit_allocator();};
-		current_printer = standard_output_printer;
-		init_logger_thread();
 		#endif
+
+		thread_initter();
+		defer { thread_deinitter(); };
 		thread->function(thread);
 		return 0;
 	}, thread, 0, 0);
@@ -394,6 +405,7 @@ struct Scoped<SpinLock> {
 	}
 };
 
+// TODO: why indirection?
 struct TL_API OsLock {
 	TL_MAKE_FIXED(OsLock);
 
@@ -421,6 +433,20 @@ void lock(OsLock &m) {
 void unlock(OsLock &m) {
 	LeaveCriticalSection((CRITICAL_SECTION *)m.handle);
 }
+#elif OS_LINUX
+OsLock::OsLock() {
+	handle = DefaultAllocator{}.allocate<pthread_mutex_t>();
+	pthread_mutex_init((pthread_mutex_t*)handle, 0);
+}
+bool try_lock(OsLock &m) {
+	return pthread_mutex_trylock((pthread_mutex_t *)m.handle) == 0;
+}
+void lock(OsLock &m) {
+	pthread_mutex_lock((pthread_mutex_t *)m.handle);
+}
+void unlock(OsLock &m) {
+	pthread_mutex_unlock((pthread_mutex_t *)m.handle);
+}
 #endif
 #endif
 
@@ -444,33 +470,94 @@ concept ALock = requires (T t) {
 	unlock(t); 
 };
 
+// Usage of LockProtected:
+// 
+//    protected.use([&](Item &item) {
+//        item.modify();
+//    });
+// 
+//    You call `use` with lambda, it calls lock, invokes the lambda, calls unlock.
+//    `use` returns whatever the lamba returned, so you can use it as an expression.
+//    You can use `locked_use` macro to shorten the expression a bit:
+// 
+//    locked_use(protected) {
+//        protected.modify();
+//    };
+// 
+//    `locked_use` shadows `protected`. If you don't want that and want to assign a different name,
+//    use locked_use_expr
+// 
+//    Problem with this is unability to return values from the outer function from inside the lambda.
+//    For that there is scoped_locked_use. It is a statement that calls lock, defers call to unlock,
+//    and shadows the `variable` with `variable.unprotected`. You would use it like this:
+// 
+//    {
+//        scoped_locked_use(protected);
+//        return protected.modify();
+//    }
+//
+// https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGe1wAyeAyYAHI%2BAEaYxCCSAJykAA6oCoRODB7evnrJqY4CQSHhLFEx8baY9vkMQgRMxASZPn5cFVXptfUEhWGR0bEJCnUNTdmtQ109xaUDAJS2qF7EyOwc5gDMwcjeWADUJutuQ/ioAHQIB9gmGgCC1zcAbqh46Lu0qMgA1hCz%2BwDsFl2iWIwQIVAg5jM7y%2BJgArG4GJDZgdASY/gARe5PF67LwMaHfX5owHA0HgyF4glwhFIlH/TG3e5DYheBy7AIfT7KYioAiYByYV7E%2B67UW7Zmsgi7ACSfOITCIxH%2BVluYrV7M53N5/L5rwAVIl9ut0bsNCiRerRRFUJ5xQhFrR0AB9Smco0mqhiJTm1WW3ag3aoRLRBUkPU/ZUWv1igk/H03aNqgD0Sd2ACVMAQlgxdsRMFRoowVrsiECeXyBa9UBFtDrdghC1HE3ms8Qc5IzPHo2iGQm/dbbUGQ4qwGADuiILLhyRdmgGEN9mYAGwEBAK35zhfC32J3OZ7NA3aj8cltcEU6JLt%2BntNtXYqvB%2BWK6zWCPbvu7w0ns3rFUf9U3ju6oAH5Tk%2BJBvgCt5%2BngVC7BACj2l4jouvinJElBQG7qKrpfHGv7QZagH/mqxGkRi8b3NccRgaGSpRMAwSQYCLYHsSq54AopAliymA3r%2B9JURoNFynRuyuMxe6tjmwoUQJxFUXJf73AGLBMExGF/mqHJfFqFa6m8lFAaSgjkmYZhRPwebUoi5nIgRQFWfBTBeKWqi7CAbyaYRZZkhC5nWugACei6wugNmQtxqj2VpYpkWKJlgv5ZgsC86D0BFdlXqKTkQC5bkeV5kZYQlIKmclgUheYYWZWYUUxT5KbifUtAhaxbY%2Be1OZcNlgnGWVSWQkwVByrVDVAV1pqURRtwcPMtCcLCvB%2BBwWikKgnBuC%2BljiosyyYIu6w8KQBCaHN8yfCAZiwqcAAcsK3ZI6ySH8ZhHRofzxOs%2BicJIy1netnC8AoIAaCdZ3zHAsAwIgICLAQiSueQlBoCwiR0NEoSsKsqhLpIuwsAoDzILsDxcHEpwGHyQy8IKhAkC8ej8IIIhiOwUgyIIigqOoq06HoADu8qJJwPDzYt/184DHAAPKuYjUqoHBqi3UuAC0eO7MAyAk1wN1cPBHhoxjSobFwsy8KdfOzPMDZMFgMQ/KQl3rGYpzk2YXC3Rot1/HEcS3WYGgaNIC0cH9pAsCArvu2Yt3%2Bxoz3x29sLSCta0bRwwOg%2BD1ukFDsPwwryMQHTiqM60zPCKI4gc1X3NqADuh1ULTAi9wc0/RwS2kOnvCZ3LCOuYGcF4lgNAhK8EBG%2Bj9Cm29ZgW7nWg26QdsO5Q4vh7wUfPacsKfX7D0dkuXCu60ffS9nYNWyv%2BcwxASBF0jFAQKjs%2BY9jnC4/jhPE6T5NThPV2AANSEFwP47t1i03wOXdATNZCs1rtIeuShG5S10N9Vu7cxZdx7pfAe8th5K12D/AmRMSZkwpsAsBECoGG1QMbOeh11hL1vudNemB7b9CdmHCOu91inDMHEJcnt1je0ekuV2sJe4A0ztfZeHDLpnzum9YO6wlxxFhJor2dUw7QNkVLeRijIYPzMfAR%2BKBGEfzIK/d%2BJsQDAD1pXOgcoQYQAiADCIwR6hBVFrwbxzBiBBRljWHU/jSCozYIIGW%2BI/FSywBELwwA3BiFoCDDupAsBqSMOIBJeA8wODwA8TAGS1qYFUPyVyqw1qgkqADWgeAIjymCR4LAAMCAgijpkkpxBrRKHRJgHJwBGlGAhnwAwwAFAgLwJgAWMtgwrWOlXJB7MUGyAbrzNauhWgGDGaYSw1h9BNJBpAeYQZqgZLVjLdYuw1bHHHAcqwlgpB3IAOppPeRUzpTBdj916SCLApynZ2B1OkFwDB3CeGaP4SFUw%2BgxFaLkNIAhRgtCSCkFFDB4UlH6OMSoYKBCdBGNCsYbRCU1GGN0YIvRcWItsFStFegJgNBxTMc2CwlgrAkFvfBcjOCkNVhrfG2tdb63grgem88jpsIhhdEAsIwZ8J3tHN26xYTOIPs9SQ908aGIzkDWwOd2GmIsUgexc8S4Wv6NsQwwAg5cDBjQWgbjKCeKloE3xETPXBNCbWBwESomMAILE1qANEnJNSbQdJETsl2ryWtfAhTHAlLKbTSpyBqkAzqWHNajTmm%2BLaTUy2XSIm9P6ZgQZwzRmgDzlQSZ0zZnzMWRElZNc1mc3kGgrZ/M9F2pQNtGw%2BbgXnMSJczg1zbn3IIOFY0TzrCvLVh86NXzVA/P%2BdEQFpT4DzFBUU5wpdIVMtaIEGl0w8UYryOkY9l6sVsovXu6oxLGikvRY%2BjoVL730pZS%2BrIb7P1noRTyzl%2B1gNhz5UYgVKt1aa1tUYXYQd3anA0BK2BM4zayutrbLhG9eG/RVXvA%2B8RfZLg0KIv4XAlz6v7oakGN9xkF0sda2xKNrEOOJokRIToqFOiek6WhfwnRnydD/PgrjojuPdWtH18Tjoyb9eEzJQaYlxPDZgJJKS0kZOOnG3JxaskFLBamgGFSql8mzYIepUt80tKCkWjppaenRArVW%2BNwRa133rUwKZMy5kLMYK2xB7aJDrK5t2pu0d9D9vnZYY5EQR3rTHekDJSYZZmF2EmY4A7DkvPxkmN5EdUAApeNus55L91%2BEPVCv9sL0BfpyJi6oN7kXVHq/i9oRLGWvuZQSirz62sMq6Den9bXd17W5Ry8DksDUcFIZrP%2BlDAE0PAZAs%2BqGpWHXNpbOVnDuGOy3vw6OgiPrPREUuWEcQzAdj%2BHqghtHjU7Zdm7VWt11XmTeuTYS319HTZo1nEx98LHmNgE/IhBAS5lwZvAyuQW2Yhc7ZsiL0hsH%2BN5b96Wg8FYj0FTBkVOtdh63dgwph0RDqSEwyvbDe3N7OwVUq/DkdVXIYgRo265NJBfVe2nfl/26MA8Y6Doe4PX6Q8BQglmwW64bPCxghVpAUcdzR9RjHYPsfQeFbOPZwAEMaCQyh6ebHmEbFhBTjh68eEHYI5IWOIjrpcDev7SjCQ7u84e3nAXcMwcQ7Q2LmHEu4dS7CzzCLVGFe4Km8rwhQu1fzYoQA6htyBP0INyT6VS5Ter3N/truh31iCPuusYOS4lxs41Rzv4kf7v0aw7TxVXcDEu%2B2%2B74HsNmNWsN/0JxGqxMuok26rxPjgnesHyEsJAalOMOiSG1TCT1ORq07GoZ8b9NJqM9uqWpnM3maljmhpTTbP2alp0vA3TjrlpSJWpfuT3PjK8z5pt/mlm8DbQH0LXbg%2By9DtFwdcWEsXOSxOg8nOoOousurQKuj8n8utMVkCjuuVtUBCtVjCienCoBnSg1leqit1kio1ukANu%2Bp1kNtgfAR%2BpMGgeyoNiSjVuMABkUEBhygoONuzEri7jjhrqKgTuKhAJKoqJthnlTrhvKnXsqoznnpXq7tXnfB7m3nYh3jEHBvahoI6j3q6h4gPkErJgEiPgpuPsdMptPmGrPhplGjGpkrpiMivoZkUsZhvhmlmjvpZrmrwDZoWhgPpsfqfrwOfgMlfiMjfnWg2r5s2gFpki/sggjjLtsnLlrtls8kOicnAf/gIFckAeiDFhYKAZ8kut8vKBusQFuglgQZVq4DeqenQegTgZgRkMQS1ngeQQ%2Br1k%2Bl1tQSQYQayvUd%2Bs0cgZQdSuUeymNlyswXgujpnGwbBlrjrnrutrwRhk3pTrtoITngRjdHEDqoqsRnnrdL7BfDzgoiaoDiDlYqnu3qniABxlxjxnxgJkJusCJnqs6qoVJloRocPhoToVbHoZPsGqGvEomnPpptGtprwOYQmsCVYSmuvuUnYdvrUo4XvgWq0m4Q5ifmWs5hfq5tfmMgEd5o2n5i2qEbDuEagh/lEVRjEekb/okUlskZwJljOrEQunlgVnkQUXAUUYgaUagX0RerUVgS0bydih0T1h1pSkQS0UUf1kKTQWKd0SNlKQMaBpNhLOIXNr/HHlQkAonitsnjwehh9vwQsRbksaIVwMhmXlokocXlwPblouIXsY9nTvXiMYaiavKkuKtkdHjH8N6SXsJGRl3GYCqo6mDI3iYm6brkdLqnrGzkHGRjdgGSqv7KcP7CmamWmXaWGQmRma6aQL0qkM4JIEAA%3D%3D
 template <class T, ALock Lock>
 struct LockProtected {
 	TL_MAKE_FIXED(LockProtected);
 
 	using Value = T;
 
-	LockProtected() = default;
-	LockProtected(T value) : value(value) {}
+	forceinline LockProtected() = default;
+	forceinline LockProtected(T value) : unprotected(value) {}
 
 	template <class Fn>
-	decltype(auto) use(Fn fn) {
-		scoped(lock);
-		return fn(value);
+	forceinline decltype(auto) use(Fn fn) {
+		scoped(_lock);
+		return fn(unprotected);
 	}
 
 	template <class Fn>
-	decltype(auto) operator * (Fn fn) { return use(fn); }
+	forceinline decltype(auto) operator->*(Fn fn) { return use(fn); }
 
-	T &use_unprotected() { return value; }
-
-private:
-	Lock lock;
-	T value;
+	// private:
+	Lock _lock;
+	T unprotected;
 };
 
-#define locked_use_ret(name) name * [&](typename std::remove_cvref_t<decltype(name)>::Value &name)
-#define locked_use(name) locked_use_ret(name) -> decltype(auto)
+/*
+// Example usage:
+locked_use_expr(queue, context->queue) {
+	queue.push(42);
+};
+*/
+#define locked_use_ret_expr(name, expr) (expr) ->* [&](typename std::remove_cvref_t<decltype(expr)>::Value &name)
+#define locked_use_expr(name, expr) locked_use_ret_expr(name, expr) -> decltype(auto)
+
+/*
+// `name` must be a single identifier
+// Example usage:
+locked_use(queue) {
+	queue.push(42);
+};
+*/
+#define locked_use_ret(name) locked_use_ret_expr(name, name)
+#define locked_use(name) locked_use_expr(name, name)
+
+/*
+// Example usage:
+{
+	scoped_locked_use_expr(queue, some_state->the_queue);
+	queue.push(42);
+}
+*/
+#define scoped_locked_use_expr(name, expr) \
+	scoped((expr)._lock); \
+	REDECLARE_REF(name, (expr).unprotected)
+
+/*
+// Example usage:
+{
+	scoped_locked_use(queue);
+	queue.push(42);
+}
+*/
+#define scoped_locked_use(name) scoped_locked_use_expr(name, name)
 
 template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
@@ -487,13 +574,24 @@ struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 			}
 		});
 	}
-	Optional<T> pop() {
+	Optional<T> try_pop() {
 		return this->use([&](auto &queue) {
 			return queue.pop();
 		});
 	}
 	umm count() {
-		return this->use_unprotected().count;
+		return this->unprotected.count;
+	}
+
+	template <class DstAllocator, class DstSize>
+	void drain(List<T, DstAllocator, DstSize> &sink) {
+		this->use([&](auto &queue) {
+			sink.reserve(sink.count + queue.count);
+			for (auto span : queue.spans()) {
+				sink.add(span);
+			}
+			queue.clear();
+		});
 	}
 };
 
@@ -620,43 +718,87 @@ void ConditionVariable::unlock() {
 #endif
 
 template <class T, class Allocator = Allocator>
-struct SignalQueue : private Queue<T, Allocator> {
-	using Base = Queue<T, Allocator>;
+struct SignalQueue {
+	Queue<T, Allocator> queue;
+	ConditionVariable cv;
 
 	void push(T value) {
 		cv.section([&]{
-			Base::push(value);
+			queue.push(value);
 		});
 		cv.wake();
 	}
 
 	void push(Span<T> value) {
 		cv.section([&]{
-			Base::push(value);
+			queue.push(value);
 		});
 		cv.wake();
 	}
+	
+	Optional<T> try_pop() {
+		Optional<T> result;
 
-	Optional<T> pop(auto cancelled, u32 timeout = -1) {
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			result = queue.pop();
+		});
+
+		return result;
+	}
+	
+	// If the queue is empty, waits for `timeout`, checks availability again once and returns.
+	Optional<T> try_pop(u32 timeout) {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			result = queue.pop();
+			if (result) {
+				return;
+			}
+			sleeper.sleep(timeout);
+			result = queue.pop();
+		});
+
+		return result;
+	}
+	
+	// Wait until an element is available, or until the user cancels the operation.
+	// sleep_period determines the frequency with which the queue is checked for available elements.
+	Optional<T> pop(auto cancelled, u32 sleep_period = -1)
+		requires requires { { cancelled() } -> std::convertible_to<bool>; }
+	{
 		Optional<T> result;
 
 		cv.section([&] (ConditionVariable::Sleeper sleeper) {
 			while (!cancelled()) {
-				if (result = Base::pop()) {
+				if (result = queue.pop()) {
 					break;
 				} else {
-					sleeper.sleep(timeout);
+					sleeper.sleep(sleep_period);
 				}
 			}
 		});
 
 		return result;
 	}
-	T pop() {
-		return pop([] { return false; }).value();
+
+	// Wait until an element is available.
+	// sleep_period determines the frequency with which the queue is checked for available elements.
+	T pop(u32 sleep_period = -1) {
+		Optional<T> result;
+
+		cv.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (1) {
+				if (result = queue.pop()) {
+					break;
+				} else {
+					sleeper.sleep(sleep_period);
+				}
+			}
+		});
+
+		return result.value();
 	}
-private:
-	ConditionVariable cv;
 };
 
 enum WaitForCompletionOption {
@@ -884,8 +1026,14 @@ inline void TaskQueueThreadPool_default_worker_proc(TaskQueueThreadPool *pool) {
 	sync(pool->end_sync_point);
 }
 	
-#if !OS_LINUX
-// :NotImplemented: for linux because gcc is buggy and I don't want to deal with that right now
+struct TaskListsThreadPool;
+inline void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
+	
+// Not a nested struct cuz gcc is stupid
+struct TaskListsThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool_default_worker_proc;
+};
 
 // Runs the latest pushed tasks 
 struct TaskListsThreadPool {
@@ -1004,14 +1152,10 @@ struct TaskListsThreadPool {
 				}
 			}
 		}
+		friend void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskListsThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
@@ -1067,35 +1211,6 @@ struct TaskListsThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskListsThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-
-		while (1) {
-			Optional<TaskListsThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					if (task = pool->tasks.pop()) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				pool->run(task.value_unchecked());
-				pool->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-
 	TaskList create_task_list() {
 		return {this};
 	}
@@ -1132,6 +1247,45 @@ private:
 		task.free(task.param);
 		atomic_increment(&task.list->finished_task_count);
 	}
+
+	friend void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool);
+};
+
+void TaskListsThreadPool_default_worker_proc(TaskListsThreadPool *pool) {
+
+	sync(pool->start_sync_point);
+
+	while (1) {
+		Optional<TaskListsThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				if (task = pool->tasks.pop()) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			pool->run(task.value_unchecked());
+			pool->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
+
+// Not nested because gcc is shit
+struct TaskQueuesThreadPool;
+inline void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
+struct TaskQueuesThreadPoolInitParams {
+	void (*worker_initter)() = [](){};
+	void (*worker_proc)(TaskQueuesThreadPool *pool) = TaskQueuesThreadPool_default_worker_proc;
 };
 
 // Runs tasks in order of addition.
@@ -1182,7 +1336,8 @@ struct TaskQueuesThreadPool {
 			auto &shared = pool.shared;
 			locked_use(shared) {
 				//tasks = shared.unused_task_queues.pop().value_or({.allocator = pool.allocator});
-				tasks = {.allocator = pool.allocator};
+				tasks = {};
+				tasks.allocator = pool.allocator;
 				shared.task_queues.add(this);
 			};
 			#if TL_DEBUG
@@ -1227,9 +1382,34 @@ struct TaskQueuesThreadPool {
 
 		inline void wait_for_completion(WaitForCompletionOption option = WaitForCompletionOption::just_wait) {
 			switch (option) {
+				case WaitForCompletionOption::do_any_task: {
+					auto &shared = pool->shared;
+					while (1) {
+						Optional<Task> task;
+
+						{
+							scoped_locked_use(shared);
+							for (umm i = shared.task_queues.count - 1; i != -1; --i) {
+								task = shared.task_queues[i]->tasks.pop();
+								if (task) {
+									break;
+								}
+							}
+						}
+
+						if (task) {
+							REDECLARE_VAL(task, task.value_unchecked());
+							pool->run(task);
+							task.queue->completion_notifier.wake();
+						} else {
+							break;
+						}
+					}
+					goto wait;
+				}
 				case WaitForCompletionOption::do_my_task: // not implemented, fall through
-				case WaitForCompletionOption::do_any_task: // not implemented, fall through
 				case WaitForCompletionOption::just_wait: {
+				wait:
 					while (started_task_count > finished_task_count) {
 						completion_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
 							sleeper.sleep(1);
@@ -1268,22 +1448,18 @@ struct TaskQueuesThreadPool {
 			};
 			pool->new_work_notifier.wake();
 		}
+		friend void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
 	};
 
-	struct InitParams {
-		void (*worker_initter)() = [](){};
-		void (*worker_proc)(TaskQueuesThreadPool *pool) = TaskQueuesThreadPool::default_worker_proc;
-	};
-
-	inline bool init(u32 thread_count, InitParams params = {}) {
+	inline bool init(u32 thread_count, TaskQueuesThreadPoolInitParams params = {}) {
 		start_sync_point = create_sync_point(thread_count + 1); // sync workers and main thread
 		end_sync_point   = create_sync_point(thread_count + 1); // sync workers and main thread
 		stopped_thread_count = 0;
 		stopping = false;
 		allocator =
 			threads.allocator =
-			shared.use_unprotected().task_queues.allocator =
-			//shared.use_unprotected().unused_task_queues.allocator =
+			shared.unprotected.task_queues.allocator =
+			//shared.unprotected.unused_task_queues.allocator =
 			TL_GET_CURRENT(allocator);
 		if (thread_count) {
 			threads.reserve(thread_count);
@@ -1334,47 +1510,6 @@ struct TaskQueuesThreadPool {
 		threads.clear();
 	}
 
-	inline static void default_worker_proc(TaskQueuesThreadPool *pool) {
-
-		sync(pool->start_sync_point);
-		
-		auto &shared = pool->shared;
-
-		while (1) {
-			Optional<TaskQueuesThreadPool::Task> task;
-			pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
-				while (!pool->stopping) {
-					locked_use(shared) {
-						for (umm i = shared.task_queues.count - 1; i != -1; --i) {
-							task = shared.task_queues[i]->tasks.pop();
-							if (task) {
-								assert(task.value_unchecked().fn != (void *)0xdddddddddddddddd);
-								break;
-							}
-						}
-					};
-					if (task) {
-						assert(task.value_unchecked().fn);
-						break;
-					} else {
-						// NOTE: Arbitrary timeout
-						sleeper.sleep(1);
-					}
-				}
-			});
-
-			if (task) {
-				REDECLARE_VAL(task, task.value_unchecked());
-				pool->run(task);
-				task.queue->completion_notifier.wake();
-			} else {
-				break;
-			}
-		}
-		atomic_add(&pool->stopped_thread_count, 1);
-		sync(pool->end_sync_point);
-	}
-
 	#if TL_DEBUG
 	~TaskQueuesThreadPool() {
 		assert(stopping, "TaskQueuesThreadPool was not properly deinitted. Call TaskQueuesThreadPool::deinit.");
@@ -1412,10 +1547,49 @@ private:
 		task.free(task.param);
 		atomic_increment(&task.queue->finished_task_count);
 	}
+	friend void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool);
 };
 
-#endif
+void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool) {
 
+	sync(pool->start_sync_point);
+		
+	auto &shared = pool->shared;
+
+	while (1) {
+		Optional<TaskQueuesThreadPool::Task> task;
+		pool->new_work_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
+			while (!pool->stopping) {
+				locked_use(shared) {
+					for (umm i = shared.task_queues.count - 1; i != -1; --i) {
+						task = shared.task_queues[i]->tasks.pop();
+						if (task) {
+							assert(task.value_unchecked().fn != (void *)0xdddddddddddddddd);
+							break;
+						}
+					}
+				};
+				if (task) {
+					assert(task.value_unchecked().fn);
+					break;
+				} else {
+					// NOTE: Arbitrary timeout
+					sleeper.sleep(1);
+				}
+			}
+		});
+
+		if (task) {
+			REDECLARE_VAL(task, task.value_unchecked());
+			pool->run(task);
+			task.queue->completion_notifier.wake();
+		} else {
+			break;
+		}
+	}
+	atomic_add(&pool->stopped_thread_count, 1);
+	sync(pool->end_sync_point);
+}
 } // namespace tl
 #pragma warning(pop)
 

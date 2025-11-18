@@ -17,7 +17,7 @@ inline List<utf8> locate_visual_c(Span<utf8> visual_studio_path) {
 
 inline List<utf8> locate_msvc(Span<utf8> visual_c_directory) {
 	auto original_allocator = current_allocator;
-	scoped(temporary_allocator);
+	scoped(current_temporary_allocator);
 
 	auto found_builds = get_items_in_directory(visual_c_directory);
 	if (!found_builds.count) {
@@ -29,7 +29,7 @@ inline List<utf8> locate_msvc(Span<utf8> visual_c_directory) {
 
 inline List<utf8> locate_wkits() {
 	auto original_allocator = current_allocator;
-	scoped(temporary_allocator);
+	scoped(current_temporary_allocator);
 
 	Span<utf8> path = u8"C:\\Program Files (x86)\\Windows Kits\\"s;
 

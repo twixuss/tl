@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "static_list.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4061)
