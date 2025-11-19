@@ -2730,6 +2730,20 @@ forceinline auto smoothstep5_unclamped(auto x) { return x*x*x*(x*(6*x - 15) + 10
 template <class T> forceinline auto smoothstep3(T x) { return smoothstep3_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 
+template <class T>
+forceinline constexpr T smoothstep_parametric(T x, T d) {
+	auto upper = x > 0.5f;
+
+	x = select(upper, 1 - x, x);
+	x = max(x, convert<T>(0));
+	x *= 2;
+	x = pow(x, d);
+	x *= 0.5f;
+	x = select(upper, 1 - x, x);
+
+	return x;
+}
+
 } // namespace tl
 
 #undef MOP

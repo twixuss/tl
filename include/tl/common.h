@@ -1072,6 +1072,9 @@ forceinline s64 round_to_int(f64 v) { return llround(v); }
 forceinline f32 frac(f32 v) { return v - floor(v); }
 forceinline f64 frac(f64 v) { return v - floor(v); }
 
+forceinline f32 pow(f32 x, f32 y) { return ::powf(x, y); }
+forceinline f64 pow(f64 x, f64 y) { return ::pow(x, y); }
+
 forceinline constexpr bool is_negative(f32 v) { return *(u32 *)&v & 0x80000000; }
 forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
 
