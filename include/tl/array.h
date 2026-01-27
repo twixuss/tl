@@ -45,22 +45,6 @@ struct Array {
 		return result;
 	}
 
-	#define OP(op)                                                               \
-		forceinline constexpr auto operator op() const                           \
-			requires requires(T t) { op t; }                                     \
-		{                                                                        \
-			Array<std::remove_cvref_t<decltype(op data[0])>, count> result = {}; \
-			for (umm i = 0; i < count; ++i)                                      \
-				result.data[i] = op data[i];                                     \
-			return result;                                                       \
-		}
-	OP(+)
-	OP(-)
-	OP(~)
-	OP(!)
-	OP(*)
-	#undef OP
-		
 	template <class U>
 	forceinline constexpr explicit operator Array<U, count>() const
 		requires requires(T t) { (U)t; }
@@ -70,88 +54,116 @@ struct Array {
 			result.data[i] = (U)data[i];
 		return result;
 	};
-	
-	#define OP(op)                                                                            \
-		template <class U>                                                                    \
-		forceinline constexpr auto operator op(Array<U, count> const &that) const             \
-			requires requires(T t, U u) { t op u; }                                           \
-		{                                                                                     \
-			Array<std::remove_cvref_t<decltype(data[0] op that.data[0])>, count> result = {}; \
-			for (umm i = 0; i < count; ++i)                                                   \
-				result.data[i] = data[i] op that.data[i];                                     \
-			return result;                                                                    \
-		}                                                                                     \
-		template <class U>                                                            \
-		forceinline constexpr auto operator op(U const &that) const                   \
-			requires requires(T t, U u) { t op u; }                                   \
-		{                                                                             \
-			Array<std::remove_cvref_t<decltype(data[0] op that)>, count> result = {}; \
-			for (umm i = 0; i < count; ++i)                                           \
-				result.data[i] = data[i] op that;                                     \
-			return result;                                                            \
-		}                                                                             \
-		template <class U>                                                                        \
-		friend forceinline constexpr auto operator op(U const &that, Array<T, count> const &self) \
-			requires requires(U u, T t) { u op t; }                                               \
-		{                                                                                         \
-			Array<std::remove_cvref_t<decltype(that op data[0])>, count> result = {};             \
-			for (umm i = 0; i < count; ++i)                                                       \
-				result.data[i] = that op self.data[i];                                            \
-			return result;                                                                        \
-		}
-	OP(==)
-	OP(!=)
-	OP(<)
-	OP(>)
-	OP(<=)
-	OP(>=)
-	OP(+)
-	OP(-)
-	OP(*)
-	OP(/)
-	OP(%)
-	OP(^)
-	OP(&)
-	OP(|)
-	OP(<<)
-	OP(>>)
-	OP(&&)
-	OP(||)
-	#undef OP
-		
-	#define OP(op)                                                              \
-		template <class U>                                                      \
-		forceinline constexpr auto &operator op##=(Array<U, count> const &that) \
-			requires requires(T t, U u) { t op##= u; }                          \
-		{                                                                       \
-			for (umm i = 0; i < count; ++i)                                     \
-				data[i] op##= that.data[i];                                     \
-			return *this;                                                       \
-		}                                                                       \
-		template <class U>                                        \
-		forceinline constexpr auto &operator op##=(U const &that) \
-			requires requires(T t, U u) { t op##= u; }            \
-		{                                                         \
-			for (umm i = 0; i < count; ++i)                       \
-				data[i] op##= that;                               \
-			return *this;                                         \
-		}
-	OP(+)
-	OP(-)
-	OP(*)
-	OP(/)
-	OP(%)
-	OP(^)
-	OP(&)
-	OP(|)
-	OP(<<)
-	OP(>>)
-	#undef OP
 };
 
 template <class T, class... Rest>
 Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof...(Rest)>;
 
+template <class T, umm count>
+inline static constexpr bool is_unsigned<Array<T, count>> = is_unsigned<T>;
+
+#define OP(op)                                                                 \
+	template <class T, umm count>                                              \
+	forceinline constexpr auto operator op(Array<T, count> const &a)           \
+		requires requires(T t) { op t; }                                       \
+	{                                                                          \
+		Array<std::remove_cvref_t<decltype(op a.data[0])>, count> result = {}; \
+		for (umm i = 0; i < count; ++i)                                        \
+			result.data[i] = op a.data[i];                                     \
+		return result;                                                         \
+	}
+OP(+)
+OP(-)
+OP(~)
+OP(!)
+OP(*)
+#undef OP
+		
+#define OP(op)                                                                                 \
+	template <class T, umm count>                                                              \
+	forceinline constexpr auto operator op(Array<T, count> const &a, Array<T, count> const &b) \
+		requires requires(T t) { t op t; }                                                     \
+	{                                                                                          \
+		Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count> result = {};       \
+		for (umm i = 0; i < count; ++i)                                                        \
+			result.data[i] = a.data[i] op b.data[i];                                           \
+		return result;                                                                         \
+	}                                                                                          \
+	template <class U, class T, umm count>                                                     \
+	forceinline constexpr auto operator op(Array<T, count> const &a, Array<U, count> const &b) \
+		requires requires(T t, U u) { t op u; }                                                \
+	{                                                                                          \
+		Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count> result = {};       \
+		for (umm i = 0; i < count; ++i)                                                        \
+			result.data[i] = a.data[i] op b.data[i];                                           \
+		return result;                                                                         \
+	}                                                                                          \
+	template <class U, class T, umm count>                                       \
+	forceinline constexpr auto operator op(Array<T, count> const &a, U const &b) \
+		requires requires(T t, U u) { t op u; }                                  \
+	{                                                                            \
+		Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count> result = {}; \
+		for (umm i = 0; i < count; ++i)                                          \
+			result.data[i] = a.data[i] op b;                                     \
+		return result;                                                           \
+	}                                                                            \
+	template <class U, class T, umm count>                                       \
+	forceinline constexpr auto operator op(U const &a, Array<T, count> const &b) \
+		requires requires(U u, T t) { u op t; }                                  \
+	{                                                                            \
+		Array<std::remove_cvref_t<decltype(a op b.data[0])>, count> result = {}; \
+		for (umm i = 0; i < count; ++i)                                          \
+			result.data[i] = a op b.data[i];                                     \
+		return result;                                                           \
+	}
+OP(==)
+OP(!=)
+OP(<)
+OP(>)
+OP(<=)
+OP(>=)
+OP(+)
+OP(-)
+OP(*)
+OP(/)
+OP(%)
+OP(^)
+OP(&)
+OP(|)
+OP(<<)
+OP(>>)
+OP(&&)
+OP(||)
+#undef OP
+		
+#define OP(op)                                                                               \
+	template <class U, class T, umm count>                                                   \
+	forceinline constexpr auto &operator op##=(Array<T, count> &a, Array<U, count> const &b) \
+		requires requires(T t, U u) { t op##= u; }                                           \
+	{                                                                                        \
+		for (umm i = 0; i < count; ++i)                                                      \
+			a.data[i] op##= b.data[i];                                                       \
+		return a;                                                                            \
+	}                                                                                        \
+	template <class U, class T, umm count>                                     \
+	forceinline constexpr auto &operator op##=(Array<T, count> &a, U const &b) \
+		requires requires(T t, U u) { t op##= u; }                             \
+	{                                                                          \
+		for (umm i = 0; i < count; ++i)                                        \
+			a.data[i] op##= b;                                                 \
+		return a;                                                              \
+	}
+OP(+)
+OP(-)
+OP(*)
+OP(/)
+OP(%)
+OP(^)
+OP(&)
+OP(|)
+OP(<<)
+OP(>>)
+#undef OP
 template <umm count, class T>
 forceinline constexpr Array<T, count> broadcast_to_array(T value) {
 	Array<T, count> result = {};
@@ -222,5 +234,83 @@ forceinline constexpr Array<T, count> select(Array<bool, count> const &mask, Arr
 		r.data[i] = mask.data[i] ? a.data[i] : b.data[i];
 	return r;
 }
+
+template <class U, class T, umm count>
+	requires(count * sizeof(T) == count * sizeof(T) / sizeof(U) * sizeof(U))
+forceinline constexpr Array<U, count * sizeof(T) / sizeof(U)> reinterpret(Array<T, count> const &a) {
+	return std::bit_cast<Array<U, count * sizeof(T) / sizeof(U)>>(a);
+}
+
+template <class T, umm count, class Index, umm indices_count>
+forceinline constexpr Array<T, count> shuffle(Array<T, count> const &a, Array<Index, indices_count> const &indices) {
+	Array<T, count> r;
+	for (umm i = 0; i < count; ++i)
+		r.data[i] = a.data[indices.data[i % indices_count] % count];
+	return r;
+}
+
+template <class T, umm count, class Index>
+forceinline constexpr Array<T, count> shuffle(Array<T, count> const &a, Array<Index, count> const &indices) {
+	Array<T, count> r;
+	for (umm i = 0; i < count; ++i)
+		r.data[i] = a.data[indices.data[i] % count];
+	return r;
+}
+
+template <umm dups, class T, umm count>
+forceinline constexpr Array<T, count * dups> dup(Array<T, count> const &a) {
+	Array<T, count * dups> r;
+	for (umm d = 0; d < dups; ++d)
+		for (umm i = 0; i < count; ++i)
+			r.data[d * count + i] = a.data[i];
+	return r;
+}
+
+template <class T, umm count>
+forceinline constexpr Array<T, count> reciprocal(Array<T, count> a) {
+	for (umm i = 0; i < count; ++i)
+		a.data[i] = 1 / a.data[i];
+	return a;
+}
+
+template <class T, umm count>
+forceinline constexpr Array<T, count> sqrt(Array<T, count> a) {
+	for (umm i = 0; i < count; ++i)
+		a.data[i] = sqrt(a.data[i]);
+	return a;
+}
+
+template <class U, class T, umm count>
+forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
+	Array<U, count> r;
+	for (umm i = 0; i < count; ++i)
+		r.data[i] = (U)a.data[i];
+	return r;
+}
+
+
+#if TL_USE_SIMD
+
+template <class T, umm count>
+	requires (count * sizeof(T) == 16)
+forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 16> const &indices) {
+	return std::bit_cast<Array<T, count>>(_mm_shuffle_epi8(std::bit_cast<__m128i>(a), std::bit_cast<__m128i>(indices)));
+}
+
+template <class T, umm count>
+	requires (count * sizeof(T) == 32)
+forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 32> const &indices) {
+	return std::bit_cast<Array<T, count>>(_mm256_shuffle_epi8(std::bit_cast<__m256i>(a), std::bit_cast<__m256i>(indices)));
+}
+
+template <> forceinline constexpr Array<f32, 8> reciprocal(Array<f32, 8> a) { return std::bit_cast<Array<f32, 8>>(_mm256_rcp_ps(std::bit_cast<__m256>(a))); }
+
+forceinline Array<f32, 8> min(Array<f32, 8> const &a, Array<f32, 8> const &b) { return std::bit_cast<Array<f32, 8>>(_mm256_min_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+forceinline Array<f32, 8> max(Array<f32, 8> const &a, Array<f32, 8> const &b) { return std::bit_cast<Array<f32, 8>>(_mm256_max_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+
+forceinline constexpr Array<f32, 8> operator+(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_add_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+forceinline constexpr Array<f32, 8> operator-(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_sub_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+
+#endif
 
 }
