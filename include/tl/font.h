@@ -520,6 +520,9 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 				placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 				placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 			}
+
+			if (!code_point)
+				break;
 		}
 		#endif
 
