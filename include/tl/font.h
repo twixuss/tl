@@ -136,7 +136,7 @@ struct TL_API TextPlacer {
 			u16 flat;
 
 			Color &operator=(v3f c) {
-				auto i = floor_to_int(c * 15.999999f);
+				auto i = round_to_int(c * 15.0f);
 				r = i.x;
 				g = i.y;
 				b = i.z;
@@ -168,9 +168,14 @@ struct TL_API TextPlacer {
 	// Just index by cursor in your input field.
 	List<CursorPosition> cursor_positions;
 
+	// Tight bounds encapsulating all quads
 	aabb<v2s> bounds = {};
+
 	u32 line_count = 0;
 	
+	// Sum of all line spacings.
+	u32 height = 0;
+
 	// Calling place a second time will clear previous data and reuse memory.
 	void place(FontCollection *collection, Span<utf8> text, PlaceTextParams params = {} TL_LP);
 	void place(FontCollection *collection, Span<utf32> text, PlaceTextParams params = {} TL_LP);
@@ -190,8 +195,8 @@ inline void free(TextPlacer &placer) {
 	free(placer.lines);
 }
 
-TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf8> text);
-TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf32> text);
+TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf8> text, u32 font_size);
+TL_API void ensure_all_chars_present(FontCollection *collection, Span<utf32> text, u32 font_size);
 
 TL_API bool render_glyph(FontCollection *collection, Font &font_, u32 font_size, SizedFont &sized_font, utf32 new_char_code_point, List<v3u8, TemporaryAllocator> &temp_pixels);
 
@@ -278,18 +283,23 @@ bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, Sized
 	auto collection = (FontCollectionFT *)collection_;
 	auto &atlas = collection->atlas;
 	auto &font = *(FontFT *)&font_;
+	
+	assert(&font.sized.get_or_insert(font_size) == &sized_font);
+
+	int error = 0;
+
 	if (!font.face) {
-		auto error = FT_New_Memory_Face(collection->ft_library, font.buffer.data, font.buffer.count, 0, &font.face);
+		error = FT_New_Memory_Face(collection->ft_library, font.buffer.data, font.buffer.count, 0, &font.face);
 		if (error) {
 			return false;
 		}
 		font.face->glyph->format = FT_GLYPH_FORMAT_BITMAP;
 	}
 
-
 	if (font.face_size != font_size) {
 		font.face_size = font_size;
-		auto error = FT_Set_Pixel_Sizes(font.face, font_size, font_size);
+
+		error = FT_Set_Pixel_Sizes(font.face, font_size, font_size);
 		if (error) {
 			return false;
 		}
@@ -305,7 +315,7 @@ bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, Sized
 		return false;
 	}
 
-	auto error = FT_Load_Glyph(font.face, glyph_index, 0);
+	error = FT_Load_Glyph(font.face, glyph_index, 0);
 	if (error) {
 		return false;
 	}
@@ -322,12 +332,23 @@ bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, Sized
 
 	collection->rendered_chars.get_or_insert({new_char_code_point, font_size}) = atlas.areas.count;
 
-	FontChar *info = 0;
+	FontChar info = {};
+	info.offset = {
+		slot->bitmap_left,
+		(s32)font_size - slot->bitmap_top + sized_font.ascender - sized_font.line_spacing,
+	};
+	info.offset = {
+		slot->bitmap_left,
+		sized_font.ascender-slot->bitmap_top,
+	};
+	info.advance = {slot->advance.x >> 6, slot->advance.y >> 6};
+	info.line_spacing = sized_font.line_spacing;
+
 
 	assert(bitmap.width % 3 == 0);
 	if (bitmap.width % 3 == 0) {
 		v2u char_size = {bitmap.width/3, bitmap.rows};
-		info = &atlas.add((v3u8*)bitmap.buffer, char_size, bitmap.pitch);
+		atlas.add(info, (v3u8*)bitmap.buffer, char_size, bitmap.pitch);
 	} else {
 		v2u char_size = {(bitmap.width+2)/3, bitmap.rows};
 		temp_pixels.clear();
@@ -339,19 +360,8 @@ bool render_glyph(FontCollection *collection_, Font &font_, u32 font_size, Sized
 			memset(dst + bitmap.width, 0, char_size.x*3 - bitmap.width);
 		}
 
-		info = &atlas.add(temp_pixels.data, char_size);
+		atlas.add(info, temp_pixels.data, char_size);
 	}
-
-	info->offset = {
-		slot->bitmap_left,
-		(s32)font_size - slot->bitmap_top + sized_font.ascender - sized_font.line_spacing,
-	};
-	info->offset = {
-		slot->bitmap_left,
-		sized_font.ascender-slot->bitmap_top,
-	};
-	info->advance = {slot->advance.x >> 6, slot->advance.y >> 6};
-	info->line_spacing = sized_font.line_spacing;
 
 	return true;
 }
@@ -408,24 +418,14 @@ static void _ensure_all_chars_present(FontCollection *collection, auto reader, u
 	
 	List<v3u8, TemporaryAllocator> temp_pixels;
 
-	if (new_chars.count) {
+	for (auto new_char_code_point : new_chars) {
+		for (auto &font : collection->fonts) {
+			auto &sized_font = font.sized.get_or_insert(font_size);
 
-		bool atlas_was_resized = false;
-		
-		aabb<v2u> updated_region = {
-			V2u(-1),
-			V2u(0),
-		};
+			bool ok = render_glyph(collection, font, font_size, sized_font, new_char_code_point, temp_pixels);
 
-		for (auto new_char_code_point : new_chars) {
-			for (auto &font : collection->fonts) {
-				auto &sized_font = font.sized.get_or_insert(font_size);
-
-				bool ok = render_glyph(collection, font, font_size, sized_font, new_char_code_point, temp_pixels);
-
-				if (ok) {
-					break;
-				}
+			if (ok) {
+				break;
 			}
 		}
 	}
@@ -446,6 +446,7 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 	placer->bounds.min = max_value<v2s>;
 	placer->bounds.max = min_value<v2s>;
 	placer->line_count = 1;
+	placer->height = 0;
 
 	aabb<s32> line_x_bounds = {max_value<s32>, min_value<s32>};
 	umm line_begin_index = 0;
@@ -476,7 +477,7 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 		return char_infos[0];
 	};
 
-	s32 line_spacing = 0;
+	u32 line_spacing = 0;
 	
 	placer->cursor_positions.add({.x = 0, .line = 0});
 
@@ -532,7 +533,7 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 			placer->lines.add({
 				.begin_index = line_begin_index,
 				.end_index = placer->quads.count,
-				.size = {line_x_bounds.size(), line_spacing},
+				.size = {line_x_bounds.size(), (s32)line_spacing},
 			});
 			max_line_width = max(max_line_width, line_x_bounds.size());
 			line_x_bounds = {max_value<s32>, min_value<s32>};
@@ -540,6 +541,9 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 			char_position.y += line_spacing;
 			placer->line_count += 1;
 			line_begin_index = placer->quads.count;
+
+			placer->height += line_spacing;
+			line_spacing = 0;
 
 			d = {};
 		}
@@ -562,6 +566,9 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 			char_position.x = 0;
 			char_position.y += line_spacing;
 			placer->line_count += 1;
+			
+			placer->height += line_spacing;
+			line_spacing = 0;
 
 			place_char();
 		}
@@ -571,7 +578,7 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 
 		placer->bounds.max = max(placer->bounds.max, c.position.max);
 		placer->bounds.min = min(placer->bounds.min, c.position.min);
-
+		
 		placer->quads.add(c TL_LA);
 
 		line_x_bounds.min = min(line_x_bounds.min, c.position.min.x);
@@ -581,24 +588,26 @@ void _place_text(TextPlacer *placer, FontCollection *collection, auto reader, Pl
 
 		// FIXME: this is wrong.
 		// baseline of the next line should be calculated by adding max ascent and max descent
-		line_spacing = max(line_spacing, (s32)d.line_spacing);
+		line_spacing = max(line_spacing, d.line_spacing);
 
 		placer->cursor_positions.add({.x = (u32)char_position.x, .line = (u16)placer->lines.count});
 
 		#undef read_char
 	}
 	
+	placer->height += line_spacing;
+	
 	placer->lines.add({
 		.begin_index = line_begin_index,
 		.end_index = placer->quads.count,
-		.size = {line_x_bounds.size(), line_spacing},
+		.size = {line_x_bounds.size(), (s32)line_spacing},
 	});
 	max_line_width = max(max_line_width, line_x_bounds.size());
 
 	if (params.line_alignment) {
 		for (auto &line : placer->lines) {
 			for (umm i = line.begin_index; i < line.end_index; ++i) {
-				s32 offset = round_to_int((params.width - line.size.x) * params.line_alignment);
+				s32 offset = round_to_int((max_line_width - line.size.x) * params.line_alignment);
 				placer->quads[i].position.min.x += offset;
 				placer->quads[i].position.max.x += offset;
 			}

@@ -3,6 +3,7 @@
 
 namespace tl {
 
+TL_API umm get_page_size();
 TL_API void *reserve_memory(umm size);
 TL_API bool commit_memory(void *data, umm size);
 TL_API bool guard_memory(void *data, umm size);
@@ -15,6 +16,14 @@ TL_API bool free_memory(void *data, umm size);
 #if OS_WINDOWS
 
 namespace tl {
+
+umm get_page_size() {
+	SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+
+    return sysInfo.dwPageSize;
+}
+
 void *reserve_memory(umm size) {
 	return VirtualAlloc(0, size, MEM_RESERVE, PAGE_READWRITE);
 }

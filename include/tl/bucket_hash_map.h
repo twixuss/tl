@@ -22,7 +22,7 @@ struct BucketHashMap : Traits {
 		Key key;
 		Value value;
 	};
-	using Bucket = LinkedList<HashKeyValue>;
+	using Bucket = LinkedList<HashKeyValue, Allocator>;
 
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 	Span<Bucket> buckets;

@@ -730,7 +730,7 @@ constexpr umm index_of(T (&array)[count], T *pointer) {
 
 template <class T, umm count>
 constexpr bool owns(T (&array)[count], T *pointer) {
-	return index_of(array, pointer) < count;
+	return (umm)(pointer - array) < count;
 }
 
 // NOTE: have to use const & to pass arrays, otherwise they rot.
@@ -1071,6 +1071,9 @@ forceinline s64 round_to_int(f64 v) { return llround(v); }
 
 forceinline f32 frac(f32 v) { return v - floor(v); }
 forceinline f64 frac(f64 v) { return v - floor(v); }
+
+forceinline f32 pow(f32 x, f32 y) { return ::powf(x, y); }
+forceinline f64 pow(f64 x, f64 y) { return ::pow(x, y); }
 
 forceinline constexpr bool is_negative(f32 v) { return *(u32 *)&v & 0x80000000; }
 forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
@@ -2231,6 +2234,10 @@ struct Span {
 			data[i] = that.data[i];
 		}
 	}
+	
+	constexpr bool owns(T const *pointer) {
+		return (umm)(pointer - data) < count;
+	}
 
 	auto iter(this auto &&self, ReverseIterOption options = {}) {
 		return span_iter(self.data, self.data + self.count, options);
@@ -2355,11 +2362,6 @@ constexpr Span<T> value_as_span(T const &value) {
 
 template <class T, class Size>
 constexpr umm count_of(Span<T, Size> span) { return span.count; }
-
-template <class T>
-constexpr bool owns(Span<T> span, T *pointer) {
-	return (umm)(pointer - span.data) < span.count;
-}
 
 template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
 constexpr smm compare(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {
@@ -3944,17 +3946,7 @@ enum class QuickSortPivot {
 };
 
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
-void quick_sort(Span<T> span, auto fn) {
-	auto less = [&] (T a, T b) {
-		if constexpr (APredicate<decltype(fn), T, T>) {
-			return fn(a, b);
-		} else if constexpr (ACompare<decltype(fn), T>) {
-			return fn(a, b) < 0;
-		} else {
-			return fn(a) < fn(b);
-		}
-	};
-
+void quick_sort(Span<T> span, auto less) requires requires(T a, T b) { { less(a, b) } -> std::same_as<bool>; } {
 	switch (span.count) {
 		case 0:
 		case 1:
@@ -3992,8 +3984,12 @@ void quick_sort(Span<T> span, auto fn) {
 	}
 	Swap(*mid, span.end()[-1]);
 
-	quick_sort(Span<T>{span.begin(), mid}, fn);
-	quick_sort(Span<T>{mid + 1, span.end()}, fn);
+	quick_sort(Span<T>{span.begin(), mid}, less);
+	quick_sort(Span<T>{mid + 1, span.end()}, less);
+}
+template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
+void quick_sort(Span<T> span, auto selector) requires requires(T a) { selector(a) < selector(a); } {
+	return quick_sort(span, [&](T a, T b) { return selector(a) < selector(b); });
 }
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span) {

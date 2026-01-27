@@ -55,8 +55,7 @@ struct LinearSet : List<T, Allocator, Size_> {
 				return false;
 			}
 		}
-		reserve_exponential(count + 1 TL_LA);
-		data[count++] = value;
+		List::add(value);
 		return true;
 	}
 

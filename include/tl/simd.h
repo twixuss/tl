@@ -959,4 +959,16 @@ SELECT(f64, _mm256_blendv_pd(b.m, a.m, _mm256_castsi256_pd(mask.m)));
 #undef A
 #undef C
 
+#ifdef _TL_STRING_H
+template <class Scalar, umm count>
+inline void append(StringBuilder &builder, Vector<Scalar, count> const &v) {
+	append(builder, "{");
+	for (umm i = 0; i < count; ++i) {
+		if (i) append(builder, ", ");
+		append(builder, v.s[i]);
+	}
+	append(builder, "}");
+}
+#endif
+
 }

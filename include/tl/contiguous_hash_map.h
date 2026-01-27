@@ -21,12 +21,12 @@ struct ContiguousHashMap : Traits {
 	using Element = KeyValue;
 	using FullHash = u64;
 	//  0 - empty
-	//  1 - removed
+	//  1 - erased
 	// >1 - hash
 	using HashAndState = u8;
 
 	inline static constexpr HashAndState state_empty = 0;
-	inline static constexpr HashAndState state_removed = 1;
+	inline static constexpr HashAndState state_erased = 1;
 
 	MultiArray<Allocator, true, HashAndState, Key, Value> buffer;
 	umm count = 0;
@@ -42,41 +42,46 @@ struct ContiguousHashMap : Traits {
 
 	InsertResult find_or_insert(Key const &key, Value const &default_value = {} TL_LP) {
 		FullHash hash = get_hash(key);
+		HashAndState compact_hash = compact(hash);
 		umm index = 0;
-		if (buffer.capacity) {
-			index = get_index_from_hash(hash, buffer.capacity);
+		if (buffer.count) {
+			index = get_index_from_hash(hash, buffer.count);
 
-			auto found = find_index_of_key_or_empty_slot(key, hash, index);
+			auto found = find_index_of_key_or_empty_slot(key, compact_hash, index);
 
-			if (found.occupied) {
-				return {
-					&key_at(found.index),
-					&value_at(found.index),
-					false,
-				};
+			if (found) {
+				if (found.value().occupied) {
+					return {
+						&key_at(found.value().index),
+						&value_at(found.value().index),
+						false,
+					};
+				}
+
+				index = found.value().index;
+			} else {
+				index = find_index_of_erased_slot(key, compact_hash, index).value();
 			}
 
-			index = found.index;
-
-			if (count >= buffer.capacity * rehash_percentage / 100) {
-				if (reserve(buffer.capacity * 2 TL_LA)) {
+			if (count >= buffer.count * rehash_percentage / 100) {
+				if (reserve(buffer.count * 2 TL_LA)) {
 					hash = get_hash(key);
-					index = get_index_from_hash(hash, buffer.capacity);
+					index = get_index_from_hash(hash, buffer.count);
 				}
 			}
 		} else {
 			// NOTE: TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY will be used inside `reserve`
 			reserve(1 TL_LA);
-			index = get_index_from_hash(hash, buffer.capacity);
+			index = get_index_from_hash(hash, buffer.count);
 		}
 		count += 1;
 
 		while (hash_and_state_at(index) > 1) {
 			on_collision(key_at(index), key);
-			index = step(index, buffer.capacity);
+			index = step(index, buffer.count);
 		}
 
-		hash_and_state_at(index) = compact(hash);
+		hash_and_state_at(index) = compact_hash;
 		
 		auto pkey = &key_at(index);
 		auto pvalue = &value_at(index);
@@ -94,7 +99,7 @@ struct ContiguousHashMap : Traits {
 	}
 
 	bool reserve(umm desired TL_LP) {
-		if (desired <= buffer.capacity)
+		if (desired <= buffer.count)
 			return false;
 
 		auto old_buffer = buffer;
@@ -109,17 +114,17 @@ struct ContiguousHashMap : Traits {
 		Key          *new_keys   = buffer.template base_of<1>();
 		Value        *new_values = buffer.template base_of<2>();
 		
-		for (umm i = 0; i < old_buffer.capacity; ++i) {
+		for (umm i = 0; i < old_buffer.count; ++i) {
 			if (old_hns[i] > 1) {
 				auto &key = old_keys[i];
 				auto &value = old_values[i];
 
 				FullHash hash = get_hash(key);
-				umm index = get_index_from_hash(hash, buffer.capacity);
+				umm index = get_index_from_hash(hash, buffer.count);
 
 				while (new_hns[index] > 1) {
 					on_collision(new_keys[index], key);
-					index = step(index, buffer.capacity);
+					index = step(index, buffer.count);
 				}
 
 				new_hns   [index] = compact(hash);
@@ -141,29 +146,31 @@ struct ContiguousHashMap : Traits {
 		umm index = 0;
 		bool occupied = false;
 	};
-
-	IndexAndOccupancy find_index_of_key_or_empty_slot(Key key, FullHash hash, umm index) const {
-		assert(buffer.capacity);
+	
+	// Either:
+	//   - returns index of cell with matching key and occupied set to true;
+	//   - returns index of empty cell and occupied set to false;
+	//   - returns Empty{} when none of the above was found.
+	Optional<IndexAndOccupancy> find_index_of_key_or_empty_slot(Key key, HashAndState compact_hash, umm index) const {
+		assert(buffer.count);
 		
 		HashAndState *hnss   = buffer.template base_of<0>();
 		Key          *keys   = buffer.template base_of<1>();
 		
-		HashAndState compact_hash = compact(hash);
-
 		#if 1
 		// Scalar version
-		umm steps = buffer.capacity;
+		umm steps = buffer.count;
 		while (steps--) {
 			auto hns = hnss[index];
 			if (hns == state_empty) {
-				return {index, false};
+				return IndexAndOccupancy{index, false};
 			}
 			if (hns == compact_hash) {
 				if (are_equal(keys[index], key)) {
-					return {index, true};
+					return IndexAndOccupancy{index, true};
 				}
 			}
-			index = step(index, buffer.capacity);
+			index = step(index, buffer.count);
 		}
 		#else
 		// SIMD version.
@@ -173,9 +180,9 @@ struct ContiguousHashMap : Traits {
 		// 
 		__m128i compact_hash_m = _mm_set1_epi8(compact_hash);
 		__m128i zero_m = _mm_setzero_si128();
-		smm steps = buffer.capacity;
+		smm steps = buffer.count;
 		while (steps > 0) {
-			if (buffer.capacity - index >= 16) {
+			if (buffer.count - index >= 16) {
 				// can load 16 elements.
 				// Find bounds and check them
 				auto hns_m = *(__m128i *)&hnss[index];
@@ -210,7 +217,7 @@ struct ContiguousHashMap : Traits {
 						return {index + first_empty, false};
 					}
 				}
-				index = (index + 16) & (buffer.capacity - 1);
+				index = (index + 16) & (buffer.count - 1);
 				steps -= 16;
 			} else {
 				// some of 16 elements would be out of bounds, check one by one.
@@ -224,18 +231,35 @@ struct ContiguousHashMap : Traits {
 						return {index, true};
 					}
 				}
-				index = step(index, buffer.capacity);
+				index = step(index, buffer.count);
 				--steps;
 			}
 		}
 		#endif
 
-		invalid_code_path("unreachable. table is 100% full?");
+		return {};
 	}
-	IndexAndOccupancy find_index_of_key_or_empty_slot(Key key) const {
+	Optional<IndexAndOccupancy> find_index_of_key_or_empty_slot(Key key) const {
 		FullHash hash = get_hash(key);
-		umm index = get_index_from_hash(hash, buffer.capacity);
-		return find_index_of_key_or_empty_slot(key, hash, index);
+		umm index = get_index_from_hash(hash, buffer.count);
+		return find_index_of_key_or_empty_slot(key, compact(hash), index);
+	}
+
+	Optional<umm> find_index_of_erased_slot(Key key, HashAndState compact_hash, umm index) const {
+		assert(buffer.count);
+		
+		HashAndState *hnss   = buffer.template base_of<0>();
+		Key          *keys   = buffer.template base_of<1>();
+		
+		umm steps = buffer.count;
+		while (steps--) {
+			auto hns = hnss[index];
+			if (hns == state_erased) {
+				return index;
+			}
+			index = step(index, buffer.count);
+		}
+		return {};
 	}
 
 	KeyValuePointers find(Key key) const {
@@ -244,15 +268,15 @@ struct ContiguousHashMap : Traits {
 
 		auto found = find_index_of_key_or_empty_slot(key);
 
-		if (found.occupied) {
-			return {&key_at(found.index), &value_at(found.index)};
+		if (found && found.value().occupied) {
+			return {&key_at(found.value().index), &value_at(found.value().index)};
 		}
 
 		return {};
 	}
 
 	void clear() {
-		for (umm i = 0; i < buffer.capacity; ++i) {
+		for (umm i = 0; i < buffer.count; ++i) {
 			hash_and_state_at(i) = state_empty;
 		}
 		count = 0;
@@ -286,13 +310,13 @@ struct ContiguousHashMap : Traits {
 		umm it = 0;
 
 		explicit operator bool() {
-			return it < map->buffer.capacity;
+			return it < map->buffer.count;
 		}
 
 		void next() {
 			while (1) {
 				++it;
-				if (it >= map->buffer.capacity)
+				if (it >= map->buffer.count)
 					break;
 				if (map->hash_and_state_at(it) > 1)
 					break;
@@ -317,7 +341,7 @@ struct ContiguousHashMap : Traits {
 		auto iter = Iter<tl_self_const>{
 			(ContiguousHashMap *)&self, 0
 		};
-		if (self.buffer.capacity && self.hash_and_state_at(0) < 2) {
+		if (self.buffer.count && self.hash_and_state_at(0) < 2) {
 			iter.next();
 		}
 		return iter;
@@ -334,7 +358,7 @@ private:
 	}
 	KeyValue mark_erased(umm index) {
 		assert(hash_and_state_at(index) > 1);
-		hash_and_state_at(index) = state_removed;
+		hash_and_state_at(index) = state_erased;
 		--count;
 		return {key_at(index), value_at(index)};
 	}

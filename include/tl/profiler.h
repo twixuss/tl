@@ -87,6 +87,7 @@ struct TL_API Profiler {
 
 	bool enabled = true;
 	bool waiting_for_everyone = false;
+	bool everyone_is_done = false;
 
 	void init(ArenaAllocator allocator, umm unique_threads_max_count);
 	void reset();
@@ -105,6 +106,11 @@ struct TL_API Profiler {
 	// Waits for all threads to finish their timed blocks.
 	// Executes `fn` while holding all locks.
 	void when_everyone_is_done(auto &&fn) {
+		if (everyone_is_done) {
+			fn();
+			return;
+		}
+
 		scoped_replace(waiting_for_everyone, true);
 
 		auto lock_everyone = [&] {
@@ -139,7 +145,10 @@ struct TL_API Profiler {
 			sleep_milliseconds(1);
 		}
 
-		fn();
+		{
+			scoped_replace(everyone_is_done, true);
+			fn();
+		}
 	
 		for (umm i = 0; i < ids_and_infos_allocated_count; ++i) {
 			auto &thread_info = ids_and_infos.base_of<1>()[i];
@@ -166,6 +175,7 @@ struct TL_API Profiler {
 		report.start_time = start_time;
 
 		report.all_time_spans.clear();
+		report.all_marks.clear();
 		report.per_thread.clear();
 
 		for (umm i = 0; i < ids_and_infos_allocated_count; ++i) {
@@ -315,7 +325,7 @@ auto &get_thread_info(Profiler &profiler, u32 thread_id) {
 
 	umm dst_index = atomic_increment(&profiler.ids_and_infos_allocated_count);
 
-	assert(dst_index < profiler.ids_and_infos.capacity);
+	assert(dst_index < profiler.ids_and_infos.count);
 
 	ids_base[dst_index] = thread_id;
 	auto &info = infos_base[dst_index];

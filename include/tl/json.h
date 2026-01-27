@@ -1,7 +1,6 @@
 #pragma once
 #include "system.h"
 #include "list.h"
-#include "hash_map.h"
 
 #pragma warning(push)
 #pragma warning(disable: 4820) // padding after struct
@@ -98,6 +97,7 @@ struct Object {
 		return &_array[i];
 	}
 	f64 number() {
+		assert_equal(type, Type::number);
 		return _number;
 	}
 	Array &array() {

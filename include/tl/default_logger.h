@@ -2,6 +2,7 @@
 #include "logger.h"
 #include "file.h"
 #include "thread.h"
+#include "date.h"
 /*
 #define TL_DEFAULT_LOGGER_MAIN_CONTEXT_MEMBERS \
 	x(tl::File, default_logger_file) \
@@ -14,6 +15,17 @@ namespace tl {
 extern TL_API OsLock stdout_mutex;
 extern TL_API File default_logger_file;
 #endif
+
+struct DateForLog : Date {
+};
+
+inline void append(StringBuilder &builder, DateForLog date) {
+	append_format(builder, "{}:{}:{}.{}", 
+		FormatInt{.value = date.hour, .leading_zero_count = 2}, 
+		FormatInt{.value = date.minute, .leading_zero_count = 2}, 
+		FormatInt{.value = date.second, .leading_zero_count = 2}, 
+		FormatInt{.value = date.millisecond, .leading_zero_count = 3});
+}
 
 struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 	Span<utf8> module = {};
@@ -37,9 +49,18 @@ struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {
 		}();
 
 		withs(TL_GET_GLOBAL(stdout_mutex)) {
-			with(color, println("[{}] {}", module, message));
-			if (is_valid(file)) {
-				write(file, as_bytes(tformat("[{}] ({}) {}\r\n", module, severity, message)));
+			auto date = DateForLog{get_date()};
+
+			if (module.count) {
+				with(color, println("[{}] [{}] {}", date, module, message));
+				if (is_valid(file)) {
+					write(file, as_bytes(tformat("[{}] [{}] ({}) {}\r\n", date, module, severity, message)));
+				}
+			} else {
+				with(color, println("[{}] {}", date, message));
+				if (is_valid(file)) {
+					write(file, as_bytes(tformat("[{}] ({}) {}\r\n", date, severity, message)));
+				}
 			}
 		};
 	}

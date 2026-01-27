@@ -20,7 +20,13 @@ struct Atlas {
 	u32 cursor_min_x = {};
 	
 	// stride_in_bytes - if 0, replaced with `new_elem_size.x * sizeof(Element)`
-	Area &add(Element *new_elem, v2u new_elem_size, u32 stride_in_bytes = 0) {
+	void add(Area area, Element *new_elem, v2u new_elem_size, u32 stride_in_bytes = 0) {
+		if (new_elem_size.x == 0 || new_elem_size.y == 0) {
+			area.rect = {};
+			areas.add(area);
+			return;
+		}
+
 		while (1) {
 			if (cursor.x + new_elem_size.x <= size.x && cursor.y + new_elem_size.y <= size.y)
 				break;
@@ -44,16 +50,13 @@ struct Atlas {
 			memcpy(dst, src, new_elem_size.x * sizeof(Element));
 		}
 
-		Area area = {};
 		area.rect = {cursor, cursor + new_elem_size};
-		auto &result = areas.add(area);
+		areas.add(area);
 		
 		on_modify(this, user_data, area.rect);
 
 		cursor.x += new_elem_size.x;
 		row_height = max(row_height, new_elem_size.y);
-
-		return result;
 	}
 
 	void grow() {

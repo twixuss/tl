@@ -599,6 +599,31 @@ forceinline constexpr auto bezier_derivative(T a, T b, T c, T d, Float t) {
 	return -3*a + 3*b + t * (6*a - 12*b + 6*c + 3 * t * (-a + 3*b - 3*c + d));
 }
 
+// ax^2 + bx + c
+template <class T>
+struct Quadratic {
+	T a, b, c;
+};
+
+template <class T>
+forceinline constexpr T evaluate(Quadratic<T> q, T x) {
+	T x2 = x*x;
+	return q.a*x2 + q.b*x + q.c;
+}
+
+template <class T>
+forceinline constexpr T derivative(Quadratic<T> q, T x) {
+	return 2*q.a*x + q.b;
+}
+
+template <class T>
+forceinline Quadratic<T> quadratic_y0y1d0(T y0, T y1, T d0) {
+	auto a = y1 - d0 - y0;
+	auto b = d0;
+	auto c = y0;
+	return {a, b, c};
+}
+
 // ax^3 + bx^2 + cx + d
 template <class T>
 struct Cubic {
@@ -619,7 +644,7 @@ forceinline constexpr T derivative(Cubic<T> c, T x) {
 }
 
 template <class T>
-Cubic<T> cubic_2y2d(T y0, T y1, T d0, T d1) {
+Cubic<T> cubic_y0y1d0d1(T y0, T y1, T d0, T d1) {
     T r1 = y1 - y0 - convert<T>(0);
     T r2 = d1 - d0;
     T a = r2 - convert<T>(2) * r1;
@@ -1381,6 +1406,11 @@ forceinline aabb<T> aabb_center_radius(T center, T radius) {
 	return {center - radius, center + radius};
 }
 
+template <class Scalar> forceinline v2<Scalar> minmin(aabb<v2<Scalar>> b) { return {b.min.x, b.min.y}; }
+template <class Scalar> forceinline v2<Scalar> minmax(aabb<v2<Scalar>> b) { return {b.min.x, b.max.y}; }
+template <class Scalar> forceinline v2<Scalar> maxmin(aabb<v2<Scalar>> b) { return {b.max.x, b.min.y}; }
+template <class Scalar> forceinline v2<Scalar> maxmax(aabb<v2<Scalar>> b) { return {b.max.x, b.max.y}; }
+
 template <ForEachFlags flags = 0, std::integral T>
 forceinline bool for_each(aabb<v2<T>> b, auto fn) {
 	using Ret = decltype(fn(v2<T>{}));
@@ -1653,10 +1683,10 @@ forceinline aabb<Vector> floor_ceil(aabb<Vector> rect, Vector step) {
 template <class S>
 Optional<aabb<v2<S>>> merge_into_one(aabb<v2<S>> a, aabb<v2<S>> b) {
 	using Result = aabb<v2<S>>;
-	if (all(a.maxmin() == b.minmin()) && all(a.maxmax() == b.minmax())) return Result{a.minmin(), b.maxmax()};
-	if (all(a.maxmax() == b.maxmin()) && all(a.minmax() == b.minmin())) return Result{a.minmin(), b.maxmax()};
-	if (all(a.minmax() == b.maxmax()) && all(a.minmin() == b.maxmin())) return Result{b.minmin(), a.maxmax()};
-	if (all(a.minmin() == b.minmax()) && all(a.maxmin() == b.maxmax())) return Result{b.minmin(), a.maxmax()};
+	if (all(maxmin(a) == minmin(b)) && all(maxmax(a) == minmax(b))) return Result{minmin(a), maxmax(b)};
+	if (all(maxmax(a) == maxmin(b)) && all(minmax(a) == minmin(b))) return Result{minmin(a), maxmax(b)};
+	if (all(minmax(a) == maxmax(b)) && all(minmin(a) == maxmin(b))) return Result{minmin(b), maxmax(a)};
+	if (all(minmin(a) == minmax(b)) && all(maxmin(a) == maxmax(b))) return Result{minmin(b), maxmax(a)};
 	return {};
 }
 
@@ -2017,11 +2047,21 @@ forceinline Optional<RaycastHit<Vector>> raycast(ray<Vector> ray, sphere<Vector>
 	if (d < 0)
 		return {};
 
-	auto point = ray.origin + ray.direction * ((-b - sqrt(d)) / 2);
+	d = sqrt(d);
+
+	float t = b + d;
+	if (t > 0)
+		t = b - d;
+	if (t > 0)
+		return {};
+
+	t = t * -0.5f;
+
+	auto point = ray.origin + ray.direction * t;
 	return RaycastHit<Vector>{
 		.position = point,
 		.normal = normalize(point - sphere.center),
-		.distance = distance(ray.origin, point),
+		.distance = t,
 	};
 }
 
@@ -2074,13 +2114,9 @@ forceinline Optional<RaycastHit<v3f>> raycast(ray<v3f> ray, triangle<v3f> tri, R
 	return hit;
 }
 
-struct RaycastAABBOptions {
-	bool from_inside = true;
-};
-
 // result[0] is the closest one
 // If ray intersects box from inside then result.count is 1
-forceinline StaticList<RaycastHit<v2f>, 2> raycast(ray<v2f> ray, aabb<v2f> box, RaycastAABBOptions options = {}) {
+forceinline StaticList<RaycastHit<v2f>, 2> raycast(ray<v2f> ray, aabb<v2f> box) {
 	v2f inv_dir = 1.0f / ray.direction;
 	v2f t1 = (box.min - ray.origin) * inv_dir;
 	v2f t2 = (box.max - ray.origin) * inv_dir;
@@ -2117,7 +2153,7 @@ forceinline StaticList<RaycastHit<v2f>, 2> raycast(ray<v2f> ray, aabb<v2f> box, 
 
 // result[0] is the closest one
 // If ray intersects box from inside then result.count is 1
-forceinline StaticList<RaycastHit<v3f>, 2> raycast(ray<v3f> ray, aabb<v3f> box, RaycastAABBOptions options = {}) {
+forceinline StaticList<RaycastHit<v3f>, 2> raycast(ray<v3f> ray, aabb<v3f> box) {
 	v3f inv_dir = 1.0f / ray.direction;
 	v3f t1 = (box.min - ray.origin) * inv_dir;
 	v3f t2 = (box.max - ray.origin) * inv_dir;
@@ -2693,6 +2729,20 @@ forceinline auto smoothstep3_unclamped(auto x) { return (3 - 2 * x) * x * x; }
 forceinline auto smoothstep5_unclamped(auto x) { return x*x*x*(x*(6*x - 15) + 10); }
 template <class T> forceinline auto smoothstep3(T x) { return smoothstep3_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
+
+template <class T>
+forceinline constexpr T smoothstep_parametric(T x, T d) {
+	auto upper = x > 0.5f;
+
+	x = select(upper, 1 - x, x);
+	x = max(x, convert<T>(0));
+	x *= 2;
+	x = pow(x, d);
+	x *= 0.5f;
+	x = select(upper, 1 - x, x);
+
+	return x;
+}
 
 } // namespace tl
 

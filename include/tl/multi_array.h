@@ -9,12 +9,12 @@ template <class Allocator, bool store_base_pointers, class ...Ts>
 struct MultiArray {
 	[[no_unique_address]] std::conditional_t<store_base_pointers, Empty, u8 *> buffer = {};
 	[[no_unique_address]] std::conditional_t<store_base_pointers, std::tuple<Ts *...>, Empty> base_pointers = {};
-	umm capacity = 0; // TODO: rename to `count`. This is an array, not a list.
+	umm count = 0;
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-	void init(umm new_capacity) {
-		base()   = (u8 *)allocator.allocate(get_buffer_size(new_capacity), max(alignof(Ts)...));
-		capacity = new_capacity;
+	void init(umm new_count) {
+		base()   = (u8 *)allocator.allocate(get_buffer_size(new_count), max(alignof(Ts)...));
+		count = new_count;
 
 		if constexpr (store_base_pointers) {
 			for_each_type(I, T, Ts) {
@@ -25,10 +25,10 @@ struct MultiArray {
 		}
 	}
 	void free() {
-		allocator.free(base(), get_buffer_size(capacity), max(alignof(Ts)...));
+		allocator.free(base(), get_buffer_size(count), max(alignof(Ts)...));
 		buffer = {};
 		base_pointers = {};
-		capacity = 0;
+		count = 0;
 	}
 	
 	u8 *&base() {
@@ -54,7 +54,7 @@ struct MultiArray {
 
 		for_each_type(I, T, Ts) {
 			if constexpr (I < type_index) {
-				offset += capacity * Array{sizeof(Ts)...}[I];
+				offset += count * Array{sizeof(Ts)...}[I];
 				offset = ceil(offset, Array{alignof(Ts)...}[I + 1]);
 			}
 		};
@@ -80,7 +80,7 @@ struct MultiArray {
 
 	template <umm type_index>
 	auto &at(umm index) const {
-		bounds_check(assert_less(index, capacity));
+		bounds_check(assert_less(index, count));
 		return base_of<type_index>()[index];
 	}
 
@@ -89,12 +89,12 @@ struct MultiArray {
 		return at<type_index_of<T, Ts...>>(index);
 	}
 
-	umm get_buffer_size(umm capacity) const {
+	umm get_buffer_size(umm count) const {
 		umm size = 0;
 
 		for (umm i = 0; i < sizeof...(Ts); ++i) {
 			size = ceil(size, Array{alignof(Ts)...}[i]);
-			size += capacity * Array{sizeof(Ts)...}[i];
+			size += count * Array{sizeof(Ts)...}[i];
 		}
 
 		return size;

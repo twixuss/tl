@@ -338,6 +338,8 @@ forceinline T atomic_update(T volatile *a, Callable<T, T> auto fn, Spinner spinn
 	}
 }
 
+#define TL_ATOMIC_UPDATE(a, b, ...) (atomic_update(a, [&](auto value) { return b; } __VA_OPT__(,) __VA_ARGS__))
+
 template <ASpinner Spinner = SleepySpinner>
 void loop_while(std::predicate<> auto &&predicate, Spinner spinner = {}) {
 	while (predicate()) {
@@ -1380,9 +1382,34 @@ struct TaskQueuesThreadPool {
 
 		inline void wait_for_completion(WaitForCompletionOption option = WaitForCompletionOption::just_wait) {
 			switch (option) {
+				case WaitForCompletionOption::do_any_task: {
+					auto &shared = pool->shared;
+					while (1) {
+						Optional<Task> task;
+
+						{
+							scoped_locked_use(shared);
+							for (umm i = shared.task_queues.count - 1; i != -1; --i) {
+								task = shared.task_queues[i]->tasks.pop();
+								if (task) {
+									break;
+								}
+							}
+						}
+
+						if (task) {
+							REDECLARE_VAL(task, task.value_unchecked());
+							pool->run(task);
+							task.queue->completion_notifier.wake();
+						} else {
+							break;
+						}
+					}
+					goto wait;
+				}
 				case WaitForCompletionOption::do_my_task: // not implemented, fall through
-				case WaitForCompletionOption::do_any_task: // not implemented, fall through
 				case WaitForCompletionOption::just_wait: {
+				wait:
 					while (started_task_count > finished_task_count) {
 						completion_notifier.section([&] (ConditionVariable::Sleeper sleeper) {
 							sleeper.sleep(1);
