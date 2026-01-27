@@ -151,15 +151,27 @@ inline u64 next(splitmix64 &state) {
 	return result ^ (result >> 31);
 }
 
-template <class F32, class U32> forceinline F32 normalize_range_f32(U32 v) requires requires(U32 x) { {(F32)x}; } {
+template <class F32, class U32>
+forceinline F32 normalize_range_f32(U32 v)
+	requires requires {
+		sizeof(F32) == sizeof(U32);
+		is_unsigned<U32>;
+	}
+{
 	v >>= 9;
 	v |= 0x3f800000u;
-	return *(F32 *)&v - 1;
+	return *(F32 *)&v - 1.0f;
 }
-template <class F64, class U64> forceinline F64 normalize_range_f64(U64 v) requires requires(U64 x) { {(F64)x}; } {
+template <class F64, class U64>
+forceinline F64 normalize_range_f64(U64 v)
+	requires requires {
+		sizeof(F64) == sizeof(U64);
+		is_unsigned<U64>;
+	}
+{
 	v >>= 12;
 	v |= 0x3ff0'0000'0000'0000u;
-	return *(F64 *)&v - 1;
+	return *(F64 *)&v - 1.0f;
 }
 
 template <class State> u8  next_u8 (State &state) { return (u8)next(state); }

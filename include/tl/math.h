@@ -61,7 +61,7 @@ forceinline constexpr auto pow(T v) {
 
 template <class T>
 forceinline constexpr T smooth_min(T a, T b, f32 k) {
-	f32 h = clamp<f32>((b - a) / k + .5f, 0, 1);
+	f32 h = clamp((b - a) / k + .5f, 0.0f, 1.0f);
 	return b + h * (a - b + k * 0.5f * (h - 1));
 }
 
