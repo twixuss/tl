@@ -158,9 +158,34 @@ forceinline Array<u8, 4> random_bytes(Array<u8, 8> in) {
 
 // NOT TESTED FOR QUALITY
 template <>
+forceinline Array<u8, 8> random_bytes(Array<u8, 4> in) {
+	u64 const k = 11400714819322457659; // next_prime(2**64 / phi)
+	u64 x = std::bit_cast<u32>(in);
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	return std::bit_cast<Array<u8, 8>>(x);
+}
+
+// NOT TESTED FOR QUALITY
+template <>
 forceinline Array<u8, 8> random_bytes(Array<u8, 8> in) {
 	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
 	u64 x = std::bit_cast<u64>(in);
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	x = x*k^k;
+	return std::bit_cast<Array<u8, 8>>(x);
+}
+
+// NOT TESTED FOR QUALITY
+template <>
+forceinline Array<u8, 8> random_bytes(Array<u8, 12> in) {
+	u64 const k = 11400714819322457659; // next_prime(2**64 / phi)
+	u64 x = std::bit_cast<u64>(in.sub_array<8>(0));
+	x ^= (u64)std::bit_cast<u32>(in.sub_array<4>(8)) * k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;

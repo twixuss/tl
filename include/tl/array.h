@@ -34,6 +34,11 @@ struct Array {
 	forceinline constexpr auto iter(this auto &&self, IterOptions options = {}) {
 		return span_iter(self.data, self.data + count, options);
 	}
+	
+	template <umm sub_count>
+	Array<T, sub_count> &sub_array(umm sub_start = 0) {
+		return *(Array<T, sub_count> *)(data + sub_start);
+	}
 
 	auto map(auto &&mapper) const
 		requires requires { mapper(data[0]); }
