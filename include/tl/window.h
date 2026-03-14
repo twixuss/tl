@@ -167,7 +167,9 @@ TL_API void draw_rect(Window &window, s32 x, s32 y, u32 w, u32 h);
 #include "win32.h"
 #include "console.h"
 #include <dwmapi.h>
+#if COMPILER_MSVC
 #pragma comment(lib, "dwmapi")
+#endif
 
 namespace tl {
 

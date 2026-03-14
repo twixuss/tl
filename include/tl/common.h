@@ -5,8 +5,11 @@
 	#pragma warning(push, 0)
 #endif
 
-#if COMPILER_MSVC
+#if OS_WINDOWS
 	#include <intrin.h>
+#endif
+
+#if COMPILER_MSVC
 	#include <vcruntime_new.h>
 #elif COMPILER_GCC
 	#include <immintrin.h>
@@ -223,6 +226,9 @@ constexpr bool operator!=(Empty, Empty) { return false; }
 
 inline umm noop() { return 0; }
 
+template <typename T>
+struct ShowType; // Use for debugging, print types at compile time.
+
 template <class ...T>
 inline constexpr umm type_count_of = sizeof...(T);
 
@@ -322,8 +328,10 @@ constexpr void destruct(T &val) {
 	val.~T();
 }
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4309)
+#endif
 
 template <class T> inline constexpr T min_value = {};
 template <class T> inline constexpr T max_value = {};
@@ -390,7 +398,9 @@ template <> inline constexpr f32 nan<f32> = __builtin_nanf("");
 template <> inline constexpr f64 nan<f64> = __builtin_nan("");
 #endif
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 #define tl_enum_flags(t) \
 forceinline constexpr t operator~(t a){using u=std::underlying_type_t<t>;return (t)~(u)a;} \
@@ -555,7 +565,7 @@ forceinline constexpr void add_carry(u8  a, u8  b, bool carry_in, u8  *result, b
 	} else {
 		#if COMPILER_MSVC
 			*carry_out = (bool)_addcarry_u8(carry_in, a, b, result);
-		#else COMPILER_GCC
+		#else
 			ce::add_carry(a, b, carry_in, result, carry_out);
 		#endif
 	}
@@ -566,7 +576,7 @@ forceinline constexpr void add_carry(u16 a, u16 b, bool carry_in, u16 *result, b
 	} else {
 		#if COMPILER_MSVC
 			*carry_out = (bool)_addcarry_u16(carry_in, a, b, result);
-		#else COMPILER_GCC
+		#else
 			ce::add_carry(a, b, carry_in, result, carry_out);
 		#endif
 	}
@@ -596,7 +606,7 @@ forceinline constexpr void sub_borrow(u8  a, u8  b, bool carry_in, u8  *result, 
 	} else {
 		#if COMPILER_MSVC
 			*carry_out = (bool)_subborrow_u8(carry_in, a, b, result);
-		#else COMPILER_GCC
+		#else
 			ce::sub_borrow(a, b, carry_in, result, carry_out);
 		#endif
 	}
@@ -607,7 +617,7 @@ forceinline constexpr void sub_borrow(u16 a, u16 b, bool carry_in, u16 *result, 
 	} else {
 		#if COMPILER_MSVC
 			*carry_out = (bool)_subborrow_u16(carry_in, a, b, result);
-		#else COMPILER_GCC
+		#else
 			ce::sub_borrow(a, b, carry_in, result, carry_out);
 		#endif
 	}
@@ -849,7 +859,7 @@ constexpr u32 count_leading_zeros(u64 v) {
 	return ce::count_bits((u64)~v);
 }
 
-// Hacker's delight - FIGURE 5–24. Number of trailing zeros, Gaudet’s algorithm
+// Hacker's delight - FIGURE 5ï¿½24. Number of trailing zeros, Gaudetï¿½s algorithm
 constexpr u8 count_trailing_zeros(u8 x) {
 	u8 y = x & (u8)-(s8)x;
 	u32 bz = !y;
@@ -1182,7 +1192,9 @@ constexpr T *midpoint(T *a, T *b) {
 
 template <class T>
 struct AutoCastable {
+#if COMPILER_MSVC
 #pragma warning(suppress: 4180) // const is meaningless for function types. No idea why and I don't care.
+#endif
 	T const &value;
 	template <class U>
 	forceinline constexpr operator U() {
@@ -1393,11 +1405,14 @@ constexpr umm count(Collection const &collection, Predicate predicate) {
 	return result;
 }
 
-constexpr auto identity_value = [] (auto &&x) -> decltype(auto) {
-	return x;
-};
+// NOTE: Can't use lambdas in headers because of potential ODR violation.
+inline struct IdentityValue {
+	constexpr auto operator()(auto &&x) const -> decltype(auto) {
+		return x;
+	}
+} identity_value;
 
-template <Collection Collection, class Mapper = decltype(identity_value)>
+template <Collection Collection, class Mapper = IdentityValue>
 auto sum(Collection const &collection, Mapper &&mapper = identity_value) {
 	std::remove_cvref_t<decltype(mapper(*(ElementOf<Collection> *)0))> result = {};
 	foreach (it, collection)
@@ -1422,7 +1437,7 @@ auto stddev(Collection const &collection) {
 	return tl::sqrt(variance);
 }
 
-template <class Predicate = decltype(identity_value)>
+template <class Predicate = IdentityValue>
 bool all(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
 		if (!predicate(*it))
@@ -1431,7 +1446,7 @@ bool all(Collection auto collection, Predicate predicate = {}) {
 	return true;
 }
 
-template <class Predicate = decltype(identity_value)>
+template <class Predicate = IdentityValue>
 bool any(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
 		if (predicate(*it))
@@ -1503,12 +1518,7 @@ struct Deferrer {
 
 private:
 	Fn fn;
-#if COMPILER_MSVC
-#pragma warning(suppress: 4626)
 };
-#else
-};
-#endif
 
 #define defer ::tl::Deferrer CONCAT(_deferrer, __COUNTER__) = [&]
 
@@ -1521,12 +1531,7 @@ struct OffableDeferrer {
 
 private:
 	Fn fn;
-#if COMPILER_MSVC
-#pragma warning(suppress: 4626)
 };
-#else
-};
-#endif
 
 #define offable_defer(name) ::tl::OffableDeferrer name = [&]
 
@@ -1718,7 +1723,9 @@ struct Optional : std::conditional_t<std::is_trivially_destructible_v<T>, Option
 			fn(this->_value);
 	}
 
+#if COMPILER_MSVC
 #pragma warning(suppress: 4820)
+#endif
 };
 
 template <>
@@ -1754,12 +1761,22 @@ struct Optional<void> : OptionalBaseTrivial<void> {
 
 	void _set_has_value(bool x) { this->_has_value = x; }
 
+#if COMPILER_MSVC
 #pragma warning(suppress: 4820)
+#endif
 };
 
-template <class T> struct std::tuple_size<Optional<T>> : std::integral_constant<size_t, 2> {};
-template <class T> struct std::tuple_element<0, Optional<T>> { using type = T; };
-template <class T> struct std::tuple_element<1, Optional<T>> { using type = bool; };
+}
+
+namespace std {
+
+template <class T> struct tuple_size<tl::Optional<T>> : integral_constant<size_t, 2> {};
+template <class T> struct tuple_element<0, tl::Optional<T>> { using type = T; };
+template <class T> struct tuple_element<1, tl::Optional<T>> { using type = bool; };
+
+}
+
+namespace tl {
 
 template <size_t i, class T>
 auto get(Optional<T> x) {
@@ -1993,8 +2010,18 @@ struct Span {
 	constexpr Element *begin() const { return data; }
 	constexpr Element *end() const { return data + count; }
 
-	constexpr ReverseIterator rbegin() const { return data + count - 1; }
-	constexpr ReverseIterator rend() const { return data - 1; }
+	constexpr ReverseIterator rbegin() const {
+		// This is ub when data is 0 and count is 0. Pointer arithmetic over/underflow is ub.
+		//return data + count - 1;
+
+		return (Element *)((umm)data + ((umm)count - 1) * sizeof(T));
+	}
+	constexpr ReverseIterator rend() const {
+		// This is ub when data is 0. Pointer arithmetic over/underflow is ub.
+		// return data - 1;
+	
+		return (Element *)((umm)data - sizeof(T));
+	}
 
 	constexpr Element &front() const {
 		bounds_check(assert(count));
@@ -2110,8 +2137,13 @@ struct Span {
 				}
 				#endif
 				while (endp - ap >= 8) {
-					u64 a = *(u64 *)ap; ap += 8;
-					u64 b = *(u64 *)bp; bp += 8;
+					u64 a;
+					u64 b;
+					memcpy(&a, ap, 8); // Dereferencing unaligned pointer is UB
+					memcpy(&b, bp, 8); // Dereferencing unaligned pointer is UB
+					ap += 8;
+					bp += 8;
+
 					if (a != b) {
 						return false;
 					}
@@ -2625,7 +2657,7 @@ void replace_inplace(Span<T, Size> &where, Span<T> what, Span<T> with, ReplaceIn
 	T *found = where.begin();
 	if (with.count <= what.count) {
 		// `where` is going to shink or stay the same size. No need for bounds checks.
-		while (found = find(Span(found, where.end()), what)) {
+		while ((found = find(Span(found, where.end()), what))) {
 			memmove(found + with.count, found + what.count, (where.end() - (found + what.count)) * sizeof(T));
 			memcpy(found, with.data, with.count * sizeof(T));
 			where.count += with.count - what.count;
@@ -2650,7 +2682,7 @@ void replace_inplace(Span<T, Size> &where, Span<T> what, Span<T> with, ReplaceIn
 
 		if (options.reverse) {
 			found = where.end();
-			while (found = find_last(Span(where.begin(), found), what).data) {
+			while ((found = find_last(Span(where.begin(), found), what).data)) {
 				spread_and_insert();
 			}
 		} else {
@@ -3522,6 +3554,15 @@ struct Allocator : AllocatorBase<Allocator> {
 
 template <class CustomAllocator>
 Allocator make_allocator_from(CustomAllocator *allocator) {
+	// allocator is allowed to be null if it is stateless,
+	// but it's ub to call methods on null, so work around that.
+	if constexpr (sizeof(CustomAllocator) == 1) {
+		if (!allocator) {
+			static CustomAllocator _static;
+			allocator = &_static;
+		}
+	}
+
 	return {
 		.func = [](AllocatorAction action, void *data, umm old_size, umm new_size, umm align, void *state TL_LPD) -> AllocationResult {
 			switch (action) {
@@ -4031,7 +4072,7 @@ namespace tl {
 	#elif COMPILER_GCC
 		AllocationResult DefaultAllocator::allocate_impl(umm size, umm alignment TL_LPD) {
 			return {
-				.data = ::__mingw_aligned_malloc(size, alignment),
+				.data = (u8 *)::__mingw_aligned_malloc(size, alignment),
 				.count = size,
 				.is_zeroed = false,
 			};
@@ -4039,7 +4080,7 @@ namespace tl {
 		AllocationResult DefaultAllocator::reallocate_impl(void *data, umm old_size, umm new_size, umm alignment TL_LPD) {
 			(void)old_size;
 			return {
-				.data = ::__mingw_aligned_realloc(data, new_size, alignment),
+				.data = (u8 *)::__mingw_aligned_realloc(data, new_size, alignment),
 				.count = new_size,
 				.is_zeroed = false,
 			};

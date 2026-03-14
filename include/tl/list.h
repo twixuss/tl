@@ -1,8 +1,10 @@
 #pragma once
 #include "common.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4582 4624)
+#endif
 
 #ifndef TL_INITIAL_LIST_CAPACITY
 #define TL_INITIAL_LIST_CAPACITY 4
@@ -243,14 +245,14 @@ struct List : Span<T, Size_> {
 		erase_all([&](T const &it) { return it == value; });
 	}
 	
-	void here_map(auto &&map) requires requires(T v) { { map(v) } -> std::same_as<T>; } {
+	void map_here(auto &&map) requires requires(T v) { { map(v) } -> std::same_as<T>; } {
 		auto end = data + count;
 		for (auto it = data; it != end; ++it) {
 			*it = map(*it);
 		}
 	}
 	
-	void here_map(auto &&map) requires requires(T v) { { map(v) } -> std::same_as<Optional<T>>; } {
+	void map_here(auto &&map) requires requires(T v) { { map(v) } -> std::same_as<Optional<T>>; } {
 		auto end = data + count;
 		auto dst = data;
 		for (auto it = data; it != end; ++it) {
@@ -265,7 +267,9 @@ struct List : Span<T, Size_> {
 	}
 
 	void erase(T *value) { 
-		erase_at(value - data);
+		bounds_check(assert(begin() <= value && value < end()));
+		--count;
+		memmove(value, value + 1, (data + count - value) * sizeof(T));
 	}
 
 	void erase_unordered_at(Size index) {
@@ -286,8 +290,8 @@ struct List : Span<T, Size_> {
 	// insert_at(with_what, index)
 	void replace(Span where, T with_what) {
 		bounds_check(assert(where.count <= count));
-		bounds_check(assert(begin() <= where.begin() && where.begin() < end()));
-		bounds_check(assert(where.end() <= end()));
+		bounds_check(assert(begin() <= where.begin() && where.begin() <  end()));
+		bounds_check(assert(begin() <= where.end  () && where.end  () <= end()));
 
 		memmove(where.data + 1, where.data + where.count, (end() - where.end()) * sizeof(T));
 		*where.data = with_what;
@@ -384,7 +388,7 @@ struct List : Span<T, Size_> {
 			.list = this,
 			.it = options.reverse ? data + count - 1 : data,
 			.end = options.reverse ? data - 1 : data + count,
-			.step = options.reverse ? -1 : 1,
+			.step = (s8)(options.reverse ? -1 : 1),
 		};
 	}
 	auto iter(IterOptions options = {}) const {
@@ -392,7 +396,7 @@ struct List : Span<T, Size_> {
 			.list = this,
 			.it = options.reverse ? data + count - 1 : data,
 			.end = options.reverse ? data - 1 : data + count,
-			.step = options.reverse ? -1 : 1,
+			.step = (s8)(options.reverse ? -1 : 1),
 		};
 	}
 };
@@ -639,7 +643,9 @@ template <class T, class Allocator, class Size> T const &back(List<T, Allocator,
 template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size> &list) { return list.back(); }
 
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 }
 

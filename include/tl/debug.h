@@ -4,8 +4,10 @@
 #include "console.h"
 #include "hash.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820)
+#endif
 
 namespace tl {
 
@@ -82,14 +84,20 @@ inline tl::u64 get_hash(tl::StringizedCallStack::Entry const &e) {
 // To avoid this, you must synchronize all concurrent calls from more than one thread to this function.
 #include "thread.h"
 
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
 #include <DbgHelp.h>
 #pragma pop_macro("OS_WINDOWS")
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
+#if COMPILER_MSVC
 #pragma comment(lib, "dbghelp")
+#endif
 
 namespace tl {
 
@@ -318,7 +326,6 @@ StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceName
 					file = as_span(line.FileName);
 				}
 			} else {
-				auto error = GetLastError();
 				TL_GET_CURRENT(logger).error("SymFromAddr failed: {}", win32_error());
 				file = "SymFromAddr failed"s;
 				name = "SymFromAddr failed"s;
@@ -359,4 +366,6 @@ bool debugger_attached() {
 
 #endif
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

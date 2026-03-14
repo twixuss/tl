@@ -6,9 +6,11 @@
 #include "logger.h"
 #include "function.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820)
 #pragma warning(disable: 4996)
+#endif
 
 struct sockaddr_in;
 
@@ -125,14 +127,20 @@ inline NetStream *create_stream(net::Socket socket) {
 #ifdef TL_IMPL
 #if OS_WINDOWS
 
+#if COMPILER_MSVC
 #pragma warning(push, 0)
 #pragma warning(disable: 4005) // macro redefinition
+#endif
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
+#if COMPILER_MSVC
 #pragma comment(lib, "iphlpapi")
 #pragma comment(lib, "ws2_32")
+#endif
 
 #include "default_logger.h"
 #include "win32.h"
@@ -373,4 +381,6 @@ void TcpServer::update() {
 #endif
 #endif
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

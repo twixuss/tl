@@ -2,11 +2,13 @@
 #include "system.h"
 #include "list.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820) // padding after struct
 #pragma warning(disable: 4582) // constructor not called implicitly
 #pragma warning(disable: 4583) // destructor not called implicitly
 #pragma warning(disable: 4061 4062) // incomplete switch
+#endif
 
 namespace tl {
 namespace Json {
@@ -376,4 +378,6 @@ Object parse(Span<utf8> json) {
 
 #endif
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

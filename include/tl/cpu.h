@@ -2,8 +2,10 @@
 #include "common.h"
 #include "static_list.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4061)
+#endif
 
 namespace tl {
 
@@ -152,7 +154,9 @@ struct CpuInfo {
 		}
 		return result;
 	}
+#if COMPILER_MSVC
 #pragma warning(suppress: 4820)
+#endif
 };
 
 TL_API CpuInfo get_cpu_info();
@@ -207,9 +211,10 @@ CpuInfo get_cpu_info() {
 			case CacheInstruction: return CpuCacheType_instruction;
 			case CacheData: return CpuCacheType_data;
 			case CacheTrace: return CpuCacheType_trace;
+			default:
+				invalid_code_path();
+				return {};
 		}
-		invalid_code_path();
-		return {};
 	};
 
 
@@ -225,7 +230,9 @@ CpuInfo get_cpu_info() {
 			}
 			default:
 				break;
+#if COMPILER_MSVC
 #pragma warning(suppress: 4061)
+#endif
 		}
 	}
 
@@ -345,42 +352,44 @@ CpuInfo get_cpu_info() {
 
 Span<char> to_string(CpuCacheLevel level) {
 	switch (level) {
-#define f(x) case CpuCacheLevel_##x: return #x##s;
+		#define f(x) case CpuCacheLevel_##x: return #x##s;
 		tl_all_cpu_cache_levels(f);
-#undef f
+		#undef f
+		default: return "unknown"s;
 	}
-	return "unknown"s;
 }
 
 Span<char> to_string(CpuCacheType type) {
 	switch (type) {
-#define f(x) case CpuCacheType_##x: return #x##s;
+		#define f(x) case CpuCacheType_##x: return #x##s;
 		tl_all_cpu_cache_types(f);
-#undef f
+		#undef f
+		default: return "unknown"s;
 	}
-	return "unknown"s;
 }
 
 Span<char> to_string(CpuFeature feature) {
 	switch (feature) {
-#define f(x) case CpuFeature_##x: return #x##s;
+		#define f(x) case CpuFeature_##x: return #x##s;
 		tl_all_cpu_features(f);
-#undef f
+		#undef f
+		default: return "unknown"s;
 	}
-	return "unknown"s;
 }
 
 Span<char> to_string(CpuVendor vendor) {
 	switch (vendor) {
-#define f(x) case CpuVendor_##x: return #x##s;
+		#define f(x) case CpuVendor_##x: return #x##s;
 		tl_all_cpu_vendors(f);
-#undef f
+		#undef f
+		default: return "unknown"s;
 	}
-	return "unknown"s;
 }
 
 #endif // TL_IMPL
 
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

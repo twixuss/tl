@@ -273,10 +273,12 @@ Tokenizer Tokenizer::create(Span<char> source) {
 	};
 }
 
+#if COMPILER_MSVC
 #pragma warning(push, 4)
 #pragma warning(disable: 4309) // constant truncation
 #pragma warning(disable: 4244) // lossy conversion
 #pragma warning(error: 5262) // case fallthrough
+#endif
 	
 bool Tokenizer::next() {
 	auto parse_string = [&](Error unclosed_error, Error invalid_error, char closing_char) {
@@ -940,7 +942,9 @@ FatToken Tokenizer::fat_token() {
 	return token;
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 #endif
 
 }

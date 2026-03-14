@@ -102,7 +102,9 @@ namespace tl {
 
 #if OS_WINDOWS
 
+#if COMPILER_MSVC
 #pragma comment(lib, "Shell32.lib")
+#endif
 
 MemoryInfo get_memory_info() {
 	MemoryInfo result;

@@ -2,20 +2,28 @@
 #include "thread.h"
 #include "common.h"
 
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <d3d11.h>
 #include <d3d11_3.h>
 #include <d3dcompiler.h>
 #pragma pop_macro("OS_WINDOWS")
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
+#if COMPILER_MSVC
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "d3dcompiler")
 #pragma comment(lib, "dxgi")
+#endif
 
 #ifndef TL_D3D11_HRESULT_HANDLER
 #define TL_D3D11_HRESULT_HANDLER(hr) (default_hresult_handler(hr, __FILE__, __LINE__, __FUNCTION__, #hr) || (invalid_code_path(), 0))
@@ -25,8 +33,10 @@
 
 #define GHR(hr) TL_D3D11_HRESULT_HANDLER(hr)
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820) // struct padding
+#endif
 
 namespace tl { namespace d3d11 {
 
@@ -159,8 +169,7 @@ struct TL_API State {
 	RenderTexture create_render_texture(u32 width, u32 height, u32 sample_count, DXGI_FORMAT format, u32 cpu_flags = 0);
 	Texture2D create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, void const *data, bool generate_mips = false);
 	Texture3D create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT format, void const *data, bool generate_mips = false);
-	UntypedBuffer create_buffer(u32 count, u32 stride, void const *data, UINT bind_flags, UINT misc_flags);
-	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
+	void *create_shader(HRESULT (ID3D11Device::*create_shader)(void const *, SIZE_T, ID3D11ClassLinkage *, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 
@@ -504,7 +513,9 @@ inline u32 get_bits_per_pixel(DXGI_FORMAT format) {
 
         default:
             return 0;
+#if COMPILER_MSVC
 #pragma warning(suppress: 4061)
+#endif
     }
 }
 
@@ -629,7 +640,7 @@ Texture3D State::create_texture_3d(u32 width, u32 height, u32 depth, DXGI_FORMAT
 	}
 	return result;
 }
-void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void *, SIZE_T, int, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **out_bytecode) {
+void *State::create_shader(HRESULT (ID3D11Device::*create_shader)(void const *, SIZE_T, ID3D11ClassLinkage *, void **), Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **out_bytecode) {
 	ID3DBlob *bytecode = 0;
 	ID3DBlob *messages = 0;
 	HRESULT result = D3DCompile(source.data, source.count, name, defines, standard_include ? D3D_COMPILE_STANDARD_FILE_INCLUDE : 0, entry_point, target, 0, 0, &bytecode, &messages);
@@ -793,28 +804,6 @@ void State::update_texture_3d(Texture3D &texture, u32 min_x, u32 min_y, u32 min_
 		.back = max_z,
 	};
 	immediate_context->UpdateSubresource(texture.tex, 0, &box, data, data_pitch1, data_pitch2);
-}
-UntypedBuffer State::create_buffer(u32 count, u32 stride, void const *data, UINT bind_flags, UINT misc_flags) {
-	UntypedBuffer buffer = {};
-
-	if (count == 0)
-		return {};
-
-	buffer.size = count * stride;
-			
-	{
-		D3D11_BUFFER_DESC d = {
-			.ByteWidth = buffer.size,
-			.Usage = buffer.usage,
-			.BindFlags = bind_flags,
-			.CPUAccessFlags = buffer.usage == D3D11_USAGE_DYNAMIC ? D3D11_CPU_ACCESS_WRITE : 0u,
-			.MiscFlags = misc_flags,
-			.StructureByteStride = stride,
-		};
-		GHR(device->CreateBuffer(&d, 0, &buffer.buffer));
-	}
-
-	return buffer;
 }
 void State::update_buffer(UntypedBuffer &buffer, u32 count, u32 stride, void const *data, u32 first_element, UINT bind_flags, UINT misc_flags) {
 	if (buffer.usage == D3D11_USAGE_DYNAMIC)
@@ -1151,4 +1140,6 @@ bool State::default_hresult_handler(HRESULT hr, char const *file, int line, char
 
 #undef GHR
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

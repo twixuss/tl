@@ -1150,8 +1150,6 @@ forceinline auto closest_point(T point, line<T> line) {
 	auto l2 = distance_squared(line.a, line.b);
 	if (l2 == 0) return T{};
 
-	using Scalar = decltype(l2);
-
 	auto t = dot(point - line.a, line.b - line.a) / l2;
 	return line.a + t * (line.b - line.a);
 }
@@ -1165,9 +1163,8 @@ forceinline auto closest_point(T point, line_segment<T> line) {
 	auto l2 = length_squared(line);
 	if (l2 == 0) return line.a;
 
-	using Scalar = decltype(l2);
-
-	auto t = clamp(dot(point - line.a, line.b - line.a) / l2, (Scalar)0, (Scalar)1);
+	auto t = dot(point - line.a, line.b - line.a) / l2;
+	t = clamp(t, (decltype(t))0, (decltype(t))1);
 	return line.a + t * (line.b - line.a);
 }
 template <class T>
@@ -1189,8 +1186,6 @@ forceinline auto distance(T point, line<T> line) {
 	auto l2 = distance_squared(line.a, line.b);
 	if (l2 == 0) return (decltype(distance(T{}, T{})))-1;
 
-	using Scalar = decltype(l2);
-
 	auto t = dot(point - line.a, line.b - line.a) / l2;
 	auto projection = line.a + t * (line.b - line.a);
 	return distance(point, projection);
@@ -1205,9 +1200,8 @@ forceinline auto distance(T point, line_segment<T> line) {
 	auto l2 = length_squared(line);
 	if (l2 == 0) return distance(point, line.a);
 
-	using Scalar = decltype(l2);
-
-	auto t = clamp(dot(point - line.a, line.b - line.a) / l2, (Scalar)0, (Scalar)1);
+	auto t = dot(point - line.a, line.b - line.a) / l2;
+	t = clamp(t, (decltype(t))0, (decltype(t))1);
 	auto projection = line.a + t * (line.b - line.a);
 	return distance(point, projection);
 }
@@ -2607,12 +2601,13 @@ forceinline bool overlaps_sphere(FrustumPlanes const &planes, v3f position, f32 
 	f32x8 plane_y = f32x8_set(planes.data[0].y, planes.data[1].y, planes.data[2].y, planes.data[3].y, planes.data[4].y, planes.data[5].y, 0, 0);
 	f32x8 plane_z = f32x8_set(planes.data[0].z, planes.data[1].z, planes.data[2].z, planes.data[3].z, planes.data[4].z, planes.data[5].z, 0, 0);
 	f32x8 plane_w = f32x8_set(planes.data[0].w, planes.data[1].w, planes.data[2].w, planes.data[3].w, planes.data[4].w, planes.data[5].w, 0, 0);
-	f32x8 position_x = f32x8_set1(position.x);
-	f32x8 position_y = f32x8_set1(position.y);
-	f32x8 position_z = f32x8_set1(position.z);
-	f32x8 negative_radius = f32x8_set1(-radius);
 
-	f32x8 f = f32x8_add(f32x8_muladd(plane_x, position_x, f32x8_muladd(plane_y, position_y, f32x8_mul(plane_z, position_z))), plane_w);
+	f32x8 f = f32x8_add(
+		f32x8_muladd(plane_x, f32x8_set1(position.x),
+		f32x8_muladd(plane_y, f32x8_set1(position.y),
+		   f32x8_mul(plane_z, f32x8_set1(position.z)))),
+		plane_w
+	);
 	auto mask = b32x8_get_mask(f32x8_lt(f, f32x8_set1(-radius)));
 	return !(mask & 0b11111100);
 #else

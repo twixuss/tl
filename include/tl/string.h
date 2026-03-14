@@ -38,9 +38,11 @@ void append(StringBuilder &builder, YourType t) {
 #include "static_list.h"
 #include "array.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820)
 #pragma warning(disable: 4702) // unreachable code
+#endif
 
 namespace tl {
 
@@ -1513,12 +1515,12 @@ template <Appendable ...Args> List<utf16> tformat(Span<utf16> fmt, Args const &.
 template <Appendable ...Args> List<utf32> tformat(Span<utf32> fmt, Args const &...args) { return TL_TMP(format(fmt, args...)); }
 
 template <class Allocator = Allocator, Appendable T>
-List<utf8, Allocator> to_string(T const &value) {
+List<utf8, Allocator> to_string(T const &value TL_LP) {
 	StringBuilder builder;
 	builder.allocator = TL_GET_CURRENT(temporary_allocator);
 	append(builder, value);
 
-	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current());
+	return (List<utf8, Allocator>)to_string<Allocator>(builder, Allocator::current() TL_LA);
 }
 
 struct UnitScaleAndName {
@@ -1797,6 +1799,8 @@ umm _to_utf16(Span<utf8> src, Span<utf16> dst) {
 
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 #endif // _TL_STRING_H

@@ -58,7 +58,9 @@ TL_API void make_os_timing_precise();
 #include "win32.h"
 #include "thread.h"
 
+#if COMPILER_MSVC
 #pragma comment(lib, "winmm")
+#endif
 
 namespace tl {
 

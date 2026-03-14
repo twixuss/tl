@@ -14,21 +14,29 @@ Requirements:
 #include "date.h"
 
 #if OS_WINDOWS
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #define NOMINMAX
 #include <Windows.h>
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
+#if COMPILER_MSVC
 #pragma comment(lib, "opengl32")
 #ifdef TL_IMPL
 #pragma comment(lib, "gdi32")
 #endif
 #endif
+#endif
 
 #include <GL/gl.h>
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4820)
+#endif
 
 #ifndef TL_GL_PROFILE
 	#ifdef TL_GL_ENABLE_PROFILE
@@ -1516,4 +1524,6 @@ void free(GrowingBuffer<T> &buffer) {
 }
 
 #undef TL_GL_PROFILE
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

@@ -248,11 +248,18 @@ forceinline constexpr smm operator""_smm(unsigned long long i) { return (smm)i; 
 	#if OS_WINDOWS
 		#pragma push_macro("OS_WINDOWS")
 		#undef OS_WINDOWS
-		#define NOMINMAX
+		#ifndef NOMINMAX
+			#define NOMINMAX
+		#endif
+		#if COMPILER_MSVC
 			#pragma warning(push, 0)
-				#pragma warning(disable: 5039 4668 5105)
-				#include <Windows.h>
+			#pragma warning(disable: 5039 4668 5105)
+		#endif
+
+		#include <Windows.h>
+		#if COMPILER_MSVC
 			#pragma warning(pop)
+		#endif
 		#pragma pop_macro("OS_WINDOWS")
 	#else
 		#include <pthread.h>

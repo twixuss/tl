@@ -18,8 +18,10 @@
 #include "string.h"
 #include "hash.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4201) // nonstandard extension: nameless struct
+#endif
 
 namespace tl {
 
@@ -423,4 +425,6 @@ inline constexpr tl::u64 get_hash(tl::v4<T> const &v) {
 		get_hash(v.w) * 1630477228166597791ull;
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

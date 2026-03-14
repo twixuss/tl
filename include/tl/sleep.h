@@ -8,6 +8,18 @@ TL_API void sleep_milliseconds(u64 milliseconds);
 TL_API void sleep_seconds(u64 seconds);
 TL_API void sleep_forever();
 
+extern "C" void _mm_pause();
+
+#if OS_WINDOWS && COMPILER_GCC
+forceinline void yield_smt() {
+	// TODO: _mm_pause fails to link, undefined reference. mingw
+	//_mm_pause();
+	__asm__ __volatile__("rep nop");
+}
+#else
+forceinline void yield_smt() { _mm_pause(); }
+#endif
+
 }
 
 #ifdef TL_IMPL
@@ -20,7 +32,6 @@ extern u64 precise_counter_resolution;
 
 extern "C" void __stdcall Sleep(unsigned long milliseconds);
 extern "C" int __stdcall SwitchToThread();
-extern "C" void _mm_pause();
 
 void sleep_nanoseconds(u64 nanoseconds) {
 	auto target = current_precise_counter() + precise_counter_resolution * nanoseconds / 1'000'000'000;
@@ -32,7 +43,7 @@ void sleep_nanoseconds(u64 nanoseconds) {
 
 	// spin for remaining time
 	while (current_precise_counter() < target) {
-		_mm_pause();
+		yield_smt();
 	}
 }
 void sleep_milliseconds(u64 milliseconds) {

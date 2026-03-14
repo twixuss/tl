@@ -33,9 +33,13 @@
 
 using namespace tl;
 
+#if COMPILER_MSVC
 #pragma warning(disable: 4100)
+#endif
 
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #include <stdio.h>
 #include <assert.h>
 #if COMPILER_GCC
@@ -779,4 +783,6 @@ s32 tl_main(Span<Span<utf8>> args) {
 
 	return 0;
 }
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

@@ -5,8 +5,10 @@
 //#include "generated/simd.h"
 //#include "generated/simd_vector.h"
 
+#if COMPILER_MSVC
 #pragma warning(push)
 //#pragma warning(disable : 4244)
+#endif
 
 namespace tl {
 
@@ -145,7 +147,7 @@ forceinline Array<u8, 4> random_bytes(Array<u8, 4> in) {
 
 template <>
 forceinline Array<u8, 4> random_bytes(Array<u8, 8> in) {
-	u64 const k = 11400714819322457659; // next_prime(2**64 / phi)
+	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
 	u64 x = std::bit_cast<u64>(in);
 	x = x*k^k;
 	x = x*k^k;
@@ -157,7 +159,7 @@ forceinline Array<u8, 4> random_bytes(Array<u8, 8> in) {
 // NOT TESTED FOR QUALITY
 template <>
 forceinline Array<u8, 8> random_bytes(Array<u8, 8> in) {
-	u64 const k = 11400714819322457659; // next_prime(2**64 / phi)
+	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
 	u64 x = std::bit_cast<u64>(in);
 	x = x*k^k;
 	x = x*k^k;
@@ -818,4 +820,6 @@ v3f random_unit_v3f(Generator &generator) {
 
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif

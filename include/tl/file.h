@@ -562,17 +562,22 @@ inline bool for_each_file(Span<utf8> directory, ForEachFileOptions options, Fn &
 #if TL_FILE_INCLUDE_DIALOG
 #pragma push_macro("OS_WINDOWS")
 #undef OS_WINDOWS
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #include <Shlwapi.h>
 #include <shlobj.h>
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 #pragma pop_macro("OS_WINDOWS")
 
+#if COMPILER_MSVC
 #pragma comment(lib, "shlwapi")
 #pragma comment(lib, "comctl32")
 #pragma comment(lib, "Ole32.lib")
-
 #pragma comment(linker, "\"/manifestdependency:type='Win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+#endif
 #endif
 
 #include "static_list.h"
@@ -851,6 +856,7 @@ static void win32_delete_directory_recursive(PathBuffer &path_buffer) {
 				win32_delete_directory_recursive(path_buffer);
 				break;
 			}
+			default: break;
 		}
 	});
 	
@@ -876,7 +882,9 @@ public:
 		static const QITAB qit[] = {
 			QITABENT(CDialogEventHandler, IFileDialogEvents),
 			QITABENT(CDialogEventHandler, IFileDialogControlEvents), { 0 },
+#if COMPILER_MSVC
 #pragma warning(suppress:4838)
+#endif
 		};
 		return QISearch(this, qit, riid, ppv);
 	}
@@ -893,24 +901,23 @@ public:
 	}
 
 	// IFileDialogEvents methods
-	IFACEMETHODIMP OnFileOk(IFileDialog *) { return S_OK; };
-	IFACEMETHODIMP OnFolderChange(IFileDialog *) { return S_OK; };
-	IFACEMETHODIMP OnFolderChanging(IFileDialog *, IShellItem *) { return S_OK; };
-	IFACEMETHODIMP OnHelp(IFileDialog *) { return S_OK; };
-	IFACEMETHODIMP OnSelectionChange(IFileDialog *) { return S_OK; };
-	IFACEMETHODIMP OnShareViolation(IFileDialog *, IShellItem *, FDE_SHAREVIOLATION_RESPONSE *) { return S_OK; };
-	IFACEMETHODIMP OnTypeChange(IFileDialog *) { return S_OK; }
-	IFACEMETHODIMP OnOverwrite(IFileDialog *, IShellItem *, FDE_OVERWRITE_RESPONSE *) { return S_OK; };
+	IFACEMETHODIMP OnFileOk(IFileDialog *) override { return S_OK; };
+	IFACEMETHODIMP OnFolderChange(IFileDialog *) override { return S_OK; };
+	IFACEMETHODIMP OnFolderChanging(IFileDialog *, IShellItem *) override { return S_OK; };
+	IFACEMETHODIMP OnSelectionChange(IFileDialog *) override { return S_OK; };
+	IFACEMETHODIMP OnShareViolation(IFileDialog *, IShellItem *, FDE_SHAREVIOLATION_RESPONSE *) override { return S_OK; };
+	IFACEMETHODIMP OnTypeChange(IFileDialog *) override { return S_OK; }
+	IFACEMETHODIMP OnOverwrite(IFileDialog *, IShellItem *, FDE_OVERWRITE_RESPONSE *) override { return S_OK; };
 
 	// IFileDialogControlEvents methods
-	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *, DWORD, DWORD) { return S_OK; }
-	IFACEMETHODIMP OnButtonClicked(IFileDialogCustomize *, DWORD) { return S_OK; };
-	IFACEMETHODIMP OnCheckButtonToggled(IFileDialogCustomize *, DWORD, BOOL) { return S_OK; };
-	IFACEMETHODIMP OnControlActivating(IFileDialogCustomize *, DWORD) { return S_OK; };
+	IFACEMETHODIMP OnItemSelected(IFileDialogCustomize *, DWORD, DWORD) override { return S_OK; }
+	IFACEMETHODIMP OnButtonClicked(IFileDialogCustomize *, DWORD) override { return S_OK; };
+	IFACEMETHODIMP OnCheckButtonToggled(IFileDialogCustomize *, DWORD, BOOL) override { return S_OK; };
+	IFACEMETHODIMP OnControlActivating(IFileDialogCustomize *, DWORD) override { return S_OK; };
 
 	CDialogEventHandler() : _cRef(1) { };
+	virtual ~CDialogEventHandler() { };
 private:
-	~CDialogEventHandler() { };
 	long _cRef;
 };
 

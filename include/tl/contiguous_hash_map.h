@@ -60,7 +60,7 @@ struct ContiguousHashMap : Traits {
 
 				index = found.value().index;
 			} else {
-				index = find_index_of_erased_slot(key, compact_hash, index).value();
+				index = find_erased_slot_at_or_after(index).value();
 			}
 
 			if (count >= buffer.count * rehash_percentage / 100) {
@@ -245,11 +245,10 @@ struct ContiguousHashMap : Traits {
 		return find_index_of_key_or_empty_slot(key, compact(hash), index);
 	}
 
-	Optional<umm> find_index_of_erased_slot(Key key, HashAndState compact_hash, umm index) const {
+	Optional<umm> find_erased_slot_at_or_after(umm index) const {
 		assert(buffer.count);
 		
-		HashAndState *hnss   = buffer.template base_of<0>();
-		Key          *keys   = buffer.template base_of<1>();
+		HashAndState *hnss = buffer.template base_of<0>();
 		
 		umm steps = buffer.count;
 		while (steps--) {
@@ -337,7 +336,7 @@ struct ContiguousHashMap : Traits {
 
 	using IterOptions = Empty;
 
-	auto iter(this auto &&self, IterOptions options = {}) {
+	auto iter(this auto &&self, IterOptions = {}) {
 		auto iter = Iter<tl_self_const>{
 			(ContiguousHashMap *)&self, 0
 		};

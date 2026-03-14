@@ -5,12 +5,20 @@
 #include "vector.h"
 #include "logger.h"
 #include "static_list.h"
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #include <Windows.h>
 #include <Psapi.h>
+#if COMPILER_MSVC
 #pragma warning(pop, 0)
+#endif
+#if COMPILER_MSVC
 #pragma comment(lib, "user32.lib")
+#endif
 
 namespace tl {
 

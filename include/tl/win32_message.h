@@ -1,10 +1,14 @@
 #pragma once
 #include "common.h"
 
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #define NOMINMAX
 #include <Windows.h>
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 namespace tl {
 

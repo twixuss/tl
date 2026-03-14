@@ -236,7 +236,7 @@ using a8x64 = __m512; using a16x32  = __m512; using a32x16 = __m512; using a64x8
 
 #define f64x2_set(a,b) d2f16(_mm_setr_pd(a,b))
 #define f64x2_set1(a) d2f16(_mm_set1_pd(a))
-#define f64x2_get(a,b) ([&]{auto _wtf_=_mm_extract_epi64(f2i16(a),b);return*(f64*)&_wtf_;}()}
+#define f64x2_get(a,b) ([&]{auto _wtf_=_mm_extract_epi64(f2i16(a),b);return*(f64*)&_wtf_;}())
 #if ARCH_AVX
 #define f64x2_lt(a,b) d2f16(_mm_cmp_pd(f2d16(a),f2d16(b),_CMP_LT_OQ))
 #define f64x2_gt(a,b) d2f16(_mm_cmp_pd(f2d16(a),f2d16(b),_CMP_GT_OQ))

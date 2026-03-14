@@ -322,9 +322,9 @@ struct RingBuffer {
 	
 	
 	auto begin(this auto &&self) { return IterAdapter{self.iter()}; }
-	auto end(this auto &&self) { return Empty{}; }
+	auto end(this auto &&self) { (void)self; return Empty{}; }
 	auto rbegin(this auto &&self) { return IterAdapter{self.iter({.reverse = true})}; }
-	auto rend(this auto &&self) { return Empty{}; }
+	auto rend(this auto &&self) { (void)self; return Empty{}; }
 	
 private:
 	T *get(umm i) {

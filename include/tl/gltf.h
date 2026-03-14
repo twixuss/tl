@@ -37,8 +37,10 @@ TL_API Scene3D parse_from_memory(Span<u8> memory);
 
 #ifdef TL_IMPL
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4061) // incomplete switch
+#endif
 
 namespace tl {
 namespace glb {
@@ -299,7 +301,9 @@ Scene3D parse_from_memory(Span<u8> memory) {
 }
 }
 
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 #endif
 

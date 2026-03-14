@@ -11,7 +11,8 @@ Span<utf8> win32_error_name(u32 error);
 
 namespace tl {
 
-Span<utf8> win32_error_name(u32 error) {
+Span<utf8> win32_error_name(u32 error_) {
+	HRESULT error = (HRESULT)error_;
 	switch (error) {
 		case HRESULT_FROM_WIN32(0L): return u8"ERROR_SUCCESS"s; 
 		case HRESULT_FROM_WIN32(1L): return u8"ERROR_INVALID_FUNCTION"s; 

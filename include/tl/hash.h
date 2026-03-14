@@ -61,14 +61,14 @@ namespace tl {
 template <class Key, bool use_high_bits = true>
 struct DefaultHashTraits {
 	inline static constexpr u32 rehash_percentage = 70;
-	inline static constexpr void on_collision(Key a, Key b) {}
+	inline static constexpr void on_collision(Key, Key) {}
 
 	// These are templates because of situation where == operator is not defined, but are_equal is defined in derived class.
 	// In that case these functions will not be instantiated.
-	inline constexpr bool are_equal(this auto &&self, Key const &a, Key const &b) { return all(a == b); }
-	inline constexpr u64 get_hash(this auto &&self, Key const &key) { return ::get_hash(key); }
+	inline constexpr bool are_equal(this auto &&, Key const &a, Key const &b) { return all(a == b); }
+	inline constexpr u64 get_hash(this auto &&, Key const &key) { return ::get_hash(key); }
 
-	inline constexpr umm get_index_from_hash(this auto &&self, u64 hash, u64 capacity) {
+	inline constexpr umm get_index_from_hash(this auto &&, u64 hash, u64 capacity) {
 		if constexpr (use_high_bits) {
 			hash ^= hash >> 32;
 			hash ^= hash >> 16;

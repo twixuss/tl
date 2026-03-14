@@ -62,6 +62,7 @@ struct LoggerBase {
 };
 
 inline void _initial_logger_proc(struct Logger *logger, LogSeverity severity, Span<utf8> message) {
+	(void)logger;
 	println("({}) {}", severity, message);
 }
 

@@ -10,10 +10,14 @@ extern tl::s32 tl_main(tl::Span<tl::Span<tl::utf8>> args);
 #endif
 
 #ifdef TL_MAIN_WINMAIN
+#if COMPILER_MSVC
 #pragma warning(push, 0)
+#endif
 #define NOMINMAX
 #include <Windows.h>
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 #include "file.h"
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, wchar_t *wcmdline, int) {
 #elif OS_WINDOWS

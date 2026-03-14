@@ -4,10 +4,17 @@
 
 namespace tl {
 
+template <class T>
+struct SortedListDefaultCompare {
+	forceinline constexpr smm operator()(T a, T b) {
+		return compare(a, b);
+	}
+};
+
 template <
 	class T,
 	auto map = identity_value,
-	auto compare = [](std::remove_cvref_t<decltype(map(*(T *)0))> a, decltype(a) b) { return compare(a, b); },
+	auto compare = SortedListDefaultCompare<std::remove_cvref_t<decltype(map(*(T *)0))>> {},
 	class Allocator = Allocator,
 	class Size = umm
 >
@@ -28,6 +35,7 @@ struct SortedList : private List<T, Allocator, Size> {
 	using Base::erase;
 	using Base::erase_at;
 	using Base::operator[];
+	using Base::owns;
 
 	T &add(T value TL_LP) {
 		Base::reserve(count + 1);
@@ -54,6 +62,15 @@ struct SortedList : private List<T, Allocator, Size> {
 		return binary_search(Base::span(), [&](T &it) {
 			return compare(value, map(it));
 		}).found;
+	}
+
+	// Erase `where` and add `new_value` in a single operation.
+	T &replace(T *where, T new_value) {
+		// TODO: Optimize. This implementation always moves memory to the right of `where` left once,
+		//       then moves memory to the right of `new_value` right once. There is some
+		//       overlap between these regions, meaning it ends up in same place. Wasteful.
+		erase(where);
+		return add(new_value);
 	}
 	
 	Base &_list() {

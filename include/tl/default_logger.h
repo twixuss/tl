@@ -99,7 +99,7 @@ void DefaultLogger::default_init(Span<utf8> program_path) {
 
 	tl::current_logger = *this;
 
-	chain(&thread_initter, [=] {
+	chain(&thread_initter, [=, this] {
 		tl::current_logger = *this;
 	});
 }

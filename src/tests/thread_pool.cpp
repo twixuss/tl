@@ -5,8 +5,10 @@
 
 using namespace tl;
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: 4459) // global shadowing
+#endif
 
 static LockProtected<HashMap<u32, u32, DefaultHashTraits<u32>, DefaultAllocator>, OsLock> thread_id_to_index;
 static u32 thread_index_counter;

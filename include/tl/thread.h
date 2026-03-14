@@ -6,6 +6,7 @@
 
 #include <emmintrin.h>
 
+#if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable: TL_DISABLED_WARNINGS)
 #pragma warning(disable: 4582)
@@ -13,17 +14,24 @@
 #pragma warning(disable: 4625)
 #pragma warning(disable: 4820)
 #pragma warning(disable: 5220)
+#endif
 
 namespace tl {
 
 template <class T>
 concept AInterlockExchangeable = sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8;
 
-forceinline void yield_smt() { _mm_pause(); }
-
 #if OS_WINDOWS
 
 TL_API void switch_thread();
+
+#elif OS_LINUX
+
+forceinline void switch_thread() {}
+
+#endif
+
+#if COMPILER_MSVC
 
 forceinline s16 atomic_increment(s16 volatile *a) { return -1 + _InterlockedIncrement16((short *)a); }
 forceinline s32 atomic_increment(s32 volatile *a) { return -1 + _InterlockedIncrement((long *)a); }
@@ -75,9 +83,7 @@ forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand)
 	return *(T *)&result;
 }
 
-#elif OS_LINUX
-
-forceinline void switch_thread() {}
+#else
 
 forceinline s8  atomic_increment(s8  volatile *a) { return __sync_fetch_and_add(a, 1); }
 forceinline s16 atomic_increment(s16 volatile *a) { return __sync_fetch_and_add(a, 1); }
@@ -123,6 +129,7 @@ template <class T>
 forceinline T atomic_compare_exchange(T volatile *dst, T new_value, T comparand) {
 	return __sync_val_compare_and_swap(dst, comparand, new_value);
 }
+
 #endif
 
 template <AInterlockExchangeable T>
@@ -1444,6 +1451,7 @@ struct TaskQueuesThreadPool {
 			atomic_increment(&started_task_count);
 			auto &shared = pool->shared;
 			locked_use(shared) {
+				(void)shared;
 				tasks.push(task);
 			};
 			pool->new_work_notifier.wake();
@@ -1591,7 +1599,9 @@ void TaskQueuesThreadPool_default_worker_proc(TaskQueuesThreadPool *pool) {
 	sync(pool->end_sync_point);
 }
 } // namespace tl
+#if COMPILER_MSVC
 #pragma warning(pop)
+#endif
 
 #ifdef TL_IMPL
 

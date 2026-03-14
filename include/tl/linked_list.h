@@ -49,8 +49,7 @@ struct LinkedList {
 	}
 
 	void erase(T *value) {
-		Node *node = (Node *)((u8 *)value - offsetof(Node, value));
-		erase(node);
+		erase((Node *)value);
 	}
 
 	void erase_at(umm index) {
@@ -65,8 +64,8 @@ struct LinkedList {
 	}
 
 	Node *unlink(Node *node) {
-		auto old_head = head;
-		auto old_tail = tail;
+		auto old_head = head; (void)old_head;
+		auto old_tail = tail; (void)old_tail;
 
 		debug_check();
 		defer { debug_check(); };

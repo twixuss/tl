@@ -268,9 +268,11 @@ struct ProfileRenderer {
 #include "int128.h"
 #include "file.h"
 
+#ifdef _MSC_VER
 #pragma optimize("g", on)
 #pragma optimize("t", on)
 #pragma optimize("y", on)
+#endif
 
 namespace tl {
 
@@ -295,6 +297,7 @@ auto &get_thread_info(Profiler &profiler, u32 thread_id) {
 
 		if (mask != 0) {
 			u8 tz = count_trailing_zeros(mask);
+			assert(infos_base[i + tz].unprotected.time_span_stack.allocator.arena != 0);
 			return infos_base[i + tz];
 		}
 	}
@@ -309,6 +312,7 @@ auto &get_thread_info(Profiler &profiler, u32 thread_id) {
 
 		if (mask != 0) {
 			u8 tz = count_trailing_zeros(mask);
+			assert(infos_base[i + tz].unprotected.time_span_stack.allocator.arena != 0);
 			return infos_base[i + tz];
 		}
 	}
@@ -318,6 +322,7 @@ auto &get_thread_info(Profiler &profiler, u32 thread_id) {
 	// Reference
 	for (umm i = 0; i < profiler.ids_and_infos_allocated_count; ++i) {
 		if (ids_base[i] == thread_id) {
+			assert(infos_base[i].unprotected.time_span_stack.allocator.arena != 0);
 			return infos_base[i];
 		}
 	}
@@ -561,7 +566,6 @@ void ProfileRenderer::setup(Profiler::Report const &r) {
 	events_duration = events_end - events_begin;
 
 	foreach(it, thread_id_to_events_to_draw) {
-		auto &thread_id = it.key();
 		auto &events_to_draw = it.value();
 
 		for (auto &event : events_to_draw.events) {
@@ -615,7 +619,9 @@ void ProfileRenderer::free() {
 }
 
 #if TL_DEBUG
+#ifdef _MSC_VER
 #pragma optimize("", on)
+#endif
 #endif
 
 #endif
