@@ -59,11 +59,6 @@ struct Array {
 			result.data[i] = (U)data[i];
 		return result;
 	};
-
-	template <umm sub_count>
-	Array<T, sub_count> &sub_array(umm sub_offset) {
-		return *(Array<T, sub_count> *)(data + sub_offset);
-	}
 };
 
 template <class T, class... Rest>

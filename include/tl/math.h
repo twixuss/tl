@@ -476,7 +476,7 @@ forceinline v2s frac(v2s v, v2s s) {
 	__m128d slo = _mm_cvtepi32_pd(sm);
 	__m128i result = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(vlo, slo)));
 	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
-	return *(v2s *)&result;
+	return std::bit_cast<v4s>(result).xy;
 }
 forceinline v4s frac(v4s v, v4s s) {
 	__m128i vm = _mm_loadu_si128((__m128i *)&v);
@@ -499,7 +499,7 @@ forceinline v4s frac(v4s v, v4s s) {
 	__m128i r = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(r0), _mm_castsi128_ps(r1)));
 
 	r = _mm_sub_epi32(vm, _mm_mullo_epi32(r, sm));
-	return *(v4s *)&r;
+	return std::bit_cast<v4s>(r);
 }
 forceinline v3s frac(v3s v, v3s s) {
 	return frac(V4s(v, 1), V4s(s, 1)).xyz;

@@ -351,17 +351,17 @@ template<> inline constexpr u32 max_value<u32> = 0xFFFFFFFF;
 template<> inline constexpr u64 min_value<u64> = 0;
 template<> inline constexpr u64 max_value<u64> = 0xFFFFFFFFFFFFFFFF;
 
-template<> inline constexpr s8  min_value<s8 > = 0x80;
-template<> inline constexpr s8  max_value<s8 > = 0x7F;
+template<> inline constexpr s8  min_value<s8 > = (s8)0x80;
+template<> inline constexpr s8  max_value<s8 > = (s8)0x7F;
 
-template<> inline constexpr s16 min_value<s16> = 0x8000;
-template<> inline constexpr s16 max_value<s16> = 0x7FFF;
+template<> inline constexpr s16 min_value<s16> = (s16)0x8000;
+template<> inline constexpr s16 max_value<s16> = (s16)0x7FFF;
 
-template<> inline constexpr s32 min_value<s32> = 0x80000000;
-template<> inline constexpr s32 max_value<s32> = 0x7FFFFFFF;
+template<> inline constexpr s32 min_value<s32> = (s32)0x80000000;
+template<> inline constexpr s32 max_value<s32> = (s32)0x7FFFFFFF;
 
-template<> inline constexpr s64 min_value<s64> = 0x8000000000000000;
-template<> inline constexpr s64 max_value<s64> = 0x7FFFFFFFFFFFFFFF;
+template<> inline constexpr s64 min_value<s64> = (s64)0x8000000000000000;
+template<> inline constexpr s64 max_value<s64> = (s64)0x7FFFFFFFFFFFFFFF;
 
 template<> inline constexpr f32 min_value<f32> = -3.402823466e+38f;
 template<> inline constexpr f32 max_value<f32> = +3.402823466e+38f;
@@ -1085,11 +1085,11 @@ forceinline f64 frac(f64 v) { return v - floor(v); }
 forceinline f32 pow(f32 x, f32 y) { return ::powf(x, y); }
 forceinline f64 pow(f64 x, f64 y) { return ::pow(x, y); }
 
-forceinline constexpr bool is_negative(f32 v) { return *(u32 *)&v & 0x80000000; }
-forceinline constexpr bool is_negative(f64 v) { return *(u64 *)&v & 0x8000000000000000; }
+forceinline constexpr bool is_negative(f32 v) { return std::bit_cast<u32>(v) & 0x80000000; }
+forceinline constexpr bool is_negative(f64 v) { return std::bit_cast<u64>(v) & 0x8000000000000000; }
 
-forceinline constexpr bool is_positive(f32 v) { return !(*(u32 *)&v & 0x80000000); }
-forceinline constexpr bool is_positive(f64 v) { return !(*(u64 *)&v & 0x8000000000000000); }
+forceinline constexpr bool is_positive(f32 v) { return !(std::bit_cast<u32>(v) & 0x80000000); }
+forceinline constexpr bool is_positive(f64 v) { return !(std::bit_cast<u64>(v) & 0x8000000000000000); }
 
 template <class T> forceinline T rotate_left_8  (T v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
 template <class T> forceinline T rotate_left_16 (T v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }

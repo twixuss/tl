@@ -204,6 +204,9 @@ bool debug_add_module(void *module, Span<char> path) {
 	return true;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclobbered"
+
 List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 	scoped(debug_lock);
 	
@@ -252,6 +255,8 @@ List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 
 	return call_stack;
 }
+
+#pragma GCC diagnostic pop
 
 StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options) {
 	scoped(debug_lock);
