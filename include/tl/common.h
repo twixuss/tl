@@ -229,6 +229,9 @@ inline umm noop() { return 0; }
 template <typename T>
 struct ShowType; // Use for debugging, print types at compile time.
 
+template <auto value>
+struct ShowValue; // Use for debugging, print values at compile time.
+
 template <class ...T>
 inline constexpr umm type_count_of = sizeof...(T);
 
@@ -4038,7 +4041,7 @@ void quick_sort(Span<T> span, auto less) requires requires(T a, T b) { { less(a,
 }
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span, auto selector) requires requires(T a) { selector(a) < selector(a); } {
-	return quick_sort(span, [&](T a, T b) { return selector(a) < selector(b); });
+	quick_sort(span, [&](T a, T b) { return selector(a) < selector(b); });
 }
 template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
 void quick_sort(Span<T> span) {
