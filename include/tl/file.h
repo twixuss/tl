@@ -46,7 +46,7 @@ template <class T>
 forceinline T read(File file) {
 	u8 bytes[sizeof(T)];
 	read(file, array_as_span(bytes));
-	return std::bit_cast<T>(bytes);
+	return bit_cast<T>(bytes);
 }
 
 TL_API umm write(File file, Span<u8> data);

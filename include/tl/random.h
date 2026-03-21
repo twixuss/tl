@@ -160,7 +160,7 @@ forceinline F32 normalize_range_f32(U32 v)
 {
 	v >>= 9;
 	v |= 0x3f800000u;
-	return std::bit_cast<F32>(v) - 1.0f;
+	return bit_cast<F32>(v) - 1.0f;
 }
 template <class F64, class U64>
 forceinline F64 normalize_range_f64(U64 v)
@@ -171,7 +171,7 @@ forceinline F64 normalize_range_f64(U64 v)
 {
 	v >>= 12;
 	v |= 0x3ff0'0000'0000'0000u;
-	return std::bit_cast<F64>(v) - 1.0f;
+	return bit_cast<F64>(v) - 1.0f;
 }
 
 template <class State> u8  next_u8 (State &state) { return (u8)next(state); }

@@ -328,6 +328,14 @@ constexpr void destruct(T &val) {
 	val.~T();
 }
 
+// This is crazy. std::bit_cast is not forceinline, which results in `call`s being generated everywhere. This is a noop!
+template<typename To, typename From>
+[[nodiscard]] forceinline constexpr To bit_cast(From const& from) noexcept
+	requires (sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<To> && std::is_trivially_copyable_v<From>
+{
+	return __builtin_bit_cast(To, from);
+}
+
 #if COMPILER_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4309)
@@ -661,8 +669,8 @@ forceinline constexpr bool is_nan(f64 v) {
 }
 
 #if COMPILER_GCC
-	forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ffs(val) : ~0; }
-	forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ffsll(val) : ~0; }
+	forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ctz(val) : ~0; }
+	forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ctzll(val) : ~0; }
 	forceinline u32 find_highest_one_bit(u32 val) { return val ? 32 - __builtin_clz(val) : ~0; }
 	forceinline u32 find_highest_one_bit(u64 val) { return val ? 64 - __builtin_clzll(val) : ~0; }
 #elif COMPILER_MSVC
@@ -942,10 +950,10 @@ forceinline constexpr u32 count_trailing_zeros(u16 v) { unsigned long r; return 
 forceinline constexpr u32 count_trailing_zeros(u32 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (_BitScanForward(&r, v), r))); }
 forceinline constexpr u32 count_trailing_zeros(u64 v) { unsigned long r; return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (_BitScanForward64(&r, v), r))); }
 #else
-forceinline constexpr u32 count_trailing_zeros(u8  v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 8  : (__builtin_ffs  (v)))); }
-forceinline constexpr u32 count_trailing_zeros(u16 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 16 : (__builtin_ffs  (v)))); }
-forceinline constexpr u32 count_trailing_zeros(u32 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (__builtin_ffs  (v)))); }
-forceinline constexpr u32 count_trailing_zeros(u64 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (__builtin_ffsll(v)))); }
+forceinline constexpr u32 count_trailing_zeros(u8  v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 8  : (__builtin_ctz  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u16 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 16 : (__builtin_ctz  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u32 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 32 : (__builtin_ctz  (v)))); }
+forceinline constexpr u32 count_trailing_zeros(u64 v) { return (std::is_constant_evaluated() ? ce::count_trailing_zeros(v) : ((v == 0) ? 64 : (__builtin_ctzll(v)))); }
 #endif
 
 forceinline constexpr u32 count_trailing_ones(u8  val) { return count_trailing_zeros((u8 )~val); }
@@ -1085,11 +1093,11 @@ forceinline f64 frac(f64 v) { return v - floor(v); }
 forceinline f32 pow(f32 x, f32 y) { return ::powf(x, y); }
 forceinline f64 pow(f64 x, f64 y) { return ::pow(x, y); }
 
-forceinline constexpr bool is_negative(f32 v) { return std::bit_cast<u32>(v) & 0x80000000; }
-forceinline constexpr bool is_negative(f64 v) { return std::bit_cast<u64>(v) & 0x8000000000000000; }
+forceinline constexpr bool is_negative(f32 v) { return bit_cast<u32>(v) & 0x80000000; }
+forceinline constexpr bool is_negative(f64 v) { return bit_cast<u64>(v) & 0x8000000000000000; }
 
-forceinline constexpr bool is_positive(f32 v) { return !(std::bit_cast<u32>(v) & 0x80000000); }
-forceinline constexpr bool is_positive(f64 v) { return !(std::bit_cast<u64>(v) & 0x8000000000000000); }
+forceinline constexpr bool is_positive(f32 v) { return !(bit_cast<u32>(v) & 0x80000000); }
+forceinline constexpr bool is_positive(f64 v) { return !(bit_cast<u64>(v) & 0x8000000000000000); }
 
 template <class T> forceinline T rotate_left_8  (T v, s32 shift = 1) { return (v << shift) | (v >> ( 8 - shift)); }
 template <class T> forceinline T rotate_left_16 (T v, s32 shift = 1) { return (v << shift) | (v >> (16 - shift)); }

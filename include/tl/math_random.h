@@ -106,26 +106,26 @@ forceinline Array<u8, size_out> random_bytes(Array<u8, size_in> in) = delete; //
 
 template <class Out, class In>
 struct StupidMiddleman {
-	forceinline static Out random(In in) requires requires { random_bytes<sizeof(Out)>(std::bit_cast<Array<u8, sizeof(In)>>(in)); } {
-		return std::bit_cast<Out>(random_bytes<sizeof(Out)>(std::bit_cast<Array<u8, sizeof(In)>>(in)));
+	forceinline static Out random(In in) requires requires { random_bytes<sizeof(Out)>(bit_cast<Array<u8, sizeof(In)>>(in)); } {
+		return bit_cast<Out>(random_bytes<sizeof(Out)>(bit_cast<Array<u8, sizeof(In)>>(in)));
 	}
 };
 
 template <class In>
 struct StupidMiddleman<f32, In> { forceinline static f32 random(In in) {
-	return normalize_range_f32<f32>(std::bit_cast<u32>(random_bytes<sizeof(f32)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+	return normalize_range_f32<f32>(bit_cast<u32>(random_bytes<sizeof(f32)>(bit_cast<Array<u8, sizeof(In)>>(in))));
 }};
 template <class In>
 struct StupidMiddleman<v2f, In> { forceinline static v2f random(In in) {
-	return normalize_range_f32<v2f>(std::bit_cast<v2u>(random_bytes<sizeof(v2f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+	return normalize_range_f32<v2f>(bit_cast<v2u>(random_bytes<sizeof(v2f)>(bit_cast<Array<u8, sizeof(In)>>(in))));
 }};
 template <class In>
 struct StupidMiddleman<v3f, In> { forceinline static v3f random(In in) {
-	return normalize_range_f32<v3f>(std::bit_cast<v3u>(random_bytes<sizeof(v3f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+	return normalize_range_f32<v3f>(bit_cast<v3u>(random_bytes<sizeof(v3f)>(bit_cast<Array<u8, sizeof(In)>>(in))));
 }};
 template <class In>
 struct StupidMiddleman<v4f, In> { forceinline static v4f random(In in) {
-	return normalize_range_f32<v4f>(std::bit_cast<v4u>(random_bytes<sizeof(v4f)>(std::bit_cast<Array<u8, sizeof(In)>>(in))));
+	return normalize_range_f32<v4f>(bit_cast<v4u>(random_bytes<sizeof(v4f)>(bit_cast<Array<u8, sizeof(In)>>(in))));
 }};
 
 
@@ -137,76 +137,76 @@ forceinline Out random(In in) requires requires { StupidMiddleman<Out, In>::rand
 template <>
 forceinline Array<u8, 4> random_bytes(Array<u8, 4> in) {
 	const u32 k = 3037000507u; // next_prime(2**31.5)
-	u32 x = std::bit_cast<u32>(in);
+	u32 x = bit_cast<u32>(in);
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
-	return std::bit_cast<Array<u8, 4>>(x);
+	return bit_cast<Array<u8, 4>>(x);
 }
 
 template <>
 forceinline Array<u8, 4> random_bytes(Array<u8, 8> in) {
 	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
-	u64 x = std::bit_cast<u64>(in);
+	u64 x = bit_cast<u64>(in);
 	x = x*k^k;
 	x = x*k^k;
 
 	u32 r = x ^ (x >> 32);
-	return std::bit_cast<Array<u8, 4>>(r);
+	return bit_cast<Array<u8, 4>>(r);
 }
 
 // NOT TESTED FOR QUALITY
 template <>
 forceinline Array<u8, 8> random_bytes(Array<u8, 4> in) {
 	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
-	u64 x = std::bit_cast<u32>(in);
+	u64 x = bit_cast<u32>(in);
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
-	return std::bit_cast<Array<u8, 8>>(x);
+	return bit_cast<Array<u8, 8>>(x);
 }
 
 // NOT TESTED FOR QUALITY
 template <>
 forceinline Array<u8, 8> random_bytes(Array<u8, 8> in) {
 	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
-	u64 x = std::bit_cast<u64>(in);
+	u64 x = bit_cast<u64>(in);
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
-	return std::bit_cast<Array<u8, 8>>(x);
+	return bit_cast<Array<u8, 8>>(x);
 }
 
 // NOT TESTED FOR QUALITY
 template <>
 forceinline Array<u8, 8> random_bytes(Array<u8, 12> in) {
 	u64 const k = 11400714819322457659ull; // next_prime(2**64 / phi)
-	u64 x = std::bit_cast<u64>(in.sub_array<8>(0));
-	x ^= (u64)std::bit_cast<u32>(in.sub_array<4>(8)) * k;
+	u64 x = bit_cast<u64>(in.sub_array<8>(0));
+	x ^= (u64)bit_cast<u32>(in.sub_array<4>(8)) * k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
 	x = x*k^k;
-	return std::bit_cast<Array<u8, 8>>(x);
+	return bit_cast<Array<u8, 8>>(x);
 }
 
 template <>
 forceinline Array<u8, 12> random_bytes(Array<u8, 4> in) {
-	u32 x = std::bit_cast<u32>(in);
+	u32 x = bit_cast<u32>(in);
 	v3u r = {
 		random<u32>(x + random_primes_u32[0]),
 		random<u32>(x + random_primes_u32[1]),
 		random<u32>(x + random_primes_u32[2]),
 	};
-	return std::bit_cast<Array<u8, 12>>(r);
+	return bit_cast<Array<u8, 12>>(r);
 }
 
 template <>
 forceinline Array<u8, 12> random_bytes(Array<u8, 16> in) {
-	__m128i x = std::bit_cast<__m128i>(in);
+	__m128i x = bit_cast<__m128i>(in);
 	x = _mm_aesenc_si128(x, _mm_set_epi64x(0x9b68c80c8405f4d9, 0x1bf1b0f0d96f7f3d));
 	x = _mm_aesenc_si128(x, _mm_set_epi64x(0x23df27c1dd3eee5e, 0xb5bcbd5448dc1f4c));
 	//x = _mm_aesenc_si128(x, _mm_set_epi64x(0xca00b5128b1edd01, 0x038b07db0eed3c04));

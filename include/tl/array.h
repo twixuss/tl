@@ -248,7 +248,7 @@ forceinline constexpr Array<T, count> blend(Array<Mask, count> const &mask, Arra
 	using MaskInt = UintWithBits<sizeof(Mask) * 8>;
 	Array<T, count> r = {};
 	for (umm i = 0; i < count; ++i) {
-		MaskInt mask_int = std::bit_cast<MaskInt>(mask.data[i]);
+		MaskInt mask_int = bit_cast<MaskInt>(mask.data[i]);
 		r.data[i] = (mask_int >> (sizeof(Mask)*8-1)) ? a.data[i] : b.data[i];
 	}
 	return r;
@@ -263,9 +263,9 @@ forceinline constexpr Array<T, count> select(Array<bool, count> const &mask, Arr
 }
 
 template <class U, class T, umm count>
-	requires(count * sizeof(T) == count * sizeof(T) / sizeof(U) * sizeof(U))
+	requires(count * sizeof(T) == count * sizeof(T) / sizeof(U) * sizeof(U) && !std::is_same_v<U, T>)
 forceinline constexpr Array<U, count * sizeof(T) / sizeof(U)> reinterpret(Array<T, count> const &a) {
-	return std::bit_cast<Array<U, count * sizeof(T) / sizeof(U)>>(a);
+	return bit_cast<Array<U, count * sizeof(T) / sizeof(U)>>(a);
 }
 
 template <class T, umm count, class Index, umm indices_count>
@@ -318,20 +318,21 @@ forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
 
 #if TL_USE_SIMD
 
-forceinline constexpr Array<f32, 4> operator+(Array<f32, 4> a, Array<f32, 4> b) { return std::bit_cast<Array<f32, 4>>(_mm_add_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator-(Array<f32, 4> a, Array<f32, 4> b) { return std::bit_cast<Array<f32, 4>>(_mm_sub_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator*(Array<f32, 4> a, Array<f32, 4> b) { return std::bit_cast<Array<f32, 4>>(_mm_mul_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator/(Array<f32, 4> a, Array<f32, 4> b) { return std::bit_cast<Array<f32, 4>>(_mm_div_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
+forceinline constexpr Array<f32, 4> operator+(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_add_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+forceinline constexpr Array<f32, 4> operator-(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_sub_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+forceinline constexpr Array<f32, 4> operator*(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_mul_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+forceinline constexpr Array<f32, 4> operator/(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_div_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
 
-template <int shift> forceinline constexpr Array<u32, 4> shift_left(Array<u32, 4> arr) { return std::bit_cast<Array<u32, 4>>(_mm_slli_epi32(std::bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 4> shift_left(Array<s32, 4> arr) { return std::bit_cast<Array<s32, 4>>(_mm_slli_epi32(std::bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<u32, 4> shift_right(Array<u32, 4> arr) { return std::bit_cast<Array<u32, 4>>(_mm_srli_epi32(std::bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 4> shift_right(Array<s32, 4> arr) { return std::bit_cast<Array<s32, 4>>(_mm_srai_epi32(std::bit_cast<__m128i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<u32, 4> shift_left(Array<u32, 4> arr) { return bit_cast<Array<u32, 4>>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<s32, 4> shift_left(Array<s32, 4> arr) { return bit_cast<Array<s32, 4>>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<u32, 4> shift_right(Array<u32, 4> arr) { return bit_cast<Array<u32, 4>>(_mm_srli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<s32, 4> shift_right(Array<s32, 4> arr) { return bit_cast<Array<s32, 4>>(_mm_srai_epi32(bit_cast<__m128i>(arr), shift)); }
 
-forceinline Array<f32, 4> lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4> t_) {
-	__m128 a = std::bit_cast<__m128>(a_);
-	__m128 b = std::bit_cast<__m128>(b_);
-	__m128 t = std::bit_cast<__m128>(t_);
+template <>
+forceinline auto lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4> t_) {
+	__m128 a = bit_cast<__m128>(a_);
+	__m128 b = bit_cast<__m128>(b_);
+	__m128 t = bit_cast<__m128>(t_);
 
 	#ifdef __AVX__
 	__m128 r = _mm_fmadd_ps(_mm_sub_ps(b, a), t, a);
@@ -339,55 +340,66 @@ forceinline Array<f32, 4> lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4>
 	__m128 r = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(b, a), t), a);
 	#endif
 
-	return std::bit_cast<Array<f32, 4>>(r);
+	return bit_cast<Array<f32, 4>>(r);
 }
 
-forceinline Array<f32, 4> min(Array<f32, 4> const &a, Array<f32, 4> const &b) { return std::bit_cast<Array<f32, 4>>(_mm_min_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
-forceinline Array<f32, 4> max(Array<f32, 4> const &a, Array<f32, 4> const &b) { return std::bit_cast<Array<f32, 4>>(_mm_max_ps(std::bit_cast<__m128>(a), std::bit_cast<__m128>(b))); }
+forceinline Array<f32, 4> min(Array<f32, 4> const &a, Array<f32, 4> const &b) { return bit_cast<Array<f32, 4>>(_mm_min_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+forceinline Array<f32, 4> max(Array<f32, 4> const &a, Array<f32, 4> const &b) { return bit_cast<Array<f32, 4>>(_mm_max_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
 
 template <class T, umm count>
 	requires (count * sizeof(T) == 16)
 forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 16> const &indices) {
-	return std::bit_cast<Array<T, count>>(_mm_shuffle_epi8(std::bit_cast<__m128i>(a), std::bit_cast<__m128i>(indices)));
+	return bit_cast<Array<T, count>>(_mm_shuffle_epi8(bit_cast<__m128i>(a), bit_cast<__m128i>(indices)));
 }
 
 template <class T, umm count>
 	requires (count * sizeof(T) == 32)
 forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 32> const &indices) {
-	return std::bit_cast<Array<T, count>>(_mm256_shuffle_epi8(std::bit_cast<__m256i>(a), std::bit_cast<__m256i>(indices)));
+	return bit_cast<Array<T, count>>(_mm256_shuffle_epi8(bit_cast<__m256i>(a), bit_cast<__m256i>(indices)));
 }
 
 #ifdef __AVX__
 
-forceinline constexpr Array<f32, 8> operator+(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_add_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator-(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_sub_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator*(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_mul_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator/(Array<f32, 8> a, Array<f32, 8> b) { return std::bit_cast<Array<f32, 8>>(_mm256_div_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+forceinline constexpr Array<f32, 8> operator+(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_add_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
+forceinline constexpr Array<f32, 8> operator-(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_sub_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
+forceinline constexpr Array<f32, 8> operator*(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_mul_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
+forceinline constexpr Array<f32, 8> operator/(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_div_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 
-template <> forceinline constexpr Array<f32, 8> reciprocal(Array<f32, 8> a) { return std::bit_cast<Array<f32, 8>>(_mm256_rcp_ps(std::bit_cast<__m256>(a))); }
-template <> forceinline constexpr Array<f32, 8> sqrt(Array<f32, 8> a) { return std::bit_cast<Array<f32, 8>>(_mm256_sqrt_ps(std::bit_cast<__m256>(a))); }
+template <> forceinline constexpr Array<f32, 8> reciprocal(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_rcp_ps(bit_cast<__m256>(a))); }
+template <> forceinline constexpr Array<f32, 8> sqrt(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_sqrt_ps(bit_cast<__m256>(a))); }
 
-forceinline Array<f32, 8> lerp(Array<f32, 8> a_, Array<f32, 8> b_, Array<f32, 8> t_) {
-	__m256 a = std::bit_cast<__m256>(a_);
-	__m256 b = std::bit_cast<__m256>(b_);
-	__m256 t = std::bit_cast<__m256>(t_);
+template <>
+forceinline auto lerp(Array<f32, 8> a_, Array<f32, 8> b_, Array<f32, 8> t_) {
+	__m256 a = bit_cast<__m256>(a_);
+	__m256 b = bit_cast<__m256>(b_);
+	__m256 t = bit_cast<__m256>(t_);
 
 	__m256 r = _mm256_fmadd_ps(_mm256_sub_ps(b, a), t, a);
 
-	return std::bit_cast<Array<f32, 8>>(r);
+	return bit_cast<Array<f32, 8>>(r);
 }
 
-forceinline Array<f32, 8> min(Array<f32, 8> const &a, Array<f32, 8> const &b) { return std::bit_cast<Array<f32, 8>>(_mm256_min_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
-forceinline Array<f32, 8> max(Array<f32, 8> const &a, Array<f32, 8> const &b) { return std::bit_cast<Array<f32, 8>>(_mm256_max_ps(std::bit_cast<__m256>(a), std::bit_cast<__m256>(b))); }
+forceinline Array<f32, 8> min(Array<f32, 8> const &a, Array<f32, 8> const &b) { return bit_cast<Array<f32, 8>>(_mm256_min_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
+forceinline Array<f32, 8> max(Array<f32, 8> const &a, Array<f32, 8> const &b) { return bit_cast<Array<f32, 8>>(_mm256_max_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 
 #endif
 
 #ifdef __AVX2__
 
-template <int shift> forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr) { return std::bit_cast<Array<u32, 8>>(_mm256_slli_epi32(std::bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr) { return std::bit_cast<Array<s32, 8>>(_mm256_slli_epi32(std::bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr) { return std::bit_cast<Array<u32, 8>>(_mm256_srli_epi32(std::bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr) { return std::bit_cast<Array<s32, 8>>(_mm256_srai_epi32(std::bit_cast<__m256i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr) { return bit_cast<Array<u32, 8>>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr) { return bit_cast<Array<s32, 8>>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr) { return bit_cast<Array<u32, 8>>(_mm256_srli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <int shift> forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr) { return bit_cast<Array<s32, 8>>(_mm256_srai_epi32(bit_cast<__m256i>(arr), shift)); }
+
+forceinline constexpr Array<u32, 4> shift_left(Array<u32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<u32, 4>>(_mm_sllv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
+forceinline constexpr Array<s32, 4> shift_left(Array<s32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<s32, 4>>(_mm_sllv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
+forceinline constexpr Array<u32, 4> shift_right(Array<u32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<u32, 4>>(_mm_srlv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
+forceinline constexpr Array<s32, 4> shift_right(Array<s32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<s32, 4>>(_mm_srav_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
+
+forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_srlv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_srav_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
 
 #endif
 

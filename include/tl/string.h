@@ -1156,6 +1156,11 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 			break;
 		}
 		case FloatFormat_exponential: {
+		case FloatFormat_exponential_e:
+			if (value == 0) {
+				buffer.add("0"s);
+				break;
+			}
 			Float mantissa = value;
 			s32 exponent = 0;
 			while (mantissa >= 10) {
@@ -1167,31 +1172,19 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 				--exponent;
 			}
 			append_float(mantissa);
-
-			buffer.add("*10^"s);
-			write_as_string(buffer, exponent);
-
-			break;
-		}
-		case FloatFormat_exponential_e: {
-			Float mantissa = value;
-			s32 exponent = 0;
-			while (mantissa >= 10) {
-				mantissa /= 10;
-				++exponent;
+			switch (format.format) {
+				case FloatFormat_exponential: {
+					buffer.add("*10^"s);
+					break;
+				}
+				case FloatFormat_exponential_e: {
+					buffer.add('e');
+					if (exponent >= 0) buffer.add('+');
+					break;
+				}
+				default: break;
 			}
-			while (mantissa < 1) {
-				mantissa *= 10;
-				--exponent;
-			}
-			append_float(mantissa);
-
-			buffer.add('e');
-
-			if (exponent >= 0) buffer.add('+');
-
 			write_as_string(buffer, exponent);
-
 			break;
 		}
 		case FloatFormat_kmb: {
