@@ -339,6 +339,10 @@ struct Is_v2<v2<T>> : std::true_type {};
 template <class T>
 concept v2Int = Is_v2<T>::value && std::integral<typename T::Scalar>;
 
+template <class T> forceinline constexpr v2<T> V2(T v) { return {v, v}; }
+template <class T> forceinline constexpr v3<T> V3(T v) { return {v, v, v}; }
+template <class T> forceinline constexpr v4<T> V4(T v) { return {v, v, v, v}; }
+
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
 	forceinline constexpr v2f V2f(f32 v = 0) { return {v, v}; }

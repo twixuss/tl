@@ -26,7 +26,7 @@ s64 divide(s128 a, s64 b) {
 	s64 remainder;
 	return _div128(a.high, a.low, b, &remainder);
 	#else
-	return *(__int128_t *)&a / b;
+	return bit_cast<__int128_t>(a) / b;
 	#endif
 }
 

@@ -12,8 +12,14 @@
 
 namespace tl {
 
-constexpr u32 next_prime_after_2_to_power_of_7_point_5 = 181;
-constexpr u32 next_prime_after_2_to_power_of_31_point_5 = 3037000507;
+constexpr u32 next_prime_after_2_to_power_of_7_point_5 = 181u; // next_prime(pow(2, 7.5))
+constexpr u32 next_prime_after_2_to_power_of_15_point_5 = 46349u; // next_prime(pow(2, 15.5))
+constexpr u32 next_prime_after_2_to_power_of_31_point_5 = 3037000507u; // next_prime(pow(2, 31.5))
+
+// These are the best I found for minimal amount of mul+xor ops with decent visual noise quality.
+constexpr u32 next_prime_after_2_to_power_of_8_over_golden_ratio = 163u; // next_prime(pow(2, 8) / phi)
+constexpr u32 next_prime_after_2_to_power_of_16_over_golden_ratio = 40507u; // next_prime(pow(2, 16) / phi)
+constexpr u32 next_prime_after_2_to_power_of_32_over_golden_ratio = 2654435789u; // next_prime(pow(2, 32) / phi)
 
 inline constexpr u32 random_primes_u32[] = {
 	3282017723,

@@ -198,7 +198,7 @@ forceinline constexpr Array<T, count> broadcast_to_array(T value) {
 }
 
 template <class T, umm count>
-forceinline constexpr umm count_of(Array<T, count> const &arr) {
+forceinline constexpr umm count_of(Array<T, count> const &) {
 	return count;
 }
 
