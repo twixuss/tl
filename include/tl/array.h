@@ -4,61 +4,49 @@
 namespace tl {
 
 template <class T, umm count_>
-struct Array {
-	using Element = T;
-	
+union Array {
 	inline static constexpr umm count = count_;
+	#include "_array_members.inc"
+	struct { T x, y, z, w; };
+	struct { v2 xy, zw; };
+	struct { T _pad0; v2 yz; };
+	struct { v3 xyz; };
+	struct { T _pad1; v3 yzw; };
+};
 
-	T data[count];
+template <class T>
+union Array<T, 1> {
+	inline static constexpr umm count = 1;
+	#include "_array_members.inc"
+	T x;
+};
 
-	forceinline constexpr auto begin(this auto &&self) { return self.data; }
-	forceinline constexpr auto end(this auto &&self) { return self.data + self.count; }
+template <class T>
+union Array<T, 2> {
+	inline static constexpr umm count = 2;
+	#include "_array_members.inc"
+	struct { T x, y; };
+	forceinline constexpr v2 xx() const { return {x, x}; }
+	forceinline constexpr v2 xy() const { return {x, y}; }
+	forceinline constexpr v2 yx() const { return {y, x}; }
+	forceinline constexpr v2 yy() const { return {y, y}; }
+};
 
-	inline operator Span<T>() const { return {(T *)data, count}; }
-	forceinline constexpr Span<T> span() const { return {begin(), end()}; }
-
-	forceinline constexpr auto &at(this auto &&self, umm i) {
-		bounds_check(assert_less(i, self.count));
-		return self.data[i];
-	}
-	forceinline constexpr auto &operator[](this auto &&self, umm i) { return self.at(i); }
-
-	forceinline constexpr auto &front(this auto &&self) { return self.data[0]; }
-	forceinline constexpr auto &back(this auto &&self) { return self.data[self.count - 1]; }
-	
-	forceinline constexpr umm index_of(T const *pointer) const { return pointer - data; }
-	forceinline constexpr bool owns(T *pointer) { return (umm)(pointer - data) < count; }
-	
-	using IterOptions = ReverseIterOption;
-
-	forceinline constexpr auto iter(this auto &&self, IterOptions options = {}) {
-		return span_iter(self.data, self.data + count, options);
-	}
-	
-	template <umm sub_count>
-	Array<T, sub_count> &sub_array(umm sub_start = 0) {
-		return *(Array<T, sub_count> *)(data + sub_start);
-	}
-
-	auto map(auto &&mapper) const
-		requires requires { mapper(data[0]); }
-	{
-		Array<std::remove_cvref_t<decltype(mapper(data[0]))>, count> result = {};
-		for (umm i = 0; i < count; ++i) {
-			result.data[i] = mapper(data[i]);
-		}
-		return result;
-	}
-
-	template <class U>
-	forceinline constexpr explicit operator Array<U, count>() const
-		requires requires(T t) { (U)t; }
-	{
-		Array<U, count> result = {};
-		for (umm i = 0; i < count; ++i)
-			result.data[i] = (U)data[i];
-		return result;
-	};
+template <class T>
+union Array<T, 3> {
+	inline static constexpr umm count = 3;
+	#include "_array_members.inc"
+	struct { T x, y, z; };
+	struct { v2 xy; };
+	struct { T _pad0; v2 yz; };
+	forceinline constexpr v2 xz() const { return {x,z}; }
+	forceinline constexpr v2 yx() const { return {y,x}; }
+	forceinline constexpr v2 zx() const { return {z,x}; }
+	forceinline constexpr v2 zy() const { return {z,y}; }
+	forceinline constexpr v3 yzx() const { return {y,z,x}; }
+	forceinline constexpr v3 zxy() const { return {z,x,y}; }
+	forceinline constexpr v3 xzy() const { return {x,z,y}; }
+	forceinline constexpr v3 zyx() const { return {z,y,x}; }
 };
 
 template <class T, class... Rest>
@@ -66,6 +54,9 @@ Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof
 
 template <class T, umm count>
 inline static constexpr bool is_unsigned<Array<T, count>> = is_unsigned<T>;
+
+template <class T>            inline static constexpr int array_nestedness = 0;
+template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
 
 #define OP(op)                                                                 \
 	template <class T, umm count>                                              \
@@ -102,24 +93,24 @@ OP(*)
 		for (umm i = 0; i < count; ++i)                                                        \
 			result.data[i] = a.data[i] op b.data[i];                                           \
 		return result;                                                                         \
-	}                                                                                          \
-	template <class U, class T, umm count>                                       \
-	forceinline constexpr auto operator op(Array<T, count> const &a, U const &b) \
-		requires requires(T t, U u) { t op u; }                                  \
-	{                                                                            \
-		Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count> result = {}; \
-		for (umm i = 0; i < count; ++i)                                          \
-			result.data[i] = a.data[i] op b;                                     \
-		return result;                                                           \
-	}                                                                            \
-	template <class U, class T, umm count>                                       \
-	forceinline constexpr auto operator op(U const &a, Array<T, count> const &b) \
-		requires requires(U u, T t) { u op t; }                                  \
-	{                                                                            \
-		Array<std::remove_cvref_t<decltype(a op b.data[0])>, count> result = {}; \
-		for (umm i = 0; i < count; ++i)                                          \
-			result.data[i] = a op b.data[i];                                     \
-		return result;                                                           \
+	}                                                                                           \
+	template <class U, class T, umm count>                                                      \
+	forceinline constexpr auto operator op(Array<T, count> const &a, U const &b)                \
+		requires requires(T t, U u) { t op u; } && (array_nestedness<U> <= array_nestedness<T>) \
+	{                                                                                           \
+		Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count> result = {};                \
+		for (umm i = 0; i < count; ++i)                                                         \
+			result.data[i] = a.data[i] op b;                                                    \
+		return result;                                                                          \
+	}                                                                                           \
+	template <class U, class T, umm count>                                                      \
+	forceinline constexpr auto operator op(U const &a, Array<T, count> const &b)                \
+		requires requires(U u, T t) { u op t; } && (array_nestedness<U> <= array_nestedness<T>) \
+	{                                                                                           \
+		Array<std::remove_cvref_t<decltype(a op b.data[0])>, count> result = {};                \
+		for (umm i = 0; i < count; ++i)                                                         \
+			result.data[i] = a op b.data[i];                                                    \
+		return result;                                                                          \
 	}
 OP(==)
 OP(!=)
@@ -228,11 +219,16 @@ forceinline constexpr bool all(Array<T, count> const &a) {
 
 template <class T, umm count>
 forceinline constexpr T dot(Array<T, count> const &a, Array<T, count> const &b) {
-	T result = 0;
+	T result = {};
 	for (umm i = 0; i < count; ++i) {
 		result += a.data[i] * b.data[i];
 	}
 	return result;
+}
+
+template <class T>
+forceinline constexpr Array<T, 3> cross(Array<T, 3> const &a, Array<T, 3> const &b) {
+	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
 }
 
 template <class T, class Index, umm count>
@@ -243,7 +239,42 @@ forceinline constexpr Array<T, count> gather(T const *pointer, Array<Index, coun
 	return r;
 }
 
+#define OP(NAME, OPERATOR)                                                         \
+	template <class T>                                                             \
+	forceinline constexpr auto mask_##NAME(T a, T b) {                             \
+		static_assert(sizeof(UintWithBits<sizeof(T)*8>) == sizeof(T));             \
+		return (UintWithBits<sizeof(T)*8>)(a OPERATOR b ? -1 : 0);                 \
+	}                                                                              \
+	template <class T, umm count>                                                  \
+	forceinline constexpr auto mask_##NAME(Array<T, count> a, Array<T, count> b) { \
+		Array<UintWithBits<sizeof(T)*8>, count> r = {};                            \
+		static_assert(sizeof(r) == sizeof(Array<T, count>));                       \
+		for (umm i = 0; i < count; ++i)                                            \
+			r.data[i] = mask_##NAME(a.data[i], b.data[i]);                         \
+		return r;                                                                  \
+	}
+
+OP(equal, ==)
+OP(not_equal, !=)
+OP(less, <)
+OP(less_equal, <=)
+OP(greater, >)
+OP(greater_equal, >=)
+
+#undef OP
+
+// Mask is not an integral, e.g. Array
 template <class T, class Mask, umm count>
+forceinline constexpr Array<T, count> blend(Array<Mask, count> const &mask, Array<T, count> const &a, Array<T, count> const &b) {
+	Array<T, count> r = {};
+	for (umm i = 0; i < count; ++i)
+		r.data[i] = blend(mask.data[i], a.data[i], b.data[i]);
+	return r;
+}
+
+// Mask is an integral
+template <class T, std::integral Mask, umm count>
+	requires (sizeof(T) == sizeof(Mask))
 forceinline constexpr Array<T, count> blend(Array<Mask, count> const &mask, Array<T, count> const &a, Array<T, count> const &b) {
 	using MaskInt = UintWithBits<sizeof(Mask) * 8>;
 	Array<T, count> r = {};
@@ -254,11 +285,12 @@ forceinline constexpr Array<T, count> blend(Array<Mask, count> const &mask, Arra
 	return r;
 }
 
-template <class T, umm count>
-forceinline constexpr Array<T, count> select(Array<bool, count> const &mask, Array<T, count> const &a, Array<T, count> const &b) {
+
+template <class Mask, class T, umm count>
+forceinline constexpr Array<T, count> select(Array<Mask, count> const &mask, Array<T, count> const &a, Array<T, count> const &b) {
 	Array<T, count> r = {};
 	for (umm i = 0; i < count; ++i)
-		r.data[i] = mask.data[i] ? a.data[i] : b.data[i];
+		r.data[i] = select(mask.data[i], a.data[i], b.data[i]);
 	return r;
 }
 
@@ -293,25 +325,11 @@ forceinline constexpr Array<T, count * dups> dup(Array<T, count> const &a) {
 	return r;
 }
 
-template <class T, umm count>
-forceinline constexpr Array<T, count> reciprocal(Array<T, count> a) {
-	for (umm i = 0; i < count; ++i)
-		a.data[i] = 1 / a.data[i];
-	return a;
-}
-
-template <class T, umm count>
-forceinline constexpr Array<T, count> sqrt(Array<T, count> a) {
-	for (umm i = 0; i < count; ++i)
-		a.data[i] = sqrt(a.data[i]);
-	return a;
-}
-
 template <class U, class T, umm count>
 forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
 	Array<U, count> r;
 	for (umm i = 0; i < count; ++i)
-		r.data[i] = (U)a.data[i];
+		r.data[i] = convert<U>(a.data[i]);
 	return r;
 }
 
@@ -346,16 +364,28 @@ forceinline auto lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4> t_) {
 forceinline Array<f32, 4> min(Array<f32, 4> const &a, Array<f32, 4> const &b) { return bit_cast<Array<f32, 4>>(_mm_min_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
 forceinline Array<f32, 4> max(Array<f32, 4> const &a, Array<f32, 4> const &b) { return bit_cast<Array<f32, 4>>(_mm_max_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
 
+template<class T>
+	requires (sizeof(T) == 1)
+forceinline Array<T, 16> blend(Array<u8, 16> mask, Array<T, 16> a, Array<T, 16> b) {
+	return bit_cast<Array<T, 16>>(_mm_blendv_epi8(bit_cast<__m128i>(b), bit_cast<__m128i>(a), bit_cast<__m128i>(mask)));
+}
+
+template<class T>
+	requires (sizeof(T) == 4)
+forceinline Array<T, 4> blend(Array<u32, 4> mask, Array<T, 4> a, Array<T, 4> b) {
+	return bit_cast<Array<T, 4>>(_mm_blendv_ps(bit_cast<__m128>(b), bit_cast<__m128>(a), bit_cast<__m128>(mask)));
+}
+
+template<class T>
+	requires (sizeof(T) == 8)
+forceinline Array<T, 2> blend(Array<u64, 2> mask, Array<T, 2> a, Array<T, 2> b) {
+	return bit_cast<Array<T, 2>>(_mm_blendv_pd(bit_cast<__m128d>(b), bit_cast<__m128d>(a), bit_cast<__m128d>(mask)));
+}
+
 template <class T, umm count>
 	requires (count * sizeof(T) == 16)
 forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 16> const &indices) {
 	return bit_cast<Array<T, count>>(_mm_shuffle_epi8(bit_cast<__m128i>(a), bit_cast<__m128i>(indices)));
-}
-
-template <class T, umm count>
-	requires (count * sizeof(T) == 32)
-forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 32> const &indices) {
-	return bit_cast<Array<T, count>>(_mm256_shuffle_epi8(bit_cast<__m256i>(a), bit_cast<__m256i>(indices)));
 }
 
 #ifdef __AVX__
@@ -364,9 +394,6 @@ forceinline constexpr Array<f32, 8> operator+(Array<f32, 8> a, Array<f32, 8> b) 
 forceinline constexpr Array<f32, 8> operator-(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_sub_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 forceinline constexpr Array<f32, 8> operator*(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_mul_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 forceinline constexpr Array<f32, 8> operator/(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_div_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-
-template <> forceinline constexpr Array<f32, 8> reciprocal(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_rcp_ps(bit_cast<__m256>(a))); }
-template <> forceinline constexpr Array<f32, 8> sqrt(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_sqrt_ps(bit_cast<__m256>(a))); }
 
 template <>
 forceinline auto lerp(Array<f32, 8> a_, Array<f32, 8> b_, Array<f32, 8> t_) {
@@ -400,6 +427,30 @@ forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr, Array<u32, 8> 
 forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
 forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_srlv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
 forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_srav_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+
+template<class T>
+	requires (sizeof(T) == 1)
+forceinline Array<T, 32> blend(Array<u8, 32> mask, Array<T, 32> a, Array<T, 32> b) {
+	return bit_cast<Array<T, 32>>(_mm256_blendv_epi8(bit_cast<__m256i>(b), bit_cast<__m256i>(a), bit_cast<__m256i>(mask)));
+}
+
+template<class T>
+	requires (sizeof(T) == 4)
+forceinline Array<T, 8> blend(Array<u32, 8> mask, Array<T, 8> a, Array<T, 8> b) {
+	return bit_cast<Array<T, 8>>(_mm256_blendv_ps(bit_cast<__m256>(b), bit_cast<__m256>(a), bit_cast<__m256>(mask)));
+}
+
+template<class T>
+	requires (sizeof(T) == 8)
+forceinline Array<T, 4> blend(Array<u64, 4> mask, Array<T, 4> a, Array<T, 4> b) {
+	return bit_cast<Array<T, 4>>(_mm256_blendv_pd(bit_cast<__m256d>(b), bit_cast<__m256d>(a), bit_cast<__m256d>(mask)));
+}
+
+template <class T, umm count>
+	requires (count * sizeof(T) == 32)
+forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8, 32> const &indices) {
+	return bit_cast<Array<T, count>>(_mm256_shuffle_epi8(bit_cast<__m256i>(a), bit_cast<__m256i>(indices)));
+}
 
 #endif
 

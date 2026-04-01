@@ -1139,8 +1139,19 @@ constexpr f32 sqrt3  = f32(1.7320508075688772935274463415059L);
 constexpr f32 sqrt5  = f32(2.2360679774997896964091736687313L);
 constexpr f32 golden_ratio = f32(1.6180339887498948482045868343656L);
 
-template <class T> forceinline constexpr auto radians(T deg) { return deg * (pi / 180.0f); }
-template <class T> forceinline constexpr auto degrees(T rad) { return rad * (180.0f / pi); }
+template <class T> forceinline constexpr auto deg_to_rad(T deg) { return deg * (pi / 180.0f); }
+template <class T> forceinline constexpr auto rad_to_deg(T rad) { return rad * (180.0f / pi); }
+
+
+template <std::unsigned_integral T> 
+forceinline constexpr T absolute(T v) { return v; }
+
+template <std::signed_integral T> 
+forceinline constexpr T absolute(T v) { return v < 0 ? -v :v; }
+
+forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabsf(v); }
+forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabs(v); }
+
 
 constexpr f32 sqrt_newton_raphson(f32 x, f32 curr, f32 prev) {
     return curr == prev ? curr : sqrt_newton_raphson(x, 0.5f * (curr + x / curr), curr);

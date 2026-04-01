@@ -654,15 +654,6 @@ Cubic<T> cubic_y0y1d0d1(T y0, T y1, T d0, T d1) {
 	return {a,b,c,d};
 }
 
-template <std::unsigned_integral T> 
-forceinline constexpr T absolute(T v) { return v; }
-
-template <std::signed_integral T> 
-forceinline constexpr T absolute(T v) { return v < 0 ? -v :v; }
-
-forceinline constexpr f32 absolute(f32 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabsf(v); }
-forceinline constexpr f64 absolute(f64 v) { return std::is_constant_evaluated() ? (v >= 0 ? v : -v) : fabs(v); }
-
 template <class Scalar> forceinline constexpr v2<Scalar> absolute(v2<Scalar> v) { return {absolute(v.x), absolute(v.y)}; }
 template <class Scalar> forceinline constexpr v3<Scalar> absolute(v3<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
 template <class Scalar> forceinline constexpr v4<Scalar> absolute(v4<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
@@ -885,6 +876,10 @@ forceinline auto sum(v3<T> v) { return v.x + v.y + v.z; }
 template <class T>
 forceinline auto sum(v4<T> v) { return v.x + v.y + v.z + v.w; }
 
+template <class T>
+forceinline constexpr T rsqrt(T v) { return 1.0f / sqrt(v); }
+
+template <>
 forceinline f32 rsqrt(f32 v) { return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(v))); }
 
 template <class T>
