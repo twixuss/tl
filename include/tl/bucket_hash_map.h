@@ -400,7 +400,7 @@ TL_TEST(BucketHashMap) {
 	}
 	{
 		struct CollideTraits : DefaultHashTraits<int> {
-			u64 get_hash(int key) const { return 0; }
+			u64 get_hash(int) const { return 0; }
 		};
 
 		BucketHashMap<int, int, CollideTraits> map;

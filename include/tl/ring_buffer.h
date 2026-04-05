@@ -32,25 +32,22 @@ struct RingBuffer {
 
 		reserve(count + span.count);
 
-		umm back_space = capacity - start - count;
-		T *past_last = storage + start + count;
+		auto dst = unused_spans();
 
-		if (span.count <= back_space) {
-			memcpy(past_last, span.data, span.count * sizeof(T));
-
-			result.add({past_last, span.count});
+		if (span.count <= dst[0].count) {
+			memcpy(dst[0].data, span.data, span.count * sizeof(T));
+			
+			result.add({dst[0].data, span.count});
 		} else {
-			umm second_count = span.count - back_space;
+			memcpy(dst[0].data, span.data, dst[0].count * sizeof(T));
+			memcpy(dst[1].data, span.data + dst[0].count, (span.count - dst[0].count) * sizeof(T));
 
-			memcpy(past_last, span.data, back_space * sizeof(T));
-			memcpy(storage, span.data + back_space, second_count * sizeof(T));
-
-			result.add({past_last, back_space});
-			result.add({storage, second_count});
+			result.add(dst[0]);
+			result.add({dst[1].data, span.count - dst[0].count});
 		}
-	
+
 		count += span.count;
-	
+
 		return result;
 	}
 	
@@ -66,58 +63,67 @@ struct RingBuffer {
 		Spans result;
 
 		reserve(count + span.count);
-	
-		umm front_space = start;
-		if (span.count <= front_space) {
-			memcpy(storage + start - span.count, span.data, span.count * sizeof(T));
 
-			result.add({storage + start - span.count, span.count});
+		auto dst = unused_spans();
+
+		if (span.count <= dst.back().count) {
+			memcpy(dst.back().end() - span.count, span.data, span.count * sizeof(T));
+
+			result.add({dst.back().end() - span.count, span.count});
 		} else {
-			umm back_count = span.count - front_space;
+			memcpy(dst[0].end() - (span.count - dst[1].count), span.data, (span.count - dst[1].count) * sizeof(T));
+			memcpy(dst[1].data, span.end() - dst[1].count, dst[1].count * sizeof(T));
 
-			memcpy(storage + capacity - back_count, span.data, back_count * sizeof(T));
-			memcpy(storage, span.data + back_count, front_space * sizeof(T));
-
-			result.add({storage + capacity - back_count, back_count});
-			result.add({storage, front_space});
+			result.add({dst[0].end() - (span.count - dst[1].count), span.count - dst[1].count});
+			result.add(dst[1]);
 		}
 
 		count += span.count;
-	
+		start = (start - span.count) & (capacity - 1);
+
 		return result;
 	}
 	
 	Optional<T> pop_back() {
 		if (!count)
 			return {};
-		return storage[--count & (capacity - 1)];
+		auto p = storage + ((start + --count) & (capacity - 1));
+		auto value = *p;
+		mark_dead(p);
+		return value;
 	}
 	
 	Optional<T> pop_front() {
 		if (!count)
 			return {};
 		--count;
-		auto result = storage[start];
-		++start &= (capacity - 1);
-		return result;
+		auto p = storage + start;
+		auto value = *p;
+		mark_dead(p);
+		start = (start + 1) & (capacity - 1);
+		return value;
 	}
 	
-	void pop_back(umm count_to_pop) {
-		count_to_pop = min(count_to_pop, count);
-		count -= count_to_pop;
-	}
-	
-	void pop_front(umm count_to_pop) {
-		count_to_pop = min(count_to_pop, count);
+	void pop_back(umm n) {
+		n = min(n, count);
 
-		count -= count_to_pop;
-		start += count_to_pop;
+		// TODO: mark_dead		
+		count -= n;
+	}
+	
+	void pop_front(umm n) {
+		n = min(n, count);
+
+		// TODO: mark_dead		
+		count -= n;
+		start += n;
 		start &= (capacity - 1);
 	}
 	
 	void clear() {
 		start = 0;
 		count = 0;
+		mark_dead(storage, capacity);
 	}
 	
 	bool is_empty() const { return count == 0; }
@@ -168,20 +174,29 @@ struct RingBuffer {
 			};
 		}
 	}
+
+	// For internal use.
+	// Returns spans to unused elements in order after last element until start.
+	Spans unused_spans() const {
+		if (start + count <= capacity) {
+			return {
+				{storage + start + count, capacity - start - count},
+				{storage, start},
+			};
+		} else {
+			return {{storage + start + count - capacity, capacity - count}};
+		}
+	}
 	
-	// Packs elements to be contiguous
+	// Packs elements to be contiguous, so all of them are accesible through a single Span.
 	// 
 	// defg_abc
 	//  =>
 	// abcdefg_
 	Span<T> pack() {
 		if (start + count <= capacity) {
-			// _ _ a b c d e _
-			// a b c d e _ _ _
-			memmove(storage, storage + start, count * sizeof(T));
-
+			return {storage + start, count};
 		} else {
-
 			#if 0
 			// Swap last with its destination
 
@@ -341,7 +356,8 @@ TL_TEST(RingBuffer) {
 	b.reserve(8);
 	assert(b.capacity == 8);
 
-	auto check = [&](Span<int> expected, umm first_span_count) {
+	auto check = [&](Span<int> expected, umm expected_start, umm first_span_count) {
+		assert(b.start == expected_start);
 		assert(b.count == expected.count);
 		for (umm i = 0; i < expected.count; ++i)
 			assert(b[i] == expected[i]);
@@ -396,31 +412,51 @@ TL_TEST(RingBuffer) {
 	};
 
 	b.add_back({0, 1, 2, 3, 4, 5});
-	check({0, 1, 2, 3, 4, 5}, 6);
+	check({0, 1, 2, 3, 4, 5}, 0, 6);
 	// 0 1 2 3 4 5 . .
 	// ^
 
 	for (int i = 0; i < 3; ++i)
 		b.pop_front();
-	check({3, 4, 5}, 3);
+	check({3, 4, 5}, 3, 3);
 	// . . . 3 4 5 . .
 	//       ^
 
 	b.add_back({6, 7, 8});
-	check({3, 4, 5, 6, 7, 8}, 5);
+	check({3, 4, 5, 6, 7, 8}, 3, 5);
 	// 8 . . 3 4 5 6 7
 	//       ^
 	
+	b.add_back({1, 2});
+	check({3, 4, 5, 6, 7, 8, 1, 2}, 3, 5);
+	// 8 1 2 3 4 5 6 7
+	//       ^
+
+	b.pop_back(2);
+	check({3, 4, 5, 6, 7, 8}, 3, 5);
+	// 8 . . 3 4 5 6 7
+	//       ^
+
+	b.add_front({1, 2});
+	check({1, 2, 3, 4, 5, 6, 7, 8}, 1, 7);
+	// 8 1 2 3 4 5 6 7
+	//   ^
+
+	b.pop_front(2);
+	check({3, 4, 5, 6, 7, 8}, 3, 5);
+	// 8 . . 3 4 5 6 7
+	//       ^
+
 	for (int i = 0; i < 3; ++i)
 		b.pop_back();
-	check({3, 4, 5}, 3);
+	check({3, 4, 5}, 3, 3);
 	// . . . 3 4 5 . .
 	//       ^
 
 	b.add_front({9, 10, 11, 12, 13});
-	check({3, 4, 5, 9, 10, 11, 12, 13}, 5);
+	check({9, 10, 11, 12, 13, 3, 4, 5}, 6, 2);
 	// 11 12 13 3 4 5 9 10
-	//          ^
+	//                ^
 
 
 
@@ -453,10 +489,10 @@ TL_TEST(RingBuffer) {
 				}
 
 				auto span = b.pack();
-				assert(span.data == arr);
+				//assert(span.data == arr); // no longer in contract
 				assert(span.count == count);
 				for (int i = 0; i < count; ++i) {
-					assert(arr[i] == i);
+					assert(b[i] == i);
 				}
 			}
 		}

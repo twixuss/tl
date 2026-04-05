@@ -83,6 +83,10 @@
 #define bounds_check(x) x
 #endif
 
+#ifndef TL_MARK_DEAD_MEMORY
+#define TL_MARK_DEAD_MEMORY TL_DEBUG
+#endif
+
 #define TL_DISABLED_WARNINGS \
 5026 /* implicitly deleted move constructor	*/ \
 5027 /* implicitly deleted move assigmnent  */
@@ -3428,6 +3432,22 @@ struct MyAllocator : AllocatorBase<MyAllocator> {
 template <class T>
 concept DefaultConstructible = requires { new T(); };
 
+inline constexpr void mark_dead(u8 *data, umm size) {
+	#if TL_MARK_DEAD_MEMORY
+	u8 mark[] { 0xde, 0xad };
+	for (umm i = 0; i != size; ++i) {
+		data[i] = mark[i&1];
+	}
+	#endif
+}
+inline constexpr void mark_dead(auto *value, umm n = 1) {
+	mark_dead((u8 *)value, n * sizeof(*value));
+}
+template <class T>
+inline constexpr void mark_dead(Span<T> span) {
+	mark_dead(span.data, span.count);
+}
+
 // TODO:
 // Some allocators may give more memory than requested, so the caller should know about this.
 // I think `allocate` should return `Span<u8>` instead of `void *` when requesting raw bytes.
@@ -3531,15 +3551,6 @@ struct AllocatorBase {
 	inline void free(void *data, umm count = 0, umm alignment = 0 TL_LP) {
 		mark_dead((u8 *)data, count);
 		derived()->deallocate_impl(data, count, alignment TL_LA);
-	}
-
-	void mark_dead(u8 *data, umm size) {
-#if TL_DEBUG
-		u8 mark[] { 0xde, 0xad };
-		for (umm i = 0; i != size; ++i) {
-			data[i] = mark[i&1];
-		}
-#endif
 	}
 
 	forceinline explicit operator bool() { return derived()->is_valid(); }
@@ -4315,7 +4326,7 @@ TL_TEST(common) {
 		sub_borrow((u64)1, (u64)0, true,  &ru64, &carry); assert(ru64 == 0); assert(carry == 0);
 	};
 
-	constexpr int x = (test_carry(), 1);
+	constexpr int x = (test_carry(), 1); (void)x;
 	test_carry();
 
 	constexpr auto test_split = [] (Span<char> input, char sep, Span<Span<char>> expected) {

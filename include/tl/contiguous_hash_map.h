@@ -415,7 +415,7 @@ TL_TEST(ContiguousHashMap) {
 	};
 
 	struct CollideTraits : DefaultHashTraits<int> {
-		u64 get_hash(int key) const { return 0; }
+		u64 get_hash(int) const { return 0; }
 	};
 
 	test.operator()<ContiguousHashMap<int, int>>();

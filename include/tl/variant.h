@@ -169,6 +169,7 @@ TL_TEST(Variant) {
 	{
 		#define x(i) S<i>, 
 		Variant<TL_IREPEAT64(x) S<64>> v;
+		#undef x
 
 		assert(v.index() == 0);
 		assert(v.is<S<0>>());
