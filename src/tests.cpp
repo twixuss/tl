@@ -38,7 +38,7 @@ using namespace tl;
 #endif
 
 #if COMPILER_MSVC
-#pragma warning(push, 0)
+#pragma warning(add, 0)
 #endif
 #include <stdio.h>
 #include <assert.h>
@@ -129,19 +129,19 @@ void mergeSort(Span<T> span) {
 
 			while (begin + left < mid && mid + right < end) {
 				if (span[begin + left] < span[mid + right]) {
-					temp.push_back(span[begin + left]);
+					temp.add_back(span[begin + left]);
 					left += 1;
 				} else {
-					temp.push_back(span[mid + right]);
+					temp.add_back(span[mid + right]);
 					right += 1;
 				}
 			}
 			while (begin + left < mid) {
-				temp.push_back(span[begin + left]);
+				temp.add_back(span[begin + left]);
 				left += 1;
 			}
 			while (mid + right < end) {
-				temp.push_back(span[mid + right]);
+				temp.add_back(span[mid + right]);
 				right += 1;
 			}
 			for (umm i = 0; i < size; i++) {
@@ -321,10 +321,10 @@ void buffer_test() {
 		CircularBuffer<char> buffer(8);
 		assert(buffer.empty());
 
-		buffer.push_back('a');
-		buffer.push_back('b');
-		buffer.push_back('c');
-		buffer.push_back('d');
+		buffer.add_back('a');
+		buffer.add_back('b');
+		buffer.add_back('c');
+		buffer.add_back('d');
 
 		assert(!buffer.empty());
 		assert(!buffer.full());
@@ -332,10 +332,10 @@ void buffer_test() {
 		assert(buffer.back() == 'd');
 		assert(buffer.front() == 'a');
 
-		buffer.push_front('e');
-		buffer.push_front('f');
-		buffer.push_front('g');
-		buffer.push_front('h');
+		buffer.add_front('e');
+		buffer.add_front('f');
+		buffer.add_front('g');
+		buffer.add_front('h');
 
 		assert(!buffer.empty());
 		assert(buffer.full());
@@ -354,23 +354,23 @@ void buffer_test() {
 	{
 		CircularBuffer<char> buffer;
 
-		buffer.push_back('a');
+		buffer.add_back('a');
 		assert(buffer.capacity() == 1);
 		assert(memequ(buffer._allocBegin, "a", 1));
 
-		buffer.push_back('b');
+		buffer.add_back('b');
 		assert(buffer.capacity() == 2);
 		assert(memequ(buffer._allocBegin, "ab", 2));
 
-		buffer.push_back('c');
+		buffer.add_back('c');
 		assert(buffer.capacity() == 4);
 		assert(memequ(buffer._allocBegin, "abc", 3));
 
-		buffer.push_front('d');
+		buffer.add_front('d');
 		assert(buffer.capacity() == 4);
 		assert(memequ(buffer._allocBegin, "abcd", 4));
 
-		buffer.push_front('e');
+		buffer.add_front('e');
 		assert(buffer.capacity() == 8);
 		assert(memequ(buffer._allocBegin, "dabc", 4));
 		assert(buffer._allocBegin[7] == 'e');

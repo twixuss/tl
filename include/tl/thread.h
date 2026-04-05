@@ -530,7 +530,7 @@ struct LockProtected {
 /*
 // Example usage:
 locked_use_expr(queue, context->queue) {
-	queue.push(42);
+	queue.add(42);
 };
 */
 #define locked_use_ret_expr(name, expr) (expr) ->* [&](typename std::remove_cvref_t<decltype(expr)>::Value &name)
@@ -540,7 +540,7 @@ locked_use_expr(queue, context->queue) {
 // `name` must be a single identifier
 // Example usage:
 locked_use(queue) {
-	queue.push(42);
+	queue.add(42);
 };
 */
 #define locked_use_ret(name) locked_use_ret_expr(name, name)
@@ -550,7 +550,7 @@ locked_use(queue) {
 // Example usage:
 {
 	scoped_locked_use_expr(queue, some_state->the_queue);
-	queue.push(42);
+	queue.add(42);
 }
 */
 #define scoped_locked_use_expr(name, expr) \
@@ -561,23 +561,23 @@ locked_use(queue) {
 // Example usage:
 {
 	scoped_locked_use(queue);
-	queue.push(42);
+	queue.add(42);
 }
 */
 #define scoped_locked_use(name) scoped_locked_use_expr(name, name)
 
 template <class T, ALock Lock, class Allocator = Allocator>
 struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
-	void push(T const &value) {
+	void add(T const &value) {
 		this->use([&](auto &queue) {
-			queue.push(value);
+			queue.add(value);
 		});
 	}
-	void push(Span<T> values) {
+	void add(Span<T> values) {
 		this->use([&](auto &queue) {
 			// FIXME: use reserve
 			for (auto &value : values) {
-				queue.push(value);
+				queue.add(value);
 			}
 		});
 	}
@@ -729,16 +729,16 @@ struct SignalQueue {
 	Queue<T, Allocator> queue;
 	ConditionVariable cv;
 
-	void push(T value) {
+	void add(T value) {
 		cv.section([&]{
-			queue.push(value);
+			queue.add(value);
 		});
 		cv.wake();
 	}
 
-	void push(Span<T> value) {
+	void add(Span<T> value) {
 		cv.section([&]{
-			queue.push(value);
+			queue.add(value);
 		});
 		cv.wake();
 	}
@@ -816,10 +816,10 @@ enum WaitForCompletionOption {
 
 // Simple thread pool.
 // Intended usage cycle:
-//     1. Push some amount of tasks, heavy first.
+//     1. add some amount of tasks, heavy first.
 //     2. Wait for them to complete.
 //
-// Only one thread may push tasks.
+// Only one thread may add tasks.
 
 // :NestedOptionsStruct:
 // This could have been a nested struct of TaskQueueThreadPool, but gcc has a bug which does not allow that.
@@ -990,7 +990,7 @@ struct TaskQueueThreadPool {
 				assert_equal(producer_id, get_current_thread_id());
 			}
 			#endif
-			tasks.push(task);
+			tasks.add(task);
 		});
 
 		new_work_notifier.wake();
@@ -1042,7 +1042,7 @@ struct TaskListsThreadPoolInitParams {
 	void (*worker_proc)(TaskListsThreadPool *pool) = TaskListsThreadPool_default_worker_proc;
 };
 
-// Runs the latest pushed tasks 
+// Runs the latest added tasks 
 struct TaskListsThreadPool {
 	struct TaskList;
 
@@ -1357,11 +1357,11 @@ struct TaskQueuesThreadPool {
 			assert(!initted, "`wait_for_completion` must be called on a TaskQueue before destruction");
 		}
 
-		inline void push_task(void (*fn)(void *param), void *param) {
-			push_task_and_notify({this, fn, param, [](void *){}});
+		inline void add_task(void (*fn)(void *param), void *param) {
+			add_task_and_notify({this, fn, param, [](void *){}});
 		}
 		template <class Fn, class ...Args>
-		void push_task(Fn &&fn, Args &&...args) {
+		void add_task(Fn &&fn, Args &&...args) {
 			using Tuple = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;
 
 			// TODO: Figure out a way to use custom allocator without race conditions.
@@ -1379,11 +1379,11 @@ struct TaskQueuesThreadPool {
 				DefaultAllocator{}.free_t(tuple, 1);
 			};
 
-			push_task_and_notify({this, invokerProc, fnParams, freer});
+			add_task_and_notify({this, invokerProc, fnParams, freer});
 		}
 		template <class Fn>
 		auto &operator+=(Fn &&fn) {
-			push_task(std::forward<Fn>(fn));
+			add_task(std::forward<Fn>(fn));
 			return *this;
 		}
 
@@ -1443,7 +1443,7 @@ struct TaskQueuesThreadPool {
 			#endif
 		}
 	private:
-		inline void push_task_and_notify(Task task) {
+		inline void add_task_and_notify(Task task) {
 			#if TL_DEBUG
 			assert(producer_id != -1);
 			assert_equal(producer_id, get_current_thread_id(), "Only one thread may operate on a TaskQueue");
@@ -1452,7 +1452,7 @@ struct TaskQueuesThreadPool {
 			auto &shared = pool->shared;
 			locked_use(shared) {
 				(void)shared;
-				tasks.push(task);
+				tasks.add(task);
 			};
 			pool->new_work_notifier.wake();
 		}

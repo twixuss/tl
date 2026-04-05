@@ -21,13 +21,13 @@ struct RingBuffer {
 
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-	T &push_back(T value = {}) {
+	T &add_back(T value = {}) {
 		reserve(count + 1);
 	
 		return *new (get(start + count++)) T(value);
 	}
 	
-	Spans push_back(Span<T> span) {
+	Spans add_back(Span<T> span) {
 		Spans result;
 
 		reserve(count + span.count);
@@ -54,7 +54,7 @@ struct RingBuffer {
 		return result;
 	}
 	
-	T &push_front(T value = {}) {
+	T &add_front(T value = {}) {
 		reserve(count + 1);
 	
 		count += 1;
@@ -62,7 +62,7 @@ struct RingBuffer {
 		return *new (storage + start) T(value);
 	}
 	
-	Spans push_front(Span<T> span) {
+	Spans add_front(Span<T> span) {
 		Spans result;
 
 		reserve(count + span.count);
@@ -395,7 +395,7 @@ TL_TEST(RingBuffer) {
 		assert(index == -1);
 	};
 
-	b.push_back({0, 1, 2, 3, 4, 5});
+	b.add_back({0, 1, 2, 3, 4, 5});
 	check({0, 1, 2, 3, 4, 5}, 6);
 	// 0 1 2 3 4 5 . .
 	// ^
@@ -406,7 +406,7 @@ TL_TEST(RingBuffer) {
 	// . . . 3 4 5 . .
 	//       ^
 
-	b.push_back({6, 7, 8});
+	b.add_back({6, 7, 8});
 	check({3, 4, 5, 6, 7, 8}, 5);
 	// 8 . . 3 4 5 6 7
 	//       ^
@@ -417,7 +417,7 @@ TL_TEST(RingBuffer) {
 	// . . . 3 4 5 . .
 	//       ^
 
-	b.push_front({9, 10, 11, 12, 13});
+	b.add_front({9, 10, 11, 12, 13});
 	check({3, 4, 5, 9, 10, 11, 12, 13}, 5);
 	// 11 12 13 3 4 5 9 10
 	//          ^

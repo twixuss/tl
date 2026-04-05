@@ -42,11 +42,11 @@ struct Queue : private RingBuffer<T, Allocator> {
 	using Base::pack;
 	using Base::erase_all;
 	
-	T &push(T value = {}) {
-		return this->push_back(value);
+	T &add(T value = {}) {
+		return this->add_back(value);
 	}
-	Spans push(Span<T> span) {
-		return this->push_back(span);
+	Spans add(Span<T> span) {
+		return this->add_back(span);
 	}
 	Optional<T> pop() {
 		return this->pop_front();
@@ -97,12 +97,12 @@ struct Queue {
 	bool is_empty() const { return count == 0; }
 
 
-	T &push(T const &value TL_LP) {
+	T &add(T const &value TL_LP) {
 		reserve(count + 1 TL_LA);
 		return *new(&get(start + count++)) T(value);
 	}
 
-	void push(Span<T> span TL_LP) {
+	void add(Span<T> span TL_LP) {
 		reserve(count + span.count TL_LA);
 		for (auto &value : span) {
 			new(&get(start + count++)) T(value);
@@ -200,11 +200,11 @@ TL_TEST(Queue) {
 	Queue<int> q;
 
 	assert(q.count == 0);
-	q.push(42);
+	q.add(42);
 	assert(q.count == 1);
-	q.push(69);
+	q.add(69);
 	assert(q.count == 2);
-	q.push(23);
+	q.add(23);
 	assert(q.count == 3);
 
 	assert(q.pop().value() == 42);

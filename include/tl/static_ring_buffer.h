@@ -16,7 +16,7 @@ struct StaticRingBuffer {
 
 	// Returns pointer to added value, or null if buffer is full.
 	[[nodiscard]]
-	T *push_back(T value = {}) {
+	T *add_back(T value = {}) {
 		if (count == capacity)
 			return 0;
 
@@ -26,9 +26,9 @@ struct StaticRingBuffer {
 	}
 
 	// Returns true if all elements were added, or false if there is not enough space.
-	// If you want to add whatever fits, call push_back on each element.
+	// If you want to add whatever fits, call add_back on each element.
 	[[nodiscard]]
-	bool push_back(Span<T> span) {
+	bool add_back(Span<T> span) {
 		if (count + span.count > capacity)
 			return false;
 
@@ -48,7 +48,7 @@ struct StaticRingBuffer {
 
 	// Returns pointer to added value, or null if buffer is full.
 	[[nodiscard]]
-	T *push_front(T value = {}) {
+	T *add_front(T value = {}) {
 		if (count == capacity)
 			return 0;
 
@@ -58,9 +58,9 @@ struct StaticRingBuffer {
 	}
 	
 	// Returns true if all elements were added, or false if there is not enough space.
-	// If you want to add whatever fits, call push_back on each element.
+	// If you want to add whatever fits, call add_back on each element.
 	[[nodiscard]]
-	bool push_front(Span<T> span) {
+	bool add_front(Span<T> span) {
 		if (count + span.count > capacity)
 			return false;
 
@@ -189,12 +189,12 @@ TL_TEST(StaticRingBuffer) {
 
 	StaticRingBuffer<int, 4> b;
 
-	assert(*b.push_back(0) == 0);
-	assert(*b.push_back(1) == 1);
-	assert(*b.push_back(2) == 2);
-	assert(*b.push_back(3) == 3);
+	assert(*b.add_back(0) == 0);
+	assert(*b.add_back(1) == 1);
+	assert(*b.add_back(2) == 2);
+	assert(*b.add_back(3) == 3);
 	assert(b.count == 4);
-	assert(b.push_back(5) == 0);
+	assert(b.add_back(5) == 0);
 	assert(b.count == 4);
 
 	assert(b.pop_back().value() == 3);
@@ -208,7 +208,7 @@ TL_TEST(StaticRingBuffer) {
 	assert(b[0] == 1);
 	assert(b[1] == 2);
 
-	assert(b.push_back({6, 7}));
+	assert(b.add_back({6, 7}));
 	assert(b.count == 4);
 	assert(b[0] == 1);
 	assert(b[1] == 2);
@@ -222,7 +222,7 @@ TL_TEST(StaticRingBuffer) {
 	assert(b[1] == 2);
 
 	
-	assert(b.push_front({8, 9}));
+	assert(b.add_front({8, 9}));
 	assert(b.count == 4);
 	assert(b[0] == 8);
 	assert(b[1] == 9);

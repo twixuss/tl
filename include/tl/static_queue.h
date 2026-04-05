@@ -13,8 +13,8 @@ struct StaticQueue : private StaticRingBuffer<T, _capacity> {
 	using Base::end;
 	using Base::clear;
 	using Base::operator[];
-	T &push(T value) { return this->push_back(value); }
-	void push(Span<T> span) { return this->push_back(span); }
+	T &add(T value) { return this->add_back(value); }
+	void add(Span<T> span) { return this->add_back(span); }
 	Optional<T> pop() { return this->pop_front(); }
 };
 
