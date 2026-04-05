@@ -33,6 +33,7 @@ struct FlyString {
         return as_span((char *)data) == as_span(that);
     }
 
+    // TODO: this calls strlen every time. maybe instead of storing utf8* do Span<utf8> ?
     inline umm count() const {
         if (!data)
             return 0;

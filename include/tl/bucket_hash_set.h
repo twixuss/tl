@@ -86,6 +86,14 @@ struct BucketHashSet {
 			buckets[bucket_index].clear();
 		}
 	}
+	
+	umm count() const {
+		umm result = 0;
+		for (auto &bucket : buckets) {
+			result += bucket.size();
+		}
+		return result;
+	}
 };
 
 template <ForEachFlags flags=0, class Value, class Traits, class Fn>
@@ -115,26 +123,6 @@ void set(BucketHashSet<Value, Traits> &destination, BucketHashSet<Value, Traits>
 	for_each(source, [&](Value const &value) {
 		destination.insert(value TL_LA);
 	});
-}
-
-template <class Value, class Traits>
-umm count_of(BucketHashSet<Value, Traits> &set) {
-	umm result = 0;
-	for (auto &bucket : set.buckets) {
-		result += bucket.size();
-	}
-	return result;
-}
-
-template <class Value, class Traits, class Fn>
-umm count(BucketHashSet<Value, Traits> set, Fn &&fn) {
-	umm result = 0;
-	for_each(set, [&](Value &value) {
-		if (fn(value)) {
-			result += 1;
-		}
-	});
-	return result;
 }
 
 template <class Value, class Traits>

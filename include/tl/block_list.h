@@ -10,6 +10,7 @@ struct BlockListIndex {
 	umm value_index;
 };
 
+// Linked list of equally sized blocks with one block stored inline.
 template <class T, umm block_capacity_, class Allocator = Allocator>
 struct StaticBlockList {
 	static constexpr umm block_capacity = block_capacity_;
@@ -109,6 +110,13 @@ struct StaticBlockList {
 	}
 	T &add(TL_LPC) { return add({} TL_LA); }
 
+	umm count() const {
+		umm total_count = 0;
+		for (auto block = &first; block != 0; block = block->next)
+			total_count += block->count;
+		return total_count;
+	}
+
 	bool empty() const { return (last == &first) && (first.count == 0); }
 
 	T &back() { return last->back(); }
@@ -190,14 +198,6 @@ struct SStaticBlockList<StaticBlockList<T, values_per_block, Allocator>> : std::
 
 template <class T>
 concept CStaticBlockList = SStaticBlockList<T>::value;
-
-umm count_of(CStaticBlockList auto const &list) {
-	umm total_count = 0;
-	for (auto block = &list.first; block != 0; block = block->next) {
-		total_count += block->count;
-	}
-	return total_count;
-}
 
 template <class T, umm block_size, class Allocator>
 T *next(StaticBlockList<T, block_size, Allocator> &list, T *source) {
@@ -624,11 +624,6 @@ struct BlockList {
 		return Span{block->begin() + offset, count};
 	}
 };
-
-template <class T>
-umm count_of(BlockList<T> const &list) {
-	return list.count;
-}
 
 template <class T>
 umm index_of(BlockList<T> const &list, T *value) {

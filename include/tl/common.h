@@ -1248,6 +1248,13 @@ struct Repeat {
 	umm count;
 };
 
+template <class T>
+constexpr umm count_of(T const &collection) {
+	if constexpr (requires {{collection.count}->std::convertible_to<umm>;}) return collection.count;
+	else if constexpr (requires {{collection.count()}->std::convertible_to<umm>;}) return collection.count();
+	else static_error_t(T, "no default count_of implementation available.");
+}
+
 template <class T, umm count>
 constexpr umm count_of(T const (&arr)[count]) { (void)arr; return count; }
 
@@ -2413,9 +2420,6 @@ template <class T>
 constexpr Span<T> value_as_span(T const &value) {
 	return {&value, 1};
 }
-
-template <class T, class Size>
-constexpr umm count_of(Span<T, Size> span) { return span.count; }
 
 template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
 constexpr smm compare(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {

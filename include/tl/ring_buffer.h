@@ -145,13 +145,10 @@ struct RingBuffer {
 
 		T *new_storage = allocator.template allocate_uninitialized<T>(new_capacity);
 
-		if (start + count <= capacity) {
-			memcpy(new_storage, storage + start, count * sizeof(T));
-		} else {
-			umm first_count = capacity - start;
-			umm second_count = count - first_count;
-			memcpy(new_storage, storage + start, first_count * sizeof(T));
-			memcpy(new_storage + first_count, storage, second_count * sizeof(T));
+		auto spans = this->spans();
+		memcpy(new_storage, spans[0].data, spans[0].count * sizeof(T));
+		if (spans.count == 2) {
+			memcpy(new_storage + spans[0].count, spans[1].data, spans[1].count * sizeof(T));
 		}
 
 		allocator.free_t(storage, capacity);

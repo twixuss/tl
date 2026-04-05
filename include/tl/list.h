@@ -148,6 +148,18 @@ struct List : Span<T, Size_> {
 		return data[count];
 	}
 
+	// Moves the data! Slow!
+	Optional<T> pop_front() {
+		if (count == 0)
+			return {};
+
+		auto result = data[0];
+		--count;
+		memmove(data, data + 1, count * sizeof(T));
+		return result;
+	}
+
+
 	template <class U, class ThatSize>
 	explicit operator List<U, Allocator, ThatSize>() const {
 		assert_equal((ThatSize)count, count);
@@ -540,17 +552,6 @@ constexpr bool for_each(List<T, Allocator, Size> &list, Fn &&fn) {
 	return false;
 }
 
-template <class T, class Allocator, class Size, class Fn>
-umm count(List<T, Allocator, Size> list, Fn &&fn) {
-	umm result = 0;
-	for (auto &v : list) {
-		if (fn(v)) {
-			result += 1;
-		}
-	}
-	return result;
-}
-
 template <class Allocator = Allocator, class T, class Size>
 List<T, Allocator, Size> replace(Span<T, Size> where, T what, T with TL_LP) {
 	List<T, Allocator, Size> result;
@@ -633,8 +634,6 @@ template <class T, class Allocator, class Size>
 umm index_of(List<T, Allocator, Size> const &list, T const *value) {
 	return value - list.data;
 }
-
-template <class T, class Allocator, class Size> umm count_of(List<T, Allocator, Size> const &list) { return list.count; }
 
 template <class T, class Allocator, class Size> T const &front(List<T, Allocator, Size> const &list) { return list.front(); }
 template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size> &list) { return list.front(); }
