@@ -3,29 +3,47 @@
 
 namespace tl {
 
+template <class T>
+inline static constexpr bool is_array = false;
+
 template <class T, umm count_>
-union Array {
+struct Array {
 	inline static constexpr umm count = count_;
-	#include "_array_members.inc"
-	struct { T x, y, z, w; };
-	struct { v2 xy, zw; };
-	struct { T _pad0; v2 yz; };
-	struct { v3 xyz; };
-	struct { T _pad1; v3 yzw; };
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		struct { T x, y, z, w; };
+		struct { v2 xy, zw; };
+		struct { T _pad0; v2 yz; };
+		struct { v3 xyz; };
+		struct { T _pad1; v3 yzw; };
+	};
+	#include "_array_members_after.inc"
 };
 
 template <class T>
-union Array<T, 1> {
+struct Array<T, 1> {
 	inline static constexpr umm count = 1;
-	#include "_array_members.inc"
-	T x;
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		T x;
+	};
+	#include "_array_members_after.inc"
 };
 
 template <class T>
-union Array<T, 2> {
+struct Array<T, 2> {
 	inline static constexpr umm count = 2;
-	#include "_array_members.inc"
-	struct { T x, y; };
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		struct { T x, y; };
+	};
+	#include "_array_members_after.inc"
 	forceinline constexpr v2 xx() const { return {x, x}; }
 	forceinline constexpr v2 xy() const { return {x, y}; }
 	forceinline constexpr v2 yx() const { return {y, x}; }
@@ -33,12 +51,17 @@ union Array<T, 2> {
 };
 
 template <class T>
-union Array<T, 3> {
+struct Array<T, 3> {
 	inline static constexpr umm count = 3;
-	#include "_array_members.inc"
-	struct { T x, y, z; };
-	struct { v2 xy; };
-	struct { T _pad0; v2 yz; };
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		struct { T x, y, z; };
+		struct { v2 xy; };
+		struct { T _pad0; v2 yz; };
+	};
+	#include "_array_members_after.inc"
 	forceinline constexpr v2 xz() const { return {x,z}; }
 	forceinline constexpr v2 yx() const { return {y,x}; }
 	forceinline constexpr v2 zx() const { return {z,x}; }
@@ -53,10 +76,36 @@ template <class T, class... Rest>
 Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof...(Rest)>;
 
 template <class T, umm count>
+inline static constexpr bool is_array<Array<T, count>> = true;
+
+template <class T, umm count>
 inline static constexpr bool is_unsigned<Array<T, count>> = is_unsigned<T>;
+
+template <class T, umm count>
+inline static constexpr bool is_integer_like<Array<T, count>> = is_integer_like<T>;
 
 template <class T>            inline static constexpr int array_nestedness = 0;
 template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
+
+template <umm sub_count, umm sub_start, class T, umm count>
+    requires (is_array<T>)
+Array<Array<typename T::Element, sub_count>, count> sub_arrays(Array<T, count> self) {
+    static_assert(sub_start + sub_count <= T::count);
+    Array<Array<typename T::Element, sub_count>, count> r = {};
+    for (umm i = 0; i < count; ++i)
+        r.data[i] = self.data[i].template sub_array<sub_count, sub_start>();
+    return r;
+}
+
+template <umm sub_count, class T, umm count>
+    requires (is_array<T>)
+Array<Array<typename T::Element, sub_count>, count> sub_arrays(Array<T, count> self, umm sub_start = 0) {
+    assert(sub_start + sub_count <= T::count);
+    Array<Array<typename T::Element, sub_count>, count> r = {};
+    for (umm i = 0; i < count; ++i)
+        r.data[i] = self.data[i].template sub_array<sub_count>(sub_start);
+    return r;
+}
 
 #define OP(op)                                                                 \
 	template <class T, umm count>                                              \
@@ -74,64 +123,82 @@ OP(~)
 OP(!)
 OP(*)
 #undef OP
-		
-#define OP(op)                                                                                 \
-	template <class T, umm count>                                                              \
-	forceinline constexpr auto operator op(Array<T, count> const &a, Array<T, count> const &b) \
-		requires requires(T t) { t op t; }                                                     \
-	{                                                                                          \
-		Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count> result = {};       \
-		for (umm i = 0; i < count; ++i)                                                        \
-			result.data[i] = a.data[i] op b.data[i];                                           \
-		return result;                                                                         \
-	}                                                                                          \
-	template <class U, class T, umm count>                                                     \
-	forceinline constexpr auto operator op(Array<T, count> const &a, Array<U, count> const &b) \
-		requires requires(T t, U u) { t op u; }                                                \
-	{                                                                                          \
-		Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count> result = {};       \
-		for (umm i = 0; i < count; ++i)                                                        \
-			result.data[i] = a.data[i] op b.data[i];                                           \
-		return result;                                                                         \
-	}                                                                                           \
-	template <class U, class T, umm count>                                                      \
-	forceinline constexpr auto operator op(Array<T, count> const &a, U const &b)                \
-		requires requires(T t, U u) { t op u; } && (array_nestedness<U> <= array_nestedness<T>) \
-	{                                                                                           \
-		Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count> result = {};                \
-		for (umm i = 0; i < count; ++i)                                                         \
-			result.data[i] = a.data[i] op b;                                                    \
-		return result;                                                                          \
-	}                                                                                           \
-	template <class U, class T, umm count>                                                      \
-	forceinline constexpr auto operator op(U const &a, Array<T, count> const &b)                \
-		requires requires(U u, T t) { u op t; } && (array_nestedness<U> <= array_nestedness<T>) \
-	{                                                                                           \
-		Array<std::remove_cvref_t<decltype(a op b.data[0])>, count> result = {};                \
-		for (umm i = 0; i < count; ++i)                                                         \
-			result.data[i] = a op b.data[i];                                                    \
-		return result;                                                                          \
+	
+template <class T>
+struct ToBoolUsingAll : T {
+	forceinline constexpr explicit operator bool() const { return all(*this); }
+};
+
+template <class T>
+struct ToBoolUsingAny : T {
+	forceinline constexpr explicit operator bool() const { return any(*this); }
+};
+
+#define ASIS(...) __VA_ARGS__
+#define WRAP_ToBoolUsingAll(...) ToBoolUsingAll<__VA_ARGS__>
+#define WRAP_ToBoolUsingAny(...) ToBoolUsingAny<__VA_ARGS__>
+
+#define OP(op, RetTypeMod)                                                                           \
+	template <class T, umm count>                                                                    \
+	forceinline constexpr auto operator op(Array<T, count> const &a, Array<T, count> const &b)       \
+		requires requires(T t) { t op t; }                                                           \
+	{                                                                                                \
+		RetTypeMod(Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count>) result = {}; \
+		for (umm i = 0; i < count; ++i)                                                              \
+			result.data[i] = a.data[i] op b.data[i];                                                 \
+		return result;                                                                               \
+	}                                                                                                \
+	template <class U, class T, umm count>                                                           \
+	forceinline constexpr auto operator op(Array<T, count> const &a, Array<U, count> const &b)       \
+		requires requires(T t, U u) { t op u; }                                                      \
+	{                                                                                                \
+		RetTypeMod(Array<std::remove_cvref_t<decltype(a.data[0] op b.data[0])>, count>) result = {}; \
+		for (umm i = 0; i < count; ++i)                                                              \
+			result.data[i] = a.data[i] op b.data[i];                                                 \
+		return result;                                                                               \
+	}                                                                                                \
+	template <class U, class T, umm count>                                                           \
+	forceinline constexpr auto operator op(Array<T, count> const &a, U const &b)                     \
+		requires requires(T t, U u) { t op u; } && (array_nestedness<U> <= array_nestedness<T>)      \
+	{                                                                                                \
+		RetTypeMod(Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count>) result = {};         \
+		for (umm i = 0; i < count; ++i)                                                              \
+			result.data[i] = a.data[i] op b;                                                         \
+		return result;                                                                               \
+	}                                                                                                \
+	template <class U, class T, umm count>                                                           \
+	forceinline constexpr auto operator op(U const &a, Array<T, count> const &b)                     \
+		requires requires(U u, T t) { u op t; } && (array_nestedness<U> <= array_nestedness<T>)      \
+	{                                                                                                \
+		RetTypeMod(Array<std::remove_cvref_t<decltype(a op b.data[0])>, count>) result = {};         \
+		for (umm i = 0; i < count; ++i)                                                              \
+			result.data[i] = a op b.data[i];                                                         \
+		return result;                                                                               \
 	}
-OP(==)
-OP(!=)
-OP(<)
-OP(>)
-OP(<=)
-OP(>=)
-OP(+)
-OP(-)
-OP(*)
-OP(/)
-OP(%)
-OP(^)
-OP(&)
-OP(|)
-OP(<<)
-OP(>>)
-OP(&&)
-OP(||)
+OP(==, WRAP_ToBoolUsingAll)
+OP(!=, WRAP_ToBoolUsingAny)
+OP(<, ASIS)
+OP(>, ASIS)
+OP(<=, ASIS)
+OP(>=, ASIS)
+OP(+, ASIS)
+OP(-, ASIS)
+OP(*, ASIS)
+OP(/, ASIS)
+OP(%, ASIS)
+OP(^, ASIS)
+OP(&, ASIS)
+OP(|, ASIS)
+OP(<<, ASIS)
+OP(>>, ASIS)
+OP(&&, ASIS)
+OP(||, ASIS)
 #undef OP
-		
+
+#undef ASIS
+#undef WRAP_ToBoolUsingAll
+#undef WRAP_ToBoolUsingAny
+
 #define OP(op)                                                                               \
 	template <class U, class T, umm count>                                                   \
 	forceinline constexpr auto &operator op##=(Array<T, count> &a, Array<U, count> const &b) \

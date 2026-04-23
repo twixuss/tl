@@ -1,20 +1,7 @@
-// This file is intended to be included in tl::Array template specializations
-// Why?
-// I just decided to have one struct for all - arrays, vectors, simd.
-// And vectors require xyzw members, which in turn require different specializations for sizes 2, 3 and 4+.
-// So to not duplicate code, put in an h file.
-
-using Element = T;
-using v2 = Array<T, 2>;
-using v3 = Array<T, 3>;
-using v4 = Array<T, 4>;
-
-T data[count];
-
 forceinline constexpr auto begin(this auto &&self) { return self.data; }
 forceinline constexpr auto end(this auto &&self) { return self.data + self.count; }
 
-inline operator Span<T>() const { return {(T *)data, count}; }
+forceinline constexpr operator Span<T>() const { return {(T *)data, count}; }
 forceinline constexpr Span<T> span() const { return {begin(), end()}; }
 
 forceinline constexpr auto &at(this auto &&self, umm i) {
@@ -35,12 +22,39 @@ forceinline constexpr auto iter(this auto &&self, IterOptions options = {}) {
     return span_iter(self.data, self.data + count, options);
 }
 
-template <umm sub_count>
-Array<T, sub_count> &sub_array(umm sub_start = 0) {
+template <umm sub_count, umm sub_start>
+forceinline constexpr Array<T, sub_count> &sub_array() {
+    static_assert(sub_start + sub_count <= count);
     return *(Array<T, sub_count> *)(data + sub_start);
 }
 
-auto map(auto &&mapper) const
+template <umm sub_count>
+forceinline constexpr Array<T, sub_count> &sub_array(umm sub_start = 0) {
+    assert(sub_start + sub_count <= count);
+    return *(Array<T, sub_count> *)(data + sub_start);
+}
+
+// SFINAE required, otherwise does not compile when T is not Array.
+template <umm sub_count, umm sub_start, class U=T>
+forceinline constexpr Array<Array<typename std::enable_if_t<is_array<U>, U>::Element, sub_count>, count> sub_arrays() {
+    static_assert(sub_start + sub_count <= T::count);
+    Array<Array<typename T::Element, sub_count>, count> r = {};
+    for (umm i = 0; i < count; ++i)
+        r.data[i] = data[i].template sub_array<sub_count, sub_start>();
+    return r;
+}
+
+// SFINAE required, otherwise does not compile when T is not Array.
+template <umm sub_count, class U=T>
+forceinline constexpr Array<Array<typename std::enable_if_t<is_array<U>, U>::Element, sub_count>, count> sub_arrays(umm sub_start = 0) {
+    assert(sub_start + sub_count <= T::count);
+    Array<Array<typename T::Element, sub_count>, count> r = {};
+    for (umm i = 0; i < count; ++i)
+        r.data[i] = data[i].template sub_array<sub_count>(sub_start);
+    return r;
+}
+
+forceinline constexpr auto map(auto &&mapper) const
     requires requires { mapper(data[0]); }
 {
     Array<std::remove_cvref_t<decltype(mapper(data[0]))>, count> result = {};

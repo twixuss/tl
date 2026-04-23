@@ -33,7 +33,7 @@
 #define ASSERTION_FAILURE(cause_string, expression_string, ...) debug_break()
 #endif
 
-#define assert_always(x, ...) (void)(!!(x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
+#define assert_always(x, ...) (void)((bool)(x) || ((ASSERTION_FAILURE("assert", #x __VA_OPT__(,) __VA_ARGS__)), false))
 
 #ifndef assert
 #define assert(x, ...) assert_always(x __VA_OPT__(,) __VA_ARGS__)
@@ -817,7 +817,9 @@ forceinline constexpr void *floor(void *v, umm s) { return (void *)floor((umm)v,
 forceinline constexpr void *ceil(void *v, umm s) { return floor((u8 *)v + s - 1, s); }
 
 template <class T>
-forceinline constexpr T frac(T v, T s) {
+forceinline constexpr T frac(T v, T s)
+	requires is_integer_like<T>
+{
 	if constexpr(is_signed<T>) {
 		return select(v < 0, (v + 1) % s + s - 1, v % s);
 	} else {
@@ -1089,8 +1091,8 @@ forceinline f64 ceil(f64 v) { return ::ceil(v); }
 forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
 forceinline s64 ceil_to_int(f64 v) { return (s64)ceil(v); }
 
-forceinline f32 round(f32 v) { return ::roundf(v); }
-forceinline f64 round(f64 v) { return ::round(v); }
+forceinline f32 round(f32 v) { return ::nearbyintf(v); }
+forceinline f64 round(f64 v) { return ::nearbyint(v); }
 forceinline s32 round_to_int(f32 v) { return (s32)lroundf(v); }
 forceinline s64 round_to_int(f64 v) { return llround(v); }
 
@@ -1583,7 +1585,7 @@ private:
 	defer { Swap(dst, src); }
 
 template <class T>
-constexpr auto reversed(T x) {
+constexpr auto reversed(T &x) {
 	struct Range {
 		constexpr auto begin() { return _begin; }
 		constexpr auto end() { return _end; }

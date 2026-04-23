@@ -23,8 +23,10 @@ struct RingBuffer {
 
 	T &add_back(T value = {}) {
 		reserve(count + 1);
-	
-		return *new (get(start + count++)) T(value);
+		T *d = storage + ((start + count) & (capacity - 1));
+		memcpy(d, &value, sizeof(T));
+		count += 1;
+		return *d;
 	}
 	
 	Spans add_back(Span<T> span) {
@@ -53,10 +55,11 @@ struct RingBuffer {
 	
 	T &add_front(T value = {}) {
 		reserve(count + 1);
-	
-		count += 1;
 		start = (start - 1) & (capacity - 1);
-		return *new (storage + start) T(value);
+		T *d = storage + start;
+		memcpy(d, &value, sizeof(T));
+		count += 1;
+		return *d;
 	}
 	
 	Spans add_front(Span<T> span) {
@@ -87,7 +90,8 @@ struct RingBuffer {
 	Optional<T> pop_back() {
 		if (!count)
 			return {};
-		auto p = storage + ((start + --count) & (capacity - 1));
+		count -= 1;
+		auto p = storage + ((start + count) & (capacity - 1));
 		auto value = *p;
 		mark_dead(p);
 		return value;
@@ -96,7 +100,7 @@ struct RingBuffer {
 	Optional<T> pop_front() {
 		if (!count)
 			return {};
-		--count;
+		count -= 1;
 		auto p = storage + start;
 		auto value = *p;
 		mark_dead(p);
@@ -156,6 +160,7 @@ struct RingBuffer {
 		if (spans.count == 2) {
 			memcpy(new_storage + spans[0].count, spans[1].data, spans[1].count * sizeof(T));
 		}
+		mark_dead(new_storage + count, capacity - count);
 
 		allocator.free_t(storage, capacity);
 
@@ -348,13 +353,17 @@ private:
 
 #ifdef TL_ENABLE_TESTS
 
+#include "list.h"
+
 TL_TEST(RingBuffer) {
 	using namespace tl;
 
 	RingBuffer<int> b;
 
-	b.reserve(8);
-	assert(b.capacity == 8);
+	// TL_INITIAL_RING_BUFFER_CAPACITY might be bigger than 8, but these tests are written for capacity of exactly 8
+	//b.reserve(8);
+	b.capacity = 8;
+	b.storage = b.allocator.allocate<int>(b.capacity);
 
 	auto check = [&](Span<int> expected, umm expected_start, umm first_span_count) {
 		assert(b.start == expected_start);
@@ -368,7 +377,7 @@ TL_TEST(RingBuffer) {
 			assert(b.spans().count == 2);
 		}
 
-		assert(b.spans()[0].data == &b[0]);
+		assert(b.spans()[0].data == (b.storage + b.start));
 		assert(b.spans()[0].count == first_span_count);
 		for (umm i = 0; i < first_span_count; ++i)
 			assert(b.spans()[0][i] == expected[i]);
@@ -410,6 +419,16 @@ TL_TEST(RingBuffer) {
 		}
 		assert(index == -1);
 	};
+
+	b.add_front({0, 1, 2});
+	check({0, 1, 2}, 5, 3);
+	// . . . . . 0 1 2
+	//           ^
+
+	b.pop_front(3);
+	check({}, 0, 0);
+	// . . . . . . . .
+	// ^
 
 	b.add_back({0, 1, 2, 3, 4, 5});
 	check({0, 1, 2, 3, 4, 5}, 0, 6);
@@ -495,6 +514,50 @@ TL_TEST(RingBuffer) {
 					assert(b[i] == i);
 				}
 			}
+		}
+	}
+
+	/* stress */ if (0) {
+		List<List<int>> a;
+		RingBuffer<List<int>> b;
+
+		int to_push = 0;
+		int expected_pop = 0;
+		for (int i = 0; i < 1024*1024; ++i) {
+			int x = i;
+			int k = 2654435789;
+			x = x*k^k;
+			x = x*k^k;
+			x = x*k^k;
+			x = x*k^k;
+
+			if ((x & 0x8000'0000) || (a.count == 0)) {
+				List<int> al, bl;
+				al.add(to_push);
+				bl.add(to_push);
+				a.add(al);
+				b.add_back(bl);
+				++to_push;
+			} else {
+				auto av = a.pop_front().value();
+				auto bv = b.pop_front().value();
+				assert(av == bv);
+				assert(av == Span(&expected_pop, 1));
+				++expected_pop;
+			}
+
+			assert(a.count == b.count);
+			for (int j = 0; j < a.count; ++j) {
+				assert(a[j] == b[j]);
+			}
+		}
+
+		while (a.count) {
+			auto av = a.pop_front().value();
+			auto bv = b.pop_front().value();
+			assert(av == bv);
+			assert(av == Span(&expected_pop, 1));
+			++expected_pop;
 		}
 	}
 };

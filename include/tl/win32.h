@@ -200,7 +200,7 @@ bool process_raw_input_message(MSG msg, bool mouse_buttons[5], s32 *mouse_wheel,
 		if (raw_input.header.dwType == RIM_TYPEMOUSE) {
 			auto &mouse = raw_input.data.mouse;
 			if (mouse_delta)
-				*mouse_delta += {mouse.lLastX, mouse.lLastY};
+				*mouse_delta += v2s{mouse.lLastX, mouse.lLastY};
 			if (mouse_wheel)
 				if (mouse.usButtonFlags & RI_MOUSE_WHEEL)
 					*mouse_wheel += (s16)mouse.usButtonData / WHEEL_DELTA;

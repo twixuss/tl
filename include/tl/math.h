@@ -61,8 +61,8 @@ forceinline constexpr auto pow(T v) {
 
 template <class T>
 forceinline constexpr T smooth_min(T a, T b, f32 k) {
-	f32 h = clamp((b - a) / k + .5f, 0.0f, 1.0f);
-	return b + h * (a - b + k * 0.5f * (h - 1));
+	f32 h = clamp((b - a) / k + 0.5f, 0.0f, 1.0f);
+	return b + h * (a - b + k * 0.5f * (h - 1.0f));
 }
 
 template <class T>
@@ -79,9 +79,8 @@ forceinline constexpr m4 M4(f32 ix, f32 iy, f32 iz, f32 iw, f32 jx, f32 jy, f32 
 				f32 ly, f32 lz, f32 lw);
 
 forceinline void cos_sin(f32 v, f32& cos_out, f32& sin_out);
-forceinline void cos_sin(v2f v, v2f& cos_out, v2f& sin_out);
-forceinline void cos_sin(v3f v, v3f& cos_out, v3f& sin_out);
-forceinline void cos_sin(v4f v, v4f& cos_out, v4f& sin_out);
+template <umm count>
+forceinline void cos_sin(Array<f32, count> v, Array<f32, count> &_cos, Array<f32, count> &_sin) { _cos = cos(v); _sin = sin(v); }
 
 union m2 {
 	using Scalar = f32;
@@ -420,161 +419,75 @@ forceinline v4fx8 unpack(v4fx8 v) {
 #endif
 
 
-#define VECTOR_REDUCE_FUNC(func) \
+#define ARRAY_REDUCE_FUNC(func) \
 	template <class Scalar> forceinline auto func(v2<Scalar> a) { return func(a.x, a.y); } \
 	template <class Scalar> forceinline auto func(v3<Scalar> a) { return func(a.x, a.y, a.z); } \
 	template <class Scalar> forceinline auto func(v4<Scalar> a) { return func(a.x, a.y, a.z, a.w); }
 
-#define VECTOR_COMPONENTWISE_FUNC_V(func) \
-	template <class Scalar> forceinline v2<Scalar> func(v2<Scalar> a) { return {func(a.x), func(a.y)}; } \
-	template <class Scalar> forceinline v3<Scalar> func(v3<Scalar> a) { return {func(a.x), func(a.y), func(a.z)}; } \
-	template <class Scalar> forceinline v4<Scalar> func(v4<Scalar> a) { return {func(a.x), func(a.y), func(a.z), func(a.w)}; }
+// SHIM_{#args}
 
-#define VECTOR_COMPONENTWISE_FUNC_VV(func) \
-	template <class Scalar> forceinline v2<Scalar> func(v2<Scalar> a, v2<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y)}; } \
-	template <class Scalar> forceinline v3<Scalar> func(v3<Scalar> a, v3<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y), func(a.z, b.z)}; } \
-	template <class Scalar> forceinline v4<Scalar> func(v4<Scalar> a, v4<Scalar> b) { return {func(a.x, b.x), func(a.y, b.y), func(a.z, b.z), func(a.w, b.w)}; }
+// NOTE: No `requires` clauses here to ensure `name` is callable is intentional.
+//       The reason is that specializing this function would require putting
+//       identical `requires` clause onto the specialization. Annoying.
+#define ARRAY_SHIM_1(name)                                                   \
+	template <class T, umm count>                                            \
+	forceinline constexpr auto name(Array<T, count> a)                       \
+	{                                                                        \
+		Array<std::remove_cvref_t<decltype(name(a.data[0]))>, count> r = {}; \
+		for (umm i = 0; i < count; ++i)                                      \
+			r.data[i] = name(a.data[i]);                                     \
+		return r;                                                            \
+	}
 
-VECTOR_REDUCE_FUNC(min);
-VECTOR_REDUCE_FUNC(max);
-VECTOR_COMPONENTWISE_FUNC_VV(min);
-VECTOR_COMPONENTWISE_FUNC_VV(max);
+#define ARRAY_SHIM_2(name)                                                              \
+	template <class T, umm count>                                                       \
+	forceinline constexpr auto name(Array<T, count> a, Array<T, count> b) {             \
+		Array<std::remove_cvref_t<decltype(name(a.data[0], b.data[0]))>, count> r = {}; \
+		for (umm i = 0; i < count; ++i)                                                 \
+			r.data[i] = name(a.data[i], b.data[i]);                                     \
+		return r;                                                                       \
+	}                                                                                   \
+	template <class T, umm count>                                                       \
+	forceinline constexpr auto name(T a, Array<T, count> b) {                           \
+		return name(broadcast_to_array<count>(a), b);                                   \
+	}                                                                                   \
+	template <class T, umm count>                                                       \
+	forceinline constexpr auto name(Array<T, count> a, T b) {                           \
+		return name(a, broadcast_to_array<count>(b));                                   \
+	}
 
-#define HALF(f32) forceinline f32 half(f32 v) { return v * 0.5f; }
-HALF(f32)
-HALF(v2f)
-HALF(v3f)
-HALF(v4f)
-#undef HALF
-
-#define HALF(s32) forceinline s32 half(s32 v) { return v / 2; }
-HALF(s32)
-HALF(v2s)
-HALF(v3s)
-HALF(v4s)
-#undef HALF
-
-#define HALF(u32) forceinline u32 half(u32 v) { return v >> 1; }
-HALF(u32)
-HALF(v2u)
-HALF(v3u)
-HALF(v4u)
-#undef HALF
-
-VECTOR_COMPONENTWISE_FUNC_V(floor);
-VECTOR_COMPONENTWISE_FUNC_VV(floor);
-VECTOR_COMPONENTWISE_FUNC_V(floor_to_power_of_2);
-VECTOR_COMPONENTWISE_FUNC_V(frac);
-
-#if 1
-// 2.8x faster in a simple benchmark
-// Change `#if 1` above to 0 to use default version.
-forceinline v2s frac(v2s v, v2s s) {
-	__m128i vm = _mm_setr_epi32(v.x, v.y, 0, 0);
-	__m128i sm = _mm_setr_epi32(s.x, s.y, 0, 0);
-	__m128d vlo = _mm_cvtepi32_pd(vm);
-	__m128d slo = _mm_cvtepi32_pd(sm);
-	__m128i result = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(vlo, slo)));
-	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
-	return bit_cast<v4s>(result).xy;
-}
-forceinline v4s frac(v4s v, v4s s) {
-	__m128i vm = _mm_loadu_si128((__m128i *)&v);
-	__m128i sm = _mm_loadu_si128((__m128i *)&s);
-
-	__m128i vm0 = vm;
-	__m128i vm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(vm), _mm_castsi128_ps(vm)));
-
-	__m128i sm0 = sm;
-	__m128i sm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(sm), _mm_castsi128_ps(sm)));
-
-	__m128d v0 = _mm_cvtepi32_pd(vm0);
-	__m128d v1 = _mm_cvtepi32_pd(vm1);
-	__m128d s0 = _mm_cvtepi32_pd(sm0);
-	__m128d s1 = _mm_cvtepi32_pd(sm1);
-
-	__m128i r0 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v0, s0)));
-	__m128i r1 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v1, s1)));
-
-	__m128i r = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(r0), _mm_castsi128_ps(r1)));
-
-	r = _mm_sub_epi32(vm, _mm_mullo_epi32(r, sm));
-	return bit_cast<v4s>(r);
-}
-forceinline v3s frac(v3s v, v3s s) {
-	return frac(V4s(v, 1), V4s(s, 1)).xyz;
-}
+ARRAY_SHIM_1(sqrt);
+#if TL_USE_SIMD
+template <> forceinline constexpr auto sqrt(Array<f32, 4> a) { return bit_cast<Array<f32, 4>>(_mm_sqrt_ps(bit_cast<__m128>(a))); }
+#ifdef __AVX__
+template <> forceinline constexpr auto sqrt(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_sqrt_ps(bit_cast<__m256>(a))); }
+#endif
+#ifdef __AVX512F__
+template <> forceinline constexpr auto sqrt(Array<f32, 16> a) { return bit_cast<Array<f32, 16>>(_mm512_sqrt_ps(bit_cast<__m256>(a))); }
+#endif
 #endif
 
-forceinline v2s frac(v2s v, s32 s) { return frac(v, V2s(s)); }
-forceinline v3s frac(v3s v, s32 s) { return frac(v, V3s(s)); }
-forceinline v4s frac(v4s v, s32 s) { return frac(v, V4s(s)); }
+ARRAY_SHIM_1(absolute);
+ARRAY_SHIM_1(floor);
+ARRAY_SHIM_2(floor);
+ARRAY_SHIM_1(floor_to_int);
+ARRAY_SHIM_1(floor_to_power_of_2);
+ARRAY_SHIM_1(ceil);
+ARRAY_SHIM_2(ceil);
+ARRAY_SHIM_1(ceil_to_int);
+ARRAY_SHIM_1(ceil_to_power_of_2);
+ARRAY_SHIM_1(round);
+ARRAY_SHIM_1(round_to_int);
+ARRAY_SHIM_2(round_to_int);
 
-#define FLOOR(v2s, s32, V2s) 		   \
-	forceinline v2s floor(v2s v, s32 s) { return floor(v, V2s(s)); }
-FLOOR(v2s, s32, V2s)
-FLOOR(v2u, u32, V2u)
-#undef FLOOR
+ARRAY_REDUCE_FUNC(min);
+ARRAY_REDUCE_FUNC(max);
 
-#define FLOOR(v3s, s32, V3s) 		  \
-	forceinline v3s floor(v3s v, s32 s) { return floor(v, V3s(s)); }
-FLOOR(v3s, s32, V3s)
-FLOOR(v3u, u32, V3u)
-#undef FLOOR
-
-#define FLOOR(v4s, s32, V4s) 		  \
-	forceinline v4s floor(v4s v, s32 s) { return floor(v, V4s(s)); }
-FLOOR(v4s, s32, V4s)
-FLOOR(v4u, u32, V4u)
-#undef FLOOR
-
-forceinline v2s floor_to_int(v2f v) {
-	return {
-		floor_to_int(v.x),
-		floor_to_int(v.y),
-	};
-}
-forceinline v3s floor_to_int(v3f v) {
-	return {
-		floor_to_int(v.x),
-		floor_to_int(v.y),
-		floor_to_int(v.z),
-	};
-}
-forceinline v4s floor_to_int(v4f v) {
-	return {
-		floor_to_int(v.x),
-		floor_to_int(v.y),
-		floor_to_int(v.z),
-		floor_to_int(v.w),
-	};
-}
-
-forceinline v2f ceil(v2f v) { return {ceil(v.x), ceil(v.y)}; }
-forceinline v3f ceil(v3f v) { return {ceil(v.x), ceil(v.y), ceil(v.z)}; }
-forceinline v4f ceil(v4f v) { return {ceil(v.x), ceil(v.y), ceil(v.z), ceil(v.w)}; }
-
-#define CEIL(t) forceinline t ceil(t v, t s) { return floor(v + s - 1, s); }
-CEIL(v2s) CEIL(v3s) CEIL(v4s);
-#undef CEIL
-
-#define CEIL(s32, f32) forceinline s32 ceil_to_int(f32 v) { return (s32)ceil(v); }
-CEIL(v2s, v2f)
-CEIL(v3s, v3f)
-CEIL(v4s, v4f)
-#undef CEIL
-
-forceinline v2f round(v2f v) { return {round(v.x), round(v.y)}; }
-forceinline v3f round(v3f v) { return {round(v.x), round(v.y), round(v.z)}; }
-forceinline v4f round(v4f v) { return {round(v.x), round(v.y), round(v.z), round(v.w)}; }
-
-forceinline v2s round_to_int(v2f v) { return {round_to_int(v.x), round_to_int(v.y)}; }
-forceinline v3s round_to_int(v3f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z)}; }
-forceinline v4s round_to_int(v4f v) { return {round_to_int(v.x), round_to_int(v.y), round_to_int(v.z), round_to_int(v.w)}; }
-
-forceinline v2s round_to_int(v2f v, v2s step) { return round_to_int(v / (v2f)step) * step; }
-forceinline v3s round_to_int(v3f v, v3s step) { return round_to_int(v / (v3f)step) * step; }
-forceinline v4s round_to_int(v4f v, v4s step) { return round_to_int(v / (v4f)step) * step; }
+forceinline constexpr f32 half(f32 v) { return v * 0.5f; }
+forceinline constexpr f64 half(f64 v) { return v * 0.5; }
+forceinline constexpr s32 half(s32 v) { return v / 2; }
+forceinline constexpr u32 half(u32 v) { return v >> 1; }
+ARRAY_SHIM_1(half);
 
 template <class Int, class T>
 forceinline constexpr auto lerp_int(Int a, Int b, T t) {
@@ -645,7 +558,7 @@ forceinline constexpr T derivative(Cubic<T> c, T x) {
 
 template <class T>
 Cubic<T> cubic_y0y1d0d1(T y0, T y1, T d0, T d1) {
-    T r1 = y1 - y0 - convert<T>(0);
+    T r1 = y1 - y0 - convert<T>(1);
     T r2 = d1 - d0;
     T a = r2 - convert<T>(2) * r1;
     T b = r1 - a;
@@ -653,10 +566,6 @@ Cubic<T> cubic_y0y1d0d1(T y0, T y1, T d0, T d1) {
     T d = y0;
 	return {a,b,c,d};
 }
-
-template <class Scalar> forceinline constexpr v2<Scalar> absolute(v2<Scalar> v) { return {absolute(v.x), absolute(v.y)}; }
-template <class Scalar> forceinline constexpr v3<Scalar> absolute(v3<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z)}; }
-template <class Scalar> forceinline constexpr v4<Scalar> absolute(v4<Scalar> v) { return {absolute(v.x), absolute(v.y), absolute(v.z), absolute(v.w)}; }
 
 template <class T>
 forceinline constexpr auto approximately(T a, T b, T epsilon) {
@@ -670,43 +579,77 @@ forceinline constexpr auto relatively_equal(T a, T b, T relative_epsilon) {
 
 forceinline f32 set_sign(f32 dst, f32 src) { return copysignf(dst, src); }
 forceinline f64 set_sign(f64 dst, f64 src) { return copysign(dst, src); }
+ARRAY_SHIM_2(set_sign);
 
 forceinline constexpr s8 sign(s8  v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline constexpr s8 sign(s16 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline constexpr s8 sign(s32 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
 forceinline constexpr s8 sign(s64 v) { return ((v > 0) ? 1 : ((v < 0) ? -1 : 0)); }
-
 forceinline f32 sign(f32 v) { return set_sign(1.0f, v); }
-
-template <class T> forceinline constexpr v2<T> sign(v2<T> v) { return {sign(v.x), sign(v.y)}; }
-template <class T> forceinline constexpr v3<T> sign(v3<T> v) { return {sign(v.x), sign(v.y), sign(v.z)}; }
-template <class T> forceinline constexpr v4<T> sign(v4<T> v) { return {sign(v.x), sign(v.y), sign(v.z), sign(v.w)}; }
+forceinline f64 sign(f64 v) { return set_sign(1.0 , v); }
+ARRAY_SHIM_1(sign);
 
 forceinline f32 trunc(f32 v) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
-forceinline v2f trunc(v2f v) { return {trunc(v.x), trunc(v.y)}; }
-forceinline v3f trunc(v3f v) { return {trunc(v.x), trunc(v.y), trunc(v.z)}; }
-forceinline v4f trunc(v4f v) { return {trunc(v.x), trunc(v.y), trunc(v.z), trunc(v.w)}; }
-
 forceinline f64 trunc(f64 v) { return _mm_cvtsd_f64(_mm_round_pd(_mm_set_sd(v), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC)); };
+ARRAY_SHIM_1(trunc);
 
-#define MOD(f32) \
-forceinline f32 modulo(f32 a, f32 b) { return set_sign(a - trunc(a / b) * b, a); } \
-forceinline f32 frac(f32 a, f32 b) { return frac(a / b) * b; }
-MOD(f32)
-MOD(f64)
-#undef MOD
+#define X(f32) \
+	forceinline f32 modulo(f32 a, f32 b) { return set_sign(a - trunc(a / b) * b, a); }
+X(f32)
+X(f64)
+#undef X
+ARRAY_SHIM_2(modulo);
 
-forceinline v2f modulo(v2f a, v2f b) { return {modulo(a.x, b.x), modulo(a.y, b.y)}; }
-forceinline v3f modulo(v3f a, v3f b) { return {modulo(a.x, b.x), modulo(a.y, b.y), modulo(a.z, b.z)}; }
-forceinline v4f modulo(v4f a, v4f b) { return {modulo(a.x, b.x), modulo(a.y, b.y), modulo(a.z, b.z), modulo(a.w, b.w)}; }
+#define X(f32) \
+	forceinline f32 frac(f32 a, f32 b) { return frac(a / b) * b; }
+X(f32)
+X(f64)
+#undef X
+ARRAY_SHIM_1(frac);
+ARRAY_SHIM_2(frac);
 
-forceinline v2f frac(v2f a, v2f b) { return {frac(a.x, b.x), frac(a.y, b.y)}; }
-forceinline v3f frac(v3f a, v3f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z)}; }
-forceinline v4f frac(v4f a, v4f b) { return {frac(a.x, b.x), frac(a.y, b.y), frac(a.z, b.z), frac(a.w, b.w)}; }
+#if 1
+// 2.8x faster in a simple benchmark
+// Change `#if 1` above to 0 to use default version.
+template <>
+forceinline v2s frac(v2s v, v2s s) {
+	__m128i vm = _mm_setr_epi32(v.x, v.y, 0, 0);
+	__m128i sm = _mm_setr_epi32(s.x, s.y, 0, 0);
+	__m128d vlo = _mm_cvtepi32_pd(vm);
+	__m128d slo = _mm_cvtepi32_pd(sm);
+	__m128i result = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(vlo, slo)));
+	result = _mm_sub_epi32(vm, _mm_mullo_epi32(result, sm));
+	return bit_cast<v4s>(result).xy;
+}
+template <>
+forceinline v4s frac(v4s v, v4s s) {
+	__m128i vm = _mm_loadu_si128((__m128i *)&v);
+	__m128i sm = _mm_loadu_si128((__m128i *)&s);
 
-forceinline constexpr v2f sqrt(v2f v) { return {sqrt(v.x), sqrt(v.y)}; }
-forceinline constexpr v3f sqrt(v3f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z)}; }
-forceinline constexpr v4f sqrt(v4f v) { return {sqrt(v.x), sqrt(v.y), sqrt(v.z), sqrt(v.w)}; }
+	__m128i vm0 = vm;
+	__m128i vm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(vm), _mm_castsi128_ps(vm)));
+
+	__m128i sm0 = sm;
+	__m128i sm1 = _mm_castps_si128(_mm_movehl_ps(_mm_castsi128_ps(sm), _mm_castsi128_ps(sm)));
+
+	__m128d v0 = _mm_cvtepi32_pd(vm0);
+	__m128d v1 = _mm_cvtepi32_pd(vm1);
+	__m128d s0 = _mm_cvtepi32_pd(sm0);
+	__m128d s1 = _mm_cvtepi32_pd(sm1);
+
+	__m128i r0 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v0, s0)));
+	__m128i r1 = _mm_cvttpd_epi32(_mm_floor_pd(_mm_div_pd(v1, s1)));
+
+	__m128i r = _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(r0), _mm_castsi128_ps(r1)));
+
+	r = _mm_sub_epi32(vm, _mm_mullo_epi32(r, sm));
+	return bit_cast<v4s>(r);
+}
+template <>
+forceinline v3s frac(v3s v, v3s s) {
+	return frac(V4s(v, 1), V4s(s, 1)).xyz;
+}
+#endif
 
 // https://suraj.sh/fast-square-root-approximation
 forceinline constexpr f32 fast_sqrt(f32 n) {
@@ -717,29 +660,27 @@ forceinline constexpr f32 fast_sqrt(f32 n) {
 }
 
 forceinline constexpr f32 reciprocal(f32 v) { return std::is_constant_evaluated() ? (1.0f / v) : _mm_cvtss_f32(_mm_rcp_ss(_mm_set_ss(v))); }
-forceinline constexpr v2f reciprocal(v2f v) { return {reciprocal(v.x), reciprocal(v.y)}; }
-forceinline constexpr v3f reciprocal(v3f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z)}; }
-forceinline constexpr v4f reciprocal(v4f v) { return {reciprocal(v.x), reciprocal(v.y), reciprocal(v.z), reciprocal(v.w)}; }
+ARRAY_SHIM_1(reciprocal);
+#if TL_USE_SIMD
+template <> forceinline constexpr auto reciprocal(Array<f32, 4> a) { return bit_cast<Array<f32, 4>>(_mm_rcp_ps(bit_cast<__m128>(a))); }
+#ifdef __AVX__
+template <> forceinline constexpr auto reciprocal(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_rcp_ps(bit_cast<__m256>(a))); }
+#endif
+#ifdef __AVX512F__
+template <> forceinline constexpr auto reciprocal(Array<f32, 16> a) { return bit_cast<Array<f32, 16>>(_mm512_rcp14_ps(bit_cast<__m512>(a))); }
+#endif
+#endif
 
 forceinline f32 sin(f32 v) { return ::sinf(v); }
-forceinline v2f sin(v2f v) { return {sin(v.x), sin(v.y)}; }
-forceinline v3f sin(v3f v) { return {sin(v.x), sin(v.y), sin(v.z)}; }
-forceinline v4f sin(v4f v) { return {sin(v.x), sin(v.y), sin(v.z), sin(v.w)}; }
+ARRAY_SHIM_1(sin);
 
 forceinline f32 cos(f32 v) { return ::cosf(v); }
-forceinline v2f cos(v2f v) { return {cos(v.x), cos(v.y)}; }
-forceinline v3f cos(v3f v) { return {cos(v.x), cos(v.y), cos(v.z)}; }
-forceinline v4f cos(v4f v) { return {cos(v.x), cos(v.y), cos(v.z), cos(v.w)}; }
+ARRAY_SHIM_1(cos);
 
 forceinline f32 tan(f32 v) { return ::tanf(v); }
-forceinline v2f tan(v2f v) { return {tan(v.x), tan(v.y)}; }
-forceinline v3f tan(v3f v) { return {tan(v.x), tan(v.y), tan(v.z)}; }
-forceinline v4f tan(v4f v) { return {tan(v.x), tan(v.y), tan(v.z), tan(v.w)}; }
+ARRAY_SHIM_1(tan);
 
 forceinline void cos_sin(f32 v, f32 &_cos, f32 &_sin) { _cos = cos(v); _sin = sin(v); }
-forceinline void cos_sin(v2f v, v2f &_cos, v2f &_sin) { _cos = cos(v); _sin = sin(v); }
-forceinline void cos_sin(v3f v, v3f &_cos, v3f &_sin) { _cos = cos(v); _sin = sin(v); }
-forceinline void cos_sin(v4f v, v4f &_cos, v4f &_sin) { _cos = cos(v); _sin = sin(v); }
 
 forceinline void cos_sin(f32 v, v2f &result) { result.x = cos(v); result.y = sin(v); }
 
@@ -848,10 +789,6 @@ forceinline constexpr f32 angular_size(f32 distance, f32 radius) {
 
 forceinline constexpr f32 dot(f32 a, f32 b) { return a * b; }
 
-template <class T> forceinline constexpr T dot(v2<T> a, v2<T> b) { return a *= b, a.x + a.y; }
-template <class T> forceinline constexpr T dot(v3<T> a, v3<T> b) { return a *= b, a.x + a.y + a.z; }
-template <class T> forceinline constexpr T dot(v4<T> a, v4<T> b) { return a *= b, a.x + a.y + a.z + a.w; }
-
 template <class T>
 forceinline auto reflect(T v, T n) {
 	return v - dot(v, n) * n * 2;
@@ -867,20 +804,30 @@ forceinline constexpr v3f cross(v3f a, v3f b) {
 	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
 }
 
-template <class T>
-forceinline auto sum(v2<T> v) { return v.x + v.y; }
-
-template <class T>
-forceinline auto sum(v3<T> v) { return v.x + v.y + v.z; }
-
-template <class T>
-forceinline auto sum(v4<T> v) { return v.x + v.y + v.z + v.w; }
+template <class T, umm count>
+forceinline auto sum(Array<T, count> v) {
+	T r = {};
+	for (umm i = 0; i < count; ++i) r += v.data[i];
+	return r;
+}
 
 template <class T>
 forceinline constexpr T rsqrt(T v) { return 1.0f / sqrt(v); }
 
 template <>
 forceinline f32 rsqrt(f32 v) { return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(v))); }
+
+ARRAY_SHIM_1(rsqrt);
+#if TL_USE_SIMD
+template <> forceinline constexpr auto rsqrt(Array<f32, 4> a) { return bit_cast<Array<f32, 4>>(_mm_rsqrt_ps(bit_cast<__m128>(a))); }
+#ifdef __AVX__
+template <> forceinline constexpr auto rsqrt(Array<f32, 8> a) { return bit_cast<Array<f32, 8>>(_mm256_rsqrt_ps(bit_cast<__m256>(a))); }
+#endif
+#ifdef __AVX512F__
+template <> forceinline constexpr auto rsqrt(Array<f32, 16> a) { return bit_cast<Array<f32, 16>>(_mm512_rsqrt14_ps(bit_cast<__m512>(a))); }
+#endif
+#endif
+
 
 template <class T>
 forceinline constexpr auto length_squared(T a) {
@@ -896,7 +843,7 @@ forceinline constexpr auto normalize_unchecked(T a) {
 }
 template <class T>
 forceinline constexpr void normalize_unchecked(T *a) {
-	*a = normalize(*a);
+	*a = normalize_unchecked(*a);
 }
 
 template <class T>
@@ -932,7 +879,7 @@ template <class T>
 forceinline constexpr auto manhattan(T a, T b) {
 	return sum(absolute(a - b));
 }
-forceinline s32 maxDistance(v3s a, v3s b) {
+forceinline s32 max_distance(v3s a, v3s b) {
 	a = absolute(a - b);
 	return max(max(a.x, a.y), a.z);
 }
@@ -2768,3 +2715,18 @@ constexpr tl::u64 get_hash(tl::aabb<T> const &x) {
 		get_hash(x.max) * 6521908912666391129ull;
 }
 #endif
+
+/*
+d/dx f(x)+g(x) = f'(x) + g'(x)
+
+d/dx f(x)*g(x) = f'(x)*g(x) + f(x)*g'(x)
+
+d/dx f(x)/g(x) = (f'(x)*g(x) - f(x)*g'(x)) / pow2(g(x))
+
+d/dx f(g(x)) = f'(g(x)) * g'(x)
+
+d/dx pow(f(x), g(x)) = f(x) <= 0 ? 0 : pow(f(x), g(x) - 1) * (f(x)*log(f(x))*g'(x) + g(x)*f'(x))
+
+d/dx log(f(x), g(x)) = ((log(f(x))*g'(x))/g(x) - (f'(x)*log(g(x)))/f(x))/(pow2(log(f(x))))
+
+*/
