@@ -791,6 +791,11 @@ inline void append(StringBuilder &b, Span<T, Size> span) {
 	return append(b, format_span(span, default_span_format));
 }
 
+template <class T, umm count>
+inline void append(StringBuilder &builder, Array<T, count> a) {
+	return append(builder, Span(a.data, count));
+}
+
 template <class T, class Allocator, class Size>
 forceinline void append(StringBuilder &b, List<T, Allocator, Size> list) { return append(b, format_span(list, default_span_format)); }
 

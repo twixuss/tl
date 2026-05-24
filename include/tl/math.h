@@ -2725,6 +2725,8 @@ d/dx f(x)/g(x) = (f'(x)*g(x) - f(x)*g'(x)) / pow2(g(x))
 
 d/dx f(g(x)) = f'(g(x)) * g'(x)
 
+d/dx pow(f(x), n) = n * pow(f(x), n - 1) * f'(x)
+
 d/dx pow(f(x), g(x)) = f(x) <= 0 ? 0 : pow(f(x), g(x) - 1) * (f(x)*log(f(x))*g'(x) + g(x)*f'(x))
 
 d/dx log(f(x), g(x)) = ((log(f(x))*g'(x))/g(x) - (f'(x)*log(g(x)))/f(x))/(pow2(log(f(x))))
