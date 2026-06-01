@@ -97,8 +97,8 @@ inline Optional<Buffer> read_entire_file(File file, ReadEntireFileParams params 
 	return result;
 }
 
-template <AChar Char, class Size>
-inline Optional<Buffer> read_entire_file(Span<Char, Size> path, ReadEntireFileParams params = {} TL_LP) {
+template <AChar Char>
+inline Optional<Buffer> read_entire_file(Span<Char> path, ReadEntireFileParams params = {} TL_LP) {
 	File file = open_file(path, {.read = true, .silent = params.silent});
 	if (!is_valid(file)) return {};
 	defer { close(file); };
@@ -300,18 +300,18 @@ inline ParsedPath parse_path(Span<utf8> path) {
 				}
 				if (result.name.count == 0) {
 					result.name = result.extension;
-					result.extension = Span(result.extension.end(), 0);
+					result.extension = Span(result.extension.end(), 0zu);
 					result.name.data --;
 					result.name.count ++;
 				}
 			} else {
 				result.directory = {path.data, last_slash};
 				result.name      = {last_slash + 1, path.end()};
-				result.extension = Span(path.end(), 0);
+				result.extension = Span(path.end(), 0zu);
 			}
 
 		} else {
-			result.directory = Span(path.data, 0);
+			result.directory = Span(path.data, 0zu);
 			result.name      = {path.data, last_dot};
 			result.extension = {last_dot + 1, path.end()};
 			// Include the dot into the name because the extension is empty
@@ -320,7 +320,7 @@ inline ParsedPath parse_path(Span<utf8> path) {
 			}
 			if (result.name.count == 0) {
 				result.name = result.extension;
-				result.extension = Span(result.extension.end(), 0);
+				result.extension = Span(result.extension.end(), 0zu);
 				result.name.data --;
 				result.name.count ++;
 			}
@@ -329,11 +329,11 @@ inline ParsedPath parse_path(Span<utf8> path) {
 		if (last_slash) {
 			result.directory = {path.data, last_slash};
 			result.name      = {last_slash + 1, path.end()};
-			result.extension = Span(path.end(), 0);
+			result.extension = Span(path.end(), 0zu);
 		} else {
-			result.directory = Span(path.data, 0);
+			result.directory = Span(path.data, 0zu);
 			result.name      = path;
-			result.extension = Span(path.end(), 0);
+			result.extension = Span(path.end(), 0zu);
 		}
 	}
 
@@ -416,8 +416,7 @@ inline List<utf8> normalize_path(Span<utf8> path, utf8 separator = u8'/') {
 }
 
 
-template <class Size>
-inline bool is_absolute_path(Span<utf8, Size> path) {
+inline bool is_absolute_path(Span<utf8> path) {
 	if (path.count < 2)
 		return false;
 	return path.data[1] == ':';
@@ -542,6 +541,8 @@ inline bool for_each_file_item(Span<utf8> directory, ForEachFileOptions options,
 				}
 				break;
 			}
+			default:
+				break;
 		}
 	}
 	return false;

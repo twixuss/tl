@@ -5,13 +5,11 @@
 namespace tl {
 
 // Collection of unique elements, stored contiguously in order of addition.
-template <class T, class Allocator = Allocator, class Size_ = umm>
-struct LinearSet : List<T, Allocator, Size_> {
+template <class T, class Allocator = Allocator>
+struct LinearSet : List<T, Allocator> {
 	using ElementType = T;
-	using Size = Size_;
-	using Span = Span<T, Size>;
-	using List = List<T, Allocator, Size>;
-
+	using Span = Span<T>;
+	using List = List<T, Allocator>;
 	using Span::data;
 	using Span::count;
 	using Span::begin;
@@ -29,8 +27,7 @@ struct LinearSet : List<T, Allocator, Size_> {
 		}
 		return List::add(value);
 	}
-	template <class ThatSize>
-	void add(tl::Span<T, ThatSize> span TL_LP) {
+	void add(tl::Span<T> span TL_LP) {
 		for (auto x : span)
 			add(x);
 	}
@@ -119,9 +116,9 @@ void erase(LinearSet<T> &set, T value) {
 	}
 }
 
-template <class T, class Size>
-LinearSet<T, Size> copy(LinearSet<T, Size> that TL_LP) {
-	LinearSet<T, Size> result;
+template <class T>
+LinearSet<T> copy(LinearSet<T> that TL_LP) {
+	LinearSet<T> result;
 	result.count = that.count;
 	result.capacity = result.count;
 	result.data = result.allocator.template allocate<T>(result.count TL_LA);

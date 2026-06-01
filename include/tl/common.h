@@ -519,8 +519,8 @@ concept ACompare1 = requires (Compare compare, T t) {
 	{ compare(t) } -> std::signed_integral;
 };
 
-forceinline bool all(bool v) { return v; }
-forceinline bool any(bool v) { return v; }
+forceinline constexpr bool all(bool v) { return v; }
+forceinline constexpr bool any(bool v) { return v; }
 
 namespace ce {
 
@@ -1473,7 +1473,7 @@ auto stddev(Collection const &collection) {
 }
 
 template <class Predicate = IdentityValue>
-bool all(Collection auto collection, Predicate predicate = {}) {
+constexpr bool all(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
 		if (!predicate(*it))
 			return false;
@@ -1482,7 +1482,7 @@ bool all(Collection auto collection, Predicate predicate = {}) {
 }
 
 template <class Predicate = IdentityValue>
-bool any(Collection auto collection, Predicate predicate = {}) {
+constexpr bool any(Collection auto collection, Predicate predicate = {}) {
 	foreach (it, collection) {
 		if (predicate(*it))
 			return true;
@@ -2022,11 +2022,9 @@ constexpr auto to_iter(T (&arr)[count], ReverseIterOption options = ReverseIterO
 	return span_iter(arr, arr + count, options);
 }
 
-#pragma pack(push, 1)
-template <class T, class Size_ = umm>
+template <class T>
 struct Span {
 	using Element = T;
-	using Size = Size_;
 	using ReverseIterator = ReverseIterator<T *>;
 	using Iter = SpanIter<T>;
 	using IterOptions = ReverseIterOption;
@@ -2034,14 +2032,14 @@ struct Span {
 	constexpr Span(std::initializer_list<Element> list) : data((Element *)list.begin()), count(list.size()) {}
 	constexpr Span() = default;
 	// constexpr Span(Element &value) : data(std::addressof(value)), count(1) {}
-	template <Size count>
+	template <umm count>
 	constexpr Span(Element (&array)[count]) : data(array), count(count) {}
 	constexpr Span(Element *begin, Element *end) : data(begin), count(end - begin) {
 		assert_equal(count, (umm)(end - begin));
 	}
 	constexpr Span(Element const *begin, Element const *end) : data((Element *)begin), count(end - begin) {}
-	constexpr Span(Element *begin, Size count) : data(begin), count(count) {}
-	constexpr Span(Element const *begin, Size count) : data((Element *)begin), count(count) {}
+	constexpr Span(Element *begin, umm count) : data(begin), count(count) {}
+	constexpr Span(Element const *begin, umm count) : data((Element *)begin), count(count) {}
 	constexpr Element *begin() const { return data; }
 	constexpr Element *end() const { return data + count; }
 
@@ -2066,11 +2064,11 @@ struct Span {
 		bounds_check(assert(count));
 		return data[count - 1];
 	}
-	constexpr Element &operator[](Size i) const {
+	constexpr Element &operator[](umm i) const {
 		bounds_check(assert_less(i, count));
 		return data[i];
 	}
-	constexpr Element &at(Size i) const {
+	constexpr Element &at(umm i) const {
 		bounds_check(assert_less(i, count));
 		return data[i];
 	}
@@ -2084,8 +2082,8 @@ struct Span {
 
 	[[deprecated("use `sample` instead")]]
 	constexpr Element at_interpolated_clamped(f64 i) const {
-		auto a = at(max((Size)0, (Size)floor_to_int(i)));
-		auto b = at(min(count - 1, (Size)ceil_to_int(i)));
+		auto a = at(max((umm)0, (umm)floor_to_int(i)));
+		auto b = at(min(count - 1, (umm)ceil_to_int(i)));
 		return lerp(a, b, frac(i));
 	}
 
@@ -2098,7 +2096,6 @@ struct Span {
 				i *= count;
 			}
 		}
-		using SSize = std::make_signed_t<Size>;
 		switch (params.interpolation) {
 			default:
 			case Interpolation::linear: {
@@ -2106,13 +2103,13 @@ struct Span {
 					default:
 					case Overflow::clamp: {
 						i = clamp<I>(i, 0, (I)(count-1));
-						auto a = at((SSize)floor_to_int(i));
-						auto b = at((SSize)ceil_to_int(i));
+						auto a = at((smm)floor_to_int(i));
+						auto b = at((smm)ceil_to_int(i));
 						return lerp(a, b, frac(i));
 					}
 					case Overflow::wrap: {
-						auto a = at(frac((SSize)floor_to_int(i), (SSize)count));
-						auto b = at(frac((SSize)ceil_to_int(i), (SSize)count));
+						auto a = at(frac((smm)floor_to_int(i), (smm)count));
+						auto b = at(frac((smm)ceil_to_int(i), (smm)count));
 						return lerp(a, b, frac(i));
 					}
 				}
@@ -2122,10 +2119,10 @@ struct Span {
 				switch (params.overflow) {
 					default:
 					case Overflow::clamp: {
-						return at(clamp<SSize>(floor_to_int(i), 0, count - 1));
+						return at(clamp<smm>(floor_to_int(i), 0, count - 1));
 					}
 					case Overflow::wrap: {
-						return at(frac((SSize)floor_to_int(i), (SSize)count));
+						return at(frac((smm)floor_to_int(i), (smm)count));
 					}
 				}
 				break;
@@ -2135,21 +2132,13 @@ struct Span {
 
 	constexpr bool is_empty() const { return count == 0; }
 
-	template <class U, class ThatSize>
-	constexpr explicit operator Span<U, ThatSize>() const {
+	template <class U>
+	constexpr explicit operator Span<U>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		assert_equal((ThatSize)count, count);
-		return {(U *)data, (ThatSize)count};
+		return {(U *)data, count};
 	}
 
-	template <class ThatSize>
-	constexpr operator Span<T, ThatSize>() const {
-		assert_equal((ThatSize)count, count);
-		return {data, (ThatSize)count};
-	}
-
-	template <class ThatSize>
-	constexpr bool operator==(Span<T, ThatSize> that) const requires requires(T t) { { t == t } -> std::convertible_to<bool>; } {
+	constexpr bool operator==(Span<T> that) const requires requires(T t) { { t == t } -> std::convertible_to<bool>; } {
 		if (count != that.count)
 			return false;
 
@@ -2233,7 +2222,7 @@ struct Span {
 			}
 			#endif
 		}
-		for (Size i = 0; i < count; ++i) {
+		for (umm i = 0; i < count; ++i) {
 			if (data[i] != that.data[i])
 				return false;
 		}
@@ -2241,7 +2230,7 @@ struct Span {
 	}
 	constexpr bool operator!=(Span that) const { return !(*this == that); }
 
-	constexpr Span subspan(Size subspan_start, Size subspan_count) const {
+	constexpr Span subspan(umm subspan_start, umm subspan_count) const {
 		return {
 			min(data + subspan_start, end()),
 			min(data + subspan_start + subspan_count, end()),
@@ -2250,10 +2239,10 @@ struct Span {
 	constexpr Span skip(smm amount) const {
 		if (amount >= 0) {
 			amount = clamp<smm>(amount, 0, count);
-			return {data + amount, (Size)((smm)count - amount)};
+			return {data + amount, (umm)((smm)count - amount)};
 		} else {
 			amount = clamp<smm>(amount, -(smm)count, 0);
-			return {data, (Size)(count + amount)};
+			return {data, (umm)(count + amount)};
 		}
 	}
 	constexpr Span take(smm amount) const {
@@ -2277,14 +2266,14 @@ struct Span {
 		count = new_end - data;
 	}
 
-	template <class U, class ThatSize=Size>
-	constexpr Span<U, ThatSize> unsafe_as() const {
+	template <class U>
+	constexpr Span<U> unsafe_as() const {
 		if constexpr (sizeof(T) > sizeof(U))
 			static_assert(sizeof(T) % sizeof(U) == 0);
 		else
 			static_assert(sizeof(U) % sizeof(T) == 0);
 
-		return {(U *)data, (ThatSize)(count * sizeof(T) / sizeof(U))};
+		return {(U *)data, count * sizeof(T) / sizeof(U)};
 	}
 
 	constexpr explicit operator bool() const { return count; }
@@ -2311,15 +2300,14 @@ struct Span {
 	}
 
 	Element *data = 0;
-	Size count = 0;
+	umm count = 0;
 };
-#pragma pack(pop)
 
 template <class T>
 inline constexpr bool is_span = false;
 
-template <class T, class Size>
-inline constexpr bool is_span<Span<T, Size>> = true;
+template <class T>
+inline constexpr bool is_span<Span<T>> = true;
 
 template <class T>
 concept ASpan = is_span<T>;
@@ -2362,8 +2350,6 @@ forceinline constexpr Span<utf16> operator""ts(utf16 const *string, umm count) {
 forceinline constexpr Span<utf32> operator""ts(utf32 const *string, umm count) { return Span((utf32 *)string, count + 1); }
 forceinline constexpr Span<u8> operator""b(char const *string, umm count) { return Span((u8 *)string, count); }
 
-forceinline constexpr Span<utf8, u32> operator""s32(utf8  const *string, umm count) { return Span((utf8  *)string, (u32)count); }
-
 template <class T, umm count>
 inline constexpr Span<T> array_as_span(T const (&arr)[count]) { return Span((T *)arr, count); }
 
@@ -2375,25 +2361,23 @@ inline constexpr Span<utf8 > as_span(utf8  const *str) { return Span((utf8  *)st
 inline constexpr Span<utf16> as_span(utf16 const *str) { return Span((utf16 *)str, string_unit_count(str)); }
 inline constexpr Span<utf32> as_span(utf32 const *str) { return Span((utf32 *)str, string_unit_count(str)); }
 
-template <class T, class Size>
-inline constexpr Span<T, Size> as_span(Span<T, Size> span) {
+template <class T>
+inline constexpr Span<T> as_span(Span<T> span) {
 	return span;
 }
 
-template <class T, class Size>
-inline constexpr Span<T, Size> as_span_of(Span<u8, Size> span) {
+template <class T>
+inline constexpr Span<T> as_span_of(Span<u8> span) {
 	return {
 		(T *)span.data,
 		span.count / sizeof(T),
 	};
 }
 
-template <class Size>
-constexpr Span<utf8, Size> as_utf8(Span<ascii, Size> span) {
+constexpr Span<utf8> as_utf8(Span<ascii> span) {
 	return {(utf8 *)span.begin(), span.count};
 }
-template <class Size>
-constexpr Span<utf8, Size> as_utf8(Span<u8, Size> span) {
+constexpr Span<utf8> as_utf8(Span<u8> span) {
 	return {(utf8 *)span.begin(), span.count};
 }
 
@@ -2403,13 +2387,13 @@ constexpr Span<u8> as_bytes(T span_like) {
 	return as_bytes(as_span(span_like));
 }
 
-template <class T, class Size>
-constexpr Span<u8, Size> as_bytes(Span<T, Size> span) {
+template <class T>
+constexpr Span<u8> as_bytes(Span<T> span) {
 	return {(u8 *)span.begin(), span.count * sizeof(T)};
 }
 
-template <class T, class Size>
-constexpr Span<ascii, Size> as_chars(Span<T, Size> span) {
+template <class T>
+constexpr Span<ascii> as_chars(Span<T> span) {
 	return {(ascii *)span.begin(), span.count * sizeof(T)};
 }
 template <class T>
@@ -2427,8 +2411,8 @@ constexpr Span<T> value_as_span(T const &value) {
 	return {&value, 1};
 }
 
-template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
-constexpr smm compare(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {
+template <class T, ACompare<T> Compare = decltype(default_comparer)>
+constexpr smm compare(Span<T> a, Span<T> b, Compare compare = default_comparer) {
 	if (a.count != b.count) {
 		return a.count - b.count;
 	}
@@ -2442,8 +2426,8 @@ constexpr smm compare(Span<T, Size> a, Span<T, Size> b, Compare compare = defaul
 	return 0;
 }
 
-template <class T, class Size, ACompare<T> Compare = decltype(default_comparer)>
-constexpr smm compare_lexical(Span<T, Size> a, Span<T, Size> b, Compare compare = default_comparer) {
+template <class T, ACompare<T> Compare = decltype(default_comparer)>
+constexpr smm compare_lexical(Span<T> a, Span<T> b, Compare compare = default_comparer) {
 	umm min_count = min(a.count, b.count);
 
 	for (umm i = 0; i < min_count; ++i) {
@@ -2460,11 +2444,11 @@ constexpr smm compare_lexical(Span<T, Size> a, Span<T, Size> b, Compare compare 
 
 inline static constexpr auto lexical_comparer = []<class T>(T a, T b) { return compare_lexical(a, b); };
 
-template <class T, class TSize, class U, class USize, APredicate<T, U> Predicate = decltype(predicate_equal)>
-inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Predicate predicate = predicate_equal) {
+template <class T, class U, APredicate<T, U> Predicate = decltype(predicate_equal)>
+inline constexpr bool starts_with(Span<T> str, Span<U> sub_str, Predicate predicate = predicate_equal) {
 	if (sub_str.count > str.count)
 		return false;
-	for (USize i = 0; i < sub_str.count; ++i) {
+	for (umm i = 0; i < sub_str.count; ++i) {
 		if (!predicate(str.data[i], sub_str.data[i])) {
 			return false;
 		}
@@ -2472,12 +2456,12 @@ inline constexpr bool starts_with(Span<T, TSize> str, Span<U, USize> sub_str, Pr
 	return true;
 }
 
-template <class T, class TSize, class U, class USize, APredicate<T, U> Predicate = decltype(predicate_equal)>
-inline constexpr bool ends_with(Span<T, TSize> str, Span<U, USize> sub_str, Predicate predicate = predicate_equal) {
+template <class T, class U, APredicate<T, U> Predicate = decltype(predicate_equal)>
+inline constexpr bool ends_with(Span<T> str, Span<U> sub_str, Predicate predicate = predicate_equal) {
 	if (sub_str.count > str.count)
 		return false;
 	auto base_offset = str.count - sub_str.count;
-	for (USize i = 0; i < sub_str.count; ++i) {
+	for (umm i = 0; i < sub_str.count; ++i) {
 		if (!predicate(str.data[i + base_offset], sub_str.data[i])) {
 			return false;
 		}
@@ -2490,13 +2474,13 @@ constexpr T *find(T (&where)[count], T const &what) {
 	return find(where, where + count, what);
 }
 
-template <class T, class Size>
-constexpr T *find(Span<T, Size> where, T const &what) {
+template <class T>
+constexpr T *find(Span<T> where, T const &what) {
 	return find(where.begin(), where.end(), what);
 }
 
-template <class T, class SizeA, class SizeB>
-constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
+template <class T>
+constexpr T *find(Span<T> where, Span<T> what) {
 	if ((smm)(where.count - what.count + 1) <= 0)
 		return 0;
 
@@ -2509,8 +2493,8 @@ constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what) {
 	return 0;
 }
 
-template <class T, class SizeA, class SizeB>
-constexpr T *find(Span<T, SizeA> where, Span<T, SizeB> what, auto &&compare) {
+template <class T>
+constexpr T *find(Span<T> where, Span<T> what, auto &&compare) {
 	if ((smm)(where.count - what.count + 1) <= 0)
 		return 0;
 
@@ -2541,8 +2525,8 @@ constexpr T *find(Span<T> where, Span<Span<T>> whats) {
 	return 0;
 }
 
-template <class T, class Size>
-constexpr T *find_last(Span<T, Size> span, T const &value) {
+template <class T>
+constexpr T *find_last(Span<T> span, T const &value) {
 	if (span.count == 0)
 		return 0;
 
@@ -2553,9 +2537,9 @@ constexpr T *find_last(Span<T, Size> span, T const &value) {
 	return 0;
 }
 
-template <class T, class SizeA, class SizeB>
-constexpr Span<T, SizeA> find_last(Span<T, SizeA> span, Span<T, SizeB> sub) {
-	Span<T, SizeB> dest = {span.end() - sub.count, sub.count};
+template <class T>
+constexpr Span<T> find_last(Span<T> span, Span<T> sub) {
+	Span<T> dest = {span.end() - sub.count, sub.count};
 	while (dest.data >= span.data) {
 		if (dest == sub)
 			return dest;
@@ -2655,8 +2639,8 @@ constexpr void replace(Span<T> destination, Span<T> source, umm start_index = 0)
 	}
 }
 
-template <class T, class Size>
-void replace_inplace(Span<T, Size> where, T what, T with) {
+template <class T>
+void replace_inplace(Span<T> where, T what, T with) {
 	for (auto &v : where) {
 		v = v == what ? with : v;
 	}
@@ -2678,8 +2662,8 @@ struct ReplaceInplaceOptions {
 };
 
 // Replaces occurrences of `what` in `where` with `with`.
-template <class T, class Size>
-void replace_inplace(Span<T, Size> &where, Span<T> what, Span<T> with, ReplaceInplaceOptions options = {}) {
+template <class T>
+void replace_inplace(Span<T> &where, Span<T> what, Span<T> with, ReplaceInplaceOptions options = {}) {
 	if (options.capacity == 0) {
 		options.capacity = where.count;
 	}
@@ -2770,10 +2754,10 @@ BinarySearchResult<T> binary_search(Span<T> span, U value, Callable<U, T> auto m
 	return binary_search(span, [&](T it) { return compare(value, map(it)); });
 }
 
-template <class T, class Size>
-auto split_by_one(Span<T, Size> what, T by) {
+template <class T>
+auto split_by_one(Span<T> what, T by) {
 	struct Iter : IterBase {
-		Span<T, Size> what = {};
+		Span<T> what = {};
 		T *word_start = 0;
 		T *cursor = 0;
 		T by = {};
@@ -2787,7 +2771,7 @@ auto split_by_one(Span<T, Size> what, T by) {
 				++cursor;
 			++cursor;
 		}
-		Span<T, Size> value() {
+		Span<T> value() {
 			return {word_start, cursor - 1};
 		}
 	};
@@ -2803,9 +2787,9 @@ auto split_by_one(Span<T, Size> what, T by) {
 	return iter;
 }
 
-template <class T, class Size, class Fn>
-void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
-	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+template <class T, class Fn>
+void split_by_one(Span<T> what, T by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T>>(in_fn);
 
 	umm start = 0;
 	umm what_start = 0;
@@ -2825,9 +2809,9 @@ void split_by_one(Span<T, Size> what, T by, Fn &&in_fn) {
 
 // If `what` contains `by`, returns first part before `by`, rest assigned to `what`.
 // If not found, returns `what`, `what` is cleared.
-template <class T, class Size, APredicate<T, T> Predicate = decltype(predicate_equal)>
-Span<T, Size> split_by_one_first(Span<T, Size> *what, T by, Predicate predicate = predicate_equal) {
-	Span<T, Size> result = {};
+template <class T, APredicate<T, T> Predicate = decltype(predicate_equal)>
+Span<T> split_by_one_first(Span<T> *what, T by, Predicate predicate = predicate_equal) {
+	Span<T> result = {};
 	for (umm i = 0; i < what->count; ++i) {
 		if (predicate(what->data[i], by)) {
 			result = {what->data, i};
@@ -2841,9 +2825,9 @@ Span<T, Size> split_by_one_first(Span<T, Size> *what, T by, Predicate predicate 
 	return result;
 }
 
-template <class T, class Size, class Fn>
-void split_by_any(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
-	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+template <class T, class Fn>
+void split_by_any(Span<T> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T>>(in_fn);
 
 	umm start = 0;
 	umm what_start = 0;
@@ -2860,9 +2844,9 @@ void split_by_any(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
 	fn(Span(what.data + start, what.end()));
 }
 
-template <class T, class Size, class Fn>
-void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
-	auto fn = wrap_foreach_fn<Span<T, Size>>(in_fn);
+template <class T, class Fn>
+void split_by_seq(Span<T> what, Span<T> by, Fn &&in_fn) {
+	auto fn = wrap_foreach_fn<Span<T>>(in_fn);
 
 	umm start = 0;
 	umm what_start = 0;
@@ -2879,17 +2863,17 @@ void split_by_seq(Span<T, Size> what, Span<T> by, Fn &&in_fn) {
 	fn(Span(what.data + start, what.end()));
 }
 
-template <class T, class Size, class Selector, class GroupProcessor>
-void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
+template <class T, class Selector, class GroupProcessor>
+void group_by(Span<T> span, Selector selector, GroupProcessor processor) {
 	if (!span.count) {
 		return;
 	}
 
 	auto first = selector(span.data[0]);
-	Size first_index = 0;
+	umm first_index = 0;
 	umm group_index = 0;
 
-	auto process_group = [&](Span<T, Size> group) {
+	auto process_group = [&](Span<T> group) {
 		if constexpr (requires { processor(group); }) {
 			processor(group);
 		} else if constexpr (requires { processor(group_index, group); }) {
@@ -2899,7 +2883,7 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 		}
 	};
 
-	for (Size i = 1; i < span.count; ++i) {
+	for (umm i = 1; i < span.count; ++i) {
 		auto next = selector(span.data[i]);
 		if (first != next) {
 			process_group(span.subspan(first_index, i - first_index));
@@ -2911,8 +2895,8 @@ void group_by(Span<T, Size> span, Selector selector, GroupProcessor processor) {
 	process_group(span.subspan(first_index, span.count - first_index));
 }
 
-template <class T, class Size>
-Span<T, Size> trim_left(Span<T, Size> span, auto &&predicate) {
+template <class T>
+Span<T> trim_left(Span<T> span, auto &&predicate) {
 	while (span.count && predicate(span.data[0])) {
 		span.data++;
 		span.count--;
@@ -2920,31 +2904,31 @@ Span<T, Size> trim_left(Span<T, Size> span, auto &&predicate) {
 	return span;
 }
 
-template <class T, class Size>
-Span<T, Size> trim_right(Span<T, Size> span, auto &&predicate) {
+template <class T>
+Span<T> trim_right(Span<T> span, auto &&predicate) {
 	while (span.count && predicate(span.data[span.count - 1])) {
 		span.count--;
 	}
 	return span;
 }
 
-template <class T, class Size>
-Span<T, Size> trim(Span<T, Size> span, auto &&predicate) {
+template <class T>
+Span<T> trim(Span<T> span, auto &&predicate) {
 	return trim_right(trim_left(span, predicate), predicate);
 }
 
-template <class T, class Size>
-Span<T, Size> trim_left(Span<T, Size> span, T &&value) {
+template <class T>
+Span<T> trim_left(Span<T> span, T &&value) {
 	return trim_left(span, [&](T const &it) { return it == value; });
 }
 
-template <class T, class Size>
-Span<T, Size> trim_right(Span<T, Size> span, T &&value) {
+template <class T>
+Span<T> trim_right(Span<T> span, T &&value) {
 	return trim_right(span, [&](T const &it) { return it == value; });
 }
 
-template <class T, class Size>
-Span<T, Size> trim(Span<T, Size> span, T &&value) {
+template <class T>
+Span<T> trim(Span<T> span, T &&value) {
 	return trim(span, [&](T const &it) { return it == value; });
 }
 
@@ -2958,8 +2942,8 @@ constexpr T dot(Span<T> a, Span<T> b) {
 	return result;
 }
 
-template <class T, class Size>
-Span<T, Size> erase_all_compacting(Span<T, Size> span, auto &&predicate)
+template <class T>
+Span<T> erase_all_compacting(Span<T> span, auto &&predicate)
 	requires requires(T v) { predicate(v); }
 {
 	auto end = span.data + span.count;
@@ -2971,7 +2955,7 @@ Span<T, Size> erase_all_compacting(Span<T, Size> span, auto &&predicate)
 			*dst++ = (T &&)*it;
 		}
 	}
-	return {span.data, (Size)(dst - span.data)};
+	return {span.data, (umm)(dst - span.data)};
 }
 
 #define passthrough(function) ([&]<class ...Args>(Args &&...args) -> decltype(auto) { return function(std::forward<Args>(args)...); })

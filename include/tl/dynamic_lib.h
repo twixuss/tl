@@ -45,7 +45,7 @@ Dll load_dll(Span<utf8> path8) {
 }
 void *get_symbol(Dll dll, Span<utf8> name) {
 	scoped(temporary_allocator_and_checkpoint);
-	return GetProcAddress((HMODULE)dll.handle, (char *)null_terminate(name).data);
+	return (void *)GetProcAddress((HMODULE)dll.handle, (char *)null_terminate(name).data);
 }
 void free(Dll &dll) {
 	if (dll.should_unload) {

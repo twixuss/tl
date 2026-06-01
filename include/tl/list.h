@@ -16,13 +16,11 @@
 
 namespace tl {
 
-#pragma pack(push, 1)
-template <class T, class Allocator_ = Allocator, class Size_ = umm>
-struct List : Span<T, Size_> {
+template <class T, class Allocator_ = Allocator>
+struct List : Span<T> {
 	using Element = T;
 	using Allocator = Allocator_;
-	using Size = Size_;
-	using Span = Span<T, Size_>;
+	using Span = Span<T>;
 
 	using Span::data;
 	using Span::count;
@@ -31,7 +29,7 @@ struct List : Span<T, Size_> {
 	using Span::front;
 	using Span::back;
 
-	Size capacity = 0;
+	umm capacity = 0;
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
 	void set(T value TL_LP) {
@@ -53,18 +51,17 @@ struct List : Span<T, Size_> {
 		memcpy(data + count, &value, sizeof(T));
 		return data[count++];
 	}
-	template <class ThatSize>
-	Span add(tl::Span<T, ThatSize> span TL_LP) {
+	Span add(Span span TL_LP) {
 		reserve_exponential(count + span.count TL_LA);
 		memcpy(data + count, span.data, span.count * sizeof(T));
 		count += span.count;
-		return {data + count - span.count, (Size)span.count};
+		return {data + count - span.count, (umm)span.count};
 	}
 	Span add(std::initializer_list<T> list TL_LP) {
 		reserve_exponential(count + list.size() TL_LA);
 		memcpy(data + count, list.begin(), list.size() * sizeof(T));
 		count += list.size();
-		return {data + count - list.size(), (Size)list.size()};
+		return {data + count - list.size(), (umm)list.size()};
 	}
 	// I don't want to have `add` overload that takes `Repeat<T>` because
 	// C++ can't select the wanted overload when using initializer list.
@@ -88,7 +85,7 @@ struct List : Span<T, Size_> {
 		return data[0];
 	}
 	
-	void reallocate(Size desired_capacity TL_LP) {
+	void reallocate(umm desired_capacity TL_LP) {
 		T *new_data;
 		if (data) {
 			new_data = allocator.template reallocate_uninitialized<T>(data, capacity, desired_capacity TL_LA);
@@ -101,7 +98,7 @@ struct List : Span<T, Size_> {
 
 	// Reserves no more than `desired_capacity` elements.
 	// Returns true if `data` was relocated.
-	bool reserve(Size desired_capacity TL_LP) {
+	bool reserve(umm desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) {
 			return false;
 		}
@@ -111,28 +108,28 @@ struct List : Span<T, Size_> {
 	}
 
 	// Returns true if `data` was relocated
-	bool reserve_exponential(Size desired_capacity TL_LP) {
+	bool reserve_exponential(umm desired_capacity TL_LP) {
 		if (capacity >= desired_capacity) {
 			return false;
 		}
 
-		Size new_capacity = ceil_to_power_of_2(max((Size)TL_INITIAL_LIST_CAPACITY, desired_capacity));
+		umm new_capacity = ceil_to_power_of_2(max((umm)TL_INITIAL_LIST_CAPACITY, desired_capacity));
 
 		reallocate(new_capacity TL_LA);
 
 		return true;
 	}
-	void resize(Size new_count, T new_value = {} TL_LP) {
+	void resize(umm new_count, T new_value = {} TL_LP) {
 		reserve(new_count TL_LA);
 
-		for (Size i = count; i < new_count; ++i) {
+		for (umm i = count; i < new_count; ++i) {
 			new (data + i) T(new_value);
 		}
 
 		count = new_count;
 	}
 
-	void reserve_after_end(Size desired_space) {
+	void reserve_after_end(umm desired_space) {
 		reserve(count + desired_space);
 	}
 
@@ -160,15 +157,13 @@ struct List : Span<T, Size_> {
 	}
 
 
-	template <class U, class ThatSize>
-	explicit operator List<U, Allocator, ThatSize>() const {
-		assert_equal((ThatSize)count, count);
-		assert_equal((ThatSize)capacity, capacity);
-		List<U, Allocator, ThatSize> result;
+	template <class U>
+	explicit operator List<U, Allocator>() const {
+		List<U, Allocator> result;
 		result.allocator = allocator;
 		result.data = (U *)data;
 		if constexpr (sizeof(T) == sizeof(U)) {
-			result.count      = count;
+			result.count     = count;
 			result.capacity  = capacity;
 		} else {
 			if constexpr (sizeof(T) > sizeof(U)) {
@@ -176,25 +171,13 @@ struct List : Span<T, Size_> {
 			} else {
 				static_assert(sizeof(U) % sizeof(T) == 0);
 			}
-			result.count      = count     * sizeof(T) / sizeof(U);
+			result.count     = count    * sizeof(T) / sizeof(U);
 			result.capacity  = capacity * sizeof(T) / sizeof(U);
 		}
 		return result;
 	}
 
-	template <class ThatSize>
-	operator List<T, Allocator, ThatSize>() const {
-		assert_equal((ThatSize)count, count);
-		assert_equal((ThatSize)capacity, capacity);
-		List<T, Allocator, ThatSize> result;
-		result.data = data;
-		result.count = (ThatSize)count;
-		result.capacity = (ThatSize)capacity;
-		result.allocator = allocator;
-		return result;
-	}
-
-	T &insert_at(T value, Size where TL_LP) {
+	T &insert_at(T value, umm where TL_LP) {
 		bounds_check(assert(where <= count));
 
 		reserve_exponential(count + 1 TL_LA);
@@ -205,7 +188,7 @@ struct List : Span<T, Size_> {
 		++count;
 		return data[where];
 	}
-	Span insert_at(Span span, Size where TL_LP) {
+	Span insert_at(Span span, umm where TL_LP) {
 		bounds_check(assert(where <= count));
 
 		reserve_exponential(count + span.count TL_LA);
@@ -219,11 +202,11 @@ struct List : Span<T, Size_> {
 	T &insert(T value, T *where TL_LP) { return insert_at(value, where - data TL_LA); }
 	Span insert(Span span, T *where TL_LP) { return insert_at(span, where - data TL_LA); }
 
-	Span insert_at(Repeat<T> repeat, Size where) {
+	Span insert_at(Repeat<T> repeat, umm where) {
 		reserve(count + repeat.count);
 		auto to_move_count = count - where;
 		memmove(data + where + repeat.count, data + where, to_move_count * sizeof(T));
-		for (Size i = 0; i != repeat.count; ++i)
+		for (umm i = 0; i != repeat.count; ++i)
 			memcpy(data + where + i, &repeat.value, sizeof(T));
 		count += repeat.count;
 		return {data + where, repeat.count};
@@ -236,11 +219,11 @@ struct List : Span<T, Size_> {
 		memmove(where_.data, where_.data + where_.count, (count - where_.count + data - where_.data) * sizeof(T));
 		count -= where_.count;
 	}
-	Optional<T> erase_at(Size where) {
+	Optional<T> erase_at(umm where) {
 		if (where < count) {
 			--count;
 			auto result = data[where];
-			for (Size i = where; i < count; ++i) {
+			for (umm i = where; i < count; ++i) {
 				data[i] = data[i + 1];
 			}
 			return result;
@@ -284,7 +267,7 @@ struct List : Span<T, Size_> {
 		memmove(value, value + 1, (data + count - value) * sizeof(T));
 	}
 
-	void erase_unordered_at(Size index) {
+	void erase_unordered_at(umm index) {
 		bounds_check(assert(index < count));
 		memcpy(data + index, &back(), sizeof(T));
 		--count;
@@ -412,10 +395,9 @@ struct List : Span<T, Size_> {
 		};
 	}
 };
-#pragma pack(pop)
 
-template <class T, class Allocator, class Size>
-void free(List<T, Allocator, Size> &list) {
+template <class T, class Allocator>
+void free(List<T, Allocator> &list) {
 	if (list.data == 0) return;
 
 	list.allocator.free_t(list.data, list.count);
@@ -424,9 +406,9 @@ void free(List<T, Allocator, Size> &list) {
 	list.capacity = 0;
 }
 
-template <class T, class Allocator, class Size>
-List<T, Allocator, Size> copy(List<T, Allocator, Size> that TL_LP) {
-	List<T, Allocator, Size> result;
+template <class T, class Allocator>
+List<T, Allocator> copy(List<T, Allocator> that TL_LP) {
+	List<T, Allocator> result;
 	result.set(as_span(that));
 	return result;
 }
@@ -439,17 +421,17 @@ List<T, Allocator> to_list(std::initializer_list<T> that, Allocator allocator = 
 	return result;
 }
 
-template <class Allocator = Allocator, class Size, class T>
-List<T, Allocator, Size> to_list(Span<T, Size> that, Allocator allocator = Allocator::current() TL_LP) {
-	List<T, Allocator, Size> result;
+template <class Allocator = Allocator, class T>
+List<T, Allocator> to_list(Span<T> that, Allocator allocator = Allocator::current() TL_LP) {
+	List<T, Allocator> result;
 	result.allocator = allocator;
 	result.set(as_span(that));
 	return result;
 }
 
-template <class Allocator = Allocator, class Size = umm>
+template <class Allocator = Allocator>
 auto to_list(AnIter auto iter TL_LP) {
-	List<std::remove_cvref_t<decltype(*iter)>, Allocator, Size> result;
+	List<std::remove_cvref_t<decltype(*iter)>, Allocator> result;
 
 	foreach (it, iter) {
 		result.add(*it TL_LA);
@@ -478,19 +460,19 @@ auto to_list_with_keys(InputCollection &&collection, typename std::remove_cvref_
 	return result;
 }
 
-template <class T, class Allocator, class Size>
-T *next(List<T, Allocator, Size> list, T *value) {
+template <class T, class Allocator>
+T *next(List<T, Allocator> list, T *value) {
 	return ++value == list.end() ? 0 : value;
 }
 
-template <class T, class Allocator, class Size>
-T *previous(List<T, Allocator, Size> list, T *value) {
+template <class T, class Allocator>
+T *previous(List<T, Allocator> list, T *value) {
 	return value-- == list.data ? 0 : value;
 }
 
-template <class T, class Allocator, class Size> constexpr T *find(List<T, Allocator, Size> list, T const &value) { return find(as_span(list), value); }
-template <class T, class Allocator, class Size> constexpr T *find(List<T, Allocator, Size> list, Span<T> cmp) { return find(as_span(list), cmp); }
-template <class T, class Allocator, class Size> constexpr T *find_last(List<T, Allocator, Size> list, T const &value) { return find_last(as_span(list), value); }
+template <class T, class Allocator> constexpr T *find(List<T, Allocator> list, T const &value) { return find(as_span(list), value); }
+template <class T, class Allocator> constexpr T *find(List<T, Allocator> list, Span<T> cmp) { return find(as_span(list), cmp); }
+template <class T, class Allocator> constexpr T *find_last(List<T, Allocator> list, T const &value) { return find_last(as_span(list), value); }
 
 template <class T>
 void find_all(Span<T> where, Span<T> what, auto &&on_find) {
@@ -510,30 +492,30 @@ void find_all(Span<T> where, Span<T> what, auto &&on_find) {
 	}
 }
 
-template <class T, class Allocator = Allocator, class Size = umm>
-List<Span<T>, Allocator, Size> find_all(Span<T> where, Span<T> what) {
-	List<Span<T>, Allocator, Size> result;
+template <class T, class Allocator = Allocator>
+List<Span<T>, Allocator> find_all(Span<T> where, Span<T> what) {
+	List<Span<T>, Allocator> result;
 	find_all(where, what, [&](auto v) { result.add(v); });
 	return result;
 }
 
-template <class T, class Allocator, class Size>
-Span<T> as_span(List<T, Allocator, Size> const &list) {
+template <class T, class Allocator>
+Span<T> as_span(List<T, Allocator> const &list) {
 	return (Span<T>)list;
 }
 
-template <class T, class Allocator, class Size, class Predicate>
-constexpr T *find_if(List<T, Allocator, Size> &list, Predicate &&predicate) {
+template <class T, class Allocator, class Predicate>
+constexpr T *find_if(List<T, Allocator> &list, Predicate &&predicate) {
 	return find_if(as_span(list), std::forward<Predicate>(predicate));
 }
 
-template <class T, class Allocator, class Size, class Predicate>
-constexpr T const *find_if(List<T, Allocator, Size> const &list, Predicate &&predicate) {
+template <class T, class Allocator, class Predicate>
+constexpr T const *find_if(List<T, Allocator> const &list, Predicate &&predicate) {
 	return find_if(as_span(list), std::forward<Predicate>(predicate));
 }
 
-template <class T, class Allocator, class Size, class Fn>
-constexpr bool for_each(List<T, Allocator, Size> &list, Fn &&fn) {
+template <class T, class Allocator, class Fn>
+constexpr bool for_each(List<T, Allocator> &list, Fn &&fn) {
 	using ReturnType = decltype(fn(*(T*)0));
 	for (auto it = list.begin(); it != list.end(); ++it) {
 		if constexpr (std::is_same_v<ReturnType, void>) {
@@ -552,9 +534,9 @@ constexpr bool for_each(List<T, Allocator, Size> &list, Fn &&fn) {
 	return false;
 }
 
-template <class Allocator = Allocator, class T, class Size>
-List<T, Allocator, Size> replace(Span<T, Size> where, T what, T with TL_LP) {
-	List<T, Allocator, Size> result;
+template <class Allocator = Allocator, class T>
+List<T, Allocator> replace(Span<T> where, T what, T with TL_LP) {
+	List<T, Allocator> result;
 	result.reserve(where.count TL_LA);
 	for (auto &v : where) {
 		result.add(v == what ? with : v);
@@ -562,9 +544,9 @@ List<T, Allocator, Size> replace(Span<T, Size> where, T what, T with TL_LP) {
 	return result;
 }
 
-template <class Allocator = Allocator, class T, class Size>
-List<T, Allocator, Size> erase_all(Span<T, Size> where, T what TL_LP) {
-	List<T, Allocator, Size> result;
+template <class Allocator = Allocator, class T>
+List<T, Allocator> erase_all(Span<T> where, T what TL_LP) {
+	List<T, Allocator> result;
 	result.reserve(where.count TL_LA);
 	for (auto &v : where) {
 		if (v != what)
@@ -573,10 +555,10 @@ List<T, Allocator, Size> erase_all(Span<T, Size> where, T what TL_LP) {
 	return result;
 }
 
-template <class Allocator = Allocator, class T, class Size, class Fn>
-auto map(Span<T, Size> span, Fn &&fn TL_LP) {
+template <class Allocator = Allocator, class T, class Fn>
+auto map(Span<T> span, Fn &&fn TL_LP) {
 	using U = decltype(fn(*(T*)0));
-	List<U, Allocator, Size> result;
+	List<U, Allocator> result;
 	result.reserve(span.count TL_LA);
 
 	for (auto &x : span) {
@@ -586,8 +568,8 @@ auto map(Span<T, Size> span, Fn &&fn TL_LP) {
 	return result;
 }
 
-template <class DstAllocator, class DstSize, class Collection>
-void set_to(List<typename std::remove_cvref_t<Collection>::Element, DstAllocator, DstSize> &list, Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options = {} TL_LP) {
+template <class DstAllocator, class Collection>
+void set_to(List<typename std::remove_cvref_t<Collection>::Element, DstAllocator> &list, Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options = {} TL_LP) {
 	list.clear();
 	list.reserve(count_of(collection) TL_LA);
 	foreach(it, collection.iter(options)) {
@@ -595,8 +577,8 @@ void set_to(List<typename std::remove_cvref_t<Collection>::Element, DstAllocator
 	}
 }
 
-template <class DstAllocator, class DstSize, class Collection>
-void set_to(List<typename std::remove_cvref_t<Collection>::KeyValue, DstAllocator, DstSize> &list, Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options = {} TL_LP) {
+template <class DstAllocator, class Collection>
+void set_to(List<typename std::remove_cvref_t<Collection>::KeyValue, DstAllocator> &list, Collection &&collection, typename std::remove_cvref_t<Collection>::IterOptions options = {} TL_LP) {
 	list.clear();
 	list.reserve(count_of(collection) TL_LA);
 	foreach(it, collection.iter(options)) {
@@ -619,9 +601,9 @@ auto map(InputCollection &&collection, auto mapper) requires requires { mapper(c
 }
 
 
-template <class Allocator = Allocator, class T, class Size = umm>
-List<T, Allocator, Size> make_list(std::initializer_list<T> list TL_LP) {
-	List<T, Allocator, Size> result;
+template <class Allocator = Allocator, class T>
+List<T, Allocator> make_list(std::initializer_list<T> list TL_LP) {
+	List<T, Allocator> result;
 	result.reserve(list.size() TL_LA);
 	result.count = list.size();
 	memcpy(result.data, list.begin(), list.size() * sizeof(T));
@@ -630,16 +612,16 @@ List<T, Allocator, Size> make_list(std::initializer_list<T> list TL_LP) {
 
 // Returns an index of the value
 // If value is not in the list, this function will return index >= list.size
-template <class T, class Allocator, class Size>
-umm index_of(List<T, Allocator, Size> const &list, T const *value) {
+template <class T, class Allocator>
+umm index_of(List<T, Allocator> const &list, T const *value) {
 	return value - list.data;
 }
 
-template <class T, class Allocator, class Size> T const &front(List<T, Allocator, Size> const &list) { return list.front(); }
-template <class T, class Allocator, class Size> T &front(List<T, Allocator, Size> &list) { return list.front(); }
+template <class T, class Allocator> T const &front(List<T, Allocator> const &list) { return list.front(); }
+template <class T, class Allocator> T &front(List<T, Allocator> &list) { return list.front(); }
 
-template <class T, class Allocator, class Size> T const &back(List<T, Allocator, Size> const &list) { return list.back(); }
-template <class T, class Allocator, class Size> T &back(List<T, Allocator, Size> &list) { return list.back(); }
+template <class T, class Allocator> T const &back(List<T, Allocator> const &list) { return list.back(); }
+template <class T, class Allocator> T &back(List<T, Allocator> &list) { return list.back(); }
 
 // Quick sort overloads that use scratch allocated memory and a loop instead of recursion.
 // Use to avoid stack overflow on big data.

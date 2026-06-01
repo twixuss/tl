@@ -590,8 +590,8 @@ struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 		return this->unprotected.count;
 	}
 
-	template <class DstAllocator, class DstSize>
-	void drain(List<T, DstAllocator, DstSize> &sink) {
+	template <class DstAllocator>
+	void drain(List<T, DstAllocator> &sink) {
 		this->use([&](auto &queue) {
 			sink.reserve(sink.count + queue.count);
 			for (auto span : queue.spans()) {

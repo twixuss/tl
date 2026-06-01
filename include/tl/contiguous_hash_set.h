@@ -299,8 +299,8 @@ struct ContiguousHashSet : Traits {
 		return result;
 	}
 
-	template <class DstAllocator, class DstSize>
-	void copy_to(List<Key, DstAllocator, DstSize> &list) {
+	template <class DstAllocator>
+	void copy_to(List<Key, DstAllocator> &list) {
 		list.clear();
 		list.reserve(count);
 		for_each([&](Key const &key) { list.add(key); });

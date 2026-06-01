@@ -24,7 +24,8 @@ T *create_stream() {
 	auto result = allocator.allocate<T>();
 	result->allocator = allocator;
 	result->_read = [](Stream *stream, Span<u8> destination) {
-		if constexpr (is_statically_overridden(read, T, Stream)) {
+		// if constexpr works on msvc, not on mingw
+		if (is_statically_overridden(read, T, Stream)) {
 			return ((T *)stream)->read(destination);
 		} else {
 			invalid_code_path("unavailable");
@@ -32,7 +33,8 @@ T *create_stream() {
 		}
 	};
 	result->_write = [](Stream *stream, Span<u8> destination) {
-		if constexpr (is_statically_overridden(write, T, Stream)) {
+		// if constexpr works on msvc, not on mingw
+		if (is_statically_overridden(write, T, Stream)) {
 			return ((T *)stream)->write(destination);
 		} else {
 			invalid_code_path("unavailable");
@@ -40,7 +42,8 @@ T *create_stream() {
 		}
 	};
 	result->_remaining_bytes = [](Stream *stream) {
-		if constexpr (is_statically_overridden(write, T, Stream)) {
+		// if constexpr works on msvc, not on mingw
+		if (is_statically_overridden(remaining_bytes, T, Stream)) {
 			return ((T *)stream)->remaining_bytes();
 		} else {
 			invalid_code_path("unavailable");
@@ -52,6 +55,8 @@ T *create_stream() {
 
 
 inline void free(Stream *stream) {
+	if (!stream)
+		return;
 	stream->free();
 	*stream = {};
 }

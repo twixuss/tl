@@ -744,6 +744,20 @@ forceinline constexpr bool all(Array<T, count> const &a) {
 }
 
 template <class T, umm count>
+forceinline constexpr bool any(Array<T, count> const &a) {
+	for (umm i = 0; i < count; ++i) {
+		if (any(a.data[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+template <class T, umm count> forceinline constexpr bool all(ToBoolUsingAll<Array<T, count>> const &a) { return all((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool all(ToBoolUsingAny<Array<T, count>> const &a) { return all((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool any(ToBoolUsingAll<Array<T, count>> const &a) { return any((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool any(ToBoolUsingAny<Array<T, count>> const &a) { return any((Array<T, count> &)a); }
+
+template <class T, umm count>
 forceinline constexpr T dot(Array<T, count> const &a, Array<T, count> const &b) {
 	T result = {};
 	for (umm i = 0; i < count; ++i) {
@@ -1021,3 +1035,9 @@ forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8,
 #endif
 
 }
+
+#define TL_ARRAY_H_INCLUDED
+
+#ifdef TL_HASH_H_INCLUDED
+#include "array-hash.h"
+#endif

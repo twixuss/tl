@@ -35,11 +35,11 @@ struct Printer {
 		return (*this)((Span<utf8>)(to_string(builder, TL_GET_CURRENT(temporary_allocator))));
 	}
 
-	template <class Size> inline umm write(Span<char, Size> const &span) { return (*this)((Span<utf8>)span); }
-	template <class Size> inline umm write(Span<utf8, Size> const &span) { return (*this)((Span<utf8>)span); }
+	inline umm write(Span<char> const &span) { return (*this)((Span<utf8>)span); }
+	inline umm write(Span<utf8> const &span) { return (*this)((Span<utf8>)span); }
 
-	template <class Size> inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
-	template <class Size> inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
+	inline umm write(List<char> const &list) { return (*this)((Span<utf8>)(Span<char>)list); }
+	inline umm write(List<utf8> const &list) { return (*this)((Span<utf8>)list); }
 
 	template <Appendable ...T>
 	inline umm writeln(T const &...args) {

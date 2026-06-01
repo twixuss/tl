@@ -37,8 +37,8 @@ template <> inline constexpr tl::u64 get_hash(tl::utf8  const &value) { return v
 template <> inline constexpr tl::u64 get_hash(tl::utf16 const &value) { return value; }
 template <> inline constexpr tl::u64 get_hash(tl::utf32 const &value) { return value; }
 
-template <class T, class Size>
-constexpr tl::u64 get_hash(tl::Span<T, Size> const &span) {
+template <class T>
+constexpr tl::u64 get_hash(tl::Span<T> const &span) {
 	tl::u64 result = 0xdeadc0debabeface;
 	for (auto const &it : span) {
 		result = tl::rotate_left(result, 23) ^ get_hash(it);
@@ -46,8 +46,8 @@ constexpr tl::u64 get_hash(tl::Span<T, Size> const &span) {
 	return result;
 }
 
-template <class T, class Allocator, class Size>
-constexpr tl::u64 get_hash(tl::List<T, Allocator, Size> const &list) {
+template <class T, class Allocator>
+constexpr tl::u64 get_hash(tl::List<T, Allocator> const &list) {
 	return get_hash(as_span(list));
 }
 
@@ -92,3 +92,9 @@ struct DefaultHashTraits {
 	using Traits::get_index_from_key; \
 
 }
+
+#define TL_HASH_H_INCLUDED
+
+#ifdef TL_ARRAY_H_INCLUDED
+#include "array-hash.h"
+#endif

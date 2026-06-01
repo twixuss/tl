@@ -113,20 +113,16 @@ struct StaticList {
 	forceinline constexpr StaticList &operator+=(StaticList<T, capacity> const &that) { add(that.span()); return *this; }
 	forceinline constexpr StaticList &operator+=(std::initializer_list<T> that) { add(Span((T *)that.begin(), (T *)that.end())); return *this; }
 
-	template <class Size = umm>
-	forceinline constexpr Span<T, Size> span() const { return {data, count}; }
+	forceinline constexpr Span<T> span() const { return {data, count}; }
 
-	template <class U, class ThatSize>
-	constexpr explicit operator Span<U, ThatSize>() const {
+	template <class U>
+	constexpr explicit operator Span<U>() const {
 		static_assert(sizeof(U) == sizeof(T));
-		assert_equal((ThatSize)count, count);
-		return {(U *)data, (ThatSize)count};
+		return {(U *)data, count};
 	}
 
-	template <class ThatSize>
-	constexpr operator Span<T, ThatSize>() const {
-		assert_equal((ThatSize)count, count);
-		return {data, (ThatSize)count};
+	constexpr operator Span<T>() const {
+		return {data, count};
 	}
 
 	forceinline constexpr T &add() {
@@ -146,11 +142,10 @@ struct StaticList {
 		}
 	}
 
-	template <class Size>
-	forceinline constexpr Span<T> add(Span<T, Size> span) {
+	forceinline constexpr Span<T> add(Span<T> span) {
 		bounds_check(assert(count + span.count <= capacity));
 		memcpy(data + count, span.data, span.count * sizeof(T));
-		defer { count = (StaticList::Size)(count + span.count); };
+		defer { count = (Size)(count + span.count); };
 		return {data + count, span.count};
 	}
 	forceinline constexpr Span<T> add(std::initializer_list<T> list) {

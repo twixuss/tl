@@ -260,6 +260,7 @@ List<void *> get_call_stack(void *context_opaque, umm frames_to_skip) {
 
 StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceNamesOptions options) {
 	scoped(debug_lock);
+	scoped(temporary_storage_checkpoint);
 
 	StringizedCallStack result;
 	for (auto &call : call_stack) {
@@ -331,9 +332,8 @@ StringizedCallStack resolve_names(Span<void *> call_stack, ResolveStackTraceName
 					file = as_span(line.FileName);
 				}
 			} else {
-				TL_GET_CURRENT(logger).error("SymFromAddr failed: {}", win32_error());
-				file = "SymFromAddr failed"s;
-				name = "SymFromAddr failed"s;
+				file = "unknown"s;
+				name = tformat("{}", format_hex((u64)call));
 			}
 
 		}
