@@ -157,7 +157,8 @@
 #elif COMPILER_GCC
 	#define forceinline   __attribute__((always_inline)) inline
 	#define no_inline     __attribute__((noinline))
-	#define debug_break() ::__builtin_trap()
+	namespace tl { forceinline void _debug_break() { __asm__("int3"); } }
+	#define debug_break() ::tl::_debug_break()
 #endif
 
 #include <stdint.h>

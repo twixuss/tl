@@ -714,6 +714,30 @@ forceinline constexpr Array<T, count> broadcast_to_array(T value) {
 	return result;
 }
 
+template <umm count, class Callable>
+	requires requires { std::declval<Callable>()(); }
+forceinline constexpr auto make_array(Callable callable)
+	-> Array<std::remove_cvref_t<decltype(callable())>, count>
+{
+	Array<std::remove_cvref_t<decltype(callable())>, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = callable();
+	}
+	return result;
+}
+
+template <umm count, class Callable>
+	requires requires { std::declval<Callable>()((umm)0); }
+forceinline constexpr auto make_array(Callable callable)
+	-> Array<std::remove_cvref_t<decltype(callable((umm)0))>, count>
+{
+	Array<std::remove_cvref_t<decltype(callable((umm)0))>, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = callable(i);
+	}
+	return result;
+}
+
 template <class T, umm count>
 forceinline constexpr umm count_of(Array<T, count> const &) {
 	return count;

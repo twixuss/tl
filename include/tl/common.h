@@ -73,7 +73,7 @@
 #if COMPILER_MSVC
 #define TL_ASSUME(x) __assume(x)
 #else
-#define TL_ASSUME(x) 0
+#define TL_ASSUME(x) ((x) ? 0 : (std::unreachable(), 0))
 #endif
 
 #define invalid_code_path(...) (ASSERTION_FAILURE("invalid_code_path", "" __VA_OPT__(,) __VA_ARGS__), TL_ASSUME(0))
@@ -133,13 +133,35 @@
 #define TL_LA
 #endif
 
+//
+//    TESTING
+//
+// To enable testing facilities you need to define TL_ENABLE_TESTS in all your translation units.
+// To register a test use TL_TEST or TL_TEST_TU macro.
+// Choose one of them depending on where is your test located:
+//  - TL_TEST in .h files;
+//  - TL_TEST_TU in .cpp files;
+// TU (stands for translation unit) version always adds the test to the list.
+// Non-TU version will only add the test if TL_IMPL is defined, so there are no duplicates.
+// 
+//
+// Running tests is up to the user of the library, for example:
+/*
+for (int i = 0; i < tl::tests_to_run_count; ++i) {
+	auto test = tl::tests_to_run[i];
+	tl::println("{}:{}:{}", test.file, test.line, test.name);
+	test.func();
+}
+*/
 #ifdef TL_ENABLE_TESTS
 #ifndef TL_IMPL
-#error TL_ENABLE_TESTS must be defined with TL_IMPL
+#error TL_ENABLE_TESTS must be defined together with TL_IMPL.
 #endif
 
 namespace tl {
 struct Test {
+	char const *file;
+	unsigned line;
 	char const *name;
 	void (*func)();
 };
@@ -147,6 +169,14 @@ Test tests_to_run[256] = {};
 int tests_to_run_count = 0;
 
 struct TestAdder {
+	TestAdder const &operator*(char const *file) const {
+		tests_to_run[tests_to_run_count].file = file;
+		return *this;
+	}
+	TestAdder const &operator+(int line) const {
+		tests_to_run[tests_to_run_count].line = line;
+		return *this;
+	}
 	TestAdder const &operator+(char const *name) const {
 		tests_to_run[tests_to_run_count].name = name;
 		return *this;
@@ -160,8 +190,10 @@ inline static constexpr TestAdder test_adder;
 
 }
 
-#define TL_TEST(name) static int _tl_test_##name = tl::test_adder + __FILE__ + []
+#define TL_TEST(name) static int _tl_test_##name = tl::test_adder * __FILE__ + __LINE__ + #name + []
+
 #endif
+
 
 #define KiB 0x400ull
 #define MiB 0x100000ull

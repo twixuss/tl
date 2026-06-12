@@ -333,13 +333,13 @@ struct SleepySpinner {
 };
 
 template <AInterlockExchangeable T, ASpinner Spinner = BasicSpinner>
-forceinline T atomic_update(T volatile *a, Callable<T, T> auto fn, Spinner spinner = {}) {
-	using Int = TypeAt<log2(sizeof(T)), u8, u16, u32, u64>;
+forceinline T atomic_update(T volatile *destination, Callable<T, T> auto fn, Spinner spinner = {}) {
 	while (1) {
-		auto old_value = *a;
-		auto new_value = fn(old_value);
-		if (atomic_compare_exchange((Int volatile *)a, *(Int *)&new_value, *(Int *)&old_value) == *(Int *)&old_value) {
-			return old_value;
+		auto expected = *destination;
+		auto updated = fn(expected);
+		auto previous = atomic_compare_exchange(destination, updated, expected);
+		if (memcmp(&previous, &expected, sizeof(previous)) == 0) {
+			return expected;
 		}
 		spinner.spin();
 	}
