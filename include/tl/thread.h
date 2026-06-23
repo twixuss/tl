@@ -376,7 +376,7 @@ inline void sync(SyncPoint &point, Spinner spinner = {}) {
 	loop_until([&] { return point.synced_thread_count == point.target_thread_count; }, spinner);
 }
 
-struct SpinLock {
+struct alignas(64) SpinLock {
 	TL_MAKE_FIXED(SpinLock);
 
 	u32 volatile locker_id = 0;
@@ -602,7 +602,7 @@ struct LockQueue : LockProtected<Queue<T, Allocator>, Lock> {
 	}
 };
 
-struct RecursiveSpinLock {
+struct alignas(64) RecursiveSpinLock {
 	TL_MAKE_FIXED(RecursiveSpinLock);
 
 	u32 volatile thread_id = 0;
