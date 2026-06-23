@@ -15,10 +15,10 @@ namespace tl {
 // stored in 'buffer'.
 // In writing mode 'data' represents an index into the 'buffer' where the element starts.
 //
-template <class T, class Allocator = Allocator, class Size = umm>
-struct ListOfLists : List<Span<T>, Allocator, Size> {
-	using Base = List<Span<T>, Allocator, Size>;
-	List<T, Allocator, Size> buffer;
+template <class T, class Allocator = Allocator>
+struct ListOfLists : List<Span<T>, Allocator> {
+	using Base = List<Span<T>, Allocator>;
+	List<T, Allocator> buffer;
 #if TL_DEBUG
 	bool is_reading = false;
 #endif
@@ -62,8 +62,8 @@ struct ListOfLists : List<Span<T>, Allocator, Size> {
 	Base &base() { return *this; }
 };
 
-template <class T, class Allocator, class Size>
-void free(ListOfLists<T, Allocator, Size> &list) {
+template <class T, class Allocator>
+void free(ListOfLists<T, Allocator> &list) {
 	free(list.base());
 	free(list.buffer);
 #if TL_DEBUG

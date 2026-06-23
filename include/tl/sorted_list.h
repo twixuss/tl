@@ -15,11 +15,10 @@ template <
 	class T,
 	auto map = identity_value,
 	auto compare = SortedListDefaultCompare<std::remove_cvref_t<decltype(map(*(T *)0))>> {},
-	class Allocator = Allocator,
-	class Size = umm
+	class Allocator = Allocator
 >
-struct SortedList : private List<T, Allocator, Size> {
-	using Base = List<T, Allocator, Size>;
+struct SortedList : private List<T, Allocator> {
+	using Base = List<T, Allocator>;
 	using Element = T;
 
 	using Base::begin;
@@ -81,8 +80,8 @@ struct SortedList : private List<T, Allocator, Size> {
 	}
 };
 
-template <class T, auto map, auto compare, class Allocator, class Size>
-void free(SortedList<T, map, compare, Allocator, Size> &list) {
+template <class T, auto map, auto compare, class Allocator>
+void free(SortedList<T, map, compare, Allocator> &list) {
 	free(list._list());
 }
 

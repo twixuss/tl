@@ -46,9 +46,9 @@ void append(StringBuilder &builder, YourType t) {
 
 namespace tl {
 
-template <class Allocator = Allocator, class T, class Size>
-List<T, Allocator, Size> null_terminate(Span<T, Size> span) {
-	List<T, Allocator, Size> result;
+template <class Allocator = Allocator, class T>
+List<T, Allocator> null_terminate(Span<T> span) {
+	List<T, Allocator> result;
 	result.count = span.count + 1;
 	result.data = result.allocator.template allocate<T>(result.count);
 	result.capacity = result.count;
@@ -704,13 +704,13 @@ forceinline void append_bytes(StringBuilder &b, T const &value TL_LP) {
 	return append_bytes(b, &value, sizeof(value) TL_LA);
 }
 
-template <class T, class Size>
-forceinline void append_bytes(StringBuilder &b, Span<T, Size> span TL_LP) {
+template <class T>
+forceinline void append_bytes(StringBuilder &b, Span<T> span TL_LP) {
 	return append_bytes(b, span.data, span.count * sizeof(T) TL_LA);
 }
 
-template <class T, class Allocator, class Size>
-forceinline void append_bytes(StringBuilder &b, List<T, Allocator, Size> list TL_LP) {
+template <class T, class Allocator>
+forceinline void append_bytes(StringBuilder &b, List<T, Allocator> list TL_LP) {
 	return append_bytes(b, list.data, list.count * sizeof(T) TL_LA);
 }
 
@@ -720,11 +720,11 @@ inline void append(StringBuilder &b, utf8  ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf16 ch) { return append_bytes(b, ch); }
 inline void append(StringBuilder &b, utf32 ch) { return append_bytes(b, ch); }
 
-template <class Size> inline void append(StringBuilder &b, Span<u8   , Size> string) { return append_bytes(b, string); }
-template <class Size> inline void append(StringBuilder &b, Span<ascii, Size> string) { return append_bytes(b, string); }
-template <class Size> inline void append(StringBuilder &b, Span<utf8 , Size> string) { return append_bytes(b, string); }
-template <class Size> inline void append(StringBuilder &b, Span<utf16, Size> string) { return append_bytes(b, string); }
-template <class Size> inline void append(StringBuilder &b, Span<utf32, Size> string) { return append_bytes(b, string); }
+inline void append(StringBuilder &b, Span<u8   > string) { return append_bytes(b, string); }
+inline void append(StringBuilder &b, Span<ascii> string) { return append_bytes(b, string); }
+inline void append(StringBuilder &b, Span<utf8 > string) { return append_bytes(b, string); }
+inline void append(StringBuilder &b, Span<utf16> string) { return append_bytes(b, string); }
+inline void append(StringBuilder &b, Span<utf32> string) { return append_bytes(b, string); }
 
 
 forceinline void append(StringBuilder &b, ascii const *string) { return append(b, as_span(string)); }
@@ -759,22 +759,22 @@ inline static const SpanFormat default_span_format = {
 	.after = "}"b,
 };
 
-template <class T, class Size>
+template <class T>
 struct FormattedSpan : SpanFormat {
-	Span<T, Size> value;
+	Span<T> value;
 };
 
-template <class T, class Size>
-FormattedSpan<T, Size> format_span(Span<T, Size> span, SpanFormat format) {
-	FormattedSpan<T, Size> result;
+template <class T>
+FormattedSpan<T> format_span(Span<T> span, SpanFormat format) {
+	FormattedSpan<T> result;
 	(SpanFormat &)result = format;
 	result.value = span;
 	return result;
 }
 
 
-template <class T, class Size>
-forceinline void append(StringBuilder &b, FormattedSpan<T, Size> formatted) {
+template <class T>
+forceinline void append(StringBuilder &b, FormattedSpan<T> formatted) {
 	append_bytes(b, formatted.before);
 	if (formatted.value.count) {
 		append(b, *formatted.value.data);
@@ -786,8 +786,8 @@ forceinline void append(StringBuilder &b, FormattedSpan<T, Size> formatted) {
 	append_bytes(b, formatted.after);
 }
 
-template <class T, class Size>
-inline void append(StringBuilder &b, Span<T, Size> span) {
+template <class T>
+inline void append(StringBuilder &b, Span<T> span) {
 	return append(b, format_span(span, default_span_format));
 }
 
@@ -796,14 +796,14 @@ inline void append(StringBuilder &builder, Array<T, count> a) {
 	return append(builder, Span(a.data, count));
 }
 
-template <class T, class Allocator, class Size>
-forceinline void append(StringBuilder &b, List<T, Allocator, Size> list) { return append(b, format_span(list, default_span_format)); }
+template <class T, class Allocator>
+forceinline void append(StringBuilder &b, List<T, Allocator> list) { return append(b, format_span(list, default_span_format)); }
 
-template <class Allocator, class Size> forceinline void append(StringBuilder &b, List<u8   , Allocator, Size> list) { return append(b, as_span(list)); }
-template <class Allocator, class Size> forceinline void append(StringBuilder &b, List<ascii, Allocator, Size> list) { return append(b, as_span(list)); }
-template <class Allocator, class Size> forceinline void append(StringBuilder &b, List<utf8 , Allocator, Size> list) { return append(b, as_span(list)); }
-template <class Allocator, class Size> forceinline void append(StringBuilder &b, List<utf16, Allocator, Size> list) { return append(b, as_span(list)); }
-template <class Allocator, class Size> forceinline void append(StringBuilder &b, List<utf32, Allocator, Size> list) { return append(b, as_span(list)); }
+template <class Allocator> forceinline void append(StringBuilder &b, List<u8   , Allocator> list) { return append(b, as_span(list)); }
+template <class Allocator> forceinline void append(StringBuilder &b, List<ascii, Allocator> list) { return append(b, as_span(list)); }
+template <class Allocator> forceinline void append(StringBuilder &b, List<utf8 , Allocator> list) { return append(b, as_span(list)); }
+template <class Allocator> forceinline void append(StringBuilder &b, List<utf16, Allocator> list) { return append(b, as_span(list)); }
+template <class Allocator> forceinline void append(StringBuilder &b, List<utf32, Allocator> list) { return append(b, as_span(list)); }
 
 inline void append(StringBuilder &b, StringBuilder const &that) {
 	that.for_each_block([&](StringBuilder::Block *block) {
@@ -1402,8 +1402,8 @@ inline void append(StringBuilder &builder, TruncText<T> t) {
 
 template <class T> struct is_utf8_t { inline static constexpr bool value = false; };
 template <> struct is_utf8_t<utf8>       { inline static constexpr bool value = true; };
-template <class Size> struct is_utf8_t<Span<utf8, Size>> { inline static constexpr bool value = true; };
-template <class Allocator, class Size> struct is_utf8_t<List<utf8, Allocator, Size>> { inline static constexpr bool value = true; };
+template <> struct is_utf8_t<Span<utf8>> { inline static constexpr bool value = true; };
+template <class Allocator> struct is_utf8_t<List<utf8, Allocator>> { inline static constexpr bool value = true; };
 
 template <class First, class ...Rest>
 struct are_utf8_t {
@@ -1420,8 +1420,8 @@ inline constexpr bool are_utf8 = are_utf8_t<Args...>::value;
 
 template <class T> struct is_utf16_t { inline static constexpr bool value = false; };
 template <> struct is_utf16_t<utf16>       { inline static constexpr bool value = true; };
-template <class Size> struct is_utf16_t<Span<utf16, Size>> { inline static constexpr bool value = true; };
-template <class Allocator, class Size> struct is_utf16_t<List<utf16, Allocator, Size>> { inline static constexpr bool value = true; };
+template <> struct is_utf16_t<Span<utf16>> { inline static constexpr bool value = true; };
+template <class Allocator> struct is_utf16_t<List<utf16, Allocator>> { inline static constexpr bool value = true; };
 
 template <class First, class ...Rest>
 struct are_utf16_t {

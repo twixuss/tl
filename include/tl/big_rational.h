@@ -9,7 +9,6 @@ struct BigRational {
 	using List = typename BigInt::List;
 	using Part = typename BigInt::Part;
 	using SignedPart = typename BigInt::SignedPart;
-	using Size = typename BigInt::Size;
 	
 	inline static constexpr umm bytes_in_part = BigInt::bytes_in_part;
 	inline static constexpr umm bits_in_part = BigInt::bits_in_part;

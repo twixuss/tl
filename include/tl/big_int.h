@@ -59,7 +59,6 @@ struct BigInt {
 	using Part = umm;
 	using SignedPart = std::make_signed_t<Part>;
 	using List = List<Part, Allocator>;
-	using Size = typename List::Size;
 
 	static_assert(is_unsigned<Part>, "BigInt::List::Element must be unsigned");
 
@@ -472,7 +471,7 @@ struct BigInt {
 
 	template <class QA, class RA>
 	void divmod(Part b, BigInt<QA> &quotient, BigInt<RA> &remainder) const {
-		umm max_parts_count = max(parts.count, (Size)1);
+		umm max_parts_count = max(parts.count, (umm)1);
 
 		quotient.msb = 0;
 		quotient.parts.clear();
@@ -568,7 +567,7 @@ struct BigInt {
 		if (parts.count != b.parts.count)
 			return false;
 
-		for (Size i = 0; i < parts.count; ++i) {
+		for (umm i = 0; i < parts.count; ++i) {
 			if (parts[i] != b.parts[i])
 				return false;
 		}

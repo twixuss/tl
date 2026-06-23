@@ -3,7 +3,7 @@
 
 namespace tl {
 
-template <class T, class Size>
+template <class T>
 struct Span;
 
 }

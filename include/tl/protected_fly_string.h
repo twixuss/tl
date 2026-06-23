@@ -16,8 +16,7 @@ namespace tl {
 struct ProtectedFlyString {
     inline ProtectedFlyString() = default;
 
-    template <class Size>
-    inline ProtectedFlyString(Span<utf8, Size> span) {
+    inline ProtectedFlyString(Span<utf8> span) {
         scoped(lock);
 
         auto found = storage.find(span);
@@ -47,14 +46,12 @@ struct ProtectedFlyString {
         return as_span(data).count;
     }
 
-    template <class Size>
-    inline operator Span<utf8, Size>() const {
-        return (Span<utf8, Size>)as_span(data);
+    inline operator Span<utf8>() const {
+        return (Span<utf8>)as_span(data);
     }
 
-    template <class Size=umm>
-    inline Span<utf8, Size> span() const {
-        return (Span<utf8, Size>)as_span(data);
+    inline Span<utf8> span() const {
+        return (Span<utf8>)as_span(data);
     }
 
     inline bool is_empty() const {

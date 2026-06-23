@@ -92,7 +92,9 @@ inline List<u8> start_process_and_get_output(Span<utf8> command_line) {
 #ifdef TL_IMPL
 
 #if OS_WINDOWS
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <Psapi.h>
 #endif
 

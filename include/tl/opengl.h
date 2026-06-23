@@ -963,7 +963,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 
 		for (u32 function_index = 0; function_index < function_count; ++function_index) {
 			char const *name = function_names[function_index];
-			void *function = wglGetProcAddress(name);
+			void *function = (void *)wglGetProcAddress(name);
 			if (function) {
 				tl_opengl_functions()->data[function_index] = function;
 			} else {

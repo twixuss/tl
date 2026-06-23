@@ -714,6 +714,30 @@ forceinline constexpr Array<T, count> broadcast_to_array(T value) {
 	return result;
 }
 
+template <umm count, class Callable>
+	requires requires { std::declval<Callable>()(); }
+forceinline constexpr auto make_array(Callable callable)
+	-> Array<std::remove_cvref_t<decltype(callable())>, count>
+{
+	Array<std::remove_cvref_t<decltype(callable())>, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = callable();
+	}
+	return result;
+}
+
+template <umm count, class Callable>
+	requires requires { std::declval<Callable>()((umm)0); }
+forceinline constexpr auto make_array(Callable callable)
+	-> Array<std::remove_cvref_t<decltype(callable((umm)0))>, count>
+{
+	Array<std::remove_cvref_t<decltype(callable((umm)0))>, count> result = {};
+	for (umm i = 0; i < count; ++i) {
+		result.data[i] = callable(i);
+	}
+	return result;
+}
+
 template <class T, umm count>
 forceinline constexpr umm count_of(Array<T, count> const &) {
 	return count;
@@ -742,6 +766,20 @@ forceinline constexpr bool all(Array<T, count> const &a) {
 	}
 	return true;
 }
+
+template <class T, umm count>
+forceinline constexpr bool any(Array<T, count> const &a) {
+	for (umm i = 0; i < count; ++i) {
+		if (any(a.data[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+template <class T, umm count> forceinline constexpr bool all(ToBoolUsingAll<Array<T, count>> const &a) { return all((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool all(ToBoolUsingAny<Array<T, count>> const &a) { return all((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool any(ToBoolUsingAll<Array<T, count>> const &a) { return any((Array<T, count> &)a); }
+template <class T, umm count> forceinline constexpr bool any(ToBoolUsingAny<Array<T, count>> const &a) { return any((Array<T, count> &)a); }
 
 template <class T, umm count>
 forceinline constexpr T dot(Array<T, count> const &a, Array<T, count> const &b) {
@@ -1021,3 +1059,9 @@ forceinline constexpr Array<T, count> pshufb(Array<T, count> const &a, Array<s8,
 #endif
 
 }
+
+#define TL_ARRAY_H_INCLUDED
+
+#ifdef TL_HASH_H_INCLUDED
+#include "array-hash.h"
+#endif
