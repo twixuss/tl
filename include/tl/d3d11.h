@@ -49,10 +49,15 @@ struct ShaderResource {
 	ID3D11ShaderResourceView *srv = 0;
 };
 
+void set_name(ID3D11Buffer *buffer, Span<char> name) {
+	buffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.count, name.data);
+}
+
 struct UntypedBuffer {
 	ID3D11Buffer *buffer = 0;
 	D3D11_USAGE usage = {};
 	u32 size = 0;
+	Span<char> name = {};
 };
 
 template <class T>
@@ -69,6 +74,7 @@ struct UntypedConstantBuffer {
 	ID3D11Buffer *buffer = 0;
 	D3D11_USAGE usage = {};
 	u32 size = 0;
+	Span<char> name = {};
 };
 
 template <class T>
@@ -173,12 +179,19 @@ struct TL_API State {
 	ID3D11VertexShader *create_vertex_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 	ID3D11PixelShader *create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include = true, D3D_SHADER_MACRO const *defines = 0, ID3DBlob **out_bytecode = 0);
 
-	UntypedConstantBuffer create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data = 0);
+	UntypedConstantBuffer create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data = 0, Span<char> name = {});
+	inline UntypedConstantBuffer create_constant_buffer(u32 size, D3D11_USAGE usage, Span<char> name) {
+		return create_constant_buffer(size, usage, 0, name);
+	}
 	template <class T>
-	inline ConstantBuffer<T> create_constant_buffer(D3D11_USAGE usage, T const *initial_data = 0) {
+	inline ConstantBuffer<T> create_constant_buffer(D3D11_USAGE usage, T const *initial_data = 0, Span<char> name = {}) {
 		ConstantBuffer<T> result;
-		(UntypedConstantBuffer &)result = create_constant_buffer(sizeof(T), usage, initial_data);
+		(UntypedConstantBuffer &)result = create_constant_buffer(sizeof(T), usage, initial_data, name);
 		return result;
+	}
+	template <class T>
+	inline ConstantBuffer<T> create_constant_buffer(D3D11_USAGE usage, Span<char> name) {
+		return create_constant_buffer<T>(usage, 0, name);
 	}
 	DepthStencilTexture create_depth_stencil_texture(u32 width, u32 height, DXGI_FORMAT format);
 	Sampler create_sampler(D3D11_TEXTURE_ADDRESS_MODE address, D3D11_FILTER filter);
@@ -673,7 +686,7 @@ ID3D11VertexShader *State::create_vertex_shader(Span<char> source, char const *n
 ID3D11PixelShader *State::create_pixel_shader(Span<char> source, char const *name, char const *entry_point, char const *target, bool standard_include, D3D_SHADER_MACRO const *defines, ID3DBlob **bytecode) {
 	return (ID3D11PixelShader *)create_shader(autocast &ID3D11Device::CreatePixelShader, source, name, entry_point, target, standard_include, defines, bytecode);
 }
-UntypedConstantBuffer State::create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data) {
+UntypedConstantBuffer State::create_constant_buffer(u32 size, D3D11_USAGE usage, void const *initial_data, Span<char> name) {
 	D3D11_BUFFER_DESC desc = {};
 	desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	desc.ByteWidth = ceil(size, 16u);
@@ -687,6 +700,8 @@ UntypedConstantBuffer State::create_constant_buffer(u32 size, D3D11_USAGE usage,
 	GHR(device->CreateBuffer(&desc, initial_data ? &data : 0, &result.buffer));
 	result.usage = usage;
 	result.size = size;
+	result.name = name;
+	set_name(result.buffer, name);
 	return result;
 }
 DepthStencilTexture State::create_depth_stencil_texture(u32 width, u32 height, DXGI_FORMAT format) {
@@ -906,6 +921,8 @@ void State::update_structured_buffer(UntypedStructuredBuffer &buffer, u32 count,
 			};
 			GHR(device->CreateBuffer(&d, 0, &new_buffer));
 		}
+
+		set_name(new_buffer, buffer.name);
 
 		ID3D11ShaderResourceView *new_srv = {};
 		{

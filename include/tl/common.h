@@ -3456,6 +3456,9 @@ inline constexpr void mark_dead(u8 *data, umm size) {
 	for (umm i = 0; i != size; ++i) {
 		data[i] = mark[i&1];
 	}
+	#else
+	(void)data;
+	(void)size;
 	#endif
 }
 inline constexpr void mark_dead(auto *value, umm n = 1) {
