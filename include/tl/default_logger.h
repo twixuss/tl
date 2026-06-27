@@ -99,9 +99,9 @@ void DefaultLogger::default_init(Span<utf8> program_path) {
 
 	tl::current_logger = *this;
 
-	chain(&thread_initter, [=, this] {
+	chain(&thread_initter, create_fat_function_pointer([=, this] {
 		tl::current_logger = *this;
-	});
+	}));
 }
 
 #endif
