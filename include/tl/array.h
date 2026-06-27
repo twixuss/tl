@@ -827,6 +827,20 @@ OP(greater_equal, >=)
 
 #undef OP
 
+// Extract top bits from mask and compress them into a single integer
+template <class Mask, umm count>
+forceinline constexpr u64 mask_to_int(Array<Mask, count> mask)
+	requires requires {
+		requires count <= 64;
+		requires sizeof(Mask) == 1 || sizeof(Mask) == 2 || sizeof(Mask) == 4 || sizeof(Mask) == 8;
+	}
+{
+	u64 result = 0;
+	for (umm i = 0; i < count; ++i)
+		result |= ((bit_cast<UintWithBits<sizeof(Mask)*8>>(mask.data[i]) >> (sizeof(Mask)*8 - 1)) & 1) << i;
+	return result;
+}
+
 // Mask is not an integral, e.g. Array
 template <class T, class Mask, umm count>
 forceinline constexpr Array<T, count> blend(Array<Mask, count> mask, Array<T, count> a, Array<T, count> b) {
@@ -904,6 +918,16 @@ forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
 	return r;
 }
 
+template <class T, umm count>
+forceinline constexpr Array<T, count> muladd(Array<T, count> a, Array<T, count> b, Array<T, count> c) {
+	return a*b + c;
+}
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, Array<T, count> b, Array<T, count> c) { return muladd(broadcast_to_array<count>(a), b, c); }
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array<T, count> a, T b, Array<T, count> c) { return muladd(a, broadcast_to_array<count>(b), c); }
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array<T, count> a, Array<T, count> b, T c) { return muladd(a, b, broadcast_to_array<count>(c)); }
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array<T, count> a, T b, T c) { return muladd(a, broadcast_to_array<count>(b), broadcast_to_array<count>(c)); }
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, Array<T, count> b, T c) { return muladd(broadcast_to_array<count>(a), b, broadcast_to_array<count>(c)); }
+template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, T b, Array<T, count> c) { return muladd(broadcast_to_array<count>(a), broadcast_to_array<count>(b), c); }
 
 #if TL_USE_SIMD
 
@@ -997,6 +1021,10 @@ forceinline auto lerp(Array<f32, 8> a_, Array<f32, 8> b_, Array<f32, 8> t_) {
 forceinline Array<f32, 8> min(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_min_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 forceinline Array<f32, 8> max(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_max_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
 
+template <> forceinline constexpr u64 mask_to_int(Array<u8, 16> mask) { return _mm_movemask_epi8 (bit_cast<__m128i>(mask)); }
+template <> forceinline constexpr u64 mask_to_int(Array<u32, 4> mask) { return _mm_movemask_ps(bit_cast<__m128 >(mask)); }
+template <> forceinline constexpr u64 mask_to_int(Array<u64, 2> mask) { return _mm_movemask_pd(bit_cast<__m128d>(mask)); }
+
 #endif
 
 #ifdef __AVX2__
@@ -1053,6 +1081,10 @@ template <class T, umm count>
 forceinline constexpr Array<T, count> pshufb(Array<T, count> a, Array<s8, 32> indices) {
 	return bit_cast<Array<T, count>>(_mm256_shuffle_epi8(bit_cast<__m256i>(a), bit_cast<__m256i>(indices)));
 }
+
+template <> forceinline constexpr u64 mask_to_int(Array<u8, 32> mask) { return _mm256_movemask_epi8 (bit_cast<__m256i>(mask)); }
+template <> forceinline constexpr u64 mask_to_int(Array<u32, 8> mask) { return _mm256_movemask_ps(bit_cast<__m256 >(mask)); }
+template <> forceinline constexpr u64 mask_to_int(Array<u64, 4> mask) { return _mm256_movemask_pd(bit_cast<__m256d>(mask)); }
 
 #endif
 

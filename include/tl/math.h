@@ -2,7 +2,6 @@
 #define TL_MATH_H
 #include "common.h"
 #include "array.h"
-#include "simd_macros.h"
 #include "string.h"
 #include "vector.h"
 #include "static_list.h"
@@ -2119,12 +2118,8 @@ union m4 {
 	using Scalar = f32;
 	using Vector = v4f;
 	struct {
-		simd::f32x4 im, jm, km, lm;
-	};
-	struct {
 		v4f i, j, k, l;
 	};
-	simd::f32x4 m[4];
 	v4f vectors[4];
 	f32 s[16];
 	forceinline v4f operator*(v4f b) const {
@@ -2134,62 +2129,38 @@ union m4 {
 		// v4f w = V4f(b.w) * l;
 		// return x + y + z + w;
 
-		union {
-			v4f v;
-			simd::f32x4 f;
-		};
-		f = f32x4_add(
-			f32x4_muladd(f32x4_set1(b.x), im, f32x4_mul(f32x4_set1(b.y), jm)),
-			f32x4_muladd(f32x4_set1(b.z), km, f32x4_mul(f32x4_set1(b.w), lm))
-		);
-		return v;
+		return muladd(l,  b.w, 
+		       muladd(k,  b.z,
+		       muladd(j,  b.y,
+		              i * b.x)));
 	}
 	forceinline v3f operator*(v3f b) const {
-		auto x = V4f(b.x) * i;
-		auto y = V4f(b.y) * j;
-		auto z = V4f(b.z) * k;
-		auto r = x + y + z;
-		v3f result;
-		memcpy(&result, &r, 12);
-		return result;
+		return muladd(k,  b.z, 
+		       muladd(j,  b.y,
+		              i * b.x)).xyz;
 	}
 	forceinline m4 operator*(m4 b) const {
-		// return {
-		// 	.i = b.i.x*i + b.i.y*j + b.i.z*k + b.i.w*l,
-		// 	.j = b.j.x*i + b.j.y*j + b.j.z*k + b.j.w*l,
-		// 	.k = b.k.x*i + b.k.y*j + b.k.z*k + b.k.w*l,
-		// 	.l = b.l.x*i + b.l.y*j + b.l.z*k + b.l.w*l,
-		// };
 		return {
-			.im = f32x4_add(f32x4_muladd(f32x4_set1(b.i.x), im, f32x4_mul(f32x4_set1(b.i.y), jm)), f32x4_muladd(f32x4_set1(b.i.z), km, f32x4_mul(f32x4_set1(b.i.w), lm))),
-			.jm = f32x4_add(f32x4_muladd(f32x4_set1(b.j.x), im, f32x4_mul(f32x4_set1(b.j.y), jm)), f32x4_muladd(f32x4_set1(b.j.z), km, f32x4_mul(f32x4_set1(b.j.w), lm))),
-			.km = f32x4_add(f32x4_muladd(f32x4_set1(b.k.x), im, f32x4_mul(f32x4_set1(b.k.y), jm)), f32x4_muladd(f32x4_set1(b.k.z), km, f32x4_mul(f32x4_set1(b.k.w), lm))),
-			.lm = f32x4_add(f32x4_muladd(f32x4_set1(b.l.x), im, f32x4_mul(f32x4_set1(b.l.y), jm)), f32x4_muladd(f32x4_set1(b.l.z), km, f32x4_mul(f32x4_set1(b.l.w), lm))),
+			.i = muladd(l, b.i.w, muladd(k, b.i.z, muladd(j, b.i.y, i * b.i.x))),
+			.j = muladd(l, b.j.w, muladd(k, b.j.z, muladd(j, b.j.y, i * b.j.x))),
+			.k = muladd(l, b.k.w, muladd(k, b.k.z, muladd(j, b.k.y, i * b.k.x))),
+			.l = muladd(l, b.l.w, muladd(k, b.l.z, muladd(j, b.l.y, i * b.l.x))),
 		};
 
-		// "smart" compiler could not figure this out...
-		// it is so smart that even after i directly said it what to do,
-		// it still produces 68 instructions half of which just shuffle the registers!!
-		// btw on platforms with fma all of this is doable in just 32 instructions.
+		// On platforms with vfma all of this is doable in just 32 instructions (excluding setup).
 
-		// xmm0 = i
-		// xmm1 = j
-		// xmm2 = k
-		// xmm3 = l
-		// xmm4 = b.i
-		// xmm5 = b.j
-		// xmm6 = b.k
-		// xmm7 = b.l
-		// compute b.i.x*i + b.i.y*j + b.i.z*k + b.i.w*l
-		// xmm9 = b.i.x // just shuffle
-		// xmm8 = xmm9*xmm0
-		// xmm9 = b.i.y
-		// xmm8 = xmm9*xmm1 + xmm8
-		// xmm9 = b.i.z
-		// xmm8 = xmm9*xmm2 + xmm8
-		// xmm9 = b.i.w
-		// xmm8 = xmm9*xmm3 + xmm8
-		// do same thing for j, k and l.
+		/* compute b.i.x*i + b.i.y*j + b.i.z*k + b.i.w*l
+
+		vshufps   tmp, b.i, b.i, (0,0,0,0) // tmp = b.i.x
+		vmulps    acc, tmp, i              // acc = tmp*i
+		vshufps   tmp, b.i, b.i, (1,1,1,1) // tmp = b.i.y
+		vfmadd231 acc, tmp, j              // acc = tmp*j + acc
+		vshufps   tmp, b.i, b.i, (2,2,2,2) // tmp = b.i.z
+		vfmadd231 acc, tmp, k              // acc = tmp*k + acc
+		vshufps   tmp, b.i, b.i, (3,3,3,3) // tmp = b.i.w
+		vfmadd231 acc, tmp, l              // acc = tmp*l + acc
+		result.i is done, do same for j, k and l.
+		*/
 
 	}
 	forceinline m4& operator*=(m4 b) { return *this = *this * b; }
@@ -2346,18 +2317,23 @@ forceinline constexpr m3 transpose(m3 const& m) {
 	}};
 }
 forceinline m4 transpose(m4 const& m) {
-	using namespace simd;
-	f32x4 tmp0 = _mm_unpacklo_ps(m.im, m.jm);
-	f32x4 tmp1 = _mm_unpackhi_ps(m.im, m.jm);
-	f32x4 tmp2 = _mm_unpacklo_ps(m.km, m.lm);
-	f32x4 tmp3 = _mm_unpackhi_ps(m.km, m.lm);
+	#define vm bit_cast<__m128>
+	#define mv bit_cast<v4f>
+
+	__m128 tmp0 = _mm_unpacklo_ps(vm(m.i), vm(m.j));
+	__m128 tmp1 = _mm_unpackhi_ps(vm(m.i), vm(m.j));
+	__m128 tmp2 = _mm_unpacklo_ps(vm(m.k), vm(m.l));
+	__m128 tmp3 = _mm_unpackhi_ps(vm(m.k), vm(m.l));
 
 	m4 result;
-	result.im = _mm_movelh_ps(tmp0, tmp2);
-	result.jm = _mm_movehl_ps(tmp2, tmp0);
-	result.km = _mm_movelh_ps(tmp1, tmp3);
-	result.lm = _mm_movehl_ps(tmp3, tmp1);
+	result.i = mv(_mm_movelh_ps(tmp0, tmp2));
+	result.j = mv(_mm_movehl_ps(tmp2, tmp0));
+	result.k = mv(_mm_movelh_ps(tmp1, tmp3));
+	result.l = mv(_mm_movehl_ps(tmp3, tmp1));
 	return result;
+
+	#undef vm
+	#undef mv
 }
 
 forceinline m3 inverse(m3 const &m) {
@@ -2433,7 +2409,14 @@ forceinline m4 inverse(m4 const &m) {
 
 forceinline constexpr m4 M4(f32 v = 0.0f) { return m4{v, v, v, v, v, v, v, v, v, v, v, v, v, v, v, v}; }
 forceinline constexpr m4 M4(v4f i, v4f j, v4f k, v4f l) { return m4{.i=i, .j=j, .k=k, .l=l}; }
-forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) { return m4{.im=i, .jm=j, .km=k, .lm=l}; }
+forceinline constexpr m4 M4(__m128 i, __m128 j, __m128 k, __m128 l) {
+	return m4 {
+		.i = bit_cast<v4f>(i),
+		.j = bit_cast<v4f>(j),
+		.k = bit_cast<v4f>(k),
+		.l = bit_cast<v4f>(l),
+	};
+}
 forceinline constexpr m4 M4(
 	f32 ix, f32 iy, f32 iz, f32 iw,
 	f32 jx, f32 jy, f32 jz, f32 jw,
@@ -2529,19 +2512,18 @@ forceinline FrustumPlanes create_frustum_planes_gl(m4 m) {
 }
 forceinline bool overlaps_sphere(FrustumPlanes const &planes, v3f position, f32 radius) {
 #if ARCH_AVX2
-	using namespace simd;
-	f32x8 plane_x = f32x8_set(planes.data[0].x, planes.data[1].x, planes.data[2].x, planes.data[3].x, planes.data[4].x, planes.data[5].x, 0, 0);
-	f32x8 plane_y = f32x8_set(planes.data[0].y, planes.data[1].y, planes.data[2].y, planes.data[3].y, planes.data[4].y, planes.data[5].y, 0, 0);
-	f32x8 plane_z = f32x8_set(planes.data[0].z, planes.data[1].z, planes.data[2].z, planes.data[3].z, planes.data[4].z, planes.data[5].z, 0, 0);
-	f32x8 plane_w = f32x8_set(planes.data[0].w, planes.data[1].w, planes.data[2].w, planes.data[3].w, planes.data[4].w, planes.data[5].w, 0, 0);
+	Array<f32, 8> plane_x = {planes.data[0].x, planes.data[1].x, planes.data[2].x, planes.data[3].x, planes.data[4].x, planes.data[5].x, 0, 0};
+	Array<f32, 8> plane_y = {planes.data[0].y, planes.data[1].y, planes.data[2].y, planes.data[3].y, planes.data[4].y, planes.data[5].y, 0, 0};
+	Array<f32, 8> plane_z = {planes.data[0].z, planes.data[1].z, planes.data[2].z, planes.data[3].z, planes.data[4].z, planes.data[5].z, 0, 0};
+	Array<f32, 8> plane_w = {planes.data[0].w, planes.data[1].w, planes.data[2].w, planes.data[3].w, planes.data[4].w, planes.data[5].w, 0, 0};
 
-	f32x8 f = f32x8_add(
-		f32x8_muladd(plane_x, f32x8_set1(position.x),
-		f32x8_muladd(plane_y, f32x8_set1(position.y),
-		   f32x8_mul(plane_z, f32x8_set1(position.z)))),
-		plane_w
-	);
-	auto mask = b32x8_get_mask(f32x8_lt(f, f32x8_set1(-radius)));
+	auto f = plane_w + 
+		muladd(plane_x,  position.x,
+		muladd(plane_y,  position.y,
+		       plane_z * position.z));
+
+	auto mask = mask_to_int(mask_less(f, broadcast_to_array<8>(-radius)));
+	
 	return !(mask & 0b11111100);
 #else
 	for (auto p : planes) {

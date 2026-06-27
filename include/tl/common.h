@@ -1250,6 +1250,8 @@ constexpr T *midpoint(T *a, T *b) {
 	return a + ((umm)(b - a) >> 1);
 }
 
+
+
 template <class T>
 struct AutoCastable {
 #if COMPILER_MSVC
@@ -1273,6 +1275,34 @@ struct AutoCaster {
 // This makes the struct not default-constructible, and when you try to default-construct it
 // the error is not about that, but a syntax one about unexpected '(' or something. It's strange.
 #define autocast AutoCaster{} ->* 
+
+
+
+template <class T>
+struct AutoBitCastable {
+#if COMPILER_MSVC
+#pragma warning(suppress: 4180) // const is meaningless for function types. No idea why and I don't care.
+#endif
+	T const &value;
+	template <class U>
+	forceinline constexpr operator U() {
+		return bit_cast<U>(value);
+	}
+};
+
+struct AutoBitCaster {
+	template <class T>
+	forceinline constexpr auto operator->*(T const &value) {
+		return AutoBitCastable{value};
+	}
+};
+
+// NOTE: MSVC breaks when this is used in initial value of a struct member.
+// This makes the struct not default-constructible, and when you try to default-construct it
+// the error is not about that, but a syntax one about unexpected '(' or something. It's strange.
+#define autobitcast AutoBitCaster{} ->* 
+
+
 
 template <class... Callables>
 struct Combine : public Callables... {
