@@ -60,7 +60,8 @@ using AppendLocationInfo = void (*)(StringBuilder &output, Span<utf8> path, u32 
 template <class AppendLocationInfo = AppendLocationInfo>
 struct LoadOptions {
 	Span<utf8> include_directive = u8"#include"s;
-	bool must_be_first_in_line = true;
+	bool must_be_first_in_line : 1 = true;
+	bool append_new_line_at_end_of_file : 1 = true; // to deal with backslashes at end of file.
 	AppendLocationInfo append_location_info = autocast []{};
 };
 
@@ -186,6 +187,9 @@ struct Includer {
 			} else {
 			nothing_left:
 				append(builder, current.remaining);
+				if (options.append_new_line_at_end_of_file) {
+					append(builder, '\n');
+				}
 				if (state_stack.count) {
 					current.deinit();
 					current = state_stack.pop().value();
