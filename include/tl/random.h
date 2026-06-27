@@ -154,8 +154,8 @@ inline u64 next(splitmix64 &state) {
 template <class F32, class U32>
 forceinline F32 normalize_range_f32(U32 v)
 	requires requires {
-		sizeof(F32) == sizeof(U32);
-		is_unsigned<U32>;
+		requires sizeof(F32) == sizeof(U32);
+		requires is_unsigned<U32>;
 	}
 {
 	v >>= 9;
@@ -165,8 +165,8 @@ forceinline F32 normalize_range_f32(U32 v)
 template <class F64, class U64>
 forceinline F64 normalize_range_f64(U64 v)
 	requires requires {
-		sizeof(F64) == sizeof(U64);
-		is_unsigned<U64>;
+		requires sizeof(F64) == sizeof(U64);
+		requires is_unsigned<U64>;
 	}
 {
 	v >>= 12;

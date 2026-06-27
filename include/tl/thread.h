@@ -1,8 +1,8 @@
 #pragma once
-#include "function.h"
 #include "list.h"
 #include "queue.h"
 #include "sleep.h"
+#include "function_detail.h"
 
 #include <emmintrin.h>
 
@@ -253,10 +253,17 @@ forceinline bool atomic_and(bool volatile *a, bool b) { return (bool)atomic_and(
 forceinline bool atomic_or (bool volatile *a, bool b) { return (bool)atomic_or ((u8 *)a, (u8)b); }
 forceinline bool atomic_xor(bool volatile *a, bool b) { return (bool)atomic_xor((u8 *)a, (u8)b); }
 
+struct FatFunctionPointer;
 extern TL_API FatFunctionPointer thread_initter;
 extern TL_API FatFunctionPointer thread_deinitter;
 
+}
+
 #ifdef TL_IMPL
+
+#include "fat_function_pointer.h"
+#include "console.h"
+namespace tl {
 
 TL_API FatFunctionPointer thread_initter = +[]{
 	init_allocator();
@@ -306,7 +313,12 @@ u32 get_thread_id(Thread *thread) {
 
 #else // ^^^ OS_WINDOWS ^^^ vvvvvv
 #endif
+
+}
+
 #endif // TL_IMPL
+
+namespace tl {
 
 template <class T>
 concept ASpinner = requires(T t) { t.spin(); };
