@@ -12,7 +12,7 @@ struct MultiArray {
 	umm count = 0;
 	[[no_unique_address]] Allocator allocator = Allocator::current();
 
-	void init(umm new_count) {
+	void init_without_constructors(umm new_count) {
 		base()   = (u8 *)allocator.allocate(get_buffer_size(new_count), max(alignof(Ts)...));
 		count = new_count;
 
@@ -23,6 +23,16 @@ struct MultiArray {
 				}
 			};
 		}
+	}
+	void init(umm new_count) {
+		init_without_constructors(new_count);
+
+		for_each_type(I, T, Ts) {
+			T *data = base_of<I>();
+			for (umm i = 0; i < count; ++i) {
+				new(&data[i]) T();
+			}
+		};
 	}
 	void free() {
 		allocator.free(base(), get_buffer_size(count), max(alignof(Ts)...));

@@ -104,7 +104,7 @@ struct ContiguousHashMap : Traits {
 
 		auto old_buffer = buffer;
 
-		buffer.init(ceil_to_power_of_2(max((umm)TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, desired)));
+		buffer.init_without_constructors(ceil_to_power_of_2(max((umm)TL_INITIAL_CONTIGUOUS_HASH_MAP_CAPACITY, desired)));
 
 		HashAndState *old_hns    = old_buffer.template base_of<0>();
 		Key          *old_keys   = old_buffer.template base_of<1>();

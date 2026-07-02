@@ -75,6 +75,7 @@ struct TL_API Profiler {
 		u64 self_time = 0;
 #endif
 		u32 depth = 0;
+		bool enabled = true;
 	};
 
 	ArenaAllocator allocator;
@@ -156,6 +157,8 @@ struct TL_API Profiler {
 		}
 	}
 
+	void enable_for_this_thread(bool enable);
+
 	struct Report {
 		struct Thread {
 			u32 id;
@@ -169,42 +172,7 @@ struct TL_API Profiler {
 		u64 start_time;
 	};
 
-	void collect_report(Report &report) {
-		assert(waiting_for_everyone);
-
-		report.start_time = start_time;
-
-		report.all_time_spans.clear();
-		report.all_marks.clear();
-		report.per_thread.clear();
-
-		for (umm i = 0; i < ids_and_infos_allocated_count; ++i) {
-			auto &thread_id   = ids_and_infos.base_of<0>()[i];
-			auto &protected_thread_info = ids_and_infos.base_of<1>()[i];
-
-			// No need to lock. It is already taken since waiting_for_everyone is true.
-			auto &thread_info = protected_thread_info.unprotected;
-
-			report.per_thread.add({
-				.id = thread_id,
-				.time_spans = {
-					(TimeSpan *)report.all_time_spans.count,
-					thread_info.recorded_time_spans.count,
-				},
-				.marks = {
-					(Mark *)report.all_marks.count,
-					thread_info.marks.count,
-				},
-			});
-			report.all_time_spans.add(thread_info.recorded_time_spans);
-			report.all_marks.add(thread_info.marks);
-		}
-
-		for (auto &thread : report.per_thread) {
-			thread.time_spans.data = report.all_time_spans.data + (umm)thread.time_spans.data;
-			thread.marks.data = report.all_marks.data + (umm)thread.marks.data;
-		}
-	}
+	void collect_report(Report &report);
 	
 	struct ReportForChrome : Report {};
 	struct ReportForTimed : Report {};
@@ -372,6 +340,10 @@ retry:
 	}
 
 	auto &protected_thread_info = get_thread_info(*this, thread_id);
+
+	if (!protected_thread_info.unprotected.enabled)
+		return;
+
 	scoped_locked_use_expr(thread_info, protected_thread_info);
 
 	// TODO: profiler.reset() requires waiting for everyone to finish their timed blocks. 
@@ -409,6 +381,10 @@ void Profiler::end() {
 	u32 thread_id = get_current_thread_id();
 	
 	auto &protected_thread_info = get_thread_info(*this, thread_id);
+
+	if (!protected_thread_info.unprotected.enabled)
+		return;
+
 	scoped_locked_use_expr(thread_info, protected_thread_info);
 
 	TimeSpan span = thread_info.time_span_stack.back();
@@ -440,6 +416,10 @@ void Profiler::mark(Span<utf8> name, Span<utf8> file, u32 line) {
 	u32 thread_id = get_current_thread_id();
 	
 	auto &protected_thread_info = get_thread_info(*this, thread_id);
+
+	if (!protected_thread_info.unprotected.enabled)
+		return;
+
 	scoped_locked_use_expr(thread_info, protected_thread_info);
 
 	Profiler::Mark mark = {
@@ -469,6 +449,50 @@ void Profiler::reset() {
 		start_time = get_performance_counter();
 	});
 }
+
+void Profiler::enable_for_this_thread(bool enable) {
+	u32 thread_id = get_current_thread_id();
+	auto &protected_thread_info = get_thread_info(*this, thread_id);
+	protected_thread_info.unprotected.enabled = enable;
+}
+
+void Profiler::collect_report(Report &report) {
+	assert(waiting_for_everyone);
+
+	report.start_time = start_time;
+
+	report.all_time_spans.clear();
+	report.all_marks.clear();
+	report.per_thread.clear();
+
+	for (umm i = 0; i < ids_and_infos_allocated_count; ++i) {
+		auto &thread_id   = ids_and_infos.base_of<0>()[i];
+		auto &protected_thread_info = ids_and_infos.base_of<1>()[i];
+
+		// No need to lock. It is already taken since waiting_for_everyone is true.
+		auto &thread_info = protected_thread_info.unprotected;
+
+		report.per_thread.add({
+			.id = thread_id,
+			.time_spans = {
+				(TimeSpan *)report.all_time_spans.count,
+				thread_info.recorded_time_spans.count,
+			},
+			.marks = {
+				(Mark *)report.all_marks.count,
+				thread_info.marks.count,
+			},
+		});
+		report.all_time_spans.add(thread_info.recorded_time_spans);
+		report.all_marks.add(thread_info.marks);
+	}
+
+	for (auto &thread : report.per_thread) {
+		thread.time_spans.data = report.all_time_spans.data + (umm)thread.time_spans.data;
+		thread.marks.data = report.all_marks.data + (umm)thread.marks.data;
+	}
+}
+
 
 void append(StringBuilder &builder, Profiler::ReportForChrome const &r) {
 	append(builder, R"({"otherData":{},"traceEvents":[
