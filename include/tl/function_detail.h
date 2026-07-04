@@ -20,7 +20,8 @@ static constexpr auto get_invoke(std::index_sequence<indices...>) noexcept {
 
 template <class State, class Param, umm... indices>
 static decltype(auto) invoke_separated(void *state, void *param) noexcept {
-	return std::invoke(*(State *)state, std::move(std::get<indices>(*(Param *)param))...);
+	auto &tuple = *(Param *)param;
+	return std::invoke(*(State *)state, std::get<indices>(tuple)...);
 }
 template <class State, class Param, umm... indices>
 static constexpr auto get_invoke_separated(std::index_sequence<indices...>) noexcept {

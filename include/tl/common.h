@@ -262,10 +262,10 @@ constexpr bool operator!=(Empty, Empty) { return false; }
 
 inline umm noop() { return 0; }
 
-template <typename T>
+template <typename ...T>
 struct ShowType; // Use for debugging, print types at compile time.
 
-template <auto value>
+template <auto ...value>
 struct ShowValue; // Use for debugging, print values at compile time.
 
 template <class ...T>
