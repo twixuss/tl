@@ -40,6 +40,13 @@
 
 namespace tl { namespace d3d11 {
 
+void set_name(ID3D11DeviceChild *device_child, Span<char> name) {
+	device_child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.count, name.data);
+}
+void set_name(ID3D11DeviceChild *device_child, Span<utf8> name) {
+	set_name(device_child, as_chars(name));
+}
+
 struct Shader {
 	ID3D11VertexShader *vs = 0;
 	ID3D11PixelShader *ps = 0;
@@ -48,10 +55,6 @@ struct Shader {
 struct ShaderResource {
 	ID3D11ShaderResourceView *srv = 0;
 };
-
-void set_name(ID3D11Buffer *buffer, Span<char> name) {
-	buffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.count, name.data);
-}
 
 struct UntypedBuffer {
 	ID3D11Buffer *buffer = 0;

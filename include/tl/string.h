@@ -1100,7 +1100,7 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 		auto round_and_trim = [&] {
 			f = frac(f);
 			if (f != 0) {
-				if (f >= 0.5f) {
+				if (f >= (Float)0.5f) {
 					auto it = buffer.end() - 1;
 					while (1) {
 						*it += 1;

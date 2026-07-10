@@ -1951,7 +1951,7 @@ forceinline Optional<RaycastHit<v2f>> raycast(ray<v2f> ray, line_segment<v2f> li
 	auto t1 = cross(v2, v1) / d;
 	auto t2 = dot(v1, v3) / d;
 
-	if (t1 < 0 || t2 < 0 || t2 > 1.0)
+	if (t1 < 0 || t2 < 0 || t2 > 1)
 		return {};
 
 	auto n = perp(normalize(line.a - line.b));

@@ -62,6 +62,7 @@ struct LoadOptions {
 	Span<utf8> include_directive = u8"#include"s;
 	bool must_be_first_in_line : 1 = true;
 	bool append_new_line_at_end_of_file : 1 = true; // to deal with backslashes at end of file.
+	bool ignore_repeated_inclusions : 1 = true; // when set to true acts like all files have `#pragma once`
 	AppendLocationInfo append_location_info = autocast []{};
 };
 
@@ -175,15 +176,24 @@ struct Includer {
 
 				auto full_include_path = format<PathAllocator>(u8"{}/{}"s, parse_path(current.path).directory, relative_include_path);
 
-				add_source_file(full_include_path);
-
-				state_stack.add(current);
-				current = {.path = full_include_path};
-				if (!current.init()) {
-					return false;
+				bool should_include = true;
+				if (options.ignore_repeated_inclusions) {
+					if (find_if(source_files, [&](SourceFile s) { return s.path == full_include_path; })) {
+						should_include = false;
+					}
 				}
 
-				options.append_location_info(builder, full_include_path, 0);
+				if (should_include) {
+					add_source_file(full_include_path);
+					
+					state_stack.add(current);
+					current = {.path = full_include_path};
+					if (!current.init()) {
+						return false;
+					}
+					
+					options.append_location_info(builder, full_include_path, 0);
+				}
 			} else {
 			nothing_left:
 				append(builder, current.remaining);

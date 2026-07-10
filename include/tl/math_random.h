@@ -367,9 +367,9 @@ forceinline f32 voronoi_edge_v3f(v3f coordinate){
 				v3f toCell = cellPosition - coordinate;
 
 				v3f diffToClosestCell = absolute(closestCell - cell);
-				bool isClosestCell = diffToClosestCell.x + diffToClosestCell.y + diffToClosestCell.z < 0.1;
+				bool isClosestCell = diffToClosestCell.x + diffToClosestCell.y + diffToClosestCell.z < 0.1f;
 				if(!isClosestCell){
-					v3f toCenter = (toClosestCell + toCell) * 0.5;
+					v3f toCenter = (toClosestCell + toCell) * 0.5f;
 					v3f cellDifference = normalize(toCell - toClosestCell);
 					float edgeDistance = dot(toCenter, cellDifference);
 					minEdgeDistance = min(minEdgeDistance, edgeDistance);

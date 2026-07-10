@@ -396,6 +396,9 @@ struct List : Span<T> {
 	}
 };
 
+template <class T> inline static constexpr bool is_list = false;
+template <class T, class Allocator> inline static constexpr bool is_list<List<T, Allocator>> = true;
+
 template <class T, class Allocator>
 void free(List<T, Allocator> &list) {
 	if (list.data == 0) return;

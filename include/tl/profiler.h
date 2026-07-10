@@ -614,14 +614,14 @@ void ProfileRenderer::render(f64 view_scale, f64 scroll_amount_in_nanoseconds, s
 		u32 max_depth = 0;
 
 		for (auto &mark : events_to_draw.marks) {
-			mark.rect.min.x = (mark.time - scroll_amount_in_nanoseconds) * view_scale;
+			mark.rect.min.x = (s64)((mark.time - scroll_amount_in_nanoseconds) * view_scale);
 			mark.rect.max.x = mark.rect.min.x + 1;
 			mark.rect.min.y = 0;
 			mark.rect.max.y = button_height * 1;
 		}
 		for (auto &event : events_to_draw.events) {
-			event.rect.min.x = (event.begin - scroll_amount_in_nanoseconds) * view_scale;
-			event.rect.max.x = max<f64>((event.end - scroll_amount_in_nanoseconds) * view_scale, event.rect.min.x + 1);
+			event.rect.min.x = (s64)((event.begin - scroll_amount_in_nanoseconds) * view_scale);
+			event.rect.max.x = max((s64)((event.end - scroll_amount_in_nanoseconds) * view_scale), event.rect.min.x + 1);
 			event.rect.min.y = button_height * (event.depth + 0);
 			event.rect.max.y = button_height * (event.depth + 1);
 
