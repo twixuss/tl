@@ -10,6 +10,193 @@ template <class T, umm count_>
 struct Array {
 	inline static constexpr umm count = count_;
 	#include "_array_members_before.inc"
+	T data[count];
+	#include "_array_members_after.inc"
+};
+
+template <class T>
+struct Array<T, 1> {
+	inline static constexpr umm count = 1;
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		T x;
+	};
+	#include "_array_members_after.inc"
+};
+
+template <class T>
+struct Array<T, 2> {
+	inline static constexpr umm count = 2;
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		struct { T x, y; };
+	};
+	#include "_array_members_after.inc"
+	forceinline constexpr v2 xx() const { return {x,x}; }
+	forceinline constexpr v2 yx() const { return {y,x}; }
+	forceinline constexpr v2 yy() const { return {y,y}; }
+	forceinline constexpr v3 xxx() const { return {x,x,x}; }
+	forceinline constexpr v3 xxy() const { return {x,x,y}; }
+	forceinline constexpr v3 xyx() const { return {x,y,x}; }
+	forceinline constexpr v3 xyy() const { return {x,y,y}; }
+	forceinline constexpr v3 yxx() const { return {y,x,x}; }
+	forceinline constexpr v3 yxy() const { return {y,x,y}; }
+	forceinline constexpr v3 yyx() const { return {y,y,x}; }
+	forceinline constexpr v3 yyy() const { return {y,y,y}; }
+	forceinline constexpr v4 xxxx() const { return {x,x,x,x}; }
+	forceinline constexpr v4 xxxy() const { return {x,x,x,y}; }
+	forceinline constexpr v4 xxyx() const { return {x,x,y,x}; }
+	forceinline constexpr v4 xxyy() const { return {x,x,y,y}; }
+	forceinline constexpr v4 xyxx() const { return {x,y,x,x}; }
+	forceinline constexpr v4 xyxy() const { return {x,y,x,y}; }
+	forceinline constexpr v4 xyyx() const { return {x,y,y,x}; }
+	forceinline constexpr v4 xyyy() const { return {x,y,y,y}; }
+	forceinline constexpr v4 yxxx() const { return {y,x,x,x}; }
+	forceinline constexpr v4 yxxy() const { return {y,x,x,y}; }
+	forceinline constexpr v4 yxyx() const { return {y,x,y,x}; }
+	forceinline constexpr v4 yxyy() const { return {y,x,y,y}; }
+	forceinline constexpr v4 yyxx() const { return {y,y,x,x}; }
+	forceinline constexpr v4 yyxy() const { return {y,y,x,y}; }
+	forceinline constexpr v4 yyyx() const { return {y,y,y,x}; }
+	forceinline constexpr v4 yyyy() const { return {y,y,y,y}; }
+};
+
+template <class T>
+struct Array<T, 3> {
+	inline static constexpr umm count = 3;
+	#include "_array_members_before.inc"
+	union {
+		T data[count];
+		T s[count]; // Compatibility with vectors
+		struct { T x, y, z; };
+		struct { v2 xy; };
+		struct { T _pad0; v2 yz; };
+	};
+	#include "_array_members_after.inc"
+	forceinline constexpr v2 xx() const { return {x,x}; }
+	forceinline constexpr v2 xz() const { return {x,z}; }
+	forceinline constexpr v2 yx() const { return {y,x}; }
+	forceinline constexpr v2 yy() const { return {y,y}; }
+	forceinline constexpr v2 zx() const { return {z,x}; }
+	forceinline constexpr v2 zy() const { return {z,y}; }
+	forceinline constexpr v2 zz() const { return {z,z}; }
+	forceinline constexpr v3 xxx() const { return {x,x,x}; }
+	forceinline constexpr v3 xxy() const { return {x,x,y}; }
+	forceinline constexpr v3 xxz() const { return {x,x,z}; }
+	forceinline constexpr v3 xyx() const { return {x,y,x}; }
+	forceinline constexpr v3 xyy() const { return {x,y,y}; }
+	forceinline constexpr v3 xzx() const { return {x,z,x}; }
+	forceinline constexpr v3 xzy() const { return {x,z,y}; }
+	forceinline constexpr v3 xzz() const { return {x,z,z}; }
+	forceinline constexpr v3 yxx() const { return {y,x,x}; }
+	forceinline constexpr v3 yxy() const { return {y,x,y}; }
+	forceinline constexpr v3 yxz() const { return {y,x,z}; }
+	forceinline constexpr v3 yyx() const { return {y,y,x}; }
+	forceinline constexpr v3 yyy() const { return {y,y,y}; }
+	forceinline constexpr v3 yyz() const { return {y,y,z}; }
+	forceinline constexpr v3 yzx() const { return {y,z,x}; }
+	forceinline constexpr v3 yzy() const { return {y,z,y}; }
+	forceinline constexpr v3 yzz() const { return {y,z,z}; }
+	forceinline constexpr v3 zxx() const { return {z,x,x}; }
+	forceinline constexpr v3 zxy() const { return {z,x,y}; }
+	forceinline constexpr v3 zxz() const { return {z,x,z}; }
+	forceinline constexpr v3 zyx() const { return {z,y,x}; }
+	forceinline constexpr v3 zyy() const { return {z,y,y}; }
+	forceinline constexpr v3 zyz() const { return {z,y,z}; }
+	forceinline constexpr v3 zzx() const { return {z,z,x}; }
+	forceinline constexpr v3 zzy() const { return {z,z,y}; }
+	forceinline constexpr v3 zzz() const { return {z,z,z}; }
+	forceinline constexpr v4 xxxx() const { return {x,x,x,x}; }
+	forceinline constexpr v4 xxxy() const { return {x,x,x,y}; }
+	forceinline constexpr v4 xxxz() const { return {x,x,x,z}; }
+	forceinline constexpr v4 xxyx() const { return {x,x,y,x}; }
+	forceinline constexpr v4 xxyy() const { return {x,x,y,y}; }
+	forceinline constexpr v4 xxyz() const { return {x,x,y,z}; }
+	forceinline constexpr v4 xxzx() const { return {x,x,z,x}; }
+	forceinline constexpr v4 xxzy() const { return {x,x,z,y}; }
+	forceinline constexpr v4 xxzz() const { return {x,x,z,z}; }
+	forceinline constexpr v4 xyxx() const { return {x,y,x,x}; }
+	forceinline constexpr v4 xyxy() const { return {x,y,x,y}; }
+	forceinline constexpr v4 xyxz() const { return {x,y,x,z}; }
+	forceinline constexpr v4 xyyx() const { return {x,y,y,x}; }
+	forceinline constexpr v4 xyyy() const { return {x,y,y,y}; }
+	forceinline constexpr v4 xyyz() const { return {x,y,y,z}; }
+	forceinline constexpr v4 xyzx() const { return {x,y,z,x}; }
+	forceinline constexpr v4 xyzy() const { return {x,y,z,y}; }
+	forceinline constexpr v4 xyzz() const { return {x,y,z,z}; }
+	forceinline constexpr v4 xzxx() const { return {x,z,x,x}; }
+	forceinline constexpr v4 xzxy() const { return {x,z,x,y}; }
+	forceinline constexpr v4 xzxz() const { return {x,z,x,z}; }
+	forceinline constexpr v4 xzyx() const { return {x,z,y,x}; }
+	forceinline constexpr v4 xzyy() const { return {x,z,y,y}; }
+	forceinline constexpr v4 xzyz() const { return {x,z,y,z}; }
+	forceinline constexpr v4 xzzx() const { return {x,z,z,x}; }
+	forceinline constexpr v4 xzzy() const { return {x,z,z,y}; }
+	forceinline constexpr v4 xzzz() const { return {x,z,z,z}; }
+	forceinline constexpr v4 yxxx() const { return {y,x,x,x}; }
+	forceinline constexpr v4 yxxy() const { return {y,x,x,y}; }
+	forceinline constexpr v4 yxxz() const { return {y,x,x,z}; }
+	forceinline constexpr v4 yxyx() const { return {y,x,y,x}; }
+	forceinline constexpr v4 yxyy() const { return {y,x,y,y}; }
+	forceinline constexpr v4 yxyz() const { return {y,x,y,z}; }
+	forceinline constexpr v4 yxzx() const { return {y,x,z,x}; }
+	forceinline constexpr v4 yxzy() const { return {y,x,z,y}; }
+	forceinline constexpr v4 yxzz() const { return {y,x,z,z}; }
+	forceinline constexpr v4 yyxx() const { return {y,y,x,x}; }
+	forceinline constexpr v4 yyxy() const { return {y,y,x,y}; }
+	forceinline constexpr v4 yyxz() const { return {y,y,x,z}; }
+	forceinline constexpr v4 yyyx() const { return {y,y,y,x}; }
+	forceinline constexpr v4 yyyy() const { return {y,y,y,y}; }
+	forceinline constexpr v4 yyyz() const { return {y,y,y,z}; }
+	forceinline constexpr v4 yyzx() const { return {y,y,z,x}; }
+	forceinline constexpr v4 yyzy() const { return {y,y,z,y}; }
+	forceinline constexpr v4 yyzz() const { return {y,y,z,z}; }
+	forceinline constexpr v4 yzxx() const { return {y,z,x,x}; }
+	forceinline constexpr v4 yzxy() const { return {y,z,x,y}; }
+	forceinline constexpr v4 yzxz() const { return {y,z,x,z}; }
+	forceinline constexpr v4 yzyx() const { return {y,z,y,x}; }
+	forceinline constexpr v4 yzyy() const { return {y,z,y,y}; }
+	forceinline constexpr v4 yzyz() const { return {y,z,y,z}; }
+	forceinline constexpr v4 yzzx() const { return {y,z,z,x}; }
+	forceinline constexpr v4 yzzy() const { return {y,z,z,y}; }
+	forceinline constexpr v4 yzzz() const { return {y,z,z,z}; }
+	forceinline constexpr v4 zxxx() const { return {z,x,x,x}; }
+	forceinline constexpr v4 zxxy() const { return {z,x,x,y}; }
+	forceinline constexpr v4 zxxz() const { return {z,x,x,z}; }
+	forceinline constexpr v4 zxyx() const { return {z,x,y,x}; }
+	forceinline constexpr v4 zxyy() const { return {z,x,y,y}; }
+	forceinline constexpr v4 zxyz() const { return {z,x,y,z}; }
+	forceinline constexpr v4 zxzx() const { return {z,x,z,x}; }
+	forceinline constexpr v4 zxzy() const { return {z,x,z,y}; }
+	forceinline constexpr v4 zxzz() const { return {z,x,z,z}; }
+	forceinline constexpr v4 zyxx() const { return {z,y,x,x}; }
+	forceinline constexpr v4 zyxy() const { return {z,y,x,y}; }
+	forceinline constexpr v4 zyxz() const { return {z,y,x,z}; }
+	forceinline constexpr v4 zyyx() const { return {z,y,y,x}; }
+	forceinline constexpr v4 zyyy() const { return {z,y,y,y}; }
+	forceinline constexpr v4 zyyz() const { return {z,y,y,z}; }
+	forceinline constexpr v4 zyzx() const { return {z,y,z,x}; }
+	forceinline constexpr v4 zyzy() const { return {z,y,z,y}; }
+	forceinline constexpr v4 zyzz() const { return {z,y,z,z}; }
+	forceinline constexpr v4 zzxx() const { return {z,z,x,x}; }
+	forceinline constexpr v4 zzxy() const { return {z,z,x,y}; }
+	forceinline constexpr v4 zzxz() const { return {z,z,x,z}; }
+	forceinline constexpr v4 zzyx() const { return {z,z,y,x}; }
+	forceinline constexpr v4 zzyy() const { return {z,z,y,y}; }
+	forceinline constexpr v4 zzyz() const { return {z,z,y,z}; }
+	forceinline constexpr v4 zzzx() const { return {z,z,z,x}; }
+	forceinline constexpr v4 zzzy() const { return {z,z,z,y}; }
+	forceinline constexpr v4 zzzz() const { return {z,z,z,z}; }
+};
+
+template <class T>
+struct Array<T, 4> {
+	inline static constexpr umm count = 4;
+	#include "_array_members_before.inc"
 	union {
 		T data[count];
 		T s[count]; // Compatibility with vectors
@@ -350,185 +537,6 @@ struct Array {
 	forceinline constexpr v4 wwwy() const { return {w,w,w,y}; }
 	forceinline constexpr v4 wwwz() const { return {w,w,w,z}; }
 	forceinline constexpr v4 wwww() const { return {w,w,w,w}; }
-};
-
-template <class T>
-struct Array<T, 1> {
-	inline static constexpr umm count = 1;
-	#include "_array_members_before.inc"
-	union {
-		T data[count];
-		T s[count]; // Compatibility with vectors
-		T x;
-	};
-	#include "_array_members_after.inc"
-};
-
-template <class T>
-struct Array<T, 2> {
-	inline static constexpr umm count = 2;
-	#include "_array_members_before.inc"
-	union {
-		T data[count];
-		T s[count]; // Compatibility with vectors
-		struct { T x, y; };
-	};
-	#include "_array_members_after.inc"
-	forceinline constexpr v2 xx() const { return {x,x}; }
-	forceinline constexpr v2 yx() const { return {y,x}; }
-	forceinline constexpr v2 yy() const { return {y,y}; }
-	forceinline constexpr v3 xxx() const { return {x,x,x}; }
-	forceinline constexpr v3 xxy() const { return {x,x,y}; }
-	forceinline constexpr v3 xyx() const { return {x,y,x}; }
-	forceinline constexpr v3 xyy() const { return {x,y,y}; }
-	forceinline constexpr v3 yxx() const { return {y,x,x}; }
-	forceinline constexpr v3 yxy() const { return {y,x,y}; }
-	forceinline constexpr v3 yyx() const { return {y,y,x}; }
-	forceinline constexpr v3 yyy() const { return {y,y,y}; }
-	forceinline constexpr v4 xxxx() const { return {x,x,x,x}; }
-	forceinline constexpr v4 xxxy() const { return {x,x,x,y}; }
-	forceinline constexpr v4 xxyx() const { return {x,x,y,x}; }
-	forceinline constexpr v4 xxyy() const { return {x,x,y,y}; }
-	forceinline constexpr v4 xyxx() const { return {x,y,x,x}; }
-	forceinline constexpr v4 xyxy() const { return {x,y,x,y}; }
-	forceinline constexpr v4 xyyx() const { return {x,y,y,x}; }
-	forceinline constexpr v4 xyyy() const { return {x,y,y,y}; }
-	forceinline constexpr v4 yxxx() const { return {y,x,x,x}; }
-	forceinline constexpr v4 yxxy() const { return {y,x,x,y}; }
-	forceinline constexpr v4 yxyx() const { return {y,x,y,x}; }
-	forceinline constexpr v4 yxyy() const { return {y,x,y,y}; }
-	forceinline constexpr v4 yyxx() const { return {y,y,x,x}; }
-	forceinline constexpr v4 yyxy() const { return {y,y,x,y}; }
-	forceinline constexpr v4 yyyx() const { return {y,y,y,x}; }
-	forceinline constexpr v4 yyyy() const { return {y,y,y,y}; }
-};
-
-template <class T>
-struct Array<T, 3> {
-	inline static constexpr umm count = 3;
-	#include "_array_members_before.inc"
-	union {
-		T data[count];
-		T s[count]; // Compatibility with vectors
-		struct { T x, y, z; };
-		struct { v2 xy; };
-		struct { T _pad0; v2 yz; };
-	};
-	#include "_array_members_after.inc"
-	forceinline constexpr v2 xx() const { return {x,x}; }
-	forceinline constexpr v2 xz() const { return {x,z}; }
-	forceinline constexpr v2 yx() const { return {y,x}; }
-	forceinline constexpr v2 yy() const { return {y,y}; }
-	forceinline constexpr v2 zx() const { return {z,x}; }
-	forceinline constexpr v2 zy() const { return {z,y}; }
-	forceinline constexpr v2 zz() const { return {z,z}; }
-	forceinline constexpr v3 xxx() const { return {x,x,x}; }
-	forceinline constexpr v3 xxy() const { return {x,x,y}; }
-	forceinline constexpr v3 xxz() const { return {x,x,z}; }
-	forceinline constexpr v3 xyx() const { return {x,y,x}; }
-	forceinline constexpr v3 xyy() const { return {x,y,y}; }
-	forceinline constexpr v3 xzx() const { return {x,z,x}; }
-	forceinline constexpr v3 xzy() const { return {x,z,y}; }
-	forceinline constexpr v3 xzz() const { return {x,z,z}; }
-	forceinline constexpr v3 yxx() const { return {y,x,x}; }
-	forceinline constexpr v3 yxy() const { return {y,x,y}; }
-	forceinline constexpr v3 yxz() const { return {y,x,z}; }
-	forceinline constexpr v3 yyx() const { return {y,y,x}; }
-	forceinline constexpr v3 yyy() const { return {y,y,y}; }
-	forceinline constexpr v3 yyz() const { return {y,y,z}; }
-	forceinline constexpr v3 yzx() const { return {y,z,x}; }
-	forceinline constexpr v3 yzy() const { return {y,z,y}; }
-	forceinline constexpr v3 yzz() const { return {y,z,z}; }
-	forceinline constexpr v3 zxx() const { return {z,x,x}; }
-	forceinline constexpr v3 zxy() const { return {z,x,y}; }
-	forceinline constexpr v3 zxz() const { return {z,x,z}; }
-	forceinline constexpr v3 zyx() const { return {z,y,x}; }
-	forceinline constexpr v3 zyy() const { return {z,y,y}; }
-	forceinline constexpr v3 zyz() const { return {z,y,z}; }
-	forceinline constexpr v3 zzx() const { return {z,z,x}; }
-	forceinline constexpr v3 zzy() const { return {z,z,y}; }
-	forceinline constexpr v3 zzz() const { return {z,z,z}; }
-	forceinline constexpr v4 xxxx() const { return {x,x,x,x}; }
-	forceinline constexpr v4 xxxy() const { return {x,x,x,y}; }
-	forceinline constexpr v4 xxxz() const { return {x,x,x,z}; }
-	forceinline constexpr v4 xxyx() const { return {x,x,y,x}; }
-	forceinline constexpr v4 xxyy() const { return {x,x,y,y}; }
-	forceinline constexpr v4 xxyz() const { return {x,x,y,z}; }
-	forceinline constexpr v4 xxzx() const { return {x,x,z,x}; }
-	forceinline constexpr v4 xxzy() const { return {x,x,z,y}; }
-	forceinline constexpr v4 xxzz() const { return {x,x,z,z}; }
-	forceinline constexpr v4 xyxx() const { return {x,y,x,x}; }
-	forceinline constexpr v4 xyxy() const { return {x,y,x,y}; }
-	forceinline constexpr v4 xyxz() const { return {x,y,x,z}; }
-	forceinline constexpr v4 xyyx() const { return {x,y,y,x}; }
-	forceinline constexpr v4 xyyy() const { return {x,y,y,y}; }
-	forceinline constexpr v4 xyyz() const { return {x,y,y,z}; }
-	forceinline constexpr v4 xyzx() const { return {x,y,z,x}; }
-	forceinline constexpr v4 xyzy() const { return {x,y,z,y}; }
-	forceinline constexpr v4 xyzz() const { return {x,y,z,z}; }
-	forceinline constexpr v4 xzxx() const { return {x,z,x,x}; }
-	forceinline constexpr v4 xzxy() const { return {x,z,x,y}; }
-	forceinline constexpr v4 xzxz() const { return {x,z,x,z}; }
-	forceinline constexpr v4 xzyx() const { return {x,z,y,x}; }
-	forceinline constexpr v4 xzyy() const { return {x,z,y,y}; }
-	forceinline constexpr v4 xzyz() const { return {x,z,y,z}; }
-	forceinline constexpr v4 xzzx() const { return {x,z,z,x}; }
-	forceinline constexpr v4 xzzy() const { return {x,z,z,y}; }
-	forceinline constexpr v4 xzzz() const { return {x,z,z,z}; }
-	forceinline constexpr v4 yxxx() const { return {y,x,x,x}; }
-	forceinline constexpr v4 yxxy() const { return {y,x,x,y}; }
-	forceinline constexpr v4 yxxz() const { return {y,x,x,z}; }
-	forceinline constexpr v4 yxyx() const { return {y,x,y,x}; }
-	forceinline constexpr v4 yxyy() const { return {y,x,y,y}; }
-	forceinline constexpr v4 yxyz() const { return {y,x,y,z}; }
-	forceinline constexpr v4 yxzx() const { return {y,x,z,x}; }
-	forceinline constexpr v4 yxzy() const { return {y,x,z,y}; }
-	forceinline constexpr v4 yxzz() const { return {y,x,z,z}; }
-	forceinline constexpr v4 yyxx() const { return {y,y,x,x}; }
-	forceinline constexpr v4 yyxy() const { return {y,y,x,y}; }
-	forceinline constexpr v4 yyxz() const { return {y,y,x,z}; }
-	forceinline constexpr v4 yyyx() const { return {y,y,y,x}; }
-	forceinline constexpr v4 yyyy() const { return {y,y,y,y}; }
-	forceinline constexpr v4 yyyz() const { return {y,y,y,z}; }
-	forceinline constexpr v4 yyzx() const { return {y,y,z,x}; }
-	forceinline constexpr v4 yyzy() const { return {y,y,z,y}; }
-	forceinline constexpr v4 yyzz() const { return {y,y,z,z}; }
-	forceinline constexpr v4 yzxx() const { return {y,z,x,x}; }
-	forceinline constexpr v4 yzxy() const { return {y,z,x,y}; }
-	forceinline constexpr v4 yzxz() const { return {y,z,x,z}; }
-	forceinline constexpr v4 yzyx() const { return {y,z,y,x}; }
-	forceinline constexpr v4 yzyy() const { return {y,z,y,y}; }
-	forceinline constexpr v4 yzyz() const { return {y,z,y,z}; }
-	forceinline constexpr v4 yzzx() const { return {y,z,z,x}; }
-	forceinline constexpr v4 yzzy() const { return {y,z,z,y}; }
-	forceinline constexpr v4 yzzz() const { return {y,z,z,z}; }
-	forceinline constexpr v4 zxxx() const { return {z,x,x,x}; }
-	forceinline constexpr v4 zxxy() const { return {z,x,x,y}; }
-	forceinline constexpr v4 zxxz() const { return {z,x,x,z}; }
-	forceinline constexpr v4 zxyx() const { return {z,x,y,x}; }
-	forceinline constexpr v4 zxyy() const { return {z,x,y,y}; }
-	forceinline constexpr v4 zxyz() const { return {z,x,y,z}; }
-	forceinline constexpr v4 zxzx() const { return {z,x,z,x}; }
-	forceinline constexpr v4 zxzy() const { return {z,x,z,y}; }
-	forceinline constexpr v4 zxzz() const { return {z,x,z,z}; }
-	forceinline constexpr v4 zyxx() const { return {z,y,x,x}; }
-	forceinline constexpr v4 zyxy() const { return {z,y,x,y}; }
-	forceinline constexpr v4 zyxz() const { return {z,y,x,z}; }
-	forceinline constexpr v4 zyyx() const { return {z,y,y,x}; }
-	forceinline constexpr v4 zyyy() const { return {z,y,y,y}; }
-	forceinline constexpr v4 zyyz() const { return {z,y,y,z}; }
-	forceinline constexpr v4 zyzx() const { return {z,y,z,x}; }
-	forceinline constexpr v4 zyzy() const { return {z,y,z,y}; }
-	forceinline constexpr v4 zyzz() const { return {z,y,z,z}; }
-	forceinline constexpr v4 zzxx() const { return {z,z,x,x}; }
-	forceinline constexpr v4 zzxy() const { return {z,z,x,y}; }
-	forceinline constexpr v4 zzxz() const { return {z,z,x,z}; }
-	forceinline constexpr v4 zzyx() const { return {z,z,y,x}; }
-	forceinline constexpr v4 zzyy() const { return {z,z,y,y}; }
-	forceinline constexpr v4 zzyz() const { return {z,z,y,z}; }
-	forceinline constexpr v4 zzzx() const { return {z,z,z,x}; }
-	forceinline constexpr v4 zzzy() const { return {z,z,z,y}; }
-	forceinline constexpr v4 zzzz() const { return {z,z,z,z}; }
 };
 
 template <class T, class... Rest>
