@@ -65,6 +65,18 @@ struct Array3 {
 	forceinline constexpr bool owns(T *pointer) const {
 		return (umm)pointer - (umm)data < flat_count*sizeof(T);
 	}
+
+	forceinline constexpr auto &as_c_array(this auto &&self) {
+		using CT = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(self)>>, const T, T>;
+		
+		if constexpr (false) {}
+		else if constexpr (layout == Array3Layout::zyx) return *(CT (*)[count_z][count_y][count_x])self.data;
+		else if constexpr (layout == Array3Layout::yzx) return *(CT (*)[count_y][count_z][count_x])self.data;
+		else if constexpr (layout == Array3Layout::zxy) return *(CT (*)[count_z][count_x][count_y])self.data;
+		else if constexpr (layout == Array3Layout::xzy) return *(CT (*)[count_x][count_z][count_y])self.data;
+		else if constexpr (layout == Array3Layout::yxz) return *(CT (*)[count_y][count_x][count_z])self.data;
+		else if constexpr (layout == Array3Layout::xyz) return *(CT (*)[count_x][count_y][count_z])self.data;
+	}
 };
 
 }
