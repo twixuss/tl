@@ -928,7 +928,7 @@ bool init_opengl(NativeWindowHandle _window, InitFlags flags, DEBUGPROC debug_pr
 		}();
 		if (!index) {
 			auto error = GetLastError();
-			print("ChoosePixelFormat failed with code 0x{} ({})\n", FormatInt{.value = error, .radix = 16}, error);
+			print("ChoosePixelFormat failed with code 0x{} ({})\n", FormattedInt{error, {.radix = 16}}, error);
 			return false;
 		}
 

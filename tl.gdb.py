@@ -1,6 +1,50 @@
 import gdb
 import re
 
+class ArrayPrinter:
+    def __init__(self, val):
+        self.data = val['data']
+        
+        t = val.type.strip_typedefs()
+
+        self.count = int(t.template_argument(1))
+        
+        Element = t.template_argument(0)
+        if str(Element).startswith("tl::Array<"):
+            self.to_string = self.to_string_outer
+            self.inner_count = int(Element.strip_typedefs().template_argument(1))
+        else:
+            self.to_string = self.to_string_inner
+
+    def to_string_inner(self):
+        data = self.data
+        count = self.count
+        return "{" + ", ".join([str(data[i]) for i in range(count)]) + "}"
+
+    def to_string_outer(self):
+        data = self.data
+        count = self.count
+        inner_count = self.inner_count
+        return "{" + ", ".join([
+               "{" + ", ".join([
+                   str(data[i]['data'][j])
+               for j in range(inner_count)]) + "}"
+               for i in range(count)]) + "}"
+
+    def children(self):
+        data = self.data
+        count = self.count
+
+        if count <= 4:
+            for i in range(count):
+                yield (["x", "y", "z", "w"][i], data[i])
+        else:
+            for i in range(count):
+                yield (str(i), data[i])
+
+    def display_hint(self):
+        return "array"
+
 class SpanPrinter:
     def __init__(self, val):
         self.val = val
@@ -47,6 +91,8 @@ class ListPrinter:
 
 
 def my_lookup_function(val):
+    if re.match(r"^tl::Array<.*>$", str(val.type)):
+        return ArrayPrinter(val)
     if re.match(r"^tl::Span<.*>$", str(val.type)):
         return SpanPrinter(val)
     if re.match(r"^tl::List<.*>$", str(val.type)):

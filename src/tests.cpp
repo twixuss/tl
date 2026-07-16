@@ -588,7 +588,7 @@ umm append(StringBuilder &builder, F32 f) {
 		append(builder, whole_part);
 		if (fract_part != 1) {
 			append(builder, '.');
-			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+			append(builder, FormattedInt{fract_part, {.skip_digits = 1}});
 		}
 	}
 
@@ -630,7 +630,7 @@ void append(StringBuilder &builder, F32 f) {
 		append(builder, whole_part);
 		if (fract_part != u256{1}) {
 			append(builder, '.');
-			append(builder, FormatInt{.value = fract_part, .skip_digits = 1});
+			append(builder, FormattedInt{fract_part, {.skip_digits = 1}});
 		}
 	}
 }
@@ -640,10 +640,10 @@ void append(StringBuilder &builder, F32 f) {
 template <class T>
 void print_floats(T x) {
 	print("{}\n", x);
-	print("{}\n", FormatFloat{.value = x, .precision = 6});
-	print("{}\n", FormatFloat{.value = x, .precision = 6, .trailing_zeros = true});
-	print("{}\n", FormatFloat{.value = x, .precision = 30});
-	print("{}\n", FormatFloat{.value = x, .precision = 30, .trailing_zeros = true});
+	print("{}\n", FormattedFloat{x, {.precision = 6}});
+	print("{}\n", FormattedFloat{x, {.precision = 6, .trailing_zeros = true}});
+	print("{}\n", FormattedFloat{x, {.precision = 30}});
+	print("{}\n", FormattedFloat{x, {.precision = 30, .trailing_zeros = true}});
 }
 
 float pow2(float a) {

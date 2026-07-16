@@ -554,6 +554,10 @@ inline static constexpr bool is_integer_like<Array<T, count>> = is_integer_like<
 template <class T>            inline static constexpr int array_nestedness = 0;
 template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
 
+// sub_arrays<2, 1>([[0, 1, 2, 3], [4, 5, 6, 7]]   ) =
+// sub_arrays<2   >([[0, 1, 2, 3], [4, 5, 6, 7]], 1) =
+// [[1, 2], [5, 6]]
+
 template <umm sub_count, umm sub_start, class T, umm count>
     requires (is_array<T>)
 Array<Array<typename T::Element, sub_count>, count> sub_arrays(Array<T, count> self) {
@@ -600,6 +604,15 @@ template <class T>
 struct ToBoolUsingAny : T {
 	forceinline constexpr explicit operator bool() const { return any(*this); }
 };
+
+template <class T, class U> forceinline constexpr auto operator&&(ToBoolUsingAll<T> a, ToBoolUsingAll<U> b) { return (T)a && (U)b; }
+template <class T, class U> forceinline constexpr auto operator&&(ToBoolUsingAll<T> a, ToBoolUsingAny<U> b) { return (T)a && (U)b; }
+template <class T, class U> forceinline constexpr auto operator&&(ToBoolUsingAny<T> a, ToBoolUsingAll<U> b) { return (T)a && (U)b; }
+template <class T, class U> forceinline constexpr auto operator&&(ToBoolUsingAny<T> a, ToBoolUsingAny<U> b) { return (T)a && (U)b; }
+template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAll<T> a, ToBoolUsingAll<U> b) { return (T)a || (U)b; }
+template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAll<T> a, ToBoolUsingAny<U> b) { return (T)a || (U)b; }
+template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny<T> a, ToBoolUsingAll<U> b) { return (T)a || (U)b; }
+template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny<T> a, ToBoolUsingAny<U> b) { return (T)a || (U)b; }
 
 #define ASIS(...) __VA_ARGS__
 #define WRAP_ToBoolUsingAll(...) ToBoolUsingAll<__VA_ARGS__>

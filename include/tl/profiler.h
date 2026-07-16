@@ -505,10 +505,10 @@ void append(StringBuilder &builder, Profiler::ReportForChrome const &r) {
 				append(builder, ",\n"s);
 			}
 			append_format(builder, R"({{"cat":"function","dur":{},"name":"{}","ph":"X","pid":0,"tid":{},"ts":{}}})",
-				FormatFloat{.value = (span.end - span.begin) * 1000000. / performance_frequency, .precision = 6},
+				FormattedFloat{(span.end - span.begin) * 1000000. / performance_frequency, {.precision = 6}},
 				span.name,
 				thread.id,
-				FormatFloat{.value = span.begin * 1000000. / performance_frequency, .precision = 6}
+				FormattedFloat{span.begin * 1000000. / performance_frequency, {.precision = 6}}
 			);
 			needComma = true;
 		}

@@ -215,10 +215,10 @@ void append(StringBuilder &builder, BigRational<Allocator> f) {
 
 			f.numer.divmod(denom, quotient, remainder);
 
-			return append_format(builder, "{}.{}", quotient, FormatInt{.value = remainder, .leading_zero_count = dc});
+			return append_format(builder, "{}.{}", quotient, FormattedInt{remainder, {.leading_zero_count = dc}});
 		}
 	}
-	append(builder, FormatFloat{.value = (f64)f, .precision = 99, .trailing_zeros = false});
+	append(builder, FormattedFloat{(f64)f, {.precision = 99, .trailing_zeros = false}});
 }
 
 }

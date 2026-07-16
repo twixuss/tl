@@ -191,58 +191,66 @@ struct Format {
 	Format(T value, FormatAlign<Char> align) : value(value), align(align) {}
 };
 
+template <class Value, class Format>
+struct Formatted {
+	Value value;
+	Format format;
+
+	template <class U>
+	Formatted<U, Format> with_value(U new_value) const {
+		return {
+			.value = new_value,
+			.format = format,
+		};
+	}
+};
+
 template <class Int>
 inline constexpr umm _intToStringSize = sizeof(Int) * 8 + (is_signed<Int> ? 1 : 0);
 
-enum IntFormat {
-	IntFormat_full,
-	IntFormat_kmb,
+enum class IntFormatShape {
+	full,
+	kmb,
 };
-
-extern thread_local IntFormat default_int_format_format;
+extern thread_local IntFormatShape default_int_format_shape;
 extern thread_local u32 default_int_format_radix;
 extern thread_local u32 default_int_format_leading_zero_count;
 extern thread_local u32 default_int_format_skip_digits;
 extern thread_local ascii const *default_int_format_char_set;
 
-template <class Int>
-struct FormatInt {
-	Int value;
-	IntFormat format = default_int_format_format;
+struct IntFormat {
+	using Shape = IntFormatShape;
+
+	Shape shape = default_int_format_shape;
 	u32 radix = default_int_format_radix;
 	u32 leading_zero_count = default_int_format_leading_zero_count;
 	u32 skip_digits = default_int_format_skip_digits;
 	ascii const *char_set = default_int_format_char_set;
 };
 
-enum FloatFormat {
-	FloatFormat_default,
-	FloatFormat_exponential,
-	FloatFormat_exponential_e,
-	FloatFormat_kmb,
+template <class Int>
+using FormattedInt = Formatted<Int, IntFormat>;
+
+enum class FloatFormatShape {
+	default_,
+	exponential,
+	exponential_e,
+	kmb,
 };
 
 extern thread_local u32 default_float_format_precision;
-extern thread_local FloatFormat default_float_format_format;
+extern thread_local FloatFormatShape default_float_format_shape;
 extern thread_local bool default_float_format_trailing_zeros;
 
-template <class Float>
-struct FormatFloat {
-	Float value;
+struct FloatFormat {
+	using Shape = FloatFormatShape;
 	u32 precision = default_float_format_precision;
-	FloatFormat format = default_float_format_format;
+	Shape shape = default_float_format_shape;
 	bool trailing_zeros = default_float_format_trailing_zeros;
-
-	template <class U>
-	FormatFloat<U> with_value(U new_value) const {
-		return FormatFloat<U> {
-			.value = new_value,
-			.precision = precision,
-			.format = format,
-			.trailing_zeros = trailing_zeros,
-		};
-	}
 };
+
+template <class Float>
+using FormattedFloat = Formatted<Float, FloatFormat>;
 
 enum class Encoding {
 	unknown,
@@ -759,29 +767,39 @@ inline static const SpanFormat default_span_format = {
 	.after = "}"b,
 };
 
-template <class T>
+template <class T, class InnerFormat = Empty>
 struct FormattedSpan : SpanFormat {
 	Span<T> value;
+	[[no_unique_address]] InnerFormat inner_format;
 };
 
-template <class T>
-FormattedSpan<T> format_span(Span<T> span, SpanFormat format) {
-	FormattedSpan<T> result;
+template <class T, class InnerFormat = Empty>
+FormattedSpan<T, InnerFormat> format_span(Span<T> span, SpanFormat format, InnerFormat inner_format = {}) {
+	FormattedSpan<T, InnerFormat> result;
 	(SpanFormat &)result = format;
 	result.value = span;
+	result.inner_format = inner_format;
 	return result;
 }
 
 
-template <class T>
-forceinline void append(StringBuilder &b, FormattedSpan<T> formatted) {
+template <class T, class InnerFormat>
+forceinline void append(StringBuilder &b, FormattedSpan<T, InnerFormat> formatted) {
+	auto append_value = [&](auto val) {
+		if constexpr (std::is_same_v<InnerFormat, Empty>) {
+			append(b, val);
+		} else {
+			append(b, Formatted{val, formatted.inner_format});
+		}
+	};
+
 	append_bytes(b, formatted.before);
 	if (formatted.value.count) {
-		append(b, *formatted.value.data);
+		append_value(*formatted.value.data);
 	}
 	for (auto &val : formatted.value.skip(1)) {
 		append_bytes(b, formatted.separator);
-		append(b, val);
+		append_value(val);
 	}
 	append_bytes(b, formatted.after);
 }
@@ -942,28 +960,28 @@ void append(StringBuilder &builder, Format<T, Char> format) {
 // it compiled successfully WITHOUT forward declaration, so I don't know what's up with that.
 // https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGEgMykrgAyeAyYAHI%2BAEaYxCBmgQAOqAqETgwe3r4BpClpjgKh4VEssfGJtpj2hQxCBEzEBFk%2BflyBdpgOGfWNBMWRMXEJHQ1NLTnttmP9YYNlw4kAlLaoXsTI7BwEmCxJBjsA1Cb%2BbsgGCgqHACon2CYaAIIKBMReDocAYqioxwDsVieh2BN0OBBOgMeJj%2BABEIQ8oU8dnsDphjqdzkxLjc7giXm8PhZGv9ISDQeD/JDoXDKQiEQA3VB4dCHJhJJKuCDRH60JYk6l0pG7fZMI4nM4XK63fz3J6M5mHADuxEImAA%2Bli1fiwsAIN9UOLpdhDlQ%2BdDSSC2RyGOgIETiOaqAA6cGwpbwp4Cz1ClGitHizHYo0Mpksq2c%2B2Gu6HaJmgEIsl02GCx5hAiHFhMMIQOMW4HK1UahRa146vU/c1canu2me2EcFa0TgAVl4fg4WlIqE4bms1kOCjWG39iR4pAImgbKwA1iB/H8nf5583JH8AByJMwATj%2BXC4zf0nEkvBYEg0GlI7c73Y4vAUIAvE47DdIcFgMEQKFQezocXIlDQH96HiYApDMPg6B2Yh7y5SdSGiMJGgAT04McEOYYgkIAeWibQuifMdALYQQsIYWgUOfUgsGiLxgDcMRaHvbheCwTMjHESj8GIfC8HpTAmM7TBVC6LwdlQ3g02qODaDwaJiGQjwsDg0tT2Y0g%2BOIbklBhXZDGAGSjEnFYqAMYAFAANTwTBFSw61xJkQQRDEdgpAc%2BQlDUODdC4fQ9JQPtLH0WT70gFZUCSWomIAWhedAThhUxLGsRJeFQDSVSwEKcyqGoMhcG0JjaIIbQGUpyj0fJ0gEQqKtSKqGFKoZ4h8zpugEXpxk8Vo9Fa2oOtmEomp6mYapamZGoWZqVkHdZNgkRsWzbOCb0OVQ1wANii9bJEOYBkGQQ4pCdMxDggXBCBIY5RyWXgny0JYZwSA8mw4Y9SFPZsLyvVLODvB9xyM18PwgJA1gIJJRP/CBAKSX9iAiVgtjWzbtt2/bDskY7eEwfAiAyvR%2BEc0RxFcwn3JUdRKO80hlTZcSFo4VtL2WzgsNEiH01QKhVo2radr2g6jpOiAPCAuIrv8LgboB58HtIBBMCYLB4myl63o%2Br6WdvWx/ruqdSFnMw10XSRJDXDQzb%2BMxmytrhKhe/wlsom9bsBt8oGBpAYbhqHveAkB6WQdk1XpLgtzVSQNDVcyhC4P41S4KPVG2iDaCgmDojg9DkPs7PMJwvCHHsojGAIUjyLg6jaPo2hGPs1i9I4zsuJ4viBOx4TkFErYx0kl7OxkuSFIwLZOxU%2ByNK0zAdLY/SdUBkymDMyzrNsxh7LJpySekMnFApryEl8wzEqsQLB6ysKIoyJiAHpYv8pLLFRF5UvS5l%2BPgabqh45wIFcUbiroAmuVHylVagALARkYBwwWrfzanUEaXVJg5R/ggvo0DmrTD6AAl46C5hlRgdNIcc0paHkZk7a8nBVqoxYAoQOhxQ5bidJHQ4Mc45OkTqdc6eMJZS1drLFYCslbDGyobdaToLZmFNs2fwGgbaSC3M9I8J4QCfWZs7X6OtHxu09iAMGHNfbflhsBBGbBODJx2rQ%2BhjDmEaFYbHBcidsa4xIMyAmsgt4uR3rIPenkqaH1pkkemZCmbfS7KzdmolDhc2oZYuhB0bEsLYY4uxIsjFwwlmYaWes5ZCOVpQBm6tVGaw0dre82iBEGznJjSWfxtp/FkZIdoGg6lkMduoyh2sckMzMBQn6XSjIrA0mkZwkggA%3D%3D
 template <class Float>
-inline void append(StringBuilder &builder, FormatFloat<Float> format);
+inline void append(StringBuilder &builder, FormattedFloat<Float> format);
 
 template <class Int, umm capacity>
-void write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
+void write_as_string(StaticList<ascii, capacity> &buffer, FormattedInt<Int> f) {
 	Int v = f.value;
-	auto radix = convert<Int>(f.radix);
+	auto radix = convert<Int>(f.format.radix);
 	constexpr u32 maxDigits = _intToStringSize<Int>;
 	ascii buf[maxDigits];
-	auto charMap = f.char_set;
+	auto charMap = f.format.char_set;
 	ascii *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
 	Span<ascii> suffix = {};
 
-	switch (f.format) {
-		case IntFormat_full:
+	switch (f.format.shape) {
+		case IntFormatShape::full:
 			break;
-		case IntFormat_kmb: {
+		case IntFormatShape::kmb: {
 			if (v >= 1000) {
 				scoped(temporary_allocator_and_checkpoint);
 				StringBuilder builder;
 				// :appendFormatFloat:
-				append(builder, FormatFloat{.value = (f64)v, .precision = 3, .format = FloatFormat_kmb});
+				append(builder, FormattedFloat{(f64)v, {.precision = 3, .shape = FloatFormatShape::kmb}});
 				buffer.add((Span<ascii>)builder.first.span());
 				return;
 			}
@@ -993,8 +1011,8 @@ void write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 		if (v == Int{})
 			break;
 	}
-	lsc += f.skip_digits;
-	charsWritten -= f.skip_digits;
+	lsc += f.format.skip_digits;
+	charsWritten -= f.format.skip_digits;
 	if constexpr (is_signed<Int>) {
 		if (negative) {
 			++charsWritten;
@@ -1003,23 +1021,23 @@ void write_as_string(StaticList<ascii, capacity> &buffer, FormatInt<Int> f) {
 	} else {
 		(void)negative;
 	}
-	if (f.leading_zero_count) {
-		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
+	if (f.format.leading_zero_count) {
+		for (u32 i = charsWritten; i < f.format.leading_zero_count; ++i) {
 			*lsc-- = '0';
 		}
-		if (f.leading_zero_count > charsWritten)
-			charsWritten = f.leading_zero_count;
+		if (f.format.leading_zero_count > charsWritten)
+			charsWritten = f.format.leading_zero_count;
 	}
 	buffer.add(Span(lsc + 1, charsWritten));
 	buffer.add(suffix);
 }
 template <class Int, umm capacity> requires is_integer<Int>
 void write_as_string(StaticList<ascii, capacity> &buffer, Int v) {
-	write_as_string(buffer, FormatInt{.value = v});
+	write_as_string(buffer, FormattedInt{.value = v});
 }
 
 template <class Int>
-void append(StringBuilder &builder, FormatInt<Int> f) {
+void append(StringBuilder &builder, FormattedInt<Int> f) {
 	StaticList<ascii, _intToStringSize<Int>> buffer;
 	write_as_string(buffer, f);
 	append(builder, buffer.span());
@@ -1027,7 +1045,7 @@ void append(StringBuilder &builder, FormatInt<Int> f) {
 
 template <class Int> requires is_integer<Int>
 void append(StringBuilder &builder, Int v) {
-	append(builder, FormatInt{.value = v});
+	append(builder, FormattedInt{.value = v});
 }
 
 struct FormatHexOptions {
@@ -1036,13 +1054,15 @@ struct FormatHexOptions {
 
 template <class Int>  requires is_integer<Int>
 auto format_hex(Int value, FormatHexOptions options = {}) {
-	return FormatInt{
+	return FormattedInt{
 		.value = (std::make_unsigned_t<Int>)value,
-		.radix = 16, 
-		.leading_zero_count = sizeof(Int) * 2,
-		.char_set = options.upper_case ?
-			"0123456789ABCDEF" :
-			"0123456789abcdef"
+		.format = {
+			.radix = 16, 
+			.leading_zero_count = sizeof(Int) * 2,
+			.char_set = options.upper_case ?
+				"0123456789ABCDEF" :
+				"0123456789abcdef"
+		}
 	};
 }
 
@@ -1066,21 +1086,26 @@ inline void append(StringBuilder &builder, HexSpan<T> hex_span) {
 	}
 }
 
+template <class T, umm count>
+forceinline void append(StringBuilder &builder, FormattedInt<Array<T, count>> f) {
+	return append(builder, format_span(f.value.span(), default_span_format, f.format));
+}
+
 forceinline void append(StringBuilder &builder, void const *p) {
-	append(builder, FormatInt{.value = (umm)p, .radix = 16, .leading_zero_count = sizeof(void *) * 2});
+	append(builder, FormattedInt{.value = (umm)p, .format = { .radix = 16, .leading_zero_count = sizeof(void *) * 2 }});
 }
 
 template <class Float>
-inline void append(StringBuilder &builder, FormatFloat<Float> format) {
+inline void append(StringBuilder &builder, FormattedFloat<Float> format) {
 	auto value = format.value;
 
 	if (is_nan(value)) {
 		return append(builder, "NaN");
 	}
 
-	scoped_replace(default_int_format_format, IntFormat_full);
+	scoped_replace(default_int_format_shape, IntFormatShape::full);
 
-	auto precision = format.precision;
+	auto precision = format.format.precision;
 
 	StaticList<ascii, 128> buffer;
 
@@ -1126,7 +1151,7 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 			}
 		};
 
-		if (format.trailing_zeros) {
+		if (format.format.trailing_zeros) {
 			if (precision) {
 				buffer.add('.');
 				for (u32 i = 0; i < precision; ++i) {
@@ -1155,13 +1180,13 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 		buffer.insert_at(whole_part_buffer, 0);
 	};
 
-	switch (format.format) {
-		case FloatFormat_default: {
+	switch (format.format.shape) {
+		case FloatFormatShape::default_: {
 			append_float(value);
 			break;
 		}
-		case FloatFormat_exponential: {
-		case FloatFormat_exponential_e:
+		case FloatFormatShape::exponential: {
+		case FloatFormatShape::exponential_e:
 			if (value == 0) {
 				buffer.add("0"s);
 				break;
@@ -1177,12 +1202,12 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 				--exponent;
 			}
 			append_float(mantissa);
-			switch (format.format) {
-				case FloatFormat_exponential: {
+			switch (format.format.shape) {
+				case FloatFormatShape::exponential: {
 					buffer.add("*10^"s);
 					break;
 				}
-				case FloatFormat_exponential_e: {
+				case FloatFormatShape::exponential_e: {
 					buffer.add('e');
 					if (exponent >= 0) buffer.add('+');
 					break;
@@ -1192,16 +1217,19 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 			write_as_string(buffer, exponent);
 			break;
 		}
-		case FloatFormat_kmb: {
+		case FloatFormatShape::kmb: {
 			Span<ascii> suffix = {};
+
 			if (value >= 1000) { value /= 1000; suffix = "k"s; }
 			if (value >= 1000) { value /= 1000; suffix = "m"s; }
 			if (value >= 1000) { value /= 1000; suffix = "b"s; }
 			if (value >= 1000) { value /= 1000; suffix = "t"s; }
 			if (value >= 1000) { value /= 1000; suffix = "q"s; }
+
 			if (value > 100) { precision = (u32)max((s32)precision - 3, 0); }
 			else if (value > 10) { precision = (u32)max((s32)precision - 2, 0); }
 			else if (value > 1) { precision = (u32)max((s32)precision - 1, 0); }
+
 			append_float(value);
 			buffer.add(suffix);
 			break;
@@ -1210,8 +1238,13 @@ inline void append(StringBuilder &builder, FormatFloat<Float> format) {
 	return append(builder, buffer.span());
 }
 
-forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormatFloat{.value = v}); }
-forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormatFloat{.value = v}); }
+forceinline void append(StringBuilder &builder, f64 v) { append(builder, FormattedFloat{v}); }
+forceinline void append(StringBuilder &builder, f32 v) { append(builder, FormattedFloat{v}); }
+
+template <class T, umm count>
+forceinline void append(StringBuilder &builder, FormattedFloat<Array<T, count>> f) {
+	return append(builder, format_span(f.value.span(), default_span_format, f.format));
+}
 
 inline void append(StringBuilder &builder, std::source_location location) {
 	append_format(builder, "{}:{}:{}: {}", location.file_name(), location.line(), location.column(), location.function_name());
@@ -1656,7 +1689,7 @@ inline NumberAbbreviation abbreviate(f64 value, NumberAbbreviationUnits const &u
 		.exponent = options.exponent,
 	};
 }
-inline void append(StringBuilder &builder, FormatFloat<NumberAbbreviation> abbrev) {
+inline void append(StringBuilder &builder, FormattedFloat<NumberAbbreviation> abbrev) {
 	append(builder, abbrev.with_value(abbrev.value.value));
 	if (abbrev.value.unit_table[abbrev.value.unit].name.count) {
 		append(builder, abbrev.value.between_value_and_unit);
@@ -1669,7 +1702,7 @@ inline void append(StringBuilder &builder, FormatFloat<NumberAbbreviation> abbre
 }
 
 inline void append(StringBuilder &builder, NumberAbbreviation abbrev) {
-	append(builder, FormatFloat{.value = abbrev, .precision = 3, .trailing_zeros = false});
+	append(builder, FormattedFloat{abbrev, {.precision = 3, .trailing_zeros = false}});
 }
 
 template <umm count>
@@ -1721,7 +1754,7 @@ inline NumberMultiAbbreviation<count> abbreviate(f64 value, Array<NumberAbbrevia
 	return result;
 }
 template <umm count>
-inline void append(StringBuilder &builder, FormatFloat<NumberMultiAbbreviation<count>> abbrev) {
+inline void append(StringBuilder &builder, FormattedFloat<NumberMultiAbbreviation<count>> abbrev) {
 	append(builder, abbrev.with_value(abbrev.value.value));
 	for (umm i = 0; i < count; ++i) {
 		auto abbreviation = abbrev.value.abbreviations[i];
@@ -1737,7 +1770,7 @@ inline void append(StringBuilder &builder, FormatFloat<NumberMultiAbbreviation<c
 }
 template <umm count>
 inline void append(StringBuilder &builder, NumberMultiAbbreviation<count> abbrev) {
-	append(builder, FormatFloat{.value = abbrev, .precision = 3, .trailing_zeros = false});
+	append(builder, FormattedFloat{abbrev, {.precision = 3, .trailing_zeros = false}});
 }
 
 
@@ -1752,14 +1785,14 @@ inline NumberAbbreviation format_bytes(auto byte_count, FormatBytesParams params
 
 #ifdef TL_IMPL
 
-thread_local IntFormat default_int_format_format = IntFormat_full;
+thread_local IntFormatShape default_int_format_shape = IntFormatShape::full;
 thread_local u32 default_int_format_radix = 10;
 thread_local u32 default_int_format_leading_zero_count = 0;
 thread_local u32 default_int_format_skip_digits = 0;
 thread_local ascii const *default_int_format_char_set = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 thread_local u32 default_float_format_precision = 3;
-thread_local FloatFormat default_float_format_format = FloatFormat_default;
+thread_local FloatFormatShape default_float_format_shape = FloatFormatShape::default_;
 thread_local bool default_float_format_trailing_zeros = false;
 
 #if OS_WINDOWS

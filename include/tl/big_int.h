@@ -912,13 +912,13 @@ BigInt<Allocator> make_big_int(s64 value) {
 }
 
 template <class Allocator>
-inline void append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
+inline void append(StringBuilder &builder, FormattedInt<BigInt<Allocator>> f) {
 	auto v = f.value;
-	auto radix = f.radix;
+	auto radix = f.format.radix;
 	u32 maxDigits = sizeof(decltype(v)::Part) * 8 * v.parts.count + 1;
 	char *buf = (char *)alloca(maxDigits);
 
-	auto charMap = f.char_set;
+	auto charMap = f.format.char_set;
 	char *lsc = buf + maxDigits - 1;
 	u32 charsWritten = 0;
 
@@ -944,18 +944,18 @@ inline void append(StringBuilder &builder, FormatInt<BigInt<Allocator>> f) {
 		if (v.is_zero())
 			break;
 	}
-	lsc += f.skip_digits;
-	charsWritten -= f.skip_digits;
+	lsc += f.format.skip_digits;
+	charsWritten -= f.format.skip_digits;
 	if (negative) {
 		++charsWritten;
 		*lsc-- = '-';
 	}
-	if (f.leading_zero_count) {
-		for (u32 i = charsWritten; i < f.leading_zero_count; ++i) {
+	if (f.format.leading_zero_count) {
+		for (u32 i = charsWritten; i < f.format.leading_zero_count; ++i) {
 			*lsc-- = '0';
 		}
-		if (f.leading_zero_count > charsWritten)
-			charsWritten = f.leading_zero_count;
+		if (f.format.leading_zero_count > charsWritten)
+			charsWritten = f.format.leading_zero_count;
 	}
 	append(builder, Span(lsc + 1, charsWritten));
 }

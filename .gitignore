@@ -5,3 +5,5 @@ tmp/
 bin/
 packages/
 *.o
+nob.exe
+nob.exe.old

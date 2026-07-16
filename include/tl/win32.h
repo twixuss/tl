@@ -139,7 +139,7 @@ static List<utf8> describe_hresult(HRESULT hr) {
 void append(StringBuilder &b, FormattedHRESULT e) {
 	auto description = describe_hresult(e.value);
 	defer { free(description); };
-	append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormatInt{.value = (u32)e.value, .radix = 16, .leading_zero_count = 8}, description);
+	append_format(b, "{} 0x{} {}", win32_error_name(e.value), FormattedInt{(u32)e.value, {.radix = 16, .leading_zero_count = 8}}, description);
 }
 
 FormattedWin32Error win32_error() {

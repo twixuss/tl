@@ -21,10 +21,10 @@ struct DateForLog : Date {
 
 inline void append(StringBuilder &builder, DateForLog date) {
 	append_format(builder, "{}:{}:{}.{}", 
-		FormatInt{.value = date.hour, .leading_zero_count = 2}, 
-		FormatInt{.value = date.minute, .leading_zero_count = 2}, 
-		FormatInt{.value = date.second, .leading_zero_count = 2}, 
-		FormatInt{.value = date.millisecond, .leading_zero_count = 3});
+		FormattedInt{date.hour, {.leading_zero_count = 2}}, 
+		FormattedInt{date.minute, {.leading_zero_count = 2}}, 
+		FormattedInt{date.second, {.leading_zero_count = 2}}, 
+		FormattedInt{date.millisecond, {.leading_zero_count = 3}});
 }
 
 struct TL_API DefaultLogger : LoggerBase<DefaultLogger> {

@@ -47,9 +47,9 @@ inline void append(StringBuilder &b, Date d) {
 		d.day,
 		month_string(d.month),
 		d.year,
-		FormatInt{.value=d.hour, .leading_zero_count=2},
-		FormatInt{.value=d.minute, .leading_zero_count=2},
-		FormatInt{.value=d.second, .leading_zero_count=2}
+		FormattedInt{d.hour, {.leading_zero_count=2}},
+		FormattedInt{d.minute, {.leading_zero_count=2}},
+		FormattedInt{d.second, {.leading_zero_count=2}}
 	);
 }
 
