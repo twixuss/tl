@@ -47,7 +47,7 @@ struct SortedList : private List<T, Allocator> {
 	}
 	
 	BinarySearchResult<T> search(T const &value) {
-		return binary_search(Base::span(), [&](T &it) {
+		return binary_search(Base::span(), [&](T const &it) {
 			return compare(map(value), map(it));
 		});
 	}
@@ -58,7 +58,7 @@ struct SortedList : private List<T, Allocator> {
 			{ map(data[0]) } -> std::same_as<U>;
 		}
 	{
-		return binary_search(Base::span(), [&](T &it) {
+		return binary_search(Base::span(), [&](T const &it) {
 			return compare(value, map(it));
 		}).found;
 	}

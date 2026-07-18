@@ -91,11 +91,12 @@ class ListPrinter:
 
 
 def my_lookup_function(val):
-    if re.match(r"^tl::Array<.*>$", str(val.type)):
+    s = str(val.type.strip_typedefs())
+    if re.match(r"^tl::Array<.*>$", s):
         return ArrayPrinter(val)
-    if re.match(r"^tl::Span<.*>$", str(val.type)):
+    if re.match(r"^tl::Span<.*>$", s):
         return SpanPrinter(val)
-    if re.match(r"^tl::List<.*>$", str(val.type)):
+    if re.match(r"^tl::List<.*>$", s):
         return ListPrinter(val)
     return None
 

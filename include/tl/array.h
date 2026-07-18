@@ -554,6 +554,17 @@ inline static constexpr bool is_integer_like<Array<T, count>> = is_integer_like<
 template <class T>            inline static constexpr int array_nestedness = 0;
 template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
 
+template <class T>
+struct ScalarOfT {
+	using Type = T;
+};
+template <class T, umm count>
+struct ScalarOfT<Array<T, count>> {
+	using Type = typename ScalarOfT<T>::Type;
+};
+template <class T>
+using ScalarOf = typename ScalarOfT<T>::Type;
+
 // sub_arrays<2, 1>([[0, 1, 2, 3], [4, 5, 6, 7]]   ) =
 // sub_arrays<2   >([[0, 1, 2, 3], [4, 5, 6, 7]], 1) =
 // [[1, 2], [5, 6]]
@@ -576,6 +587,14 @@ Array<Array<typename T::Element, sub_count>, count> sub_arrays(Array<T, count> s
     for (umm i = 0; i < count; ++i)
         r.data[i] = self.data[i].template sub_array<sub_count>(sub_start);
     return r;
+}
+
+template <umm count, class T>
+forceinline constexpr Array<T, count> broadcast_to_array(T value) {
+	Array<T, count> result = {};
+	for (umm i = 0; i < count; ++i)
+		result.data[i] = value;
+	return result;
 }
 
 #define OP(op)                                                                 \
@@ -618,6 +637,17 @@ template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny
 #define WRAP_ToBoolUsingAll(...) ToBoolUsingAll<__VA_ARGS__>
 #define WRAP_ToBoolUsingAny(...) ToBoolUsingAny<__VA_ARGS__>
 
+// The binary operators for Array allow type promotion.
+// This means that Array<int, 3>{} * 1.23f produces Array<float, 3>,
+// which is good in most cases as you don't want to explicitly cast.
+// This also means that working with small integer types is very annoying:
+// Array<u8, 16> * Array<u8, 16> = Array<int, 16>.
+// There are three choices:
+// 1) Disallow promotion - template code becomes bigger as you need to cast literals to T.
+// 2) Allow promotion - working with small integers sucks, need to add casts, and there is wasted cpu time promoting and unpromoting.
+// 3) Have both. Make two namespaces and users import whichever they want. Problem is that now every user has to make a decision on what to import
+//    and write it. There can't be a default one globally available, as importing another one would introduce ambiguity.
+
 #define OP(op, RetTypeMod)                                                                           \
 	template <class T, umm count>                                                                    \
 	forceinline constexpr auto operator op(Array<T, count> a, Array<T, count> b)                     \
@@ -639,21 +669,15 @@ template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny
 	}                                                                                                \
 	template <class U, class T, umm count>                                                           \
 	forceinline constexpr auto operator op(Array<T, count> a, U b)                                   \
-		requires requires(T t, U u) { t op u; } && (array_nestedness<U> <= array_nestedness<T>)      \
+		requires (array_nestedness<U> <= array_nestedness<T>)                                        \
 	{                                                                                                \
-		RetTypeMod(Array<std::remove_cvref_t<decltype(a.data[0] op b)>, count>) result = {};         \
-		for (umm i = 0; i < count; ++i)                                                              \
-			result.data[i] = a.data[i] op b;                                                         \
-		return result;                                                                               \
+		return a op broadcast_to_array<count>(b);                                                    \
 	}                                                                                                \
 	template <class U, class T, umm count>                                                           \
 	forceinline constexpr auto operator op(U a, Array<T, count> b)                                   \
-		requires requires(U u, T t) { u op t; } && (array_nestedness<U> <= array_nestedness<T>)      \
+		requires (array_nestedness<U> <= array_nestedness<T>)                                        \
 	{                                                                                                \
-		RetTypeMod(Array<std::remove_cvref_t<decltype(a op b.data[0])>, count>) result = {};         \
-		for (umm i = 0; i < count; ++i)                                                              \
-			result.data[i] = a op b.data[i];                                                         \
-		return result;                                                                               \
+		return broadcast_to_array<count>(a) op b;                                                    \
 	}
 OP(==, WRAP_ToBoolUsingAll)
 OP(!=, WRAP_ToBoolUsingAny)
@@ -726,15 +750,6 @@ forceinline constexpr Array<T, count> shift_right(Array<T, count> arr) {
 	return result;
 }
 
-template <umm count, class T>
-forceinline constexpr Array<T, count> broadcast_to_array(T value) {
-	Array<T, count> result = {};
-	for (umm i = 0; i < count; ++i) {
-		result.data[i] = value;
-	}
-	return result;
-}
-
 template <umm count, class Callable>
 	requires requires { std::declval<Callable>()(); }
 forceinline constexpr auto make_array(Callable callable)
@@ -757,6 +772,15 @@ forceinline constexpr auto make_array(Callable callable)
 		result.data[i] = callable(i);
 	}
 	return result;
+}
+
+template <class T, umm count>
+forceinline constexpr Array<T, count> array_iota(umm start = 0, umm step = 1) {
+	Array<T, count> r = {};
+	for (umm i = 0, v = start; i < count; ++i, v += step) {
+		r.data[i] = convert<T>(v);
+	}
+	return r;
 }
 
 template <class T, umm count>
@@ -824,19 +848,41 @@ forceinline constexpr Array<T, count> gather(T const *pointer, Array<Index, coun
 	return r;
 }
 
-#define OP(NAME, OPERATOR)                                                         \
-	template <class T>                                                             \
-	forceinline constexpr auto mask_##NAME(T a, T b) {                             \
-		static_assert(sizeof(UintWithBits<sizeof(T)*8>) == sizeof(T));             \
-		return (UintWithBits<sizeof(T)*8>)(a OPERATOR b ? -1 : 0);                 \
-	}                                                                              \
-	template <class T, umm count>                                                  \
-	forceinline constexpr auto mask_##NAME(Array<T, count> a, Array<T, count> b) { \
-		Array<UintWithBits<sizeof(T)*8>, count> r = {};                            \
-		static_assert(sizeof(r) == sizeof(Array<T, count>));                       \
-		for (umm i = 0; i < count; ++i)                                            \
-			r.data[i] = mask_##NAME(a.data[i], b.data[i]);                         \
-		return r;                                                                  \
+template <class T, class Index, umm count>
+forceinline constexpr void scatter(T *pointer, Array<T, count> values, Array<Index, count> indices) {
+	for (umm i = 0; i < count; ++i)
+		pointer[indices.data[i]] = values.data[i];
+}
+
+#define OP(NAME, OPERATOR)                                                       \
+	template <class T>                                                           \
+	forceinline constexpr auto mask_##NAME(T a, T b)                             \
+		requires requires(T t) { t OPERATOR t; }                                 \
+	{                                                                            \
+		static_assert(sizeof(UintWithBits<sizeof(T)*8>) == sizeof(T));           \
+		return (UintWithBits<sizeof(T)*8>)(-(a OPERATOR b));                     \
+	}                                                                            \
+	template <class T, umm count>                                                \
+	forceinline constexpr auto mask_##NAME(Array<T, count> a, Array<T, count> b) \
+		requires requires(T t) { mask_##NAME(t, t); }                            \
+	{                                                                            \
+		Array<UintWithBits<sizeof(T)*8>, count> r = {};                          \
+		static_assert(sizeof(r) == sizeof(Array<T, count>));                     \
+		for (umm i = 0; i < count; ++i)                                          \
+			r.data[i] = mask_##NAME(a.data[i], b.data[i]);                       \
+		return r;                                                                \
+	}                                                                            \
+	template <class U, class T, umm count>                                       \
+	forceinline constexpr auto mask_##NAME(Array<T, count> a, U b)               \
+		requires (array_nestedness<U> <= array_nestedness<T>)                    \
+	{                                                                            \
+		return mask_##NAME(a, broadcast_to_array<count>(b));                     \
+	}                                                                            \
+	template <class U, class T, umm count>                                       \
+	forceinline constexpr auto mask_##NAME(U a, Array<T, count> b)               \
+		requires (array_nestedness<U> <= array_nestedness<T>)                    \
+	{                                                                            \
+		return mask_##NAME(broadcast_to_array<count>(a), b);                     \
 	}
 
 OP(equal, ==)
@@ -952,24 +998,86 @@ template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, 
 
 #if TL_USE_SIMD
 
-forceinline constexpr Array<u32, 4> operator+(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_add_epi32  (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<u32, 4> operator-(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_sub_epi32  (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<u32, 4> operator*(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_mullo_epi32(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<u32, 4> operator^(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_xor_si128(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<u32, 4> operator&(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_and_si128(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<u32, 4> operator|(Array<u32, 4> a, Array<u32, 4> b) { return bit_cast<Array<u32, 4>>(_mm_or_si128 (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
+#define intrdef1(m, name, intr, ...)                  \
+	template <> constexpr auto name(__VA_ARGS__ a_) { \
+		m a = bit_cast<m>(a_);                        \
+		return bit_cast<__VA_ARGS__>(intr);           \
+	}
 
-forceinline constexpr Array<s32, 4> operator+(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_add_epi32  (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<s32, 4> operator-(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_sub_epi32  (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<s32, 4> operator*(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_mullo_epi32(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<s32, 4> operator^(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_xor_si128(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<s32, 4> operator&(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_and_si128(bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
-forceinline constexpr Array<s32, 4> operator|(Array<s32, 4> a, Array<s32, 4> b) { return bit_cast<Array<s32, 4>>(_mm_or_si128 (bit_cast<__m128i>(a), bit_cast<__m128i>(b))); }
+#define intrdef2(m, name, intr, ...)                                  \
+	template <> constexpr auto name(__VA_ARGS__ a_, __VA_ARGS__ b_) { \
+		m a = bit_cast<m>(a_);                                        \
+		m b = bit_cast<m>(b_);                                        \
+		return bit_cast<__VA_ARGS__>(intr);                           \
+	}
 
-forceinline constexpr Array<f32, 4> operator+(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_add_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator-(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_sub_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator*(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_mul_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
-forceinline constexpr Array<f32, 4> operator/(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_div_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+#define intrdef3(m, name, intr, ...)                                                  \
+	template <> constexpr auto name(__VA_ARGS__ a_, __VA_ARGS__ b_, __VA_ARGS__ c_) { \
+		m a = bit_cast<m>(a_);                                                        \
+		m b = bit_cast<m>(b_);                                                        \
+		m c = bit_cast<m>(c_);                                                        \
+		return bit_cast<__VA_ARGS__>(intr);                                           \
+	}
+
+#define intr128f1(name, intr, ...) intrdef1(__m128, name, intr, __VA_ARGS__)
+#define intr256f1(name, intr, ...) intrdef1(__m256, name, intr, __VA_ARGS__)
+#define intr512f1(name, intr, ...) intrdef1(__m512, name, intr, __VA_ARGS__)
+#define intr128i1(name, intr, ...) intrdef1(__m128i, name, intr, __VA_ARGS__)
+#define intr256i1(name, intr, ...) intrdef1(__m256i, name, intr, __VA_ARGS__)
+#define intr512i1(name, intr, ...) intrdef1(__m512i, name, intr, __VA_ARGS__)
+
+#define intr128f2(name, intr, ...) intrdef2(__m128, name, intr, __VA_ARGS__)
+#define intr256f2(name, intr, ...) intrdef2(__m256, name, intr, __VA_ARGS__)
+#define intr512f2(name, intr, ...) intrdef2(__m512, name, intr, __VA_ARGS__)
+#define intr128i2(name, intr, ...) intrdef2(__m128i, name, intr, __VA_ARGS__)
+#define intr256i2(name, intr, ...) intrdef2(__m256i, name, intr, __VA_ARGS__)
+#define intr512i2(name, intr, ...) intrdef2(__m512i, name, intr, __VA_ARGS__)
+
+#define intr128f3(name, intr, ...) intrdef3(__m128, name, intr, __VA_ARGS__)
+#define intr256f3(name, intr, ...) intrdef3(__m256, name, intr, __VA_ARGS__)
+#define intr512f3(name, intr, ...) intrdef3(__m512, name, intr, __VA_ARGS__)
+#define intr128i3(name, intr, ...) intrdef3(__m128i, name, intr, __VA_ARGS__)
+#define intr256i3(name, intr, ...) intrdef3(__m256i, name, intr, __VA_ARGS__)
+#define intr512i3(name, intr, ...) intrdef3(__m512i, name, intr, __VA_ARGS__)
+
+#define _mm_not_si128(a) _mm_xor_si128(a, _mm_set1_epi8(-1))
+#define _mm_topbit_i8  _mm_set1_epi8(0x80)
+#define _mm_topbit_i16 _mm_set1_epi16(0x8000)
+#define _mm_topbit_i32 _mm_set1_epi32(0x80000000)
+#define _mm_topbit_i64 _mm_set1_epi64x(0x8000000000000000)
+#define _mm_fliptop_i8(a)  _mm_xor_si128(a, _mm_topbit_i8)
+#define _mm_fliptop_i16(a) _mm_xor_si128(a, _mm_topbit_i16)
+#define _mm_fliptop_i32(a) _mm_xor_si128(a, _mm_topbit_i32)
+#define _mm_fliptop_i64(a) _mm_xor_si128(a, _mm_topbit_i64)
+
+#define _mm256_not_si256(a) _mm256_xor_si256(a, _mm256_set1_epi8(-1))
+#define _mm256_topbit_i8  _mm256_set1_epi8(0x80)
+#define _mm256_topbit_i16 _mm256_set1_epi16(0x8000)
+#define _mm256_topbit_i32 _mm256_set1_epi32(0x80000000)
+#define _mm256_topbit_i64 _mm256_set1_epi64x(0x8000000000000000)
+#define _mm256_fliptop_i8(a)  _mm256_xor_si256(a, _mm256_topbit_i8)
+#define _mm256_fliptop_i16(a) _mm256_xor_si256(a, _mm256_topbit_i16)
+#define _mm256_fliptop_i32(a) _mm256_xor_si256(a, _mm256_topbit_i32)
+#define _mm256_fliptop_i64(a) _mm256_xor_si256(a, _mm256_topbit_i64)
+
+intr128i2(operator+, _mm_add_epi32(a, b), Array<u32, 4>)
+intr128i2(operator-, _mm_sub_epi32  (a, b), Array<u32, 4>)
+intr128i2(operator*, _mm_mullo_epi32(a, b), Array<u32, 4>)
+intr128i2(operator^, _mm_xor_si128(a, b), Array<u32, 4>)
+intr128i2(operator&, _mm_and_si128(a, b), Array<u32, 4>)
+intr128i2(operator|, _mm_or_si128 (a, b), Array<u32, 4>)
+
+intr128i2(operator+, _mm_add_epi32(a, b), Array<s32, 4>)
+intr128i2(operator-, _mm_sub_epi32  (a, b), Array<s32, 4>)
+intr128i2(operator*, _mm_mullo_epi32(a, b), Array<s32, 4>)
+intr128i2(operator^, _mm_xor_si128(a, b), Array<s32, 4>)
+intr128i2(operator&, _mm_and_si128(a, b), Array<s32, 4>)
+intr128i2(operator|, _mm_or_si128 (a, b), Array<s32, 4>)
+
+intr128f2(operator+, _mm_add_ps(a, b), Array<f32, 4>)
+intr128f2(operator-, _mm_sub_ps(a, b), Array<f32, 4>)
+intr128f2(operator*, _mm_mul_ps(a, b), Array<f32, 4>)
+intr128f2(operator/, _mm_div_ps(a, b), Array<f32, 4>)
 
 template <> forceinline constexpr Array<f32, 4> element_cast(Array<s32, 4> a) { return bit_cast<Array<f32, 4>>(_mm_cvtepi32_ps(bit_cast<__m128i>(a))); }
 template <> forceinline constexpr Array<s32, 4> element_cast(Array<f32, 4> a) { return bit_cast<Array<s32, 4>>(_mm_cvtps_epi32(bit_cast<__m128>(a))); }
@@ -996,6 +1104,58 @@ forceinline auto lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4> t_) {
 
 forceinline Array<f32, 4> min(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_min_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
 forceinline Array<f32, 4> max(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_max_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+
+// unsigned comparisons
+intr128i2(mask_equal, _mm_cmpeq_epi8 (a, b), Array<u8, 16>)
+intr128i2(mask_equal, _mm_cmpeq_epi16(a, b), Array<u16, 8>)
+intr128i2(mask_equal, _mm_cmpeq_epi32(a, b), Array<u32, 4>)
+intr128i2(mask_equal, _mm_cmpeq_epi64(a, b), Array<u64, 2>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi8 (a, b)), Array<u8, 16>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi16(a, b)), Array<u16, 8>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi32(a, b)), Array<u32, 4>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi64(a, b)), Array<u64, 2>)
+intr128i2(mask_less, _mm_cmpgt_epi8 (_mm_fliptop_i8 (b), _mm_fliptop_i8 (a)), Array<u8, 16>)
+intr128i2(mask_less, _mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a)), Array<u16, 8>)
+intr128i2(mask_less, _mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a)), Array<u32, 4>)
+intr128i2(mask_less, _mm_cmpgt_epi32(_mm_fliptop_i64(b), _mm_fliptop_i64(a)), Array<u64, 2>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi8 (_mm_fliptop_i8 (a), _mm_fliptop_i8 (b))), Array<u8, 16>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b))), Array<u16, 8>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b))), Array<u32, 4>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b))), Array<u64, 2>)
+intr128i2(mask_greater, _mm_cmpgt_epi8 (_mm_fliptop_i8 (a), _mm_fliptop_i8 (b)), Array<u8, 16>)
+intr128i2(mask_greater, _mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b)), Array<u16, 8>)
+intr128i2(mask_greater, _mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b)), Array<u32, 4>)
+intr128i2(mask_greater, _mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b)), Array<u64, 2>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi8 (_mm_fliptop_i8 (b), _mm_fliptop_i8 (a))), Array<u8, 16>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a))), Array<u16, 8>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a))), Array<u32, 4>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i64(b), _mm_fliptop_i64(a))), Array<u64, 2>)
+
+// signed comparisons
+intr128i2(mask_equal, _mm_cmpeq_epi8 (a, b), Array<s8, 16>)
+intr128i2(mask_equal, _mm_cmpeq_epi16(a, b), Array<s16, 8>)
+intr128i2(mask_equal, _mm_cmpeq_epi32(a, b), Array<s32, 4>)
+intr128i2(mask_equal, _mm_cmpeq_epi64(a, b), Array<s64, 2>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi8 (a, b)), Array<s8, 16>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi16(a, b)), Array<s16, 8>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi32(a, b)), Array<s32, 4>)
+intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi64(a, b)), Array<s64, 2>)
+intr128i2(mask_less, _mm_cmpgt_epi8 (b, a), Array<s8, 16>)
+intr128i2(mask_less, _mm_cmpgt_epi16(b, a), Array<s16, 8>)
+intr128i2(mask_less, _mm_cmpgt_epi32(b, a), Array<s32, 4>)
+intr128i2(mask_less, _mm_cmpgt_epi32(b, a), Array<s64, 2>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi8 (a, b)), Array<s8, 16>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi16(a, b)), Array<s16, 8>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi32(a, b)), Array<s32, 4>)
+intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi64(a, b)), Array<s64, 2>)
+intr128i2(mask_greater, _mm_cmpgt_epi8 (a, b), Array<s8, 16>)
+intr128i2(mask_greater, _mm_cmpgt_epi16(a, b), Array<s16, 8>)
+intr128i2(mask_greater, _mm_cmpgt_epi32(a, b), Array<s32, 4>)
+intr128i2(mask_greater, _mm_cmpgt_epi64(a, b), Array<s64, 2>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi8 (b, a)), Array<s8, 16>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi16(b, a)), Array<s16, 8>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(b, a)), Array<s32, 4>)
+intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(b, a)), Array<s64, 2>)
 
 template<class T>
 	requires (sizeof(T) == 1)
@@ -1078,6 +1238,58 @@ forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr, Array<u32, 8> 
 forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
 forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_srlv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
 forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_srav_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+
+// unsigned comparisons
+intr256i2(mask_equal, _mm256_cmpeq_epi8 (a, b), Array<u8,  32>)
+intr256i2(mask_equal, _mm256_cmpeq_epi16(a, b), Array<u16, 16>)
+intr256i2(mask_equal, _mm256_cmpeq_epi32(a, b), Array<u32,  8>)
+intr256i2(mask_equal, _mm256_cmpeq_epi64(a, b), Array<u64,  4>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi8 (a, b)), Array<u8,  32>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), Array<u16, 16>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), Array<u32,  8>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), Array<u64,  4>)
+intr256i2(mask_less, _mm256_cmpgt_epi8 (_mm256_fliptop_i8 (b), _mm256_fliptop_i8 (a)), Array<u8,  32>)
+intr256i2(mask_less, _mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a)), Array<u16, 16>)
+intr256i2(mask_less, _mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a)), Array<u32,  8>)
+intr256i2(mask_less, _mm256_cmpgt_epi32(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a)), Array<u64,  4>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (_mm256_fliptop_i8 (a), _mm256_fliptop_i8 (b))), Array<u8,  32>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b))), Array<u16, 16>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b))), Array<u32,  8>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b))), Array<u64,  4>)
+intr256i2(mask_greater, _mm256_cmpgt_epi8 (_mm256_fliptop_i8 (a), _mm256_fliptop_i8 (b)), Array<u8,  32>)
+intr256i2(mask_greater, _mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b)), Array<u16, 16>)
+intr256i2(mask_greater, _mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b)), Array<u32,  8>)
+intr256i2(mask_greater, _mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b)), Array<u64,  4>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (_mm256_fliptop_i8 (b), _mm256_fliptop_i8 (a))), Array<u8,  32>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a))), Array<u16, 16>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a))), Array<u32,  8>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a))), Array<u64,  4>)
+
+// signed comparisons
+intr256i2(mask_equal, _mm256_cmpeq_epi8 (a, b), Array<s8,  32>)
+intr256i2(mask_equal, _mm256_cmpeq_epi16(a, b), Array<s16, 16>)
+intr256i2(mask_equal, _mm256_cmpeq_epi32(a, b), Array<s32,  8>)
+intr256i2(mask_equal, _mm256_cmpeq_epi64(a, b), Array<s64,  4>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi8 (a, b)), Array<s8,  32>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), Array<s16, 16>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), Array<s32,  8>)
+intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), Array<s64,  4>)
+intr256i2(mask_less, _mm256_cmpgt_epi8 (b, a), Array<s8,  32>)
+intr256i2(mask_less, _mm256_cmpgt_epi16(b, a), Array<s16, 16>)
+intr256i2(mask_less, _mm256_cmpgt_epi32(b, a), Array<s32,  8>)
+intr256i2(mask_less, _mm256_cmpgt_epi32(b, a), Array<s64,  4>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (a, b)), Array<s8,  32>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi16(a, b)), Array<s16, 16>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi32(a, b)), Array<s32,  8>)
+intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi64(a, b)), Array<s64,  4>)
+intr256i2(mask_greater, _mm256_cmpgt_epi8 (a, b), Array<s8,  32>)
+intr256i2(mask_greater, _mm256_cmpgt_epi16(a, b), Array<s16, 16>)
+intr256i2(mask_greater, _mm256_cmpgt_epi32(a, b), Array<s32,  8>)
+intr256i2(mask_greater, _mm256_cmpgt_epi64(a, b), Array<s64,  4>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (b, a)), Array<s8,  32>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi16(b, a)), Array<s16, 16>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), Array<s32,  8>)
+intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), Array<s64,  4>)
 
 template<class T>
 	requires (sizeof(T) == 1)
