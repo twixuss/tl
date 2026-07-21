@@ -83,9 +83,20 @@ struct Is_v2<v2<T>> : std::true_type {};
 template <class T>
 concept v2Int = Is_v2<T>::value && std::integral<typename T::Scalar>;
 
-template <class T> forceinline constexpr v2<T> V2(T v) { return {v, v}; }
-template <class T> forceinline constexpr v3<T> V3(T v) { return {v, v, v}; }
-template <class T> forceinline constexpr v4<T> V4(T v) { return {v, v, v, v}; }
+template <class T> forceinline constexpr v2<T> V2(T x, T y) { return {x, y}; }
+template <class T> forceinline constexpr v2<T> V2(T v = {}) { return {v, v}; }
+template <class T> forceinline constexpr v3<T> V3(T x, T y, T z) { return {x, y, z}; }
+template <class T> forceinline constexpr v3<T> V3(T v = {}) { return {v, v, v}; }
+template <class T> forceinline constexpr v3<T> V3(v2<T> xy, T z) { return {xy.x, xy.y, z}; }
+template <class T> forceinline constexpr v3<T> V3(T x, v2<T> yz) { return {x, yz.x, yz.y}; }
+template <class T> forceinline constexpr v4<T> V4(T x, T y, T z, T w) { return {x, y, z, w}; }
+template <class T> forceinline constexpr v4<T> V4(T v = {}) { return {v, v, v, v}; }
+template <class T> forceinline constexpr v4<T> V4(v2<T> xy, v2<T> zw) { return {xy.x, xy.y, zw.x, zw.y}; }
+template <class T> forceinline constexpr v4<T> V4(v2<T> xy, T z, T w) { return {xy.x, xy.y, z, w}; }
+template <class T> forceinline constexpr v4<T> V4(T x, T y, v2<T> zw) { return {x, y, zw.x, zw.y}; }
+template <class T> forceinline constexpr v4<T> V4(v3<T> xyz, T w) { return {xyz.x, xyz.y, xyz.z, w}; }
+template <class T> forceinline constexpr v4<T> V4(T x, v3<T> yzw) { return {x, yzw.x, yzw.y, yzw.z}; }
+
 
 #define V2(f32, v2f, V2f)                                     \
 	forceinline constexpr v2f V2f(f32 x, f32 y) { return {x, y}; } \
