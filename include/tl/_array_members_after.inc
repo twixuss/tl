@@ -10,6 +10,17 @@ forceinline constexpr auto &at(this auto &&self, umm i) {
 }
 forceinline constexpr auto &operator[](this auto &&self, umm i) { return self.at(i); }
 
+template <std::integral Index, umm index_count>
+forceinline constexpr auto operator[](Array<Index, index_count> indices) const {
+    for (umm i = 0; i < index_count; ++i)
+        assert(indices[i] < count);
+
+    Array<T, count> result = {};
+    for (umm i = 0; i < index_count; ++i)
+        result.data[i] = data[indices[i]];
+    return result;
+}
+
 forceinline constexpr auto &front(this auto &&self) { return self.data[0]; }
 forceinline constexpr auto &back(this auto &&self) { return self.data[self.count - 1]; }
 

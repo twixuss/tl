@@ -60,7 +60,7 @@ forceinline constexpr auto pow(T v) {
 
 template <class T>
 forceinline constexpr T smooth_min(T a, T b, f32 k) {
-	f32 h = clamp((b - a) / k + 0.5f, 0.0f, 1.0f);
+	auto h = clamp((b - a) / k + 0.5f, convert<T>(0.0f), convert<T>(1.0f));
 	return b + h * (a - b + k * 0.5f * (h - 1.0f));
 }
 
@@ -2608,6 +2608,10 @@ forceinline constexpr v4s frac(v4s v, s32 step) {
 }
 
 } // namespace ce
+
+forceinline void append(StringBuilder &builder, m3 m) {
+	return append_format(builder, "{{{}, {}, {}}}", m.i, m.j, m.k);
+}
 
 forceinline void append(StringBuilder &builder, m4 m) {
 	return append_format(builder, "{{{}, {}, {}, {}}}", m.i, m.j, m.k, m.l);

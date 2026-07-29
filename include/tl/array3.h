@@ -77,6 +77,29 @@ struct Array3 {
 		else if constexpr (layout == Array3Layout::yxz) return *(CT (*)[count_y][count_x][count_z])self.data;
 		else if constexpr (layout == Array3Layout::xyz) return *(CT (*)[count_x][count_y][count_z])self.data;
 	}
+	
+	constexpr Span<T> span() const { return {begin(), end()}; }
+	
+	constexpr v3umm index_of(T const *value) const {
+		umm i = value - data;
+		
+		if constexpr (false) {}
+		else if constexpr (layout == Array3Layout::zyx) return { i % count.x, i / count.x % count.y, i / (count.x * count.y) };
+		else if constexpr (layout == Array3Layout::yzx) return { i % count.x, i / (count.x * count.z), i / count.x % count.z };
+		else if constexpr (layout == Array3Layout::zxy) return { i / count.y % count.x, i % count.y, i / (count.x * count.y) };
+		else if constexpr (layout == Array3Layout::xzy) return { i / (count.y * count.z), i % count.y, i / count.y % count.z };
+		else if constexpr (layout == Array3Layout::yxz) return { i / count.z % count.x, i / (count.x * count.z), i % count.z };
+		else if constexpr (layout == Array3Layout::xyz) return { i / (count.y * count.z), i / count.z % count.y, i % count.z };
+	}
+
+	constexpr auto apply(this auto &&self, auto &&fn)
+		requires requires { fn(self.data[0]); }
+	{
+		Array3<std::remove_cvref_t<decltype(fn(self.data[0]))>, count.x, count.y, count.z, layout> result = {};
+		for (umm i = 0; i < flat_count; ++i)
+			result.data[i] = fn(self.data[i]);
+		return result;
+	}
 };
 
 }
