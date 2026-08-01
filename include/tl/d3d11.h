@@ -71,7 +71,9 @@ struct UntypedStructuredBuffer : ShaderResource, UntypedBuffer {
 };
 
 template <class T>
-struct StructuredBuffer : UntypedStructuredBuffer {};
+struct StructuredBuffer : UntypedStructuredBuffer {
+	forceinline constexpr umm count() const { return size / sizeof(T); }
+};
 
 struct UntypedConstantBuffer {
 	ID3D11Buffer *buffer = 0;
