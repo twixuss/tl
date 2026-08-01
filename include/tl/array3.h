@@ -100,6 +100,12 @@ struct Array3 {
 			result.data[i] = fn(self.data[i]);
 		return result;
 	}
+
+	template <class U>
+	constexpr Array3<U, count_x, count_y, count_z, layout> &reinterpret() {
+		static_assert(sizeof(T) == sizeof(U));
+		return *(Array3<U, count_x, count_y, count_z, layout> *)this;
+	}
 };
 
 }
