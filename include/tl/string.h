@@ -1055,7 +1055,7 @@ struct FormatHexOptions {
 template <class Int>  requires is_integer<Int>
 auto format_hex(Int value, FormatHexOptions options = {}) {
 	return FormattedInt{
-		.value = (std::make_unsigned_t<Int>)value,
+		.value = (MakeUnsigned<Int>)value,
 		.format = {
 			.radix = 16, 
 			.leading_zero_count = sizeof(Int) * 2,
@@ -1835,3 +1835,9 @@ umm _to_utf16(Span<utf8> src, Span<utf16> dst) {
 #endif
 
 #endif // _TL_STRING_H
+
+#define TL_STRING_H_INCLUDED
+
+#ifdef TL_INT_H_INCLUDED
+#include "int-string.h"
+#endif

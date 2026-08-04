@@ -260,6 +260,12 @@ template <class T> inline constexpr bool is_signed = std::is_signed_v<T>;
 template <class T> inline constexpr bool is_unsigned = std::is_unsigned_v<T>;
 template <class T> inline constexpr bool is_float = std::is_floating_point_v<T>;
 
+template <class T> struct MakeUnsignedT { using Type = std::make_unsigned_t<T>; };
+template <class T> using MakeUnsigned = typename MakeUnsignedT<T>::Type;
+
+template <class T> struct MakeSignedT { using Type = std::make_signed_t<T>; };
+template <class T> using MakeSigned = typename MakeSignedT<T>::Type;
+
 struct Empty {};
 constexpr bool operator==(Empty, Empty) { return true; }
 constexpr bool operator!=(Empty, Empty) { return false; }
@@ -1250,6 +1256,14 @@ constexpr T midpoint(T a, T b) {
 	sort_values(a, b);
 	return a + (b - a) / 2;
 }
+
+forceinline constexpr u16 mulfull(u8  a, u8  b) { return (u16)((u16)a * (u16)b); }
+forceinline constexpr u32 mulfull(u16 a, u16 b) { return (u32)((u32)a * (u32)b); }
+forceinline constexpr u64 mulfull(u32 a, u32 b) { return (u64)((u64)a * (u64)b); }
+
+forceinline constexpr s16 mulfull(s8  a, s8  b) { return (s16)((s16)a * (s16)b); }
+forceinline constexpr s32 mulfull(s16 a, s16 b) { return (s32)((s32)a * (s32)b); }
+forceinline constexpr s64 mulfull(s32 a, s32 b) { return (s64)((s64)a * (s64)b); }
 
 template <umm bits>
 using UintWithBits = TypeAt<log2(ceil_to_power_of_2(bits) / 8), u8, u16, u32, u64>;

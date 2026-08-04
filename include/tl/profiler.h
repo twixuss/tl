@@ -233,7 +233,7 @@ struct ProfileRenderer {
 #if OS_WINDOWS
 #include "win32.h"
 #include "string.h"
-#include "int128.h"
+#include "int.h"
 #include "file.h"
 
 #ifdef _MSC_VER
@@ -532,8 +532,8 @@ void append(StringBuilder &builder, Profiler::ReportForTimed const &r) {
 	append_bytes(builder, (u32)r.all_time_spans.count);
 	for (auto thread : r.per_thread) {
 		for (auto span : thread.time_spans) {
-			append_bytes(builder, (s64)(divide(multiply(span.begin - r.start_time, nanoseconds_in_second), performance_frequency)));
-			append_bytes(builder, (s64)(divide(multiply(span.end   - r.start_time, nanoseconds_in_second), performance_frequency)));
+			append_bytes(builder, (s64)(div(mulfull(span.begin - r.start_time, nanoseconds_in_second), performance_frequency)));
+			append_bytes(builder, (s64)(div(mulfull(span.end   - r.start_time, nanoseconds_in_second), performance_frequency)));
 			append_bytes(builder, (u32)thread.id);
 			append_bytes(builder, (u16)span.name.count);
 			append_bytes(builder, span.name);
@@ -542,7 +542,7 @@ void append(StringBuilder &builder, Profiler::ReportForTimed const &r) {
 	append_bytes(builder, (u32)r.all_marks.count);
 	for (auto thread : r.per_thread) {
 		for (auto mark : thread.marks) {
-			append_bytes(builder, (s64)(divide(multiply(mark.time - r.start_time, nanoseconds_in_second), performance_frequency)));
+			append_bytes(builder, (s64)(div(mulfull(mark.time - r.start_time, nanoseconds_in_second), performance_frequency)));
 			append_bytes(builder, (u32)thread.id);
 			append_bytes(builder, (u32)-1); // color
 		}
@@ -557,14 +557,14 @@ void ProfileRenderer::setup(Profiler::Report const &r) {
 
 	for (auto thread : r.per_thread) {
 		for (auto span : thread.time_spans) {
-			auto begin = (Nanoseconds)divide(multiply(span.begin, 1'000'000'000), performance_frequency);
-			auto end = (Nanoseconds)divide(multiply(span.end, 1'000'000'000), performance_frequency);
+			auto begin = (Nanoseconds)div(mulfull(span.begin, 1'000'000'000), performance_frequency);
+			auto end = (Nanoseconds)div(mulfull(span.end, 1'000'000'000), performance_frequency);
 			Event e = {
 				.name = span.name,
 				.begin = begin,
 				.end = end,
 				.depth = span.depth,
-				.self_duration = (Nanoseconds)divide(multiply(span.self, 1'000'000'000), performance_frequency),
+				.self_duration = (Nanoseconds)div(mulfull(span.self, 1'000'000'000), performance_frequency),
 			};
 			auto &t = thread_id_to_events_to_draw.get_or_insert(thread.id);
 			t.id = thread.id;
@@ -577,7 +577,7 @@ void ProfileRenderer::setup(Profiler::Report const &r) {
 		for (auto mark : thread.marks) {
 			Mark m = {
 				.name = mark.name,
-				.time = (Nanoseconds)divide(multiply(mark.time, 1'000'000'000), performance_frequency),
+				.time = (Nanoseconds)div(mulfull(mark.time, 1'000'000'000), performance_frequency),
 			};
 			auto &t = thread_id_to_events_to_draw.get_or_insert(thread.id);
 			t.id = thread.id;
