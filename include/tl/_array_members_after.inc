@@ -79,8 +79,5 @@ template <class U>
 forceinline constexpr explicit operator Array<U, count>() const
     requires requires(T t) { (U)t; }
 {
-    Array<U, count> result = {};
-    for (umm i = 0; i < count; ++i)
-        result.data[i] = (U)data[i];
-    return result;
+    return element_cast<U>(*this);
 };

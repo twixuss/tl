@@ -2522,7 +2522,7 @@ forceinline bool overlaps_sphere(FrustumPlanes const &planes, v3f position, f32 
 		muladd(plane_y,  position.y,
 		       plane_z * position.z));
 
-	auto mask = mask_to_int(mask_less(f, broadcast_to_array<8>(-radius)));
+	auto mask = mask_to_int(mask_lt(f, broadcast_to_array<8>(-radius)));
 	
 	return !(mask & 0b11111100);
 #else

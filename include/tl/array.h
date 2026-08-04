@@ -542,14 +542,14 @@ struct Array<T, 4> {
 template <class T, class... Rest>
 Array(T, Rest...) -> Array<typename RequireAllSame<T, Rest...>::Type, 1 + sizeof...(Rest)>;
 
-template <class T, umm count>
-inline static constexpr bool is_array<Array<T, count>> = true;
+template <class T, umm count> inline static constexpr bool is_array<Array<T, count>> = true;
 
-template <class T, umm count>
-inline static constexpr bool is_unsigned<Array<T, count>> = is_unsigned<T>;
+template <class T>
+concept AnArray = is_array<T>;
 
-template <class T, umm count>
-inline static constexpr bool is_integer_like<Array<T, count>> = is_integer_like<T>;
+template <class T, umm count> inline static constexpr bool is_unsigned<Array<T, count>> = is_unsigned<T>;
+
+template <class T, umm count> inline static constexpr bool is_integer_like<Array<T, count>> = is_integer_like<T>;
 
 template <class T>            inline static constexpr int array_nestedness = 0;
 template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
@@ -558,12 +558,16 @@ template <class T>
 struct ScalarOfT {
 	using Type = T;
 };
-template <class T, umm count>
-struct ScalarOfT<Array<T, count>> {
-	using Type = typename ScalarOfT<T>::Type;
-};
+template <class T, umm count> struct ScalarOfT<Array<T, count>> { using Type = typename ScalarOfT<T>::Type; };
 template <class T>
 using ScalarOf = typename ScalarOfT<T>::Type;
+
+template <class NewScalar, class T>
+struct WithScalarT { using Type = NewScalar; };
+template <class NewScalar, class T, umm count>
+struct WithScalarT<NewScalar, Array<T, count>> { using Type = Array<typename WithScalarT<NewScalar, T>::Type, count>; };
+template <class NewScalar, class T>
+using WithScalar = typename WithScalarT<NewScalar, T>::Type;
 
 // sub_arrays<2, 1>([[0, 1, 2, 3], [4, 5, 6, 7]]   ) =
 // sub_arrays<2   >([[0, 1, 2, 3], [4, 5, 6, 7]], 1) =
@@ -637,6 +641,10 @@ template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny
 #define WRAP_ToBoolUsingAll(...) ToBoolUsingAll<__VA_ARGS__>
 #define WRAP_ToBoolUsingAny(...) ToBoolUsingAny<__VA_ARGS__>
 
+#ifndef TL_ARRAY_STRONG
+#define TL_ARRAY_STRONG 1
+#endif
+
 // The binary operators for Array allow type promotion.
 // This means that Array<int, 3>{} * 1.23f produces Array<float, 3>,
 // which is good in most cases as you don't want to explicitly cast.
@@ -647,6 +655,156 @@ template <class T, class U> forceinline constexpr auto operator||(ToBoolUsingAny
 // 2) Allow promotion - working with small integers sucks, need to add casts, and there is wasted cpu time promoting and unpromoting.
 // 3) Have both. Make two namespaces and users import whichever they want. Problem is that now every user has to make a decision on what to import
 //    and write it. There can't be a default one globally available, as importing another one would introduce ambiguity.
+
+#if TL_ARRAY_STRONG
+
+//////////////////////
+// Strong operators //
+//////////////////////
+
+#define OP(op)                                                                                                                            \
+	template <class T, umm count>                                                                                                         \
+	forceinline constexpr auto operator op(Array<T, count> a, Array<T, count> b)                                                          \
+		requires requires(T t) { t op t; }                                                                                                \
+	{                                                                                                                                     \
+		Array<T, count> result = {};                                                                                                      \
+		for (umm i = 0; i < count; ++i)                                                                                                   \
+			result.data[i] = a.data[i] op b.data[i];                                                                                      \
+		return result;                                                                                                                    \
+	}                                                                                                                                     \
+	template <class U, class T, umm count>                                                                                                \
+	forceinline constexpr Array<T, count> operator op(Array<T, count> a, U b)                                                             \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+			requires !is_array<U>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return a op broadcast_to_array<count>((T)b);                                                                                      \
+	}                                                                                                                                     \
+	template <class U, class T, umm count>                                                                                                \
+	forceinline constexpr Array<T, count> operator op(U a, Array<T, count> b)                                                             \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+			requires !is_array<U>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return broadcast_to_array<count>((T)a) op b;                                                                                      \
+	}                                                                                                                                     \
+	template <class U, class T, umm count, umm inner_count>                                                                               \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(Array<Array<T, inner_count>, count> a, U b)                     \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+			requires !is_array<U>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return a op broadcast_to_array<count>(broadcast_to_array<inner_count>((T)b));                                                     \
+	}                                                                                                                                     \
+	template <class U, class T, umm count, umm inner_count>                                                                               \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(U a, Array<Array<T, inner_count>, count> b)                     \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+			requires !is_array<U>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return broadcast_to_array<count>(broadcast_to_array<inner_count>((T)a)) op b;                                                     \
+	}                                                                                                                                     \
+	template <class T, umm count, umm inner_count>                                                                                        \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(Array<Array<T, inner_count>, count> a, Array<T, inner_count> b) \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return a op broadcast_to_array<count>(b);                                                                                         \
+	}                                                                                                                                     \
+	template <class T, umm count, umm inner_count>                                                                                        \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(Array<T, inner_count> a, Array<Array<T, inner_count>, count> b) \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		return broadcast_to_array<count>(a) op b;                                                                                         \
+	}                                                                                                                                     \
+	template <class T, umm count, umm inner_count>                                                                                        \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(Array<Array<T, inner_count>, count> a, Array<T, count> b)       \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		Array<Array<T, inner_count>, count> r;                                                                                            \
+		for (umm i = 0; i < count; ++i)                                                                                                   \
+			r.data[i] = a.data[i] op b.data[i];                                                                                           \
+		return r;                                                                                                                         \
+	}                                                                                                                                     \
+	template <class T, umm count, umm inner_count>                                                                                        \
+	forceinline constexpr Array<Array<T, inner_count>, count> operator op(Array<T, count> a, Array<Array<T, inner_count>, count> b)       \
+		requires requires {                                                                                                               \
+			requires !is_array<T>;                                                                                                        \
+		}                                                                                                                                 \
+	{                                                                                                                                     \
+		Array<Array<T, inner_count>, count> r;                                                                                            \
+		for (umm i = 0; i < count; ++i)                                                                                                   \
+			r.data[i] = a.data[i] op b.data[i];                                                                                           \
+		return r;                                                                                                                         \
+	}                                                                                                                                     \
+	template <class T, umm count, class U>                                                                                                \
+	forceinline constexpr Array<T, count> &operator op##=(Array<T, count> &a, U b)                                                        \
+		requires requires { a op b; }                                                                                                     \
+	{                                                                                                                                     \
+		return a = a op b;                                                                                                                \
+	}
+OP(+)
+OP(-)
+OP(*)
+OP(/)
+OP(%)
+OP(^)
+OP(&)
+OP(|)
+OP(<<)
+OP(>>)
+#undef OP
+
+#define OP(op, RetTypeMod)                                                                        \
+	template <class T, umm count>                                                                 \
+	forceinline constexpr auto operator op(Array<T, count> a, Array<T, count> b)                  \
+		requires requires(T t) { t op t; }                                                        \
+	{                                                                                             \
+		RetTypeMod(WithScalar<bool, Array<T, count>>) result = {};                                \
+		for (umm i = 0; i < count; ++i)                                                           \
+			result.data[i] = a.data[i] op b.data[i];                                              \
+		return result;                                                                            \
+	}                                                                                             \
+	template <class U, class T, umm count>                                                        \
+	forceinline constexpr auto operator op(Array<T, count> a, U b)                                \
+		requires requires {                                                                       \
+			requires array_nestedness<U> <= array_nestedness<T>;                                  \
+			requires requires { a op broadcast_to_array<count>((WithScalar<ScalarOf<T>, U>)b); }; \
+		}                                                                                         \
+	{                                                                                             \
+		return a op broadcast_to_array<count>((WithScalar<ScalarOf<T>, U>)b);                     \
+	}                                                                                             \
+	template <class U, class T, umm count>                                                        \
+	forceinline constexpr auto operator op(U a, Array<T, count> b)                                \
+		requires requires {                                                                       \
+			requires array_nestedness<U> <= array_nestedness<T>;                                  \
+			requires requires { broadcast_to_array<count>((WithScalar<ScalarOf<T>, U>)a) op b; }; \
+		}                                                                                         \
+	{                                                                                             \
+		return broadcast_to_array<count>((WithScalar<ScalarOf<T>, U>)a) op b;                     \
+	}
+OP(==, WRAP_ToBoolUsingAll)
+OP(!=, WRAP_ToBoolUsingAny)
+OP(<, ASIS)
+OP(>, ASIS)
+OP(<=, ASIS)
+OP(>=, ASIS)
+#undef OP
+
+#else
+
+////////////////////
+// Weak operators //
+////////////////////
 
 #define OP(op, RetTypeMod)                                                                           \
 	template <class T, umm count>                                                                    \
@@ -731,6 +889,8 @@ OP(|)
 OP(<<)
 OP(>>)
 #undef OP
+
+#endif
 
 template <int shift, class T, umm count>
 forceinline constexpr Array<T, count> shift_left(Array<T, count> arr) {
@@ -885,12 +1045,12 @@ forceinline constexpr void scatter(T *pointer, Array<T, count> values, Array<Ind
 		return mask_##NAME(broadcast_to_array<count>(a), b);                     \
 	}
 
-OP(equal, ==)
-OP(not_equal, !=)
-OP(less, <)
-OP(less_equal, <=)
-OP(greater, >)
-OP(greater_equal, >=)
+OP(eq, ==)
+OP(ne, !=)
+OP(lt, <)
+OP(le, <=)
+OP(gt, >)
+OP(ge, >=)
 
 #undef OP
 
@@ -978,17 +1138,19 @@ forceinline constexpr void convert(Array<T, count> &to, From from) {
 }
 
 template <class U, class T, umm count>
-forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
-	Array<U, count> r;
+	requires is_array<U> && requires(T t) { (ElementOf<U>)t; }
+forceinline constexpr U convert(Array<T, count> a) {
+	U r;
 	for (umm i = 0; i < count; ++i)
-		r.data[i] = convert<U>(a.data[i]);
+		r.data[i] = convert<ElementOf<U>>(a.data[i]);
 	return r;
 }
 
-template <class T, umm count>
-forceinline constexpr Array<T, count> muladd(Array<T, count> a, Array<T, count> b, Array<T, count> c) {
-	return a*b + c;
+template <class U, class T, umm count>
+forceinline constexpr Array<U, count> element_cast(Array<T, count> a) {
+	return convert<Array<U, count>>(a);
 }
+
 template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, Array<T, count> b, Array<T, count> c) { return muladd(broadcast_to_array<count>(a), b, c); }
 template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array<T, count> a, T b, Array<T, count> c) { return muladd(a, broadcast_to_array<count>(b), c); }
 template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array<T, count> a, Array<T, count> b, T c) { return muladd(a, b, broadcast_to_array<count>(c)); }
@@ -996,49 +1158,108 @@ template <class T, umm count> forceinline constexpr Array<T, count> muladd(Array
 template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, Array<T, count> b, T c) { return muladd(broadcast_to_array<count>(a), b, broadcast_to_array<count>(c)); }
 template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, T b, Array<T, count> c) { return muladd(broadcast_to_array<count>(a), broadcast_to_array<count>(b), c); }
 
+template <umm count>
+forceinline constexpr Array<u8, count> count_bits(Array<u8, count> a) {
+	a = (a & 0x55) + ((a >> 1) & 0x55);
+	a = (a & 0x33) + ((a >> 2) & 0x33);
+	a = (a & 0x0f) + ((a >> 4) & 0x0f);
+	return a;
+}
+template <umm count>
+forceinline constexpr Array<u16, count> count_bits(Array<u16, count> a) {
+	a = (a & 0x5555) + ((a >> 1) & 0x5555);
+	a = (a & 0x3333) + ((a >> 2) & 0x3333);
+	a = (a & 0x0f0f) + ((a >> 4) & 0x0f0f);
+	a = (a & 0x00ff) + ((a >> 8) & 0x00ff);
+	return a;
+}
+template <umm count>
+forceinline constexpr Array<u32, count> count_bits(Array<u32, count> a) {
+	a = (a & 0x55555555) + ((a >>  1) & 0x55555555);
+	a = (a & 0x33333333) + ((a >>  2) & 0x33333333);
+	a = (a & 0x0f0f0f0f) + ((a >>  4) & 0x0f0f0f0f);
+	a = (a & 0x00ff00ff) + ((a >>  8) & 0x00ff00ff);
+	a = (a & 0x0000ffff) + ((a >> 16) & 0x0000ffff);
+	return a;
+}
+template <umm count>
+forceinline constexpr Array<u64, count> count_bits(Array<u64, count> a) {
+	a = (a & 0x5555555555555555) + ((a >>  1) & 0x5555555555555555);
+	a = (a & 0x3333333333333333) + ((a >>  2) & 0x3333333333333333);
+	a = (a & 0x0f0f0f0f0f0f0f0f) + ((a >>  4) & 0x0f0f0f0f0f0f0f0f);
+	a = (a & 0x00ff00ff00ff00ff) + ((a >>  8) & 0x00ff00ff00ff00ff);
+	a = (a & 0x0000ffff0000ffff) + ((a >> 16) & 0x0000ffff0000ffff);
+	a = (a & 0x00000000ffffffff) + ((a >> 32) & 0x00000000ffffffff);
+	return a;
+}
+
+using u8x16 = Array<u8, 16>; using u8x32 = Array<u8, 32>; using u8x64 = Array<u8, 64>;
+using s8x16 = Array<s8, 16>; using s8x32 = Array<s8, 32>; using s8x64 = Array<s8, 64>;
+using u16x8 = Array<u16, 8>; using u16x16 = Array<u16, 16>; using u16x32 = Array<u16, 32>;
+using s16x8 = Array<s16, 8>; using s16x16 = Array<s16, 16>; using s16x32 = Array<s16, 32>;
+using u32x4 = Array<u32, 4>; using u32x8 = Array<u32, 8>; using u32x16 = Array<u32, 16>;
+using s32x4 = Array<s32, 4>; using s32x8 = Array<s32, 8>; using s32x16 = Array<s32, 16>;
+using f32x4 = Array<f32, 4>; using f32x8 = Array<f32, 8>; using f32x16 = Array<f32, 16>;
+using u64x2 = Array<u64, 2>; using u64x4 = Array<u64, 4>; using u64x8 = Array<u64, 8>;
+using s64x2 = Array<s64, 2>; using s64x4 = Array<s64, 4>; using s64x8 = Array<s64, 8>;
+using f64x2 = Array<f64, 2>; using f64x4 = Array<f64, 4>; using f64x8 = Array<f64, 8>;
+
 #if TL_USE_SIMD
 
-#define intrdef1(m, name, intr, ...)                  \
-	template <> constexpr auto name(__VA_ARGS__ a_) { \
-		m a = bit_cast<m>(a_);                        \
-		return bit_cast<__VA_ARGS__>(intr);           \
+//#if TL_STRONG_ARRAY
+//#define TL_INTR_RET(type) type 
+//#else
+#define TL_INTR_RET(type) auto
+//#endif 
+
+template <class T> struct IntrTypeT {};
+template <> struct IntrTypeT<u8x16> { using Type = __m128i; };
+template <> struct IntrTypeT<u16x8> { using Type = __m128i; };
+template <> struct IntrTypeT<u32x4> { using Type = __m128i; };
+template <> struct IntrTypeT<u64x2> { using Type = __m128i; };
+template <> struct IntrTypeT<s8x16> { using Type = __m128i; };
+template <> struct IntrTypeT<s16x8> { using Type = __m128i; };
+template <> struct IntrTypeT<s32x4> { using Type = __m128i; };
+template <> struct IntrTypeT<s64x2> { using Type = __m128i; };
+template <> struct IntrTypeT<f32x4> { using Type = __m128;  };
+template <> struct IntrTypeT<f64x2> { using Type = __m128d; };
+template <> struct IntrTypeT<u8x32 > { using Type = __m256i; };
+template <> struct IntrTypeT<u16x16> { using Type = __m256i; };
+template <> struct IntrTypeT<u32x8 > { using Type = __m256i; };
+template <> struct IntrTypeT<u64x4 > { using Type = __m256i; };
+template <> struct IntrTypeT<s8x32 > { using Type = __m256i; };
+template <> struct IntrTypeT<s16x16> { using Type = __m256i; };
+template <> struct IntrTypeT<s32x8 > { using Type = __m256i; };
+template <> struct IntrTypeT<s64x4 > { using Type = __m256i; };
+template <> struct IntrTypeT<f32x8 > { using Type = __m256;  };
+template <> struct IntrTypeT<f64x4 > { using Type = __m256d; };
+template <class T> using IntrType = typename IntrTypeT<T>::Type;
+
+// This shit breaks constexpr. Can't call unspecialized version in c++.
+// Workaround would be to have two functions (v1 with default implementation,
+// v2 with default that calls v1, v2 can be specialized and call v1 if needed)
+// ... FOR EACH FUCKING OPERATION.
+
+#define intr1(ret, name, intr, t1)                                                 \
+	template <> forceinline constexpr TL_INTR_RET(ret) name(t1 a_) {               \
+		auto a = bit_cast<IntrType<t1>>(a_);                                       \
+		return bit_cast<ret>(intr);                                                \
 	}
 
-#define intrdef2(m, name, intr, ...)                                  \
-	template <> constexpr auto name(__VA_ARGS__ a_, __VA_ARGS__ b_) { \
-		m a = bit_cast<m>(a_);                                        \
-		m b = bit_cast<m>(b_);                                        \
-		return bit_cast<__VA_ARGS__>(intr);                           \
+#define intr2(ret, name, intr, t1, t2)                                             \
+	template <> forceinline constexpr TL_INTR_RET(ret) name(t1 a_, t2 b_) {        \
+		auto a = bit_cast<IntrType<t1>>(a_);                                       \
+		auto b = bit_cast<IntrType<t2>>(b_);                                       \
+		return bit_cast<ret>(intr);                                                \
 	}
 
-#define intrdef3(m, name, intr, ...)                                                  \
-	template <> constexpr auto name(__VA_ARGS__ a_, __VA_ARGS__ b_, __VA_ARGS__ c_) { \
-		m a = bit_cast<m>(a_);                                                        \
-		m b = bit_cast<m>(b_);                                                        \
-		m c = bit_cast<m>(c_);                                                        \
-		return bit_cast<__VA_ARGS__>(intr);                                           \
+#define intr3(ret, name, intr, t1, t2, t3)                                         \
+	template <> forceinline constexpr TL_INTR_RET(ret) name(t1 a_, t2 b_, t3 c_) { \
+		auto a = bit_cast<IntrType<t1>>(a_);                                       \
+		auto b = bit_cast<IntrType<t2>>(b_);                                       \
+		auto c = bit_cast<IntrType<t3>>(c_);                                       \
+		return bit_cast<ret>(intr);                                                \
 	}
-
-#define intr128f1(name, intr, ...) intrdef1(__m128, name, intr, __VA_ARGS__)
-#define intr256f1(name, intr, ...) intrdef1(__m256, name, intr, __VA_ARGS__)
-#define intr512f1(name, intr, ...) intrdef1(__m512, name, intr, __VA_ARGS__)
-#define intr128i1(name, intr, ...) intrdef1(__m128i, name, intr, __VA_ARGS__)
-#define intr256i1(name, intr, ...) intrdef1(__m256i, name, intr, __VA_ARGS__)
-#define intr512i1(name, intr, ...) intrdef1(__m512i, name, intr, __VA_ARGS__)
-
-#define intr128f2(name, intr, ...) intrdef2(__m128, name, intr, __VA_ARGS__)
-#define intr256f2(name, intr, ...) intrdef2(__m256, name, intr, __VA_ARGS__)
-#define intr512f2(name, intr, ...) intrdef2(__m512, name, intr, __VA_ARGS__)
-#define intr128i2(name, intr, ...) intrdef2(__m128i, name, intr, __VA_ARGS__)
-#define intr256i2(name, intr, ...) intrdef2(__m256i, name, intr, __VA_ARGS__)
-#define intr512i2(name, intr, ...) intrdef2(__m512i, name, intr, __VA_ARGS__)
-
-#define intr128f3(name, intr, ...) intrdef3(__m128, name, intr, __VA_ARGS__)
-#define intr256f3(name, intr, ...) intrdef3(__m256, name, intr, __VA_ARGS__)
-#define intr512f3(name, intr, ...) intrdef3(__m512, name, intr, __VA_ARGS__)
-#define intr128i3(name, intr, ...) intrdef3(__m128i, name, intr, __VA_ARGS__)
-#define intr256i3(name, intr, ...) intrdef3(__m256i, name, intr, __VA_ARGS__)
-#define intr512i3(name, intr, ...) intrdef3(__m512i, name, intr, __VA_ARGS__)
 
 #define _mm_not_si128(a) _mm_xor_si128(a, _mm_set1_epi8(-1))
 #define _mm_topbit_i8  _mm_set1_epi8(0x80)
@@ -1060,266 +1281,450 @@ template <class T, umm count> forceinline constexpr Array<T, count> muladd(T a, 
 #define _mm256_fliptop_i32(a) _mm256_xor_si256(a, _mm256_topbit_i32)
 #define _mm256_fliptop_i64(a) _mm256_xor_si256(a, _mm256_topbit_i64)
 
-intr128i2(operator+, _mm_add_epi32(a, b), Array<u32, 4>)
-intr128i2(operator-, _mm_sub_epi32  (a, b), Array<u32, 4>)
-intr128i2(operator*, _mm_mullo_epi32(a, b), Array<u32, 4>)
-intr128i2(operator^, _mm_xor_si128(a, b), Array<u32, 4>)
-intr128i2(operator&, _mm_and_si128(a, b), Array<u32, 4>)
-intr128i2(operator|, _mm_or_si128 (a, b), Array<u32, 4>)
-
-intr128i2(operator+, _mm_add_epi32(a, b), Array<s32, 4>)
-intr128i2(operator-, _mm_sub_epi32  (a, b), Array<s32, 4>)
-intr128i2(operator*, _mm_mullo_epi32(a, b), Array<s32, 4>)
-intr128i2(operator^, _mm_xor_si128(a, b), Array<s32, 4>)
-intr128i2(operator&, _mm_and_si128(a, b), Array<s32, 4>)
-intr128i2(operator|, _mm_or_si128 (a, b), Array<s32, 4>)
-
-intr128f2(operator+, _mm_add_ps(a, b), Array<f32, 4>)
-intr128f2(operator-, _mm_sub_ps(a, b), Array<f32, 4>)
-intr128f2(operator*, _mm_mul_ps(a, b), Array<f32, 4>)
-intr128f2(operator/, _mm_div_ps(a, b), Array<f32, 4>)
-
-template <> forceinline constexpr Array<f32, 4> element_cast(Array<s32, 4> a) { return bit_cast<Array<f32, 4>>(_mm_cvtepi32_ps(bit_cast<__m128i>(a))); }
-template <> forceinline constexpr Array<s32, 4> element_cast(Array<f32, 4> a) { return bit_cast<Array<s32, 4>>(_mm_cvtps_epi32(bit_cast<__m128>(a))); }
-
-template <int shift> forceinline constexpr Array<u32, 4> shift_left(Array<u32, 4> arr) { return bit_cast<Array<u32, 4>>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 4> shift_left(Array<s32, 4> arr) { return bit_cast<Array<s32, 4>>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<u32, 4> shift_right(Array<u32, 4> arr) { return bit_cast<Array<u32, 4>>(_mm_srli_epi32(bit_cast<__m128i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 4> shift_right(Array<s32, 4> arr) { return bit_cast<Array<s32, 4>>(_mm_srai_epi32(bit_cast<__m128i>(arr), shift)); }
-
-template <>
-forceinline auto lerp(Array<f32, 4> a_, Array<f32, 4> b_, Array<f32, 4> t_) {
-	__m128 a = bit_cast<__m128>(a_);
-	__m128 b = bit_cast<__m128>(b_);
-	__m128 t = bit_cast<__m128>(t_);
-
-	#ifdef __AVX__
-	__m128 r = _mm_fmadd_ps(_mm_sub_ps(b, a), t, a);
-	#else
-	__m128 r = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(b, a), t), a);
-	#endif
-
-	return bit_cast<Array<f32, 4>>(r);
-}
-
-forceinline Array<f32, 4> min(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_min_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
-forceinline Array<f32, 4> max(Array<f32, 4> a, Array<f32, 4> b) { return bit_cast<Array<f32, 4>>(_mm_max_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
-
-// unsigned comparisons
-intr128i2(mask_equal, _mm_cmpeq_epi8 (a, b), Array<u8, 16>)
-intr128i2(mask_equal, _mm_cmpeq_epi16(a, b), Array<u16, 8>)
-intr128i2(mask_equal, _mm_cmpeq_epi32(a, b), Array<u32, 4>)
-intr128i2(mask_equal, _mm_cmpeq_epi64(a, b), Array<u64, 2>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi8 (a, b)), Array<u8, 16>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi16(a, b)), Array<u16, 8>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi32(a, b)), Array<u32, 4>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi64(a, b)), Array<u64, 2>)
-intr128i2(mask_less, _mm_cmpgt_epi8 (_mm_fliptop_i8 (b), _mm_fliptop_i8 (a)), Array<u8, 16>)
-intr128i2(mask_less, _mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a)), Array<u16, 8>)
-intr128i2(mask_less, _mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a)), Array<u32, 4>)
-intr128i2(mask_less, _mm_cmpgt_epi32(_mm_fliptop_i64(b), _mm_fliptop_i64(a)), Array<u64, 2>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi8 (_mm_fliptop_i8 (a), _mm_fliptop_i8 (b))), Array<u8, 16>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b))), Array<u16, 8>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b))), Array<u32, 4>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b))), Array<u64, 2>)
-intr128i2(mask_greater, _mm_cmpgt_epi8 (_mm_fliptop_i8 (a), _mm_fliptop_i8 (b)), Array<u8, 16>)
-intr128i2(mask_greater, _mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b)), Array<u16, 8>)
-intr128i2(mask_greater, _mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b)), Array<u32, 4>)
-intr128i2(mask_greater, _mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b)), Array<u64, 2>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi8 (_mm_fliptop_i8 (b), _mm_fliptop_i8 (a))), Array<u8, 16>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a))), Array<u16, 8>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a))), Array<u32, 4>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i64(b), _mm_fliptop_i64(a))), Array<u64, 2>)
-
-// signed comparisons
-intr128i2(mask_equal, _mm_cmpeq_epi8 (a, b), Array<s8, 16>)
-intr128i2(mask_equal, _mm_cmpeq_epi16(a, b), Array<s16, 8>)
-intr128i2(mask_equal, _mm_cmpeq_epi32(a, b), Array<s32, 4>)
-intr128i2(mask_equal, _mm_cmpeq_epi64(a, b), Array<s64, 2>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi8 (a, b)), Array<s8, 16>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi16(a, b)), Array<s16, 8>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi32(a, b)), Array<s32, 4>)
-intr128i2(mask_not_equal, _mm_not_si128(_mm_cmpeq_epi64(a, b)), Array<s64, 2>)
-intr128i2(mask_less, _mm_cmpgt_epi8 (b, a), Array<s8, 16>)
-intr128i2(mask_less, _mm_cmpgt_epi16(b, a), Array<s16, 8>)
-intr128i2(mask_less, _mm_cmpgt_epi32(b, a), Array<s32, 4>)
-intr128i2(mask_less, _mm_cmpgt_epi32(b, a), Array<s64, 2>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi8 (a, b)), Array<s8, 16>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi16(a, b)), Array<s16, 8>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi32(a, b)), Array<s32, 4>)
-intr128i2(mask_less_equal, _mm_not_si128(_mm_cmpgt_epi64(a, b)), Array<s64, 2>)
-intr128i2(mask_greater, _mm_cmpgt_epi8 (a, b), Array<s8, 16>)
-intr128i2(mask_greater, _mm_cmpgt_epi16(a, b), Array<s16, 8>)
-intr128i2(mask_greater, _mm_cmpgt_epi32(a, b), Array<s32, 4>)
-intr128i2(mask_greater, _mm_cmpgt_epi64(a, b), Array<s64, 2>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi8 (b, a)), Array<s8, 16>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi16(b, a)), Array<s16, 8>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(b, a)), Array<s32, 4>)
-intr128i2(mask_greater_equal, _mm_not_si128(_mm_cmpgt_epi32(b, a)), Array<s64, 2>)
-
-template<class T>
-	requires (sizeof(T) == 1)
-forceinline Array<T, 16> blend(Array<u8, 16> mask, Array<T, 16> a, Array<T, 16> b) {
-	return bit_cast<Array<T, 16>>(_mm_blendv_epi8(bit_cast<__m128i>(b), bit_cast<__m128i>(a), bit_cast<__m128i>(mask)));
-}
-
-template<class T>
-	requires (sizeof(T) == 4)
-forceinline Array<T, 4> blend(Array<u32, 4> mask, Array<T, 4> a, Array<T, 4> b) {
-	return bit_cast<Array<T, 4>>(_mm_blendv_ps(bit_cast<__m128>(b), bit_cast<__m128>(a), bit_cast<__m128>(mask)));
-}
-
-template<class T>
-	requires (sizeof(T) == 8)
-forceinline Array<T, 2> blend(Array<u64, 2> mask, Array<T, 2> a, Array<T, 2> b) {
-	return bit_cast<Array<T, 2>>(_mm_blendv_pd(bit_cast<__m128d>(b), bit_cast<__m128d>(a), bit_cast<__m128d>(mask)));
-}
-
-template <class T, umm count>
-	requires (count * sizeof(T) == 16)
-forceinline constexpr Array<T, count> pshufb(Array<T, count> a, Array<s8, 16> indices) {
-	return bit_cast<Array<T, count>>(_mm_shuffle_epi8(bit_cast<__m128i>(a), bit_cast<__m128i>(indices)));
-}
 
 #ifdef __AVX__
-
-forceinline constexpr Array<f32, 8> operator+(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_add_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator-(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_sub_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator*(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_mul_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-forceinline constexpr Array<f32, 8> operator/(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_div_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-
-template <>
-forceinline auto lerp(Array<f32, 8> a_, Array<f32, 8> b_, Array<f32, 8> t_) {
-	__m256 a = bit_cast<__m256>(a_);
-	__m256 b = bit_cast<__m256>(b_);
-	__m256 t = bit_cast<__m256>(t_);
-
-	__m256 r = _mm256_fmadd_ps(_mm256_sub_ps(b, a), t, a);
-
-	return bit_cast<Array<f32, 8>>(r);
-}
-
-forceinline Array<f32, 8> min(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_min_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-forceinline Array<f32, 8> max(Array<f32, 8> a, Array<f32, 8> b) { return bit_cast<Array<f32, 8>>(_mm256_max_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); }
-
-template <> forceinline constexpr u64 mask_to_int(Array<u8, 16> mask) { return _mm_movemask_epi8 (bit_cast<__m128i>(mask)); }
-template <> forceinline constexpr u64 mask_to_int(Array<u32, 4> mask) { return _mm_movemask_ps(bit_cast<__m128 >(mask)); }
-template <> forceinline constexpr u64 mask_to_int(Array<u64, 2> mask) { return _mm_movemask_pd(bit_cast<__m128d>(mask)); }
-
+#define IF_AVX(...) __VA_ARGS__
+#else
+#define IF_AVX(...)
 #endif
 
 #ifdef __AVX2__
+#define IF_AVX2(...) __VA_ARGS__
+#else
+#define IF_AVX2(...)
+#endif
 
-forceinline constexpr Array<u32, 8> operator+(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_add_epi32  (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<u32, 8> operator-(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_sub_epi32  (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<u32, 8> operator*(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_mullo_epi32(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<u32, 8> operator^(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_xor_si256(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<u32, 8> operator&(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_and_si256(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<u32, 8> operator|(Array<u32, 8> a, Array<u32, 8> b) { return bit_cast<Array<u32, 8>>(_mm256_or_si256 (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
+#ifdef __AVX512F__
+#define IF_AVX512F(...) __VA_ARGS__
+#else
+#define IF_AVX512F(...)
+#endif
 
-forceinline constexpr Array<s32, 8> operator+(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_add_epi32  (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<s32, 8> operator-(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_sub_epi32  (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<s32, 8> operator*(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_mullo_epi32(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<s32, 8> operator^(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_xor_si256(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<s32, 8> operator&(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_and_si256(bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
-forceinline constexpr Array<s32, 8> operator|(Array<s32, 8> a, Array<s32, 8> b) { return bit_cast<Array<s32, 8>>(_mm256_or_si256 (bit_cast<__m256i>(a), bit_cast<__m256i>(b))); }
+#ifdef __AVX512BW__
+#define IF_AVX512BW(...) __VA_ARGS__
+#else
+#define IF_AVX512BW(...)
+#endif
 
-template <int shift> forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr) { return bit_cast<Array<u32, 8>>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr) { return bit_cast<Array<s32, 8>>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr) { return bit_cast<Array<u32, 8>>(_mm256_srli_epi32(bit_cast<__m256i>(arr), shift)); }
-template <int shift> forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr) { return bit_cast<Array<s32, 8>>(_mm256_srai_epi32(bit_cast<__m256i>(arr), shift)); }
+#ifdef __AVX512DQ__
+#define IF_AVX512DQ(...) __VA_ARGS__
+#else
+#define IF_AVX512DQ(...)
+#endif
 
-forceinline constexpr Array<u32, 4> shift_left(Array<u32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<u32, 4>>(_mm_sllv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
-forceinline constexpr Array<s32, 4> shift_left(Array<s32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<s32, 4>>(_mm_sllv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
-forceinline constexpr Array<u32, 4> shift_right(Array<u32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<u32, 4>>(_mm_srlv_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
-forceinline constexpr Array<s32, 4> shift_right(Array<s32, 4> arr, Array<u32, 4> shift) { return bit_cast<Array<s32, 4>>(_mm_srav_epi32(bit_cast<__m128i>(arr), bit_cast<__m128i>(shift))); }
+#ifdef __AVX512VL__
+#define IF_AVX512VL(...) __VA_ARGS__
+#else
+#define IF_AVX512VL(...)
+#endif
 
-forceinline constexpr Array<u32, 8> shift_left(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
-forceinline constexpr Array<s32, 8> shift_left(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_sllv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
-forceinline constexpr Array<u32, 8> shift_right(Array<u32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<u32, 8>>(_mm256_srlv_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
-forceinline constexpr Array<s32, 8> shift_right(Array<s32, 8> arr, Array<u32, 8> shift) { return bit_cast<Array<s32, 8>>(_mm256_srav_epi32(bit_cast<__m256i>(arr), bit_cast<__m256i>(shift))); }
+#if defined(__AVX512VL__) && defined(__AVX512BW__)
+#define IF_AVX512VLBW(...) __VA_ARGS__
+#else
+#define IF_AVX512VLBW(...)
+#endif
 
-// unsigned comparisons
-intr256i2(mask_equal, _mm256_cmpeq_epi8 (a, b), Array<u8,  32>)
-intr256i2(mask_equal, _mm256_cmpeq_epi16(a, b), Array<u16, 16>)
-intr256i2(mask_equal, _mm256_cmpeq_epi32(a, b), Array<u32,  8>)
-intr256i2(mask_equal, _mm256_cmpeq_epi64(a, b), Array<u64,  4>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi8 (a, b)), Array<u8,  32>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), Array<u16, 16>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), Array<u32,  8>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), Array<u64,  4>)
-intr256i2(mask_less, _mm256_cmpgt_epi8 (_mm256_fliptop_i8 (b), _mm256_fliptop_i8 (a)), Array<u8,  32>)
-intr256i2(mask_less, _mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a)), Array<u16, 16>)
-intr256i2(mask_less, _mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a)), Array<u32,  8>)
-intr256i2(mask_less, _mm256_cmpgt_epi32(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a)), Array<u64,  4>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (_mm256_fliptop_i8 (a), _mm256_fliptop_i8 (b))), Array<u8,  32>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b))), Array<u16, 16>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b))), Array<u32,  8>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b))), Array<u64,  4>)
-intr256i2(mask_greater, _mm256_cmpgt_epi8 (_mm256_fliptop_i8 (a), _mm256_fliptop_i8 (b)), Array<u8,  32>)
-intr256i2(mask_greater, _mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b)), Array<u16, 16>)
-intr256i2(mask_greater, _mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b)), Array<u32,  8>)
-intr256i2(mask_greater, _mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b)), Array<u64,  4>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (_mm256_fliptop_i8 (b), _mm256_fliptop_i8 (a))), Array<u8,  32>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a))), Array<u16, 16>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a))), Array<u32,  8>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a))), Array<u64,  4>)
+//u8x16
+/*  + */               intr2(u8x16, operator+, _mm_add_epi8 (a, b), u8x16, u8x16)
+/*  - */               intr2(u8x16, operator-, _mm_sub_epi8 (a, b), u8x16, u8x16)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(u8x16, operator^, _mm_xor_si128(a, b), u8x16, u8x16)
+/*  & */               intr2(u8x16, operator&, _mm_and_si128(a, b), u8x16, u8x16)
+/*  | */               intr2(u8x16, operator|, _mm_or_si128 (a, b), u8x16, u8x16)
+/* << */ 
+/* >> */ 
+/* == */               intr2(u8x16, mask_eq, _mm_cmpeq_epi8(a, b), u8x16, u8x16)
+/* != */               intr2(u8x16, mask_ne, _mm_not_si128(_mm_cmpeq_epi8(a, b)), u8x16, u8x16)
+/*  < */               intr2(u8x16, mask_lt, _mm_cmpgt_epi8(_mm_fliptop_i8(b), _mm_fliptop_i8(a)), u8x16, u8x16)
+/* <= */               intr2(u8x16, mask_le, _mm_not_si128(_mm_cmpgt_epi8(_mm_fliptop_i8(a), _mm_fliptop_i8(b))), u8x16, u8x16)
+/*  > */               intr2(u8x16, mask_gt, _mm_cmpgt_epi8(_mm_fliptop_i8(a), _mm_fliptop_i8(b)), u8x16, u8x16)
+/* >= */               intr2(u8x16, mask_ge, _mm_not_si128(_mm_cmpgt_epi8(_mm_fliptop_i8(b), _mm_fliptop_i8(a))), u8x16, u8x16)
+//u16x8
+/*  + */               intr2(u16x8, operator+,  _mm_add_epi16  (a, b), u16x8, u16x8)
+/*  - */               intr2(u16x8, operator-,  _mm_sub_epi16  (a, b), u16x8, u16x8)
+/*  * */               intr2(u16x8, operator*,  _mm_mullo_epi16(a, b), u16x8, u16x8)
+/*  / */ 
+/*  ^ */               intr2(u16x8, operator^,  _mm_xor_si128  (a, b), u16x8, u16x8)
+/*  & */               intr2(u16x8, operator&,  _mm_and_si128  (a, b), u16x8, u16x8)
+/*  | */               intr2(u16x8, operator|,  _mm_or_si128   (a, b), u16x8, u16x8)
+/* << */ IF_AVX512VLBW(intr2(u16x8, operator<<, _mm_sllv_epi16 (a, b), u16x8, u16x8))
+/* >> */ IF_AVX512VLBW(intr2(u16x8, operator>>, _mm_srlv_epi16 (a, b), u16x8, u16x8))
+/* == */               intr2(u16x8, mask_eq, _mm_cmpeq_epi16(a, b), u16x8, u16x8)
+/* != */               intr2(u16x8, mask_ne, _mm_not_si128(_mm_cmpeq_epi16(a, b)), u16x8, u16x8)
+/*  < */               intr2(u16x8, mask_lt, _mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a)), u16x8, u16x8)
+/* <= */               intr2(u16x8, mask_le, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b))), u16x8, u16x8)
+/*  > */               intr2(u16x8, mask_gt, _mm_cmpgt_epi16(_mm_fliptop_i16(a), _mm_fliptop_i16(b)), u16x8, u16x8)
+/* >= */               intr2(u16x8, mask_ge, _mm_not_si128(_mm_cmpgt_epi16(_mm_fliptop_i16(b), _mm_fliptop_i16(a))), u16x8, u16x8)
+//u32x4
+/*  + */               intr2(u32x4, operator+, _mm_add_epi32  (a, b), u32x4, u32x4)
+/*  - */               intr2(u32x4, operator-, _mm_sub_epi32  (a, b), u32x4, u32x4)
+/*  * */               intr2(u32x4, operator*, _mm_mullo_epi32(a, b), u32x4, u32x4)
+/*  / */ 
+/*  ^ */               intr2(u32x4, operator^, _mm_xor_si128  (a, b), u32x4, u32x4)
+/*  & */               intr2(u32x4, operator&, _mm_and_si128  (a, b), u32x4, u32x4)
+/*  | */               intr2(u32x4, operator|, _mm_or_si128   (a, b), u32x4, u32x4)
+/* << */       IF_AVX2(intr2(u32x4, operator<<, _mm_sllv_epi32(a, b), u32x4, u32x4))
+/* >> */       IF_AVX2(intr2(u32x4, operator>>, _mm_srlv_epi32(a, b), u32x4, u32x4))
+/* == */               intr2(u32x4, mask_eq, _mm_cmpeq_epi32(a, b), u32x4, u32x4)
+/* != */               intr2(u32x4, mask_ne, _mm_not_si128(_mm_cmpeq_epi32(a, b)), u32x4, u32x4)
+/*  < */               intr2(u32x4, mask_lt, _mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a)), u32x4, u32x4)
+/* <= */               intr2(u32x4, mask_le, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b))), u32x4, u32x4)
+/*  > */               intr2(u32x4, mask_gt, _mm_cmpgt_epi32(_mm_fliptop_i32(a), _mm_fliptop_i32(b)), u32x4, u32x4)
+/* >= */               intr2(u32x4, mask_ge, _mm_not_si128(_mm_cmpgt_epi32(_mm_fliptop_i32(b), _mm_fliptop_i32(a))), u32x4, u32x4)
+//u64x2
+/*  + */               intr2(u64x2, operator+, _mm_add_epi64(a, b), u64x2, u64x2)
+/*  - */               intr2(u64x2, operator-, _mm_sub_epi64(a, b), u64x2, u64x2)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(u64x2, operator^, _mm_xor_si128(a, b), u64x2, u64x2)
+/*  & */               intr2(u64x2, operator&, _mm_and_si128(a, b), u64x2, u64x2)
+/*  | */               intr2(u64x2, operator|, _mm_or_si128 (a, b), u64x2, u64x2)
+/* << */       IF_AVX2(intr2(u64x2, operator<<, _mm_sllv_epi64(a, b), u64x2, u64x2))
+/* >> */       IF_AVX2(intr2(u64x2, operator>>, _mm_srlv_epi64(a, b), u64x2, u64x2))
+/* == */               intr2(u64x2, mask_eq, _mm_cmpeq_epi64(a, b), u64x2, u64x2)
+/* != */               intr2(u64x2, mask_ne, _mm_not_si128(_mm_cmpeq_epi64(a, b)), u64x2, u64x2)
+/*  < */               intr2(u64x2, mask_lt, _mm_cmpgt_epi64(_mm_fliptop_i64(b), _mm_fliptop_i64(a)), u64x2, u64x2)
+/* <= */               intr2(u64x2, mask_le, _mm_not_si128(_mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b))), u64x2, u64x2)
+/*  > */               intr2(u64x2, mask_gt, _mm_cmpgt_epi64(_mm_fliptop_i64(a), _mm_fliptop_i64(b)), u64x2, u64x2)
+/* >= */               intr2(u64x2, mask_ge, _mm_not_si128(_mm_cmpgt_epi64(_mm_fliptop_i64(b), _mm_fliptop_i64(a))), u64x2, u64x2)
+//s8x16
+/*  + */               intr2(s8x16, operator+, _mm_add_epi8 (a, b), s8x16, s8x16)
+/*  - */               intr2(s8x16, operator-, _mm_sub_epi8 (a, b), s8x16, s8x16)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(s8x16, operator^, _mm_xor_si128(a, b), s8x16, s8x16)
+/*  & */               intr2(s8x16, operator&, _mm_and_si128(a, b), s8x16, s8x16)
+/*  | */               intr2(s8x16, operator|, _mm_or_si128 (a, b), s8x16, s8x16)
+/* << */
+/* >> */
+/* == */               intr2(u8x16, mask_eq, _mm_cmpeq_epi8 (a, b), s8x16, s8x16)
+/* != */               intr2(u8x16, mask_ne, _mm_not_si128(_mm_cmpeq_epi8 (a, b)), s8x16, s8x16)
+/*  < */               intr2(u8x16, mask_lt, _mm_cmpgt_epi8 (b, a), s8x16, s8x16)
+/* <= */               intr2(u8x16, mask_le, _mm_not_si128(_mm_cmpgt_epi8 (a, b)), s8x16, s8x16)
+/*  > */               intr2(u8x16, mask_gt, _mm_cmpgt_epi8 (a, b), s8x16, s8x16)
+/* >= */               intr2(u8x16, mask_ge, _mm_not_si128(_mm_cmpgt_epi8 (b, a)), s8x16, s8x16)
+//s16x8
+/*  + */               intr2(s16x8, operator+, _mm_add_epi16  (a, b), s16x8, s16x8)
+/*  - */               intr2(s16x8, operator-, _mm_sub_epi16  (a, b), s16x8, s16x8)
+/*  * */               intr2(s16x8, operator*, _mm_mullo_epi16(a, b), s16x8, s16x8)
+/*  / */ 
+/*  ^ */               intr2(s16x8, operator^, _mm_xor_si128  (a, b), s16x8, s16x8)
+/*  & */               intr2(s16x8, operator&, _mm_and_si128  (a, b), s16x8, s16x8)
+/*  | */               intr2(s16x8, operator|, _mm_or_si128   (a, b), s16x8, s16x8)
+/* << */ IF_AVX512VLBW(intr2(s16x8, operator<<, _mm_sllv_epi16 (a, b), s16x8, s16x8))
+/* >> */ IF_AVX512VLBW(intr2(s16x8, operator>>, _mm_srlv_epi16 (a, b), s16x8, s16x8))
+/* == */               intr2(u16x8, mask_eq, _mm_cmpeq_epi16(a, b), s16x8, s16x8)
+/* != */               intr2(u16x8, mask_ne, _mm_not_si128(_mm_cmpeq_epi16(a, b)), s16x8, s16x8)
+/*  < */               intr2(u16x8, mask_lt, _mm_cmpgt_epi16(b, a), s16x8, s16x8)
+/* <= */               intr2(u16x8, mask_le, _mm_not_si128(_mm_cmpgt_epi16(a, b)), s16x8, s16x8)
+/*  > */               intr2(u16x8, mask_gt, _mm_cmpgt_epi16(a, b), s16x8, s16x8)
+/* >= */               intr2(u16x8, mask_ge, _mm_not_si128(_mm_cmpgt_epi16(b, a)), s16x8, s16x8)
+//s32x4
+/*  + */               intr2(s32x4, operator+, _mm_add_epi32  (a, b), s32x4, s32x4)
+/*  - */               intr2(s32x4, operator-, _mm_sub_epi32  (a, b), s32x4, s32x4)
+/*  * */               intr2(s32x4, operator*, _mm_mullo_epi32(a, b), s32x4, s32x4)
+/*  / */ 
+/*  ^ */               intr2(s32x4, operator^, _mm_xor_si128  (a, b), s32x4, s32x4)
+/*  & */               intr2(s32x4, operator&, _mm_and_si128  (a, b), s32x4, s32x4)
+/*  | */               intr2(s32x4, operator|, _mm_or_si128   (a, b), s32x4, s32x4)
+/* << */       IF_AVX2(intr2(s32x4, operator<<, _mm_sllv_epi32(a, b), s32x4, s32x4))
+/* >> */       IF_AVX2(intr2(s32x4, operator>>, _mm_srav_epi32(a, b), s32x4, s32x4))
+/* == */               intr2(u32x4, mask_eq, _mm_cmpeq_epi32(a, b), s32x4, s32x4)
+/* != */               intr2(u32x4, mask_ne, _mm_not_si128(_mm_cmpeq_epi32(a, b)), s32x4, s32x4)
+/*  < */               intr2(u32x4, mask_lt, _mm_cmpgt_epi32(b, a), s32x4, s32x4)
+/* <= */               intr2(u32x4, mask_le, _mm_not_si128(_mm_cmpgt_epi32(a, b)), s32x4, s32x4)
+/*  > */               intr2(u32x4, mask_gt, _mm_cmpgt_epi32(a, b), s32x4, s32x4)
+/* >= */               intr2(u32x4, mask_ge, _mm_not_si128(_mm_cmpgt_epi32(b, a)), s32x4, s32x4)
+//s64x2
+/*  + */               intr2(s64x2, operator+, _mm_add_epi64(a, b), s64x2, s64x2)
+/*  - */               intr2(s64x2, operator-, _mm_sub_epi64(a, b), s64x2, s64x2)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(s64x2, operator^, _mm_xor_si128(a, b), s64x2, s64x2)
+/*  & */               intr2(s64x2, operator&, _mm_and_si128(a, b), s64x2, s64x2)
+/*  | */               intr2(s64x2, operator|, _mm_or_si128 (a, b), s64x2, s64x2)
+/* << */       IF_AVX2(intr2(s64x2, operator<<, _mm_sllv_epi64(a, b), s64x2, s64x2))
+/* >> */   IF_AVX512VL(intr2(s64x2, operator>>, _mm_srav_epi64(a, b), s64x2, s64x2))
+/* == */               intr2(u64x2, mask_eq, _mm_cmpeq_epi64(a, b), s64x2, s64x2)
+/* != */               intr2(u64x2, mask_ne, _mm_not_si128(_mm_cmpeq_epi64(a, b)), s64x2, s64x2)
+/*  < */               intr2(u64x2, mask_lt, _mm_cmpgt_epi32(b, a), s64x2, s64x2)
+/* <= */               intr2(u64x2, mask_le, _mm_not_si128(_mm_cmpgt_epi64(a, b)), s64x2, s64x2)
+/*  > */               intr2(u64x2, mask_gt, _mm_cmpgt_epi64(a, b), s64x2, s64x2)
+/* >= */               intr2(u64x2, mask_ge, _mm_not_si128(_mm_cmpgt_epi32(b, a)), s64x2, s64x2)
+//f32x4
+/*  + */               intr2(f32x4, operator+, _mm_add_ps (a, b), f32x4, f32x4)
+/*  - */               intr2(f32x4, operator-, _mm_sub_ps (a, b), f32x4, f32x4)
+/*  * */               intr2(f32x4, operator*, _mm_mul_ps (a, b), f32x4, f32x4)
+/*  / */               intr2(f32x4, operator/, _mm_div_ps (a, b), f32x4, f32x4)
+/* == */               intr2(u32x4, mask_eq, _mm_cmpeq_ps (a, b), f32x4, f32x4)
+/* != */               intr2(u32x4, mask_ne, _mm_cmpneq_ps(a, b), f32x4, f32x4)
+/*  < */               intr2(u32x4, mask_lt, _mm_cmplt_ps (a, b), f32x4, f32x4)
+/* <= */               intr2(u32x4, mask_le, _mm_cmple_ps (a, b), f32x4, f32x4)
+/*  > */               intr2(u32x4, mask_gt, _mm_cmpgt_ps (a, b), f32x4, f32x4)
+/* >= */               intr2(u32x4, mask_ge, _mm_cmpge_ps (a, b), f32x4, f32x4)
+//f64x2
+/*  + */               intr2(f64x2, operator+, _mm_add_pd (a, b), f64x2, f64x2)
+/*  - */               intr2(f64x2, operator-, _mm_sub_pd (a, b), f64x2, f64x2)
+/*  * */               intr2(f64x2, operator*, _mm_mul_pd (a, b), f64x2, f64x2)
+/*  / */               intr2(f64x2, operator/, _mm_div_pd (a, b), f64x2, f64x2)
+/* == */               intr2(u64x2, mask_eq, _mm_cmpeq_pd (a, b), f64x2, f64x2)
+/* != */               intr2(u64x2, mask_ne, _mm_cmpneq_pd(a, b), f64x2, f64x2)
+/*  < */               intr2(u64x2, mask_lt, _mm_cmplt_pd (a, b), f64x2, f64x2)
+/* <= */               intr2(u64x2, mask_le, _mm_cmple_pd (a, b), f64x2, f64x2)
+/*  > */               intr2(u64x2, mask_gt, _mm_cmpgt_pd (a, b), f64x2, f64x2)
+/* >= */               intr2(u64x2, mask_ge, _mm_cmpge_pd (a, b), f64x2, f64x2)
+#ifdef __AVX__
+#ifdef __AVX2__
+//u8x32
+/*  + */               intr2(u8x32, operator+, _mm256_add_epi8 (a, b), u8x32, u8x32)
+/*  - */               intr2(u8x32, operator-, _mm256_sub_epi8 (a, b), u8x32, u8x32)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(u8x32, operator^, _mm256_xor_si256(a, b), u8x32, u8x32)
+/*  & */               intr2(u8x32, operator&, _mm256_and_si256(a, b), u8x32, u8x32)
+/*  | */               intr2(u8x32, operator|, _mm256_or_si256 (a, b), u8x32, u8x32)
+/* << */ 
+/* >> */ 
+/* == */               intr2(u8x32, mask_eq, _mm256_cmpeq_epi8(a, b), u8x32, u8x32)
+/* != */               intr2(u8x32, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi8(a, b)), u8x32, u8x32)
+/*  < */               intr2(u8x32, mask_lt, _mm256_cmpgt_epi8(_mm256_fliptop_i8(b), _mm256_fliptop_i8(a)), u8x32, u8x32)
+/* <= */               intr2(u8x32, mask_le, _mm256_not_si256(_mm256_cmpgt_epi8(_mm256_fliptop_i8(a), _mm256_fliptop_i8(b))), u8x32, u8x32)
+/*  > */               intr2(u8x32, mask_gt, _mm256_cmpgt_epi8(_mm256_fliptop_i8(a), _mm256_fliptop_i8(b)), u8x32, u8x32)
+/* >= */               intr2(u8x32, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi8(_mm256_fliptop_i8(b), _mm256_fliptop_i8(a))), u8x32, u8x32)
+//u16x16
+/*  + */               intr2(u16x16, operator+, _mm256_add_epi16  (a, b), u16x16, u16x16)
+/*  - */               intr2(u16x16, operator-, _mm256_sub_epi16  (a, b), u16x16, u16x16)
+/*  * */               intr2(u16x16, operator*, _mm256_mullo_epi16(a, b), u16x16, u16x16)
+/*  / */ 
+/*  ^ */               intr2(u16x16, operator^, _mm256_xor_si256  (a, b), u16x16, u16x16)
+/*  & */               intr2(u16x16, operator&, _mm256_and_si256  (a, b), u16x16, u16x16)
+/*  | */               intr2(u16x16, operator|, _mm256_or_si256   (a, b), u16x16, u16x16)
+/* << */ IF_AVX512VLBW(intr2(u16x16, operator<<, _mm256_sllv_epi16(a, b), u16x16, u16x16))
+/* >> */ IF_AVX512VLBW(intr2(u16x16, operator>>, _mm256_srlv_epi16(a, b), u16x16, u16x16))
+/* == */               intr2(u16x16, mask_eq, _mm256_cmpeq_epi16(a, b), u16x16, u16x16)
+/* != */               intr2(u16x16, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), u16x16, u16x16)
+/*  < */               intr2(u16x16, mask_lt, _mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a)), u16x16, u16x16)
+/* <= */               intr2(u16x16, mask_le, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b))), u16x16, u16x16)
+/*  > */               intr2(u16x16, mask_gt, _mm256_cmpgt_epi16(_mm256_fliptop_i16(a), _mm256_fliptop_i16(b)), u16x16, u16x16)
+/* >= */               intr2(u16x16, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi16(_mm256_fliptop_i16(b), _mm256_fliptop_i16(a))), u16x16, u16x16)
+//u32x8
+/*  + */               intr2(u32x8, operator+, _mm256_add_epi32  (a, b), u32x8, u32x8)
+/*  - */               intr2(u32x8, operator-, _mm256_sub_epi32  (a, b), u32x8, u32x8)
+/*  * */               intr2(u32x8, operator*, _mm256_mullo_epi32(a, b), u32x8, u32x8)
+/*  / */ 
+/*  ^ */               intr2(u32x8, operator^, _mm256_xor_si256  (a, b), u32x8, u32x8)
+/*  & */               intr2(u32x8, operator&, _mm256_and_si256  (a, b), u32x8, u32x8)
+/*  | */               intr2(u32x8, operator|, _mm256_or_si256   (a, b), u32x8, u32x8)
+/* << */               intr2(u32x8, operator<<, _mm256_sllv_epi32(a, b), u32x8, u32x8)
+/* >> */               intr2(u32x8, operator>>, _mm256_srlv_epi32(a, b), u32x8, u32x8)
+/* == */               intr2(u32x8, mask_eq, _mm256_cmpeq_epi32(a, b), u32x8, u32x8)
+/* != */               intr2(u32x8, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), u32x8, u32x8)
+/*  < */               intr2(u32x8, mask_lt, _mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a)), u32x8, u32x8)
+/* <= */               intr2(u32x8, mask_le, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b))), u32x8, u32x8)
+/*  > */               intr2(u32x8, mask_gt, _mm256_cmpgt_epi32(_mm256_fliptop_i32(a), _mm256_fliptop_i32(b)), u32x8, u32x8)
+/* >= */               intr2(u32x8, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi32(_mm256_fliptop_i32(b), _mm256_fliptop_i32(a))), u32x8, u32x8)
+//u64x4
+/*  + */               intr2(u64x4, operator+, _mm256_add_epi64(a, b), u64x4, u64x4)
+/*  - */               intr2(u64x4, operator-, _mm256_sub_epi64(a, b), u64x4, u64x4)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(u64x4, operator^, _mm256_xor_si256(a, b), u64x4, u64x4)
+/*  & */               intr2(u64x4, operator&, _mm256_and_si256(a, b), u64x4, u64x4)
+/*  | */               intr2(u64x4, operator|, _mm256_or_si256 (a, b), u64x4, u64x4)
+/* << */               intr2(u64x4, operator<<, _mm256_sllv_epi64(a, b), u64x4, u64x4)
+/* >> */               intr2(u64x4, operator>>, _mm256_srlv_epi64(a, b), u64x4, u64x4)
+/* == */               intr2(u64x4, mask_eq, _mm256_cmpeq_epi64(a, b), u64x4, u64x4)
+/* != */               intr2(u64x4, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), u64x4, u64x4)
+/*  < */               intr2(u64x4, mask_lt, _mm256_cmpgt_epi64(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a)), u64x4, u64x4)
+/* <= */               intr2(u64x4, mask_le, _mm256_not_si256(_mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b))), u64x4, u64x4)
+/*  > */               intr2(u64x4, mask_gt, _mm256_cmpgt_epi64(_mm256_fliptop_i64(a), _mm256_fliptop_i64(b)), u64x4, u64x4)
+/* >= */               intr2(u64x4, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi64(_mm256_fliptop_i64(b), _mm256_fliptop_i64(a))), u64x4, u64x4)
+//s8x32
+/*  + */               intr2(s8x32, operator+, _mm256_add_epi8 (a, b), s8x32, s8x32)
+/*  - */               intr2(s8x32, operator-, _mm256_sub_epi8 (a, b), s8x32, s8x32)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(s8x32, operator^, _mm256_xor_si256(a, b), s8x32, s8x32)
+/*  & */               intr2(s8x32, operator&, _mm256_and_si256(a, b), s8x32, s8x32)
+/*  | */               intr2(s8x32, operator|, _mm256_or_si256 (a, b), s8x32, s8x32)
+/* << */
+/* >> */
+/* == */               intr2(u8x32, mask_eq, _mm256_cmpeq_epi8 (a, b), s8x32, s8x32)
+/* != */               intr2(u8x32, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi8 (a, b)), s8x32, s8x32)
+/*  < */               intr2(u8x32, mask_lt, _mm256_cmpgt_epi8 (b, a), s8x32, s8x32)
+/* <= */               intr2(u8x32, mask_le, _mm256_not_si256(_mm256_cmpgt_epi8 (a, b)), s8x32, s8x32)
+/*  > */               intr2(u8x32, mask_gt, _mm256_cmpgt_epi8 (a, b), s8x32, s8x32)
+/* >= */               intr2(u8x32, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi8 (b, a)), s8x32, s8x32)
+//s16x16
+/*  + */               intr2(s16x16, operator+, _mm256_add_epi16  (a, b), s16x16, s16x16)
+/*  - */               intr2(s16x16, operator-, _mm256_sub_epi16  (a, b), s16x16, s16x16)
+/*  * */               intr2(s16x16, operator*, _mm256_mullo_epi16(a, b), s16x16, s16x16)
+/*  / */ 
+/*  ^ */               intr2(s16x16, operator^, _mm256_xor_si256  (a, b), s16x16, s16x16)
+/*  & */               intr2(s16x16, operator&, _mm256_and_si256  (a, b), s16x16, s16x16)
+/*  | */               intr2(s16x16, operator|, _mm256_or_si256   (a, b), s16x16, s16x16)
+/* << */ IF_AVX512VLBW(intr2(s16x16, operator<<, _mm256_sllv_epi16(a, b), s16x16, s16x16))
+/* >> */ IF_AVX512VLBW(intr2(s16x16, operator>>, _mm256_srav_epi16(a, b), s16x16, s16x16))
+/* == */               intr2(u16x16, mask_eq, _mm256_cmpeq_epi16(a, b), s16x16, s16x16)
+/* != */               intr2(u16x16, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), s16x16, s16x16)
+/*  < */               intr2(u16x16, mask_lt, _mm256_cmpgt_epi16(b, a), s16x16, s16x16)
+/* <= */               intr2(u16x16, mask_le, _mm256_not_si256(_mm256_cmpgt_epi16(a, b)), s16x16, s16x16)
+/*  > */               intr2(u16x16, mask_gt, _mm256_cmpgt_epi16(a, b), s16x16, s16x16)
+/* >= */               intr2(u16x16, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi16(b, a)), s16x16, s16x16)
+//s32x8
+/*  + */               intr2(s32x8, operator+, _mm256_add_epi32  (a, b), s32x8, s32x8)
+/*  - */               intr2(s32x8, operator-, _mm256_sub_epi32  (a, b), s32x8, s32x8)
+/*  * */               intr2(s32x8, operator*, _mm256_mullo_epi32(a, b), s32x8, s32x8)
+/*  / */ 
+/*  ^ */               intr2(s32x8, operator^, _mm256_xor_si256  (a, b), s32x8, s32x8)
+/*  & */               intr2(s32x8, operator&, _mm256_and_si256  (a, b), s32x8, s32x8)
+/*  | */               intr2(s32x8, operator|, _mm256_or_si256   (a, b), s32x8, s32x8)
+/* << */               intr2(s32x8, operator<<, _mm256_sllv_epi32(a, b), s32x8, s32x8)
+/* >> */               intr2(s32x8, operator>>, _mm256_srav_epi32(a, b), s32x8, s32x8)
+/* == */               intr2(u32x8, mask_eq, _mm256_cmpeq_epi32(a, b), s32x8, s32x8)
+/* != */               intr2(u32x8, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), s32x8, s32x8)
+/*  < */               intr2(u32x8, mask_lt, _mm256_cmpgt_epi32(b, a), s32x8, s32x8)
+/* <= */               intr2(u32x8, mask_le, _mm256_not_si256(_mm256_cmpgt_epi32(a, b)), s32x8, s32x8)
+/*  > */               intr2(u32x8, mask_gt, _mm256_cmpgt_epi32(a, b), s32x8, s32x8)
+/* >= */               intr2(u32x8, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), s32x8, s32x8)
+//s64x4
+/*  + */               intr2(s64x4, operator+, _mm256_add_epi64(a, b), s64x4, s64x4)
+/*  - */               intr2(s64x4, operator-, _mm256_sub_epi64(a, b), s64x4, s64x4)
+/*  * */ 
+/*  / */ 
+/*  ^ */               intr2(s64x4, operator^, _mm256_xor_si256(a, b), s64x4, s64x4)
+/*  & */               intr2(s64x4, operator&, _mm256_and_si256(a, b), s64x4, s64x4)
+/*  | */               intr2(s64x4, operator|, _mm256_or_si256 (a, b), s64x4, s64x4)
+/* << */               intr2(s64x4, operator<<, _mm256_sllv_epi64(a, b), s64x4, s64x4)
+/* >> */   IF_AVX512VL(intr2(s64x4, operator>>, _mm256_srav_epi64(a, b), s64x4, s64x4))
+/* == */               intr2(u64x4, mask_eq, _mm256_cmpeq_epi64(a, b), s64x4, s64x4)
+/* != */               intr2(u64x4, mask_ne, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), s64x4, s64x4)
+/*  < */               intr2(u64x4, mask_lt, _mm256_cmpgt_epi32(b, a), s64x4, s64x4)
+/* <= */               intr2(u64x4, mask_le, _mm256_not_si256(_mm256_cmpgt_epi64(a, b)), s64x4, s64x4)
+/*  > */               intr2(u64x4, mask_gt, _mm256_cmpgt_epi64(a, b), s64x4, s64x4)
+/* >= */               intr2(u64x4, mask_ge, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), s64x4, s64x4)
+#endif // def __AVX2__
+//f32x8
+/*  + */               intr2(f32x8, operator+, _mm256_add_ps (a, b), f32x8, f32x8)
+/*  - */               intr2(f32x8, operator-, _mm256_sub_ps (a, b), f32x8, f32x8)
+/*  * */               intr2(f32x8, operator*, _mm256_mul_ps (a, b), f32x8, f32x8)
+/*  / */               intr2(f32x8, operator/, _mm256_div_ps (a, b), f32x8, f32x8)
+/* == */               intr2(u32x8, mask_eq, _mm256_cmp_ps(a, b, _CMP_EQ_OQ), f32x8, f32x8)
+/* != */               intr2(u32x8, mask_ne, _mm256_cmp_ps(a, b, _CMP_NEQ_OQ), f32x8, f32x8)
+/*  < */               intr2(u32x8, mask_lt, _mm256_cmp_ps(a, b, _CMP_LT_OQ), f32x8, f32x8)
+/* <= */               intr2(u32x8, mask_le, _mm256_cmp_ps(a, b, _CMP_LE_OQ), f32x8, f32x8)
+/*  > */               intr2(u32x8, mask_gt, _mm256_cmp_ps(a, b, _CMP_GT_OQ), f32x8, f32x8)
+/* >= */               intr2(u32x8, mask_ge, _mm256_cmp_ps(a, b, _CMP_GE_OQ), f32x8, f32x8)
+//f64x4
+/*  + */               intr2(f64x4, operator+, _mm256_add_pd (a, b), f64x4, f64x4)
+/*  - */               intr2(f64x4, operator-, _mm256_sub_pd (a, b), f64x4, f64x4)
+/*  * */               intr2(f64x4, operator*, _mm256_mul_pd (a, b), f64x4, f64x4)
+/*  / */               intr2(f64x4, operator/, _mm256_div_pd (a, b), f64x4, f64x4)
+/* == */               intr2(u64x4, mask_eq, _mm256_cmp_pd(a, b, _CMP_EQ_OQ), f64x4, f64x4)
+/* != */               intr2(u64x4, mask_ne, _mm256_cmp_pd(a, b, _CMP_NEQ_OQ), f64x4, f64x4)
+/*  < */               intr2(u64x4, mask_lt, _mm256_cmp_pd(a, b, _CMP_LT_OQ), f64x4, f64x4)
+/* <= */               intr2(u64x4, mask_le, _mm256_cmp_pd(a, b, _CMP_LE_OQ), f64x4, f64x4)
+/*  > */               intr2(u64x4, mask_gt, _mm256_cmp_pd(a, b, _CMP_GT_OQ), f64x4, f64x4)
+/* >= */               intr2(u64x4, mask_ge, _mm256_cmp_pd(a, b, _CMP_GE_OQ), f64x4, f64x4)
+#endif
 
-// signed comparisons
-intr256i2(mask_equal, _mm256_cmpeq_epi8 (a, b), Array<s8,  32>)
-intr256i2(mask_equal, _mm256_cmpeq_epi16(a, b), Array<s16, 16>)
-intr256i2(mask_equal, _mm256_cmpeq_epi32(a, b), Array<s32,  8>)
-intr256i2(mask_equal, _mm256_cmpeq_epi64(a, b), Array<s64,  4>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi8 (a, b)), Array<s8,  32>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi16(a, b)), Array<s16, 16>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi32(a, b)), Array<s32,  8>)
-intr256i2(mask_not_equal, _mm256_not_si256(_mm256_cmpeq_epi64(a, b)), Array<s64,  4>)
-intr256i2(mask_less, _mm256_cmpgt_epi8 (b, a), Array<s8,  32>)
-intr256i2(mask_less, _mm256_cmpgt_epi16(b, a), Array<s16, 16>)
-intr256i2(mask_less, _mm256_cmpgt_epi32(b, a), Array<s32,  8>)
-intr256i2(mask_less, _mm256_cmpgt_epi32(b, a), Array<s64,  4>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (a, b)), Array<s8,  32>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi16(a, b)), Array<s16, 16>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi32(a, b)), Array<s32,  8>)
-intr256i2(mask_less_equal, _mm256_not_si256(_mm256_cmpgt_epi64(a, b)), Array<s64,  4>)
-intr256i2(mask_greater, _mm256_cmpgt_epi8 (a, b), Array<s8,  32>)
-intr256i2(mask_greater, _mm256_cmpgt_epi16(a, b), Array<s16, 16>)
-intr256i2(mask_greater, _mm256_cmpgt_epi32(a, b), Array<s32,  8>)
-intr256i2(mask_greater, _mm256_cmpgt_epi64(a, b), Array<s64,  4>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi8 (b, a)), Array<s8,  32>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi16(b, a)), Array<s16, 16>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), Array<s32,  8>)
-intr256i2(mask_greater_equal, _mm256_not_si256(_mm256_cmpgt_epi32(b, a)), Array<s64,  4>)
+template <> forceinline constexpr f32x4 element_cast(s32x4 a) { return bit_cast<f32x4>(_mm_cvtepi32_ps(bit_cast<__m128i>(a))); }
+template <> forceinline constexpr s32x4 element_cast(f32x4 a) { return bit_cast<s32x4>(_mm_cvtps_epi32(bit_cast<__m128>(a))); }
 
-template<class T>
-	requires (sizeof(T) == 1)
-forceinline Array<T, 32> blend(Array<u8, 32> mask, Array<T, 32> a, Array<T, 32> b) {
-	return bit_cast<Array<T, 32>>(_mm256_blendv_epi8(bit_cast<__m256i>(b), bit_cast<__m256i>(a), bit_cast<__m256i>(mask)));
+template <std::integral Shift> forceinline constexpr u16x8 operator<<(u16x8 arr, Shift shift) { return bit_cast<u16x8>(_mm_slli_epi16(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s16x8 operator<<(s16x8 arr, Shift shift) { return bit_cast<s16x8>(_mm_slli_epi16(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u16x8 operator>>(u16x8 arr, Shift shift) { return bit_cast<u16x8>(_mm_srli_epi16(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s16x8 operator>>(s16x8 arr, Shift shift) { return bit_cast<s16x8>(_mm_srai_epi16(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u32x4 operator<<(u32x4 arr, Shift shift) { return bit_cast<u32x4>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s32x4 operator<<(s32x4 arr, Shift shift) { return bit_cast<s32x4>(_mm_slli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u32x4 operator>>(u32x4 arr, Shift shift) { return bit_cast<u32x4>(_mm_srli_epi32(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s32x4 operator>>(s32x4 arr, Shift shift) { return bit_cast<s32x4>(_mm_srai_epi32(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u64x2 operator<<(u64x2 arr, Shift shift) { return bit_cast<u64x2>(_mm_slli_epi64(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s64x2 operator<<(s64x2 arr, Shift shift) { return bit_cast<s64x2>(_mm_slli_epi64(bit_cast<__m128i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u64x2 operator>>(u64x2 arr, Shift shift) { return bit_cast<u64x2>(_mm_srli_epi64(bit_cast<__m128i>(arr), shift)); }
+IF_AVX512F(template <std::integral Shift> forceinline constexpr s64x2 operator>>(s64x2 arr, Shift shift) { return bit_cast<s64x2>(_mm_srai_epi64(bit_cast<__m128i>(arr), shift)); })
+#ifdef __AVX2__
+template <std::integral Shift> forceinline constexpr u16x16 operator<<(u16x16 arr, Shift shift) { return bit_cast<u16x16>(_mm256_slli_epi16(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s16x16 operator<<(s16x16 arr, Shift shift) { return bit_cast<s16x16>(_mm256_slli_epi16(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u16x16 operator>>(u16x16 arr, Shift shift) { return bit_cast<u16x16>(_mm256_srli_epi16(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s16x16 operator>>(s16x16 arr, Shift shift) { return bit_cast<s16x16>(_mm256_srai_epi16(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u32x8 operator<<(u32x8 arr, Shift shift) { return bit_cast<u32x8>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s32x8 operator<<(s32x8 arr, Shift shift) { return bit_cast<s32x8>(_mm256_slli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u32x8 operator>>(u32x8 arr, Shift shift) { return bit_cast<u32x8>(_mm256_srli_epi32(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s32x8 operator>>(s32x8 arr, Shift shift) { return bit_cast<s32x8>(_mm256_srai_epi32(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u64x4 operator<<(u64x4 arr, Shift shift) { return bit_cast<u64x4>(_mm256_slli_epi64(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr s64x4 operator<<(s64x4 arr, Shift shift) { return bit_cast<s64x4>(_mm256_slli_epi64(bit_cast<__m256i>(arr), shift)); }
+template <std::integral Shift> forceinline constexpr u64x4 operator>>(u64x4 arr, Shift shift) { return bit_cast<u64x4>(_mm256_srli_epi64(bit_cast<__m256i>(arr), shift)); }
+IF_AVX512F(template <std::integral Shift> forceinline constexpr s64x4 operator>>(s64x4 arr, Shift shift) { return bit_cast<s64x4>(_mm256_srai_epi64(bit_cast<__m256i>(arr), shift)); })
+#endif
+
+#if defined(__AVX2__) && !TL_STRICT_MATH
+	intr3(f32x4, muladd, _mm_fmadd_ps(a, b, c), f32x4, f32x4, f32x4)
+#else
+	intr3(f32x4, muladd, _mm_add_ps(_mm_mul_ps(a, b), c), f32x4, f32x4, f32x4)
+#endif
+#ifdef __AVX2__
+	#if !TL_STRICT_MATH
+		intr3(f32x8, muladd, _mm256_fmadd_ps(a, b, c), f32x8, f32x8, f32x8)
+	#else
+		intr3(f32x8, muladd, _mm256_add_ps(_mm256_mul_ps(a, b), c), f32x8, f32x8, f32x8)
+	#endif
+#endif
+
+
+       forceinline f32x4 min(f32x4 a, f32x4 b) { return bit_cast<f32x4>(_mm_min_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+       forceinline f32x4 max(f32x4 a, f32x4 b) { return bit_cast<f32x4>(_mm_max_ps(bit_cast<__m128>(a), bit_cast<__m128>(b))); }
+	   forceinline f64x2 min(f64x2 a, f64x2 b) { return bit_cast<f64x2>(_mm_min_pd(bit_cast<__m128d>(a), bit_cast<__m128d>(b))); }
+	   forceinline f64x2 max(f64x2 a, f64x2 b) { return bit_cast<f64x2>(_mm_max_pd(bit_cast<__m128d>(a), bit_cast<__m128d>(b))); }
+IF_AVX(forceinline f32x8 min(f32x8 a, f32x8 b) { return bit_cast<f32x8>(_mm256_min_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); })
+IF_AVX(forceinline f32x8 max(f32x8 a, f32x8 b) { return bit_cast<f32x8>(_mm256_max_ps(bit_cast<__m256>(a), bit_cast<__m256>(b))); })
+IF_AVX(forceinline f64x4 min(f64x4 a, f64x4 b) { return bit_cast<f64x4>(_mm256_min_pd(bit_cast<__m256d>(a), bit_cast<__m256d>(b))); })
+IF_AVX(forceinline f64x4 max(f64x4 a, f64x4 b) { return bit_cast<f64x4>(_mm256_max_pd(bit_cast<__m256d>(a), bit_cast<__m256d>(b))); })
+
+#define blenddef(elem_bits, count, intr, __m)                                                                  \
+	template<class T>                                                                                          \
+		requires (sizeof(T) == elem_bits/8)                                                                    \
+	forceinline Array<T, count> blend(Array<u##elem_bits, count> mask, Array<T, count> a, Array<T, count> b) { \
+		return bit_cast<Array<T, count>>(intr(bit_cast<__m>(b), bit_cast<__m>(a), bit_cast<__m>(mask)));       \
+	}
+        blenddef(8,  16, _mm_blendv_epi8, __m128i)
+        blenddef(32,  4, _mm_blendv_ps,   __m128 )
+        blenddef(64,  2, _mm_blendv_pd,   __m128d)
+IF_AVX (blenddef(8,  32, _mm256_blendv_epi8, __m256i))
+IF_AVX (blenddef(32,  8, _mm256_blendv_ps,   __m256 ))
+IF_AVX2(blenddef(64,  4, _mm256_blendv_pd,   __m256d))
+#undef blenddef
+
+template <class T, umm count>
+	requires (count * sizeof(T) == 16)
+forceinline constexpr Array<T, count> pshufb(Array<T, count> a, s8x16 indices) {
+	return bit_cast<Array<T, count>>(_mm_shuffle_epi8(bit_cast<__m128i>(a), bit_cast<__m128i>(indices)));
 }
 
-template<class T>
-	requires (sizeof(T) == 4)
-forceinline Array<T, 8> blend(Array<u32, 8> mask, Array<T, 8> a, Array<T, 8> b) {
-	return bit_cast<Array<T, 8>>(_mm256_blendv_ps(bit_cast<__m256>(b), bit_cast<__m256>(a), bit_cast<__m256>(mask)));
-}
+        template <> forceinline constexpr u64 mask_to_int(u8x16 mask) { return _mm_movemask_epi8 (bit_cast<__m128i>(mask)); }
+        template <> forceinline constexpr u64 mask_to_int(u32x4 mask) { return _mm_movemask_ps(bit_cast<__m128 >(mask)); }
+        template <> forceinline constexpr u64 mask_to_int(u64x2 mask) { return _mm_movemask_pd(bit_cast<__m128d>(mask)); }
+IF_AVX2(template <> forceinline constexpr u64 mask_to_int(u8x32 mask) { return _mm256_movemask_epi8 (bit_cast<__m256i>(mask)); })
+IF_AVX2(template <> forceinline constexpr u64 mask_to_int(u32x8 mask) { return _mm256_movemask_ps(bit_cast<__m256 >(mask)); })
+IF_AVX2(template <> forceinline constexpr u64 mask_to_int(u64x4 mask) { return _mm256_movemask_pd(bit_cast<__m256d>(mask)); })
 
-template<class T>
-	requires (sizeof(T) == 8)
-forceinline Array<T, 4> blend(Array<u64, 4> mask, Array<T, 4> a, Array<T, 4> b) {
-	return bit_cast<Array<T, 4>>(_mm256_blendv_pd(bit_cast<__m256d>(b), bit_cast<__m256d>(a), bit_cast<__m256d>(mask)));
-}
+#ifdef __AVX2__
 
 template <class T, umm count>
 	requires (count * sizeof(T) == 32)
-forceinline constexpr Array<T, count> pshufb(Array<T, count> a, Array<s8, 32> indices) {
+forceinline constexpr Array<T, count> pshufb(Array<T, count> a, s8x32 indices) {
 	return bit_cast<Array<T, count>>(_mm256_shuffle_epi8(bit_cast<__m256i>(a), bit_cast<__m256i>(indices)));
 }
 
-template <> forceinline constexpr u64 mask_to_int(Array<u8, 32> mask) { return _mm256_movemask_epi8 (bit_cast<__m256i>(mask)); }
-template <> forceinline constexpr u64 mask_to_int(Array<u32, 8> mask) { return _mm256_movemask_ps(bit_cast<__m256 >(mask)); }
-template <> forceinline constexpr u64 mask_to_int(Array<u64, 4> mask) { return _mm256_movemask_pd(bit_cast<__m256d>(mask)); }
-
 #endif
+
+#undef IF_AVX
+#undef IF_AVX2
+#undef IF_AVX512F
+#undef IF_AVX512BW
+#undef IF_AVX512DQ
+#undef IF_AVX512VL
 
 #endif
 

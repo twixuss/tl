@@ -70,6 +70,10 @@
 #define assert_greater_equal(a, b) assert((a) >= (b), "{} = {}; {} = {}. ", #a, a, #b, b)
 #endif
 
+#ifndef TL_STRICT_MATH
+#define TL_STRICT_MATH 0
+#endif
+
 #if COMPILER_MSVC
 #define TL_ASSUME(x) __assume(x)
 #else
@@ -1230,7 +1234,16 @@ template <class From, class To>
 forceinline constexpr auto map_clamped(From value, From source_min, From source_max, To dest_min, To dest_max) {
 	return map(clamp(value, min(source_min, source_max), max(source_min, source_max)), source_min, source_max, dest_min, dest_max);
 }
-template <class T, class U> forceinline constexpr auto lerp(T a, T b, U t) { return a + (b - a) * t; }
+
+template <class T>
+forceinline constexpr auto muladd(T a, T b, T c) {
+	return a * b + c;
+}
+
+template <class T, class U>
+forceinline constexpr auto lerp(T a, T b, U t) {
+	return muladd(convert<T>(b - a), convert<T>(t), a);
+}
 
 template <class T>
 constexpr T midpoint(T a, T b) {
