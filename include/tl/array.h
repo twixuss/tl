@@ -1099,6 +1099,14 @@ forceinline constexpr Array<T, count> select(Array<Mask, count> mask, Array<T, c
 	return r;
 }
 
+template <class Mask, class T, umm count, umm outer_count>
+forceinline constexpr Array<Array<T, count>, outer_count> select(Array<Mask, count> mask, Array<Array<T, count>, outer_count> a, Array<Array<T, count>, outer_count> b) {
+	Array<Array<T, count>, outer_count> r = {};
+	for (umm i = 0; i < outer_count; ++i)
+		r.data[i] = select(mask, a.data[i], b.data[i]);
+	return r;
+}
+
 template <class U, class T, umm count>
 	requires(count * sizeof(T) == count * sizeof(T) / sizeof(U) * sizeof(U) && !std::is_same_v<U, T>)
 forceinline constexpr Array<U, count * sizeof(T) / sizeof(U)> reinterpret(Array<T, count> a) {
@@ -1133,14 +1141,24 @@ forceinline constexpr Array<T, count * dups> dup(Array<T, count> a) {
 template <class T, umm count, class From>
 	requires std::is_convertible_v<From, T>
 forceinline constexpr void convert(Array<T, count> &to, From from) {
+	T t = (T)from;
 	for (umm i = 0; i < count; ++i)
-		to.data[i] = (T)from;
+		to.data[i] = t;
+}
+
+template <class T, umm count, umm inner_count, class From>
+	requires std::is_convertible_v<From, T>
+forceinline constexpr void convert(Array<Array<T, inner_count>, count> &to, From from) {
+	T t = (T)from;
+	for (umm i = 0; i < count; ++i)
+		for (umm j = 0; j < inner_count; ++j)
+			to.data[i].data[j] = t;
 }
 
 template <class U, class T, umm count>
 	requires is_array<U> && requires(T t) { (ElementOf<U>)t; }
 forceinline constexpr U convert(Array<T, count> a) {
-	U r;
+	U r = {};
 	for (umm i = 0; i < count; ++i)
 		r.data[i] = convert<ElementOf<U>>(a.data[i]);
 	return r;
@@ -1191,6 +1209,19 @@ forceinline constexpr Array<u64, count> count_bits(Array<u64, count> a) {
 	a = (a & 0x0000ffff0000ffff) + ((a >> 16) & 0x0000ffff0000ffff);
 	a = (a & 0x00000000ffffffff) + ((a >> 32) & 0x00000000ffffffff);
 	return a;
+}
+
+template <class T, umm count>
+forceinline auto sum(Array<T, count> v) {
+	T r = {};
+	for (umm i = 0; i < count; ++i)
+		r += v.data[i];
+	return r;
+}
+
+template <class T, umm count>
+forceinline auto average(Array<T, count> v) {
+	return sum(v) / count;
 }
 
 using u8x16 = Array<u8, 16>; using u8x32 = Array<u8, 32>; using u8x64 = Array<u8, 64>;

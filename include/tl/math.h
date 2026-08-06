@@ -69,6 +69,32 @@ forceinline constexpr T smooth_max(T a, T b, f32 k) {
 	return smooth_min(a, b, -k);
 }
 
+template <class T, umm dim>
+struct ValueAndDerivative {
+	T value;
+	Array<T, dim> derivative;
+};
+
+template <class T> constexpr bool is_value_and_derivative = false;
+template <class T, umm dim> constexpr bool is_value_and_derivative<ValueAndDerivative<T, dim>> = true;
+
+template <class T>
+concept AValueAndDerivative = is_value_and_derivative<T>;
+
+template <AValueAndDerivative T>
+forceinline constexpr T smooth_min_quadratic(T a, T b, f32 k) {
+	auto h = clamp((b.value - a.value) / k + 0.5f, convert<decltype(a.value)>(0.0f), convert<decltype(a.value)>(1.0f));
+	return {
+		.value = b.value + h * (a.value - b.value + k * 0.5f * (h - 1.0f)),
+		.derivative = lerp(b.derivative, a.derivative, h),
+	};
+}
+template <AValueAndDerivative T>
+forceinline constexpr T smooth_max_quadratic(T a, T b, f32 k) {
+	return smooth_min_quadratic(a, b, -k);
+}
+
+
 union m3;
 union m4;
 
@@ -792,13 +818,6 @@ forceinline constexpr f32 cross(v2f a, v2f b) {
 }
 forceinline constexpr v3f cross(v3f a, v3f b) {
 	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
-}
-
-template <class T, umm count>
-forceinline auto sum(Array<T, count> v) {
-	T r = {};
-	for (umm i = 0; i < count; ++i) r += v.data[i];
-	return r;
 }
 
 template <class T>
@@ -2595,19 +2614,6 @@ forceinline f32 sdf_ellipse(v2f point, v2f radius) {
 
 	return length(r - p) * msign(p.y - r.y);
 }
-
-namespace ce {
-
-forceinline constexpr v4s frac(v4s v, s32 step) {
-	return {
-		tl::frac(v.x, step),
-		tl::frac(v.y, step),
-		tl::frac(v.z, step),
-		tl::frac(v.w, step),
-	};
-}
-
-} // namespace ce
 
 forceinline void append(StringBuilder &builder, m3 m) {
 	return append_format(builder, "{{{}, {}, {}}}", m.i, m.j, m.k);

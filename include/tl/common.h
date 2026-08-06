@@ -717,6 +717,29 @@ forceinline constexpr bool is_nan(f64 v) {
 	return ((u & 0x7ff0000000000000) == 0x7ff0000000000000) && (u & 0x000fffffffffffff);
 }
 
+template <class F32, class U32>
+forceinline F32 normalize_range_f32(U32 v)
+	requires requires {
+		requires sizeof(F32) == sizeof(U32);
+		requires is_unsigned<U32>;
+	}
+{
+	v >>= 9;
+	v |= 0x3f800000u;
+	return bit_cast<F32>(v) - 1.0f;
+}
+template <class F64, class U64>
+forceinline F64 normalize_range_f64(U64 v)
+	requires requires {
+		requires sizeof(F64) == sizeof(U64);
+		requires is_unsigned<U64>;
+	}
+{
+	v >>= 12;
+	v |= 0x3ff0'0000'0000'0000u;
+	return bit_cast<F64>(v) - 1.0f;
+}
+
 #if COMPILER_GCC
 	forceinline u32 find_lowest_one_bit(u32 val) { return val ? __builtin_ctz(val) : ~0; }
 	forceinline u32 find_lowest_one_bit(u64 val) { return val ? __builtin_ctzll(val) : ~0; }
