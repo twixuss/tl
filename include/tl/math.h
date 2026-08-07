@@ -2213,16 +2213,43 @@ union m4 {
 	static forceinline m4 translation(v3f v) { return translation(v.x, v.y, v.z); }
 	static forceinline m4 translation(v2f xy, f32 z) { return translation(xy.x, xy.y, z); }
 	static forceinline m4 translation(f32 v) { return translation(v, v, v); }
-	static forceinline m4 perspective_left_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
-		f32 h	   = 1.0f / tanf(fov * 0.5f);
-		f32 w	   = h / aspect;
-		f32 fzdfmn = fz / (fz - nz);
+	static forceinline m4 perspective(f32 aspect, f32 fov, aabb<f32> camera_z_planes, aabb<f32> ndc_z_planes) {
+		f32 h	= 1.0f / tanf(fov * 0.5f);
+		f32 w	= h / aspect;
+		auto s = camera_z_planes;
+		auto d = ndc_z_planes;
 		return {.s = {
 			w, 0, 0, 0,
 			0, h, 0, 0,
-			0, 0, fzdfmn, 1,
-			0, 0, -fzdfmn * nz, 0,
+			0, 0, d.min - ((d.max - d.min) * s.max / (s.min - s.max)), 1,
+			0, 0, s.min * ((d.max - d.min) * s.max / (s.min - s.max)), 0,
 		}};
+
+
+		// ndc.z = (cam.z * scale + offset) / cam.z
+		//       =  scale + offset / cam.z
+
+		// Constraints:
+		// scale + offset / s.min = d.min
+		// scale + offset / s.max = d.max
+		
+		// Solution:
+		// scale = d.min - offset / s.min
+		// d.min - offset / s.min + offset / s.max = d.max
+		// offset / s.max - offset / s.min = d.max - d.min
+		// offset * (1 / s.max - 1 / s.min) = d.max - d.min
+		// offset = (d.max - d.min) / (1 / s.max - 1 / s.min)
+		//        = (d.max - d.min) / ((s.min*s.max / s.max - s.min*s.max / s.min)/(s.min*s.max))
+		//        = (d.max - d.min) / ((s.min - s.max)/(s.min*s.max))
+		//        = (d.max - d.min) * (s.min*s.max) / (s.min - s.max)
+		// scale = d.min - (d.max - d.min) * (s.min*s.max) / (s.min - s.max) / s.min
+		//       = d.min - (d.max - d.min) * s.max / (s.min - s.max)
+	}
+	static forceinline m4 perspective_left_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		return perspective(aspect, fov, {nz, fz}, {0, 1});
+	}
+	static forceinline m4 perspective_left_handed_invz(f32 aspect, f32 fov, f32 nz, f32 fz) {
+		return perspective(aspect, fov, {nz, fz}, {1, 0});
 	}
 	static forceinline m4 perspective_right_handed(f32 aspect, f32 fov, f32 nz, f32 fz) {
 		f32 h = 1.0f / tan(fov * 0.5f);

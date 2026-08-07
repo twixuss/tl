@@ -128,9 +128,9 @@ struct Includer {
 		}
 
 		while (current.remaining.count) {
-		refind:
 			utf8 *found = find(current.remaining, options.include_directive);
-
+			
+		refound:
 			if (found) {
 				if (options.must_be_first_in_line) {
 					utf8 *c = found;
@@ -150,8 +150,8 @@ struct Includer {
 							default:
 								auto endl = find(Span(found, current.remaining.end()), u8'\n');
 								if (endl) {
-									current.remaining = Span(endl + 1, current.remaining.end());
-									goto refind;
+									found = find(Span(endl + 1, current.remaining.end()), options.include_directive);
+									goto refound;
 								} else {
 									current.remaining = Span(current.remaining.end(), current.remaining.end());
 									goto nothing_left;
