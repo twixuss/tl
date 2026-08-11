@@ -810,16 +810,6 @@ forceinline auto reflect(T v, T n) {
 	return v - dot(v, n) * n * 2;
 }
 
-forceinline constexpr v2f perp(v2f a) { return {-a.y, a.x}; }
-forceinline constexpr v2s perp(v2s a) { return {-a.y, a.x}; }
-
-forceinline constexpr f32 cross(v2f a, v2f b) {
-	return a.x * b.y - a.y * b.x;
-}
-forceinline constexpr v3f cross(v3f a, v3f b) {
-	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
-}
-
 template <class T>
 forceinline constexpr T rsqrt(T v) { return 1.0f / sqrt(v); }
 

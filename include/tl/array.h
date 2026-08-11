@@ -798,6 +798,8 @@ OP(<, ASIS)
 OP(>, ASIS)
 OP(<=, ASIS)
 OP(>=, ASIS)
+OP(&&, ASIS)
+OP(||, ASIS)
 #undef OP
 
 #else
@@ -996,6 +998,14 @@ forceinline constexpr T dot(Array<T, count> a, Array<T, count> b) {
 }
 
 template <class T>
+forceinline constexpr Array<T, 2> perp(Array<T, 2> a) { return {-a.y, a.x}; }
+
+template <class T>
+forceinline constexpr T cross(Array<T, 2> a, Array<T, 2> b) {
+	return a.x * b.y - a.y * b.x;
+}
+
+template <class T>
 forceinline constexpr Array<T, 3> cross(Array<T, 3> a, Array<T, 3> b) {
 	return a.yzx() * b.zxy() - a.zxy() * b.yzx();
 }
@@ -1105,6 +1115,14 @@ forceinline constexpr Array<Array<T, count>, outer_count> select(Array<Mask, cou
 	for (umm i = 0; i < outer_count; ++i)
 		r.data[i] = select(mask, a.data[i], b.data[i]);
 	return r;
+}
+
+template <class T, umm count>
+void sort_values(Array<T, count> &a, Array<T, count> &b) {
+	auto alessb = mask_lt(a, b);
+	auto c = a;
+	a = select(alessb, a, b);
+	b = select(alessb, b, c);
 }
 
 template <class U, class T, umm count>
