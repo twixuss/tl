@@ -460,9 +460,13 @@ template <> inline constexpr f64 nan<f64> = __builtin_nan("");
 #endif
 
 #define tl_enum_flags(t) \
-forceinline constexpr t operator~(t a){using u=std::underlying_type_t<t>;return (t)~(u)a;} \
-forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a|(u)b);} \
-forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
+	forceinline constexpr t operator~(t a){using u=std::underlying_type_t<t>;return (t)~(u)a;} \
+	forceinline constexpr t operator^(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a^(u)b);} \
+	forceinline constexpr t operator&(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a&(u)b);} \
+	forceinline constexpr t operator|(t a,t b){using u=std::underlying_type_t<t>;return (t)((u)a|(u)b);} \
+	forceinline constexpr t &operator^=(t &a,t b){ return a = a^b;} \
+	forceinline constexpr t &operator&=(t &a,t b){ return a = a&b;} \
+	forceinline constexpr t &operator|=(t &a,t b){ return a = a|b;} \
 
 template <class T>
 concept AFundamentalType = std::is_fundamental_v<T>;

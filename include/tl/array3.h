@@ -106,6 +106,18 @@ struct Array3 {
 		static_assert(sizeof(T) == sizeof(U));
 		return *(Array3<U, count_x, count_y, count_z, layout> *)this;
 	}
+
+	
+	forceinline constexpr auto map(auto &&mapper) const
+		requires requires { mapper(data[0]); }
+	{
+		Array3<std::remove_cvref_t<decltype(mapper(data[0]))>, count_x, count_y, count_z, layout> result = {};
+		for (umm i = 0; i < flat_count; ++i) {
+			result.data[i] = mapper(data[i]);
+		}
+		return result;
+	}
+
 };
 
 }
