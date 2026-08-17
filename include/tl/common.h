@@ -523,13 +523,9 @@ forceinline constexpr void convert(To &to, From from) {
 }
 template <class To, class From>
 forceinline constexpr To convert(From from) {
-	if constexpr (requires {(To)from;}) {
-		return (To)from;
-	} else {
-		To to;
-		convert(to, from);
-		return to;
-	}
+	To to;
+	convert(to, from);
+	return to;
 }
 
 forceinline constexpr smm compare(bool a, bool b) { return (s8)a - (s8)b; }

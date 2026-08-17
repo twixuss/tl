@@ -73,6 +73,17 @@ template <class T, umm dim>
 struct ValueAndDerivative {
 	T value;
 	Array<T, dim> derivative;
+
+	forceinline constexpr auto operator[](umm i)
+		requires is_array<T>
+	{
+		ValueAndDerivative<typename T::Element, dim> r = {};
+		r.value = value[i];
+		for (umm d = 0; d < dim; ++d) {
+			r.derivative[d] = derivative[d][i];
+		}
+		return r;
+	}
 };
 
 template <class T> constexpr bool is_value_and_derivative = false;
@@ -80,6 +91,110 @@ template <class T, umm dim> constexpr bool is_value_and_derivative<ValueAndDeriv
 
 template <class T>
 concept AValueAndDerivative = is_value_and_derivative<T>;
+
+forceinline constexpr auto operator+(AValueAndDerivative auto vd, decltype(vd.value) constant) {
+	return ValueAndDerivative{vd.value + constant, vd.derivative};
+}
+forceinline constexpr auto operator-(AValueAndDerivative auto vd, decltype(vd.value) constant) {
+	return ValueAndDerivative{vd.value - constant, vd.derivative};
+}
+forceinline constexpr auto operator*(AValueAndDerivative auto vd, decltype(vd.value) constant) {
+	return ValueAndDerivative{vd.value * constant, vd.derivative * constant};
+}
+forceinline constexpr auto operator/(AValueAndDerivative auto vd, decltype(vd.value) constant) {
+	return ValueAndDerivative{vd.value / constant, vd.derivative / constant};
+}
+
+template <AValueAndDerivative T>
+forceinline constexpr auto operator+(decltype(T::value) constant, T vd) {
+	return ValueAndDerivative{constant + vd.value, vd.derivative};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator-(decltype(T::value) constant, T vd) {
+	return ValueAndDerivative{constant - vd.value, -vd.derivative};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator*(decltype(T::value) constant, T vd) {
+	return ValueAndDerivative{constant * vd.value, vd.derivative * constant};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator/(decltype(T::value) constant, T vd) {
+	return ValueAndDerivative{constant / vd.value, (vd.derivative * -constant) / (vd.value * vd.value)};
+}
+
+forceinline constexpr auto operator+(AValueAndDerivative auto vd, typename decltype(vd.value)::Element constant) {
+	return ValueAndDerivative{vd.value + constant, vd.derivative};
+}
+forceinline constexpr auto operator-(AValueAndDerivative auto vd, typename decltype(vd.value)::Element constant) {
+	return ValueAndDerivative{vd.value - constant, vd.derivative};
+}
+forceinline constexpr auto operator*(AValueAndDerivative auto vd, typename decltype(vd.value)::Element constant) {
+	return ValueAndDerivative{vd.value * constant, vd.derivative * constant};
+}
+forceinline constexpr auto operator/(AValueAndDerivative auto vd, typename decltype(vd.value)::Element constant) {
+	return ValueAndDerivative{vd.value / constant, vd.derivative / constant};
+}
+
+template <AValueAndDerivative T>
+forceinline constexpr auto operator+(typename decltype(T::value)::Element constant, T vd) {
+	return ValueAndDerivative{constant + vd.value, vd.derivative};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator-(typename decltype(T::value)::Element constant, T vd) {
+	return ValueAndDerivative{constant - vd.value, -vd.derivative};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator*(typename decltype(T::value)::Element constant, T vd) {
+	return ValueAndDerivative{constant * vd.value, vd.derivative * constant};
+}
+template <AValueAndDerivative T>
+forceinline constexpr auto operator/(typename decltype(T::value)::Element constant, T vd) {
+	return ValueAndDerivative{constant / vd.value, (vd.derivative * -constant) / (vd.value * vd.value)};
+}
+
+forceinline constexpr auto operator+(AValueAndDerivative auto a, decltype(a) b) {
+	return ValueAndDerivative{a.value + b.value, a.derivative + b.derivative};
+}
+forceinline constexpr auto operator-(AValueAndDerivative auto a, decltype(a) b) {
+	return ValueAndDerivative{a.value - b.value, a.derivative - b.derivative};
+}
+forceinline constexpr auto operator*(AValueAndDerivative auto a, decltype(a) b) {
+	return ValueAndDerivative{a.value * b.value, a.derivative * b.value + a.value * b.derivative};
+}
+forceinline constexpr auto operator/(AValueAndDerivative auto a, decltype(a) b) {
+	return ValueAndDerivative{a.value / b.value, (a.derivative * b.value - a.value * b.derivative) / (b.value * b.value)};
+}
+
+forceinline constexpr auto &operator+=(AValueAndDerivative auto &a, auto b) requires requires { a + b; } { return a = a + b; }
+forceinline constexpr auto &operator-=(AValueAndDerivative auto &a, auto b) requires requires { a - b; } { return a = a - b; }
+forceinline constexpr auto &operator*=(AValueAndDerivative auto &a, auto b) requires requires { a * b; } { return a = a * b; }
+forceinline constexpr auto &operator/=(AValueAndDerivative auto &a, auto b) requires requires { a / b; } { return a = a / b; }
+
+template <AValueAndDerivative T>
+forceinline constexpr T min(T const &a, T const &b) {
+	auto mask = a.value < b.value;
+	T r = {};
+	r.value = select(mask, a.value, b.value);
+	r.derivative = select(mask, a.derivative, b.derivative);
+	return r;
+}
+
+template <AValueAndDerivative T>
+forceinline constexpr T max(T const &a, T const &b) {
+	auto mask = a.value > b.value;
+	T r = {};
+	r.value = select(mask, a.value, b.value);
+	r.derivative = select(mask, a.derivative, b.derivative);
+	return r;
+}
+
+template <AValueAndDerivative T>
+forceinline constexpr void convert(T &r, auto constant) {
+	r = {
+		.value = convert<decltype(T::value)>(constant),
+		.derivative = {},
+	};
+}
 
 template <AValueAndDerivative T>
 forceinline constexpr T smooth_min_quadratic(T a, T b, f32 k) {

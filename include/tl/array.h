@@ -964,6 +964,31 @@ forceinline constexpr Array<T, count> to_array(T const (&array)[count]) {
 	return result;
 }
 
+// at_deepest(
+//     [[0, 1, 2], [3, 4, 5]],
+//     [0, 2]
+// )
+// =
+// [[0, 2], [3, 5]]
+template <class T, umm count, class Index, umm index_count>
+	requires (!is_array<T>)
+forceinline constexpr Array<T, index_count> at_deepest(Array<T, count> array, Array<Index, index_count> indices) {
+	Array<T, index_count> result = {};
+	for (umm i = 0; i < index_count; ++i)
+		result.data[i] = array[indices.data[i]]; // bounds check is intended
+	return result;
+}
+
+template <class T, umm count, umm inner_count, class Index, umm index_count>
+	requires (!is_array<T>)
+forceinline constexpr Array<Array<T, index_count>, count> at_deepest(Array<Array<T, inner_count>, count> array, Array<Index, index_count> indices) {
+	Array<Array<T, index_count>, count> result = {};
+	for (umm j = 0; j < count; ++j)
+		for (umm i = 0; i < index_count; ++i)
+			result.data[j].data[i] = array.data[j][indices.data[i]]; // bounds check is intended
+	return result;
+}
+
 template <class T, umm count>
 forceinline constexpr bool all(Array<T, count> a) {
 	for (umm i = 0; i < count; ++i) {
@@ -1174,12 +1199,10 @@ forceinline constexpr void convert(Array<Array<T, inner_count>, count> &to, From
 }
 
 template <class U, class T, umm count>
-	requires is_array<U> && requires(T t) { (ElementOf<U>)t; }
-forceinline constexpr U convert(Array<T, count> a) {
-	U r = {};
+	requires std::is_convertible_v<T, U>
+forceinline constexpr void convert(Array<U, count> &r, Array<T, count> a) {
 	for (umm i = 0; i < count; ++i)
-		r.data[i] = convert<ElementOf<U>>(a.data[i]);
-	return r;
+		r.data[i] = convert<U>(a.data[i]);
 }
 
 template <class U, class T, umm count>
