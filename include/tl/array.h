@@ -554,6 +554,11 @@ template <class T, umm count> inline static constexpr bool is_integer_like<Array
 template <class T>            inline static constexpr int array_nestedness = 0;
 template <class T, umm count> inline static constexpr int array_nestedness<Array<T, count>> = array_nestedness<T> + 1;
 
+template <class T, umm x>                      inline Span<T> flatten(Array<T, x>                               &array) { return {(T *)&array, x      }; }
+template <class T, umm x, umm y>               inline Span<T> flatten(Array<Array<T, y>, x>                     &array) { return {(T *)&array, x*y    }; }
+template <class T, umm x, umm y, umm z>        inline Span<T> flatten(Array<Array<Array<T, z>, y>, x>           &array) { return {(T *)&array, x*y*z  }; }
+template <class T, umm x, umm y, umm z, umm w> inline Span<T> flatten(Array<Array<Array<Array<T, w>, z>, y>, x> &array) { return {(T *)&array, x*y*z*w}; }
+
 template <class T>
 struct ScalarOfT {
 	using Type = T;
