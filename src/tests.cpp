@@ -21,7 +21,7 @@
 #include <tl/system.h>
 #include <tl/thread.h>
 #include <tl/precise_time.h>
-#include <tl/u256.h>
+#include <tl/int.h>
 #include <tl/big_int.h>
 #include <tl/main.h>
 #include <tl/default_logger.h>
@@ -403,154 +403,6 @@ union F32 {
 };
 
 
-struct u128 {
-	u64 low;
-	u64 high;
-
-	u128 &operator++() { return *this += {.low = 1}; }
-	u128 operator++(int) { u128 copy = *this; ++*this; return copy; }
-
-	u128 operator~() const { return {.low = ~low, .high = ~high}; }
-	u128 operator-() const {
-		u128 result = ~*this;
-		result.low += 1;
-		if (result.low == 0) {
-			result.high += 1;
-		}
-		return result;
-	}
-
-	u128 operator|(u128 b) const { return {.low = low | b.low, .high = high | b.high }; }
-	u128 operator&(u128 b) const { return {.low = low & b.low, .high = high & b.high }; }
-	u128 operator<<(u32 b) const {
-		if (b == 0) return *this;
-		u128 result;
-		result.low = b < 64 ? low << b : 0;
-		result.high = (high << b) | (low >> (64 - b));
-		return result;
-	}
-	u128 operator>>(u32 b) const {
-		if (b == 0) return *this;
-		u128 result;
-		result.low = (low >> b) | (high << (64 - b));
-		result.high = high >> b;
-		return result;
-	}
-	u128 operator+(u128 b) const {
-		u128 result;
-		bool carry;
-		add_carry(low, b.low, false, &result.low, &carry);
-		result.high = high + b.high + carry;
-		return result;
-	}
-	u128 operator-(u128 b) const {
-		return *this + -b;
-	}
-	u128 operator*(u128 b) const {
-		u128 result = {};
-		for (u32 bit_index = 0; bit_index < 128; ++bit_index) {
-			if (b.bit_at(bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	u128 operator*(u8 b) const {
-		u128 result = {};
-		for (u32 bit_index = 0; bit_index < 8; ++bit_index) {
-			if (b & ((u8)1 << bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	u128 operator*(u16 b) const {
-		u128 result = {};
-		for (u32 bit_index = 0; bit_index < 16; ++bit_index) {
-			if (b & ((u16)1 << bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	u128 operator*(u32 b) const {
-		u128 result = {};
-		for (u32 bit_index = 0; bit_index < 32; ++bit_index) {
-			if (b & ((u32)1 << bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	u128 operator*(u64 b) const {
-		u128 result = {};
-		for (u32 bit_index = 0; bit_index < 64; ++bit_index) {
-			if (b & ((u64)1 << bit_index)) {
-				result += *this << bit_index;
-			}
-		}
-		return result;
-	}
-	u128 operator/(u128 b) const {
-		u128 result = {};
-
-		u128 remainder = *this;
-		while (remainder >= b) {
-			remainder -= b;
-			++result;
-		}
-
-		return result;
-	}
-	u128 operator%(u128 b) const {
-		u128 remainder = *this;
-		while (remainder >= b) {
-			remainder -= b;
-		}
-		return remainder;
-	}
-
-	bool operator==(u128 b) const { return low == b.low && high == b.high; }
-	bool operator!=(u128 b) const { return low != b.low || high != b.high; }
-
-	bool operator>(u128 b) const { return high >= b.high && low > b.low; }
-	bool operator<(u128 b) const { return high <= b.high && low < b.low; }
-	bool operator>=(u128 b) const { return high >= b.high && low >= b.low; }
-	bool operator<=(u128 b) const { return high <= b.high && low <= b.low; }
-
-	bool bit_at(u32 index) const {
-		return ((u32 *)this)[index >> 5] & ((u32)1 << (index & 31));
-		return index < 64 ? (low & ((u64)1 << index)) : (high & ((u64)1 << (index - 64)));
-	}
-
-	u128 &operator|=(u128 b) { return *this = *this | b; }
-	u128 &operator+=(u128 b) { return *this = *this + b; }
-	u128 &operator-=(u128 b) { return *this = *this - b; }
-	u128 &operator*=(u128 b) { return *this = *this * b; }
-	u128 &operator/=(u128 b) { return *this = *this / b; }
-
-	u128 &operator+=(u64 b) { return *this = *this + u128{.low = b}; }
-
-	u128 &operator*=(u8  b) { return *this = *this * b; }
-	u128 &operator*=(u16 b) { return *this = *this * b; }
-	u128 &operator*=(u32 b) { return *this = *this * b; }
-	u128 &operator*=(u64 b) { return *this = *this * b; }
-
-	operator u64() const { return low; };
-};
-
-template <> constexpr bool tl::is_integer<u128> = true;
-template <> constexpr bool tl::is_integer_like<u128> = true;
-
-u128 U128(u64 val) {
-	return {.low = val};
-}
-
-u128 operator""su(unsigned long long val) {
-	return {.low = val};
-}
-
-
 
 #if 1
 #if 0
@@ -703,35 +555,6 @@ s32 tl_main(Span<Span<utf8>> args) {
 	print_floats(-infinity<f32>);
 	print_floats(+tl::nan<f32>);
 	print_floats(-tl::nan<f32>);
-
-	{
-		u128 test = 0su;
-		assert(++test == 1su);
-	}
-	{
-		u128 test = 0su;
-		assert(test++ == 0su);
-	}
-
-	{
-		u128 test = U128(~(u64)0);
-		assert(++test == U128(~(u64)0) + 1su);
-	}
-	{
-		u128 test = U128(~(u64)0);
-		assert(test++ == U128(~(u64)0));
-	}
-
-	assert((~0su).low == ~0);
-	assert((~0su).high == ~0);
-	{
-		u128 result = ((u128)(~(u64)0)) << 64u;
-		u128 expected = {.low = 0, .high = ~(u64)0};
-		assert(result == expected);
-	}
-
-	assert(27ou / 10ou == 2ou);
-	assert(27ou % 10ou == 7ou);
 
 	// assert(27bu + 10bu == 37bu);
 	// assert(37bu - 10bu == 27bu);

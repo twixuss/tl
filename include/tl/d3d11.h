@@ -40,10 +40,10 @@
 
 namespace tl { namespace d3d11 {
 
-void set_name(ID3D11DeviceChild *device_child, Span<char> name) {
+forceinline void set_name(ID3D11DeviceChild *device_child, Span<char> name) {
 	device_child->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.count, name.data);
 }
-void set_name(ID3D11DeviceChild *device_child, Span<utf8> name) {
+forceinline void set_name(ID3D11DeviceChild *device_child, Span<utf8> name) {
 	set_name(device_child, as_chars(name));
 }
 

@@ -350,7 +350,7 @@ forceinline s128 mulfull(s64 a, s64 b) {
 	return bit_cast<s128>((__int128_t)a * (__int128_t)b);
 	#endif
 }
-s64 div(s128 a, s64 b) {
+forceinline s64 div(s128 a, s64 b) {
 	#ifdef _MSC_VER
 	s64 remainder;
 	return _div128(a.high, a.low, b, &remainder);

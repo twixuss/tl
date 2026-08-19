@@ -236,7 +236,7 @@ bool connect(Socket s, char const *ip, u16 port) {
 bool set_blocking(Socket s, bool blocking) {
 	//  https://stackoverflow.com/a/1549344
 	unsigned long mode = blocking ? 0 : 1;
-	if (ioctlsocket((int)s, FIONBIO, &mode) != 0) {
+	if (ioctlsocket((int)(intptr_t)s, FIONBIO, &mode) != 0) {
 		logger.error("Failed to set blocking mode on socket.");
 		return false;
 	}

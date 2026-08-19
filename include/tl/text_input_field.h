@@ -81,7 +81,7 @@ struct TextInputField {
 		sanitized_string.set(string);
 
 		if (banned_chars.count) {
-			sanitized_string.here_map([&](utf32 c) -> Optional<utf32> {
+			sanitized_string.map_here([&](utf32 c) -> Optional<utf32> {
 				if (auto found = banned_chars.find(c)) {
 					if (*found.value) {
 						return *found.value;

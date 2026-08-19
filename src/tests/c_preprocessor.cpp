@@ -122,7 +122,7 @@ SourceLocation get_source_location(String location, GetSourceLocationOptions opt
 
 	char *file_start = 0;
 	for (auto &source_file : source_files) {
-		if (owns(source_file.source_buffer, (u8 *)chunk_start)) {
+		if (source_file.source_buffer.owns((u8 *)chunk_start)) {
 			file_start = (char *)source_file.source_buffer.data;
 			result.file = source_file.path;
 			break;

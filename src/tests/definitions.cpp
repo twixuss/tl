@@ -100,7 +100,7 @@
 #include <tl/precise_time.h>
 #include <tl/tracking_allocator.h>
 #include <tl/turn.h>
-#include <tl/u256.h>
+#include <tl/int.h>
 #include <tl/variant.h>
 #include <tl/vector.h>
 #include <tl/window.h>
@@ -110,6 +110,7 @@
 
 void run_tl_tests() {
 	using namespace tl;
+	println("Running {} tests...", tests_to_run_count);
 	for (int i = 0; i < tests_to_run_count; i++) {
 		println(tests_to_run[i].name);
 		tests_to_run[i].func();

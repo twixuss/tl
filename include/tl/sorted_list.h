@@ -6,7 +6,7 @@ namespace tl {
 
 template <class T>
 struct SortedListDefaultCompare {
-	forceinline constexpr smm operator()(T a, T b) {
+	forceinline constexpr smm operator()(T a, T b) const {
 		return compare(a, b);
 	}
 };
