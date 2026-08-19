@@ -40,7 +40,6 @@ int main(int argc, char **argv) {
         relative("src/tests/fly_string.cpp"),
         relative("src/tests/function.cpp"),
         relative("src/tests/math.cpp"),
-        relative("src/tests/simd.cpp"),
         relative("src/tests/sorted_list.cpp"),
         relative("src/tests/stream.cpp"),
         relative("src/tests/string.cpp"),

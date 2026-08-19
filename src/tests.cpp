@@ -16,7 +16,6 @@
 #include <tl/opengl.h>
 #include <tl/profiler.h>
 #include <tl/random.h>
-#include <tl/simd.h>
 #include <tl/string.h>
 #include <tl/system.h>
 #include <tl/thread.h>
@@ -580,7 +579,6 @@ s32 tl_main(Span<Span<utf8>> args) {
 	// TEST(utf8_test);
 	TEST(fly_string_test);
 	//TEST(big_int_test);
-	TEST(simd_test);
 	TEST(sorted_list_test);
 	TEST(thread_pool_test);
 #undef TEST;

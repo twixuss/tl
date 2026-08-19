@@ -9,6 +9,7 @@ TL_API bool commit_memory(void *data, umm size);
 TL_API bool guard_memory(void *data, umm size);
 TL_API bool decommit_memory(void *data, umm size);
 TL_API bool free_memory(void *data, umm size);
+TL_API umm get_ram_size();
 
 }
 
@@ -39,6 +40,12 @@ bool decommit_memory(void *data, umm size) {
 bool free_memory(void *data, umm size) {
 	return VirtualFree(data, size, MEM_RELEASE);
 }
+umm get_ram_size() {
+	ULONGLONG kilobytes = 0;
+	GetPhysicallyInstalledSystemMemory(&kilobytes);
+	return kilobytes * 1024;
+}
+
 }
 #elif OS_LINUX
 #include <sys/mman.h>

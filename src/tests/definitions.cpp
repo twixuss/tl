@@ -27,7 +27,6 @@
 #include <tl/buffer.h>
 #include <tl/c_version.h>
 #include <tl/clipboard.h>
-#include <tl/color.h>
 #include <tl/common.h>
 #include <tl/compiler.h>
 #include <tl/complex.h>
@@ -76,18 +75,15 @@
 #include <tl/msvc.h>
 #include <tl/net.h>
 #include <tl/opengl.h>
-#include <tl/pointer.h>
 #include <tl/pool32.h>
 #include <tl/process.h>
 #include <tl/profiler.h>
 #include <tl/protected_fly_string.h>
 #include <tl/qoi.h>
 #include <tl/quaternion.h>
-#include <tl/ram.h>
 #include <tl/random.h>
 #include <tl/reusable_fiber.h>
 #include <tl/ring_buffer.h>
-#include <tl/simd.h>
 #include <tl/sleep.h>
 #include <tl/sorted_list.h>
 #include <tl/source_location.h>
