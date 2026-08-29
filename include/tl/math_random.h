@@ -625,20 +625,14 @@ forceinline f32 gradient_noise(f32 coordinate) {
 	f32 tile = floor(coordinate);
 	f32 local = frac(coordinate);
 
-	f32 t0 = local;
-	f32 t1 = t0 - 1.f;
+	f32 d0 = Randomizer{}.template random<f32>(tile + 0) * 2.0f - 1.0f;
+	f32 d1 = Randomizer{}.template random<f32>(tile + 1) * 2.0f - 1.0f;
 
-	static constexpr f32 directions[] = {-1, -.75, -.5, -.25, .25, .5, .75, 1};
-	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](f32 offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 26) & (count_of(directions) - 1)]; };
-	f32 d0 = get_direction(0);
-	f32 d1 = get_direction(1);
-
-	f32 v0 = d0 * t0;
-	f32 v1 = d1 * t1;
+	f32 v0 = d0 * (local - 0);
+	f32 v1 = d1 * (local - 1);
 
 	f32 t = smoothstep3(local);
-	return lerp(v0, v1, t) + 0.5f;
+	return lerp(v0, v1, t);
 }
 
 template <class Randomizer = DefaultRandomizer>
@@ -646,33 +640,18 @@ forceinline f32 gradient_noise(v2f coordinate) {
 	v2f tile = floor(coordinate);
 	v2f local = frac(coordinate);
 
-	v2f t0 = local;
-	v2f t1 = t0 - 1.f;
+	v2f g00 = Randomizer{}.template random<v2f>(tile + v2f{0, 0}) * 2.0f - 1.0f;
+	v2f g10 = Randomizer{}.template random<v2f>(tile + v2f{1, 0}) * 2.0f - 1.0f;
+	v2f g01 = Randomizer{}.template random<v2f>(tile + v2f{0, 1}) * 2.0f - 1.0f;
+	v2f g11 = Randomizer{}.template random<v2f>(tile + v2f{1, 1}) * 2.0f - 1.0f;
 
-	static const v2f directions[] = {
-		v2f{ 1, 0},
-		v2f{-1, 0},
-		v2f{ 0, 1},
-		v2f{ 0,-1},
-		normalize(v2f{ 1, 1}),
-		normalize(v2f{-1, 1}),
-		normalize(v2f{ 1,-1}),
-		normalize(v2f{-1,-1})
-	};
-	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2f offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
-	v2f g00 = get_direction(v2f{0, 0});
-	v2f g10 = get_direction(v2f{1, 0});
-	v2f g01 = get_direction(v2f{0, 1});
-	v2f g11 = get_direction(v2f{1, 1});
-
-	f32 v00 = g00.x * t0.x + g00.y * t0.y;
-	f32 v10 = g10.x * t1.x + g10.y * t0.y;
-	f32 v01 = g01.x * t0.x + g01.y * t1.y;
-	f32 v11 = g11.x * t1.x + g11.y * t1.y;
+	f32 v00 = dot(g00, local - v2f{0, 0});
+	f32 v10 = dot(g10, local - v2f{1, 0});
+	f32 v01 = dot(g01, local - v2f{0, 1});
+	f32 v11 = dot(g11, local - v2f{1, 1});
 
 	v2f t = smoothstep3(local);
-	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
+	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y);
 }
 
 template <class Randomizer = DefaultRandomizer>
@@ -680,47 +659,32 @@ forceinline f32 gradient_noise(v3f coordinate) {
 	v3f tile = floor(coordinate);
 	v3f local = coordinate - tile;
 
-	v3f t0 = local;
-	v3f t1 = t0 - 1;
 
-	static constexpr v3f directions[] = {
-		normalize(v3f{ 1, 1, 1}),
-		normalize(v3f{-1, 1, 1}),
-		normalize(v3f{ 1,-1, 1}),
-		normalize(v3f{-1,-1, 1}),
-		normalize(v3f{ 1, 1,-1}),
-		normalize(v3f{-1, 1,-1}),
-		normalize(v3f{ 1,-1,-1}),
-		normalize(v3f{-1,-1,-1})
-	};
-	static_assert(is_power_of_2(count_of(directions)));
+	v3f g000 = Randomizer{}.template random<v3f>(tile + v3f{0, 0, 0}) * 2.0f - 1.0f;
+	v3f g100 = Randomizer{}.template random<v3f>(tile + v3f{1, 0, 0}) * 2.0f - 1.0f;
+	v3f g010 = Randomizer{}.template random<v3f>(tile + v3f{0, 1, 0}) * 2.0f - 1.0f;
+	v3f g110 = Randomizer{}.template random<v3f>(tile + v3f{1, 1, 0}) * 2.0f - 1.0f;
+	v3f g001 = Randomizer{}.template random<v3f>(tile + v3f{0, 0, 1}) * 2.0f - 1.0f;
+	v3f g101 = Randomizer{}.template random<v3f>(tile + v3f{1, 0, 1}) * 2.0f - 1.0f;
+	v3f g011 = Randomizer{}.template random<v3f>(tile + v3f{0, 1, 1}) * 2.0f - 1.0f;
+	v3f g111 = Randomizer{}.template random<v3f>(tile + v3f{1, 1, 1}) * 2.0f - 1.0f;
+	f32 v000 = dot(g000, local - v3f{0, 0, 0});
+	f32 v100 = dot(g100, local - v3f{1, 0, 0});
+	f32 v010 = dot(g010, local - v3f{0, 1, 0});
+	f32 v110 = dot(g110, local - v3f{1, 1, 0});
+	f32 v001 = dot(g001, local - v3f{0, 0, 1});
+	f32 v101 = dot(g101, local - v3f{1, 0, 1});
+	f32 v011 = dot(g011, local - v3f{0, 1, 1});
+	f32 v111 = dot(g111, local - v3f{1, 1, 1});
 
 	v3f t = smoothstep3(local);
-
-	auto get_direction = [&](v3f offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
-	v3f g000 = get_direction({0, 0, 0});
-	v3f g100 = get_direction({1, 0, 0});
-	v3f g010 = get_direction({0, 1, 0});
-	v3f g110 = get_direction({1, 1, 0});
-	v3f g001 = get_direction({0, 0, 1});
-	v3f g101 = get_direction({1, 0, 1});
-	v3f g011 = get_direction({0, 1, 1});
-	v3f g111 = get_direction({1, 1, 1});
-	f32 v000 = dot(g000, v3f{ t0.x, t0.y, t0.z});
-	f32 v100 = dot(g100, v3f{ t1.x, t0.y, t0.z});
-	f32 v010 = dot(g010, v3f{ t0.x, t1.y, t0.z});
-	f32 v110 = dot(g110, v3f{ t1.x, t1.y, t0.z});
-	f32 v001 = dot(g001, v3f{ t0.x, t0.y, t1.z});
-	f32 v101 = dot(g101, v3f{ t1.x, t0.y, t1.z});
-	f32 v011 = dot(g011, v3f{ t0.x, t1.y, t1.z});
-	f32 v111 = dot(g111, v3f{ t1.x, t1.y, t1.z});
 
 	return
 		lerp(
 			lerp(lerp(v000, v100, t.x), lerp(v010, v110, t.x), t.y),
 			lerp(lerp(v001, v101, t.x), lerp(v011, v111, t.x), t.y),
 			t.z
-		) / sqrt3 + 0.5f;
+		);
 }
 
 template <class Randomizer = DefaultRandomizer>
@@ -729,33 +693,18 @@ forceinline f32 gradient_noise(v2s coordinate, s32 step) {
 	v2s tile = floored / step;
 	v2f local = (v2f)(coordinate - floored) * reciprocal((f32)step);
 
-	v2f t0 = local;
-	v2f t1 = t0 - 1.f;
+	v2f g00 = Randomizer{}.template random<v2f>(tile + v2s{0, 0}) * 2.0f - 1.0f;
+	v2f g10 = Randomizer{}.template random<v2f>(tile + v2s{1, 0}) * 2.0f - 1.0f;
+	v2f g01 = Randomizer{}.template random<v2f>(tile + v2s{0, 1}) * 2.0f - 1.0f;
+	v2f g11 = Randomizer{}.template random<v2f>(tile + v2s{1, 1}) * 2.0f - 1.0f;
 
-	static const v2f directions[] = {
-		v2f{ 1, 0},
-		v2f{-1, 0},
-		v2f{ 0, 1},
-		v2f{ 0,-1},
-		normalize(v2f{ 1, 1}),
-		normalize(v2f{-1, 1}),
-		normalize(v2f{ 1,-1}),
-		normalize(v2f{-1,-1})
-	};
-	static_assert(is_power_of_2(count_of(directions)));
-	auto get_direction = [&](v2s offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
-	v2f g00 = get_direction(v2s{0, 0});
-	v2f g10 = get_direction(v2s{1, 0});
-	v2f g01 = get_direction(v2s{0, 1});
-	v2f g11 = get_direction(v2s{1, 1});
-
-	f32 v00 = dot(g00, v2f{t0.x, t0.y});
-	f32 v10 = dot(g10, v2f{t1.x, t0.y});
-	f32 v01 = dot(g01, v2f{t0.x, t1.y});
-	f32 v11 = dot(g11, v2f{t1.x, t1.y});
+	f32 v00 = dot(g00, local - v2f{0, 0});
+	f32 v10 = dot(g10, local - v2f{1, 0});
+	f32 v01 = dot(g01, local - v2f{0, 1});
+	f32 v11 = dot(g11, local - v2f{1, 1});
 
 	v2f t = smoothstep3(local);
-	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y) * (sqrt2 / 2.0f) + 0.5f;
+	return lerp(lerp(v00, v10, t.x), lerp(v01, v11, t.x), t.y);
 }
 
 template <class Randomizer = DefaultRandomizer>
@@ -764,53 +713,32 @@ forceinline f32 gradient_noise(v3s coordinate, s32 step) {
 	v3s tile = floored / step;
 	v3f local = (v3f)(coordinate - floored) * reciprocal((f32)step);
 
-	v3f t0 = local;
-	v3f t1 = t0 - 1;
 
-	static constexpr v3f directions[] = {
-		// v3f{ 1, 0, 0},
-		// v3f{-1, 0, 0},
-		// v3f{ 0, 1, 0},
-		// v3f{ 0,-1, 0},
-		// v3f{ 0, 0, 1},
-		// v3f{ 0, 0,-1},
-		normalize(v3f{ 1, 1, 1}),
-		normalize(v3f{-1, 1, 1}),
-		normalize(v3f{ 1,-1, 1}),
-		normalize(v3f{-1,-1, 1}),
-		normalize(v3f{ 1, 1,-1}),
-		normalize(v3f{-1, 1,-1}),
-		normalize(v3f{ 1,-1,-1}),
-		normalize(v3f{-1,-1,-1})
-	};
-	static_assert(is_power_of_2(count_of(directions)));
+    v3f g000 = Randomizer{}.template random<v3f>(tile + v3s{0, 0, 0}) * 2.0f - 1.0f;
+    v3f g100 = Randomizer{}.template random<v3f>(tile + v3s{1, 0, 0}) * 2.0f - 1.0f;
+    v3f g010 = Randomizer{}.template random<v3f>(tile + v3s{0, 1, 0}) * 2.0f - 1.0f;
+    v3f g110 = Randomizer{}.template random<v3f>(tile + v3s{1, 1, 0}) * 2.0f - 1.0f;
+    v3f g001 = Randomizer{}.template random<v3f>(tile + v3s{0, 0, 1}) * 2.0f - 1.0f;
+    v3f g101 = Randomizer{}.template random<v3f>(tile + v3s{1, 0, 1}) * 2.0f - 1.0f;
+    v3f g011 = Randomizer{}.template random<v3f>(tile + v3s{0, 1, 1}) * 2.0f - 1.0f;
+    v3f g111 = Randomizer{}.template random<v3f>(tile + v3s{1, 1, 1}) * 2.0f - 1.0f;
+	f32 v000 = dot(g000, local - v3f{0, 0, 0});
+    f32 v100 = dot(g100, local - v3f{1, 0, 0});
+    f32 v010 = dot(g010, local - v3f{0, 1, 0});
+    f32 v110 = dot(g110, local - v3f{1, 1, 0});
+	f32 v001 = dot(g001, local - v3f{0, 0, 1});
+    f32 v101 = dot(g101, local - v3f{1, 0, 1});
+    f32 v011 = dot(g011, local - v3f{0, 1, 1});
+    f32 v111 = dot(g111, local - v3f{1, 1, 1});
 
 	v3f t = smoothstep3(local);
-
-	auto get_direction = [&](v3s offset) { return directions[(Randomizer{}.template random<u32>(tile + offset) >> 13) & (count_of(directions) - 1)]; };
-    v3f g000 = get_direction({0, 0, 0});
-    v3f g100 = get_direction({1, 0, 0});
-    v3f g010 = get_direction({0, 1, 0});
-    v3f g110 = get_direction({1, 1, 0});
-    v3f g001 = get_direction({0, 0, 1});
-    v3f g101 = get_direction({1, 0, 1});
-    v3f g011 = get_direction({0, 1, 1});
-    v3f g111 = get_direction({1, 1, 1});
-	f32 v000 = dot(g000, v3f{ t0.x, t0.y, t0.z});
-    f32 v100 = dot(g100, v3f{ t1.x, t0.y, t0.z});
-    f32 v010 = dot(g010, v3f{ t0.x, t1.y, t0.z});
-    f32 v110 = dot(g110, v3f{ t1.x, t1.y, t0.z});
-	f32 v001 = dot(g001, v3f{ t0.x, t0.y, t1.z});
-    f32 v101 = dot(g101, v3f{ t1.x, t0.y, t1.z});
-    f32 v011 = dot(g011, v3f{ t0.x, t1.y, t1.z});
-    f32 v111 = dot(g111, v3f{ t1.x, t1.y, t1.z});
 
     return
 		lerp(
 			lerp(lerp(v000, v100, t.x), lerp(v010, v110, t.x), t.y),
 			lerp(lerp(v001, v101, t.x), lerp(v011, v111, t.x), t.y),
 			t.z
-		) / sqrt3 + 0.5f;
+		);
 }
 
 template <class T>

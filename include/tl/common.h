@@ -1148,8 +1148,8 @@ forceinline constexpr f64 floor(f64 v) { return std::is_constant_evaluated() ? (
 
 forceinline constexpr f32 floor(f32 v, f32 s) { return floor(v / s) * s; }
 
-forceinline s32 floor_to_int(f32 v) { return (s32)floor(v); }
-forceinline s64 floor_to_int(f64 v) { return (s64)floor(v); }
+forceinline constexpr s32 floor_to_int(f32 v) { return (s32)floor(v); }
+forceinline constexpr s64 floor_to_int(f64 v) { return (s64)floor(v); }
 
 forceinline f32 ceil(f32 v) { return ::ceilf(v); }
 forceinline f64 ceil(f64 v) { return ::ceil(v); }
@@ -1161,8 +1161,8 @@ forceinline f64 round(f64 v) { return ::nearbyint(v); }
 forceinline s32 round_to_int(f32 v) { return (s32)lroundf(v); }
 forceinline s64 round_to_int(f64 v) { return llround(v); }
 
-forceinline f32 frac(f32 v) { return v - floor(v); }
-forceinline f64 frac(f64 v) { return v - floor(v); }
+forceinline constexpr f32 frac(f32 v) { return v - floor(v); }
+forceinline constexpr f64 frac(f64 v) { return v - floor(v); }
 
 forceinline f32 pow(f32 x, f32 y) { return ::powf(x, y); }
 forceinline f64 pow(f64 x, f64 y) { return ::pow(x, y); }
@@ -4117,66 +4117,6 @@ void rotate(Span<T> span, smm to_be_first_index) {
 	} else {
 		return rotate(span, span.data + to_be_first_index);
 	}
-}
-
-enum class QuickSortPivot {
-	middle,
-	last,
-};
-
-template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
-void quick_sort(Span<T> span, auto less) requires requires(T a, T b) { { less(a, b) } -> std::same_as<bool>; } {
-	switch (span.count) {
-		case 0:
-		case 1:
-			return;
-		case 2: {
-			if (!less(span[0], span[1])) {
-				Swap(span[0], span[1]);
-			}
-			return;
-		}
-	}
-
-	T pivot = {};
-	T *mid = 0;
-
-	switch (pivot_mode) {
-		case QuickSortPivot::middle: {
-			auto p = midpoint(span.begin(), span.end());
-			pivot = *p;
-			Swap(*p, span.end()[-1]);
-			break;
-		}
-		case QuickSortPivot::last: {
-			pivot = span.end()[-1];
-			break;
-		}
-	}
-
-	mid = span.begin();
-	for (auto i = span.begin(); i < span.end() - 1; i++) {
-		if (less(*i, pivot)) {
-			Swap(*i, *mid);
-			mid++;
-		}
-	}
-	Swap(*mid, span.end()[-1]);
-
-	quick_sort(Span<T>{span.begin(), mid}, less);
-	quick_sort(Span<T>{mid + 1, span.end()}, less);
-}
-template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
-void quick_sort(Span<T> span, auto selector) requires requires(T a) { selector(a) < selector(a); } {
-	quick_sort(span, [&](T a, T b) { return selector(a) < selector(b); });
-}
-template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T>
-void quick_sort(Span<T> span) {
-	quick_sort<pivot_mode>(span, [](T a, T b) { return a < b; });
-}
-template <QuickSortPivot pivot_mode = QuickSortPivot::middle, class T, umm size>
-void quick_sort(T (&array)[size], auto ...args) {
-	quick_sort<pivot_mode>(array_as_span(array), args...);
 }
 
 }

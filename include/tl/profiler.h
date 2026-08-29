@@ -235,6 +235,7 @@ struct ProfileRenderer {
 #include "string.h"
 #include "int.h"
 #include "file.h"
+#include "quick_sort.h"
 
 #ifdef _MSC_VER
 #pragma optimize("g", on)

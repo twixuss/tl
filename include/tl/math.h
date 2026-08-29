@@ -732,7 +732,7 @@ X(f64)
 ARRAY_SHIM_2(modulo);
 
 #define X(f32) \
-	forceinline f32 frac(f32 a, f32 b) { return frac(a / b) * b; }
+	forceinline constexpr f32 frac(f32 a, f32 b) { return frac(a / b) * b; }
 X(f32)
 X(f64)
 #undef X
@@ -1101,10 +1101,10 @@ forceinline v3f rotate_around(v3f v, v3f axis, f32 angle) {
     return r * v;
 }
 
-forceinline v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
+forceinline constexpr v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
 	h = frac(h);
 	f32 c = v * s;
-	f32 x = c * (1 - absolute(modulo(h * 6, 2) - 1));
+	f32 x = c * (1 - absolute(frac(h * 6, 2) - 1));
 	v3f m = V3f(v - c);
 	     if (h < ( 60 / 360.0f)) { m += v3f{c, x, 0}; }
 	else if (h < (120 / 360.0f)) { m += v3f{x, c, 0}; }
@@ -1115,11 +1115,11 @@ forceinline v3f hsv_to_rgb(f32 h, f32 s, f32 v) {
 
 	return m;
 }
-forceinline v4f hsv_to_rgb(f32 h, f32 s, f32 v, f32 a) { return V4f(hsv_to_rgb(h, s, v), a); }
-forceinline v3f hsv_to_rgb(v3f hsv) { return hsv_to_rgb(hsv.x, hsv.y, hsv.z); }
-forceinline v4f hsv_to_rgb(v4f hsv) { hsv.xyz = hsv_to_rgb(hsv.xyz); return hsv; }
+forceinline constexpr v4f hsv_to_rgb(f32 h, f32 s, f32 v, f32 a) { return V4f(hsv_to_rgb(h, s, v), a); }
+forceinline constexpr v3f hsv_to_rgb(v3f hsv) { return hsv_to_rgb(hsv.x, hsv.y, hsv.z); }
+forceinline constexpr v4f hsv_to_rgb(v4f hsv) { hsv.xyz = hsv_to_rgb(hsv.xyz); return hsv; }
 
-forceinline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
+forceinline constexpr v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
 	f32 cMax = max(max(r, g), b);
 	f32 cMin = min(min(r, g), b);
 	f32 delta = cMax - cMin;
@@ -1144,8 +1144,8 @@ forceinline v3f rgb_to_hsv(f32 r, f32 g, f32 b) {
 
     return result;
 }
-forceinline v3f rgb_to_hsv(v3f rgb) { return rgb_to_hsv(rgb.x, rgb.y, rgb.z); }
-forceinline v4f rgb_to_hsv(v4f rgb) { rgb.xyz = rgb_to_hsv(rgb.xyz); return rgb; }
+forceinline constexpr v3f rgb_to_hsv(v3f rgb) { return rgb_to_hsv(rgb.x, rgb.y, rgb.z); }
+forceinline constexpr v4f rgb_to_hsv(v4f rgb) { rgb.xyz = rgb_to_hsv(rgb.xyz); return rgb; }
 
 // This is a line with no bounds
 template<class T>
@@ -1358,10 +1358,9 @@ struct aabb {
 	aabb &operator+=(T b) { return min += b, max += b, *this; }
 
 	aabb<T> with_size(T new_size, T local_pivot = convert<T>(0.5f)) requires std::is_floating_point_v<typename T::Scalar> {
-		auto pivot = lerp(min, max, local_pivot);
 		return {
-			.min = pivot - new_size / 2,
-			.max = pivot + new_size / 2,
+			.min = lerp(min, max - new_size, local_pivot),
+			.max = lerp(min + new_size, max, local_pivot),
 		};
 	}
 
