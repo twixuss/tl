@@ -607,7 +607,6 @@ Texture2D State::create_texture_2d(u32 width, u32 height, DXGI_FORMAT format, vo
 	GHR(device->CreateShaderResourceView(result.tex, &d, &result.srv));
 
 	if (generate_mips) {
-		immediate_context->UpdateSubresource(result.tex, 0, 0, data, pitch, 0);
 		immediate_context->GenerateMips(result.srv);
 	}
 
