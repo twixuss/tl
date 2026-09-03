@@ -79,7 +79,7 @@ class ListPrinter:
             yield (f"[{i}]", (data + i).dereference())
 
     def display_hint(self):
-        return "map"
+        return "array"
 
     def to_string(self):
         data = self.val['data']

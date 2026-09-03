@@ -2769,8 +2769,8 @@ forceinline T saturate(T t) {
 	return clamp(t, convert<T>(0), convert<T>(1));
 }
 
-forceinline auto smoothstep3_unclamped(auto x) { return (3 - 2 * x) * x * x; }
-forceinline auto smoothstep5_unclamped(auto x) { return x*x*x*(x*(6*x - 15) + 10); }
+forceinline auto smoothstep3_unclamped(auto x) { return (3 - 2 * x) * (x * x); }
+forceinline auto smoothstep5_unclamped(auto x) { return (x*x*x)*(x*(6*x - 15) + 10); }
 template <class T> forceinline auto smoothstep3(T x) { return smoothstep3_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 template <class T> forceinline auto smoothstep5(T x) { return smoothstep5_unclamped(clamp(x, convert<T>(0), convert<T>(1))); }
 

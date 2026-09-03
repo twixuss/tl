@@ -98,7 +98,7 @@ inline Optional<u64> parse_u64(Span<utf8> string) {
 
 }
 
-inline u64 chop_u64(Span<utf8> &string, u32 base = 10) {
+inline Optional<u64> chop_u64(Span<utf8> &string, u32 base = 10) {
 	u64 result = 0;
 	u64 previous = 0;
 	umm i = 0;
@@ -114,8 +114,92 @@ inline u64 chop_u64(Span<utf8> &string, u32 base = 10) {
 			break;
 		}
 	}
+	if (i == 0)
+		return {};
 	string = {string.data + i, string.count - i};
 	return result;
+}
+
+inline Optional<f64> chop_f64(Span<utf8> &string_ref) {
+	auto string = string_ref;
+
+	if (!string.count)
+		return {};
+
+	bool negative = false;
+	switch (string.data[0]) {
+		case '-': negative = true; string.data += 1; string.count -= 1; break;
+		case '+': negative = false; string.data += 1; string.count -= 1; break;
+	}
+	
+	if (!string.count)
+		return {};
+	
+	
+	f64 whole = 0.0;
+	switch (string.data[0]) {
+		case '0': case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8': case '9': {
+			while (string.count) {
+				switch (string.data[0]) {
+					case '0': case '1': case '2': case '3': case '4':
+					case '5': case '6': case '7': case '8': case '9': {
+						whole = whole * 10.0 + (f64)(string.data[0] - '0');
+						string.data += 1;
+						string.count -= 1;
+						continue;
+					}
+					case '.': {
+						string.data += 1;
+						string.count -= 1;
+						goto start_fraction;
+					}
+					default:
+						goto ret_whole;
+				}
+			}
+		ret_whole:
+			string_ref = string;
+			f64 result = whole;
+			return negative ? -result : result;
+		}
+		case '.': {
+			string.data += 1;
+			string.count -= 1;
+			goto start_fraction;
+		}
+		default:
+			return {};
+	}
+start_fraction:
+
+	switch (string.data[0]) {
+		case '0': case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8': case '9': {
+			f64 fractional = 0.0;
+			f64 divisor = 1.0;
+			while (1) {
+				switch (string.data[0]) {
+					case '0': case '1': case '2': case '3': case '4':
+					case '5': case '6': case '7': case '8': case '9': {
+						fractional = fractional * 10.0 + (f64)(string.data[0] - '0');
+						divisor *= 10.0;
+						string.data += 1;
+						string.count -= 1;
+						continue;
+					}
+					default:
+						goto ret_fraction;
+				}
+			}
+		ret_fraction:
+			string_ref = string;
+			f64 result = whole + fractional / divisor;
+			return negative ? -result : result;
+		}
+		default:
+			goto ret_whole;
+	}
 }
 
 #if 0

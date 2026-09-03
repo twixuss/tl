@@ -94,10 +94,19 @@ struct Object {
 			return &_members.values[index_of(_members.names, found)];
 		return 0;
 	}
-	Object *index(umm i) {
+	Object *index(u8  i) { return index((u64)i); }
+	Object *index(u16 i) { return index((u64)i); }
+	Object *index(u32 i) { return index((u64)i); }
+	Object *index(u64 i) {
 		assert_equal(type, Type::array);
-		return &_array[i];
+		return &_array[i];	
 	}
+	Object *index(s8  i) { return index((u64)i); }
+	Object *index(s16 i) { return index((u64)i); }
+	Object *index(s32 i) { return index((u64)i); }
+	Object *index(s64 i) { return index((u64)i); }
+	Object *index(f32 i) { return index((u64)i); }
+	Object *index(f64 i) { return index((u64)i); }
 	f64 number() {
 		assert_equal(type, Type::number);
 		return _number;
